@@ -12,9 +12,35 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+
 package sequencer
 
-// TransactionPool is an in memory record of all transactions delegated to a coordinator
-// that have not yet been assembled
+import "context"
+
 type TransactionPool interface {
+	AddTransaction(context.Context, *PooledTransaction) error
+	GetTransactionsForSender(context.Context, string) ([]*PooledTransaction, error)
+}
+
+type transactionPool struct {
+	transactionsBySender map[string][]*PooledTransaction
+}
+
+func NewTransactionPool(_ context.Context) TransactionPool {
+	return &transactionPool{
+		transactionsBySender: make(map[string][]*PooledTransaction),
+	}
+}
+
+func (tp *transactionPool) GetTransactionsForSender(ctx context.Context, sender string) ([]*PooledTransaction, error) {
+	return tp.transactionsBySender[sender], nil
+
+}
+
+func (tp *transactionPool) AddTransaction(ctx context.Context, transaction *PooledTransaction) error {
+	if tp.transactionsBySender[transaction.Sender] == nil {
+		tp.transactionsBySender[transaction.Sender] = make([]*PooledTransaction, 0)
+	}
+	tp.transactionsBySender[transaction.Sender] = append(tp.transactionsBySender[transaction.Sender], transaction)
+	return nil
 }

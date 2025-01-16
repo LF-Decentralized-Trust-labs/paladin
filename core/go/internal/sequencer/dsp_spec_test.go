@@ -20,10 +20,10 @@ This file contains all test that assert spec compliance.  There is one test for 
 package sequencer
 
 import (
-	"context"
 	"testing"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -66,21 +66,15 @@ func TestRule1_3(t *testing.T) {
 
 	testCoordinatorNode := "testCoordinatorNode"
 
-	ctx := context.Background()
-	// GIVEN a ContractSequencerAgent is in Observing state
-	//  `AND` `ActiveCoordinator` is not empty
-
 	fixture := Given(t).
 		ContractSequencerAgent().
 		InObservingState().
 		ActiveCoordinator(testCoordinatorNode).
 		Build()
 
-	//`WHEN` the sender does not receive any `CoordinatorHeartbeatNotification` message for a period of `CoordinatorHeartbeatFailureThreshold`
-	fixture.ExceedHeartbeatFailureThreshold(ctx)
+	fixture.ExceedHeartbeatFailureThreshold()
 
-	//`THEN` the `ActiveCoordinator` is empty
-	assert.True(t, ActiveCoordinatorBecomesEmpty(t, ctx, fixture.csa))
+	assert.True(t, ActiveCoordinatorBecomesEmpty(t, fixture.ctx, fixture.csa))
 
 }
 
@@ -94,33 +88,28 @@ func TestRule1_4(t *testing.T) {
 	testCoordinatorNode1 := "testCoordinatorNode1"
 	testCoordinatorNode2 := "testCoordinatorNode2"
 
-	//`GIVEN` a`ContractSequencerAgent` is in `Sending` state
 	fixture := Given(t).
 		ContractSequencerAgent().
 		InSenderState().
-		DelegatedTransactions(
-			func(builder *DelegatedTransactionListFixtureBuilder) {
+		PooledTransactions(
+			func(builder *PooledTransactionListFixtureBuilder) {
 				builder.
 					Length(2)
 			}).
 		ActiveCoordinator(testCoordinatorNode1).
 		Build()
 
-	//`WHEN` a `CoordinatorHeartbeatNotification` heartbeat message is received from any node other than the current `ActiveCoordinator`
 	err := fixture.csa.HandleCoordinatorHeartbeatNotification(fixture.ctx, &CoordinatorHeartbeatNotification{
 		From: testCoordinatorNode2,
 	})
 	require.NoError(t, err)
 
-	//`THEN` the `ActiveCoordinator` is equal to the sender of the given `CoordinatorHeartbeatNotification`
 	assert.True(t, ActiveCoordinatorBecomesEqualTo(t, fixture.ctx, fixture.csa, testCoordinatorNode2))
-
-	//		`AND` a `DelegationRequest` message for all transactions in `DELEGATED` state is sent to the new `ActiveCoordinator`
 	assert.True(
 		t,
 		fixture.outboundMessageMonitor.Sends(
 			FireAndForgetMessageMatcher(DelegationRequestMatcher().
-				Containing(fixture.delegatedTransactions).Match(),
+				Containing(fixture.pooledTransactions).Match(),
 			),
 		),
 	)
@@ -221,10 +210,12 @@ func TestRule3_1(t *testing.T) {
 	//Setup
 	fixture := Given(t).
 		ContractSequencerAgent().
+		Committee("testCoordinatorNode1", "testCoordinatorNode2", "testCoordinatorNode3").
 		InSenderState().
 		ActiveCoordinator("testCoordinatorNode1").
-		DelegatedTransactions(
-			func(builder *DelegatedTransactionListFixtureBuilder) {
+		CoordinatorRankingForCurrentBlock("testCoordinatorNode1", "testCoordinatorNode2", "testCoordinatorNode3").
+		PooledTransactions(
+			func(builder *PooledTransactionListFixtureBuilder) {
 				builder.
 					Length(2).
 					Coordinator("testCoordinatorNode1")
@@ -232,19 +223,288 @@ func TestRule3_1(t *testing.T) {
 		Build()
 
 	//Exercise
-	fixture.ExceedHeartbeatFailureThreshold(fixture.ctx)
+	fixture.ExceedHeartbeatFailureThreshold()
 
 	//Verify
+	assert.Equal(t, "testCoordinatorNode2", fixture.csa.ActiveCoordinator())
 	assert.True(
 		t,
 		fixture.outboundMessageMonitor.Sends(
 			DelegationRequestMatcher().
 				Containing(
-					fixture.delegatedTransactions,
+					fixture.pooledTransactions,
 				).
+				To("testCoordinatorNode2").
 				Match(),
 		),
 		"Expected delegation request not sent.",
+	)
+}
+
+func TestRule3_2(t *testing.T) {
+	/*
+		   `GIVEN` a`ContractSequencerAgent` is in `Sender` state
+		   		`AND` there are some transactions in `Delegated` state
+		   		`AND` the `ActiveCoordinator` is the `n`th most preferred coordinator for the current block range
+		   `WHEN` the sender does not receive any `CoordinatorHeartbeatNotification` message from the `ActiveCoordinator` for a period less than `CoordinatorHeartbeatFailureThreshold`
+		   `THEN` the `ActiveCoordinator` is unchanged
+			   	`AND` a `DelegationRequest` message is not sent to any other coordinator
+	*/
+
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		Committee("testCoordinatorNode1", "testCoordinatorNode2", "testCoordinatorNode3").
+		InSenderState().
+		ActiveCoordinator("testCoordinatorNode1").
+		CoordinatorRankingForCurrentBlock("testCoordinatorNode1", "testCoordinatorNode2", "testCoordinatorNode3").
+		PooledTransactions(
+			func(builder *PooledTransactionListFixtureBuilder) {
+				builder.
+					Length(2).
+					Coordinator("testCoordinatorNode1")
+			}).
+		Build()
+
+	//Exercise
+	fixture.AlmostExceedHeartbeatFailureThreshold()
+
+	//Verify
+	assert.Equal(t, "testCoordinatorNode1", fixture.csa.ActiveCoordinator())
+	assert.False(
+		t,
+		fixture.outboundMessageMonitor.Sends(
+			DelegationRequestMatcher().
+				Match(),
+		),
+		"Expected delegation request not sent.",
+	)
+}
+func TestRule4_1(t *testing.T) {
+	/*
+		   `GIVEN` a`ContractSequencerAgent` is in `Sender` state
+			   	`AND` there are some transactions in `Delegated` state
+			   	`AND` the active coordinator is block range `n`
+		   `WHEN` a new block height is detected which moves `this` block height to a range higher than `n`
+		   `THEN` `ActiveCoordinator` is the highest ranking coordinator for the current block range
+		   		`AND` sender sends a `DelegationRequest` to containing all transactions currently in `Delegated` state to `ActiveCoordinator
+	*/
+
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		InSenderState().
+		ActiveCoordinator("testCoordinatorNode1").
+		//RelativeBlockHeight(BlockHeight_LastInRange).
+		CoordinatorRankingForCurrentBlock("testCoordinatorNode1", "testCoordinatorNode2", "testCoordinatorNode3").
+		CoordinatorRankingForNextBlock("testCoordinatorNode2", "testCoordinatorNode3", "testCoordinatorNode1").
+		PooledTransactions(
+			func(builder *PooledTransactionListFixtureBuilder) {
+				builder.
+					Length(2).
+					Coordinator("testCoordinatorNode1")
+			}).
+		Build()
+
+	//Exercise
+	fixture.MoveToNextBlockRange()
+
+	//Verify
+	assert.Equal(t, "testCoordinatorNode2", fixture.csa.ActiveCoordinator())
+	assert.True(
+		t,
+		fixture.outboundMessageMonitor.Sends(
+			DelegationRequestMatcher().
+				Containing(
+					fixture.pooledTransactions,
+				).
+				To("testCoordinatorNode2").
+				Match(),
+		),
+	)
+}
+
+func TestRule4_2(t *testing.T) {
+	/*
+	   	`GIVEN` a ContractSequencerAgent` is not in `Coordinator` state
+	 		`AND` `ActiveCoordinator` is empty
+	   	`WHEN` a `DelegationRequest` is received
+	   	`THEN` the `ContractSequencerAgent` is in `Coordinator.Active` state
+	*/
+
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		Build()
+
+	//Exercise
+	privateTransactionList := Given(t).PrivateTransactionList().Length(2).Build()
+
+	fixture.csa.HandleDelegationRequest(fixture.ctx, &DelegationRequest{
+		Sender:          "testSenderNode1",
+		ContractAddress: tktypes.RandAddress(),
+		Transactions:    privateTransactionList.privateTransactions,
+	})
+
+	//Verify
+	assert.True(t, fixture.csa.IsCoordinator())
+	assert.Equal(t, CoordinatorState_Active, fixture.csa.CoordinatorState())
+
+}
+
+func TestRule4_3(t *testing.T) {
+	/*
+		`GIVEN` a ContractSequencerAgent` is not in `Coordinator` state
+			`AND` `ActiveCoordinator` is not empty
+			`AND`  `FlushPoint` is empty in the latest `CoordinatorHeartbeatNotification` from the `ActiveCoordinator`
+		`WHEN` a `DelegationRequest` is received
+		`THEN` the `ContractSequencerAgent` is in `Coordinator.Elect` state
+			`AND` a `HandoverRequest` is sent to the `ActiveCoordinator`
+	*/
+
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		ActiveCoordinator("otherCoordinatorNode").
+		LatestReceivedHeartbeatNotification(
+			func(builder CoordinatorHeartbeatNotificationBuilder) {
+				builder.CoordinatorState(CoordinatorState_Active)
+			},
+		).
+		Build()
+
+	//Exercise
+	privateTransactionList := Given(t).PrivateTransactionList().Length(2).Build()
+
+	fixture.csa.HandleDelegationRequest(fixture.ctx, &DelegationRequest{
+		Sender:          "testSenderNode1",
+		ContractAddress: tktypes.RandAddress(),
+		Transactions:    privateTransactionList.privateTransactions,
+	})
+
+	//Verify
+	assert.True(t, fixture.csa.IsCoordinator())
+	assert.Equal(t, CoordinatorState_Elect, fixture.csa.CoordinatorState())
+	assert.True(
+		t,
+		fixture.outboundMessageMonitor.Sends(
+			HandoverRequestMatcher().
+				To("otherCoordinatorNode").
+				Match(),
+		),
+	)
+}
+
+func TestRule4_4(t *testing.T) {
+	/*
+		`GIVEN` a`ContractSequencerAgent` is in `Coordinator.Flush` state
+			`AND` some transactions have been delegated by multiple, but not all, senders
+			`AND` some of those delegated transactions have been dispatched
+			`AND` some of the dispatched transactions have been confirmed on the blockchain as success
+			`AND` some of the dispatched transactions have been confirmed on the blockchain as reverted
+		`WHEN` `HeartbeatInterval` passes
+		`THEN` a `CoordinatorHeartbeatNotification` message is broadcast to every node in the group reporting the `Flushpoints`, current block height, all dispatched unconfirmed transactions, and zero non dispatched transactions, all transaction dispatched by this coordinator that have been confirmed ( success or revert) on the block chain since entering flush state
+	*/
+
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		NodeName("nodeA").
+		Committee("nodeA", "nodeB", "nodeC", "nodeD").
+		CoordinatorState(CoordinatorState_Flush).
+		DelegatedTransactions(
+			[]DelegatedTransaction{
+				{"nodeB", "txB1", TransactionState_ConfirmedSuccess},
+				{"nodeB", "txB2", TransactionState_ConfirmedReverted},
+				{"nodeB", "txB3", TransactionState_Dispatched},
+				{"nodeB", "txB4", TransactionState_Assembled},
+				{"nodeB", "txB5", TransactionState_Pooled},
+				{"nodeC", "txC1", TransactionState_ConfirmedSuccess},
+				{"nodeC", "txC2", TransactionState_ConfirmedReverted},
+				{"nodeC", "txC3", TransactionState_Dispatched},
+			}).
+		Build()
+
+	//Exercise
+	fixture.HeartbeatIntervalPassed()
+
+	//Verify
+	assert.True(
+		t,
+		fixture.outboundMessageMonitor.Sends(
+			CoordinatorHeartbeatNotificationMatcher().
+				To("nodeB").
+				CoordinatorState(CoordinatorState_Flush).
+				PooledTransactionList(
+					func(matcher *PooledTransactionListMatcher) {
+						matcher.
+							Length(2)
+					}).
+				DispatchedTransactionList(
+					func(matcher *DispatchedTransactionListMatcher) {
+						matcher.
+							Length(2)
+					}).
+				ConfirmedTransactionList(
+					func(matcher *ConfirmedTransactionListMatcher) {
+						matcher.
+							Length(4)
+					}).
+				BlockHeight(fixture.csa.BlockHeight()).
+				Match(),
+		),
+	)
+
+	assert.True(
+		t,
+		fixture.outboundMessageMonitor.Sends(
+			CoordinatorHeartbeatNotificationMatcher().
+				To("nodeC").
+				CoordinatorState(CoordinatorState_Flush).
+				PooledTransactionList(
+					func(matcher *PooledTransactionListMatcher) {
+						matcher.
+							Length(0)
+					}).
+				DispatchedTransactionList(
+					func(matcher *DispatchedTransactionListMatcher) {
+						matcher.
+							Length(2)
+					}).
+				ConfirmedTransactionList(
+					func(matcher *ConfirmedTransactionListMatcher) {
+						matcher.
+							Length(4)
+					}).
+				BlockHeight(fixture.csa.BlockHeight()).
+				Match(),
+		),
+	)
+
+	assert.True(
+		t,
+		fixture.outboundMessageMonitor.Sends(
+			CoordinatorHeartbeatNotificationMatcher().
+				To("nodeD").
+				CoordinatorState(CoordinatorState_Flush).
+				PooledTransactionList(
+					func(matcher *PooledTransactionListMatcher) {
+						matcher.
+							Length(0)
+					}).
+				DispatchedTransactionList(
+					func(matcher *DispatchedTransactionListMatcher) {
+						matcher.
+							Length(2)
+					}).
+				ConfirmedTransactionList(
+					func(matcher *ConfirmedTransactionListMatcher) {
+						matcher.
+							Length(4)
+					}).
+				BlockHeight(fixture.csa.BlockHeight()).
+				Match(),
+		),
 	)
 }
 

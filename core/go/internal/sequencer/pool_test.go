@@ -13,3 +13,50 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 package sequencer
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func NewTransactionPoolForUnitTesting(_ *testing.T) *transactionPool {
+	return &transactionPool{
+		transactionsBySender: make(map[string][]*PooledTransaction),
+	}
+}
+
+func TestPool_GetTransactionsForSender(t *testing.T) {
+	ctx := context.Background()
+	pool := NewTransactionPoolForUnitTesting(t)
+	sender1NodeName := "sender1"
+	sender2NodeName := "sender2"
+	sender3NodeName := "sender3"
+
+	txn1A := &PooledTransaction{}
+	txn1A.Sender = sender1NodeName
+
+	txn1B := &PooledTransaction{}
+	txn1B.Sender = sender1NodeName
+
+	txn2A := &PooledTransaction{}
+	txn2A.Sender = sender2NodeName
+
+	pool.AddTransaction(ctx, txn1A)
+	pool.AddTransaction(ctx, txn1B)
+	pool.AddTransaction(ctx, txn2A)
+
+	pooledTransactionsForSender1, err := pool.GetTransactionsForSender(ctx, sender1NodeName)
+	assert.NoError(t, err)
+	assert.Len(t, pooledTransactionsForSender1, 2)
+
+	pooledTransactionsForSender2, err := pool.GetTransactionsForSender(ctx, sender2NodeName)
+	assert.NoError(t, err)
+	assert.Len(t, pooledTransactionsForSender2, 1)
+
+	pooledTransactionsForSender3, err := pool.GetTransactionsForSender(ctx, sender3NodeName)
+	assert.NoError(t, err)
+	assert.Len(t, pooledTransactionsForSender3, 0)
+
+}

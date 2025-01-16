@@ -73,3 +73,7 @@ func (f *fakeTransportManager) SendsReliable(outboundMessageMatcher ReliableMess
 	}
 	return false
 }
+
+func ptrTo[T any](v T) *T {
+	return &v
+}

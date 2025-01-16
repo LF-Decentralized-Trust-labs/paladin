@@ -19,36 +19,71 @@ import (
 	"context"
 	"testing"
 
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	mock "github.com/stretchr/testify/mock"
 )
 
-func NewContractSequencerAgentForUnitTesting(t *testing.T) *contractSequencerAgent {
+type contractSequencerAgentDependencies struct {
+	coordinatorSelector *MockCoordinatorSelector
+	transportManager    *MockTransportManager
+}
 
-	return NewContractSequencerAgent(nil).(*contractSequencerAgent)
+func NewContractSequencerAgentForUnitTesting(t *testing.T, committee []string) (*contractSequencerAgent, *contractSequencerAgentDependencies) {
+
+	mockCoordinatorSelector := NewMockCoordinatorSelector(t)
+	mockCoordinatorSelector.On("Initialize", mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	mockTransportManager := NewMockTransportManager(t)
+	nodeName := "testNode"
+
+	contractAddress := tktypes.RandAddress()
+
+	return NewContractSequencerAgent(context.Background(), nodeName, mockTransportManager, mockCoordinatorSelector, committee, contractAddress).(*contractSequencerAgent), &contractSequencerAgentDependencies{
+		coordinatorSelector: mockCoordinatorSelector,
+		transportManager:    mockTransportManager,
+	}
 }
 
 func TestIsObserver(t *testing.T) {
-	csa := NewContractSequencerAgentForUnitTesting(t)
+	csa, _ := NewContractSequencerAgentForUnitTesting(t, nil)
 	// should always be in observing state while it is in memory
 	assert.True(t, csa.IsObserver())
 }
 
-func TestIsControllerFalse(t *testing.T) {
-	csa := NewContractSequencerAgentForUnitTesting(t)
-	// should always be in observing state while it is in memory
+func TestIsCoordinatorFalse(t *testing.T) {
+	csa, _ := NewContractSequencerAgentForUnitTesting(t, nil)
 	assert.False(t, csa.IsCoordinator())
 }
 
-func TestIsControllerTrue(t *testing.T) {
-	csa := NewContractSequencerAgentForUnitTesting(t)
-	csa.isCoordinator = true
-	// should always be in observing state while it is in memory
+func TestIsCoordinatorTrueIfActive(t *testing.T) {
+	csa, _ := NewContractSequencerAgentForUnitTesting(t, nil)
+	csa.coordinatorState = CoordinatorState_Active
+	assert.True(t, csa.IsCoordinator())
+}
+
+func TestIsCoordinatorTrueIfStandby(t *testing.T) {
+	csa, _ := NewContractSequencerAgentForUnitTesting(t, nil)
+	csa.coordinatorState = CoordinatorState_Standby
+	assert.True(t, csa.IsCoordinator())
+}
+
+func TestIsCoordinatorTrueIfElect(t *testing.T) {
+	csa, _ := NewContractSequencerAgentForUnitTesting(t, nil)
+	csa.coordinatorState = CoordinatorState_Elect
+	assert.True(t, csa.IsCoordinator())
+}
+
+func TestIsCoordinatorTrueIfPrepared(t *testing.T) {
+	csa, _ := NewContractSequencerAgentForUnitTesting(t, nil)
+	csa.coordinatorState = CoordinatorState_Prepared
 	assert.True(t, csa.IsCoordinator())
 }
 
 func TestHandleCoordinatorHeartbeatNotification(t *testing.T) {
 	ctx := context.Background()
-	csa := NewContractSequencerAgentForUnitTesting(t)
+	csa, mocks := NewContractSequencerAgentForUnitTesting(t, nil)
+	mocks.transportManager.On("Send", ctx, mock.Anything).Return(nil).Once()
 	chn := &CoordinatorHeartbeatNotification{
 		From: "test",
 	}

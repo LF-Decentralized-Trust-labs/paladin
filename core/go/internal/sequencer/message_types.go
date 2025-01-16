@@ -22,10 +22,21 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
+const (
+	MessageType_DelegationRequest                = "DelegationRequest"
+	MessageType_HandoverRequest                  = "HandoverRequest"
+	MessageType_CoordinatorHeartbeatNotification = "CoordinatorHeartbeatNotification"
+)
+
 type CoordinatorHeartbeatNotification struct {
 	From                   string                   `json:"from"`
 	ContractAddress        *tktypes.EthAddress      `json:"contractAddress"`
+	FlushPoints            []*FlushPoint            `json:"flushPoints"`
 	DispatchedTransactions []*DispatchedTransaction `json:"dispatchedTransactions"`
+	PooledTransactions     []*PooledTransaction     `json:"pooledTransactions"`
+	ConfirmedTransactions  []*ConfirmedTransaction  `json:"confirmedTransactions"`
+	CoordinatorState       CoordinatorState         `json:"coordinatorState"`
+	BlockHeight            uint64                   `json:"blockHeight"`
 }
 
 func (chn *CoordinatorHeartbeatNotification) bytes() []byte {
@@ -40,9 +51,18 @@ func ParseCoordinatorHeartbeatNotification(bytes []byte) (*CoordinatorHeartbeatN
 }
 
 type DelegationRequest struct {
-	From            string                           `json:"from"`
+	Sender          string                           `json:"sender"` //TODO this is duplicate of the ReplyTo field in the transport message.  Would it be more secure to assert that they are the same?
 	ContractAddress *tktypes.EthAddress              `json:"contractAddress"`
 	Transactions    []*components.PrivateTransaction `json:"transactions"`
+}
+
+type HandoverRequest struct {
+	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
+}
+
+func (dr *HandoverRequest) bytes() []byte {
+	jsonBytes, _ := json.Marshal(dr)
+	return jsonBytes
 }
 
 func (dr *DelegationRequest) bytes() []byte {
