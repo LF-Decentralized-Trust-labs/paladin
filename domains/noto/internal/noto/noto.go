@@ -79,6 +79,7 @@ type Noto struct {
 	coinSchema       *prototk.StateSchema
 	lockedCoinSchema *prototk.StateSchema
 	dataSchema       *prototk.StateSchema
+	lockInfoSchema   *prototk.StateSchema
 	factoryABI       abi.ABI
 	contractABI      abi.ABI
 	hooksABI         abi.ABI
@@ -258,6 +259,10 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomain
 	if err != nil {
 		return nil, err
 	}
+	lockSchemaJSON, err := json.Marshal(types.NotoLockInfoABI)
+	if err != nil {
+		return nil, err
+	}
 	lockedCoinSchemaJSON, err := json.Marshal(types.NotoLockedCoinABI)
 	if err != nil {
 		return nil, err
@@ -284,6 +289,7 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomain
 				string(coinSchemaJSON),
 				string(lockedCoinSchemaJSON),
 				string(infoSchemaJSON),
+				string(lockSchemaJSON),
 			},
 			AbiEventsJson: string(eventsJSON),
 		},
@@ -294,6 +300,7 @@ func (n *Noto) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (
 	n.coinSchema = req.AbiStateSchemas[0]
 	n.lockedCoinSchema = req.AbiStateSchemas[1]
 	n.dataSchema = req.AbiStateSchemas[2]
+	n.lockInfoSchema = req.AbiStateSchemas[3]
 	return &prototk.InitDomainResponse{}, nil
 }
 
@@ -961,21 +968,16 @@ func (n *Noto) ExecCall(ctx context.Context, req *prototk.ExecCallRequest) (*pro
 	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
 }
 
-func (n *Noto) statesForReceipt(ctx context.Context, states []*prototk.EndorsableState) ([]*types.ReceiptState, error) {
+func (n *Noto) receiptStates(ctx context.Context, states []*prototk.EndorsableState) ([]*types.ReceiptState, error) {
 	coins := make([]*types.ReceiptState, len(states))
 	for i, state := range states {
 		id, err := tktypes.ParseHexBytes(ctx, state.Id)
 		if err != nil {
 			return nil, err
 		}
-		schema, err := tktypes.ParseBytes32Ctx(ctx, state.SchemaId)
-		if err != nil {
-			return nil, err
-		}
 		coins[i] = &types.ReceiptState{
-			ID:     id,
-			Schema: schema,
-			Data:   tktypes.RawJSON(state.StateDataJson),
+			ID:   id,
+			Data: tktypes.RawJSON(state.StateDataJson),
 		}
 	}
 	return coins, nil
@@ -984,30 +986,71 @@ func (n *Noto) statesForReceipt(ctx context.Context, states []*prototk.Endorsabl
 func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptRequest) (res *prototk.BuildReceiptResponse, err error) {
 	receipt := &types.NotoDomainReceipt{}
 
-	receipt.Inputs, err = n.statesForReceipt(ctx, n.filterSchema(req.InputStates, []string{n.coinSchema.Id}))
+	infoStates := n.filterSchema(req.InfoStates, []string{n.dataSchema.Id})
+	if len(infoStates) == 1 {
+		info, err := n.unmarshalInfo(infoStates[0].StateDataJson)
+		if err != nil {
+			return nil, err
+		}
+		receipt.Data = info.Data
+	}
+
+	lockStates := n.filterSchema(req.InfoStates, []string{n.lockInfoSchema.Id})
+	if len(lockStates) == 1 {
+		lock, err := n.unmarshalLock(lockStates[0].StateDataJson)
+		if err != nil {
+			return nil, err
+		}
+		receipt.LockInfo = &types.ReceiptLockInfo{LockID: lock.LockID}
+		if !lock.Delegate.IsZero() {
+			receipt.LockInfo.Delegate = lock.Delegate
+		}
+	}
+
+	receipt.States.Inputs, err = n.receiptStates(ctx, n.filterSchema(req.InputStates, []string{n.coinSchema.Id}))
 	if err == nil {
-		receipt.LockedInputs, err = n.statesForReceipt(ctx, n.filterSchema(req.InputStates, []string{n.lockedCoinSchema.Id}))
+		receipt.States.LockedInputs, err = n.receiptStates(ctx, n.filterSchema(req.InputStates, []string{n.lockedCoinSchema.Id}))
 	}
 	if err == nil {
-		receipt.Outputs, err = n.statesForReceipt(ctx, n.filterSchema(req.OutputStates, []string{n.coinSchema.Id}))
+		receipt.States.Outputs, err = n.receiptStates(ctx, n.filterSchema(req.OutputStates, []string{n.coinSchema.Id}))
 	}
 	if err == nil {
-		receipt.LockedOutputs, err = n.statesForReceipt(ctx, n.filterSchema(req.OutputStates, []string{n.lockedCoinSchema.Id}))
+		receipt.States.LockedOutputs, err = n.receiptStates(ctx, n.filterSchema(req.OutputStates, []string{n.lockedCoinSchema.Id}))
 	}
 	if err == nil {
-		receipt.ReadInputs, err = n.statesForReceipt(ctx, n.filterSchema(req.ReadStates, []string{n.coinSchema.Id}))
+		receipt.States.ReadInputs, err = n.receiptStates(ctx, n.filterSchema(req.ReadStates, []string{n.coinSchema.Id}))
 	}
 	if err == nil {
-		receipt.ReadLockedInputs, err = n.statesForReceipt(ctx, n.filterSchema(req.ReadStates, []string{n.lockedCoinSchema.Id}))
+		receipt.States.ReadLockedInputs, err = n.receiptStates(ctx, n.filterSchema(req.ReadStates, []string{n.lockedCoinSchema.Id}))
 	}
 	if err == nil {
-		receipt.PreparedOutputs, err = n.statesForReceipt(ctx, n.filterSchema(req.InfoStates, []string{n.coinSchema.Id}))
+		receipt.States.PreparedOutputs, err = n.receiptStates(ctx, n.filterSchema(req.InfoStates, []string{n.coinSchema.Id}))
 	}
 	if err == nil {
-		receipt.PreparedLockedOutputs, err = n.statesForReceipt(ctx, n.filterSchema(req.InfoStates, []string{n.lockedCoinSchema.Id}))
+		receipt.States.PreparedLockedOutputs, err = n.receiptStates(ctx, n.filterSchema(req.InfoStates, []string{n.lockedCoinSchema.Id}))
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	if receipt.LockInfo != nil && len(receipt.States.ReadLockedInputs) > 0 && len(receipt.States.PreparedOutputs) > 0 {
+		// For prepareUnlock transactions, include the encoded "unlock" call that can be used to unlock the coins
+		unlock := n.contractABI.Functions()["unlock"]
+		params := &NotoUnlockParams{
+			LockID:        receipt.LockInfo.LockID,
+			LockedInputs:  endorsableStateIDs(n.filterSchema(req.ReadStates, []string{n.lockedCoinSchema.Id})),
+			LockedOutputs: endorsableStateIDs(n.filterSchema(req.InfoStates, []string{n.lockedCoinSchema.Id})),
+			Outputs:       endorsableStateIDs(n.filterSchema(req.InfoStates, []string{n.coinSchema.Id})),
+		}
+		paramsJSON, err := json.Marshal(params)
+		if err != nil {
+			return nil, err
+		}
+		encodedCall, err := unlock.EncodeCallDataJSONCtx(ctx, paramsJSON)
+		if err != nil {
+			return nil, err
+		}
+		receipt.LockInfo.Unlock = encodedCall
 	}
 
 	receiptJSON, err := json.Marshal(receipt)

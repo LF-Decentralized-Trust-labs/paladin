@@ -115,6 +115,11 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	if err != nil {
 		return nil, err
 	}
+	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, nil, []string{notary, tx.Transaction.From})
+	if err != nil {
+		return nil, err
+	}
+	infoStates = append(infoStates, lockState)
 
 	encodedLock, err := h.noto.encodeLock(ctx, tx.ContractAddress, inputStates.coins, unlockedOutputStates.coins, lockedOutputStates.coins)
 	if err != nil {

@@ -126,6 +126,18 @@ func (n *Noto) unmarshalLockedCoin(stateData string) (*types.NotoLockedCoin, err
 	return &coin, err
 }
 
+func (n *Noto) unmarshalInfo(stateData string) (*types.TransactionData, error) {
+	var info types.TransactionData
+	err := json.Unmarshal([]byte(stateData), &info)
+	return &info, err
+}
+
+func (n *Noto) unmarshalLock(stateData string) (*types.NotoLockInfo, error) {
+	var lock types.NotoLockInfo
+	err := json.Unmarshal([]byte(stateData), &lock)
+	return &lock, err
+}
+
 func (n *Noto) makeNewCoinState(coin *types.NotoCoin, distributionList []string) (*prototk.NewState, error) {
 	coinJSON, err := json.Marshal(coin)
 	if err != nil {
@@ -158,6 +170,18 @@ func (n *Noto) makeNewInfoState(info *types.TransactionData, distributionList []
 	return &prototk.NewState{
 		SchemaId:         n.dataSchema.Id,
 		StateDataJson:    string(infoJSON),
+		DistributionList: distributionList,
+	}, nil
+}
+
+func (n *Noto) makeNewLockState(lock *types.NotoLockInfo, distributionList []string) (*prototk.NewState, error) {
+	lockJSON, err := json.Marshal(lock)
+	if err != nil {
+		return nil, err
+	}
+	return &prototk.NewState{
+		SchemaId:         n.lockInfoSchema.Id,
+		StateDataJson:    string(lockJSON),
 		DistributionList: distributionList,
 	}, nil
 }
@@ -320,6 +344,20 @@ func (n *Noto) prepareInfo(data tktypes.HexBytes, distributionList []string) ([]
 	}
 	newState, err := n.makeNewInfoState(newData, distributionList)
 	return []*prototk.NewState{newState}, err
+}
+
+func (n *Noto) prepareLockInfo(lockID tktypes.Bytes32, owner, delegate *tktypes.EthAddress, distributionList []string) (*prototk.NewState, error) {
+	if delegate == nil {
+		delegate = &tktypes.EthAddress{}
+	}
+	newData := &types.NotoLockInfo{
+		Salt:     tktypes.RandBytes32(),
+		LockID:   lockID,
+		Owner:    owner,
+		Delegate: delegate,
+	}
+	return n.makeNewLockState(newData, distributionList)
+
 }
 
 func (n *Noto) filterSchema(states []*prototk.EndorsableState, schemas []string) (filtered []*prototk.EndorsableState) {

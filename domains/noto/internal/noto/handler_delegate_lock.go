@@ -84,6 +84,16 @@ func (h *delegateLockHandler) Assemble(ctx context.Context, tx *types.ParsedTran
 		return nil, err
 	}
 
+	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, tx.Transaction.From})
+	if err != nil {
+		return nil, err
+	}
+	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, params.Delegate, []string{notary, tx.Transaction.From})
+	if err != nil {
+		return nil, err
+	}
+	infoStates = append(infoStates, lockState)
+
 	// This approval may leak the requesting signature on-chain, as all the inputs are visible on-chain
 	// TODO: possibly we should be signing a different payload here
 	encodedApproval, err := h.noto.encodeDelegateLock(ctx, tx.ContractAddress, params.LockID, params.Delegate, params.Data)
@@ -95,6 +105,7 @@ func (h *delegateLockHandler) Assemble(ctx context.Context, tx *types.ParsedTran
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
 		AssembledTransaction: &prototk.AssembledTransaction{
 			ReadStates: lockedInputs.states,
+			InfoStates: infoStates,
 		},
 		AttestationPlan: []*prototk.AttestationRequest{
 			// Sender confirms the initial request with a signature

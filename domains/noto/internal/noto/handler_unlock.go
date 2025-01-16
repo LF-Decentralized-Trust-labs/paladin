@@ -133,6 +133,11 @@ func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTrans
 	if err != nil {
 		return nil, nil, err
 	}
+	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, nil, []string{notary, params.From})
+	if err != nil {
+		return nil, nil, err
+	}
+	infoStates = append(infoStates, lockState)
 
 	return &prototk.AssembleTransactionResponse{
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,

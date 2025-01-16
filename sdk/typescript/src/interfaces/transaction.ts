@@ -82,20 +82,27 @@ export interface IPenteLog {
 }
 
 export interface INotoDomainReceipt {
-  inputs: IReceiptState<INotoCoin>[];
-  outputs: IReceiptState<INotoCoin>[];
-  readInputs: IReceiptState<INotoCoin>[];
-  preparedOutputs: IReceiptState<INotoCoin>[];
+  states: {
+    inputs?: IReceiptState<INotoCoin>[];
+    outputs?: IReceiptState<INotoCoin>[];
+    readInputs?: IReceiptState<INotoCoin>[];
+    preparedOutputs?: IReceiptState<INotoCoin>[];
 
-  lockedInputs: IReceiptState<INotoLockedCoin>[];
-  lockedOutputs: IReceiptState<INotoLockedCoin>[];
-  readLockedInputs: IReceiptState<INotoLockedCoin>[];
-  preparedLockedOutputs: IReceiptState<INotoLockedCoin>[];
+    lockedInputs?: IReceiptState<INotoLockedCoin>[];
+    lockedOutputs?: IReceiptState<INotoLockedCoin>[];
+    readLockedInputs?: IReceiptState<INotoLockedCoin>[];
+    preparedLockedOutputs?: IReceiptState<INotoLockedCoin>[];
+  };
+  lockInfo?: {
+    lockId: string;
+    delegate?: string;
+    unlock?: string;
+  };
+  data?: string;
 }
 
 export interface IReceiptState<T> {
   id: string;
-  schema: string;
   data: T;
 }
 

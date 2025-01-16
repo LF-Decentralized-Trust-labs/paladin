@@ -109,9 +109,11 @@ async function main(): Promise<boolean> {
   logger.log("Unlocking cash...");
   receipt = await notoCash.using(paladin3).unlockAsDelegate(investor2, {
     lockId,
-    lockedInputs: domainReceipt?.readLockedInputs?.map((s) => s.id) ?? [],
-    lockedOutputs: domainReceipt?.preparedLockedOutputs?.map((s) => s.id) ?? [],
-    outputs: domainReceipt?.preparedOutputs?.map((s) => s.id) ?? [],
+    lockedInputs:
+      domainReceipt?.states.readLockedInputs?.map((s) => s.id) ?? [],
+    lockedOutputs:
+      domainReceipt?.states.preparedLockedOutputs?.map((s) => s.id) ?? [],
+    outputs: domainReceipt?.states.preparedOutputs?.map((s) => s.id) ?? [],
     signature: "0x",
     data: "0x",
   });
