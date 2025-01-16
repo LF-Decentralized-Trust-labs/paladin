@@ -79,7 +79,6 @@ type ApproveParams struct {
 }
 
 type LockParams struct {
-	LockID tktypes.Bytes32     `json:"lockId"`
 	Amount *tktypes.HexUint256 `json:"amount"`
 	Data   tktypes.HexBytes    `json:"data"`
 }

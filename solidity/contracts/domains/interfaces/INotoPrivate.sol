@@ -29,7 +29,6 @@ interface INotoPrivate {
     ) external;
 
     function lock(
-        bytes32 lockId,
         uint256 amount,
         bytes calldata data
     ) external;

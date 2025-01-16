@@ -27,6 +27,7 @@ type Noto interface {
 	Name() string
 	CoinSchemaID() string
 	LockedCoinSchemaID() string
+	LockInfoSchemaID() string
 }
 
 func New(callbacks plugintk.DomainCallbacks) Noto {

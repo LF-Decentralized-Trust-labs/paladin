@@ -139,6 +139,19 @@ func findLockedCoins(t *testing.T, ctx context.Context, rpc rpcbackend.Backend, 
 	return notoCoins
 }
 
+func extractLockID(noto *Noto, invokeResult *testbed.TransactionResult) (tktypes.Bytes32, error) {
+	for _, state := range invokeResult.InfoStates {
+		if state.Schema.String() == noto.lockInfoSchema.Id {
+			lockInfo, err := noto.unmarshalLock(string(state.Data))
+			if err != nil {
+				return tktypes.Bytes32{}, err
+			}
+			return lockInfo.LockID, nil
+		}
+	}
+	return tktypes.Bytes32{}, nil
+}
+
 // TODO: make this easier to extract
 func buildUnlock(notoDomain *Noto, lockID tktypes.Bytes32, prepareUnlockResult *testbed.TransactionResult) *NotoUnlockParams {
 	lockedInputs := make([]string, 0)
@@ -528,14 +541,12 @@ func TestNotoLock(t *testing.T) {
 	assert.Equal(t, recipient1Key.Verifier.Verifier, coins[0].Data.Owner.String())
 
 	log.L(ctx).Infof("Lock 50 from recipient1")
-	lockID := tktypes.RandBytes32()
 	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			From:     recipient1Name,
 			To:       &notoAddress,
 			Function: "lock",
 			Data: toJSON(t, &types.LockParams{
-				LockID: lockID,
 				Amount: tktypes.Int64ToInt256(50),
 			}),
 		},
@@ -544,6 +555,10 @@ func TestNotoLock(t *testing.T) {
 	if rpcerr != nil {
 		require.NoError(t, rpcerr.Error())
 	}
+
+	lockID, err := extractLockID(noto, &invokeResult)
+	require.NoError(t, err)
+	require.NotEmpty(t, lockID)
 
 	coins = findLockedCoins(t, ctx, rpc, noto, notoAddress, nil)
 	require.Len(t, coins, 1)

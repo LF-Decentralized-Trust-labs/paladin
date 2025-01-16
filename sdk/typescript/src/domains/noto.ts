@@ -99,7 +99,6 @@ export interface NotoApproveTransferParams {
 }
 
 export interface NotoLockParams {
-  lockId: string;
   amount: string | number;
   data: string;
 }

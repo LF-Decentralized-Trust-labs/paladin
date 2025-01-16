@@ -74,13 +74,19 @@ async function main(): Promise<boolean> {
 
   // Lock some tokens
   logger.log("Locking cash from investor1...");
-  const lockId = randomBytes(32).toString("hex");
   receipt = await notoCash.using(paladin2).lock(investor1, {
-    lockId,
     amount: 100,
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;
+  receipt = await paladin2.getTransactionReceipt(receipt.id, true);
+
+  let domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
+  const lockId = domainReceipt?.lockInfo?.lockId;
+  if (lockId === undefined) {
+    logger.error("No lock ID found in domain receipt");
+    return false;
+  }
 
   // Prepare unlock operation
   logger.log("Preparing unlock to investor2...");
@@ -92,9 +98,7 @@ async function main(): Promise<boolean> {
   });
   if (!checkReceipt(receipt)) return false;
   receipt = await paladin2.getTransactionReceipt(receipt.id, true);
-  const domainReceipt = receipt?.domainReceipt as
-    | INotoDomainReceipt
-    | undefined;
+  domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
 
   // Approve unlock operation
   logger.log("Delegating lock to investor2...");

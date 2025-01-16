@@ -40,9 +40,6 @@ func (h *lockHandler) ValidateParams(ctx context.Context, config *types.NotoPars
 	if err := json.Unmarshal([]byte(params), &lockParams); err != nil {
 		return nil, err
 	}
-	if lockParams.LockID.IsZero() {
-		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "lockId")
-	}
 	if lockParams.Amount == nil || lockParams.Amount.Int().Sign() != 1 {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterGreaterThanZero, "amount")
 	}
@@ -95,7 +92,8 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		return nil, err
 	}
 
-	lockedOutputStates, err := h.noto.prepareLockedOutputs(params.LockID, fromAddress, params.Amount, []string{notary, tx.Transaction.From})
+	lockID := tktypes.RandBytes32()
+	lockedOutputStates, err := h.noto.prepareLockedOutputs(lockID, fromAddress, params.Amount, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +113,7 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	if err != nil {
 		return nil, err
 	}
-	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, nil, []string{notary, tx.Transaction.From})
+	lockState, err := h.noto.prepareLockInfo(lockID, fromAddress, nil, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
@@ -200,9 +198,7 @@ func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *lockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
-	inParams := tx.Params.(*types.LockParams)
-
+func (h *lockHandler) baseLedgerInvoke(ctx context.Context, lockID tktypes.Bytes32, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inputs := make([]string, len(req.InputStates))
 	for i, state := range req.InputStates {
 		inputs[i] = state.Id
@@ -230,7 +226,7 @@ func (h *lockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTran
 		return nil, err
 	}
 	params := &NotoLockParams{
-		LockID:        inParams.LockID,
+		LockID:        lockID,
 		Inputs:        inputs,
 		Outputs:       remainderOutputs,
 		LockedOutputs: []string{lockedOutput.String()},
@@ -247,7 +243,7 @@ func (h *lockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTran
 	}, nil
 }
 
-func (h *lockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+func (h *lockHandler) hookInvoke(ctx context.Context, lockID tktypes.Bytes32, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.LockParams)
 
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
@@ -261,7 +257,7 @@ func (h *lockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransactio
 	}
 	params := &LockHookParams{
 		Sender: fromAddress,
-		LockID: inParams.LockID,
+		LockID: lockID,
 		From:   fromAddress,
 		Amount: inParams.Amount,
 		Data:   inParams.Data,
@@ -288,14 +284,31 @@ func (h *lockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransactio
 	}, nil
 }
 
+func (h *lockHandler) extractLockID(ctx context.Context, req *prototk.PrepareTransactionRequest) (tktypes.Bytes32, error) {
+	lockStates := h.noto.filterSchema(req.InfoStates, []string{h.noto.lockInfoSchema.Id})
+	if len(lockStates) == 1 {
+		lock, err := h.noto.unmarshalLock(lockStates[0].StateDataJson)
+		if err != nil {
+			return tktypes.Bytes32{}, err
+		}
+		return lock.LockID, nil
+	}
+	return tktypes.Bytes32{}, i18n.NewError(ctx, msgs.MsgLockIDNotFound)
+}
+
 func (h *lockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, req)
+	lockID, err := h.extractLockID(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	baseTransaction, err := h.baseLedgerInvoke(ctx, lockID, tx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	if tx.DomainConfig.NotaryMode == types.NotaryModeHooks.Enum() {
-		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
+		hookTransaction, err := h.hookInvoke(ctx, lockID, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err
 		}

@@ -230,6 +230,10 @@ func (n *Noto) LockedCoinSchemaID() string {
 	return n.lockedCoinSchema.Id
 }
 
+func (n *Noto) LockInfoSchemaID() string {
+	return n.lockInfoSchema.Id
+}
+
 func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
 	err := json.Unmarshal([]byte(req.ConfigJson), &n.config)
 	if err != nil {
