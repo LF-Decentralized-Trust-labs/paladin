@@ -160,3 +160,8 @@ export interface IEventWithData {
   address: string;
   data: any;
 }
+
+export interface IStoredABI {
+  hash: string;
+  abi: ethers.InterfaceAbi;
+}
