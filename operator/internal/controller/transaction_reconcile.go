@@ -36,6 +36,16 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 )
 
+var _ transactionReconcileInterface = &transactionReconcile{}
+
+type transactionReconcileInterface interface {
+	reconcile(ctx context.Context) error
+	isStatusChanged() bool
+	isSucceeded() bool
+	isFailed() bool
+	getReceipt() *pldapi.TransactionReceipt
+}
+
 type transactionReconcile struct {
 	client.Client
 	idempotencyKeyPrefix string
@@ -47,6 +57,7 @@ type transactionReconcile struct {
 	statusChanged        bool
 	succeeded            bool
 	failed               bool
+	getPaladinRPCFunc    func(ctx context.Context, c client.Client, nodeName, namespace string) (pldclient.PaladinClient, error)
 }
 
 func newTransactionReconcile(c client.Client,
@@ -54,7 +65,7 @@ func newTransactionReconcile(c client.Client,
 	nodeName, namespace string,
 	pStatus *corev1alpha1.TransactionSubmission,
 	txFactory func() (bool, *pldapi.TransactionInput, error),
-) *transactionReconcile {
+) transactionReconcileInterface {
 	return &transactionReconcile{
 		Client:               c,
 		idempotencyKeyPrefix: idempotencyKeyPrefix,
@@ -64,6 +75,10 @@ func newTransactionReconcile(c client.Client,
 		pStatus:              pStatus,
 	}
 }
+func (r *transactionReconcile) isStatusChanged() bool                  { return r.statusChanged }
+func (r *transactionReconcile) isSucceeded() bool                      { return r.succeeded }
+func (r *transactionReconcile) isFailed() bool                         { return r.failed }
+func (r *transactionReconcile) getReceipt() *pldapi.TransactionReceipt { return r.receipt }
 
 func (r *transactionReconcile) reconcile(ctx context.Context) error {
 
@@ -85,8 +100,11 @@ func (r *transactionReconcile) reconcile(ctx context.Context) error {
 		return nil
 	}
 
+	if r.getPaladinRPCFunc == nil {
+		r.getPaladinRPCFunc = getPaladinRPC
+	}
 	// Check availability of the Paladin node and deploy
-	paladinRPC, err := getPaladinRPC(ctx, r.Client, r.nodeName, r.namespace)
+	paladinRPC, err := r.getPaladinRPCFunc(ctx, r.Client, r.nodeName, r.namespace)
 	if err != nil || paladinRPC == nil {
 		return err
 	}
@@ -157,13 +175,17 @@ func (r *transactionReconcile) trackTransactionAndRequeue(ctx context.Context, p
 	}
 	if r.receipt.Success {
 		r.pStatus.TransactionStatus = corev1alpha1.TransactionStatusSuccess
+		r.succeeded = true
 	} else {
 		r.pStatus.TransactionStatus = corev1alpha1.TransactionStatusFailed
 		r.pStatus.FailureMessage = r.receipt.FailureMessage
+		r.failed = true
 	}
 	r.statusChanged = true
 	return nil
 }
+
+var getPaladinURLEndpointFunc = getPaladinURLEndpoint
 
 func getPaladinRPC(ctx context.Context, c client.Client, nodeName, namespace string) (pldclient.PaladinClient, error) {
 
@@ -183,7 +205,7 @@ func getPaladinRPC(ctx context.Context, c client.Client, nodeName, namespace str
 		return nil, nil
 	}
 
-	url, err := getPaladinURLEndpoint(ctx, c, nodeName, namespace)
+	url, err := getPaladinURLEndpointFunc(ctx, c, nodeName, namespace)
 	if err != nil {
 		return nil, err
 	}
