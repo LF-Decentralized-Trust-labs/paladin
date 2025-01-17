@@ -12,6 +12,9 @@ spec:
   config: |
     log:
       level: debug
+    publicTxManager:
+      gasLimit:
+        gasEstimateFactor: 2.0
   database:
     mode: sidecarPostgres
     migrationMode: auto

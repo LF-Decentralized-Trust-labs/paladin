@@ -52,7 +52,8 @@ dependencies {
 
 ext {
     clusterName = project.hasProperty('clusterName') ? project.clusterName : 'paladin' 
-    namespace = project.hasProperty('namespace') ? project.namespace : 'default' // Default namespace is 'default' 
+    namespace = project.hasProperty('namespace') ? project.namespace : 'default' // Default namespace is 'default'
+    mode = project.hasProperty('mode') ? project.mode : 'devnet'
     deleteCluster = project.hasProperty('deleteCluster') ? project.deleteCluster.toBoolean() : false // By default, do not delete the cluster
     buildPaladin = project.hasProperty('buildPaladin') ? project.buildPaladin == 'true' : true // Default is to build Paladin
     buildOperator = project.hasProperty('buildOperator') ? project.buildOperator == 'true' : true // Default is to build the operator
@@ -233,6 +234,7 @@ task installOperator(type: Exec, dependsOn: [installCrds, promoteKindImages, pre
     args "OPERATOR_IMAGE_TAG=${operatorImageTag}"
     args "PALADIN_IMAGE_NAME=${paladinImageName}"
     args "PALADIN_IMAGE_TAG=${paladinImageTag}"
+    args "MODE=${mode}"
 }
 
 
