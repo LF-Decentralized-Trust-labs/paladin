@@ -98,12 +98,12 @@ func TestGoodConfigJSON(t *testing.T) {
 
 func TestHandleEventBatchOk(t *testing.T) {
 
-	txHash1 := tktypes.Bytes32(tktypes.RandBytes(32)).String()
-	txHash2 := tktypes.Bytes32(tktypes.RandBytes(32)).String()
+	txHash1 := tktypes.RandBytes32().String()
+	txHash2 := tktypes.RandBytes32().String()
 
 	identityRegistered := IdentityRegisteredEvent{
-		ParentIdentityHash: tktypes.Bytes32(tktypes.RandBytes(32)),
-		IdentityHash:       tktypes.Bytes32(tktypes.RandBytes(32)),
+		ParentIdentityHash: tktypes.RandBytes32(),
+		IdentityHash:       tktypes.RandBytes32(),
 		Name:               "node1",
 		Owner:              *tktypes.RandAddress(),
 	}
@@ -188,7 +188,7 @@ func TestHandleEventBatchOk(t *testing.T) {
 
 func TestHandleEventBadIdentityRegistered(t *testing.T) {
 
-	txHash := tktypes.Bytes32(tktypes.RandBytes(32)).String()
+	txHash := tktypes.RandBytes32().String()
 	callbacks := &testCallbacks{}
 
 	transport := NewEVMRegistry(callbacks).(*evmRegistry)
@@ -209,7 +209,7 @@ func TestHandleEventBadIdentityRegistered(t *testing.T) {
 
 func TestHandleEventBadSetProperty(t *testing.T) {
 
-	txHash := tktypes.Bytes32(tktypes.RandBytes(32)).String()
+	txHash := tktypes.RandBytes32().String()
 	callbacks := &testCallbacks{}
 
 	transport := NewEVMRegistry(callbacks).(*evmRegistry)
@@ -246,7 +246,7 @@ func TestHandleEventBadSig(t *testing.T) {
 }
 func TestHandleEventUnknownSig(t *testing.T) {
 
-	txHash := tktypes.Bytes32(tktypes.RandBytes(32)).String()
+	txHash := tktypes.RandBytes32().String()
 	callbacks := &testCallbacks{}
 
 	transport := NewEVMRegistry(callbacks).(*evmRegistry)
@@ -269,12 +269,12 @@ func TestHandleEventUnknownSig(t *testing.T) {
 
 func TestHandleEventBadEntryName(t *testing.T) {
 
-	txHash := tktypes.Bytes32(tktypes.RandBytes(32)).String()
+	txHash := tktypes.RandBytes32().String()
 	callbacks := &testCallbacks{}
 
 	identityRegistered := IdentityRegisteredEvent{
-		ParentIdentityHash: tktypes.Bytes32(tktypes.RandBytes(32)),
-		IdentityHash:       tktypes.Bytes32(tktypes.RandBytes(32)),
+		ParentIdentityHash: tktypes.RandBytes32(),
+		IdentityHash:       tktypes.RandBytes32(),
 		Name:               "___ wrong",
 		Owner:              *tktypes.RandAddress(),
 	}
@@ -299,10 +299,10 @@ func TestHandleEventBadEntryName(t *testing.T) {
 
 func TestHandleEventBatchPropBadName(t *testing.T) {
 
-	txHash := tktypes.Bytes32(tktypes.RandBytes(32)).String()
+	txHash := tktypes.RandBytes32().String()
 
 	propSet := PropertySetEvent{
-		IdentityHash: tktypes.Bytes32(tktypes.RandBytes(32)),
+		IdentityHash: tktypes.RandBytes32(),
 		Name:         "___ wrong",
 		Value:        `{"endpoint":"details"}`,
 	}

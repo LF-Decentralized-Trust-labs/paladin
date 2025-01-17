@@ -23,6 +23,7 @@ import (
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
@@ -118,8 +119,8 @@ func TestLocktInit(t *testing.T) {
 
 func TestLockAssemble(t *testing.T) {
 	params := sampleTransferPayload()
-	testCallbacks := &testDomainCallbacks{
-		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks := &domain.MockDomainCallbacks{
+		MockFindAvailableStates: func() (*prototk.FindAvailableStatesResponse, error) {
 			return &prototk.FindAvailableStatesResponse{
 				States: []*prototk.StoredState{
 					{

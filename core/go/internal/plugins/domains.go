@@ -98,6 +98,33 @@ func (br *domainBridge) RequestReply(ctx context.Context, reqMsg plugintk.Plugin
 				}
 			},
 		)
+	case *prototk.DomainMessage_SendTransaction:
+		return callManagerImpl(ctx, req.SendTransaction,
+			br.manager.SendTransaction,
+			func(resMsg *prototk.DomainMessage, res *prototk.SendTransactionResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_SendTransactionRes{
+					SendTransactionRes: res,
+				}
+			},
+		)
+	case *prototk.DomainMessage_LocalNodeName:
+		return callManagerImpl(ctx, req.LocalNodeName,
+			br.manager.LocalNodeName,
+			func(resMsg *prototk.DomainMessage, res *prototk.LocalNodeNameResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_LocalNodeNameRes{
+					LocalNodeNameRes: res,
+				}
+			},
+		)
+	case *prototk.DomainMessage_GetStates:
+		return callManagerImpl(ctx, req.GetStates,
+			br.manager.GetStates,
+			func(resMsg *prototk.DomainMessage, res *prototk.GetStatesResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_GetStatesRes{
+					GetStatesRes: res,
+				}
+			},
+		)
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgPluginBadRequestBody, req)
 	}

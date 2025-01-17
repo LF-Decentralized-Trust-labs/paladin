@@ -201,7 +201,7 @@ func TestWriteReceivedStatesValidateHashFail(t *testing.T) {
 	md.On("ValidateStateHashes", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
 
 	_, err := ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{
-		{ID: tktypes.RandBytes(32), SchemaID: tktypes.Bytes32(tktypes.RandBytes(32)),
+		{ID: tktypes.RandBytes(32), SchemaID: tktypes.RandBytes32(),
 			Data: tktypes.RawJSON(fmt.Sprintf(
 				`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
 				tktypes.RandHex(32)))},

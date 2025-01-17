@@ -249,6 +249,15 @@ func (dc *domainContext) mergeInMemoryMatches(schema components.Schema, states [
 
 }
 
+func (dc *domainContext) GetStates(dbTX *gorm.DB, schemaID tktypes.Bytes32, ids []string) (components.Schema, []*pldapi.State, error) {
+	idsAny := make([]any, len(ids))
+	for i, id := range ids {
+		idsAny[i] = id
+	}
+	query := query.NewQueryBuilder().In(".id", idsAny).Query()
+	return dc.ss.findStates(dc, dbTX, dc.domainName, &dc.contractAddress, schemaID, query, pldapi.StateStatusAll)
+}
+
 func (dc *domainContext) FindAvailableStates(dbTX *gorm.DB, schemaID tktypes.Bytes32, query *query.QueryJSON) (components.Schema, []*pldapi.State, error) {
 	log.L(dc.Context).Debug("domainContext:FindAvailableStates")
 	// Build a list of spending states

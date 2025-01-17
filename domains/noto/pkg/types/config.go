@@ -27,32 +27,51 @@ type DomainConfig struct {
 
 var NotoConfigID_V0 = tktypes.MustParseHexBytes("0x00010000")
 
+// This is the config we expect to receive from the contract registration event
 type NotoConfig_V0 struct {
 	NotaryAddress tktypes.EthAddress `json:"notaryAddress"`
 	Variant       tktypes.HexUint64  `json:"variant"`
 	Data          tktypes.HexBytes   `json:"data"`
-	DecodedData   *NotoConfigData_V0 `json:"-"`
 }
 
+// This is the structure we expect to unpack from the config data
 type NotoConfigData_V0 struct {
-	NotaryLookup    string              `json:"notaryLookup"`
-	NotaryType      tktypes.HexUint64   `json:"notaryType"`
-	PrivateAddress  *tktypes.EthAddress `json:"privateAddress"`
-	PrivateGroup    *PentePrivateGroup  `json:"privateGroup"`
-	RestrictMinting bool                `json:"restrictMinting"`
-	AllowBurning    bool                `json:"allowBurning"`
+	NotaryLookup   string              `json:"notaryLookup"`
+	NotaryMode     tktypes.HexUint64   `json:"notaryMode"`
+	PrivateAddress *tktypes.EthAddress `json:"privateAddress"`
+	PrivateGroup   *PentePrivateGroup  `json:"privateGroup"`
+	RestrictMint   bool                `json:"restrictMint"`
+	AllowBurn      bool                `json:"allowBurn"`
+	AllowLock      bool                `json:"allowLock"`
+	RestrictUnlock bool                `json:"restrictUnlock"`
 }
 
 // This is the structure we parse the config into in InitConfig and gets passed back to us on every call
 type NotoParsedConfig struct {
-	NotaryLookup    string              `json:"notaryLookup"`
-	NotaryType      tktypes.HexUint64   `json:"notaryType"`
-	NotaryAddress   tktypes.EthAddress  `json:"notaryAddress"`
-	Variant         tktypes.HexUint64   `json:"variant"`
-	PrivateAddress  *tktypes.EthAddress `json:"privateAddress,omitempty"`
-	PrivateGroup    *PentePrivateGroup  `json:"privateGroup,omitempty"`
-	RestrictMinting bool                `json:"restrictMinting"`
-	AllowBurning    bool                `json:"allowBurning"`
+	NotaryLookup string                   `json:"notaryLookup"`
+	NotaryMode   tktypes.Enum[NotaryMode] `json:"notaryMode"`
+	Variant      tktypes.HexUint64        `json:"variant"`
+	IsNotary     bool                     `json:"isNotary"`
+	Options      NotoOptions              `json:"options"`
+}
+
+type NotoOptions struct {
+	Basic *NotoBasicOptions `json:"basic,omitempty"`
+	Hooks *NotoHooksOptions `json:"hooks,omitempty"`
+}
+
+type NotoBasicOptions struct {
+	RestrictMint   *bool `json:"restrictMint"`   // Only allow notary to mint (default: true)
+	AllowBurn      *bool `json:"allowBurn"`      // Allow token holders to burn their tokens (default: true)
+	AllowLock      *bool `json:"allowLock"`      // Allow token holders to lock their tokens (default: true)
+	RestrictUnlock *bool `json:"restrictUnlock"` // Only allow lock creator to unlock tokens (default: true)
+}
+
+type NotoHooksOptions struct {
+	PublicAddress     *tktypes.EthAddress `json:"publicAddress"`               // Public address of the Pente privacy group
+	PrivateGroup      *PentePrivateGroup  `json:"privateGroup,omitempty"`      // Details on the Pente privacy group
+	PrivateAddress    *tktypes.EthAddress `json:"privateAddress,omitempty"`    // Private address of the hook contract deployed within the privacy group
+	DevUsePublicHooks bool                `json:"devUsePublicHooks,omitempty"` // Use a public hooks contract - insecure, for dev purposes only! (privateGroup/privateAddress are ignored)
 }
 
 type PentePrivateGroup struct {
@@ -81,8 +100,9 @@ var NotoTransactionDataABI_V0 = &abi.ParameterArray{
 type DomainHandler = domain.DomainHandler[NotoParsedConfig]
 type ParsedTransaction = domain.ParsedTransaction[NotoParsedConfig]
 
-var NotaryTypeSigner tktypes.HexUint64 = 0x0000
-var NotaryTypePente tktypes.HexUint64 = 0x0001
+const (
+	NotaryModeIntBasic tktypes.HexUint64 = 0x0000
+	NotaryModeIntHooks tktypes.HexUint64 = 0x0001
+)
 
 var NotoVariantDefault tktypes.HexUint64 = 0x0000
-var NotoVariantSelfSubmit tktypes.HexUint64 = 0x0001

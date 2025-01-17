@@ -42,94 +42,121 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 		return &burnHandler{noto: n}
 	case "approveTransfer":
 		return &approveHandler{noto: n}
+	case "lock":
+		return &lockHandler{noto: n}
+	case "unlock":
+		return &unlockHandler{
+			unlockCommon: unlockCommon{noto: n},
+		}
+	case "prepareUnlock":
+		return &prepareUnlockHandler{
+			unlockCommon: unlockCommon{noto: n},
+		}
+	case "delegateLock":
+		return &delegateLockHandler{noto: n}
 	default:
 		return nil
 	}
 }
 
 // Check that a mint has no inputs, and an output matching the requested amount
-func (n *Noto) validateMintAmounts(ctx context.Context, params *types.MintParams, coins *gatheredCoins) error {
-	if len(coins.inCoins) > 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "mint", coins.inCoins)
+func (n *Noto) validateMintAmounts(ctx context.Context, params *types.MintParams, inputs, outputs *parsedCoins) error {
+	if len(inputs.coins) > 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "mint", inputs.coins)
 	}
-	if coins.outTotal.Cmp(params.Amount.Int()) != 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "mint", params.Amount.Int().Text(10), coins.outTotal.Text(10))
+	if outputs.total.Cmp(params.Amount.Int()) != 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "mint", params.Amount.Int().Text(10), outputs.total.Text(10))
 	}
 	return nil
 }
 
 // Check that a transfer has at least one input and output, and they net out to zero
-func (n *Noto) validateTransferAmounts(ctx context.Context, coins *gatheredCoins) error {
-	if len(coins.inCoins) == 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "transfer", coins.inCoins)
+func (n *Noto) validateTransferAmounts(ctx context.Context, inputs, outputs *parsedCoins) error {
+	if len(inputs.coins) == 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "transfer", inputs.coins)
 	}
-	if coins.inTotal.Cmp(coins.outTotal) != 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "transfer", coins.inTotal, coins.outTotal)
+	if inputs.total.Cmp(outputs.total) != 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "transfer", inputs.total, outputs.total)
 	}
 	return nil
 }
 
 // Check that a burn has at least one input, and a net output matching the requested amount
-func (n *Noto) validateBurnAmounts(ctx context.Context, params *types.BurnParams, coins *gatheredCoins) error {
-	if len(coins.inCoins) == 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "burn", coins.inCoins)
+func (n *Noto) validateBurnAmounts(ctx context.Context, params *types.BurnParams, inputs, outputs *parsedCoins) error {
+	if len(inputs.coins) == 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "burn", inputs.coins)
 	}
-	amount := big.NewInt(0).Sub(coins.inTotal, coins.outTotal)
+	amount := big.NewInt(0).Sub(inputs.total, outputs.total)
 	if amount.Cmp(params.Amount.Int()) != 0 {
 		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "burn", params.Amount.Int().Text(10), amount.Text(10))
 	}
 	return nil
 }
 
-// Check that the sender of a transfer provided a signature on the input transaction details
-func (n *Noto) validateTransferSignature(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest, coins *gatheredCoins) error {
-	signature := domain.FindAttestation("sender", req.Signatures)
-	if signature == nil {
-		return i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
+// Check that a lock produces locked coins matching the difference between the inputs and outputs
+func (n *Noto) validateLockAmounts(ctx context.Context, inputs, outputs *parsedCoins) error {
+	if len(inputs.coins) == 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "lock", inputs.coins)
 	}
-	if signature.Verifier.Lookup != tx.Transaction.From {
-		return i18n.NewError(ctx, msgs.MsgAttestationUnexpected, "sender", tx.Transaction.From, signature.Verifier.Lookup)
-	}
-	encodedTransfer, err := n.encodeTransferUnmasked(ctx, tx.ContractAddress, coins.inCoins, coins.outCoins)
-	if err != nil {
-		return err
-	}
-	recoveredSignature, err := n.recoverSignature(ctx, encodedTransfer, signature.Payload)
-	if err != nil {
-		return err
-	}
-	if recoveredSignature.String() != signature.Verifier.Verifier {
-		return i18n.NewError(ctx, msgs.MsgSignatureDoesNotMatch, "sender", signature.Verifier.Verifier, recoveredSignature.String())
+	amount := big.NewInt(0).Sub(inputs.total, outputs.total)
+	if amount.Cmp(outputs.lockedTotal) != 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "lock", outputs.lockedTotal.Text(10), amount.Text(10))
 	}
 	return nil
 }
 
-// Check that the sender of an approval provided a signature on the input transaction details
-func (n *Noto) validateApprovalSignature(ctx context.Context, req *prototk.EndorseTransactionRequest, transferHash []byte) error {
-	signature := domain.FindAttestation("sender", req.Signatures)
-	if signature == nil {
-		return i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
+// Check that an unlock produces unlocked coins matching the difference between the locked inputs and outputs
+func (n *Noto) validateUnlockAmounts(ctx context.Context, inputs, outputs *parsedCoins) error {
+	if len(inputs.lockedCoins) == 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "unlock", inputs.lockedCoins)
 	}
-	recoveredSignature, err := n.recoverSignature(ctx, transferHash, signature.Payload)
-	if err != nil {
-		return err
-	}
-	if recoveredSignature.String() != signature.Verifier.Verifier {
-		return i18n.NewError(ctx, msgs.MsgSignatureDoesNotMatch, "sender", signature.Verifier.Verifier, recoveredSignature.String())
+	amount := big.NewInt(0).Sub(inputs.lockedTotal, outputs.lockedTotal)
+	if amount.Cmp(outputs.total) != 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "unlock", outputs.total.Text(10), amount.Text(10))
 	}
 	return nil
 }
 
-// Check that all input coins are owned by the transaction sender
-func (n *Noto) validateOwners(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest, coins *gatheredCoins) error {
-	fromAddress, err := n.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
+// Check that the sender of a transaction provided a signature on the input details
+func (n *Noto) validateSignature(ctx context.Context, name string, attestations []*prototk.AttestationResult, encodedMessage []byte) error {
+	signature := domain.FindAttestation(name, attestations)
+	if signature == nil {
+		return i18n.NewError(ctx, msgs.MsgAttestationNotFound, name)
+	}
+	recoveredSignature, err := n.recoverSignature(ctx, encodedMessage, signature.Payload)
+	if err != nil {
+		return err
+	}
+	if recoveredSignature.String() != signature.Verifier.Verifier {
+		return i18n.NewError(ctx, msgs.MsgSignatureDoesNotMatch, name, signature.Verifier.Verifier, recoveredSignature.String())
+	}
+	return nil
+}
+
+// Check that all coins are owned by the transaction sender
+func (n *Noto) validateOwners(ctx context.Context, owner string, req *prototk.EndorseTransactionRequest, coins []*types.NotoCoin, states []*prototk.StateRef) error {
+	fromAddress, err := n.findEthAddressVerifier(ctx, "from", owner, req.ResolvedVerifiers)
 	if err != nil {
 		return err
 	}
 
-	for i, coin := range coins.inCoins {
+	for i, coin := range coins {
 		if !coin.Owner.Equals(fromAddress) {
-			return i18n.NewError(ctx, msgs.MsgStateWrongOwner, coins.inStates[i].Id, tx.Transaction.From)
+			return i18n.NewError(ctx, msgs.MsgStateWrongOwner, states[i].Id, owner)
+		}
+	}
+	return nil
+}
+
+// Check that all locked coins are owned by the transaction sender
+func (n *Noto) validateLockOwners(ctx context.Context, owner string, verifiers []*prototk.ResolvedVerifier, coins []*types.NotoLockedCoin, states []*prototk.StateRef) error {
+	fromAddress, err := n.findEthAddressVerifier(ctx, "from", owner, verifiers)
+	if err != nil {
+		return err
+	}
+	for i, coin := range coins {
+		if !coin.Owner.Equals(fromAddress) {
+			return i18n.NewError(ctx, msgs.MsgStateWrongOwner, states[i].Id, owner)
 		}
 	}
 	return nil

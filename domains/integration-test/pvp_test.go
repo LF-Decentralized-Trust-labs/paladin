@@ -22,14 +22,17 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
+	"github.com/kaleido-io/paladin/domains/noto/pkg/noto"
 	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	zetotests "github.com/kaleido-io/paladin/domains/zeto/integration-test"
 	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
@@ -60,6 +63,66 @@ type NotoTransferHookParams struct {
 type PentePreparedTransaction struct {
 	ContractAddress tktypes.EthAddress `json:"contractAddress"`
 	EncodedCall     tktypes.HexBytes   `json:"encodedCall"`
+}
+
+func decodeTransactionResult(t *testing.T, resultInput map[string]any) *testbed.TransactionResult {
+	resultJSON, err := json.Marshal(resultInput)
+	require.NoError(t, err)
+	var result testbed.TransactionResult
+	err = json.Unmarshal(resultJSON, &result)
+	require.NoError(t, err)
+	return &result
+}
+
+func extractLockID(noto noto.Noto, invokeResult *testbed.TransactionResult) (tktypes.Bytes32, error) {
+	for _, state := range invokeResult.InfoStates {
+		if state.Schema.String() == noto.LockInfoSchemaID() {
+			var lockInfo map[string]any
+			err := json.Unmarshal(state.Data, &lockInfo)
+			if err != nil {
+				return tktypes.Bytes32{}, err
+			}
+			return tktypes.MustParseBytes32(lockInfo["lockId"].(string)), nil
+		}
+	}
+	return tktypes.Bytes32{}, nil
+}
+
+// TODO: make this easier to extract
+func buildUnlock(ctx context.Context, notoDomain noto.Noto, abi abi.ABI, lockID tktypes.Bytes32, prepareUnlockResult *testbed.TransactionResult) ([]*pldapi.StateEncoded, []*pldapi.StateEncoded, []byte, error) {
+	notoInputStates := make([]*pldapi.StateEncoded, 0, len(prepareUnlockResult.ReadStates))
+	notoOutputStates := make([]*pldapi.StateEncoded, 0, len(prepareUnlockResult.InfoStates))
+	lockedInputs := make([]tktypes.HexBytes, 0)
+	lockedOutputs := make([]tktypes.HexBytes, 0)
+	unlockedOutputs := make([]tktypes.HexBytes, 0)
+	for _, input := range prepareUnlockResult.ReadStates {
+		notoInputStates = append(notoInputStates, input)
+		lockedInputs = append(lockedInputs, input.ID)
+	}
+	for _, output := range prepareUnlockResult.InfoStates {
+		switch output.Schema.String() {
+		case notoDomain.CoinSchemaID():
+			notoOutputStates = append(notoOutputStates, output)
+			unlockedOutputs = append(unlockedOutputs, output.ID)
+		case notoDomain.LockedCoinSchemaID():
+			notoOutputStates = append(notoOutputStates, output)
+			lockedOutputs = append(lockedOutputs, output.ID)
+		}
+	}
+
+	unlockParams, err := json.Marshal(map[string]any{
+		"lockId":        lockID,
+		"lockedInputs":  lockedInputs,
+		"lockedOutputs": lockedOutputs,
+		"outputs":       unlockedOutputs,
+		"signature":     "0x",
+		"data":          "0x",
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	encodedCall, err := abi.Functions()["unlock"].EncodeCallDataJSONCtx(ctx, unlockParams)
+	return notoInputStates, notoOutputStates, encodedCall, err
 }
 
 func TestNotoForNoto(t *testing.T) {
@@ -342,8 +405,32 @@ func TestNotoForZeto(t *testing.T) {
 		TokenValue2:   tktypes.Int64ToInt256(1),
 	})
 
-	log.L(ctx).Infof("Prepare the transfers")
-	transferNoto := noto.Transfer(ctx, bob, 1).Prepare(alice)
+	log.L(ctx).Infof("Prepare the Noto transfer")
+	notoLock := noto.Lock(ctx, &nototypes.LockParams{
+		Amount: tktypes.Int64ToInt256(1),
+	}).SignAndSend(alice).Wait()
+	notoLockResult := decodeTransactionResult(t, notoLock)
+
+	lockID, err := extractLockID(notoDomain, notoLockResult)
+	require.NoError(t, err)
+	require.NotEmpty(t, lockID)
+
+	time.Sleep(1 * time.Second) // TODO: remove
+	notoPrepareUnlock := noto.PrepareUnlock(ctx, &nototypes.UnlockParams{
+		LockID: lockID,
+		From:   alice,
+		Recipients: []*nototypes.UnlockRecipient{{
+			To:     bob,
+			Amount: tktypes.Int64ToInt256(1),
+		}},
+	}).SignAndSend(alice).Wait()
+	require.NotNil(t, notoPrepareUnlock)
+	prepareUnlockResult := decodeTransactionResult(t, notoPrepareUnlock)
+
+	notoInputStates, notoOutputStates, transferNoto, err := buildUnlock(ctx, notoDomain, noto.ABI, lockID, prepareUnlockResult)
+	require.NoError(t, err)
+
+	log.L(ctx).Infof("Prepare the Zeto transfer")
 	transferZeto := zeto.Transfer(ctx, alice, 1).Prepare(bob)
 	zeto.Lock(ctx, tktypes.MustEthAddress(bobKey.Verifier.Verifier), transferZeto.EncodedCall).SignAndSend(bob).Wait()
 
@@ -354,8 +441,8 @@ func TestNotoForZeto(t *testing.T) {
 	// TODO: should probably include the full encoded calls (including the zkp)
 	log.L(ctx).Infof("Record the prepared transfers")
 	sent := swap.Prepare(ctx, &helpers.StateData{
-		Inputs:  transferNoto.InputStates,
-		Outputs: transferNoto.OutputStates,
+		Inputs:  notoInputStates,
+		Outputs: notoOutputStates,
 	}).SignAndSend(alice).Wait(5 * time.Second)
 	require.NoError(t, sent.Error())
 	sent = swap.Prepare(ctx, &helpers.StateData{
@@ -374,15 +461,11 @@ func TestNotoForZeto(t *testing.T) {
 	log.L(ctx).Infof("Bob proposes tokens: contract=%s value=%s inputs=%+v outputs=%+v",
 		bobData["tokenAddress"], bobData["tokenValue"], bobStates["inputs"], bobStates["outputs"])
 
-	var transferNotoExtra nototypes.NotoTransferMetadata
-	err = json.Unmarshal(transferNoto.PreparedMetadata, &transferNotoExtra)
-	require.NoError(t, err)
-
 	log.L(ctx).Infof("Create Atom instance")
 	transferAtom := atomFactory.Create(ctx, alice, []*helpers.AtomOperation{
 		{
 			ContractAddress: noto.Address,
-			CallData:        transferNotoExtra.TransferWithApproval.EncodedCall,
+			CallData:        transferNoto,
 		},
 		{
 			ContractAddress: zeto.Address,
@@ -402,15 +485,9 @@ func TestNotoForZeto(t *testing.T) {
 	// TODO: all parties should verify the Atom against the original proposed trade
 	// If any party found a discrepancy at this point, they could cancel the swap (last chance to back out)
 
-	var transferNotoParams NotoTransferParams
-	err = json.Unmarshal(transferNoto.PreparedTransaction.Data, &transferNotoParams)
-	require.NoError(t, err)
-
 	log.L(ctx).Infof("Approve both transfers")
-	noto.ApproveTransfer(ctx, &nototypes.ApproveParams{
-		Inputs:   transferNoto.InputStates,
-		Outputs:  transferNoto.OutputStates,
-		Data:     transferNotoParams.Data,
+	noto.DelegateLock(ctx, &nototypes.DelegateLockParams{
+		LockID:   lockID,
 		Delegate: transferAtom.Address,
 	}).SignAndSend(alice).Wait()
 	zeto.Lock(ctx, transferAtom.Address, transferZeto.EncodedCall).SignAndSend(bob).Wait()
@@ -420,15 +497,15 @@ func TestNotoForZeto(t *testing.T) {
 	require.NoError(t, sent.Error())
 
 	// TODO: better way to wait for events to be indexed after Atom execution
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	notoCoins = findAvailableCoins[nototypes.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
 	require.NoError(t, err)
 	require.Len(t, notoCoins, 2)
-	assert.Equal(t, int64(1), notoCoins[0].Data.Amount.Int().Int64())
-	assert.Equal(t, bobKey.Verifier.Verifier, notoCoins[0].Data.Owner.String())
-	assert.Equal(t, int64(9), notoCoins[1].Data.Amount.Int().Int64())
-	assert.Equal(t, aliceKey.Verifier.Verifier, notoCoins[1].Data.Owner.String())
+	assert.Equal(t, int64(9), notoCoins[0].Data.Amount.Int().Int64())
+	assert.Equal(t, aliceKey.Verifier.Verifier, notoCoins[0].Data.Owner.String())
+	assert.Equal(t, int64(1), notoCoins[1].Data.Amount.Int().Int64())
+	assert.Equal(t, bobKey.Verifier.Verifier, notoCoins[1].Data.Owner.String())
 
 	zetoCoins = findAvailableCoins[zetotypes.ZetoCoinState](t, ctx, rpc, zetoDomain.Name(), zetoDomain.CoinSchemaID(), zeto.Address, nil)
 	require.NoError(t, err)
