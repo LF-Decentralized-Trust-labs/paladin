@@ -106,12 +106,12 @@ contract BondTracker is NotoTrackerERC20, Ownable {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) public virtual override onlyOwner {
+    ) external virtual override onlyOwner {
         require(sender == _issuer, "Bond must be issued by issuer");
         require(to == owner(), "Bond must be issued to custodian");
         require(_status == Status.INITIALIZED, "Bond has already been issued");
 
-        super.onMint(sender, to, amount, data, prepared);
+        _onMint(sender, to, amount, data, prepared);
         _status = Status.ISSUED;
 
         emit PenteExternalCall(
@@ -127,9 +127,9 @@ contract BondTracker is NotoTrackerERC20, Ownable {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) public virtual override onlyOwner {
+    ) external virtual override onlyOwner {
         _checkTransfer(sender, from, to, amount);
-        super.onTransfer(sender, from, to, amount, data, prepared);
+        _onTransfer(sender, from, to, amount, data, prepared);
 
         if (_status == Status.DISTRIBUTION_STARTED && from == owner()) {
             emit PenteExternalCall(
@@ -145,9 +145,9 @@ contract BondTracker is NotoTrackerERC20, Ownable {
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) public virtual override onlyOwner {
-        _checkTransfers(sender, _locks[lockId].from, recipients);
-        super.onUnlock(sender, lockId, recipients, data, prepared);
+    ) external virtual override onlyOwner {
+        _checkTransfers(sender, _locks.ownerOf(lockId), recipients);
+        _onUnlock(sender, lockId, recipients, data, prepared);
     }
 
     function onPrepareUnlock(
@@ -156,8 +156,8 @@ contract BondTracker is NotoTrackerERC20, Ownable {
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) public virtual override onlyOwner {
-        _checkTransfers(sender, _locks[lockId].from, recipients);
-        super.onPrepareUnlock(sender, lockId, recipients, data, prepared);
+    ) external virtual override onlyOwner {
+        _checkTransfers(sender, _locks.ownerOf(lockId), recipients);
+        _onPrepareUnlock(sender, lockId, recipients, data, prepared);
     }
 }
