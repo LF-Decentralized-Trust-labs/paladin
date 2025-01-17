@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
@@ -39,7 +40,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	assert.NotNil(t, z)
 }
@@ -87,7 +88,7 @@ func TestDecodeDomainConfig(t *testing.T) {
 }
 
 func TestInitDomain(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	req := &prototk.InitDomainRequest{
 		AbiStateSchemas: []*prototk.StateSchema{
@@ -111,7 +112,7 @@ func TestInitDomain(t *testing.T) {
 }
 
 func TestInitDeploy(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	req := &prototk.InitDeployRequest{
 		Transaction: &prototk.DeployTransactionSpecification{
@@ -128,7 +129,7 @@ func TestInitDeploy(t *testing.T) {
 }
 
 func TestPrepareDeploy(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.config = &types.DomainFactoryConfig{
 		DomainContracts: types.DomainConfigContracts{
@@ -164,7 +165,7 @@ func TestPrepareDeploy(t *testing.T) {
 }
 
 func TestInitContract(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	req := &prototk.InitContractRequest{
 		ContractConfig: []byte("bad config"),
@@ -191,7 +192,7 @@ func TestInitContract(t *testing.T) {
 }
 
 func TestInitTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	req := &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
@@ -259,7 +260,7 @@ func TestInitTransaction(t *testing.T) {
 }
 
 func TestAssembleTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.name = "z1"
 	z.coinSchema = &prototk.StateSchema{
@@ -301,7 +302,7 @@ func TestAssembleTransaction(t *testing.T) {
 }
 
 func TestEndorseTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	req := &prototk.EndorseTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
@@ -327,7 +328,7 @@ func TestEndorseTransaction(t *testing.T) {
 }
 
 func TestPrepareTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.config = &types.DomainFactoryConfig{
 		DomainContracts: types.DomainConfigContracts{
@@ -368,8 +369,8 @@ func TestPrepareTransaction(t *testing.T) {
 }
 
 func TestFindCoins(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{
-		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks := &domain.MockDomainCallbacks{
+		MockFindAvailableStates: func() (*prototk.FindAvailableStatesResponse, error) {
 			return nil, errors.New("find coins error")
 		},
 	}
@@ -383,7 +384,7 @@ func TestFindCoins(t *testing.T) {
 	_, err := findCoins(context.Background(), z, useNullifiers, addr, "{}")
 	assert.EqualError(t, err, "find coins error")
 
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		return &prototk.FindAvailableStatesResponse{
 			States: []*prototk.StoredState{
 				{
@@ -397,9 +398,9 @@ func TestFindCoins(t *testing.T) {
 	assert.NotNil(t, res)
 }
 
-func newTestZeto() (*Zeto, *testDomainCallbacks) {
-	testCallbacks := &testDomainCallbacks{
-		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
+func newTestZeto() (*Zeto, *domain.MockDomainCallbacks) {
+	testCallbacks := &domain.MockDomainCallbacks{
+		MockFindAvailableStates: func() (*prototk.FindAvailableStatesResponse, error) {
 			return &prototk.FindAvailableStatesResponse{}, nil
 		},
 	}
@@ -422,7 +423,7 @@ func newTestZeto() (*Zeto, *testDomainCallbacks) {
 
 func TestHandleEventBatch(t *testing.T) {
 	z, testCallbacks := newTestZeto()
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		return nil, errors.New("find merkle tree root error")
 	}
 	ctx := context.Background()
@@ -452,7 +453,7 @@ func TestHandleEventBatch(t *testing.T) {
 	_, err = z.HandleEventBatch(ctx, req)
 	assert.EqualError(t, err, "PD210019: Failed to create Merkle tree for smt_Zeto_AnonNullifier_0x1234567890123456789012345678901234567890: PD210065: Failed to find available states for the merkle tree. find merkle tree root error")
 
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		return &prototk.FindAvailableStatesResponse{}, nil
 	}
 	res1, err := z.HandleEventBatch(ctx, req)
@@ -487,7 +488,7 @@ func TestHandleEventBatch(t *testing.T) {
 }
 
 func TestGetVerifier(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.name = "z1"
 	z.coinSchema = &prototk.StateSchema{
@@ -515,7 +516,7 @@ func TestGetVerifier(t *testing.T) {
 }
 
 func TestSign(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.name = "z1"
 	z.coinSchema = &prototk.StateSchema{

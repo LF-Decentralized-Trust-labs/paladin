@@ -340,6 +340,12 @@ func TestStateContextMintSpendMint(t *testing.T) {
 	// Flush the states to the database
 	syncFlushContext(t, dc)
 
+	// Query state by ID
+	_, statesByID, err := dc.GetStates(ss.p.DB(), schemaID, []string{states[0].ID.String()})
+	require.NoError(t, err)
+	assert.Len(t, statesByID, 1)
+	assert.Equal(t, int64(50), parseFakeCoin(t, statesByID[0]).Amount.Int64())
+
 	// Check the DB persisted state is what we expect
 	_, states, err = dc.FindAvailableStates(ss.p.DB(), schemaID, query.NewQueryBuilder().Sort("owner", "amount").Query())
 	require.NoError(t, err)

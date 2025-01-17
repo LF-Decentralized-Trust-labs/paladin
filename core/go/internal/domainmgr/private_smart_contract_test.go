@@ -522,6 +522,51 @@ func TestRecoverSignature(t *testing.T) {
 	assert.Equal(t, kp.Address.String(), res.Verifier)
 }
 
+func TestSendTransaction(t *testing.T) {
+	txID := uuid.New()
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
+		mc.txManager.On("SendTransaction", mock.Anything, mock.Anything).Return(&txID, nil)
+	})
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	_, err := td.d.SendTransaction(td.ctx, &prototk.SendTransactionRequest{
+		Transaction: &prototk.TransactionInput{
+			ContractAddress: "0x05d936207F04D81a85881b72A0D17854Ee8BE45A",
+			FunctionAbiJson: `{}`,
+			ParamsJson:      `{}`,
+		},
+	})
+	require.NoError(t, err)
+}
+
+func TestSendTransactionFail(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
+		mc.txManager.On("SendTransaction", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
+	})
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	_, err := td.d.SendTransaction(td.ctx, &prototk.SendTransactionRequest{
+		Transaction: &prototk.TransactionInput{
+			ContractAddress: "0x05d936207F04D81a85881b72A0D17854Ee8BE45A",
+			FunctionAbiJson: `{}`,
+			ParamsJson:      `{}`,
+		},
+	})
+	require.EqualError(t, err, "pop")
+}
+
+func TestLocalNodeName(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	res, err := td.d.LocalNodeName(td.ctx, &prototk.LocalNodeNameRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, "node1", res.Name)
+}
+
 func TestDomainInitTransactionMissingInput(t *testing.T) {
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()

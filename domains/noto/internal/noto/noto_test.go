@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +29,7 @@ import (
 )
 
 var encodedConfig = func() []byte {
-	configData := tktypes.HexBytes(`{"notaryLookup":"notary"}`)
+	configData := tktypes.HexBytes(`{"notaryLookup":"notary@node1"}`)
 	encoded, err := types.NotoConfigABI_V0.EncodeABIDataJSON([]byte(fmt.Sprintf(`{
 		"notaryAddress": "0x138baffcdcc3543aad1afd81c71d2182cdf9c8cd",
 		"variant": "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -43,8 +44,16 @@ var encodedConfig = func() []byte {
 	return result
 }()
 
+var mockCallbacks = &domain.MockDomainCallbacks{
+	MockLocalNodeName: func() (*prototk.LocalNodeNameResponse, error) {
+		return &prototk.LocalNodeNameResponse{
+			Name: "node1",
+		}, nil
+	},
+}
+
 func TestConfigureDomainBadConfig(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.ConfigureDomain(context.Background(), &prototk.ConfigureDomainRequest{
 		ConfigJson: "!!wrong",
 	})
@@ -52,7 +61,7 @@ func TestConfigureDomainBadConfig(t *testing.T) {
 }
 
 func TestInitDeployBadParams(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.InitDeploy(context.Background(), &prototk.InitDeployRequest{
 		Transaction: &prototk.DeployTransactionSpecification{
 			ConstructorParamsJson: "!!wrong",
@@ -62,7 +71,7 @@ func TestInitDeployBadParams(t *testing.T) {
 }
 
 func TestPrepareDeployBadParams(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.PrepareDeploy(context.Background(), &prototk.PrepareDeployRequest{
 		Transaction: &prototk.DeployTransactionSpecification{
 			ConstructorParamsJson: "!!wrong",
@@ -72,7 +81,7 @@ func TestPrepareDeployBadParams(t *testing.T) {
 }
 
 func TestPrepareDeployMissingVerifier(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.PrepareDeploy(context.Background(), &prototk.PrepareDeployRequest{
 		Transaction: &prototk.DeployTransactionSpecification{
 			ConstructorParamsJson: "{}",
@@ -82,7 +91,7 @@ func TestPrepareDeployMissingVerifier(t *testing.T) {
 }
 
 func TestInitTransactionBadAbi(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.InitTransaction(context.Background(), &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
 			FunctionAbiJson: "!!wrong",
@@ -92,7 +101,7 @@ func TestInitTransactionBadAbi(t *testing.T) {
 }
 
 func TestInitTransactionBadFunction(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.InitTransaction(context.Background(), &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
 			ContractInfo: &prototk.ContractInfo{
@@ -105,7 +114,7 @@ func TestInitTransactionBadFunction(t *testing.T) {
 }
 
 func TestInitContractOk(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	res, err := n.InitContract(context.Background(), &prototk.InitContractRequest{
 		ContractAddress: tktypes.RandAddress().String(),
 		ContractConfig:  encodedConfig,
@@ -113,7 +122,8 @@ func TestInitContractOk(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, `{
 		"notaryAddress": "0x138baffcdcc3543aad1afd81c71d2182cdf9c8cd",
-		"notaryLookup": "notary",
+		"notaryLookup": "notary@node1",
+		"isNotary": true,
 		"notaryType": "0x0",
 		"restrictMinting": false,
 		"allowBurning": false,
@@ -122,7 +132,7 @@ func TestInitContractOk(t *testing.T) {
 }
 
 func TestInitTransactionBadParams(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.InitTransaction(context.Background(), &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
 			ContractInfo: &prototk.ContractInfo{
@@ -136,7 +146,7 @@ func TestInitTransactionBadParams(t *testing.T) {
 }
 
 func TestInitTransactionMissingTo(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.InitTransaction(context.Background(), &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
 			ContractInfo: &prototk.ContractInfo{
@@ -150,7 +160,7 @@ func TestInitTransactionMissingTo(t *testing.T) {
 }
 
 func TestInitTransactionMissingAmount(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.InitTransaction(context.Background(), &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
 			ContractInfo: &prototk.ContractInfo{
@@ -164,7 +174,7 @@ func TestInitTransactionMissingAmount(t *testing.T) {
 }
 
 func TestInitTransactionBadSignature(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.InitTransaction(context.Background(), &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
 			ContractInfo: &prototk.ContractInfo{
@@ -178,7 +188,7 @@ func TestInitTransactionBadSignature(t *testing.T) {
 }
 
 func TestAssembleTransactionBadAbi(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.AssembleTransaction(context.Background(), &prototk.AssembleTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
 			FunctionAbiJson: "!!wrong",
@@ -188,7 +198,7 @@ func TestAssembleTransactionBadAbi(t *testing.T) {
 }
 
 func TestEndorseTransactionBadAbi(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.EndorseTransaction(context.Background(), &prototk.EndorseTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
 			FunctionAbiJson: "!!wrong",
@@ -198,7 +208,7 @@ func TestEndorseTransactionBadAbi(t *testing.T) {
 }
 
 func TestPrepareTransactionBadAbi(t *testing.T) {
-	n := &Noto{}
+	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.PrepareTransaction(context.Background(), &prototk.PrepareTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
 			FunctionAbiJson: "!!wrong",

@@ -1022,6 +1022,55 @@ func TestRecoverSignerFailCases(t *testing.T) {
 	assert.Regexp(t, "PD011638", err)
 }
 
+func TestSendTransactionFailCases(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+
+	_, err := td.d.SendTransaction(td.ctx, &prototk.SendTransactionRequest{
+		Transaction: &prototk.TransactionInput{
+			ContractAddress: "badnotgood",
+			FunctionAbiJson: `{}`,
+			ParamsJson:      `{}`,
+		},
+	})
+	require.ErrorContains(t, err, "bad address")
+
+	_, err = td.d.SendTransaction(td.ctx, &prototk.SendTransactionRequest{
+		Transaction: &prototk.TransactionInput{
+			ContractAddress: "0x05d936207F04D81a85881b72A0D17854Ee8BE45A",
+			FunctionAbiJson: `bad`,
+			ParamsJson:      `{}`,
+		},
+	})
+	require.ErrorContains(t, err, "invalid character")
+}
+
+func TestGetStatesFailCases(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+
+	_, err := td.d.GetStates(td.ctx, &prototk.GetStatesRequest{
+		StateQueryContext: "bad",
+	})
+	require.ErrorContains(t, err, "PD011649")
+
+	_, err = td.d.GetStates(td.ctx, &prototk.GetStatesRequest{
+		StateQueryContext: td.c.id,
+		SchemaId:          "bad",
+	})
+	require.ErrorContains(t, err, "PD011641")
+
+	schemaID := tktypes.Bytes32(tktypes.RandBytes(32))
+	td.mdc.On("GetStates", mock.Anything, schemaID, []string{"id1"}).Return(nil, nil, fmt.Errorf("pop"))
+
+	_, err = td.d.GetStates(td.ctx, &prototk.GetStatesRequest{
+		StateQueryContext: td.c.id,
+		SchemaId:          schemaID.String(),
+		StateIds:          []string{"id1"},
+	})
+	require.EqualError(t, err, "pop")
+}
+
 func TestMapStateLockType(t *testing.T) {
 	for _, pldType := range pldapi.StateLockType("").Options() {
 		assert.NotNil(t, mapStateLockType(pldapi.StateLockType(pldType)))
