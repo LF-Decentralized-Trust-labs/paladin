@@ -231,7 +231,7 @@ Generally should not be called directly.
 
 ```json
 {
-    "name": "mint",
+    "name": "transition",
     "type": "function",
     "inputs": [
         {"name": "txId", "type": "bytes32"},
