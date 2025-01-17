@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {NotoTrackerERC20} from "./NotoTrackerERC20.sol";
 import {InvestorList} from "./InvestorList.sol";
 
@@ -9,7 +8,7 @@ import {InvestorList} from "./InvestorList.sol";
  * @title BondTracker
  * @dev Hook logic to model a simple bond lifecycle on top of Noto.
  */
-contract BondTracker is NotoTrackerERC20, Ownable {
+contract BondTracker is NotoTrackerERC20 {
     enum Status {
         INITIALIZED,
         ISSUED,
@@ -21,10 +20,16 @@ contract BondTracker is NotoTrackerERC20, Ownable {
     Status internal _status;
     address internal _publicTracker;
     address internal _issuer;
+    address internal _custodian;
     InvestorList public investorList;
 
-    modifier onlyIssuer() {
-        require(_msgSender() == _issuer, "Sender is not issuer");
+    modifier onlyIssuer(address sender) {
+        require(sender == _issuer, "Sender is not bond issuer");
+        _;
+    }
+
+    modifier onlyCustodian(address sender) {
+        require(sender == _custodian, "Sender is not bond custodian");
         _;
     }
 
@@ -33,17 +38,18 @@ contract BondTracker is NotoTrackerERC20, Ownable {
         string memory symbol,
         address custodian,
         address publicTracker
-    ) NotoTrackerERC20(name, symbol) Ownable(custodian) {
+    ) NotoTrackerERC20(name, symbol) {
         _status = Status.INITIALIZED;
         _publicTracker = publicTracker;
-        _issuer = _msgSender();
+        _issuer = msg.sender;
+        _custodian = custodian;
         investorList = new InvestorList(custodian);
     }
 
     function beginDistribution(
         uint256 discountPrice,
         uint256 minimumDenomination
-    ) external onlyOwner {
+    ) external onlyCustodian(msg.sender) {
         require(_status == Status.ISSUED, "Bond has not been issued");
         _status = Status.DISTRIBUTION_STARTED;
         emit PenteExternalCall(
@@ -56,7 +62,7 @@ contract BondTracker is NotoTrackerERC20, Ownable {
         );
     }
 
-    function closeDistribution() external onlyOwner {
+    function closeDistribution() external onlyCustodian(msg.sender) {
         _status = Status.DISTRIBUTION_CLOSED;
         emit PenteExternalCall(
             _publicTracker,
@@ -64,7 +70,7 @@ contract BondTracker is NotoTrackerERC20, Ownable {
         );
     }
 
-    function setActive() external onlyIssuer {
+    function setActive() external onlyIssuer(msg.sender) {
         require(
             _status == Status.DISTRIBUTION_CLOSED,
             "Bond is not ready to be activated"
@@ -106,9 +112,8 @@ contract BondTracker is NotoTrackerERC20, Ownable {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external virtual override onlyOwner {
-        require(sender == _issuer, "Bond must be issued by issuer");
-        require(to == owner(), "Bond must be issued to custodian");
+    ) external virtual override onlyIssuer(sender) {
+        require(to == _custodian, "Bond must be issued to custodian");
         require(_status == Status.INITIALIZED, "Bond has already been issued");
 
         _onMint(sender, to, amount, data, prepared);
@@ -127,11 +132,11 @@ contract BondTracker is NotoTrackerERC20, Ownable {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external virtual override onlyOwner {
+    ) external virtual override onlySelf(sender, from) {
         _checkTransfer(sender, from, to, amount);
         _onTransfer(sender, from, to, amount, data, prepared);
 
-        if (_status == Status.DISTRIBUTION_STARTED && from == owner()) {
+        if (_status == Status.DISTRIBUTION_STARTED && from == _custodian) {
             emit PenteExternalCall(
                 _publicTracker,
                 abi.encodeWithSignature("onDistribute(uint256)", amount)
@@ -145,7 +150,7 @@ contract BondTracker is NotoTrackerERC20, Ownable {
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external virtual override onlyOwner {
+    ) external virtual override onlyLockOwner(sender, lockId) {
         _checkTransfers(sender, _locks.ownerOf(lockId), recipients);
         _onUnlock(sender, lockId, recipients, data, prepared);
     }
@@ -156,7 +161,7 @@ contract BondTracker is NotoTrackerERC20, Ownable {
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external virtual override onlyOwner {
+    ) external virtual override onlyLockOwner(sender, lockId) {
         _checkTransfers(sender, _locks.ownerOf(lockId), recipients);
         _onPrepareUnlock(sender, lockId, recipients, data, prepared);
     }

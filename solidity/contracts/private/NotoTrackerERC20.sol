@@ -6,13 +6,34 @@ import {INotoHooks} from "../private/interfaces/INotoHooks.sol";
 import {NotoLocks} from "./NotoLocks.sol";
 
 /**
+ * @title NotoTrackerERC20
  * @dev Example Noto hooks which track all Noto token movements on a private ERC20.
  */
 contract NotoTrackerERC20 is INotoHooks, ERC20 {
     NotoLocks internal _locks;
+    address internal _notary;
+
+    modifier onlyNotary(address sender) {
+        require(sender == _notary, "Sender is not the notary");
+        _;
+    }
+
+    modifier onlySelf(address sender, address from) {
+        require(sender == from, "Sender is not the from address");
+        _;
+    }
+
+    modifier onlyLockOwner(address sender, bytes32 lockId) {
+        require(
+            sender == _locks.ownerOf(lockId),
+            "Sender is not the lock owner"
+        );
+        _;
+    }
 
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {
         _locks = new NotoLocks();
+        _notary = msg.sender;
     }
 
     function _onMint(
@@ -93,7 +114,7 @@ contract NotoTrackerERC20 is INotoHooks, ERC20 {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external virtual override {
+    ) external virtual override onlyNotary(sender) {
         _onMint(sender, to, amount, data, prepared);
     }
 
@@ -104,7 +125,7 @@ contract NotoTrackerERC20 is INotoHooks, ERC20 {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external virtual override {
+    ) external virtual override onlySelf(sender, from) {
         _onTransfer(sender, from, to, amount, data, prepared);
     }
 
@@ -148,7 +169,7 @@ contract NotoTrackerERC20 is INotoHooks, ERC20 {
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external virtual override {
+    ) external virtual override onlyLockOwner(sender, lockId) {
         _onUnlock(sender, lockId, recipients, data, prepared);
     }
 
@@ -158,7 +179,7 @@ contract NotoTrackerERC20 is INotoHooks, ERC20 {
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external virtual override {
+    ) external virtual override onlyLockOwner(sender, lockId) {
         _onPrepareUnlock(sender, lockId, recipients, data, prepared);
     }
 
