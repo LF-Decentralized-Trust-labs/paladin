@@ -1,16 +1,14 @@
 import PaladinClient, {
-  Algorithms,
   encodeStates,
   newGroupSalt,
   newTransactionId,
   NotoFactory,
   PenteFactory,
   TransactionType,
-  Verifiers,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
-import bondTrackerPublicJson from "./abis/BondTrackerPublic.json";
-import atomFactoryJson from "./abis/AtomFactory.json";
 import atomJson from "./abis/Atom.json";
+import atomFactoryJson from "./abis/AtomFactory.json";
+import bondTrackerPublicJson from "./abis/BondTrackerPublic.json";
 import { newBondSubscription } from "./helpers/bondsubscription";
 import { newBondTracker } from "./helpers/bondtracker";
 import { checkDeploy, checkReceipt } from "./util";
@@ -40,7 +38,7 @@ async function main(): Promise<boolean> {
   const notoFactory = new NotoFactory(paladin1, "noto");
   const notoCash = await notoFactory.newNoto(cashIssuer, {
     notary: cashIssuer,
-    restrictMinting: true,
+    notaryMode: "basic",
   });
   if (!checkDeploy(notoCash)) return false;
 
@@ -107,12 +105,14 @@ async function main(): Promise<boolean> {
   logger.log("Deploying Noto bond token...");
   const notoBond = await notoFactory.newNoto(bondIssuer, {
     notary: bondCustodian,
-    hooks: {
-      privateGroup: issuerCustodianGroup.group,
-      publicAddress: issuerCustodianGroup.address,
-      privateAddress: bondTracker.address,
+    notaryMode: "hooks",
+    options: {
+      hooks: {
+        privateGroup: issuerCustodianGroup.group,
+        publicAddress: issuerCustodianGroup.address,
+        privateAddress: bondTracker.address,
+      },
     },
-    restrictMinting: false,
   });
   if (!checkDeploy(notoBond)) return false;
 
@@ -201,11 +201,7 @@ async function main(): Promise<boolean> {
     txID,
     10000
   );
-  if (paymentTransfer === undefined) {
-    logger.error("Failed!");
-    return false;
-  }
-  logger.log("Success!");
+  if (!paymentTransfer) return false;
 
   if (paymentTransfer.transaction.to === undefined) {
     logger.error("Prepared payment transfer had no 'to' address");

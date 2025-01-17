@@ -522,6 +522,51 @@ func TestRecoverSignature(t *testing.T) {
 	assert.Equal(t, kp.Address.String(), res.Verifier)
 }
 
+func TestSendTransaction(t *testing.T) {
+	txID := uuid.New()
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
+		mc.txManager.On("SendTransaction", mock.Anything, mock.Anything).Return(&txID, nil)
+	})
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	_, err := td.d.SendTransaction(td.ctx, &prototk.SendTransactionRequest{
+		Transaction: &prototk.TransactionInput{
+			ContractAddress: "0x05d936207F04D81a85881b72A0D17854Ee8BE45A",
+			FunctionAbiJson: `{}`,
+			ParamsJson:      `{}`,
+		},
+	})
+	require.NoError(t, err)
+}
+
+func TestSendTransactionFail(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
+		mc.txManager.On("SendTransaction", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
+	})
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	_, err := td.d.SendTransaction(td.ctx, &prototk.SendTransactionRequest{
+		Transaction: &prototk.TransactionInput{
+			ContractAddress: "0x05d936207F04D81a85881b72A0D17854Ee8BE45A",
+			FunctionAbiJson: `{}`,
+			ParamsJson:      `{}`,
+		},
+	})
+	require.EqualError(t, err, "pop")
+}
+
+func TestLocalNodeName(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	res, err := td.d.LocalNodeName(td.ctx, &prototk.LocalNodeNameRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, "node1", res.Name)
+}
+
 func TestDomainInitTransactionMissingInput(t *testing.T) {
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -606,13 +651,13 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	state4 := storeTestState(t, td, ptx.ID, ethtypes.NewHexInteger64(4444444))
 
 	state5 := &fakeState{
-		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Salt:   tktypes.RandBytes32(),
 		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
 		Amount: ethtypes.NewHexInteger64(5555555),
 	}
 
 	state6 := &fakeState{
-		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Salt:   tktypes.RandBytes32(),
 		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
 		Amount: ethtypes.NewHexInteger64(6666666),
 	}
@@ -957,7 +1002,7 @@ func TestDomainWritePotentialStatesBadSchema(t *testing.T) {
 
 func TestDomainWritePotentialStatesFail(t *testing.T) {
 	schema := componentmocks.NewSchema(t)
-	schemaID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schemaID := tktypes.RandBytes32()
 	schema.On("ID").Return(schemaID)
 	schema.On("Signature").Return("schema1_signature")
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(schema), mockBlockHeight)
@@ -975,7 +1020,7 @@ func TestDomainWritePotentialStatesFail(t *testing.T) {
 
 func TestDomainWritePotentialStatesBadID(t *testing.T) {
 	schema := componentmocks.NewSchema(t)
-	schemaID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schemaID := tktypes.RandBytes32()
 	schema.On("ID").Return(schemaID)
 	schema.On("Signature").Return("schema1_signature")
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(schema), mockBlockHeight)

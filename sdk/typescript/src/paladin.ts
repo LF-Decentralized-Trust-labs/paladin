@@ -15,8 +15,15 @@ import {
   ITransactionStates,
   IDecodedEvent,
   IEventWithData,
+  IStoredABI,
 } from "./interfaces/transaction";
-import { Algorithms, Verifiers } from "./interfaces";
+import {
+  Algorithms,
+  ISchema,
+  IState,
+  StateStatus,
+  Verifiers,
+} from "./interfaces";
 import { ethers, InterfaceAbi } from "ethers";
 import { PaladinVerifier } from "./verifier";
 
@@ -202,6 +209,13 @@ export default class PaladinClient {
     await this.post("ptx_storeABI", [abi]);
   }
 
+  async getStoredABI(hash: string) {
+    const res = await this.post<JsonRpcResult<IStoredABI>>("ptx_getStoredABI", [
+      hash,
+    ]);
+    return res.data.result;
+  }
+
   async decodeEvent(topics: string[], data: string) {
     try {
       const res = await this.post<JsonRpcResult<IDecodedEvent>>(
@@ -226,6 +240,43 @@ export default class PaladinClient {
     const res = await this.post<JsonRpcResult<IEventWithData[]>>(
       "bidx_decodeTransactionEvents",
       [transactionHash, abi, resultFormat]
+    );
+    return res.data.result;
+  }
+
+  async listSchemas(domain: string) {
+    const res = await this.post<JsonRpcResult<ISchema[]>>(
+      "pstate_listSchemas",
+      [domain]
+    );
+    return res.data.result;
+  }
+
+  async queryStates(
+    domain: string,
+    schema: string,
+    query: IQuery,
+    status: StateStatus
+  ) {
+    const res = await this.post<JsonRpcResult<IState[]>>("pstate_queryStates", [
+      domain,
+      schema,
+      query,
+      status,
+    ]);
+    return res.data.result;
+  }
+
+  async queryContractStates(
+    domain: string,
+    contractAddress: string,
+    schema: string,
+    query: IQuery,
+    status: StateStatus
+  ) {
+    const res = await this.post<JsonRpcResult<IState[]>>(
+      "pstate_queryContractStates",
+      [domain, contractAddress, schema, query, status]
     );
     return res.data.result;
   }

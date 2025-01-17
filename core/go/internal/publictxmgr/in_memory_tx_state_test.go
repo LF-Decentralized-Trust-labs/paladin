@@ -47,7 +47,7 @@ const testTransactionData string = "0x7369676e6564206d657373616765"
 func NewTestInMemoryTxState(t *testing.T) InMemoryTxStateManager {
 	oldTime := tktypes.TimestampNow()
 	oldFrom := tktypes.MustEthAddress("0x4e598f6e918321dd47c86e7a077b4ab0e7414846")
-	oldTxHash := tktypes.Bytes32(tktypes.RandBytes(32))
+	oldTxHash := tktypes.RandBytes32()
 	oldTo := tktypes.MustEthAddress("0x6cee73cf4d5b0ac66ce2d1c0617bec4bedd09f39")
 	oldNonce := tktypes.HexUint64(1)
 	oldGasLimit := tktypes.HexUint64(2000)

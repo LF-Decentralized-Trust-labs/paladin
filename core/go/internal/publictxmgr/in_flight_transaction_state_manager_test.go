@@ -217,7 +217,7 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 	go func() {
 		for i := 0; i < expectedNumberOfSignSuccessOutput; i++ {
 			go func() {
-				stateManager.AddSignOutput(ctx, []byte("data"), confutil.P(tktypes.Bytes32(tktypes.RandBytes(32))), nil)
+				stateManager.AddSignOutput(ctx, []byte("data"), confutil.P(tktypes.RandBytes32()), nil)
 				countChanel <- true
 			}()
 		}
@@ -369,7 +369,7 @@ func TestStateManagerTxPersistenceManagementUpdateErrors(t *testing.T) {
 	rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{
 		NewSubmission: &DBPubTxnSubmission{
 			from:            "0x12345",
-			TransactionHash: tktypes.Bytes32(tktypes.RandBytes(32)),
+			TransactionHash: tktypes.RandBytes32(),
 		},
 	}
 

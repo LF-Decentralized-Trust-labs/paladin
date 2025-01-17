@@ -248,6 +248,7 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 			deploy := rpc["node1"].ForABI(ctx, abi.ABI{
 				{Type: abi.Constructor, Inputs: abi.ParameterArray{
 					{Name: "notary", Type: "string"},
+					{Name: "notaryMode", Type: "string"},
 				}},
 			}).
 				Private().
@@ -255,7 +256,8 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 				Constructor().
 				From(notary).
 				Inputs(&nototypes.ConstructorParams{
-					Notary: notary,
+					Notary:     notary,
+					NotaryMode: nototypes.NotaryModeBasic,
 				}).
 				Send().
 				Wait(5 * time.Second)
@@ -366,8 +368,8 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 		})
 
 		penteGroupNodes1and2 := nototypes.PentePrivateGroup{
-			Salt:    tktypes.Bytes32(tktypes.RandBytes(32)), // unique salt must be shared privately to retain anonymity
-			Members: []string{"bob@node1", "sally@node2"},   // these will be salted to establish the endorsement key identifiers
+			Salt:    tktypes.RandBytes32(),                // unique salt must be shared privately to retain anonymity
+			Members: []string{"bob@node1", "sally@node2"}, // these will be salted to establish the endorsement key identifiers
 		}
 
 		var penteContract *tktypes.EthAddress
@@ -609,10 +611,13 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 			deploy := rpc["node1"].ForABI(ctx, abi.ABI{
 				{Type: abi.Constructor, Inputs: abi.ParameterArray{
 					{Name: "notary", Type: "string"},
-					{Name: "hooks", Type: "tuple", Components: abi.ParameterArray{
-						{Name: "publicAddress", Type: "string"},
-						{Name: "privateAddress", Type: "string"},
-						{Name: "privateGroup", Type: "tuple", Components: pentePrivGroupComps},
+					{Name: "notaryMode", Type: "string"},
+					{Name: "options", Type: "tuple", Components: abi.ParameterArray{
+						{Name: "hooks", Type: "tuple", Components: abi.ParameterArray{
+							{Name: "publicAddress", Type: "string"},
+							{Name: "privateAddress", Type: "string"},
+							{Name: "privateGroup", Type: "tuple", Components: pentePrivGroupComps},
+						}},
 					}},
 				}},
 			}).
@@ -621,11 +626,14 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 				Constructor().
 				From(notary).
 				Inputs(&nototypes.ConstructorParams{
-					Notary: notary,
-					Hooks: &nototypes.HookParams{
-						PublicAddress:  penteContract,
-						PrivateAddress: notoTrackerAddr,
-						PrivateGroup:   &penteGroupNodes1and2,
+					Notary:     notary,
+					NotaryMode: nototypes.NotaryModeHooks,
+					Options: nototypes.NotoOptions{
+						Hooks: &nototypes.NotoHooksOptions{
+							PublicAddress:  penteContract,
+							PrivateAddress: notoTrackerAddr,
+							PrivateGroup:   &penteGroupNodes1and2,
+						},
 					},
 				}).
 				Send().

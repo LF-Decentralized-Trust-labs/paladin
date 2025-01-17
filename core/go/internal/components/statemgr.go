@@ -96,6 +96,9 @@ type DomainContext interface {
 	// The dbTX is passed in to allow re-use of a connection during read operations.
 	FindAvailableStates(dbTX *gorm.DB, schemaID tktypes.Bytes32, query *query.QueryJSON) (Schema, []*pldapi.State, error)
 
+	// GetStates retrieves a set of states by ID
+	GetStates(dbTX *gorm.DB, schemaID tktypes.Bytes32, ids []string) (Schema, []*pldapi.State, error)
+
 	// Return a snapshot of all currently known state locks
 	ExportSnapshot() ([]byte, error)
 
