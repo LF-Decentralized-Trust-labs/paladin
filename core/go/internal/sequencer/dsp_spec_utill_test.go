@@ -804,12 +804,13 @@ func (c *CoordinatorHeartbeatNotificationMatcherBuilder) BlockHeight(expectedBlo
 }
 
 type DispatchConfirmationResponseMatcherBuilder struct {
+	t                       *testing.T
 	expectedTransactionID   string
 	expectedContractAddress *tktypes.EthAddress
 }
 
-func DispatchConfirmationResponseMatcher() *DispatchConfirmationResponseMatcherBuilder {
-	return &DispatchConfirmationResponseMatcherBuilder{}
+func DispatchConfirmationResponseMatcher(t *testing.T) *DispatchConfirmationResponseMatcherBuilder {
+	return &DispatchConfirmationResponseMatcherBuilder{t: t}
 }
 
 func (d *DispatchConfirmationResponseMatcherBuilder) TransactionID(expectedTransactionID string) *DispatchConfirmationResponseMatcherBuilder {
@@ -828,9 +829,7 @@ func (d *DispatchConfirmationResponseMatcherBuilder) Match() FireAndForgetMessag
 			return false
 		}
 		actualDispatchConfirmationResponse, err := ParseDispatchConfirmationResponse(message.Payload)
-		if err != nil {
-			return false
-		}
+		require.NoError(d.t, err)
 		if d.expectedTransactionID != "" {
 			if actualDispatchConfirmationResponse.TransactionID != d.expectedTransactionID {
 				return false

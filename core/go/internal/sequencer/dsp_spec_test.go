@@ -643,7 +643,7 @@ func TestRule4_8(t *testing.T) {
 	assert.False(
 		t,
 		fixture.outboundMessageMonitor.Sends(
-			DispatchConfirmationResponseMatcher().
+			DispatchConfirmationResponseMatcher(t).
 				Match(),
 		),
 	)
@@ -682,7 +682,7 @@ func TestRule4_9(t *testing.T) {
 	assert.False(
 		t,
 		fixture.outboundMessageMonitor.Sends(
-			DispatchConfirmationResponseMatcher().
+			DispatchConfirmationResponseMatcher(t).
 				Match(),
 		),
 	)
@@ -722,7 +722,7 @@ func TestRule5_9(t *testing.T) {
 	assert.True(
 		t,
 		fixture.outboundMessageMonitor.Sends(
-			DispatchConfirmationResponseMatcher().
+			DispatchConfirmationResponseMatcher(t).
 				Match(),
 		),
 	)
