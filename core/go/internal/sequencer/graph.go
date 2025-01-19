@@ -25,7 +25,7 @@ import (
 )
 
 type Graph interface {
-	AddTransaction(ctx context.Context, transaction *delegation)
+	AddTransaction(ctx context.Context, transaction *Delegation)
 	GetDispatchableTransactions(ctx context.Context) (DispatchableTransactions, error)
 	RemoveTransaction(ctx context.Context, txID uuid.UUID)
 	RemoveTransactions(ctx context.Context, transactionsToRemove []uuid.UUID)
@@ -33,17 +33,17 @@ type Graph interface {
 }
 
 // Map of signing address to an ordered list of transaction flows that are ready to be dispatched by that signing address
-type DispatchableTransactions map[string][]*delegation
+type DispatchableTransactions map[string][]*Delegation
 
 func NewGraph(_ context.Context) Graph {
 	return &graph{
-		allTransactions: make(map[uuid.UUID]*delegation),
+		allTransactions: make(map[uuid.UUID]*Delegation),
 	}
 }
 
 type graph struct {
 	// This is the source of truth for all transaction
-	allTransactions map[uuid.UUID]*delegation
+	allTransactions map[uuid.UUID]*Delegation
 
 	// all of the following are ephemeral and derived from allTransactions
 
@@ -52,12 +52,12 @@ type graph struct {
 	// and the third dimension is the array of state hashes that connect the two transactions
 	//  this direction makes it easier to isolate a sequence of dispatchable transactions by doing a breadth first search starting at the layer of independent transactions
 	transactionsMatrix [][][]string
-	transactions       []*delegation
+	transactions       []*Delegation
 	//map of transaction id to index in the transactions array
 	transactionIndex map[uuid.UUID]int
 }
 
-func (g *graph) AddTransaction(ctx context.Context, transaction *delegation) {
+func (g *graph) AddTransaction(ctx context.Context, transaction *Delegation) {
 	log.L(ctx).Debugf("Adding transaction %s to graph", transaction.ID.String())
 	g.allTransactions[transaction.ID] = transaction
 
@@ -70,7 +70,7 @@ func (g *graph) IncludesTransaction(txID uuid.UUID) bool {
 func (g *graph) buildMatrix(ctx context.Context) error {
 	log.L(ctx).Debugf("Building graph with %d transactions", len(g.allTransactions))
 	g.transactionIndex = make(map[uuid.UUID]int)
-	g.transactions = make([]*delegation, len(g.allTransactions))
+	g.transactions = make([]*Delegation, len(g.allTransactions))
 	currentIndex := 0
 	for txnId, txn := range g.allTransactions {
 		g.transactionIndex[txnId] = currentIndex
@@ -139,7 +139,7 @@ func (g *graph) GetDispatchableTransactions(ctx context.Context) (DispatchableTr
 	queue := make([]int, 0, len(g.transactionsMatrix))
 	//find all independent transactions - that have no input states in this graph and then do a breadth first search
 	// of each of them to find all of its dependent transactions that are also dispatchable and recurse
-	dispatchable := make([]*delegation, 0, len(g.transactionsMatrix))
+	dispatchable := make([]*Delegation, 0, len(g.transactionsMatrix))
 	//i.e. the input states are the output of transactions that are either in the dispatch stage or have been confirmed
 
 	// calcaulate the number of dependencies of each transaction
@@ -209,13 +209,13 @@ func (g *graph) GetDispatchableTransactions(ctx context.Context) (DispatchableTr
 	if len(dispatchable) > 0 {
 		signingAddress := g.allTransactions[dispatchable[0].ID].Txn().Signer
 		log.L(ctx).Debugf("Graph.GetDispatchableTransactions %d dispatchable transactions", len(dispatchable))
-		return map[string][]*delegation{
+		return map[string][]*Delegation{
 			signingAddress: dispatchable,
 		}, nil
 	}
 	log.L(ctx).Debug("Graph.GetDispatchableTransactions No dispatchable transactions")
 
-	return map[string][]*delegation{}, nil
+	return map[string][]*Delegation{}, nil
 }
 func (g *graph) RemoveTransaction(ctx context.Context, txID uuid.UUID) {
 	log.L(ctx).Debugf("Graph.RemoveTransaction Removing transaction %s from graph", txID.String())

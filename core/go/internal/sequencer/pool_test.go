@@ -18,12 +18,22 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/stretchr/testify/assert"
 )
 
 func NewTransactionPoolForUnitTesting(_ *testing.T) *transactionPool {
 	return &transactionPool{
 		transactionsBySender: make(map[string][]*pooledTransaction),
+	}
+}
+
+func NewPooledTransactionForUnitTesting(sender string) *pooledTransaction {
+	return &pooledTransaction{
+		Delegation: NewDelegation(sender, &components.PrivateTransaction{
+			ID: uuid.New(),
+		}),
 	}
 }
 
@@ -34,14 +44,9 @@ func TestPool_GetTransactionsForSender(t *testing.T) {
 	sender2NodeName := "sender2"
 	sender3NodeName := "sender3"
 
-	txn1A := &pooledTransaction{}
-	txn1A.sender = sender1NodeName
-
-	txn1B := &pooledTransaction{}
-	txn1B.sender = sender1NodeName
-
-	txn2A := &pooledTransaction{}
-	txn2A.sender = sender2NodeName
+	txn1A := NewPooledTransactionForUnitTesting(sender1NodeName)
+	txn1B := NewPooledTransactionForUnitTesting(sender1NodeName)
+	txn2A := NewPooledTransactionForUnitTesting(sender2NodeName)
 
 	pool.AddTransaction(ctx, txn1A)
 	pool.AddTransaction(ctx, txn1B)

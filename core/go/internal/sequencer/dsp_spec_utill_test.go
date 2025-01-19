@@ -281,7 +281,7 @@ type TransactionFixture struct {
 	transactionID        *uuid.UUID
 	requiredEndorsements []string
 	endorsements         []string
-	delegation           *delegation
+	delegation           *Delegation
 }
 
 func NewTransactionFixture(transactionAlias string) *TransactionFixture {
@@ -363,7 +363,7 @@ func (c *ContractSequencerAgentFixtureBuilder) Build() *ContractSequencerAgentFi
 	if c.isInSenderState {
 		pooledTransactionsFixture := c.pooledTransactions.Build()
 		for _, transaction := range pooledTransactionsFixture.pooledTransactions {
-			csa.delegationsByTransactionID[transaction.ID.String()] = &delegation{
+			csa.delegationsByTransactionID[transaction.ID.String()] = &Delegation{
 				PrivateTransaction: transaction,
 			}
 		}

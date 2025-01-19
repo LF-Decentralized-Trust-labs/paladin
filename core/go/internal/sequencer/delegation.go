@@ -27,37 +27,28 @@ type endorsementRequirement struct {
 	party      string
 }
 
-// A delegation is a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
-/*type Delegation interface {
-	ID() uuid.UUID
-	Sender() string
-	IsEndorsed(context.Context) bool
-	OutputStateIDs(context.Context) []string
-	InputStateIDs(context.Context) []string
-	Txn() *components.PrivateTransaction
-}*/
+// Delegation represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
+type Delegation struct {
+	sender string
+	*components.PrivateTransaction
+}
 
-func NewDelegation(sender string, pt *components.PrivateTransaction) *delegation {
-	return &delegation{
+func NewDelegation(sender string, pt *components.PrivateTransaction) *Delegation {
+	return &Delegation{
 		sender:             sender,
 		PrivateTransaction: pt,
 	}
 }
 
-type delegation struct {
-	sender string
-	*components.PrivateTransaction
-}
-
-func (d *delegation) Sender() string {
+func (d *Delegation) Sender() string {
 	return d.sender
 }
 
-func (d *delegation) IsEndorsed(ctx context.Context) bool {
+func (d *Delegation) IsEndorsed(ctx context.Context) bool {
 	return !d.hasOutstandingEndorsementRequests(ctx)
 }
 
-func (d *delegation) OutputStateIDs(_ context.Context) []string {
+func (d *Delegation) OutputStateIDs(_ context.Context) []string {
 
 	//We use the output states here not the OutputStatesPotential because it is not possible for another transaction
 	// to spend a state unless it has been written to the state store and at that point we have the state ID
@@ -68,7 +59,7 @@ func (d *delegation) OutputStateIDs(_ context.Context) []string {
 	return outputStateIDs
 }
 
-func (d *delegation) InputStateIDs(_ context.Context) []string {
+func (d *Delegation) InputStateIDs(_ context.Context) []string {
 
 	inputStateIDs := make([]string, len(d.PostAssembly.InputStates))
 	for i, inputState := range d.PostAssembly.InputStates {
@@ -77,15 +68,15 @@ func (d *delegation) InputStateIDs(_ context.Context) []string {
 	return inputStateIDs
 }
 
-func (d *delegation) Txn() *components.PrivateTransaction {
+func (d *Delegation) Txn() *components.PrivateTransaction {
 	return d.PrivateTransaction
 }
 
-func (d *delegation) hasOutstandingEndorsementRequests(ctx context.Context) bool {
+func (d *Delegation) hasOutstandingEndorsementRequests(ctx context.Context) bool {
 	return len(d.outstandingEndorsementRequests(ctx)) > 0
 }
 
-func (d *delegation) outstandingEndorsementRequests(ctx context.Context) []*endorsementRequirement {
+func (d *Delegation) outstandingEndorsementRequests(ctx context.Context) []*endorsementRequirement {
 	outstandingEndorsementRequests := make([]*endorsementRequirement, 0)
 	if d.PostAssembly == nil {
 		log.L(ctx).Debugf("PostAssembly is nil so there are no outstanding endorsement requests")

@@ -18,7 +18,7 @@ package sequencer
 import "context"
 
 type pooledTransaction struct {
-	*delegation
+	*Delegation
 }
 
 type TransactionPool interface {
@@ -36,9 +36,9 @@ func NewTransactionPool(_ context.Context) TransactionPool {
 	}
 }
 
-func NewPooledTransaction(pt *delegation) *pooledTransaction {
+func NewPooledTransaction(pt *Delegation) *pooledTransaction {
 	return &pooledTransaction{
-		delegation: pt,
+		Delegation: pt,
 	}
 }
 

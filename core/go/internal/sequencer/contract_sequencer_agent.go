@@ -62,7 +62,7 @@ type ContractSequencerAgent interface {
 	DispatchedTransactions(ctx context.Context) []*DispatchedTransaction
 	BlockHeight() uint64
 	Committee() []CommitteeMember
-	GetDelegation(ctx context.Context, transactionID uuid.UUID) (*delegation, error)
+	GetDelegation(ctx context.Context, transactionID uuid.UUID) (*Delegation, error)
 }
 
 type ContractSequencerHeartbeatTicker interface {
@@ -79,7 +79,7 @@ type contractSequencerAgent struct {
 	activeCoordinator                   string
 	missedHeartbeats                    int
 	heartbeatFailureThreshold           int
-	delegationsByTransactionID          map[string]*delegation
+	delegationsByTransactionID          map[string]*Delegation
 	dispatchedTransactionsByCoordinator map[string][]*DispatchedTransaction // all transactions that have been dispatched by any recently active coordinator, ( including the local node)
 	confirmedTransactionsBySubmitter    map[string][]*ConfirmedTransaction  //all transactions that have recently been confirmed, indexed by which coordinator submitted them ( including the local node)
 	transportManager                    TransportManager
@@ -107,7 +107,7 @@ func NewContractSequencerAgent(ctx context.Context, nodeName string, transportMa
 	coordinatorSelector.Initialize(ctx, committeeMembers)
 
 	return &contractSequencerAgent{
-		delegationsByTransactionID:          make(map[string]*delegation),
+		delegationsByTransactionID:          make(map[string]*Delegation),
 		dispatchedTransactionsByCoordinator: make(map[string][]*DispatchedTransaction),
 		confirmedTransactionsBySubmitter:    make(map[string][]*ConfirmedTransaction),
 		transportManager:                    transportManager,
@@ -352,7 +352,7 @@ func (c *contractSequencerAgent) HandleTransaction(ctx context.Context, transact
 	return nil
 }
 
-func (c *contractSequencerAgent) GetDelegation(ctx context.Context, transactionID uuid.UUID) (*delegation, error) {
+func (c *contractSequencerAgent) GetDelegation(ctx context.Context, transactionID uuid.UUID) (*Delegation, error) {
 	if delegation, ok := c.delegationsByTransactionID[transactionID.String()]; ok {
 		return delegation, nil
 	}
