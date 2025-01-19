@@ -58,25 +58,25 @@ func TestIsCoordinatorFalse(t *testing.T) {
 
 func TestIsCoordinatorTrueIfActive(t *testing.T) {
 	csa, _ := NewContractSequencerAgentForUnitTesting(t, nil)
-	csa.coordinatorState = CoordinatorState_Active
+	csa.coordinator.state = CoordinatorState_Active
 	assert.True(t, csa.IsCoordinator())
 }
 
 func TestIsCoordinatorTrueIfStandby(t *testing.T) {
 	csa, _ := NewContractSequencerAgentForUnitTesting(t, nil)
-	csa.coordinatorState = CoordinatorState_Standby
+	csa.coordinator.state = CoordinatorState_Standby
 	assert.True(t, csa.IsCoordinator())
 }
 
 func TestIsCoordinatorTrueIfElect(t *testing.T) {
 	csa, _ := NewContractSequencerAgentForUnitTesting(t, nil)
-	csa.coordinatorState = CoordinatorState_Elect
+	csa.coordinator.state = CoordinatorState_Elect
 	assert.True(t, csa.IsCoordinator())
 }
 
 func TestIsCoordinatorTrueIfPrepared(t *testing.T) {
 	csa, _ := NewContractSequencerAgentForUnitTesting(t, nil)
-	csa.coordinatorState = CoordinatorState_Prepared
+	csa.coordinator.state = CoordinatorState_Prepared
 	assert.True(t, csa.IsCoordinator())
 }
 

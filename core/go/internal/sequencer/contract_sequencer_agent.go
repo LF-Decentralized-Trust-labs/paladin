@@ -20,6 +20,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
@@ -30,28 +32,18 @@ type TransportManager interface {
 	SendReliable(ctx context.Context, dbTX *gorm.DB, msg ...*components.ReliableMessage) (preCommit func(), err error)
 }
 
-type CoordinatorState string
-
-const (
-	CoordinatorState_Idle     CoordinatorState = "CoordinatorState_Idle"
-	CoordinatorState_Standby  CoordinatorState = "CoordinatorState_Standby"
-	CoordinatorState_Elect    CoordinatorState = "CoordinatorState_Elect"
-	CoordinatorState_Prepared CoordinatorState = "CoordinatorState_Prepared"
-	CoordinatorState_Active   CoordinatorState = "CoordinatorState_Active"
-	CoordinatorState_Flush    CoordinatorState = "CoordinatorState_Flush"
-	CoordinatorState_Closing  CoordinatorState = "CoordinatorState_Closing"
-)
-
 type TransactionState string
 
 const (
-	TransactionState_Pooled            TransactionState = "TransactionState_Pooled"
-	TransactionState_Dispatched        TransactionState = "TransactionState_Dispatched"
-	TransactionState_Committed         TransactionState = "TransactionState_Committed"
-	TransactionState_Rejected          TransactionState = "TransactionState_Rejected"
-	TransactionState_ConfirmedSuccess  TransactionState = "TransactionState_ConfirmedSuccess"
-	TransactionState_ConfirmedReverted TransactionState = "TransactionState_ConfirmedReverted"
-	TransactionState_Assembled         TransactionState = "TransactionState_Assembled"
+	TransactionState_Pooled                TransactionState = "TransactionState_Pooled"
+	TransactionState_Assembled             TransactionState = "TransactionState_Assembled"
+	TransactionState_ConfirmingForDispatch TransactionState = "TransactionState_ConfirmingForDispatch"
+	TransactionState_Dispatched            TransactionState = "TransactionState_Dispatched"
+	TransactionState_Submitted             TransactionState = "TransactionState_Submitted"
+	TransactionState_Committed             TransactionState = "TransactionState_Committed"
+	TransactionState_Rejected              TransactionState = "TransactionState_Rejected"
+	TransactionState_ConfirmedSuccess      TransactionState = "TransactionState_ConfirmedSuccess"
+	TransactionState_ConfirmedReverted     TransactionState = "TransactionState_ConfirmedReverted"
 )
 
 // ContractSequencerAgent defines the interface for an in memory component that maintains
@@ -66,39 +58,20 @@ type ContractSequencerAgent interface {
 	HandleDelegationRequest(ctx context.Context, message *DelegationRequest) error
 	HandleTransaction(ctx context.Context, transaction *components.PrivateTransaction) error
 	HandleMissedHeartbeat(ctx context.Context) error
+	HandleIndexedBlocks(ctx context.Context, blocks []*pldapi.IndexedBlock, transactions []*blockindexer.IndexedTransactionNotify) error
 	DispatchedTransactions(ctx context.Context) []*DispatchedTransaction
 	BlockHeight() uint64
 	Committee() []CommitteeMember
+	GetDelegation(ctx context.Context, transactionID uuid.UUID) (*delegation, error)
 }
 
 type ContractSequencerHeartbeatTicker interface {
 	C() <-chan struct{}
 }
 
-type Delegation struct {
-	Sender      string
-	Transaction *components.PrivateTransaction
-}
-
-type PooledTransaction struct {
-	Delegation
-}
-
-type DispatchedTransaction struct {
-	TransactionID        uuid.UUID
-	Signer               tktypes.EthAddress
-	LatestSubmissionHash []byte
-	Nonce                uint64
-}
-
-type ConfirmedTransaction struct {
-	TransactionID uuid.UUID
-	Hash          []byte
-}
-
 type FlushPoint struct {
 	TransactionID uuid.UUID
-	Hash          []byte
+	Hash          tktypes.Bytes32
 }
 
 type contractSequencerAgent struct {
@@ -106,7 +79,7 @@ type contractSequencerAgent struct {
 	activeCoordinator                   string
 	missedHeartbeats                    int
 	heartbeatFailureThreshold           int
-	delegationsByTransactionID          map[string]*Delegation
+	delegationsByTransactionID          map[string]*delegation
 	dispatchedTransactionsByCoordinator map[string][]*DispatchedTransaction // all transactions that have been dispatched by any recently active coordinator, ( including the local node)
 	confirmedTransactionsBySubmitter    map[string][]*ConfirmedTransaction  //all transactions that have recently been confirmed, indexed by which coordinator submitted them ( including the local node)
 	transportManager                    TransportManager
@@ -114,11 +87,10 @@ type contractSequencerAgent struct {
 	currentBlockRange                   uint64
 	currentBlockHeight                  uint64
 	coordinatorSelector                 CoordinatorSelector
-	coordinatorState                    CoordinatorState
+	coordinator                         *coordinator
 	contractAddress                     *tktypes.EthAddress
 	committeeMembers                    []CommitteeMember
 	nodeName                            string
-	transactionPool                     TransactionPool
 	flushPointsBySignerAddress          map[string]*FlushPoint
 }
 
@@ -135,7 +107,7 @@ func NewContractSequencerAgent(ctx context.Context, nodeName string, transportMa
 	coordinatorSelector.Initialize(ctx, committeeMembers)
 
 	return &contractSequencerAgent{
-		delegationsByTransactionID:          make(map[string]*Delegation),
+		delegationsByTransactionID:          make(map[string]*delegation),
 		dispatchedTransactionsByCoordinator: make(map[string][]*DispatchedTransaction),
 		confirmedTransactionsBySubmitter:    make(map[string][]*ConfirmedTransaction),
 		transportManager:                    transportManager,
@@ -143,11 +115,10 @@ func NewContractSequencerAgent(ctx context.Context, nodeName string, transportMa
 		currentBlockRange:                   0,
 		currentBlockHeight:                  0,
 		coordinatorSelector:                 coordinatorSelector,
-		coordinatorState:                    CoordinatorState_Idle,
 		contractAddress:                     contractAddress,
 		committeeMembers:                    committeeMembers,
 		nodeName:                            nodeName,
-		transactionPool:                     NewTransactionPool(ctx),
+		coordinator:                         NewCoordinator(ctx),
 	}
 }
 
@@ -156,11 +127,11 @@ func (c *contractSequencerAgent) IsObserver() bool {
 }
 
 func (c *contractSequencerAgent) IsCoordinator() bool {
-	return c.coordinatorState != CoordinatorState_Idle
+	return c.coordinator.state != CoordinatorState_Idle
 }
 
 func (c *contractSequencerAgent) CoordinatorState() CoordinatorState {
-	return c.coordinatorState
+	return c.coordinator.state
 }
 
 func (c *contractSequencerAgent) IsSender() bool {
@@ -185,7 +156,7 @@ func (c *contractSequencerAgent) delegateAllTransactions(ctx context.Context) er
 	//re-delegate all transactions to the new coordinator
 	transactions := make([]*components.PrivateTransaction, 0, len(c.delegationsByTransactionID))
 	for _, delegation := range c.delegationsByTransactionID {
-		transactions = append(transactions, delegation.Transaction)
+		transactions = append(transactions, delegation.Txn())
 	}
 	//send delegation request
 	delegationRequest := DelegationRequest{
@@ -218,12 +189,10 @@ func (c *contractSequencerAgent) HandleCoordinatorHeartbeatNotification(ctx cont
 
 func (c *contractSequencerAgent) HandleDelegationRequest(ctx context.Context, message *DelegationRequest) error {
 	for _, transaction := range message.Transactions {
-		c.delegationsByTransactionID[transaction.ID.String()] = &Delegation{
-			Transaction: transaction,
-		}
+		c.delegationsByTransactionID[transaction.ID.String()] = NewDelegation(message.Sender, transaction)
 	}
 	if c.activeCoordinator == "" {
-		c.coordinatorState = CoordinatorState_Active
+		c.coordinator.state = CoordinatorState_Active
 	} else {
 		//We are aware of another active coordinator so we ask for handover information that will prevent us from
 		// wastefully trying to dispatch transactions that will ultimately encounter double spend collision on the base ledger
@@ -238,7 +207,7 @@ func (c *contractSequencerAgent) HandleDelegationRequest(ctx context.Context, me
 			Payload: handoverRequest.bytes(),
 		})
 
-		c.coordinatorState = CoordinatorState_Elect
+		c.coordinator.state = CoordinatorState_Elect
 
 	}
 
@@ -257,17 +226,42 @@ func (c *contractSequencerAgent) HandleMissedHeartbeat(ctx context.Context) erro
 				return err
 			}
 		}
-	} else if c.coordinatorState != CoordinatorState_Idle {
+	} else if c.coordinator.state != CoordinatorState_Idle {
 		// we should be sending a heartbeat
-
+		if c.coordinator.state == CoordinatorState_Closing {
+			if c.coordinator.heartbeatIntervalsSinceStateChange >= c.heartbeatFailureThreshold {
+				c.coordinator.state = CoordinatorState_Idle
+				return nil
+			}
+			c.coordinator.heartbeatIntervalsSinceStateChange++
+		}
 		c.sendCoordinatorHeartbeatNotifications(ctx)
-
 	}
 	return nil
 }
 
+func (c *contractSequencerAgent) HandleIndexedBlocks(ctx context.Context, blocks []*pldapi.IndexedBlock, transactions []*blockindexer.IndexedTransactionNotify) error {
+	//if any of the transactions are ones that we have submitted, then we need to update our in memory record of the transaction
+	// if - or when we are in flush mode, it is important to include information about confirmed transactions in the heartbeat messages
+
+	//if we are in flush mode, we need to ensure that we are aware of all the transactions that have been confirmed
+	// and we need to ensure that we have a record of all the flush points that have been submitted by the coordinator
+	for _, transaction := range transactions {
+		c.coordinator.handleTransactionConfirmed(ctx, transaction)
+	}
+
+	return nil
+}
+
+func (c *contractSequencerAgent) HandleDispatchConfirmationResponse(ctx context.Context, message *DispatchConfirmationResponse) error {
+	//TODO should there be some validation that the response message was sent by the sender for this transaction?
+	//TODO
+	return nil
+
+}
+
 func (c *contractSequencerAgent) sendCoordinatorHeartbeatNotifications(ctx context.Context) error {
-	switch c.coordinatorState {
+	switch c.coordinator.state {
 	case CoordinatorState_Elect:
 	case CoordinatorState_Prepared:
 	case CoordinatorState_Active:
@@ -293,7 +287,7 @@ func (c *contractSequencerAgent) sendCoordinatorHeartbeatNotifications(ctx conte
 
 		var confirmedTransactions []*ConfirmedTransaction = nil
 		var flushPoints []*FlushPoint = nil
-		if c.coordinatorState == CoordinatorState_Flush {
+		if c.coordinator.state == CoordinatorState_Flush {
 			confirmedTransactions, err = c.getConfirmedTransactionsSubmittedLocally(ctx)
 			if err != nil {
 				//TODO
@@ -307,7 +301,7 @@ func (c *contractSequencerAgent) sendCoordinatorHeartbeatNotifications(ctx conte
 		coordinatorHeartbeatMessage := &CoordinatorHeartbeatNotification{
 			From:                   c.activeCoordinator,
 			ContractAddress:        c.contractAddress,
-			CoordinatorState:       c.coordinatorState,
+			CoordinatorState:       c.coordinator.state,
 			BlockHeight:            c.currentBlockHeight,
 			FlushPoints:            flushPoints,
 			PooledTransactions:     pooledTransactions,
@@ -358,9 +352,15 @@ func (c *contractSequencerAgent) HandleTransaction(ctx context.Context, transact
 	return nil
 }
 
-func (c *contractSequencerAgent) getPooledTransactionsForSender(ctx context.Context, sender string) ([]*PooledTransaction, error) {
-	// Implement the logic to get pooled transactions for the sender
-	return c.transactionPool.GetTransactionsForSender(ctx, sender)
+func (c *contractSequencerAgent) GetDelegation(ctx context.Context, transactionID uuid.UUID) (*delegation, error) {
+	if delegation, ok := c.delegationsByTransactionID[transactionID.String()]; ok {
+		return delegation, nil
+	}
+	return nil, nil
+}
+
+func (c *contractSequencerAgent) getPooledTransactionsForSender(ctx context.Context, sender string) ([]*pooledTransaction, error) {
+	return c.coordinator.pooledTransactions.GetTransactionsForSender(ctx, sender)
 }
 
 func (c *contractSequencerAgent) getTransactionsDispatchedLocally(_ context.Context) ([]*DispatchedTransaction, error) {

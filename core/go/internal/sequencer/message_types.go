@@ -26,6 +26,7 @@ const (
 	MessageType_DelegationRequest                = "DelegationRequest"
 	MessageType_HandoverRequest                  = "HandoverRequest"
 	MessageType_CoordinatorHeartbeatNotification = "CoordinatorHeartbeatNotification"
+	MessageType_DispatchConfirmationResponse     = "DispatchConfirmationResponse"
 )
 
 type CoordinatorHeartbeatNotification struct {
@@ -33,7 +34,7 @@ type CoordinatorHeartbeatNotification struct {
 	ContractAddress        *tktypes.EthAddress      `json:"contractAddress"`
 	FlushPoints            []*FlushPoint            `json:"flushPoints"`
 	DispatchedTransactions []*DispatchedTransaction `json:"dispatchedTransactions"`
-	PooledTransactions     []*PooledTransaction     `json:"pooledTransactions"`
+	PooledTransactions     []*pooledTransaction     `json:"pooledTransactions"`
 	ConfirmedTransactions  []*ConfirmedTransaction  `json:"confirmedTransactions"`
 	CoordinatorState       CoordinatorState         `json:"coordinatorState"`
 	BlockHeight            uint64                   `json:"blockHeight"`
@@ -60,6 +61,11 @@ type HandoverRequest struct {
 	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
 }
 
+type DispatchConfirmationResponse struct {
+	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
+	TransactionID   string              `json:"transactionID"`
+}
+
 func (dr *HandoverRequest) bytes() []byte {
 	jsonBytes, _ := json.Marshal(dr)
 	return jsonBytes
@@ -70,8 +76,19 @@ func (dr *DelegationRequest) bytes() []byte {
 	return jsonBytes
 }
 
+func (dr *DispatchConfirmationResponse) bytes() []byte {
+	jsonBytes, _ := json.Marshal(dr)
+	return jsonBytes
+}
+
 func ParseDelegationRequest(bytes []byte) (*DelegationRequest, error) {
 	dr := &DelegationRequest{}
 	err := json.Unmarshal(bytes, dr)
 	return dr, err
+}
+
+func ParseDispatchConfirmationResponse(bytes []byte) (*DispatchConfirmationResponse, error) {
+	dcr := &DispatchConfirmationResponse{}
+	err := json.Unmarshal(bytes, dcr)
+	return dcr, err
 }

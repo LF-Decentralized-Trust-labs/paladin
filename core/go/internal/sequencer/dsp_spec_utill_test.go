@@ -29,11 +29,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 //TODO seed the random generator so that tests are deterministic
+
+//Fixtures can be created using a NewXXX function which accepts the most likely parameters for the fixture and randomizes the rest
+//Alternatively, fixtures can be created using a builder pattern.  The builder pattern is useful when the fixture has many fields and the test only cares about a few of them but different tests care about different fields. So the NewXXX function would be too cumbersome to use and would clutter the test code with irrelevant details.
 
 // The Fixture Builder pattern is a builder for creating test fixtures
 // The Builder objects follow the builder pattern, but the goal is to construct a test fixture.  The fields of the Builder object hold the instructions for creating the fixture. The `Build` method constructs the fixture object using those instructions and/or defaults/random values if no instructions are provided.
@@ -70,7 +76,7 @@ type ContractSequencerAgentFixtureBuilder struct {
 	isInSenderState                     bool
 	coordinatorState                    CoordinatorState
 	committee                           []string
-	delegatedTransactions               []DelegatedTransaction
+	delegatedTransactions               []*TransactionFixture
 	pooledTransactions                  *PooledTransactionListFixtureBuilder
 	dispatchedTransactionLists          []*DispatchedTransactionListFixture
 	blockHeight                         int64
@@ -79,6 +85,7 @@ type ContractSequencerAgentFixtureBuilder struct {
 	coordinatorRankingForCurrentBlock   []string
 	coordinatorRankingForNextBlock      []string
 	latestReceivedHeartbeatNotification CoordinatorHeartbeatNotificationBuilder
+	heartbeatIntervalsSinceStateChange  *int
 }
 
 const (
@@ -110,6 +117,7 @@ type PrivateTransactionListFixtureBuilder struct {
 }
 
 type TestFixture struct {
+	t   *testing.T
 	ctx context.Context
 }
 
@@ -121,6 +129,7 @@ type ContractSequencerAgentFixture struct {
 	blockHeight            int64
 	coordinatorSelector    *coordinatorSelectorForTesting
 	startingBlockRange     uint64
+	transactionsByAlias    map[string]*TransactionFixture
 }
 
 type PooledTransactionListFixture struct {
@@ -169,6 +178,11 @@ func (c *ContractSequencerAgentFixtureBuilder) ActiveCoordinator(activeCoordinat
 
 func (c *ContractSequencerAgentFixtureBuilder) CoordinatorState(coordinatorState CoordinatorState) *ContractSequencerAgentFixtureBuilder {
 	c.coordinatorState = coordinatorState
+	return c
+}
+
+func (c *ContractSequencerAgentFixtureBuilder) HeartbeatIntervalsSinceStateChange(heartbeatIntervalsSinceStateChange int) *ContractSequencerAgentFixtureBuilder {
+	c.heartbeatIntervalsSinceStateChange = &heartbeatIntervalsSinceStateChange
 	return c
 }
 
@@ -257,13 +271,61 @@ func (c *ContractSequencerAgentFixtureBuilder) DispatchedTransactions(transactio
 	return c
 }
 
-type DelegatedTransaction struct {
-	senderNode       string
-	transactionAlias string
-	transactionState TransactionState
+type TransactionFixture struct {
+	senderNode           string
+	transactionAlias     string
+	transactionState     TransactionState
+	hash                 *tktypes.Bytes32
+	signer               *tktypes.EthAddress
+	nonce                *uint64
+	transactionID        *uuid.UUID
+	requiredEndorsements []string
+	endorsements         []string
+	delegation           *delegation
 }
 
-func (c *ContractSequencerAgentFixtureBuilder) DelegatedTransactions(delegatedTransactions []DelegatedTransaction) *ContractSequencerAgentFixtureBuilder {
+func NewTransactionFixture(transactionAlias string) *TransactionFixture {
+	return &TransactionFixture{
+		transactionAlias: transactionAlias,
+	}
+}
+
+func (c *TransactionFixture) Sender(senderNode string) *TransactionFixture {
+	c.senderNode = senderNode
+	return c
+}
+
+func (c *TransactionFixture) State(transactionState TransactionState) *TransactionFixture {
+	c.transactionState = transactionState
+	return c
+}
+
+func (c *TransactionFixture) Hash(hash tktypes.Bytes32) *TransactionFixture {
+	c.hash = &hash
+	return c
+}
+
+func (c *TransactionFixture) Signer(signer tktypes.EthAddress) *TransactionFixture {
+	c.signer = &signer
+	return c
+}
+
+func (c *TransactionFixture) Nonce(nonce uint64) *TransactionFixture {
+	c.nonce = &nonce
+	return c
+}
+
+func (c *TransactionFixture) RequiredEndorsements(requiredEndorsements ...string) *TransactionFixture {
+	c.requiredEndorsements = requiredEndorsements
+	return c
+}
+
+func (c *TransactionFixture) Endorsements(endorsements ...string) *TransactionFixture {
+	c.endorsements = endorsements
+	return c
+}
+
+func (c *ContractSequencerAgentFixtureBuilder) DelegatedTransactions(delegatedTransactions []*TransactionFixture) *ContractSequencerAgentFixtureBuilder {
 	c.delegatedTransactions = delegatedTransactions
 	return c
 }
@@ -276,10 +338,7 @@ func (c *ContractSequencerAgentFixtureBuilder) Build() *ContractSequencerAgentFi
 		nodeName = c.nodeName
 	}
 
-	signer := tktypes.RandAddress()
-
 	outboundMessageMonitor := newFakeTransportManager(c.t)
-
 	contractAddress := tktypes.RandAddress()
 
 	csa := NewContractSequencerAgent(context.Background(), nodeName, outboundMessageMonitor, c.coordinatorSelector, c.committee, contractAddress).(*contractSequencerAgent)
@@ -304,8 +363,8 @@ func (c *ContractSequencerAgentFixtureBuilder) Build() *ContractSequencerAgentFi
 	if c.isInSenderState {
 		pooledTransactionsFixture := c.pooledTransactions.Build()
 		for _, transaction := range pooledTransactionsFixture.pooledTransactions {
-			csa.delegationsByTransactionID[transaction.ID.String()] = &Delegation{
-				Transaction: transaction,
+			csa.delegationsByTransactionID[transaction.ID.String()] = &delegation{
+				PrivateTransaction: transaction,
 			}
 		}
 		//there must be an active coordinator if we are in sender state so set it to a random value if not already provided
@@ -314,31 +373,46 @@ func (c *ContractSequencerAgentFixtureBuilder) Build() *ContractSequencerAgentFi
 		}
 	}
 	if c.coordinatorState != "" {
-		csa.coordinatorState = c.coordinatorState
+		csa.coordinator.state = c.coordinatorState
 	}
 
+	transactionsByAlias := make(map[string]*TransactionFixture)
 	for _, dt := range c.delegatedTransactions {
+		dt.transactionID = ptrTo(uuid.New())
+		transactionsByAlias[dt.transactionAlias] = dt
+		dt.delegation = NewDelegation(
+			dt.senderNode,
+			&components.PrivateTransaction{
+				ID: *dt.transactionID,
+			})
 		switch dt.transactionState {
 		case TransactionState_Assembled:
 			//TODO add to graph
+			csa.coordinator.assembledTransactions.AddTransaction(ctx, dt.delegation)
 			fallthrough
 		case TransactionState_Pooled:
-			pooledTransaction := &PooledTransaction{}
-			pooledTransaction.Transaction = &components.PrivateTransaction{}
-			pooledTransaction.Transaction.ID = uuid.New()
-			pooledTransaction.Sender = dt.senderNode
-			csa.transactionPool.AddTransaction(ctx, pooledTransaction)
+			pooledTransaction := NewPooledTransaction(NewDelegation(dt.senderNode, &components.PrivateTransaction{
+				ID: uuid.New(),
+			}))
+			csa.coordinator.pooledTransactions.AddTransaction(ctx, pooledTransaction)
+		case TransactionState_Submitted:
+			dt.hash = ptrTo(tktypes.Bytes32(tktypes.RandBytes(32)))
+			//dt.nonce = ptrTo(rand.Uint64())
+			dt.nonce = ptrTo(uint64(42))
+			fallthrough
 		case TransactionState_Dispatched:
+			dt.signer = tktypes.RandAddress()
 			if csa.dispatchedTransactionsByCoordinator[nodeName] == nil {
 				csa.dispatchedTransactionsByCoordinator[nodeName] = make([]*DispatchedTransaction, 0)
 			}
 			dispatchedTransaction := &DispatchedTransaction{}
-			dispatchedTransaction.TransactionID = uuid.New()
-			dispatchedTransaction.Signer = *signer
-
+			dispatchedTransaction.TransactionID = *dt.transactionID
+			dispatchedTransaction.Signer = *dt.signer
+			dispatchedTransaction.Nonce = dt.nonce
+			dispatchedTransaction.LatestSubmissionHash = dt.hash
+			csa.coordinator.dispatchedTransactions.add(dispatchedTransaction)
 			csa.dispatchedTransactionsByCoordinator[nodeName] = append(csa.dispatchedTransactionsByCoordinator[nodeName], dispatchedTransaction)
-		case TransactionState_Committed:
-		case TransactionState_Rejected:
+
 		case TransactionState_ConfirmedSuccess:
 		case TransactionState_ConfirmedReverted:
 		}
@@ -351,8 +425,13 @@ func (c *ContractSequencerAgentFixtureBuilder) Build() *ContractSequencerAgentFi
 		csa.dispatchedTransactionsByCoordinator[c.coordinator] = c.dispatchedTransactions
 	}
 
+	if c.heartbeatIntervalsSinceStateChange != nil {
+		csa.coordinator.heartbeatIntervalsSinceStateChange = *c.heartbeatIntervalsSinceStateChange
+	}
+
 	return &ContractSequencerAgentFixture{
 		TestFixture: TestFixture{
+			t:   c.t,
 			ctx: ctx,
 		},
 		csa:                    csa,
@@ -360,6 +439,7 @@ func (c *ContractSequencerAgentFixtureBuilder) Build() *ContractSequencerAgentFi
 		startingBlockRange:     c.startingBlockRange,
 		outboundMessageMonitor: outboundMessageMonitor,
 		coordinatorSelector:    c.coordinatorSelector,
+		transactionsByAlias:    transactionsByAlias,
 	}
 }
 
@@ -426,6 +506,7 @@ func (f *ContractSequencerAgentFixture) HeartbeatIntervalPassed() {
 	f.csa.HandleMissedHeartbeat(f.ctx)
 }
 
+// TODO remove this
 func (f *ContractSequencerAgentFixture) ExceedHeartbeatFailureThreshold() {
 
 	for i := 0; i < f.csa.heartbeatFailureThreshold; i++ {
@@ -433,6 +514,7 @@ func (f *ContractSequencerAgentFixture) ExceedHeartbeatFailureThreshold() {
 	}
 }
 
+// TODO remove this
 func (f *ContractSequencerAgentFixture) AlmostExceedHeartbeatFailureThreshold() {
 
 	for i := 0; i < f.csa.heartbeatFailureThreshold-1; i++ {
@@ -440,11 +522,54 @@ func (f *ContractSequencerAgentFixture) AlmostExceedHeartbeatFailureThreshold() 
 	}
 }
 
+func (f *ContractSequencerAgentFixture) HandleDispatchConfirmationResponse(transactionAlias string) {
+	transaction, ok := f.transactionsByAlias[transactionAlias]
+	require.True(f.t, ok, "No transaction hash with alias %s", transactionAlias)
+
+	dispatchConfirmationResponse := &DispatchConfirmationResponse{}
+	dispatchConfirmationResponse.ContractAddress = f.csa.contractAddress
+	dispatchConfirmationResponse.TransactionID = transaction.transactionID.String()
+	f.csa.HandleDispatchConfirmationResponse(f.ctx, dispatchConfirmationResponse)
+}
+
 func (f *ContractSequencerAgentFixture) MoveToNextBlockRange() {
 	currentBlockRange := f.csa.currentBlockRange
 	nextBlockRange := currentBlockRange + 1
 	newBlockHeight := nextBlockRange * f.csa.blockRangeSize
 	f.csa.HandleBlockHeightChange(f.ctx, newBlockHeight)
+}
+
+func (f *ContractSequencerAgentFixture) ConfirmTransaction(transactionAlias string) {
+	transaction, ok := f.transactionsByAlias[transactionAlias]
+	if !ok {
+		f.t.Fatalf("No transaction hash with alias %s", transactionAlias)
+	}
+
+	newBlockHeight := f.csa.currentBlockHeight + 1
+
+	require.NotNil(f.t, transaction.hash)
+	require.NotNil(f.t, transaction.nonce)
+	require.NotNil(f.t, transaction.signer)
+
+	f.csa.HandleIndexedBlocks(
+		f.ctx,
+		[]*pldapi.IndexedBlock{
+			{
+				Number:    int64(newBlockHeight),
+				Hash:      tktypes.Bytes32(tktypes.RandBytes(32)),
+				Timestamp: tktypes.TimestampNow(),
+			},
+		},
+		[]*blockindexer.IndexedTransactionNotify{
+			{
+				IndexedTransaction: pldapi.IndexedTransaction{
+					Hash:  *transaction.hash,
+					From:  transaction.signer,
+					Nonce: *transaction.nonce,
+				},
+			},
+		},
+	)
 }
 
 func (f *FixtureBuilder) DispatchedTransactionList() *DispatchedTransactionListFixtureBuilder {
@@ -471,8 +596,7 @@ func (d *DispatchedTransactionListFixtureBuilder) Build() *DispatchedTransaction
 		dispatchedTransactions[i] = &DispatchedTransaction{
 			TransactionID:        uuid.New(),
 			Signer:               *tktypes.RandAddress(),
-			LatestSubmissionHash: tktypes.RandBytes(32),
-			Nonce:                rand.Uint64(),
+			LatestSubmissionHash: ptrTo(tktypes.Bytes32(tktypes.RandBytes(32))),
 		}
 	}
 	return &DispatchedTransactionListFixture{
@@ -637,6 +761,7 @@ func (h *HandoverRequestMatcherBuilder) Match() FireAndForgetMessageMatcher {
 }
 
 type CoordinatorHeartbeatNotificationMatcherBuilder struct {
+	t                                        *testing.T
 	expectedFrom                             string
 	expectedContractAddress                  *tktypes.EthAddress
 	expectedCoordinatorState                 CoordinatorState
@@ -647,8 +772,10 @@ type CoordinatorHeartbeatNotificationMatcherBuilder struct {
 	expectedBlockHeight                      *uint64
 }
 
-func CoordinatorHeartbeatNotificationMatcher() *CoordinatorHeartbeatNotificationMatcherBuilder {
-	return &CoordinatorHeartbeatNotificationMatcherBuilder{}
+func CoordinatorHeartbeatNotificationMatcher(t *testing.T) *CoordinatorHeartbeatNotificationMatcherBuilder {
+	return &CoordinatorHeartbeatNotificationMatcherBuilder{
+		t: t,
+	}
 }
 
 func (c *CoordinatorHeartbeatNotificationMatcherBuilder) From(expectedFrom string) *CoordinatorHeartbeatNotificationMatcherBuilder {
@@ -676,6 +803,48 @@ func (c *CoordinatorHeartbeatNotificationMatcherBuilder) BlockHeight(expectedBlo
 	return c
 }
 
+type DispatchConfirmationResponseMatcherBuilder struct {
+	expectedTransactionID   string
+	expectedContractAddress *tktypes.EthAddress
+}
+
+func DispatchConfirmationResponseMatcher() *DispatchConfirmationResponseMatcherBuilder {
+	return &DispatchConfirmationResponseMatcherBuilder{}
+}
+
+func (d *DispatchConfirmationResponseMatcherBuilder) TransactionID(expectedTransactionID string) *DispatchConfirmationResponseMatcherBuilder {
+	d.expectedTransactionID = expectedTransactionID
+	return d
+}
+
+func (d *DispatchConfirmationResponseMatcherBuilder) ContractAddress(expectedContractAddress *tktypes.EthAddress) *DispatchConfirmationResponseMatcherBuilder {
+	d.expectedContractAddress = expectedContractAddress
+	return d
+}
+
+func (d *DispatchConfirmationResponseMatcherBuilder) Match() FireAndForgetMessageMatcher {
+	return func(message *components.FireAndForgetMessageSend) bool {
+		if message.MessageType != MessageType_DispatchConfirmationResponse {
+			return false
+		}
+		actualDispatchConfirmationResponse, err := ParseDispatchConfirmationResponse(message.Payload)
+		if err != nil {
+			return false
+		}
+		if d.expectedTransactionID != "" {
+			if actualDispatchConfirmationResponse.TransactionID != d.expectedTransactionID {
+				return false
+			}
+		}
+		if d.expectedContractAddress != nil {
+			if actualDispatchConfirmationResponse.ContractAddress != d.expectedContractAddress {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 type PooledTransactionListMatcher struct {
 	length *int
 }
@@ -685,7 +854,7 @@ func (p *PooledTransactionListMatcher) Length(length int) *PooledTransactionList
 	return p
 }
 
-type PooledTransactionList []*PooledTransaction
+type PooledTransactionList []*pooledTransaction
 
 func (p *PooledTransactionListMatcher) Match(actualPooledTransactions PooledTransactionList) bool {
 	if p.length != nil {
@@ -769,9 +938,7 @@ func (c *CoordinatorHeartbeatNotificationMatcherBuilder) Match() FireAndForgetMe
 			return false
 		}
 		actualCoordinatorHeartbeatNotification, err := ParseCoordinatorHeartbeatNotification(message.Payload)
-		if err != nil {
-			return false
-		}
+		require.NoError(c.t, err)
 
 		if c.expectedFrom != "" {
 			if actualCoordinatorHeartbeatNotification.From != c.expectedFrom {
@@ -822,7 +989,7 @@ func RandomDispatchedTransaction() *DispatchedTransaction {
 	return &DispatchedTransaction{
 		TransactionID:        uuid.New(),
 		Signer:               *tktypes.RandAddress(),
-		LatestSubmissionHash: tktypes.RandBytes(32),
+		LatestSubmissionHash: ptrTo(tktypes.Bytes32(tktypes.RandBytes(32))),
 	}
 }
 

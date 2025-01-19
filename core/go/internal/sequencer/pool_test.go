@@ -23,7 +23,7 @@ import (
 
 func NewTransactionPoolForUnitTesting(_ *testing.T) *transactionPool {
 	return &transactionPool{
-		transactionsBySender: make(map[string][]*PooledTransaction),
+		transactionsBySender: make(map[string][]*pooledTransaction),
 	}
 }
 
@@ -34,14 +34,14 @@ func TestPool_GetTransactionsForSender(t *testing.T) {
 	sender2NodeName := "sender2"
 	sender3NodeName := "sender3"
 
-	txn1A := &PooledTransaction{}
-	txn1A.Sender = sender1NodeName
+	txn1A := &pooledTransaction{}
+	txn1A.sender = sender1NodeName
 
-	txn1B := &PooledTransaction{}
-	txn1B.Sender = sender1NodeName
+	txn1B := &pooledTransaction{}
+	txn1B.sender = sender1NodeName
 
-	txn2A := &PooledTransaction{}
-	txn2A.Sender = sender2NodeName
+	txn2A := &pooledTransaction{}
+	txn2A.sender = sender2NodeName
 
 	pool.AddTransaction(ctx, txn1A)
 	pool.AddTransaction(ctx, txn1B)

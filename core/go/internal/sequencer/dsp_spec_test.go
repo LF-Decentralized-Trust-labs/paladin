@@ -413,16 +413,17 @@ func TestRule4_4(t *testing.T) {
 		Committee("nodeA", "nodeB", "nodeC", "nodeD").
 		CoordinatorState(CoordinatorState_Flush).
 		DelegatedTransactions(
-			[]DelegatedTransaction{
-				{"nodeB", "txB1", TransactionState_ConfirmedSuccess},
-				{"nodeB", "txB2", TransactionState_ConfirmedReverted},
-				{"nodeB", "txB3", TransactionState_Dispatched},
-				{"nodeB", "txB4", TransactionState_Assembled},
-				{"nodeB", "txB5", TransactionState_Pooled},
-				{"nodeC", "txC1", TransactionState_ConfirmedSuccess},
-				{"nodeC", "txC2", TransactionState_ConfirmedReverted},
-				{"nodeC", "txC3", TransactionState_Dispatched},
-			}).
+			[]*TransactionFixture{
+				NewTransactionFixture("txB1").Sender("nodeB").State(TransactionState_ConfirmedSuccess),
+				NewTransactionFixture("txB2").Sender("nodeB").State(TransactionState_ConfirmedReverted),
+				NewTransactionFixture("txB3").Sender("nodeB").State(TransactionState_Dispatched),
+				NewTransactionFixture("txB4").Sender("nodeB").State(TransactionState_Assembled),
+				NewTransactionFixture("txB5").Sender("nodeB").State(TransactionState_Pooled),
+				NewTransactionFixture("txC1").Sender("nodeC").State(TransactionState_ConfirmedSuccess),
+				NewTransactionFixture("txC2").Sender("nodeC").State(TransactionState_ConfirmedReverted),
+				NewTransactionFixture("txC3").Sender("nodeC").State(TransactionState_Dispatched),
+			},
+		).
 		Build()
 
 	//Exercise
@@ -432,7 +433,7 @@ func TestRule4_4(t *testing.T) {
 	assert.True(
 		t,
 		fixture.outboundMessageMonitor.Sends(
-			CoordinatorHeartbeatNotificationMatcher().
+			CoordinatorHeartbeatNotificationMatcher(t).
 				To("nodeB").
 				CoordinatorState(CoordinatorState_Flush).
 				PooledTransactionList(
@@ -458,7 +459,7 @@ func TestRule4_4(t *testing.T) {
 	assert.True(
 		t,
 		fixture.outboundMessageMonitor.Sends(
-			CoordinatorHeartbeatNotificationMatcher().
+			CoordinatorHeartbeatNotificationMatcher(t).
 				To("nodeC").
 				CoordinatorState(CoordinatorState_Flush).
 				PooledTransactionList(
@@ -484,7 +485,7 @@ func TestRule4_4(t *testing.T) {
 	assert.True(
 		t,
 		fixture.outboundMessageMonitor.Sends(
-			CoordinatorHeartbeatNotificationMatcher().
+			CoordinatorHeartbeatNotificationMatcher(t).
 				To("nodeD").
 				CoordinatorState(CoordinatorState_Flush).
 				PooledTransactionList(
@@ -506,6 +507,227 @@ func TestRule4_4(t *testing.T) {
 				Match(),
 		),
 	)
+}
+
+func TestRule4_5(t *testing.T) {
+	/*
+		`GIVEN` a`ContractSequencerAgent` is in `Coordinator.Flush` state
+		  `AND` a number of transactions have been dispatched and submitted but not confirmed
+		`WHEN` a block receipt is received that confirms (success or revert) the final transaction (flushpoint) dispatched by this coordinator
+		`THEN` a ContractSequencerAgent` is in `Coordinator.Closing` state
+	*/
+
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		NodeName("nodeA").
+		Committee("nodeA", "nodeB", "nodeC", "nodeD").
+		CoordinatorState(CoordinatorState_Flush).
+		DelegatedTransactions(
+			[]*TransactionFixture{
+				NewTransactionFixture("txB1").Sender("nodeB").State(TransactionState_Submitted),
+			}).
+		Build()
+
+	//Exercise
+	fixture.ConfirmTransaction("txB1")
+
+	//Verify
+	assert.Equal(t, CoordinatorState_Closing, fixture.csa.CoordinatorState())
+
+}
+
+func TestRule4_6(t *testing.T) {
+	/*
+		`GIVEN`  a ContractSequencerAgent` is in `Coordinator.Closing` state
+		`WHEN` `HeartbeatInterval` passes
+		`THEN` a `CoordinatorHeartbeatNotification` message is broadcast to every node in the group reporting the `ClosingStatus`  which includes a list of all transactions that were confirmed ( as success or revert) on the block chain since entering flush state
+	*/
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		NodeName("nodeA").
+		Committee("nodeA", "nodeB", "nodeC", "nodeD").
+		CoordinatorState(CoordinatorState_Closing).
+		DelegatedTransactions(
+			[]*TransactionFixture{
+				NewTransactionFixture("txA1").Sender("nodeA").State(TransactionState_Submitted),
+				NewTransactionFixture("txB1").Sender("nodeB").State(TransactionState_Submitted),
+				NewTransactionFixture("txC1").Sender("nodeC").State(TransactionState_Submitted),
+				NewTransactionFixture("txD1").Sender("nodeD").State(TransactionState_Submitted),
+			}).
+		Build()
+
+	//Exercise
+	fixture.HeartbeatIntervalPassed()
+
+	//Verify
+	assert.True(
+		t,
+		fixture.outboundMessageMonitor.Sends(
+			CoordinatorHeartbeatNotificationMatcher(t).
+				To("nodeB").
+				CoordinatorState(CoordinatorState_Closing).
+				ConfirmedTransactionList(
+					func(matcher *ConfirmedTransactionListMatcher) {
+						matcher.
+							Length(4)
+					}).
+				BlockHeight(fixture.csa.BlockHeight()).
+				Match(),
+		),
+	)
+}
+
+func TestRule4_7(t *testing.T) {
+	/*
+	   `GIVEN`  a ContractSequencerAgent` is in `Coordinator.Closing` state
+	   `WHEN` `CoordinatorHeartbeatFailureThreshold` passes since entering `Coordinator.Closing` state
+	   `THEN` the `ContractSequencerAgent` is in `Coordinator.Idle` state
+	*/
+
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		NodeName("nodeA").
+		Committee("nodeA", "nodeB", "nodeC", "nodeD").
+		CoordinatorState(CoordinatorState_Closing).
+		HeartbeatIntervalsSinceStateChange(5).
+		DelegatedTransactions(
+			[]*TransactionFixture{
+				NewTransactionFixture("txB1").Sender("nodeB").State(TransactionState_Submitted),
+			}).
+		Build()
+
+	//Exercise
+	fixture.HeartbeatIntervalPassed()
+
+	//Verify
+	assert.Equal(t, CoordinatorState_Idle, fixture.csa.CoordinatorState())
+
+	// Extra verify that no further heartbeat is sent after the state change
+	fixture.outboundMessageMonitor.Clear()
+	fixture.HeartbeatIntervalPassed()
+	assert.False(
+		t,
+		fixture.outboundMessageMonitor.Sends(
+			CoordinatorHeartbeatNotificationMatcher(t).
+				Match(),
+		),
+	)
+}
+
+func TestRule4_8(t *testing.T) {
+	/*
+		`GIVEN` a`ContractSequencerAgent` is in `Coordinator.Flush` state
+		`WHEN` a `DispatchConfirmation` is received for a prepared transaction
+		`THEN` the transaction is not dispatched
+	*/
+
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		NodeName("nodeA").
+		Committee("nodeA", "nodeB", "nodeC", "nodeD").
+		CoordinatorState(CoordinatorState_Flush).
+		DelegatedTransactions(
+			[]*TransactionFixture{
+				NewTransactionFixture("txB1").Sender("nodeB").State(TransactionState_ConfirmingForDispatch),
+			}).
+		Build()
+
+	//Exercise
+	fixture.HandleDispatchConfirmationResponse("txB1")
+
+	//Verify
+	assert.False(
+		t,
+		fixture.outboundMessageMonitor.Sends(
+			DispatchConfirmationResponseMatcher().
+				Match(),
+		),
+	)
+}
+
+func TestRule4_9(t *testing.T) {
+	/*
+	   `GIVEN` a`ContractSequencerAgent` is in `Coordinator.Flush` state
+	   `WHEN` a `EndorsementResponse` is received for an `Assembled` transaction
+	   `THEN` the `EndorsementResponse` is ignored
+	   	`AND` there is no `DispatchConfirmationRequest`
+
+	   NOTE: this is a difficult rule to express because the memory state of the Coordinator does not necessarily contain the Assembled transaction. It is valid for the coordinator to delete all non dispatched transactions from memory when it goes into `Flush` state.
+	*/
+
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		NodeName("nodeA").
+		Committee("nodeA", "nodeB", "nodeC").
+		CoordinatorState(CoordinatorState_Flush).
+		DelegatedTransactions(
+			[]*TransactionFixture{
+				NewTransactionFixture("txB1").
+					Sender("nodeB").
+					State(TransactionState_Assembled).
+					RequiredEndorsements("nodeA", "nodeB", "nodeC").
+					Endorsements("nodeA", "nodeB"),
+			}).
+		Build()
+
+	//Exercise
+	fixture.HandleDispatchConfirmationResponse("txB1")
+
+	//Verify
+	assert.False(
+		t,
+		fixture.outboundMessageMonitor.Sends(
+			DispatchConfirmationResponseMatcher().
+				Match(),
+		),
+	)
+}
+
+func TestRule5_9(t *testing.T) {
+	/*
+		`GIVEN` a `ContractSequencerAgent` is in `Coordinator.Active` state
+			`AND` a transaction is in `Graph` state
+			`AND` all bar one endorsements have been received
+			`AND` the transaction has no dependencies
+		`WHEN` the final `EndorsementResponse` is received
+		`THEN` the `ContractSequencerAgent` sends a `DispatchConfirmationRequest`
+			`AND` the transaction is in `ConfirmingForDispatch` state
+	*/
+
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		NodeName("nodeA").
+		Committee("nodeA", "nodeB", "nodeC").
+		CoordinatorState(CoordinatorState_Active).
+		DelegatedTransactions(
+			[]*TransactionFixture{
+				NewTransactionFixture("txB1").
+					Sender("nodeB").
+					State(TransactionState_Assembled).
+					RequiredEndorsements("nodeA", "nodeB", "nodeC").
+					Endorsements("nodeA", "nodeB"),
+			}).
+		Build()
+
+	//Exercise
+	fixture.HandleDispatchConfirmationResponse("txB1")
+
+	//Verify
+	assert.True(
+		t,
+		fixture.outboundMessageMonitor.Sends(
+			DispatchConfirmationResponseMatcher().
+				Match(),
+		),
+	)
+
+	//assert.Equal(t, TransactionState_ConfirmingForDispatch, fixture.TransactionState("txB1"))
 }
 
 func TestRule10000(t *testing.T) {

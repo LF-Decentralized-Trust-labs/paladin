@@ -17,30 +17,39 @@ package sequencer
 
 import "context"
 
+type pooledTransaction struct {
+	*delegation
+}
+
 type TransactionPool interface {
-	AddTransaction(context.Context, *PooledTransaction) error
-	GetTransactionsForSender(context.Context, string) ([]*PooledTransaction, error)
+	AddTransaction(context.Context, *pooledTransaction) error
+	GetTransactionsForSender(context.Context, string) ([]*pooledTransaction, error)
 }
 
 type transactionPool struct {
-	transactionsBySender map[string][]*PooledTransaction
+	transactionsBySender map[string][]*pooledTransaction
 }
 
 func NewTransactionPool(_ context.Context) TransactionPool {
 	return &transactionPool{
-		transactionsBySender: make(map[string][]*PooledTransaction),
+		transactionsBySender: make(map[string][]*pooledTransaction),
 	}
 }
 
-func (tp *transactionPool) GetTransactionsForSender(ctx context.Context, sender string) ([]*PooledTransaction, error) {
+func NewPooledTransaction(pt *delegation) *pooledTransaction {
+	return &pooledTransaction{
+		delegation: pt,
+	}
+}
+
+func (tp *transactionPool) GetTransactionsForSender(ctx context.Context, sender string) ([]*pooledTransaction, error) {
 	return tp.transactionsBySender[sender], nil
-
 }
 
-func (tp *transactionPool) AddTransaction(ctx context.Context, transaction *PooledTransaction) error {
-	if tp.transactionsBySender[transaction.Sender] == nil {
-		tp.transactionsBySender[transaction.Sender] = make([]*PooledTransaction, 0)
+func (tp *transactionPool) AddTransaction(ctx context.Context, transaction *pooledTransaction) error {
+	if tp.transactionsBySender[transaction.Sender()] == nil {
+		tp.transactionsBySender[transaction.Sender()] = make([]*pooledTransaction, 0)
 	}
-	tp.transactionsBySender[transaction.Sender] = append(tp.transactionsBySender[transaction.Sender], transaction)
+	tp.transactionsBySender[transaction.Sender()] = append(tp.transactionsBySender[transaction.Sender()], transaction)
 	return nil
 }

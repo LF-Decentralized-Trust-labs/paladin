@@ -50,6 +50,10 @@ func (f *fakeTransportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, 
 	return func() {}, nil
 }
 
+func (f *fakeTransportManager) Clear() {
+	f.sentFireAndForgetMessages = nil
+	f.sentReliableMessages = nil
+}
 func (f *fakeTransportManager) Sends(outboundMessageMatcher FireAndForgetMessageMatcher) bool {
 	for _, message := range f.sentFireAndForgetMessages {
 		if outboundMessageMatcher(message) {
@@ -72,8 +76,4 @@ func (f *fakeTransportManager) SendsReliable(outboundMessageMatcher ReliableMess
 		}
 	}
 	return false
-}
-
-func ptrTo[T any](v T) *T {
-	return &v
 }
