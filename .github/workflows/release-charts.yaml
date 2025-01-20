@@ -86,6 +86,12 @@ jobs:
           repository: ${{ github.repository_owner }}
           registry: ${{ inputs.registry }}
       
+      - name: Finalize image names
+        shell: bash
+        run: |
+          echo "IMG_PALADIN=${{ inputs.registry }}/${{ steps.docker_repo.outputs.repository }}/paladin" >> $GITHUB_ENV
+          echo "IMG_OPERATOR=${{ inputs.registry }}/${{ steps.docker_repo.outputs.repository }}/paladin-operator" >> $GITHUB_ENV
+      
       - name: Override image tags
         uses: ./.github/actions/update-yaml
         with:
@@ -93,11 +99,11 @@ jobs:
           updates: |
             operator:
               image:
-                repository: ${{ inputs.registry }}/${{ steps.docker_repo.outputs.repository }}/paladin-operator
+                repository: ${{ env.IMG_OPERATOR }}
                 tag: ${{ inputs.images_tag }}
             paladin:
               image:
-                repository: ${{ inputs.registry }}/${{ steps.docker_repo.outputs.repository }}/paladin
+                repository: ${{ env.IMG_PALADIN }}
                 tag: ${{ inputs.images_tag }}
       
       # Remove 'v' prefix from the tag
@@ -125,7 +131,18 @@ jobs:
           rm -rf charts
           rm Chart.lock
 
-      # TODO: Add e2e tests for the helm chart
+      # e2e tests 
+      - name: E2E Test
+        run: |
+          ./gradlew e2e \
+            -PloadImages=false \
+            -PbuildOperator=false \
+            -PbuildPaladin=false \
+            -PoperatorImageName=${{ env.IMG_OPERATOR }} \
+            -PoperatorImageTag=${{ inputs.images_tag }} \
+            -PpaladinImageName=${{ env.IMG_PALADIN }} \
+            -PpaladinImageTag=${{ inputs.images_tag }} \
+            -PdeleteCluster=true
 
       # set CR_TOKEN env with the GitHub token secret when it is workflow_dispatch action
       - name: Set CR_TOKEN

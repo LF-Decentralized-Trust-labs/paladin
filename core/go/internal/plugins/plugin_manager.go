@@ -83,10 +83,9 @@ func NewPluginManager(bgCtx context.Context,
 		loaderID:        loaderID,
 		shutdownTimeout: confutil.DurationMin(conf.GRPC.ShutdownTimeout, 0, *pldconf.DefaultGRPCConfig.ShutdownTimeout),
 
-		domainPlugins:    make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
-		transportPlugins: make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
-		registryPlugins:  make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
-
+		domainPlugins:        make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
+		transportPlugins:     make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
+		registryPlugins:      make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
 		serverDone:           make(chan error),
 		notifyPluginsUpdated: make(chan bool, 1),
 		notifySystemCommand:  make(chan prototk.PluginLoad_SysCommand, 1),

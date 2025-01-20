@@ -19,9 +19,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.ByteString;
+import io.kaleido.paladin.logging.PaladinLogging;
 import io.kaleido.paladin.pente.evmrunner.EVMRunner;
-import io.kaleido.paladin.toolkit.FromDomain;
-import io.kaleido.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.pente.evmstate.AccountLoader;
 import io.kaleido.paladin.pente.evmstate.DynamicLoadWorldState;
 import io.kaleido.paladin.pente.evmstate.PersistedAccount;
@@ -29,7 +28,6 @@ import io.kaleido.paladin.toolkit.*;
 import io.kaleido.paladin.toolkit.JsonHex.Address;
 import io.kaleido.paladin.toolkit.JsonHex.Bytes;
 import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.FormattedMessage;
 
@@ -40,7 +38,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 public class PenteDomain extends DomainInstance {
-    private static final Logger LOGGER = LogManager.getLogger(PenteDomain.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(PenteDomain.class);
 
     private final PenteConfiguration config = new PenteConfiguration();
 

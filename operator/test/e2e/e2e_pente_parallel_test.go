@@ -237,9 +237,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 
 			results := make(chan error)
 			for _iUser, _user := range users {
-				iUser := _iUser
-				user := _user
-				go func() {
+				go func(iUser int, user []string) {
 					var err error
 					defer func() {
 						results <- err
@@ -267,12 +265,12 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 							Send().
 							// We submit the transactions one-at-a-time within each go-routine in this test
 							// (but have three concurrent go routines running)
-							Wait(5 * time.Second)
+							Wait(15 * time.Second)
 						testLog("[%d]:%.3d/%.3d SimpleERC20 mint %d from %s@%s to %s@%s transaction %s",
 							iUser, i, count, amount, user[0], user[1], toUser[0], toUser[1], invoke.ID())
 						err = invoke.Error()
 					}
-				}()
+				}(_iUser, _user)
 			}
 			// Wait for the three go routines to complete
 			for i := 0; i < len(users); i++ {
@@ -296,9 +294,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 
 			results := make(chan []pldclient.SentTransaction)
 			for _iUser, _user := range users {
-				iUser := _iUser
-				user := _user
-				go func() {
+				go func(iUser int, user []string) {
 					const count = 10
 					transfers := make([]pldclient.SentTransaction, 0, count)
 					toUser := users[(iUser+1)%len(users)]
@@ -325,7 +321,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 						transfers = append(transfers, invoke)
 					}
 					results <- transfers
-				}()
+				}(_iUser, _user)
 			}
 			// Wait for the three go routines to complete
 			for i := 0; i < len(users); i++ {

@@ -18,12 +18,12 @@ package io.kaleido.paladin.pente.domain;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.kaleido.paladin.logging.PaladinLogging;
 import io.kaleido.paladin.toolkit.JsonABI;
 import io.kaleido.paladin.toolkit.JsonHex;
 import io.kaleido.paladin.toolkit.JsonHex.Address;
 import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
 import io.kaleido.paladin.toolkit.ToDomain;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.web3j.abi.TypeDecoder;
 import org.web3j.abi.TypeEncoder;
@@ -44,7 +44,7 @@ import java.util.List;
  * on any thread.
  **/
 public class PenteConfiguration {
-    private static final Logger LOGGER = LogManager.getLogger(PenteConfiguration.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(PenteConfiguration.class);
 
     public static final String transferSignature = "event PenteTransition(bytes32 txId, bytes32[] inputs, bytes32[] reads, bytes32[] outputs, bytes32[] info)";
     public static final String approvalSignature = "event PenteApproved(bytes32 txId, address delegate, bytes32 transitionHash)";

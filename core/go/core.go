@@ -19,6 +19,7 @@ import (
 )
 import (
 	"fmt"
+	_ "net/http/pprof"
 	"os"
 	"runtime/debug"
 

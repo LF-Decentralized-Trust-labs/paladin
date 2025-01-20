@@ -90,6 +90,7 @@ func (r *TransactionInvokeReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		"txinvoke."+txi.Name,
 		txi.Spec.Node, txi.Namespace,
 		&txi.Status.TransactionSubmission,
+		"5s",
 		func() (bool, *pldapi.TransactionInput, error) { return r.buildDeployTransaction(&txi) },
 	)
 	err = txReconcile.reconcile(ctx)
@@ -107,11 +108,11 @@ func (r *TransactionInvokeReconciler) Reconcile(ctx context.Context, req ctrl.Re
 }
 
 func (r *TransactionInvokeReconciler) updateStatusAndRequeue(ctx context.Context, txi *corev1alpha1.TransactionInvoke) (ctrl.Result, error) {
-	if err := r.Status().Update(ctx, txi); err != nil {
+	if err := r.Status().Update(ctx, txi); err != nil && !errors.IsConflict(err) {
 		log.FromContext(ctx).Error(err, "Failed to update smart contract deployment status")
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{Requeue: true}, nil // Run again immediately to submit
+	return ctrl.Result{RequeueAfter: 50 * time.Millisecond}, nil // Run again immediately to submit
 }
 
 func (r *TransactionInvokeReconciler) buildDeployTransaction(txi *corev1alpha1.TransactionInvoke) (bool, *pldapi.TransactionInput, error) {

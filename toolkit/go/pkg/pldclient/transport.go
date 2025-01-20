@@ -26,6 +26,7 @@ type Transport interface {
 
 	NodeName(ctx context.Context) (nodeName string, err error)
 	LocalTransports(ctx context.Context) (transportNames []string, err error)
+	LocalTransportDetails(ctx context.Context, transportName string) (transportDetailsStr string, err error)
 	Peers(ctx context.Context) (peers []*pldapi.PeerInfo, err error)
 	PeerInfo(ctx context.Context, nodeName string) (peer *pldapi.PeerInfo, err error)
 }
@@ -56,6 +57,8 @@ var transportInfo = &rpcModuleInfo{
 		},
 	},
 }
+
+var _ Transport = &transport{}
 
 type transport struct {
 	*rpcModuleInfo

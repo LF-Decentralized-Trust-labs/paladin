@@ -185,8 +185,12 @@ ENV PATH=$PATH:/usr/local/java/bin
 # Define the entry point for running the application
 ENTRYPOINT [                         \
     "java",                          \
+    "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED", \
+    "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED", \
+    "--add-opens", "java.base/java.nio=ALL-UNNAMED", \
+    "-Dio.netty.tryReflectionSetAccessible=true", \
     "-Djna.library.path=/app/libs",  \
     "-jar",                          \
     "/app/libs/paladin.jar"          \
 ]
- 
+

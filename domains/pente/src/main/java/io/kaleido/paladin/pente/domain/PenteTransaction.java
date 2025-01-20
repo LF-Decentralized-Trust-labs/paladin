@@ -20,11 +20,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.ByteString;
-import io.kaleido.paladin.toolkit.*;
+import io.kaleido.paladin.logging.PaladinLogging;
 import io.kaleido.paladin.pente.evmrunner.EVMRunner;
 import io.kaleido.paladin.pente.evmstate.DynamicLoadWorldState;
+import io.kaleido.paladin.toolkit.*;
 import io.kaleido.paladin.toolkit.JsonHex.Address;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
@@ -64,7 +64,7 @@ import java.util.concurrent.ExecutionException;
  * - outputs:  { "name": "outputs",  "type": "tuple", "components": [ ... your function output definitions go here ] }
  */
 class PenteTransaction {
-    private static final Logger LOGGER = LogManager.getLogger(PenteTransaction.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(PenteTransaction.class);
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Values(

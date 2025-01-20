@@ -17,10 +17,9 @@ package io.kaleido.paladin.configlight;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.config.Configurator;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,7 +27,7 @@ import java.util.UUID;
 
 public class YamlConfig {
 
-    private static final Logger LOGGER = LogManager.getLogger(YamlConfig.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(YamlConfig.class);
 
     private final YamlRootConfig loadedConfig;
 
@@ -71,7 +70,7 @@ public class YamlConfig {
             case "trace" -> Level.TRACE;
             default -> Level.INFO;
         };
-        Configurator.setAllLevels("io.kaleido.paladin", level);
+        PaladinLogging.setLevel(level);
 
     }
 
