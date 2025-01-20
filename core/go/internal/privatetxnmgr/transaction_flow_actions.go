@@ -74,6 +74,8 @@ func (tf *transactionFlow) Action(ctx context.Context) {
 		//we know we need to finalize but we are not currently waiting for a finalize to complete
 		// most likely a previous attempt to finalize has failed
 		tf.finalize(ctx)
+		tf.logActionInfo(ctx, "finalize initiated")
+		return
 	}
 
 	if tf.dispatched {
@@ -284,6 +286,8 @@ func (tf *transactionFlow) finalize(ctx context.Context) {
 			go tf.publisher.PublishTransactionFinalizeError(ctx, tf.transaction.ID.String(), tf.finalizeRevertReason, rollbackErr)
 		},
 	)
+
+	tf.finalizePending = true
 }
 
 func (tf *transactionFlow) delegateIfRequired(ctx context.Context) (doContinue bool) {
