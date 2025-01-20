@@ -39,7 +39,9 @@ func testQueryWrapper(txm *txManager, jq *query.QueryJSON) *queryWrapper[persist
 }
 
 func TestQueryWrapperLimitRequired(t *testing.T) {
-	ctx, txm, done := newTestTransactionManager(t, false)
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+	)
 	defer done()
 
 	_, err := testQueryWrapper(txm, query.NewQueryBuilder().Query()).run(ctx, txm.p.DB())
@@ -47,9 +49,11 @@ func TestQueryWrapperLimitRequired(t *testing.T) {
 }
 
 func TestQueryWrapperMapFail(t *testing.T) {
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*transactions").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.New()))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*transactions").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.New()))
+		})
 	defer done()
 
 	qw := testQueryWrapper(txm, query.NewQueryBuilder().Limit(1).Query())

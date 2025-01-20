@@ -2263,7 +2263,7 @@ func TestPrivateTxManagerDeployFailPrepare(t *testing.T) {
 				reverted <- args.Get(2).([]*components.ReceiptInput)
 			},
 		).
-		Return(nil)
+		Return(func() {}, nil)
 
 	err := privateTxManager.Start()
 	require.NoError(t, err)
@@ -2349,7 +2349,7 @@ func TestPrivateTxManagerFailSignerResolve(t *testing.T) {
 				reverted <- args.Get(2).([]*components.ReceiptInput)
 			},
 		).
-		Return(nil)
+		Return(func() {}, nil)
 
 	err = privateTxManager.Start()
 	require.NoError(t, err)
@@ -2424,7 +2424,7 @@ func TestPrivateTxManagerDeployFailNoInvokeOrDeploy(t *testing.T) {
 				reverted <- args.Get(2).([]*components.ReceiptInput)
 			},
 		).
-		Return(nil)
+		Return(func() {}, nil)
 
 	err := privateTxManager.Start()
 	require.NoError(t, err)

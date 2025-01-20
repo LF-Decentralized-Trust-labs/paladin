@@ -53,3 +53,7 @@ func (p *sqliteProvider) Open(uri string) gorm.Dialector {
 func (p *sqliteProvider) GetMigrationDriver(db *sql.DB) (migratedb.Driver, error) {
 	return migratesqlite3.WithInstance(db, &migratesqlite3.Config{})
 }
+
+func (p *sqliteProvider) TakeNamedLock(ctx context.Context, dbTX *gorm.DB, lockName string) error {
+	return nil
+}

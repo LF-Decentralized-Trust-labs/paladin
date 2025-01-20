@@ -36,21 +36,26 @@ import (
 
 func TestFinalizeTransactionsNoOp(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false)
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+	)
 	defer done()
 
-	err := txm.FinalizeTransactions(ctx, txm.p.DB(), nil)
+	fn, err := txm.FinalizeTransactions(ctx, txm.p.DB(), nil)
 	assert.NoError(t, err)
+	fn()
 
 }
 
 func TestFinalizeTransactionsSuccessWithFailure(t *testing.T) {
 
 	txID := uuid.New()
-	ctx, txm, done := newTestTransactionManager(t, false)
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+	)
 	defer done()
 
-	err := txm.FinalizeTransactions(ctx, txm.p.DB(), []*components.ReceiptInput{
+	_, err := txm.FinalizeTransactions(ctx, txm.p.DB(), []*components.ReceiptInput{
 		{TransactionID: txID, ReceiptType: components.RT_Success,
 			FailureMessage: "not empty",
 		},
@@ -61,10 +66,12 @@ func TestFinalizeTransactionsSuccessWithFailure(t *testing.T) {
 func TestFinalizeTransactionsBadType(t *testing.T) {
 
 	txID := uuid.New()
-	ctx, txm, done := newTestTransactionManager(t, false)
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+	)
 	defer done()
 
-	err := txm.FinalizeTransactions(ctx, txm.p.DB(), []*components.ReceiptInput{
+	_, err := txm.FinalizeTransactions(ctx, txm.p.DB(), []*components.ReceiptInput{
 		{TransactionID: txID, ReceiptType: components.ReceiptType(42)}})
 	assert.Regexp(t, "PD012213", err)
 
@@ -73,10 +80,12 @@ func TestFinalizeTransactionsBadType(t *testing.T) {
 func TestFinalizeTransactionsFailedWithMessageNoMessage(t *testing.T) {
 
 	txID := uuid.New()
-	ctx, txm, done := newTestTransactionManager(t, false)
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+	)
 	defer done()
 
-	err := txm.FinalizeTransactions(ctx, txm.p.DB(), []*components.ReceiptInput{
+	_, err := txm.FinalizeTransactions(ctx, txm.p.DB(), []*components.ReceiptInput{
 		{TransactionID: txID, ReceiptType: components.RT_FailedWithMessage}})
 	assert.Regexp(t, "PD012213", err)
 
@@ -85,10 +94,12 @@ func TestFinalizeTransactionsFailedWithMessageNoMessage(t *testing.T) {
 func TestFinalizeTransactionsFailedWithRevertDataWithMessage(t *testing.T) {
 
 	txID := uuid.New()
-	ctx, txm, done := newTestTransactionManager(t, false)
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+	)
 	defer done()
 
-	err := txm.FinalizeTransactions(ctx, txm.p.DB(), []*components.ReceiptInput{
+	_, err := txm.FinalizeTransactions(ctx, txm.p.DB(), []*components.ReceiptInput{
 		{TransactionID: txID, ReceiptType: components.RT_FailedOnChainWithRevertData,
 			FailureMessage: "not empty"}})
 	assert.Regexp(t, "PD012213", err)
@@ -98,17 +109,20 @@ func TestFinalizeTransactionsFailedWithRevertDataWithMessage(t *testing.T) {
 func TestFinalizeTransactionsInsertFail(t *testing.T) {
 
 	txID := uuid.New()
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectBegin()
-		mc.db.ExpectExec("INSERT.*transaction_receipts").WillReturnError(fmt.Errorf("pop"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectBegin()
+			mc.db.ExpectExec("INSERT.*transaction_receipts").WillReturnError(fmt.Errorf("pop"))
+		})
 	defer done()
 
 	err := txm.p.DB().Transaction(func(tx *gorm.DB) error {
-		return txm.FinalizeTransactions(ctx, tx, []*components.ReceiptInput{
+		_, err := txm.FinalizeTransactions(ctx, tx, []*components.ReceiptInput{
 			{TransactionID: txID, ReceiptType: components.RT_FailedWithMessage,
 				FailureMessage: "something went wrong"},
 		})
+		return err
 	})
 	assert.Regexp(t, "pop", err)
 
@@ -192,23 +206,27 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = txm.p.DB().Transaction(func(tx *gorm.DB) error {
-		return txm.FinalizeTransactions(ctx, tx, []*components.ReceiptInput{
+	var postCommit func()
+	err = txm.p.DB().Transaction(func(tx *gorm.DB) (err error) {
+		postCommit, err = txm.FinalizeTransactions(ctx, tx, []*components.ReceiptInput{
 			{
 				TransactionID: *txID,
 				ReceiptType:   components.RT_FailedOnChainWithRevertData,
 			},
 		})
+		return err
 	})
 	require.NoError(t, err)
+	postCommit()
 
 	receipt, err := txm.GetTransactionReceiptByID(ctx, *txID)
 	require.NoError(t, err)
 	require.NotNil(t, receipt)
 	require.JSONEq(t, fmt.Sprintf(`{
 		"id":"%s",
+		"sequence":%d,
 		"failureMessage":"PD012214: Unable to decode revert data (no revert data available)"
-	}`, txID), string(tktypes.JSONString(receipt)))
+	}`, txID, receipt.Sequence), string(tktypes.JSONString(receipt)))
 
 }
 
@@ -244,8 +262,9 @@ func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = txm.p.DB().Transaction(func(tx *gorm.DB) error {
-		return txm.FinalizeTransactions(ctx, tx, []*components.ReceiptInput{
+	var postCommit func()
+	err = txm.p.DB().Transaction(func(tx *gorm.DB) (err error) {
+		postCommit, err = txm.FinalizeTransactions(ctx, tx, []*components.ReceiptInput{
 			{
 				TransactionID: *txID,
 				Domain:        "domain1",
@@ -260,8 +279,10 @@ func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 				},
 			},
 		})
+		return err
 	})
 	require.NoError(t, err)
+	postCommit()
 
 	receipt, err := txm.GetTransactionReceiptByIDFull(ctx, *txID)
 	require.NoError(t, err)
@@ -269,6 +290,7 @@ func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 	require.NotNil(t, receipt)
 	require.JSONEq(t, fmt.Sprintf(`{
 		"id":"%s",
+		"sequence":%d,
 		"domain": "domain1",
 		"blockNumber":12345, 
 		"logIndex":5,
@@ -278,13 +300,15 @@ func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 		"transactionIndex":10,
 		"states": {"none": true},
 		"domainReceiptError": "not available"
-	}`, txID), tktypes.JSONString(receipt).Pretty())
+	}`, txID, receipt.Sequence), tktypes.JSONString(receipt).Pretty())
 
 }
 
 func TestCalculateRevertErrorNoData(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false)
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+	)
 	defer done()
 
 	err := txm.CalculateRevertError(ctx, nil, nil)
@@ -294,9 +318,11 @@ func TestCalculateRevertErrorNoData(t *testing.T) {
 
 func TestCalculateRevertErrorQueryFail(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*abi_entries").WillReturnError(fmt.Errorf("pop"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*abi_entries").WillReturnError(fmt.Errorf("pop"))
+		})
 	defer done()
 
 	err := txm.CalculateRevertError(ctx, txm.p.DB(), []byte("any data"))
@@ -306,9 +332,11 @@ func TestCalculateRevertErrorQueryFail(t *testing.T) {
 
 func TestCalculateRevertErrorDecodeFail(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*abi_entries").WillReturnRows(sqlmock.NewRows([]string{"definition"}).AddRow(`{}`))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*abi_entries").WillReturnRows(sqlmock.NewRows([]string{"definition"}).AddRow(`{}`))
+		})
 	defer done()
 
 	err := txm.CalculateRevertError(ctx, txm.p.DB(), []byte("any data"))
@@ -318,9 +346,11 @@ func TestCalculateRevertErrorDecodeFail(t *testing.T) {
 
 func TestGetTransactionReceiptNoResult(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*transaction_receipts").WillReturnRows(sqlmock.NewRows([]string{}))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*transaction_receipts").WillReturnRows(sqlmock.NewRows([]string{}))
+		})
 	defer done()
 
 	res, err := txm.GetTransactionReceiptByID(ctx, uuid.New())
@@ -331,9 +361,11 @@ func TestGetTransactionReceiptNoResult(t *testing.T) {
 
 func TestGetTransactionReceiptFullNoResult(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*transaction_receipts").WillReturnRows(sqlmock.NewRows([]string{}))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*transaction_receipts").WillReturnRows(sqlmock.NewRows([]string{}))
+		})
 	defer done()
 
 	res, err := txm.GetTransactionReceiptByIDFull(ctx, uuid.New())
@@ -344,9 +376,11 @@ func TestGetTransactionReceiptFullNoResult(t *testing.T) {
 
 func TestGetDomainReceiptFail(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.domainManager.On("GetDomainByName", mock.Anything, "domain1").Return(nil, fmt.Errorf("not found"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.domainManager.On("GetDomainByName", mock.Anything, "domain1").Return(nil, fmt.Errorf("not found"))
+		})
 	defer done()
 
 	_, err := txm.GetDomainReceiptByID(ctx, "domain1", uuid.New())
@@ -357,9 +391,11 @@ func TestGetDomainReceiptFail(t *testing.T) {
 func TestDecodeRevertErrorBadSerializer(t *testing.T) {
 	revertReasonTooSmallHex := tktypes.MustParseHexBytes("0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001d5468652073746f7265642076616c756520697320746f6f20736d616c6c000000")
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*abi_entries").WillReturnRows(sqlmock.NewRows([]string{}))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*abi_entries").WillReturnRows(sqlmock.NewRows([]string{}))
+		})
 	defer done()
 
 	_, err := txm.DecodeRevertError(ctx, txm.p.DB(), revertReasonTooSmallHex, "wrong")

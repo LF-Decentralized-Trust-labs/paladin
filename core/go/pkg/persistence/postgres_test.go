@@ -17,18 +17,35 @@
 package persistence
 
 import (
+	"context"
+	"database/sql/driver"
 	"reflect"
 	"testing"
 
+	gormPostgres "gorm.io/driver/postgres"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestPostgresProvider(t *testing.T) {
 	p := &postgresProvider{}
 	assert.Equal(t, "postgres", p.DBName())
 	assert.Equal(t, "*postgres.Dialector", reflect.TypeOf(p.Open("")).String())
-	db, _, _ := sqlmock.New()
+	db, mdb, _ := sqlmock.New()
 	_, err := p.GetMigrationDriver(db)
 	assert.Error(t, err)
+
+	mdb.ExpectBegin()
+	mdb.ExpectExec("SELECT pg_advisory_xact_lock").WillReturnResult(driver.ResultNoRows)
+	mdb.ExpectCommit()
+
+	gdb, err := gorm.Open(gormPostgres.New(gormPostgres.Config{Conn: db}), &gorm.Config{})
+	require.NoError(t, err)
+	err = gdb.Transaction(func(dbTX *gorm.DB) error {
+		return p.TakeNamedLock(context.Background(), dbTX, "any")
+	})
+	require.NoError(t, err)
 }

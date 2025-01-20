@@ -17,6 +17,7 @@
 package mockpersistence
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,4 +31,5 @@ func TestSQLMockProvider(t *testing.T) {
 	assert.Equal(t, "sqlmock", (&SQLMockProvider{}).DBName())
 	_, err = (&SQLMockProvider{}).GetMigrationDriver(nil)
 	assert.Regexp(t, "not supported", err)
+	require.NoError(t, m.TakeNamedLock(context.Background(), nil, ""))
 }

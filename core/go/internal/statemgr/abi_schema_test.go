@@ -49,6 +49,10 @@ func mockDomain(t *testing.T, m *mockComponents, name string, customHashFunction
 	return md
 }
 
+func mockStateCallback(m *mockComponents) {
+	m.txManager.On("NotifyStatesDBChanged").Return()
+}
+
 // This is an E2E test using the actual database, the flush-writer DB storage system, and the schema cache
 func TestStoreRetrieveABISchema(t *testing.T) {
 
@@ -56,6 +60,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	defer done()
 
 	_ = mockDomain(t, m, "domain1", false)
+	mockStateCallback(m)
 
 	as, err := newABISchema(ctx, "domain1", &abi.Parameter{
 		Type:         "tuple",
@@ -122,7 +127,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	contractAddress := tktypes.RandAddress()
 
 	// Check it handles data
-	states, err := ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{
+	pc, states, err := ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{
 		{
 			ID:       nil, // default hashing algo
 			SchemaID: schemaID,
@@ -142,6 +147,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	pc()
 	state1 := states[0]
 	assert.Equal(t, []*pldapi.StateLabel{
 		// uint256 written as zero padded string

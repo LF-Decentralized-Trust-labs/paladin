@@ -69,6 +69,33 @@ func newTestTransactionManagerWithRPC(t *testing.T, init ...func(*pldconf.TxMana
 
 }
 
+func newTestTransactionManagerWithWebSocketRPC(t *testing.T, init ...func(*pldconf.TxManagerConfig, *mockComponents)) (context.Context, string, *txManager, func()) {
+	ctx, txm, txmDone := newTestTransactionManager(t, true, init...)
+
+	rpcServer, err := rpcserver.NewRPCServer(ctx, &pldconf.RPCServerConfig{
+		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
+		WS: pldconf.RPCServerConfigWS{
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Port:            confutil.P(0),
+				ShutdownTimeout: confutil.P("0"),
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	rpcServer.Register(txm.rpcModule)
+	rpcServer.Register(txm.debugRpcModule)
+
+	err = rpcServer.Start()
+	require.NoError(t, err)
+
+	return ctx, fmt.Sprintf("ws://%s", rpcServer.WSAddr()), txm, func() {
+		txmDone()
+		rpcServer.Stop()
+	}
+
+}
+
 func mockResolveKeyOKThenFail(t *testing.T, mc *mockComponents, identifier string, senderAddr *tktypes.EthAddress) {
 	kr := mockKeyResolverForFail(t, mc)
 	kr.On("ResolveKey", identifier, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS).
@@ -252,7 +279,7 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 	// Finalize the deploy as a success
 	txHash1 := tktypes.Bytes32(tktypes.RandBytes(32))
 	blockNumber1 := int64(12345)
-	err = tmr.FinalizeTransactions(ctx, tmr.p.DB(), []*components.ReceiptInput{
+	postCommit, err := tmr.FinalizeTransactions(ctx, tmr.p.DB(), []*components.ReceiptInput{
 		{
 			TransactionID: tx1ID,
 			ReceiptType:   components.RT_Success,
@@ -264,6 +291,7 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	postCommit()
 
 	// We should get that back with full
 	var txWithReceipt *pldapi.TransactionFull
@@ -291,7 +319,7 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 	blockNumber2 := int64(12345)
 	revertData, err := sampleABI.Errors()["BadValue"].EncodeCallDataValuesCtx(ctx, []any{12345})
 	require.NoError(t, err)
-	err = tmr.FinalizeTransactions(ctx, tmr.p.DB(), []*components.ReceiptInput{
+	postCommit, err = tmr.FinalizeTransactions(ctx, tmr.p.DB(), []*components.ReceiptInput{
 		{
 			TransactionID: tx2ID,
 			ReceiptType:   components.RT_FailedOnChainWithRevertData,
@@ -304,6 +332,7 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	postCommit()
 
 	var de *pldapi.ABIDecodedData
 	err = rpcClient.CallRPC(ctx, &de, "ptx_decodeError", tktypes.HexBytes(revertData), tktypes.DefaultJSONFormatOptions)
@@ -607,5 +636,108 @@ func TestPrepareTransactions(t *testing.T) {
 	err = rpcClient.CallRPC(ctx, &returnedTX, "ptx_getTransaction", txID)
 	require.NoError(t, err)
 	require.Equal(t, pldapi.SubmitModeExternal, returnedTX.SubmitMode.V())
+
+}
+
+func TestRCPReceiptListenersCRUDRealDB(t *testing.T) {
+	ctx, url, txm, done := newTestTransactionManagerWithRPC(t)
+	defer done()
+
+	rpcClient, err := rpcclient.NewHTTPClient(ctx, &pldconf.HTTPClientConfig{URL: url})
+	require.NoError(t, err)
+
+	// Create listener in default (started)
+	var boolRes *bool
+	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_createReceiptListener", &pldapi.TransactionReceiptListener{
+		Name: "listener1",
+	})
+	require.NoError(t, err)
+	require.True(t, *boolRes)
+
+	// Duplpicate
+	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_createReceiptListener", &pldapi.TransactionReceiptListener{
+		Name: "listener1",
+	})
+	require.Regexp(t, "PD012237.*listener1", err)
+
+	// should be queryable
+	var listeners []*pldapi.TransactionReceiptListener
+	err = rpcClient.CallRPC(ctx, &listeners, "ptx_queryReceiptListeners", query.NewQueryBuilder().Limit(1).Query())
+	require.NoError(t, err)
+	require.Len(t, listeners, 1)
+	assert.Equal(t, listeners[0].Name, "listener1")
+
+	// should be started
+	var l *pldapi.TransactionReceiptListener
+	err = rpcClient.CallRPC(ctx, &l, "ptx_getReceiptListener", "listener1")
+	require.NoError(t, err)
+	require.NotNil(t, l)
+	assert.True(t, *l.Started)
+
+	// delete listener
+	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_deleteReceiptListener", "listener1")
+	require.NoError(t, err)
+	err = rpcClient.CallRPC(ctx, &l, "ptx_getReceiptListener", "listener1")
+	require.NoError(t, err)
+	require.Nil(t, l)
+
+	// Create listener stopped
+	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_createReceiptListener", &pldapi.TransactionReceiptListener{
+		Name:    "listener1",
+		Started: confutil.P(false),
+	})
+	require.NoError(t, err)
+	require.True(t, *boolRes)
+
+	// should be stopped
+	err = rpcClient.CallRPC(ctx, &l, "ptx_getReceiptListener", "listener1")
+	require.NoError(t, err)
+	assert.False(t, *l.Started)
+
+	// start it
+	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_startReceiptListener", "listener1")
+	require.NoError(t, err)
+	require.True(t, *boolRes)
+
+	// should be started
+	err = rpcClient.CallRPC(ctx, &l, "ptx_getReceiptListener", "listener1")
+	require.NoError(t, err)
+	assert.True(t, *l.Started)
+
+	// stop it
+	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_stopReceiptListener", "listener1")
+	require.NoError(t, err)
+	require.True(t, *boolRes)
+
+	// should be stopped
+	err = rpcClient.CallRPC(ctx, &l, "ptx_getReceiptListener", "listener1")
+	require.NoError(t, err)
+	assert.False(t, *l.Started)
+
+	// Simulate restart so we can do startup processing
+	txm.receiptsInit()
+
+	// Force persistent state to be started
+	err = txm.p.DB().Model(&persistedReceiptListener{}).
+		Where("name = ?", "listener1").Update("started", true).Error
+	require.NoError(t, err)
+
+	// Load the listeners
+	err = txm.loadReceiptListeners()
+	require.NoError(t, err)
+
+	// Check it's not actually started (yet)
+	require.Nil(t, txm.receiptListeners["listener1"].done)
+
+	// Do the startup
+	txm.startReceiptListeners()
+
+	// Check it's started now
+	err = rpcClient.CallRPC(ctx, &l, "ptx_getReceiptListener", "listener1")
+	require.NoError(t, err)
+	assert.True(t, *l.Started)
+
+	// Check it's now actually started
+	require.NotNil(t, txm.receiptListeners["listener1"].done)
 
 }

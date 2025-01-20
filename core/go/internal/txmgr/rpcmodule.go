@@ -58,7 +58,14 @@ func (tm *txManager) buildRPCModule() {
 		Add("ptx_decodeCall", tm.rpcDecodeCall()).
 		Add("ptx_decodeEvent", tm.rpcDecodeEvent()).
 		Add("ptx_decodeError", tm.rpcDecodeError()).
-		Add("ptx_resolveVerifier", tm.rpcResolveVerifier())
+		Add("ptx_resolveVerifier", tm.rpcResolveVerifier()).
+		Add("ptx_createReceiptListener", tm.rpcCreateReceiptListener()).
+		Add("ptx_queryReceiptListeners", tm.rpcQueryReceiptListeners()).
+		Add("ptx_getReceiptListener", tm.rpcGetReceiptListener()).
+		Add("ptx_startReceiptListener", tm.rpcStartReceiptListener()).
+		Add("ptx_stopReceiptListener", tm.rpcStopReceiptListener()).
+		Add("ptx_deleteReceiptListener", tm.rpcDeleteReceiptListener()).
+		AddAsync(tm.rpcEventStreams)
 
 	tm.debugRpcModule = rpcserver.NewRPCModule("debug").
 		Add("debug_getTransactionStatus", tm.rpcDebugTransactionStatus())
@@ -327,5 +334,54 @@ func (tm *txManager) rpcDecodeEvent() rpcserver.RPCHandler {
 		dataFormat tktypes.JSONFormatOptions,
 	) (*pldapi.ABIDecodedData, error) {
 		return tm.DecodeEvent(ctx, tm.p.DB(), topics, data, dataFormat)
+	})
+}
+
+func (tm *txManager) rpcCreateReceiptListener() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		listener *pldapi.TransactionReceiptListener,
+	) (bool, error) {
+		err := tm.CreateReceiptListener(ctx, listener)
+		return true, err
+	})
+}
+
+func (tm *txManager) rpcQueryReceiptListeners() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		query query.QueryJSON,
+	) ([]*pldapi.TransactionReceiptListener, error) {
+		return tm.QueryReceiptListeners(ctx, tm.p.DB(), &query)
+	})
+}
+
+func (tm *txManager) rpcGetReceiptListener() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		name string,
+	) (*pldapi.TransactionReceiptListener, error) {
+		return tm.GetReceiptListener(ctx, name), nil
+	})
+}
+
+func (tm *txManager) rpcStartReceiptListener() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		name string,
+	) (bool, error) {
+		return true, tm.StartReceiptListener(ctx, name)
+	})
+}
+
+func (tm *txManager) rpcStopReceiptListener() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		name string,
+	) (bool, error) {
+		return true, tm.StopReceiptListener(ctx, name)
+	})
+}
+
+func (tm *txManager) rpcDeleteReceiptListener() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		name string,
+	) (bool, error) {
+		return true, tm.DeleteReceiptListener(ctx, name)
 	})
 }

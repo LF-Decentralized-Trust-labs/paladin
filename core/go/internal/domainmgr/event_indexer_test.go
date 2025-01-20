@@ -251,7 +251,7 @@ func TestHandleEventBatch(t *testing.T) {
 				ContractAddress: *contract2,
 				SchemaID:        fakeSchema,
 			},
-		}).Return(nil, nil)
+		}).Return(func() {}, nil, nil)
 
 		mc.txManager.On("FinalizeTransactions", mock.Anything, mock.Anything, mock.MatchedBy(func(receipts []*components.ReceiptInput) bool {
 			// Note first contract is unrecognized, second is recognized
@@ -265,7 +265,7 @@ func TestHandleEventBatch(t *testing.T) {
 			assert.Equal(t, expectedEvent.TransactionIndex, r.OnChain.TransactionIndex)
 			assert.Equal(t, expectedEvent.LogIndex, r.OnChain.LogIndex)
 			return true
-		})).Return(nil)
+		})).Return(func() {}, nil)
 
 		mc.privateTxManager.On("PrivateTransactionConfirmed", mock.Anything, mock.Anything).Return()
 	})
@@ -351,7 +351,7 @@ func TestHandleEventBatchFinalizeFail(t *testing.T) {
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
 		mc.db.ExpectExec(`INSERT.*private_smart_contracts`).WillReturnResult(driver.ResultNoRows)
 
-		mc.txManager.On("FinalizeTransactions", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("pop"))
+		mc.txManager.On("FinalizeTransactions", mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
 	})
 	defer done()
 
@@ -999,7 +999,7 @@ func TestHandleEventBatchUpsertStateFail(t *testing.T) {
 	contract1 := tktypes.RandAddress()
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
-		mc.stateStore.On("WritePreVerifiedStates", mock.Anything, mock.Anything, "test1", mock.Anything).Return(nil, fmt.Errorf("pop"))
+		mc.stateStore.On("WritePreVerifiedStates", mock.Anything, mock.Anything, "test1", mock.Anything).Return(nil, nil, fmt.Errorf("pop"))
 	})
 	defer done()
 

@@ -68,6 +68,7 @@ func TestRPC(t *testing.T) {
 	defer done()
 
 	_ = mockDomain(t, m, "domain1", false)
+	mockStateCallback(m)
 
 	var abiParam abi.Parameter
 	err := json.Unmarshal([]byte(widgetABI), &abiParam)

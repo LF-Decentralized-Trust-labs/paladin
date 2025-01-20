@@ -133,6 +133,7 @@ var (
 	TransactionReceiptDataOnchainEventLogIndex    = ffm("TransactionReceiptDataOnchainEvent.logIndex", "Log index")
 	TransactionReceiptDataOnchainEventSource      = ffm("TransactionReceiptDataOnchainEvent.source", "Event source")
 	TransactionReceiptDataIndexed                 = ffm("TransactionReceiptData.indexed", "The time when this receipt was indexed by the node, providing a relative order of transaction receipts within this node (might be significantly after the timestamp of the block)")
+	TransactionReceiptDataSequence                = ffm("TransactionReceiptData.sequence", "A local order of this receipt compared to other receipts on the node, used for ordering of receipts when delivering to receipt listeners")
 	TransactionReceiptDataDomain                  = ffm("TransactionReceiptData.domain", "The domain that executed the transaction, for private transactions only")
 	TransactionReceiptDataSuccess                 = ffm("TransactionReceiptData.success", "Transaction success status")
 	TransactionReceiptDataFailureMessage          = ffm("TransactionReceiptData.failureMessage", "Failure message - set if transaction reverted")

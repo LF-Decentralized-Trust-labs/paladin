@@ -50,10 +50,10 @@ func TestPersistStateMissingSchema(t *testing.T) {
 		},
 	}
 
-	_, err := ss.WritePreVerifiedStates(ctx, ss.p.DB(), "domain1", upserts)
+	_, _, err := ss.WritePreVerifiedStates(ctx, ss.p.DB(), "domain1", upserts)
 	assert.Regexp(t, "PD010106", err)
 
-	_, err = ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", upserts)
+	_, _, err = ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", upserts)
 	assert.Regexp(t, "PD010106", err)
 }
 
@@ -76,10 +76,10 @@ func TestPersistStateInvalidState(t *testing.T) {
 		},
 	}
 
-	_, err := ss.WritePreVerifiedStates(ctx, ss.p.DB(), "domain1", upserts)
+	_, _, err := ss.WritePreVerifiedStates(ctx, ss.p.DB(), "domain1", upserts)
 	assert.Regexp(t, "PD010116", err)
 
-	_, err = ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", upserts)
+	_, _, err = ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", upserts)
 	assert.Regexp(t, "PD010116", err)
 }
 
@@ -185,10 +185,10 @@ func TestWritePreVerifiedStateInvalidDomain(t *testing.T) {
 
 	m.domainManager.On("GetDomainByName", mock.Anything, "domain1").Return(nil, fmt.Errorf("not found"))
 
-	_, err := ss.WritePreVerifiedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{})
+	_, _, err := ss.WritePreVerifiedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{})
 	assert.Regexp(t, "not found", err)
 
-	_, err = ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{})
+	_, _, err = ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{})
 	assert.Regexp(t, "not found", err)
 
 }
@@ -200,7 +200,7 @@ func TestWriteReceivedStatesValidateHashFail(t *testing.T) {
 	md := mockDomain(t, m, "domain1", true)
 	md.On("ValidateStateHashes", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
 
-	_, err := ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{
+	_, _, err := ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{
 		{ID: tktypes.RandBytes(32), SchemaID: tktypes.Bytes32(tktypes.RandBytes(32)),
 			Data: tktypes.RawJSON(fmt.Sprintf(
 				`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
@@ -223,7 +223,7 @@ func TestWriteReceivedStatesValidateHashOkInsertFail(t *testing.T) {
 	stateID1 := tktypes.RandBytes(32)
 	md.On("ValidateStateHashes", mock.Anything, mock.Anything).Return([]tktypes.HexBytes{stateID1}, nil)
 
-	_, err = ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{
+	_, _, err = ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{
 		{SchemaID: schema1.ID(), Data: tktypes.RawJSON(fmt.Sprintf(
 			`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
 			tktypes.RandHex(32)))},

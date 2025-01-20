@@ -106,6 +106,7 @@ var (
 	MsgJSONRPCIncorrectParamCount = ffe("PD020703", "method %s requires %d params (supplied=%d)")
 	MsgJSONRPCInvalidParam        = ffe("PD020704", "method %s parameter %d invalid: %s")
 	MsgJSONRPCResultSerialization = ffe("PD020705", "method %s result serialization failed: %s")
+	MsgJSONRPCAysncNonWSConn      = ffe("PD020706", "method %s only available on WebSocket connections")
 
 	// Signing module PD0208XX
 	MsgSigningModuleBadPathError                = ffe("PD020800", "Path '%s' does not exist, or it is not a directory")

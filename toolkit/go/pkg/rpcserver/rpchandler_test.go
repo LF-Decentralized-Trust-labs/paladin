@@ -237,9 +237,9 @@ func TestRPCHandleIOError(t *testing.T) {
 	_, s, done := newTestServerHTTP(t, &pldconf.RPCServerConfig{})
 	defer done()
 
-	iRPCResponse, ok := s.rpcHandler(context.Background(), iotest.ErrReader(fmt.Errorf("pop")), nil)
-	assert.False(t, ok)
-	jsonResponse := iRPCResponse.(*rpcclient.RPCResponse)
+	r := s.rpcHandler(context.Background(), iotest.ErrReader(fmt.Errorf("pop")), nil)
+	assert.False(t, r.isOK)
+	jsonResponse := r.res.(*rpcclient.RPCResponse)
 	assert.Equal(t, int64(rpcclient.RPCCodeInvalidRequest), jsonResponse.Error.Code)
 	assert.Regexp(t, "PD020700", jsonResponse.Error.Message)
 
@@ -250,9 +250,9 @@ func TestRPCBadArrayError(t *testing.T) {
 	_, s, done := newTestServerHTTP(t, &pldconf.RPCServerConfig{})
 	defer done()
 
-	iRPCResponse, ok := s.rpcHandler(context.Background(), strings.NewReader("[... this is not an array"), nil)
-	assert.False(t, ok)
-	jsonResponse := iRPCResponse.(*rpcclient.RPCResponse)
+	r := s.rpcHandler(context.Background(), strings.NewReader("[... this is not an array"), nil)
+	assert.False(t, r.isOK)
+	jsonResponse := r.res.(*rpcclient.RPCResponse)
 	assert.Equal(t, int64(rpcclient.RPCCodeInvalidRequest), jsonResponse.Error.Code)
 	assert.Regexp(t, "PD020700", jsonResponse.Error.Message)
 

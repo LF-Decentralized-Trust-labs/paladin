@@ -91,7 +91,7 @@ type PrivateTxManager interface {
 	// in the meantime, this is handy for some blackish box testing
 	Subscribe(ctx context.Context, subscriber PrivateTxEventSubscriber)
 
-	NotifyFailedPublicTx(ctx context.Context, dbTX *gorm.DB, confirms []*PublicTxMatch) error
+	NotifyFailedPublicTx(ctx context.Context, dbTX *gorm.DB, confirms []*PublicTxMatch) (func(), error)
 
 	PrivateTransactionConfirmed(ctx context.Context, receipt *TxCompletion)
 

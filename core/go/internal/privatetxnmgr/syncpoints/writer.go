@@ -88,6 +88,7 @@ func (s *syncPoints) runBatch(ctx context.Context, dbTX *gorm.DB, values []*sync
 	// to in the DB transaction below using foreign key relationships
 	domainContextDBTXCallbacks := make([]func(err error), 0, len(domainContextsToFlush))
 	var pubTXCbs []func()
+	var finalizeTxCB func()
 	dbTXCallback := func(err error) {
 		for _, dcTXCallback := range domainContextDBTXCallbacks {
 			if dcTXCallback != nil {
@@ -97,6 +98,9 @@ func (s *syncPoints) runBatch(ctx context.Context, dbTX *gorm.DB, values []*sync
 		if err == nil {
 			for _, publicTXCallback := range pubTXCbs {
 				publicTXCallback()
+			}
+			if finalizeTxCB != nil {
+				finalizeTxCB()
 			}
 		}
 	}
@@ -124,7 +128,7 @@ func (s *syncPoints) runBatch(ctx context.Context, dbTX *gorm.DB, values []*sync
 	// assumption at time of coding because WriteKey returns the contract address
 	// but probably should consider a less brittle way to codify this assertion
 	if err == nil && len(finalizeOperations) > 0 {
-		err = s.writeFailureOperations(ctx, dbTX, finalizeOperations) // err variable must not be re-allocated
+		finalizeTxCB, err = s.writeFailureOperations(ctx, dbTX, finalizeOperations) // err variable must not be re-allocated
 	}
 
 	if err == nil && len(dispatchOperations) > 0 {

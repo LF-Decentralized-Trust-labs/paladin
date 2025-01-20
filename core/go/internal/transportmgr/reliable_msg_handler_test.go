@@ -67,7 +67,7 @@ func TestReceiveMessageStateWithNullifierSendAckRealDB(t *testing.T) {
 		mockGoodTransport,
 		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
-				Return(nil, nil).Once()
+				Return(func() {}, nil, nil).Once()
 			nullifier := &components.NullifierUpsert{ID: tktypes.RandBytes(32)}
 			mc.stateManager.On("WriteNullifiersForReceivedStates", mock.Anything, mock.Anything, "domain1", []*components.NullifierUpsert{nullifier}).
 				Return(nil).Once()
@@ -132,7 +132,7 @@ func TestHandleStateDistroBadState(t *testing.T) {
 		mockEmptyReliableMsgs,
 		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
-				Return(nil, fmt.Errorf("bad data")).Twice()
+				Return(nil, nil, fmt.Errorf("bad data")).Twice()
 		},
 	)
 	defer done()
@@ -161,6 +161,48 @@ func TestHandleStateDistroBadState(t *testing.T) {
 	require.NoError(t, err)
 
 	// Run the postCommit and check we get the nack
+	postCommit(nil)
+
+	ackNackCheck()
+}
+
+func TestHandleStateDistroMixedBatchBadAndGoodStates(t *testing.T) {
+	ctx, tm, tp, done := newTestTransport(t, false,
+		mockGoodTransport,
+		mockEmptyReliableMsgs,
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
+				Return(nil, nil, fmt.Errorf("bad data")).Once()
+			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
+				Return(func() {}, nil, nil).Once()
+		},
+	)
+	defer done()
+
+	msg := testReceivedReliableMsg(
+		RMHMessageTypeStateDistribution,
+		&components.StateDistributionWithData{
+			StateDistribution: components.StateDistribution{
+				Domain:          "domain1",
+				ContractAddress: tktypes.RandAddress().String(),
+				SchemaID:        tktypes.RandHex(32),
+				StateID:         tktypes.RandHex(32),
+			},
+			StateData: []byte(`{"some":"data"}`),
+		})
+
+	ackNackCheck := setupAckOrNackCheck(t, tp, msg.MessageID, "")
+
+	p, err := tm.getPeer(ctx, "node2", false)
+	require.NoError(t, err)
+
+	// Handle the batch - will fail to write the states
+	postCommit, _, err := tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
+		{p: p, msg: msg},
+	})
+	require.NoError(t, err)
+
+	// Run the postCommit and check we get the ack
 	postCommit(nil)
 
 	ackNackCheck()
@@ -342,7 +384,7 @@ func TestHandleReceiptFail(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t, false,
 		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mc.txManager.On("FinalizeTransactions", mock.Anything, mock.Anything, mock.Anything).
-				Return(fmt.Errorf("pop"))
+				Return(nil, fmt.Errorf("pop"))
 		},
 	)
 	defer done()
@@ -362,6 +404,34 @@ func TestHandleReceiptFail(t *testing.T) {
 		{p: p, msg: msg},
 	})
 	require.Regexp(t, "pop", err)
+
+}
+
+func TestHandleReceiptOk(t *testing.T) {
+	ctx, tm, _, done := newTestTransport(t, false,
+		mockGoodTransport,
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+			mc.txManager.On("FinalizeTransactions", mock.Anything, mock.Anything, mock.Anything).
+				Return(func() {}, nil)
+		},
+	)
+	defer done()
+
+	msg := testReceivedReliableMsg(
+		RMHMessageTypeReceipt,
+		&components.ReceiptInput{
+			Domain:      "domain1",
+			ReceiptType: components.RT_Success,
+		})
+
+	p, err := tm.getPeer(ctx, "node2", false)
+	require.NoError(t, err)
+
+	pc, _, err := tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
+		{p: p, msg: msg},
+	})
+	require.NoError(t, err)
+	pc(nil)
 
 }
 
@@ -396,7 +466,7 @@ func TestHandleNullifierFail(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t, false,
 		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
-				Return(nil, nil).Once()
+				Return(func() {}, nil, nil).Once()
 			nullifier := &components.NullifierUpsert{ID: tktypes.RandBytes(32)}
 			mc.stateManager.On("WriteNullifiersForReceivedStates", mock.Anything, mock.Anything, "domain1", []*components.NullifierUpsert{nullifier}).
 				Return(fmt.Errorf("pop")).Once()
@@ -442,7 +512,7 @@ func TestHandleNullifierPreCommitKRCFail(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t, false,
 		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
-				Return(nil, nil).Once()
+				Return(func() {}, nil, nil).Once()
 			nullifier := &components.NullifierUpsert{ID: tktypes.RandBytes(32)}
 			mc.stateManager.On("WriteNullifiersForReceivedStates", mock.Anything, mock.Anything, "domain1", []*components.NullifierUpsert{nullifier}).
 				Return(nil).Once()

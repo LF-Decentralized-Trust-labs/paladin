@@ -75,7 +75,7 @@ func makeWidgets(t *testing.T, ctx context.Context, ss *stateManager, domainName
 	states := make([]*pldapi.State, len(withoutSalt))
 	for i, w := range withoutSalt {
 		withSalt := genWidget(t, schemaID, nil, w)
-		newStates, err := ss.WritePreVerifiedStates(ctx, ss.p.DB(), domainName, []*components.StateUpsertOutsideContext{
+		pc, newStates, err := ss.WritePreVerifiedStates(ctx, ss.p.DB(), domainName, []*components.StateUpsertOutsideContext{
 			{
 				ContractAddress: contractAddress,
 				SchemaID:        schemaID,
@@ -83,6 +83,7 @@ func makeWidgets(t *testing.T, ctx context.Context, ss *stateManager, domainName
 			},
 		})
 		require.NoError(t, err)
+		pc()
 		states[i] = newStates[0]
 		fmt.Printf("widget[%d]: %s\n", i, states[i].Data)
 	}
@@ -110,6 +111,7 @@ func TestStateLockingQuery(t *testing.T) {
 	defer done()
 
 	_ = mockDomain(t, m, "domain1", false)
+	mockStateCallback(m)
 
 	schema, err := newABISchema(ctx, "domain1", testABIParam(t, widgetABI))
 	require.NoError(t, err)

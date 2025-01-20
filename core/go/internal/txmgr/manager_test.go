@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/mocks/ethclientmocks"
@@ -49,7 +50,11 @@ func newTestTransactionManager(t *testing.T, realDB bool, init ...func(conf *pld
 	// log.SetLevel("debug")
 	ctx := context.Background()
 
-	conf := &pldconf.TxManagerConfig{}
+	conf := &pldconf.TxManagerConfig{
+		ReceiptListeners: pldconf.ReceiptListeners{
+			StateGapCheckInterval: confutil.P("100ms"),
+		},
+	}
 	mc := &mockComponents{
 		c:                componentmocks.NewAllComponents(t),
 		blockIndexer:     componentmocks.NewBlockIndexer(t),
@@ -63,7 +68,10 @@ func newTestTransactionManager(t *testing.T, realDB bool, init ...func(conf *pld
 		transportManager: componentmocks.NewTransportManager(t),
 	}
 
+	txm := NewTXManager(ctx, conf).(*txManager)
+
 	componentMocks := mc.c
+	componentMocks.On("TxManager").Return(txm).Maybe()
 	componentMocks.On("BlockIndexer").Return(mc.blockIndexer).Maybe()
 	componentMocks.On("DomainManager").Return(mc.domainManager).Maybe()
 	componentMocks.On("KeyManager").Return(mc.keyManager).Maybe()
@@ -95,8 +103,6 @@ func newTestTransactionManager(t *testing.T, realDB bool, init ...func(conf *pld
 	for _, fn := range init {
 		fn(conf, mc)
 	}
-
-	txm := NewTXManager(ctx, conf).(*txManager)
 
 	ic, err := txm.PreInit(componentMocks)
 	require.NoError(t, err)

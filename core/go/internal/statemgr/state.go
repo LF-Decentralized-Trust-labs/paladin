@@ -46,21 +46,21 @@ func (transactionStateRecord) TableName() string {
 	return "states"
 }
 
-func (ss *stateManager) WritePreVerifiedStates(ctx context.Context, dbTX *gorm.DB, domainName string, states []*components.StateUpsertOutsideContext) ([]*pldapi.State, error) {
+func (ss *stateManager) WritePreVerifiedStates(ctx context.Context, dbTX *gorm.DB, domainName string, states []*components.StateUpsertOutsideContext) (func(), []*pldapi.State, error) {
 
 	d, err := ss.domainManager.GetDomainByName(ctx, domainName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return ss.processInsertStates(ctx, dbTX, d, states)
 }
 
-func (ss *stateManager) WriteReceivedStates(ctx context.Context, dbTX *gorm.DB, domainName string, states []*components.StateUpsertOutsideContext) ([]*pldapi.State, error) {
+func (ss *stateManager) WriteReceivedStates(ctx context.Context, dbTX *gorm.DB, domainName string, states []*components.StateUpsertOutsideContext) (func(), []*pldapi.State, error) {
 
 	d, err := ss.domainManager.GetDomainByName(ctx, domainName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if d.CustomHashFunction() {
@@ -75,7 +75,7 @@ func (ss *stateManager) WriteReceivedStates(ctx context.Context, dbTX *gorm.DB, 
 		ids, err := d.ValidateStateHashes(ctx, dStates)
 		if err != nil {
 			// Whole batch fails if any state in the batch is invalid
-			return nil, err
+			return nil, nil, err
 		}
 		for i, s := range states {
 			// The domain is responsible for generating any missing IDs
@@ -114,28 +114,28 @@ func (ss *stateManager) WriteNullifiersForReceivedStates(ctx context.Context, db
 	return err
 }
 
-func (ss *stateManager) processInsertStates(ctx context.Context, dbTX *gorm.DB, d components.Domain, inStates []*components.StateUpsertOutsideContext) (processedStates []*pldapi.State, err error) {
+func (ss *stateManager) processInsertStates(ctx context.Context, dbTX *gorm.DB, d components.Domain, inStates []*components.StateUpsertOutsideContext) (postCommit func(), processedStates []*pldapi.State, err error) {
 
 	processedStates = make([]*pldapi.State, len(inStates))
 	for i, inState := range inStates {
 		schema, err := ss.GetSchema(ctx, dbTX, d.Name(), inState.SchemaID, true)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		s, err := schema.ProcessState(ctx, inState.ContractAddress, inState.Data, inState.ID, d.CustomHashFunction())
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		processedStates[i] = s.State
 	}
 
 	// Write them directly
 	if err = ss.writeStates(ctx, dbTX, processedStates); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return processedStates, nil
+	return ss.txManager.NotifyStatesDBChanged, processedStates, nil
 }
 
 func (ss *stateManager) writeStates(ctx context.Context, dbTX *gorm.DB, states []*pldapi.State) (err error) {

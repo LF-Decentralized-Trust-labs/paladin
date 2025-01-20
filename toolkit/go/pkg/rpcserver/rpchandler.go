@@ -29,7 +29,13 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader, wsc *webSocketConnection) (interface{}, bool) {
+type handlerResult struct {
+	sendRes bool
+	isOK    bool
+	res     any
+}
+
+func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader, wsc *webSocketConnection) handlerResult {
 
 	b, err := io.ReadAll(r)
 	if err != nil {
@@ -45,7 +51,8 @@ func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader, wsc *webSocketC
 			log.L(ctx).Errorf("Bad RPC array received %s", b)
 			return s.replyRPCParseError(ctx, b, err)
 		}
-		return s.handleRPCBatch(ctx, rpcArray)
+		batchRes, isOK := s.handleRPCBatch(ctx, rpcArray, wsc)
+		return handlerResult{isOK: isOK, sendRes: true, res: batchRes}
 	}
 
 	var rpcRequest rpcclient.RPCRequest
@@ -53,24 +60,22 @@ func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader, wsc *webSocketC
 	if err != nil {
 		return s.replyRPCParseError(ctx, b, err)
 	}
-	if wsc != nil {
-		if rpcRequest.Method == "eth_subscribe" {
-			return s.processSubscribe(ctx, &rpcRequest, wsc)
-		} else if rpcRequest.Method == "eth_unsubscribe" {
-			return s.processUnsubscribe(ctx, &rpcRequest, wsc)
-		}
-	}
-	return s.processRPC(ctx, &rpcRequest)
+	res, isOK := s.processRPC(ctx, &rpcRequest, wsc)
+	return handlerResult{isOK: isOK, sendRes: res != nil, res: res}
 
 }
 
-func (s *rpcServer) replyRPCParseError(ctx context.Context, b []byte, err error) (*rpcclient.RPCResponse, bool) {
+func (s *rpcServer) replyRPCParseError(ctx context.Context, b []byte, err error) handlerResult {
 	log.L(ctx).Errorf("Request could not be parsed (err=%v): %s", err, b)
-	return rpcclient.NewRPCErrorResponse(
-		i18n.NewError(ctx, tkmsgs.MsgJSONRPCInvalidRequest),
-		tktypes.RawJSON(`"1"`),
-		rpcclient.RPCCodeInvalidRequest,
-	), false
+	return handlerResult{
+		isOK:    false,
+		sendRes: true,
+		res: rpcclient.NewRPCErrorResponse(
+			i18n.NewError(ctx, tkmsgs.MsgJSONRPCInvalidRequest),
+			tktypes.RawJSON(`"1"`),
+			rpcclient.RPCCodeInvalidRequest,
+		),
+	}
 }
 
 func (s *rpcServer) sniffFirstByte(data []byte) byte {
@@ -86,7 +91,7 @@ func (s *rpcServer) sniffFirstByte(data []byte) byte {
 	return 0x00
 }
 
-func (s *rpcServer) handleRPCBatch(ctx context.Context, rpcArray []*rpcclient.RPCRequest) ([]*rpcclient.RPCResponse, bool) {
+func (s *rpcServer) handleRPCBatch(ctx context.Context, rpcArray []*rpcclient.RPCRequest, wsc *webSocketConnection) ([]*rpcclient.RPCResponse, bool) {
 
 	// Kick off a routine to fill in each
 	rpcResponses := make([]*rpcclient.RPCResponse, len(rpcArray))
@@ -96,7 +101,7 @@ func (s *rpcServer) handleRPCBatch(ctx context.Context, rpcArray []*rpcclient.RP
 		rpcReq := r
 		go func() {
 			var ok bool
-			rpcResponses[responseNumber], ok = s.processRPC(ctx, rpcReq)
+			rpcResponses[responseNumber], ok = s.processRPC(ctx, rpcReq, wsc)
 			results <- ok
 		}()
 	}

@@ -29,9 +29,11 @@ import (
 
 func TestGetABIByHashError(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*abis").WillReturnError(fmt.Errorf("pop"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*abis").WillReturnError(fmt.Errorf("pop"))
+		})
 	defer done()
 
 	_, err := txm.getABIByHash(ctx, txm.p.DB(), tktypes.Bytes32(tktypes.RandBytes(32)))
@@ -41,13 +43,15 @@ func TestGetABIByHashError(t *testing.T) {
 
 func TestGetABIByHashBadData(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*abis").WillReturnRows(sqlmock.NewRows(
-			[]string{"abi"},
-		).AddRow(
-			`{!!!! bad JSON`,
-		))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*abis").WillReturnRows(sqlmock.NewRows(
+				[]string{"abi"},
+			).AddRow(
+				`{!!!! bad JSON`,
+			))
+		})
 	defer done()
 
 	_, err := txm.getABIByHash(ctx, txm.p.DB(), tktypes.Bytes32(tktypes.RandBytes(32)))
@@ -57,13 +61,15 @@ func TestGetABIByHashBadData(t *testing.T) {
 
 func TestGetABIByCache(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*abis").WillReturnRows(sqlmock.NewRows(
-			[]string{"abi"},
-		).AddRow(
-			`[]`,
-		))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*abis").WillReturnRows(sqlmock.NewRows(
+				[]string{"abi"},
+			).AddRow(
+				`[]`,
+			))
+		})
 	defer done()
 
 	hash := tktypes.Bytes32(tktypes.RandBytes(32))
@@ -80,7 +86,9 @@ func TestGetABIByCache(t *testing.T) {
 
 func TestUpsertABIBadData(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false)
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+	)
 	defer done()
 
 	_, _, err := txm.UpsertABI(ctx, txm.p.DB(), abi.ABI{{Inputs: abi.ParameterArray{{Type: "wrong"}}}})
@@ -90,9 +98,11 @@ func TestUpsertABIBadData(t *testing.T) {
 
 func TestUpsertABIFail(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectExec("INSERT INTO.*abis").WillReturnError(fmt.Errorf("pop"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectExec("INSERT INTO.*abis").WillReturnError(fmt.Errorf("pop"))
+		})
 	defer done()
 
 	_, _, err := txm.storeABI(ctx, txm.p.DB(), abi.ABI{{Type: abi.Function, Name: "get"}})

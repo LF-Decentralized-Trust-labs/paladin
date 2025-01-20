@@ -954,7 +954,7 @@ func (p *privateTxManager) publishToSubscribers(ctx context.Context, event compo
 	}
 }
 
-func (p *privateTxManager) NotifyFailedPublicTx(ctx context.Context, dbTX *gorm.DB, failures []*components.PublicTxMatch) error {
+func (p *privateTxManager) NotifyFailedPublicTx(ctx context.Context, dbTX *gorm.DB, failures []*components.PublicTxMatch) (func(), error) {
 	// TODO: We have processing we need to do here to resubmit
 	// For now, we directly raise a failure receipt for them back with the main transaction manager
 	privateFailureReceipts := make([]*components.ReceiptInput, len(failures))

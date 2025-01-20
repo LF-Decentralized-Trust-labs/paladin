@@ -47,6 +47,7 @@ type SQLDBProvider interface {
 	DBName() string
 	Open(uri string) gorm.Dialector
 	GetMigrationDriver(*sql.DB) (migratedb.Driver, error)
+	TakeNamedLock(ctx context.Context, dbTX *gorm.DB, lockName string) error
 }
 
 func NewSQLProvider(ctx context.Context, p SQLDBProvider, conf *pldconf.SQLDBConfig, defs *pldconf.SQLDBConfig) (_ Persistence, err error) {
@@ -155,4 +156,8 @@ func (gp *provider) DB() *gorm.DB {
 func (gp *provider) Close() {
 	err := gp.db.Close()
 	log.L(context.Background()).Infof("DB closed (err=%v)", err)
+}
+
+func (gp *provider) TakeNamedLock(ctx context.Context, dbTX *gorm.DB, lockName string) error {
+	return gp.p.TakeNamedLock(ctx, dbTX, lockName)
 }

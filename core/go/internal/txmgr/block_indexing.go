@@ -66,13 +66,16 @@ func (tm *txManager) blockIndexerPreCommit(
 
 	// Write the receipts themselves - only way of duplicates should be a rewind of
 	// the block explorer, so we simply OnConflict ignore
-	if err := tm.FinalizeTransactions(ctx, dbTX, finalizeInfo); err != nil {
+	finalizeTxPostCommit1, err := tm.FinalizeTransactions(ctx, dbTX, finalizeInfo)
+	if err != nil {
 		return nil, err
 	}
 
 	// Deliver the failures to the private transaction manager
+	var finalizeTxPostCommit2 func()
 	if len(failedForPrivateTx) > 0 {
-		if err := tm.privateTxMgr.NotifyFailedPublicTx(ctx, dbTX, failedForPrivateTx); err != nil {
+		finalizeTxPostCommit2, err = tm.privateTxMgr.NotifyFailedPublicTx(ctx, dbTX, failedForPrivateTx)
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -83,6 +86,12 @@ func (tm *txManager) blockIndexerPreCommit(
 		// a public or private transaction)
 		if len(txMatches) > 0 {
 			tm.publicTxMgr.NotifyConfirmPersisted(ctx, txMatches)
+		}
+		if finalizeTxPostCommit1 != nil {
+			finalizeTxPostCommit1()
+		}
+		if finalizeTxPostCommit2 != nil {
+			finalizeTxPostCommit2()
 		}
 	}, nil
 }

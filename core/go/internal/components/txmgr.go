@@ -73,12 +73,20 @@ type ResolvedFunction struct {
 	Signature    string           `json:"signature"`
 }
 
+type ReceiptReceiver interface {
+	DeliverReceiptBatch(ctx context.Context, batchID uint64, receipts []*pldapi.TransactionReceiptFull) error
+}
+
+type ReceiptReceiverCloser interface {
+	Close()
+}
+
 type TXManager interface {
 	ManagerLifecycle
 
 	// These are the general purpose functions exposed also as JSON/RPC APIs on the TX Manager
 
-	FinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*ReceiptInput) error // requires all transactions to be known
+	FinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*ReceiptInput) (postCommit func(), err error) // requires all transactions to be known
 	CalculateRevertError(ctx context.Context, dbTX *gorm.DB, revertData tktypes.HexBytes) error
 	DecodeRevertError(ctx context.Context, dbTX *gorm.DB, revertData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
 	DecodeCall(ctx context.Context, dbTX *gorm.DB, callData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
@@ -105,9 +113,17 @@ type TXManager interface {
 	QueryPreparedTransactionsWithRefs(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*PreparedTransactionWithRefs, error)
 	CallTransaction(ctx context.Context, result any, tx *pldapi.TransactionCall) (err error)
 	UpsertABI(ctx context.Context, dbTX *gorm.DB, a abi.ABI) (func(), *pldapi.StoredABI, error)
+	CreateReceiptListener(ctx context.Context, spec *pldapi.TransactionReceiptListener) error
+	GetReceiptListener(ctx context.Context, name string) *pldapi.TransactionReceiptListener
+	QueryReceiptListeners(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*pldapi.TransactionReceiptListener, error)
+	StartReceiptListener(ctx context.Context, name string) error
+	StopReceiptListener(ctx context.Context, name string) error
+	DeleteReceiptListener(ctx context.Context, name string) error
+	AddReceiptReceiver(ctx context.Context, name string, r ReceiptReceiver) (ReceiptReceiverCloser, error)
 
-	// These functions for use of the private TX manager for chaining private transactions.
+	// These functions for use of other components
 
+	NotifyStatesDBChanged() // called by state manager after committing DB TXs writing new states that might fill in gaps
 	PrepareInternalPrivateTransaction(ctx context.Context, dbTX *gorm.DB, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (func(), *ValidatedTransaction, error)
 	UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, dbTX *gorm.DB, txis []*ValidatedTransaction) (postCommit func(), err error)
 	WritePreparedTransactions(ctx context.Context, dbTX *gorm.DB, prepared []*PreparedTransactionWithRefs) (postCommit func(), err error)

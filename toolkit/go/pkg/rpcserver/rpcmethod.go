@@ -32,6 +32,23 @@ type RPCHandler interface {
 	Handle(ctx context.Context, req *rpcclient.RPCRequest) *rpcclient.RPCResponse
 }
 
+type RPCAsyncControl interface {
+	ID() string
+	Closed() // must be called to clean up resources
+	Send(method string, params any)
+}
+
+type RPCAsyncInstance interface {
+	ConnectionClosed() // called if the underlying connection is closed
+}
+
+type RPCAsyncHandler interface {
+	StartMethod() string
+	LifecycleMethods() []string
+	HandleStart(ctx context.Context, req *rpcclient.RPCRequest, ctrl RPCAsyncControl) (RPCAsyncInstance, *rpcclient.RPCResponse)
+	HandleLifecycle(ctx context.Context, req *rpcclient.RPCRequest) *rpcclient.RPCResponse
+}
+
 func HandlerFunc(fn func(ctx context.Context, req *rpcclient.RPCRequest) *rpcclient.RPCResponse) RPCHandler {
 	return &rpcHandlerFunc{fn: fn}
 }

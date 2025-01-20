@@ -69,3 +69,7 @@ func (p *SQLMockProvider) Open(uri string) gorm.Dialector {
 func (p *SQLMockProvider) GetMigrationDriver(db *sql.DB) (migratedb.Driver, error) {
 	return nil, fmt.Errorf("not supported")
 }
+
+func (p *SQLMockProvider) TakeNamedLock(ctx context.Context, dbTX *gorm.DB, lockName string) error {
+	return nil // no-op
+}

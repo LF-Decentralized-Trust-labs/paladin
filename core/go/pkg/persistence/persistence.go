@@ -18,6 +18,7 @@ package persistence
 
 import (
 	"context"
+	"hash/fnv"
 
 	// Import pq driver
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -29,6 +30,9 @@ import (
 type Persistence interface {
 	DB() *gorm.DB
 	Close()
+
+	// DB specific implementation function
+	TakeNamedLock(ctx context.Context, dbTX *gorm.DB, lockName string) error
 }
 
 const (
@@ -45,4 +49,14 @@ func NewPersistence(ctx context.Context, conf *pldconf.DBConfig) (Persistence, e
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgPersistenceInvalidType, conf.Type)
 	}
+}
+
+func hashCode(s string) int64 {
+	h := fnv.New64a()
+	h.Write([]byte(s))
+	v := int64(h.Sum64())
+	if v < 0 {
+		return -v
+	}
+	return v
 }

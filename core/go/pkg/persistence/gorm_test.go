@@ -142,3 +142,17 @@ func TestDSNTemplateBadTemplate(t *testing.T) {
 	_, err := templatedDSN(context.Background(), conf)
 	require.Regexp(t, "PD010205", err)
 }
+
+func TestTakeNamedLockPassthrough(t *testing.T) {
+	p, err := newSQLiteProvider(context.Background(), &pldconf.DBConfig{
+		Type: "sqlite",
+		SQLite: pldconf.SQLiteConfig{
+			SQLDBConfig: pldconf.SQLDBConfig{
+				DSN: ":memory:",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, p.TakeNamedLock(context.Background(), nil, ""))
+	p.Close()
+}

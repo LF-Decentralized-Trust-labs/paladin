@@ -71,7 +71,7 @@ func TestRunBatchFinalizeOperations(t *testing.T) {
 		},
 	}
 
-	m.txMgr.On("FinalizeTransactions", ctx, dbTX, expectedReceipts).Return(nil)
+	m.txMgr.On("FinalizeTransactions", ctx, dbTX, expectedReceipts).Return(func() {}, nil)
 
 	dbResultCB, res, err := s.runBatch(ctx, dbTX, testSyncPointOperations)
 	assert.NoError(t, err)
@@ -151,7 +151,7 @@ func TestRunBatchFinalizeOperationsMixedContractAddresses(t *testing.T) {
 		},
 	}
 
-	m.txMgr.On("FinalizeTransactions", ctx, dbTX, expectedReceipts).Return(nil)
+	m.txMgr.On("FinalizeTransactions", ctx, dbTX, expectedReceipts).Return(func() {}, nil)
 
 	dbResultCB, res, err := s.runBatch(ctx, dbTX, testSyncPointOperations)
 	assert.NoError(t, err)

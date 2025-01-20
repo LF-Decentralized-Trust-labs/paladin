@@ -70,8 +70,10 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 	var txReceiptsToFinalize []*components.ReceiptInput
 	var writePreparedTxPostCommit func()
 	var krc components.KeyResolutionContext
+	var finalizeTxPostCommit func()
+	stateWritePostCommits := make([]func(), 0, 1)
 
-	cleanup := func(err error) {
+	postCommit := func(err error) {
 		if krc != nil {
 			krc.Close(err == nil)
 		}
@@ -83,6 +85,14 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 			}
 			if writePreparedTxPostCommit != nil {
 				writePreparedTxPostCommit()
+			}
+
+			for _, pc := range stateWritePostCommits {
+				pc()
+			}
+
+			if finalizeTxPostCommit != nil {
+				finalizeTxPostCommit()
 			}
 		}
 	}
@@ -158,14 +168,19 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 		for i, s := range states {
 			batchStates[i] = s.state
 		}
-		_, batchErr := tm.stateManager.WriteReceivedStates(ctx, dbTX, domain, batchStates)
-		if batchErr != nil {
+		var batchErr error
+		statePostCommit, _, batchErr := tm.stateManager.WriteReceivedStates(ctx, dbTX, domain, batchStates)
+		if batchErr == nil {
+			stateWritePostCommits = append(stateWritePostCommits, statePostCommit)
+		} else {
 			// We have to try each individually (note if the error was transient in the DB we will rollback
 			// the whole transaction and won't send any acks at all - which is good as sender will retry in that case)
 			log.L(ctx).Errorf("batch insert of %d states for domain %s failed - attempting each individually: %s", len(states), domain, batchErr)
 			for _, s := range states {
-				_, err := tm.stateManager.WriteReceivedStates(ctx, dbTX, domain, []*components.StateUpsertOutsideContext{s.state})
-				if err != nil {
+				statePostCommit, _, err := tm.stateManager.WriteReceivedStates(ctx, dbTX, domain, []*components.StateUpsertOutsideContext{s.state})
+				if err == nil {
+					stateWritePostCommits = append(stateWritePostCommits, statePostCommit)
+				} else {
 					log.L(ctx).Errorf("insert state %s from message %s for domain %s failed: %s", s.state.ID, s.ack.id, domain, batchErr)
 					s.ack.Error = err.Error()
 				}
@@ -186,7 +201,7 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 		var matchedMsgs []*components.ReliableMessage
 		err := dbTX.WithContext(ctx).Select("id").Find(&matchedMsgs).Error
 		if err != nil {
-			return cleanup, nil, err
+			return postCommit, nil, err
 		}
 		validatedAcks := make([]*components.ReliableMessageAck, 0, len(acksToWrite))
 		for _, a := range acksToWrite {
@@ -200,15 +215,17 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 		if len(validatedAcks) > 0 {
 			// Now we're actually ready to insert them
 			if err := tm.writeAcks(ctx, dbTX, acksToWrite...); err != nil {
-				return cleanup, nil, err
+				return postCommit, nil, err
 			}
 		}
 	}
 
 	// Insert the transaction receipts
 	if len(txReceiptsToFinalize) > 0 {
-		if err := tm.txManager.FinalizeTransactions(ctx, dbTX, txReceiptsToFinalize); err != nil {
-			return cleanup, nil, err
+		var err error
+		finalizeTxPostCommit, err = tm.txManager.FinalizeTransactions(ctx, dbTX, txReceiptsToFinalize)
+		if err != nil {
+			return postCommit, nil, err
 		}
 	}
 
@@ -216,26 +233,26 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 	if len(preparedTxnToAdd) > 0 {
 		var err error
 		if writePreparedTxPostCommit, err = tm.txManager.WritePreparedTransactions(ctx, dbTX, preparedTxnToAdd); err != nil {
-			return cleanup, nil, err
+			return postCommit, nil, err
 		}
 	}
 
 	// Write any nullifiers we generated
 	for domain, nullifiers := range nullifierUpserts {
 		if err := tm.stateManager.WriteNullifiersForReceivedStates(ctx, dbTX, domain, nullifiers); err != nil {
-			return cleanup, nil, err
+			return postCommit, nil, err
 		}
 	}
 
 	// Ensure we close out the key resolution context if we started one
 	if krc != nil {
 		if err := krc.PreCommit(); err != nil {
-			return cleanup, nil, err
+			return postCommit, nil, err
 		}
 	}
 
 	// We use a post-commit handler to send back any acks to the other side that are required
-	return cleanup, make([]flushwriter.Result[*noResult], len(values)), nil
+	return postCommit, make([]flushwriter.Result[*noResult], len(values)), nil
 
 }
 

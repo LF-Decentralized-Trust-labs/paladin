@@ -40,6 +40,22 @@ func (tt TransactionType) Options() []string {
 	}
 }
 
+type PTXEventType string
+
+const (
+	PTXEventTypeReceipts PTXEventType = "receipts"
+)
+
+func (tt PTXEventType) Enum() tktypes.Enum[PTXEventType] {
+	return tktypes.Enum[PTXEventType](tt)
+}
+
+func (tt PTXEventType) Options() []string {
+	return []string{
+		string(PTXEventTypeReceipts),
+	}
+}
+
 type SubmitMode string
 
 const (
@@ -131,6 +147,12 @@ type TransactionReceiptFull struct {
 	DomainReceiptError string             `docstruct:"TransactionReceiptFull" json:"domainReceiptError,omitempty"`
 }
 
+type TransactionReceiptBatch struct {
+	Subscription string                    `docstruct:"TransactionReceiptBatch" json:"subscription,omitempty"`
+	Batch        uint64                    `docstruct:"TransactionReceiptBatch" json:"batch,omitempty"`
+	Receipts     []*TransactionReceiptFull `docstruct:"TransactionReceiptBatch" json:"receipts,omitempty"`
+}
+
 type TransactionReceiptDataOnchain struct {
 	TransactionHash  *tktypes.Bytes32 `docstruct:"TransactionReceiptDataOnchain" json:"transactionHash,omitempty"`
 	BlockNumber      int64            `docstruct:"TransactionReceiptDataOnchain" json:"blockNumber,omitempty"`
@@ -144,6 +166,7 @@ type TransactionReceiptDataOnchainEvent struct {
 
 type TransactionReceiptData struct {
 	Indexed                             tktypes.Timestamp   `docstruct:"TransactionReceiptData" json:"indexed,omitempty"` // the time when this receipt was indexed
+	Sequence                            uint64              `docstruct:"TransactionReceiptData" json:"sequence"`          // local order only, used for listeners
 	Domain                              string              `docstruct:"TransactionReceiptData" json:"domain,omitempty"`  // only set on private transaction receipts
 	Success                             bool                `docstruct:"TransactionReceiptData" json:"success,omitempty"` // true for success (note "status" is reserved for future use)
 	*TransactionReceiptDataOnchain      `json:",inline"`    // if the result was finalized by the blockchain (note quirk of omitempty that we can't put zero-valid int pointers on main struct)

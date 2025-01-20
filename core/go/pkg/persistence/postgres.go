@@ -55,3 +55,7 @@ func (p *postgresProvider) Open(dsn string) gorm.Dialector {
 func (p *postgresProvider) GetMigrationDriver(db *sql.DB) (migratedb.Driver, error) {
 	return postgres.WithInstance(db, &postgres.Config{})
 }
+
+func (p *postgresProvider) TakeNamedLock(ctx context.Context, dbTX *gorm.DB, lockName string) error {
+	return dbTX.Exec(`SELECT pg_advisory_xact_lock( ? )`, hashCode(lockName)).Error
+}

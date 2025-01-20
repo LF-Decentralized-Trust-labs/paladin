@@ -47,7 +47,8 @@ func TestWriteFinalizeOperations(t *testing.T) {
 		},
 	}
 
-	m.txMgr.On("FinalizeTransactions", ctx, dbTX, expectedReceipts).Return(nil)
-	err := s.writeFailureOperations(ctx, dbTX, finalizeOperations)
+	m.txMgr.On("FinalizeTransactions", ctx, dbTX, expectedReceipts).Return(func() {}, nil)
+	pc, err := s.writeFailureOperations(ctx, dbTX, finalizeOperations)
 	assert.NoError(t, err)
+	pc()
 }

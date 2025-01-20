@@ -39,8 +39,6 @@ type RPCServer interface {
 	WSAddr() net.Addr
 
 	Register(module *RPCModule)
-	EthPublish(eventType string, result interface{}) // Note this is an `eth_` specific extension, with no ack or reliability
-	WSSubscriptionCount(eventType string) int
 
 	WSHandler(w http.ResponseWriter, r *http.Request)   // Provides access to the WebSocket handler directly to be able to install it into another server
 	HTTPHandler(w http.ResponseWriter, r *http.Request) // Provides access to the http handler directly to be able to install it into another server
@@ -134,15 +132,15 @@ func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusMethodNotAllowed)
 	}
 
-	rpcRes, isOK := s.rpcHandler(req.Context(), req.Body, nil /* not websockets */)
+	r := s.rpcHandler(req.Context(), req.Body, nil /* not websockets */)
 
 	res.Header().Set("Content-Type", "application/json; charset=utf-8")
 	status := http.StatusOK
-	if !isOK {
+	if !r.isOK {
 		status = http.StatusInternalServerError
 	}
 	res.WriteHeader(status)
-	_ = json.NewEncoder(res).Encode(rpcRes)
+	_ = json.NewEncoder(res).Encode(r.res)
 }
 
 func (s *rpcServer) wsHandler(res http.ResponseWriter, req *http.Request) {

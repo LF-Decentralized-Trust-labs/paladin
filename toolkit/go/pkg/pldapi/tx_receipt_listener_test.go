@@ -14,25 +14,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package persistence
+package pldapi
 
 import (
-	"context"
-	"reflect"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestSQLiteProvider(t *testing.T) {
-	p := &sqliteProvider{}
-	assert.Equal(t, "sqlite", p.DBName())
-	assert.Equal(t, "*sqlite.Dialector", reflect.TypeOf(p.Open("")).String())
-	db, _, _ := sqlmock.New()
-	_, err := p.GetMigrationDriver(db)
-	assert.Error(t, err)
-
-	require.NoError(t, p.TakeNamedLock(context.Background(), nil, "")) // no-op, so doesn't matter the values are junk
+func TestSIncompleteStateReceiptBehavior(t *testing.T) {
+	require.Equal(t, IncompleteStateReceiptBehaviorProcess, IncompleteStateReceiptBehaviorProcess.Enum().V())
+	def, err := IncompleteStateReceiptBehavior("").Enum().Validate()
+	require.NoError(t, err)
+	require.Equal(t, "block_contract", string(def))
+	_, err = IncompleteStateReceiptBehavior("wrong").Enum().Validate()
+	require.Regexp(t, "PD020003", err)
 }

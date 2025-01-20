@@ -22,12 +22,13 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
-func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcclient.RPCRequest) (*rpcclient.RPCResponse, bool) {
+func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcclient.RPCRequest, wsc *webSocketConnection) (*rpcclient.RPCResponse, bool) {
 	if rpcReq.ID == nil {
 		// While the JSON/RPC standard does not strictly require an ID (it strongly discourages use of a null ID),
 		// we choose to make an ID mandatory. We do not enforce the type - it can be a number, string, or even boolean.
@@ -36,25 +37,41 @@ func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcclient.RPCRequest
 		return rpcclient.NewRPCErrorResponse(err, rpcReq.ID, rpcclient.RPCCodeInvalidRequest), false
 	}
 
-	var handler RPCHandler
+	var mh *rpcMethodEntry
 	group := strings.SplitN(rpcReq.Method, "_", 2)[0]
 	module := s.rpcModules[group]
 	if module != nil {
-		handler = module.methods[rpcReq.Method]
+		mh = module.methods[rpcReq.Method]
 	}
-	if handler == nil {
+	if mh == nil {
 		err := i18n.NewError(ctx, tkmsgs.MsgJSONRPCUnsupportedMethod, rpcReq.Method)
 		return rpcclient.NewRPCErrorResponse(err, rpcReq.ID, rpcclient.RPCCodeInvalidRequest), false
 	}
 
 	startTime := time.Now()
 	log.L(ctx).Debugf("RPC-> %s", rpcReq.Method)
-	rpcRes := handler.Handle(ctx, rpcReq)
-	durationMS := float64(time.Since(startTime)) / float64(time.Millisecond)
-	if rpcRes.Error != nil {
-		log.L(ctx).Errorf("<!RPC[Server] %s (%.2fms): %s", rpcReq.Method, durationMS, rpcRes.Error.Message)
+	var rpcRes *rpcbackend.RPCResponse
+	if mh.methodType == rpcMethodTypeMethod {
+		rpcRes = mh.handler.Handle(ctx, rpcReq)
 	} else {
-		log.L(ctx).Debugf("<-RPC[Server] %s (%.2fms)", rpcReq.Method, durationMS)
+		if wsc == nil {
+			return rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, tkmsgs.MsgJSONRPCAysncNonWSConn, rpcReq.Method), rpcReq.ID, rpcclient.RPCCodeInvalidRequest), false
+		}
+		if mh.methodType == rpcMethodTypeAsyncStart {
+			rpcRes = wsc.handleNewAsync(ctx, rpcReq, mh.async)
+		} else {
+			rpcRes = wsc.handleLifecycle(ctx, rpcReq, mh.async)
+		}
 	}
-	return rpcRes, rpcRes.Error == nil
+	isOK := true
+	if rpcRes != nil {
+		isOK = rpcRes.Error == nil
+		durationMS := float64(time.Since(startTime)) / float64(time.Millisecond)
+		if rpcRes.Error != nil {
+			log.L(ctx).Errorf("<!RPC[Server] %s (%.2fms): %s", rpcReq.Method, durationMS, rpcRes.Error.Message)
+		} else {
+			log.L(ctx).Debugf("<-RPC[Server] %s (%.2fms)", rpcReq.Method, durationMS)
+		}
+	}
+	return rpcRes, isOK
 }
