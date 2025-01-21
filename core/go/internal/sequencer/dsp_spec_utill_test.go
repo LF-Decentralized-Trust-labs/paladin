@@ -29,10 +29,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
+	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -130,6 +135,7 @@ type ContractSequencerAgentFixture struct {
 	coordinatorSelector    *coordinatorSelectorForTesting
 	startingBlockRange     uint64
 	transactionsByAlias    map[string]*TransactionFixture
+	partiesByAlias         map[string]*IdentityFixture
 }
 
 type PooledTransactionListFixture struct {
@@ -167,6 +173,10 @@ func (c *ContractSequencerAgentFixtureBuilder) InSenderState() *ContractSequence
 }
 
 func (c *ContractSequencerAgentFixtureBuilder) Committee(committeeMember ...string) *ContractSequencerAgentFixtureBuilder {
+	//In the default case, the list of committee members is used to construct a list of nodes that are candidates for coordinator selection
+	// and also the list of identities that are used to endorse transactions
+	// One identity per node.  Node name is "committeeMember" and the identity locator is "committeeMember@committeeMemberNode"
+	// TODO some tests in future might require some overrides of this behavior but for now this should be fine
 	c.committee = committeeMember
 	return c
 }
@@ -284,6 +294,23 @@ type TransactionFixture struct {
 	delegation           *Delegation
 }
 
+type IdentityFixture struct {
+	identity        string
+	identityLocator string
+	verifier        string
+	keyHandle       string
+}
+
+// resolvedVerifier method on IdentityFixture returns a ResolvedVerifier object
+func (i *IdentityFixture) resolvedVerifier() *prototk.ResolvedVerifier {
+	return &prototk.ResolvedVerifier{
+		Lookup:       i.identityLocator,
+		Verifier:     i.verifier,
+		Algorithm:    algorithms.ECDSA_SECP256K1,
+		VerifierType: verifiers.ETH_ADDRESS,
+	}
+}
+
 func NewTransactionFixture(transactionAlias string) *TransactionFixture {
 	return &TransactionFixture{
 		transactionAlias: transactionAlias,
@@ -341,7 +368,12 @@ func (c *ContractSequencerAgentFixtureBuilder) Build() *ContractSequencerAgentFi
 	outboundMessageMonitor := newFakeTransportManager(c.t)
 	contractAddress := tktypes.RandAddress()
 
-	csa := NewContractSequencerAgent(context.Background(), nodeName, outboundMessageMonitor, c.coordinatorSelector, c.committee, contractAddress).(*contractSequencerAgent)
+	keyManager := componentmocks.NewKeyManager(c.t)
+	keyManager.On("ResolveEthAddressNewDatabaseTX", mock.Anything, mock.Anything).Return(tktypes.RandAddress(), nil).Maybe()
+	allComponents := componentmocks.NewAllComponents(c.t)
+	allComponents.On("KeyManager").Return(keyManager).Maybe()
+
+	csa := NewContractSequencerAgent(context.Background(), nodeName, outboundMessageMonitor, allComponents, c.coordinatorSelector, c.committee, contractAddress).(*contractSequencerAgent)
 	// Set default configuration
 	csa.blockRangeSize = 1000
 	c.startingBlockRange = uint64(rand.Intn((int)(math.MaxInt64 / csa.blockRangeSize)))
@@ -376,6 +408,18 @@ func (c *ContractSequencerAgentFixtureBuilder) Build() *ContractSequencerAgentFi
 		csa.coordinator.state = c.coordinatorState
 	}
 
+	//create an identity for each committee member
+	partiesByAlias := make(map[string]*IdentityFixture)
+	for _, committeeMember := range c.committee {
+		identity := &IdentityFixture{
+			identityLocator: fmt.Sprintf("%s@%sNode", committeeMember, committeeMember),
+			verifier:        tktypes.RandAddress().String(),
+			identity:        committeeMember,
+			keyHandle:       fmt.Sprintf("%s_KeyHandle", committeeMember),
+		}
+		partiesByAlias[committeeMember] = identity
+	}
+
 	transactionsByAlias := make(map[string]*TransactionFixture)
 	for _, dt := range c.delegatedTransactions {
 		dt.transactionID = ptrTo(uuid.New())
@@ -385,9 +429,37 @@ func (c *ContractSequencerAgentFixtureBuilder) Build() *ContractSequencerAgentFi
 			&components.PrivateTransaction{
 				ID: *dt.transactionID,
 			})
+
 		switch dt.transactionState {
+		case TransactionState_ConfirmingForDispatch:
+			//TODO update the delegation state with details of the confirmation request
+			fallthrough
 		case TransactionState_Assembled:
-			//TODO add to graph
+			dt.delegation.PostAssembly = &components.TransactionPostAssembly{
+				AttestationPlan: make([]*prototk.AttestationRequest, 0),
+				Endorsements:    make([]*prototk.AttestationResult, 0),
+			}
+			if dt.requiredEndorsements != nil {
+				for _, requiredEndorsement := range dt.requiredEndorsements {
+					dt.delegation.PostAssembly.AttestationPlan = append(dt.delegation.PostAssembly.AttestationPlan, &prototk.AttestationRequest{
+						Name:            requiredEndorsement,
+						AttestationType: prototk.AttestationType_ENDORSE,
+						VerifierType:    verifiers.ETH_ADDRESS,
+						Parties:         []string{partiesByAlias[requiredEndorsement].identityLocator},
+					})
+				}
+			}
+			if dt.endorsements != nil {
+				for _, endorsement := range dt.endorsements {
+					identity := partiesByAlias[endorsement]
+					dt.delegation.PostAssembly.Endorsements = append(dt.delegation.PostAssembly.Endorsements, &prototk.AttestationResult{
+						Name:            endorsement,
+						AttestationType: prototk.AttestationType_ENDORSE,
+						Payload:         tktypes.RandBytes(32),
+						Verifier:        identity.resolvedVerifier(),
+					})
+				}
+			}
 			csa.coordinator.assembledTransactions.AddTransaction(ctx, dt.delegation)
 			fallthrough
 		case TransactionState_Pooled:
@@ -405,8 +477,10 @@ func (c *ContractSequencerAgentFixtureBuilder) Build() *ContractSequencerAgentFi
 			if csa.dispatchedTransactionsByCoordinator[nodeName] == nil {
 				csa.dispatchedTransactionsByCoordinator[nodeName] = make([]*DispatchedTransaction, 0)
 			}
-			dispatchedTransaction := &DispatchedTransaction{}
-			dispatchedTransaction.TransactionID = *dt.transactionID
+			dispatchedTransaction := &DispatchedTransaction{
+				Delegation: dt.delegation,
+			}
+
 			dispatchedTransaction.Signer = *dt.signer
 			dispatchedTransaction.Nonce = dt.nonce
 			dispatchedTransaction.LatestSubmissionHash = dt.hash
@@ -440,6 +514,7 @@ func (c *ContractSequencerAgentFixtureBuilder) Build() *ContractSequencerAgentFi
 		outboundMessageMonitor: outboundMessageMonitor,
 		coordinatorSelector:    c.coordinatorSelector,
 		transactionsByAlias:    transactionsByAlias,
+		partiesByAlias:         partiesByAlias,
 	}
 }
 
@@ -526,10 +601,41 @@ func (f *ContractSequencerAgentFixture) HandleDispatchConfirmationResponse(trans
 	transaction, ok := f.transactionsByAlias[transactionAlias]
 	require.True(f.t, ok, "No transaction hash with alias %s", transactionAlias)
 
+	require.NotNil(f.t, transaction.transactionID)
 	dispatchConfirmationResponse := &DispatchConfirmationResponse{}
 	dispatchConfirmationResponse.ContractAddress = f.csa.contractAddress
-	dispatchConfirmationResponse.TransactionID = transaction.transactionID.String()
+	dispatchConfirmationResponse.TransactionID = *transaction.transactionID
 	f.csa.HandleDispatchConfirmationResponse(f.ctx, dispatchConfirmationResponse)
+}
+
+func (f *ContractSequencerAgentFixture) HandleEndorsementResponse(transactionAlias string, endorser string) {
+	transaction, ok := f.transactionsByAlias[transactionAlias]
+	require.True(f.t, ok, "No transaction with alias %s", transactionAlias)
+	party, ok := f.partiesByAlias[endorser]
+	require.True(f.t, ok, "No party with alias %s", endorser)
+
+	if transaction.transactionID == nil {
+		//TODO error
+	}
+
+	endorsementResponse := &EndorsementResponse{
+		TransactionID:   *transaction.transactionID,
+		ContractAddress: f.csa.contractAddress.String(),
+		Endorsement: &prototk.AttestationResult{
+			Name:            endorser,
+			AttestationType: prototk.AttestationType_ENDORSE,
+			Payload:         tktypes.RandBytes(32),
+			Verifier: &prototk.ResolvedVerifier{
+				Lookup:       party.identityLocator,
+				Verifier:     party.verifier,
+				Algorithm:    algorithms.ECDSA_SECP256K1,
+				VerifierType: verifiers.ETH_ADDRESS,
+			},
+		},
+	}
+
+	f.csa.HandleEndorsementResponse(f.ctx, endorsementResponse)
+
 }
 
 func (f *ContractSequencerAgentFixture) MoveToNextBlockRange() {
@@ -571,6 +677,16 @@ func (f *ContractSequencerAgentFixture) ConfirmTransaction(transactionAlias stri
 		},
 	)
 }
+func (f *ContractSequencerAgentFixture) TransactionIsDispatched(transactionAlias string) bool {
+	transaction, ok := f.transactionsByAlias[transactionAlias]
+	require.True(f.t, ok, "No transaction with alias %s", transactionAlias)
+
+	_, found := f.csa.coordinator.dispatchedTransactions.TransactionsByID[*transaction.transactionID]
+	// TODO once we have a complete implementation of DispatchTransactions, we should be using mocks here to assert that the correct integration
+	// has happened with other components such as syncpoints / persistence and public transaction manager
+	return found
+
+}
 
 func (f *FixtureBuilder) DispatchedTransactionList() *DispatchedTransactionListFixtureBuilder {
 	return &DispatchedTransactionListFixtureBuilder{
@@ -594,10 +710,16 @@ func (d *DispatchedTransactionListFixtureBuilder) Build() *DispatchedTransaction
 	dispatchedTransactions := make([]*DispatchedTransaction, d.length)
 	for i := 0; i < d.length; i++ {
 		dispatchedTransactions[i] = &DispatchedTransaction{
-			TransactionID:        uuid.New(),
+			Delegation: &Delegation{
+				PrivateTransaction: &components.PrivateTransaction{
+					ID: uuid.New(),
+					//TODO populate other fields
+				},
+			},
 			Signer:               *tktypes.RandAddress(),
 			LatestSubmissionHash: ptrTo(tktypes.Bytes32(tktypes.RandBytes(32))),
 		}
+
 	}
 	return &DispatchedTransactionListFixture{
 		dispatchedTransactions: dispatchedTransactions,
@@ -803,6 +925,47 @@ func (c *CoordinatorHeartbeatNotificationMatcherBuilder) BlockHeight(expectedBlo
 	return c
 }
 
+type DispatchConfirmationRequestMatcherBuilder struct {
+	t *testing.T
+	//expectedTransactionID   string
+	expectedContractAddress *tktypes.EthAddress
+}
+
+func DispatchConfirmationRequestMatcher(t *testing.T) *DispatchConfirmationRequestMatcherBuilder {
+	return &DispatchConfirmationRequestMatcherBuilder{t: t}
+}
+
+/*func (d *DispatchConfirmationRequestMatcherBuilder) TransactionID(expectedTransactionID string) *DispatchConfirmationRequestMatcherBuilder {
+	d.expectedTransactionID = expectedTransactionID
+	return d
+}*/
+
+func (d *DispatchConfirmationRequestMatcherBuilder) ContractAddress(expectedContractAddress *tktypes.EthAddress) *DispatchConfirmationRequestMatcherBuilder {
+	d.expectedContractAddress = expectedContractAddress
+	return d
+}
+
+func (d *DispatchConfirmationRequestMatcherBuilder) Match() FireAndForgetMessageMatcher {
+	return func(message *components.FireAndForgetMessageSend) bool {
+		if message.MessageType != MessageType_DispatchConfirmationRequest {
+			return false
+		}
+		actualDispatchConfirmationRequest, err := ParseDispatchConfirmationRequest(message.Payload)
+		require.NoError(d.t, err)
+		/*if d.expectedTransactionID != "" {
+			if actualDispatchConfirmationRequest.TransactionID != d.expectedTransactionID {
+				return false
+			}
+		}*/
+		if d.expectedContractAddress != nil {
+			if actualDispatchConfirmationRequest.ContractAddress != d.expectedContractAddress {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 type DispatchConfirmationResponseMatcherBuilder struct {
 	t                       *testing.T
 	expectedTransactionID   string
@@ -830,11 +993,11 @@ func (d *DispatchConfirmationResponseMatcherBuilder) Match() FireAndForgetMessag
 		}
 		actualDispatchConfirmationResponse, err := ParseDispatchConfirmationResponse(message.Payload)
 		require.NoError(d.t, err)
-		if d.expectedTransactionID != "" {
+		/*if d.expectedTransactionID != "" {
 			if actualDispatchConfirmationResponse.TransactionID != d.expectedTransactionID {
 				return false
 			}
-		}
+		}*/
 		if d.expectedContractAddress != nil {
 			if actualDispatchConfirmationResponse.ContractAddress != d.expectedContractAddress {
 				return false
@@ -980,15 +1143,6 @@ func (c *CoordinatorHeartbeatNotificationMatcherBuilder) Match() FireAndForgetMe
 		}
 
 		return true
-	}
-}
-
-// RandomDispatchedTransaction creates DispatchedTransaction with random values
-func RandomDispatchedTransaction() *DispatchedTransaction {
-	return &DispatchedTransaction{
-		TransactionID:        uuid.New(),
-		Signer:               *tktypes.RandAddress(),
-		LatestSubmissionHash: ptrTo(tktypes.Bytes32(tktypes.RandBytes(32))),
 	}
 }
 

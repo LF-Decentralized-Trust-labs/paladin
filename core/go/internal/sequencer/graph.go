@@ -24,15 +24,18 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
+// TODO this whole implementation needs to be refactored.  It is more complex than it needs to be and can be made more efficient at the same time as being simplified
+
 type Graph interface {
 	AddTransaction(ctx context.Context, transaction *Delegation)
-	GetDispatchableTransactions(ctx context.Context) (DispatchableTransactions, error)
+	GetDispatchableTransactions(ctx context.Context, txID uuid.UUID) (DispatchableTransactions, error)
 	RemoveTransaction(ctx context.Context, txID uuid.UUID)
 	RemoveTransactions(ctx context.Context, transactionsToRemove []uuid.UUID)
 	IncludesTransaction(txID uuid.UUID) bool
+	FindTransactionByID(txID uuid.UUID) (*Delegation, error)
 }
 
-// Map of signing address to an ordered list of transaction flows that are ready to be dispatched by that signing address
+// Map of signing identity locator to an ordered list of transaction flows that are ready to be dispatched by that signing address
 type DispatchableTransactions map[string][]*Delegation
 
 func NewGraph(_ context.Context) Graph {
@@ -65,6 +68,10 @@ func (g *graph) AddTransaction(ctx context.Context, transaction *Delegation) {
 
 func (g *graph) IncludesTransaction(txID uuid.UUID) bool {
 	return g.allTransactions[txID] != nil
+}
+
+func (g *graph) FindTransactionByID(txID uuid.UUID) (*Delegation, error) {
+	return g.allTransactions[txID], nil
 }
 
 func (g *graph) buildMatrix(ctx context.Context) error {
@@ -120,8 +127,11 @@ func (g *graph) buildMatrix(ctx context.Context) error {
 // by isolating subgraphs (within each subgraph all transactions are to be dispatched with the same signing key)
 // of transactions that have been endorsed and have no dependencies on transactions that have not been endorsed
 // and then doing a topological sort of each of those subgraphs
-func (g *graph) GetDispatchableTransactions(ctx context.Context) (DispatchableTransactions, error) {
+func (g *graph) GetDispatchableTransactions(ctx context.Context, txID uuid.UUID) (DispatchableTransactions, error) {
 	log.L(ctx).Debug("Graph.GetDispatchableTransactions")
+	//TODO current implementation is inefficient because it assumes that any transaction in the graph could
+	// have suddenly become dispatchable and so it inspects all transactions on the independent edge
+	// however, in reality, we have been told about a specific transaction that has been recently approved for dispatch so we only need to look at the dependents of it
 
 	// TODO should probably cache this graph and only rebuild it when needed (e.g. on restart)
 	// and incrementally update it when new transactions are added etc...
@@ -176,6 +186,12 @@ func (g *graph) GetDispatchableTransactions(ctx context.Context) (DispatchableTr
 				log.L(ctx).Tracef("Graph.GetDispatchableTransactions Transaction %s not endorsed so cannot be dispatched", g.transactions[nextTransaction].ID.String())
 			}
 			continue
+		} else if !g.transactions[nextTransaction].dispatchConfirmed {
+			//this transaction is not confirmed for dispatch yet, so we cannot dispatch it
+			if log.IsTraceEnabled() {
+				log.L(ctx).Tracef("Graph.GetDispatchableTransactions Transaction %s not confirmed for dispatch so cannot be dispatched", g.transactions[nextTransaction].ID.String())
+			}
+			continue
 		} else {
 			if log.IsTraceEnabled() {
 				log.L(ctx).Tracef("Graph.GetDispatchableTransactions Transaction %s is endorsed and will be dispatched", g.transactions[nextTransaction].ID.String())
@@ -217,6 +233,7 @@ func (g *graph) GetDispatchableTransactions(ctx context.Context) (DispatchableTr
 
 	return map[string][]*Delegation{}, nil
 }
+
 func (g *graph) RemoveTransaction(ctx context.Context, txID uuid.UUID) {
 	log.L(ctx).Debugf("Graph.RemoveTransaction Removing transaction %s from graph", txID.String())
 	delete(g.allTransactions, txID)

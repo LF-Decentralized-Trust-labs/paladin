@@ -19,6 +19,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
@@ -26,23 +27,37 @@ import (
 
 type contractSequencerAgentDependencies struct {
 	coordinatorSelector *MockCoordinatorSelector
+	allComponents       *componentmocks.AllComponents
+	keyManager          *componentmocks.KeyManager
 	transportManager    *MockTransportManager
 }
 
 func NewContractSequencerAgentForUnitTesting(t *testing.T, committee []string) (*contractSequencerAgent, *contractSequencerAgentDependencies) {
 
-	mockCoordinatorSelector := NewMockCoordinatorSelector(t)
-	mockCoordinatorSelector.On("Initialize", mock.Anything, mock.Anything).Return(nil).Maybe()
+	mocks := &contractSequencerAgentDependencies{
+		allComponents:       componentmocks.NewAllComponents(t),
+		transportManager:    NewMockTransportManager(t),
+		keyManager:          componentmocks.NewKeyManager(t),
+		coordinatorSelector: NewMockCoordinatorSelector(t),
+	}
 
-	mockTransportManager := NewMockTransportManager(t)
+	mocks.coordinatorSelector.On("Initialize", mock.Anything, mock.Anything).Return(nil).Maybe()
+	mocks.allComponents.On("KeyManager").Return(mocks.keyManager).Maybe()
+
 	nodeName := "testNode"
 
 	contractAddress := tktypes.RandAddress()
 
-	return NewContractSequencerAgent(context.Background(), nodeName, mockTransportManager, mockCoordinatorSelector, committee, contractAddress).(*contractSequencerAgent), &contractSequencerAgentDependencies{
-		coordinatorSelector: mockCoordinatorSelector,
-		transportManager:    mockTransportManager,
-	}
+	return NewContractSequencerAgent(
+			context.Background(),
+			nodeName,
+			mocks.transportManager,
+			mocks.allComponents,
+			mocks.coordinatorSelector,
+			committee,
+			contractAddress,
+		).(*contractSequencerAgent),
+		mocks
 }
 
 func TestIsObserver(t *testing.T) {

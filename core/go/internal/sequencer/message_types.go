@@ -18,7 +18,9 @@ package sequencer
 import (
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -26,6 +28,7 @@ const (
 	MessageType_DelegationRequest                = "DelegationRequest"
 	MessageType_HandoverRequest                  = "HandoverRequest"
 	MessageType_CoordinatorHeartbeatNotification = "CoordinatorHeartbeatNotification"
+	MessageType_DispatchConfirmationRequest      = "DispatchConfirmationRequest"
 	MessageType_DispatchConfirmationResponse     = "DispatchConfirmationResponse"
 )
 
@@ -38,6 +41,16 @@ type CoordinatorHeartbeatNotification struct {
 	ConfirmedTransactions  []*ConfirmedTransaction  `json:"confirmedTransactions"`
 	CoordinatorState       CoordinatorState         `json:"coordinatorState"`
 	BlockHeight            uint64                   `json:"blockHeight"`
+}
+
+type EndorsementResponse struct {
+	TransactionID          uuid.UUID                  `json:"transactionId"`
+	IdempotencyKey         string                     `json:"idempotencyKey"`
+	ContractAddress        string                     `json:"contractAddress"`
+	Endorsement            *prototk.AttestationResult `json:"endorsement"`
+	RevertReason           *string                    `json:"revertReason"`
+	Party                  string                     `json:"party"`
+	AttestationRequestName string                     `json:"attestationRequestName"`
 }
 
 func (chn *CoordinatorHeartbeatNotification) bytes() []byte {
@@ -61,9 +74,16 @@ type HandoverRequest struct {
 	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
 }
 
+type DispatchConfirmationRequest struct {
+	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
+	Coordinator     string              `json:"coordinator"`
+	TransactionID   uuid.UUID           `json:"transactionID"`
+	TransactionHash []byte              `json:"transactionHash"`
+}
+
 type DispatchConfirmationResponse struct {
 	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
-	TransactionID   string              `json:"transactionID"`
+	TransactionID   uuid.UUID           `json:"transactionID"`
 }
 
 func (dr *HandoverRequest) bytes() []byte {
@@ -72,6 +92,11 @@ func (dr *HandoverRequest) bytes() []byte {
 }
 
 func (dr *DelegationRequest) bytes() []byte {
+	jsonBytes, _ := json.Marshal(dr)
+	return jsonBytes
+}
+
+func (dr *DispatchConfirmationRequest) bytes() []byte {
 	jsonBytes, _ := json.Marshal(dr)
 	return jsonBytes
 }
@@ -85,6 +110,12 @@ func ParseDelegationRequest(bytes []byte) (*DelegationRequest, error) {
 	dr := &DelegationRequest{}
 	err := json.Unmarshal(bytes, dr)
 	return dr, err
+}
+
+func ParseDispatchConfirmationRequest(bytes []byte) (*DispatchConfirmationRequest, error) {
+	dcr := &DispatchConfirmationRequest{}
+	err := json.Unmarshal(bytes, dcr)
+	return dcr, err
 }
 
 func ParseDispatchConfirmationResponse(bytes []byte) (*DispatchConfirmationResponse, error) {

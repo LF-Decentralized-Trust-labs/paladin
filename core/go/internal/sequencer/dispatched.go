@@ -24,7 +24,8 @@ import (
 )
 
 type DispatchedTransaction struct {
-	TransactionID        uuid.UUID
+	*Delegation
+	SignerLocator        string
 	Signer               tktypes.EthAddress
 	LatestSubmissionHash *tktypes.Bytes32
 	Nonce                *uint64
@@ -44,7 +45,7 @@ func NewDispatchedTransactionIndex(_ context.Context) *DispatchedTransactionInde
 
 func (d *DispatchedTransactionIndex) add(transaction *DispatchedTransaction) {
 	// Add the transaction to the list
-	d.TransactionsByID[transaction.TransactionID] = transaction
+	d.TransactionsByID[transaction.ID] = transaction
 	if transaction.Nonce != nil {
 		signerNonce := fmt.Sprintf("%s:%d", transaction.Signer.String(), *transaction.Nonce)
 		d.transactionsBySignerNonce[signerNonce] = transaction
@@ -54,7 +55,7 @@ func (d *DispatchedTransactionIndex) add(transaction *DispatchedTransaction) {
 func (d *DispatchedTransactionIndex) remove(transaction *DispatchedTransaction) {
 	signerNonce := fmt.Sprintf("%s:%d", transaction.Signer.String(), transaction.Nonce)
 	delete(d.transactionsBySignerNonce, signerNonce)
-	delete(d.TransactionsByID, transaction.TransactionID)
+	delete(d.TransactionsByID, transaction.ID)
 }
 
 func (d *DispatchedTransactionIndex) empty() bool {

@@ -17,10 +17,13 @@ package sequencer
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
@@ -92,9 +95,11 @@ type contractSequencerAgent struct {
 	committeeMembers                    []CommitteeMember
 	nodeName                            string
 	flushPointsBySignerAddress          map[string]*FlushPoint
+	defaultSignerLocator                string
+	components                          components.AllComponents
 }
 
-func NewContractSequencerAgent(ctx context.Context, nodeName string, transportManager TransportManager, coordinatorSelector CoordinatorSelector, committee []string, contractAddress *tktypes.EthAddress) ContractSequencerAgent {
+func NewContractSequencerAgent(ctx context.Context, nodeName string, transportManager TransportManager, components components.AllComponents, coordinatorSelector CoordinatorSelector, committee []string, contractAddress *tktypes.EthAddress) ContractSequencerAgent {
 
 	committeeMembers := make([]CommitteeMember, 0, len(committee))
 	for _, member := range committee {
@@ -110,7 +115,6 @@ func NewContractSequencerAgent(ctx context.Context, nodeName string, transportMa
 		delegationsByTransactionID:          make(map[string]*Delegation),
 		dispatchedTransactionsByCoordinator: make(map[string][]*DispatchedTransaction),
 		confirmedTransactionsBySubmitter:    make(map[string][]*ConfirmedTransaction),
-		transportManager:                    transportManager,
 		blockRangeSize:                      1000, //TODO: make this configurable per contract
 		currentBlockRange:                   0,
 		currentBlockHeight:                  0,
@@ -119,6 +123,9 @@ func NewContractSequencerAgent(ctx context.Context, nodeName string, transportMa
 		committeeMembers:                    committeeMembers,
 		nodeName:                            nodeName,
 		coordinator:                         NewCoordinator(ctx),
+		defaultSignerLocator:                fmt.Sprintf("domains.%s.submit.%s", contractAddress, uuid.New()),
+		components:                          components,
+		transportManager:                    transportManager,
 	}
 }
 
@@ -253,9 +260,63 @@ func (c *contractSequencerAgent) HandleIndexedBlocks(ctx context.Context, blocks
 	return nil
 }
 
+func (c *contractSequencerAgent) HandleEndorsementResponse(ctx context.Context, message *EndorsementResponse) error {
+	//Find the transaction in question and determine if we already have an endorsement request outstanding for it
+	// if not, then add this response and then run the graph analysis to determine if we can dispatch this transaction and any other
+	// previously endorsed transactions in the graph that it is blocking
+	if c.coordinator.state != CoordinatorState_Active {
+		//There are no other states where we should be receiving endorsement responses
+		// in elect, preparing, standby state, we would not have sent any endorsement requests yet
+		// in idle, flush or closing state, we might have sent endorsement requests, but it is too late to do anything with the responses
+		// so we should just ignore them
+		log.L(ctx).Info("Received an endorsement response in an unexpected state", "state", c.coordinator.state)
+		return nil
+	}
+	transaction, err := c.coordinator.assembledTransactions.FindTransactionByID(message.TransactionID)
+	if err != nil {
+		//TODO - log an error
+	}
+	if transaction == nil {
+		//TODO - log
+	}
+	transaction.handleEndorsementResponse(ctx, message)
+	if transaction.IsEndorsed(ctx) {
+		//we have a fully endorsed transaction, send a request to confirm approval to dispatch
+		c.sendDispatchConfirmationRequest(ctx, transaction)
+		//TODO - record request in a map so that we can handle the response and send retries if necessary
+	}
+	return nil
+}
+
 func (c *contractSequencerAgent) HandleDispatchConfirmationResponse(ctx context.Context, message *DispatchConfirmationResponse) error {
-	//TODO should there be some validation that the response message was sent by the sender for this transaction?
-	//TODO
+	if c.coordinator.state != CoordinatorState_Active {
+		//There are no other states where we should be receiving DispatchConfirmationResponse
+		// in elect, preparing, standby state, we would not have sent any DispatchConfirmationRequests yet
+		// in idle, flush or closing state, we might have sent DispatchConfirmationRequests, but it is too late to do anything with the responses
+		// so we should just ignore them
+		log.L(ctx).Info("Received an DispatchConfirmationResponse in an unexpected state", "state", c.coordinator.state)
+		return nil
+	}
+	transaction, err := c.coordinator.assembledTransactions.FindTransactionByID(message.TransactionID)
+	if err != nil {
+		//TODO - log an error
+		return err
+	}
+	if transaction == nil {
+		//TODO - log
+		return errors.New("transaction not found")
+	}
+	transaction.handleDispatchConfirmationResponse(ctx, message)
+
+	dispatchableTransactions, err := c.coordinator.assembledTransactions.GetDispatchableTransactions(ctx, transaction.ID)
+	if err != nil {
+		//TODO - log an error
+		//TODO we are unlikely to ask the question about this transaction again.  Should we remove it and all its dependencies from the graph?
+		// what are the likely error situations that would conceivably recover from?
+	}
+
+	c.DispatchTransactions(ctx, dispatchableTransactions)
+
 	return nil
 
 }
@@ -316,6 +377,28 @@ func (c *contractSequencerAgent) sendCoordinatorHeartbeatNotifications(ctx conte
 		})
 	}
 	return nil
+}
+
+func (c *contractSequencerAgent) sendDispatchConfirmationRequest(ctx context.Context, transaction *Delegation) {
+
+	transactionHash, err := transaction.Hash()
+	if err != nil {
+		//TODO
+	}
+
+	request := &DispatchConfirmationRequest{
+
+		ContractAddress: c.contractAddress,
+		Coordinator:     c.nodeName,
+		TransactionID:   transaction.ID,
+		TransactionHash: transactionHash,
+	}
+
+	c.transportManager.Send(ctx, &components.FireAndForgetMessageSend{
+		Node:        transaction.Sender(),
+		MessageType: MessageType_DispatchConfirmationRequest,
+		Payload:     request.bytes(),
+	})
 }
 
 func (c *contractSequencerAgent) HandleBlockHeightChange(ctx context.Context, newBlockHeight uint64) error {

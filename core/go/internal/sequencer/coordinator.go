@@ -69,7 +69,7 @@ func (c *coordinator) handleTransactionConfirmed(ctx context.Context, transactio
 
 	c.dispatchedTransactions.remove(dispatchedTransaction)
 	c.confirmedTransactions.add(&ConfirmedTransaction{
-		TransactionID: dispatchedTransaction.TransactionID,
+		TransactionID: dispatchedTransaction.ID,
 		Hash:          transaction.Hash,
 		RevertReason:  transaction.RevertReason,
 	})

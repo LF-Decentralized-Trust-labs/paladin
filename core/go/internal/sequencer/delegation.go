@@ -29,7 +29,8 @@ type endorsementRequirement struct {
 
 // Delegation represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
 type Delegation struct {
-	sender string
+	sender            string
+	dispatchConfirmed bool
 	*components.PrivateTransaction
 }
 
@@ -38,6 +39,55 @@ func NewDelegation(sender string, pt *components.PrivateTransaction) *Delegation
 		sender:             sender,
 		PrivateTransaction: pt,
 	}
+}
+
+// Hash method of Delegation
+func (d *Delegation) Hash() ([]byte, error) {
+	if d.PrivateTransaction == nil {
+		//TODO should this be an error?
+		return nil, nil
+	}
+
+	//find the attestation result that has the same name as the signature attestation
+
+	signatureAttestationName, err := d.SignatureAttestationName()
+	if err != nil {
+		return nil, err
+	}
+	for _, endorsement := range d.PostAssembly.Endorsements {
+		if endorsement.Name == signatureAttestationName {
+			return endorsement.Payload, nil
+		}
+	}
+	//TODO should this be an error?
+	return nil, nil
+}
+
+// SignatureAttestationName is a method of Delegation that returns the name of the attestation in the attestation plan that is a signature
+func (d *Delegation) SignatureAttestationName() (string, error) {
+	for _, attRequest := range d.PostAssembly.AttestationPlan {
+		if attRequest.AttestationType == prototk.AttestationType_SIGN {
+			return attRequest.Name, nil
+		}
+	}
+	return "", nil
+}
+
+func (d *Delegation) handleEndorsementResponse(ctx context.Context, response *EndorsementResponse) error {
+	//TODO check that this matches a pending request
+	//TODO check that it is not a rejection
+
+	d.PostAssembly.Endorsements = append(d.PostAssembly.Endorsements, response.Endorsement)
+
+	return nil
+}
+
+func (d *Delegation) handleDispatchConfirmationResponse(ctx context.Context, response *DispatchConfirmationResponse) error {
+	//TODO check that this matches a pending request
+	//TODO check that it is not a rejection
+
+	d.dispatchConfirmed = true
+	return nil
 }
 
 func (d *Delegation) Sender() string {

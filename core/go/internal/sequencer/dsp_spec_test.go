@@ -628,7 +628,7 @@ func TestRule4_8(t *testing.T) {
 	fixture := Given(t).
 		ContractSequencerAgent().
 		NodeName("nodeA").
-		Committee("nodeA", "nodeB", "nodeC", "nodeD").
+		Committee("nodeA", "nodeB", "nodeC").
 		CoordinatorState(CoordinatorState_Flush).
 		DelegatedTransactions(
 			[]*TransactionFixture{
@@ -642,10 +642,7 @@ func TestRule4_8(t *testing.T) {
 	//Verify
 	assert.False(
 		t,
-		fixture.outboundMessageMonitor.Sends(
-			DispatchConfirmationResponseMatcher(t).
-				Match(),
-		),
+		fixture.TransactionIsDispatched("txB1"),
 	)
 }
 
@@ -676,13 +673,13 @@ func TestRule4_9(t *testing.T) {
 		Build()
 
 	//Exercise
-	fixture.HandleDispatchConfirmationResponse("txB1")
+	fixture.HandleEndorsementResponse("txB1", "nodeC")
 
 	//Verify
 	assert.False(
 		t,
 		fixture.outboundMessageMonitor.Sends(
-			DispatchConfirmationResponseMatcher(t).
+			DispatchConfirmationRequestMatcher(t).
 				Match(),
 		),
 	)
@@ -716,18 +713,59 @@ func TestRule5_9(t *testing.T) {
 		Build()
 
 	//Exercise
-	fixture.HandleDispatchConfirmationResponse("txB1")
+	fixture.HandleEndorsementResponse("txB1", "nodeC")
 
 	//Verify
 	assert.True(
 		t,
 		fixture.outboundMessageMonitor.Sends(
-			DispatchConfirmationResponseMatcher(t).
+			DispatchConfirmationRequestMatcher(t).
 				Match(),
 		),
 	)
 
 	//assert.Equal(t, TransactionState_ConfirmingForDispatch, fixture.TransactionState("txB1"))
+}
+func TestRule5_10(t *testing.T) {
+	/*
+		`GIVEN` a `ContractSequencerAgent` is in `Coordinator.Active` state
+			`AND` a transaction is in `Graph` state
+			`AND` more than one endorsements are outstanding
+			`AND` the transaction has no dependencies
+		`WHEN` one `EndorsementResponse` is received
+		`THEN` the `ContractSequencerAgent` does not send a `DispatchConfirmationRequest`
+			`AND` the transaction remains in `Graph` state
+	*/
+}
+
+func TestRule6_3(t *testing.T) {
+	/*
+		`GIVEN` a`ContractSequencerAgent` is in `Coordinator.Active` state
+			`AND` a transaction is in the `ConfirmingForDispatch` state
+		`WHEN` a `DispatchConfirmation` is received from the transaction's sender
+		`THEN` the transaction is dispatched
+	*/
+
+	//Setup
+	fixture := Given(t).
+		ContractSequencerAgent().
+		NodeName("nodeA").
+		Committee("nodeA", "nodeB", "nodeC").
+		CoordinatorState(CoordinatorState_Active).
+		DelegatedTransactions(
+			[]*TransactionFixture{
+				NewTransactionFixture("txB1").Sender("nodeB").State(TransactionState_ConfirmingForDispatch),
+			}).
+		Build()
+
+	//Exercise
+	fixture.HandleDispatchConfirmationResponse("txB1")
+
+	//Verify
+	assert.True(
+		t,
+		fixture.TransactionIsDispatched("txB1"),
+	)
 }
 
 func TestRule10000(t *testing.T) {
