@@ -93,6 +93,11 @@ export interface INotoDomainReceipt {
     readLockedInputs?: IReceiptState<INotoLockedCoin>[];
     preparedLockedOutputs?: IReceiptState<INotoLockedCoin>[];
   };
+  transfers?: {
+    from?: string;
+    to?: string;
+    amount: string;
+  }[];
   lockInfo?: {
     lockId: string;
     delegate?: string;
@@ -154,4 +159,9 @@ export interface IEventWithData {
   soliditySignature: string;
   address: string;
   data: any;
+}
+
+export interface IStoredABI {
+  hash: string;
+  abi: ethers.InterfaceAbi;
 }

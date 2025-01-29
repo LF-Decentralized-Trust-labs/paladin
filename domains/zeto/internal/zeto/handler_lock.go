@@ -96,35 +96,54 @@ func (h *lockHandler) decodeTransferCall(ctx context.Context, config *types.Doma
 	return &params, err
 }
 
-func (h *lockHandler) loadCoins(ctx context.Context, ids []any, stateQueryContext string) ([]*types.ZetoCoin, error) {
+func (h *lockHandler) loadCoins(ctx context.Context, ids []any, stateQueryContext string) ([]*types.ZetoCoin, []*prototk.StateRef, error) {
 	inputIDs := make([]any, 0, len(ids))
+	stateRefs := make([]*prototk.StateRef, 0, len(ids))
 	for _, input := range ids {
 		parsed, err := tktypes.ParseHexUint256(ctx, input.(string))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !parsed.NilOrZero() {
 			inputIDs = append(inputIDs, parsed)
+			stateRefs = append(stateRefs, &prototk.StateRef{
+				Id:       parsed.String(),
+				SchemaId: h.zeto.coinSchema.Id,
+			})
 		}
 	}
 
+	// TODO: this should probably query all states and not just available ones
 	queryBuilder := query.NewQueryBuilder().In(".id", inputIDs)
 	inputStates, err := h.zeto.findAvailableStates(ctx, false, stateQueryContext, queryBuilder.Query().String())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(inputStates) != len(inputIDs) {
-		return nil, i18n.NewError(ctx, msgs.MsgErrorParseInputStates)
+		missingStates := make([]*tktypes.HexUint256, 0, len(inputIDs))
+		for _, id := range inputIDs {
+			idInt := id.(*tktypes.HexUint256)
+			found := false
+			for _, state := range inputStates {
+				if state.Id == idInt.String() {
+					found = true
+				}
+			}
+			if !found {
+				missingStates = append(missingStates, idInt)
+			}
+		}
+		return nil, nil, i18n.NewError(ctx, msgs.MsgStatesNotFound, missingStates)
 	}
 
 	inputCoins := make([]*types.ZetoCoin, len(inputStates))
 	for i, state := range inputStates {
 		err := json.Unmarshal([]byte(state.DataJson), &inputCoins[i])
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return inputCoins, nil
+	return inputCoins, stateRefs, nil
 }
 
 func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
@@ -133,7 +152,7 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeTransferCall, err)
 	}
-	inputCoins, err := h.loadCoins(ctx, decodedTransfer.Inputs, req.StateQueryContext)
+	inputCoins, inputStates, err := h.loadCoins(ctx, decodedTransfer.Inputs, req.StateQueryContext)
 	if err != nil {
 		return nil, err
 	}
@@ -155,8 +174,7 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	return &prototk.AssembleTransactionResponse{
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
 		AssembledTransaction: &prototk.AssembledTransaction{
-			InputStates:  []*prototk.StateRef{},
-			OutputStates: []*prototk.NewState{},
+			ReadStates: inputStates,
 		},
 		AttestationPlan: []*prototk.AttestationRequest{
 			{

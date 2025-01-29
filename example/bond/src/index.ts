@@ -201,11 +201,7 @@ async function main(): Promise<boolean> {
     txID,
     10000
   );
-  if (paymentTransfer === undefined) {
-    logger.error("Failed!");
-    return false;
-  }
-  logger.log("Success!");
+  if (!paymentTransfer) return false;
 
   if (paymentTransfer.transaction.to === undefined) {
     logger.error("Prepared payment transfer had no 'to' address");

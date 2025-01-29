@@ -394,7 +394,7 @@ func (tf *transactionFlow) writeAndLockStates(ctx context.Context) {
 			tf.logActionDebugf(ctx, "Potential states written %s", tf.domainContext.Info().ID)
 		}
 	}
-	if len(tf.transaction.PostAssembly.InputStates) > 0 {
+	if len(tf.transaction.PostAssembly.InputStates) > 0 && tf.transaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION {
 		readTX := tf.components.Persistence().DB() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
 
 		err := tf.domainAPI.LockStates(tf.domainContext, readTX, tf.transaction)

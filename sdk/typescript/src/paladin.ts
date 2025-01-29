@@ -15,6 +15,7 @@ import {
   ITransactionStates,
   IDecodedEvent,
   IEventWithData,
+  IStoredABI,
 } from "./interfaces/transaction";
 import {
   Algorithms,
@@ -206,6 +207,13 @@ export default class PaladinClient {
 
   async storeABI(abi: ethers.InterfaceAbi) {
     await this.post("ptx_storeABI", [abi]);
+  }
+
+  async getStoredABI(hash: string) {
+    const res = await this.post<JsonRpcResult<IStoredABI>>("ptx_getStoredABI", [
+      hash,
+    ]);
+    return res.data.result;
   }
 
   async decodeEvent(topics: string[], data: string) {

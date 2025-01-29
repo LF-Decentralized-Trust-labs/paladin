@@ -147,4 +147,5 @@ var (
 	MsgErrorDecodeDepositCall              = ffe("PD210105", "Failed to decode the deposit call. %s")
 	MsgErrorDecodeWithdrawCall             = ffe("PD210106", "Failed to decode the withdraw call. %s")
 	MsgParamTotalAmountInRange             = ffe("PD210107", "Total amount must be in the range (0, 2^100)")
+	MsgStatesNotFound                      = ffe("PD210108", "States not found: %s")
 )

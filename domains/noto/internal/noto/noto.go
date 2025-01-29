@@ -988,6 +988,83 @@ func (n *Noto) receiptStates(ctx context.Context, states []*prototk.EndorsableSt
 	return coins, nil
 }
 
+func (n *Noto) receiptTransfers(ctx context.Context, req *prototk.BuildReceiptRequest) ([]*types.ReceiptTransfer, error) {
+	inputCoins, err := n.parseCoinList(ctx, "inputs", n.filterSchema(req.InputStates, []string{n.coinSchema.Id, n.lockedCoinSchema.Id}))
+	if err != nil {
+		return nil, err
+	}
+	outputCoins, err := n.parseCoinList(ctx, "outputs", n.filterSchema(req.OutputStates, []string{n.coinSchema.Id, n.lockedCoinSchema.Id}))
+	if err != nil {
+		return nil, err
+	}
+
+	var from *tktypes.EthAddress
+	fromAmount := big.NewInt(0)
+	to := make(map[tktypes.EthAddress]*big.Int)
+
+	parseInput := func(owner *tktypes.EthAddress, amount *big.Int) bool {
+		if from == nil {
+			from = owner
+		} else if !owner.Equals(from) {
+			return false
+		}
+		fromAmount.Add(fromAmount, amount)
+		return true
+	}
+
+	parseOutput := func(owner tktypes.EthAddress, amount *big.Int) bool {
+		if owner.Equals(from) {
+			fromAmount.Sub(fromAmount, amount)
+		} else if toAmount, ok := to[owner]; ok {
+			toAmount.Add(toAmount, amount)
+		} else {
+			to[owner] = amount
+		}
+		return true
+	}
+
+	for _, coin := range inputCoins.coins {
+		if !parseInput(coin.Owner, coin.Amount.Int()) {
+			return nil, nil
+		}
+	}
+	for _, coin := range inputCoins.lockedCoins {
+		if !parseInput(coin.Owner, coin.Amount.Int()) {
+			return nil, nil
+		}
+	}
+	for _, coin := range outputCoins.coins {
+		if !parseOutput(*coin.Owner, coin.Amount.Int()) {
+			return nil, nil
+		}
+	}
+	for _, coin := range outputCoins.lockedCoins {
+		if !parseOutput(*coin.Owner, coin.Amount.Int()) {
+			return nil, nil
+		}
+	}
+
+	if len(to) == 0 && from != nil && fromAmount.BitLen() > 0 {
+		// special case for burn (no recipients)
+		return []*types.ReceiptTransfer{{
+			From:   from,
+			Amount: (*tktypes.HexUint256)(fromAmount),
+		}}, nil
+	}
+
+	transfers := make([]*types.ReceiptTransfer, 0, len(to))
+	for owner, amount := range to {
+		if amount.BitLen() > 0 {
+			transfers = append(transfers, &types.ReceiptTransfer{
+				From:   from,
+				To:     &owner,
+				Amount: (*tktypes.HexUint256)(amount),
+			})
+		}
+	}
+	return transfers, nil
+}
+
 func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptRequest) (res *prototk.BuildReceiptResponse, err error) {
 	receipt := &types.NotoDomainReceipt{}
 
@@ -1056,6 +1133,11 @@ func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 			return nil, err
 		}
 		receipt.LockInfo.Unlock = encodedCall
+	}
+
+	receipt.Transfers, err = n.receiptTransfers(ctx, req)
+	if err != nil {
+		return nil, err
 	}
 
 	receiptJSON, err := json.Marshal(receipt)

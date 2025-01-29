@@ -21,9 +21,10 @@ import (
 )
 
 type NotoDomainReceipt struct {
-	States   ReceiptStates    `json:"states"`
-	LockInfo *ReceiptLockInfo `json:"lockInfo,omitempty"`
-	Data     tktypes.HexBytes `json:"data,omitempty"`
+	States    ReceiptStates      `json:"states"`
+	Transfers []*ReceiptTransfer `json:"transfers,omitempty"`
+	LockInfo  *ReceiptLockInfo   `json:"lockInfo,omitempty"`
+	Data      tktypes.HexBytes   `json:"data,omitempty"`
 }
 
 type ReceiptStates struct {
@@ -46,6 +47,12 @@ type ReceiptLockInfo struct {
 type ReceiptState struct {
 	ID   tktypes.HexBytes `json:"id"`
 	Data tktypes.RawJSON  `json:"data"`
+}
+
+type ReceiptTransfer struct {
+	From   *tktypes.EthAddress `json:"from,omitempty"`
+	To     *tktypes.EthAddress `json:"to,omitempty"`
+	Amount *tktypes.HexUint256 `json:"amount"`
 }
 
 type NotoCoinState struct {

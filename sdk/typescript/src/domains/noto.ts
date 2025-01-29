@@ -342,4 +342,15 @@ export class NotoInstance {
     });
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
   }
+
+  encodeUnlock(data: NotoUnlockPublicParams) {
+    return new ethers.Interface(notoJSON.abi).encodeFunctionData("unlock", [
+      data.lockId,
+      data.lockedInputs,
+      data.lockedOutputs,
+      data.outputs,
+      data.signature,
+      data.data,
+    ]);
+  }
 }
