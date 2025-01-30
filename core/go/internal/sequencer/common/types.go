@@ -12,38 +12,23 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
-package sequencer
+package common
 
 import (
-	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-type ConfirmedTransaction struct {
+type FlushPoint struct {
+	From          tktypes.EthAddress
+	Nonce         uint64
 	TransactionID uuid.UUID
 	Hash          tktypes.Bytes32
-	RevertReason  tktypes.HexBytes
+	Confirmed     bool
 }
 
-type ConfirmedTransactionIndex struct {
-	TransactionsByID map[uuid.UUID]*ConfirmedTransaction
-}
-
-func NewConfirmedTransactionIndex(_ context.Context) *ConfirmedTransactionIndex {
-	return &ConfirmedTransactionIndex{
-		TransactionsByID: make(map[uuid.UUID]*ConfirmedTransaction),
-	}
-}
-
-func (c *ConfirmedTransactionIndex) add(transaction *ConfirmedTransaction) {
-	// Add the transaction to the list
-	c.TransactionsByID[transaction.TransactionID] = transaction
-}
-
-func (c *ConfirmedTransactionIndex) remove(transaction *ConfirmedTransaction) {
-	// Remove the transaction from the list
-	delete(c.TransactionsByID, transaction.TransactionID)
+func (f *FlushPoint) GetSignerNonce() string {
+	return fmt.Sprintf("%s:%d", f.From.String(), f.Nonce)
 }

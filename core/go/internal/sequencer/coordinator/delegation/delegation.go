@@ -12,14 +12,30 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package sequencer
+package delegation
 
 import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+)
+
+type TransactionState string
+
+const (
+	TransactionState_Pooled                TransactionState = "TransactionState_Pooled"
+	TransactionState_Assembled             TransactionState = "TransactionState_Assembled"
+	TransactionState_ConfirmingForDispatch TransactionState = "TransactionState_ConfirmingForDispatch"
+	TransactionState_Dispatched            TransactionState = "TransactionState_Dispatched"
+	TransactionState_Submitted             TransactionState = "TransactionState_Submitted"
+	TransactionState_Committed             TransactionState = "TransactionState_Committed"
+	TransactionState_Rejected              TransactionState = "TransactionState_Rejected"
+	TransactionState_ConfirmedSuccess      TransactionState = "TransactionState_ConfirmedSuccess"
+	TransactionState_ConfirmedReverted     TransactionState = "TransactionState_ConfirmedReverted"
 )
 
 type endorsementRequirement struct {
@@ -29,16 +45,39 @@ type endorsementRequirement struct {
 
 // Delegation represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
 type Delegation struct {
+	*components.PrivateTransaction
 	sender            string
 	dispatchConfirmed bool
-	*components.PrivateTransaction
+	//SignerLocator        *string
+	signerAddress        *tktypes.EthAddress
+	latestSubmissionHash *tktypes.Bytes32
+	nonce                *uint64
+	stateMachine         *StateMachine
 }
 
 func NewDelegation(sender string, pt *components.PrivateTransaction) *Delegation {
-	return &Delegation{
+	d := &Delegation{
 		sender:             sender,
 		PrivateTransaction: pt,
 	}
+	d.InitializeStateMachine(State_Pooled)
+	return d
+}
+
+func (d *Delegation) GetSignerAddress() *tktypes.EthAddress {
+	return d.signerAddress
+}
+
+func (d *Delegation) GetNonce() *uint64 {
+	return d.nonce
+}
+
+func (d *Delegation) GetState() State {
+	return d.stateMachine.currentState
+}
+
+func (d *Delegation) GetLatestSubmissionHash() *tktypes.Bytes32 {
+	return d.latestSubmissionHash
 }
 
 // Hash method of Delegation
@@ -73,7 +112,7 @@ func (d *Delegation) SignatureAttestationName() (string, error) {
 	return "", nil
 }
 
-func (d *Delegation) handleEndorsementResponse(ctx context.Context, response *EndorsementResponse) error {
+func (d *Delegation) handleEndorsementResponse(_ context.Context, response *transport.EndorsementResponse) error {
 	//TODO check that this matches a pending request
 	//TODO check that it is not a rejection
 
@@ -82,7 +121,7 @@ func (d *Delegation) handleEndorsementResponse(ctx context.Context, response *En
 	return nil
 }
 
-func (d *Delegation) handleDispatchConfirmationResponse(ctx context.Context, response *DispatchConfirmationResponse) error {
+func (d *Delegation) handleDispatchConfirmationResponse(_ context.Context, _ *transport.DispatchConfirmationResponse) error {
 	//TODO check that this matches a pending request
 	//TODO check that it is not a rejection
 
@@ -158,4 +197,12 @@ func (d *Delegation) outstandingEndorsementRequests(ctx context.Context) []*endo
 		}
 	}
 	return outstandingEndorsementRequests
+}
+
+func (d *Delegation) sendAssembleRequest(_ context.Context) error {
+	return nil
+}
+
+func (d *Delegation) sendEndorsementRequests(_ context.Context) error {
+	return nil
 }

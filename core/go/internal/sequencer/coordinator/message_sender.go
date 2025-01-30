@@ -12,18 +12,17 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package sequencer
 
-import "context"
+package coordinator
 
-type CommitteeMember struct {
-	NodeName  string
-	Weighting int
-}
+import (
+	"context"
 
-type CoordinatorSelector interface {
-	Initialize(ctx context.Context, committee []CommitteeMember) error
-	Eliminate(ctx context.Context, node string) error
-	Select(ctx context.Context, blockRange uint64) (string, error)
-	Reset(ctx context.Context) error
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+)
+
+type MessageSender interface {
+	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *tktypes.EthAddress)
+	SendDispatchConfirmationRequest(ctx context.Context, transactionSender string, transactionHash []byte, transactionID uuid.UUID, contractAddress *tktypes.EthAddress, nodeName string)
 }
