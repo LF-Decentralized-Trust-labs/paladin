@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package delegation
+package transaction
 
 import (
 	"github.com/google/uuid"
@@ -26,17 +26,17 @@ type Event interface {
 	GetTransactionID() uuid.UUID
 }
 
-type delegationEvent struct {
+type event struct {
 	TransactionID uuid.UUID
 }
 
-func (e *delegationEvent) GetTransactionID() uuid.UUID {
+func (e *event) GetTransactionID() uuid.UUID {
 	return e.TransactionID
 }
 
-// DelegationSelectedEvent
+// TransactionSelectedEvent
 type SelectedEvent struct {
-	delegationEvent
+	event
 }
 
 func (_ *SelectedEvent) Type() EventType {
@@ -45,7 +45,7 @@ func (_ *SelectedEvent) Type() EventType {
 
 // AssembleRequestSentEvent
 type AssembleRequestSentEvent struct {
-	delegationEvent
+	event
 }
 
 func (_ *AssembleRequestSentEvent) Type() EventType {
@@ -54,7 +54,7 @@ func (_ *AssembleRequestSentEvent) Type() EventType {
 
 // AssembledEvent
 type AssembledEvent struct {
-	delegationEvent
+	event
 }
 
 func (_ *AssembledEvent) Type() EventType {
@@ -63,7 +63,7 @@ func (_ *AssembledEvent) Type() EventType {
 
 // EndorsedEvent
 type EndorsedEvent struct {
-	delegationEvent
+	event
 }
 
 func (_ *EndorsedEvent) Type() EventType {
@@ -72,7 +72,7 @@ func (_ *EndorsedEvent) Type() EventType {
 
 // DispatchConfirmedEvent
 type DispatchConfirmedEvent struct {
-	delegationEvent
+	event
 }
 
 func (_ *DispatchConfirmedEvent) Type() EventType {
@@ -81,7 +81,7 @@ func (_ *DispatchConfirmedEvent) Type() EventType {
 
 // CollectedEvent
 type CollectedEvent struct {
-	delegationEvent
+	event
 }
 
 func (_ *CollectedEvent) Type() EventType {
@@ -90,7 +90,7 @@ func (_ *CollectedEvent) Type() EventType {
 
 // NonceAllocatedEvent
 type NonceAllocatedEvent struct {
-	delegationEvent
+	event
 }
 
 func (_ *NonceAllocatedEvent) Type() EventType {
@@ -99,7 +99,7 @@ func (_ *NonceAllocatedEvent) Type() EventType {
 
 // SubmittedEvent
 type SubmittedEvent struct {
-	delegationEvent
+	event
 }
 
 func (_ *SubmittedEvent) Type() EventType {
@@ -108,7 +108,7 @@ func (_ *SubmittedEvent) Type() EventType {
 
 // ConfirmedEvent
 type ConfirmedEvent struct {
-	delegationEvent
+	event
 	Nonce        uint64
 	Hash         tktypes.Bytes32
 	RevertReason tktypes.HexBytes

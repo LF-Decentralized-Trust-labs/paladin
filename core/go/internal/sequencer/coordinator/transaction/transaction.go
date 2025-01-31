@@ -12,7 +12,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package delegation
+package transaction
 
 import (
 	"context"
@@ -32,7 +32,6 @@ const (
 	TransactionState_ConfirmingForDispatch TransactionState = "TransactionState_ConfirmingForDispatch"
 	TransactionState_Dispatched            TransactionState = "TransactionState_Dispatched"
 	TransactionState_Submitted             TransactionState = "TransactionState_Submitted"
-	TransactionState_Committed             TransactionState = "TransactionState_Committed"
 	TransactionState_Rejected              TransactionState = "TransactionState_Rejected"
 	TransactionState_ConfirmedSuccess      TransactionState = "TransactionState_ConfirmedSuccess"
 	TransactionState_ConfirmedReverted     TransactionState = "TransactionState_ConfirmedReverted"
@@ -43,8 +42,8 @@ type endorsementRequirement struct {
 	party      string
 }
 
-// Delegation represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
-type Delegation struct {
+// Transaction represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
+type Transaction struct {
 	*components.PrivateTransaction
 	sender            string
 	dispatchConfirmed bool
@@ -55,8 +54,8 @@ type Delegation struct {
 	stateMachine         *StateMachine
 }
 
-func NewDelegation(sender string, pt *components.PrivateTransaction) *Delegation {
-	d := &Delegation{
+func NewTransaction(sender string, pt *components.PrivateTransaction) *Transaction {
+	d := &Transaction{
 		sender:             sender,
 		PrivateTransaction: pt,
 	}
@@ -64,24 +63,24 @@ func NewDelegation(sender string, pt *components.PrivateTransaction) *Delegation
 	return d
 }
 
-func (d *Delegation) GetSignerAddress() *tktypes.EthAddress {
+func (d *Transaction) GetSignerAddress() *tktypes.EthAddress {
 	return d.signerAddress
 }
 
-func (d *Delegation) GetNonce() *uint64 {
+func (d *Transaction) GetNonce() *uint64 {
 	return d.nonce
 }
 
-func (d *Delegation) GetState() State {
+func (d *Transaction) GetState() State {
 	return d.stateMachine.currentState
 }
 
-func (d *Delegation) GetLatestSubmissionHash() *tktypes.Bytes32 {
+func (d *Transaction) GetLatestSubmissionHash() *tktypes.Bytes32 {
 	return d.latestSubmissionHash
 }
 
-// Hash method of Delegation
-func (d *Delegation) Hash() ([]byte, error) {
+// Hash method of Transaction
+func (d *Transaction) Hash() ([]byte, error) {
 	if d.PrivateTransaction == nil {
 		//TODO should this be an error?
 		return nil, nil
@@ -102,8 +101,8 @@ func (d *Delegation) Hash() ([]byte, error) {
 	return nil, nil
 }
 
-// SignatureAttestationName is a method of Delegation that returns the name of the attestation in the attestation plan that is a signature
-func (d *Delegation) SignatureAttestationName() (string, error) {
+// SignatureAttestationName is a method of Transaction that returns the name of the attestation in the attestation plan that is a signature
+func (d *Transaction) SignatureAttestationName() (string, error) {
 	for _, attRequest := range d.PostAssembly.AttestationPlan {
 		if attRequest.AttestationType == prototk.AttestationType_SIGN {
 			return attRequest.Name, nil
@@ -112,7 +111,7 @@ func (d *Delegation) SignatureAttestationName() (string, error) {
 	return "", nil
 }
 
-func (d *Delegation) handleEndorsementResponse(_ context.Context, response *transport.EndorsementResponse) error {
+func (d *Transaction) handleEndorsementResponse(_ context.Context, response *transport.EndorsementResponse) error {
 	//TODO check that this matches a pending request
 	//TODO check that it is not a rejection
 
@@ -121,7 +120,7 @@ func (d *Delegation) handleEndorsementResponse(_ context.Context, response *tran
 	return nil
 }
 
-func (d *Delegation) handleDispatchConfirmationResponse(_ context.Context, _ *transport.DispatchConfirmationResponse) error {
+func (d *Transaction) handleDispatchConfirmationResponse(_ context.Context, _ *transport.DispatchConfirmationResponse) error {
 	//TODO check that this matches a pending request
 	//TODO check that it is not a rejection
 
@@ -129,15 +128,15 @@ func (d *Delegation) handleDispatchConfirmationResponse(_ context.Context, _ *tr
 	return nil
 }
 
-func (d *Delegation) Sender() string {
+func (d *Transaction) Sender() string {
 	return d.sender
 }
 
-func (d *Delegation) IsEndorsed(ctx context.Context) bool {
+func (d *Transaction) IsEndorsed(ctx context.Context) bool {
 	return !d.hasOutstandingEndorsementRequests(ctx)
 }
 
-func (d *Delegation) OutputStateIDs(_ context.Context) []string {
+func (d *Transaction) OutputStateIDs(_ context.Context) []string {
 
 	//We use the output states here not the OutputStatesPotential because it is not possible for another transaction
 	// to spend a state unless it has been written to the state store and at that point we have the state ID
@@ -148,7 +147,7 @@ func (d *Delegation) OutputStateIDs(_ context.Context) []string {
 	return outputStateIDs
 }
 
-func (d *Delegation) InputStateIDs(_ context.Context) []string {
+func (d *Transaction) InputStateIDs(_ context.Context) []string {
 
 	inputStateIDs := make([]string, len(d.PostAssembly.InputStates))
 	for i, inputState := range d.PostAssembly.InputStates {
@@ -157,15 +156,15 @@ func (d *Delegation) InputStateIDs(_ context.Context) []string {
 	return inputStateIDs
 }
 
-func (d *Delegation) Txn() *components.PrivateTransaction {
+func (d *Transaction) Txn() *components.PrivateTransaction {
 	return d.PrivateTransaction
 }
 
-func (d *Delegation) hasOutstandingEndorsementRequests(ctx context.Context) bool {
+func (d *Transaction) hasOutstandingEndorsementRequests(ctx context.Context) bool {
 	return len(d.outstandingEndorsementRequests(ctx)) > 0
 }
 
-func (d *Delegation) outstandingEndorsementRequests(ctx context.Context) []*endorsementRequirement {
+func (d *Transaction) outstandingEndorsementRequests(ctx context.Context) []*endorsementRequirement {
 	outstandingEndorsementRequests := make([]*endorsementRequirement, 0)
 	if d.PostAssembly == nil {
 		log.L(ctx).Debugf("PostAssembly is nil so there are no outstanding endorsement requests")
@@ -199,10 +198,10 @@ func (d *Delegation) outstandingEndorsementRequests(ctx context.Context) []*endo
 	return outstandingEndorsementRequests
 }
 
-func (d *Delegation) sendAssembleRequest(_ context.Context) error {
+func (d *Transaction) sendAssembleRequest(_ context.Context) error {
 	return nil
 }
 
-func (d *Delegation) sendEndorsementRequests(_ context.Context) error {
+func (d *Transaction) sendEndorsementRequests(_ context.Context) error {
 	return nil
 }

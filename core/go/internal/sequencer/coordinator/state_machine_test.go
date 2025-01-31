@@ -23,7 +23,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/delegation"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	mock "github.com/stretchr/testify/mock"
 	"gotest.tools/assert"
@@ -198,36 +198,36 @@ func TestStateMachinePreparedNoTransitionOnTransactionConfirmedIfNotFlushComplet
 
 }
 
-func TestStateMachineActiveToIdleOnTransactionConfirmedIfNoDelegationsInFlight(t *testing.T) {
+func TestStateMachineActiveToIdleOnTransactionConfirmedIfNoTransactionsInFlight(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Active
 
-	soleDelegation := delegation.NewDelegationBuilderForTesting(t, delegation.State_Submitted).Build()
+	soleTransaction := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
-	c.delegationsByTransactionID = map[uuid.UUID]*delegation.Delegation{
-		soleDelegation.ID: soleDelegation,
+	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
+		soleTransaction.ID: soleTransaction,
 	}
 
 	c.HandleEvent(ctx, &TransactionConfirmedEvent{
-		From:  soleDelegation.GetSignerAddress(),
-		Nonce: *soleDelegation.GetNonce(),
-		Hash:  *soleDelegation.GetLatestSubmissionHash(),
+		From:  soleTransaction.GetSignerAddress(),
+		Nonce: *soleTransaction.GetNonce(),
+		Hash:  *soleTransaction.GetLatestSubmissionHash(),
 	})
 
 	assert.Equal(t, State_Idle, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
 }
 
-func TestStateMachineActiveNoTransitionOnTransactionConfirmedIfNotDelegationsEmpty(t *testing.T) {
+func TestStateMachineActiveNoTransitionOnTransactionConfirmedIfNotTransactionsEmpty(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Active
 
-	delegation1 := delegation.NewDelegationBuilderForTesting(t, delegation.State_Submitted).Build()
-	delegation2 := delegation.NewDelegationBuilderForTesting(t, delegation.State_Submitted).Build()
+	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
-	c.delegationsByTransactionID = map[uuid.UUID]*delegation.Delegation{
+	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
 		delegation1.ID: delegation1,
 		delegation2.ID: delegation2,
 	}
@@ -246,9 +246,9 @@ func TestStateMachineActiveToFlushOnHandoverRequest(t *testing.T) {
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Active
 
-	delegation1 := delegation.NewDelegationBuilderForTesting(t, delegation.State_Submitted).Build()
-	delegation2 := delegation.NewDelegationBuilderForTesting(t, delegation.State_Submitted).Build()
-	c.delegationsByTransactionID = map[uuid.UUID]*delegation.Delegation{
+	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
 		delegation1.ID: delegation1,
 		delegation2.ID: delegation2,
 	}
@@ -266,11 +266,11 @@ func TestStateMachineFlushToClosingOnTransactionConfirmedIfFlushComplete(t *test
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Flush
 
-	//We have 2 delegations in flight but only of them has passed the point of no return so we
+	//We have 2 transactions in flight but only of them has passed the point of no return so we
 	// should consider the flush complete when that one is confirmed
-	delegation1 := delegation.NewDelegationBuilderForTesting(t, delegation.State_Submitted).Build()
-	delegation2 := delegation.NewDelegationBuilderForTesting(t, delegation.State_Endorsed).Build()
-	c.delegationsByTransactionID = map[uuid.UUID]*delegation.Delegation{
+	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsed).Build()
+	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
 		delegation1.ID: delegation1,
 		delegation2.ID: delegation2,
 	}
@@ -290,12 +290,12 @@ func TestStateMachineFlushNoTransitionOnTransactionConfirmedIfNotFlushComplete(t
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Flush
 
-	//We have 2 delegations in flight and passed the point of no return but only one of them will be confirmed so we should not
+	//We have 2 transactions in flight and passed the point of no return but only one of them will be confirmed so we should not
 	// consider the flush complete
 
-	delegation1 := delegation.NewDelegationBuilderForTesting(t, delegation.State_Submitted).Build()
-	delegation2 := delegation.NewDelegationBuilderForTesting(t, delegation.State_Submitted).Build()
-	c.delegationsByTransactionID = map[uuid.UUID]*delegation.Delegation{
+	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
 		delegation1.ID: delegation1,
 		delegation2.ID: delegation2,
 	}
@@ -315,8 +315,8 @@ func TestStateMachineClosingToIdleOnHeartbeatIntervalIfClosingGracePeriodExpired
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Closing
 
-	d := delegation.NewDelegationBuilderForTesting(t, delegation.State_Submitted).Build()
-	c.delegationsByTransactionID = map[uuid.UUID]*delegation.Delegation{
+	d := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
 		d.ID: d,
 	}
 	//one heartbeat interval away from the grace period expiring
@@ -333,8 +333,8 @@ func TestStateMachineClosingNoTransitionOnHeartbeatIntervalIfNotClosingGracePeri
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Closing
 
-	d := delegation.NewDelegationBuilderForTesting(t, delegation.State_Submitted).Build()
-	c.delegationsByTransactionID = map[uuid.UUID]*delegation.Delegation{
+	d := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
 		d.ID: d,
 	}
 

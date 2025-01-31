@@ -12,7 +12,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package delegation
+package transaction
 
 import (
 	"math/rand/v2"
@@ -23,7 +23,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-type DelegationBuilderForTesting struct {
+type TransactionBuilderForTesting struct {
 	t                    *testing.T
 	id                   uuid.UUID
 	sender               string
@@ -34,10 +34,10 @@ type DelegationBuilderForTesting struct {
 	state                State
 }
 
-// Function NewDelegationBuilderForTesting creates a DelegationBuilderForTesting with random values for all fields
-// use the builder methods to set specific values for fields before calling Build to create a new Delegation
-func NewDelegationBuilderForTesting(t *testing.T, state State) *DelegationBuilderForTesting {
-	builder := &DelegationBuilderForTesting{
+// Function NewTransactionBuilderForTesting creates a TransactionBuilderForTesting with random values for all fields
+// use the builder methods to set specific values for fields before calling Build to create a new Transaction
+func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuilderForTesting {
+	builder := &TransactionBuilderForTesting{
 		id:                   uuid.New(),
 		sender:               uuid.NewString(),
 		dispatchConfirmed:    false,
@@ -57,11 +57,11 @@ func NewDelegationBuilderForTesting(t *testing.T, state State) *DelegationBuilde
 	return builder
 }
 
-func (b *DelegationBuilderForTesting) Build() *Delegation {
+func (b *TransactionBuilderForTesting) Build() *Transaction {
 	privateTransaction := &components.PrivateTransaction{
 		ID: b.id,
 	}
-	d := NewDelegation(b.sender, privateTransaction)
+	d := NewTransaction(b.sender, privateTransaction)
 	d.dispatchConfirmed = b.dispatchConfirmed
 	d.signerAddress = b.signerAddress
 	d.latestSubmissionHash = b.latestSubmissionHash

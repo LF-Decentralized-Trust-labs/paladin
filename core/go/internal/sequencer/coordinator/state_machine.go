@@ -150,7 +150,7 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 			Event_TransactionConfirmed: {
 				{
 					To: State_Idle,
-					If: noDelegationsInflight,
+					If: noTransactionsInflight,
 				},
 			},
 			Event_HandoverRequestReceived: {
@@ -179,7 +179,7 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 
 	//Event handlers are functions that are called when an event is received while in a particular state,
 	//even if the event does not cause a state transition, it may still have an effect on the internal fine grained state of the coordinator
-	//or its subordinate state machines (delegations)
+	//or its subordinate state machines (transactions)
 	sm.handlers = map[State]EventHandlers{
 		State_Active: {
 			OnTransactionsDelegated: func(ctx context.Context, delegatedEvent *TransactionsDelegatedEvent) error {
@@ -187,7 +187,7 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 				return nil
 			},
 			OnTransactionDispatchConfirmed: func(ctx context.Context, event *TransactionDispatchConfirmedEvent) error {
-				c.propagateEventToDelegation(ctx, event)
+				c.propagateEventToTransaction(ctx, event)
 				return nil
 			},
 		},

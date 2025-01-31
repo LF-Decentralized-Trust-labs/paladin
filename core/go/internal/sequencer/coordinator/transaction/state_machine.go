@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package delegation
+package transaction
 
 import (
 	"context"
@@ -68,12 +68,12 @@ type StateMachine struct {
 	currentState State
 	transitions  map[State]map[EventType]State
 	handlers     map[State]EventHandlers
-	delegation   *Delegation
+	transaction  *Transaction
 }
 
-func (d *Delegation) InitializeStateMachine(initialState State) {
+func (d *Transaction) InitializeStateMachine(initialState State) {
 	d.stateMachine = &StateMachine{
-		delegation:   d,
+		transaction:  d,
 		currentState: initialState,
 		transitions:  make(map[State]map[EventType]State),
 	}
@@ -121,7 +121,7 @@ func (d *Delegation) InitializeStateMachine(initialState State) {
 
 }
 
-func (d *Delegation) HandleEvent(ctx context.Context, event Event) {
+func (d *Transaction) HandleEvent(ctx context.Context, event Event) {
 	sm := d.stateMachine
 
 	if newState, ok := sm.transitions[sm.currentState][event.Type()]; ok {

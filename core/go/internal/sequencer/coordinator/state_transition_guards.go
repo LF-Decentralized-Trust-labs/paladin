@@ -18,7 +18,7 @@ package coordinator
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/delegation"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
 )
 
 type Guard func(ctx context.Context, c *coordinator, event Event) bool
@@ -45,19 +45,19 @@ func activeCoordinatorFlushComplete(ctx context.Context, c *coordinator, event E
 // Function flushComplete returns true if there are no transactions past the point of no return that haven't been confirmed yet
 func flushComplete(ctx context.Context, c *coordinator, event Event) bool {
 	return len(
-		c.getTransactionsInStates(ctx, []delegation.State{
-			delegation.State_Ready_For_Dispatch,
-			delegation.State_Dispatched,
-			delegation.State_Submitted,
+		c.getTransactionsInStates(ctx, []transaction.State{
+			transaction.State_Ready_For_Dispatch,
+			transaction.State_Dispatched,
+			transaction.State_Submitted,
 		}),
 	) == 0
 }
 
-// Function noDelegationsInflight returns true if all transactions that have been delegated to this coordinator have been confirmed
-func noDelegationsInflight(ctx context.Context, c *coordinator, event Event) bool {
+// Function noTransactionsInflight returns true if all transactions that have been delegated to this coordinator have been confirmed
+func noTransactionsInflight(ctx context.Context, c *coordinator, event Event) bool {
 	return len(
-		c.getTransactionsNotInStates(ctx, []delegation.State{
-			delegation.State_Confirmed,
+		c.getTransactionsNotInStates(ctx, []transaction.State{
+			transaction.State_Confirmed,
 		}),
 	) == 0
 }
