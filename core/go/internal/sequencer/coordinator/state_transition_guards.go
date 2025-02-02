@@ -22,19 +22,19 @@ import (
 )
 
 // TODO event should not be passed into guard.  Better if guard is purely a function of the state of the coordinator after the effect of any events have been applied
-type Guard func(ctx context.Context, c *coordinator, event Event) bool
+type Guard func(ctx context.Context, c *coordinator) bool
 
-func behind(ctx context.Context, c *coordinator, event Event) bool {
+func behind(ctx context.Context, c *coordinator) bool {
 	//Return true if the current block height that our indexer has reached is behind the current coordinator
 	// there is a configured tolerance so if we are within this tolerance we are not considered behind
 	return c.currentBlockHeight < c.activeCoordinatorBlockHeight-c.blockHeightTolerance
 }
 
-func notBehind(ctx context.Context, c *coordinator, event Event) bool {
-	return !behind(ctx, c, event)
+func notBehind(ctx context.Context, c *coordinator) bool {
+	return !behind(ctx, c)
 }
 
-func activeCoordinatorFlushComplete(ctx context.Context, c *coordinator, event Event) bool {
+func activeCoordinatorFlushComplete(ctx context.Context, c *coordinator) bool {
 	for _, flushPoint := range c.activeCoordinatorsFlushPointsBySignerNonce {
 		if !flushPoint.Confirmed {
 			return false
@@ -44,7 +44,7 @@ func activeCoordinatorFlushComplete(ctx context.Context, c *coordinator, event E
 }
 
 // Function flushComplete returns true if there are no transactions past the point of no return that haven't been confirmed yet
-func flushComplete(ctx context.Context, c *coordinator, event Event) bool {
+func flushComplete(ctx context.Context, c *coordinator) bool {
 	return len(
 		c.getTransactionsInStates(ctx, []transaction.State{
 			transaction.State_Ready_For_Dispatch,
@@ -55,7 +55,7 @@ func flushComplete(ctx context.Context, c *coordinator, event Event) bool {
 }
 
 // Function noTransactionsInflight returns true if all transactions that have been delegated to this coordinator have been confirmed
-func noTransactionsInflight(ctx context.Context, c *coordinator, event Event) bool {
+func noTransactionsInflight(ctx context.Context, c *coordinator) bool {
 	return len(
 		c.getTransactionsNotInStates(ctx, []transaction.State{
 			transaction.State_Confirmed,
@@ -63,6 +63,6 @@ func noTransactionsInflight(ctx context.Context, c *coordinator, event Event) bo
 	) == 0
 }
 
-func closingGracePeriodExpired(ctx context.Context, c *coordinator, event Event) bool {
+func closingGracePeriodExpired(ctx context.Context, c *coordinator) bool {
 	return c.heartbeatIntervalsSinceStateChange >= c.closingGracePeriod
 }

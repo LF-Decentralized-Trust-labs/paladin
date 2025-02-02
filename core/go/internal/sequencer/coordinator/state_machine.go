@@ -278,7 +278,7 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) {
 	//Determine whether this event triggers a state transition
 	if transitionRules, ok := sm.transitions[sm.currentState][event.Type()]; ok {
 		for _, rule := range transitionRules {
-			if rule.If == nil || rule.If(ctx, c, event) { //if there is no guard defined, or the guard returns true
+			if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
 				fromState := sm.currentState
 				sm.currentState = rule.To
 				sm.currentState.OnTransitionTo(ctx, c, fromState, event)
