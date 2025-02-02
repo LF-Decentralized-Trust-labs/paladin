@@ -13,16 +13,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package coordinator
+package common
 
-import (
-	"context"
+import "time"
 
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-)
+// TODO consider abstracting even more here so that we are never exposing a Time object, but instead some abstract token that might be related to real (seconds and milliseconds) time units or might just be related to some nebulous measurement of time like "heartbeats" or "clicks" (as a sub division of heartbeats)
+type Clock interface {
+	//wrapper of time.Now()
+	//primarily to allow artificial clocks to be injected for testing
+	Now() time.Time
+}
+type realClock struct{}
 
-type MessageSender interface {
-	transaction.MessageSender
-	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *tktypes.EthAddress)
+func (c *realClock) Now() time.Time {
+	return time.Now()
+}
+func RealClock() Clock {
+	return &realClock{}
 }

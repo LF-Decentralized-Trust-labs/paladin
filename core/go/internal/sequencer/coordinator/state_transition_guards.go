@@ -21,6 +21,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
 )
 
+// TODO event should not be passed into guard.  Better if guard is purely a function of the state of the coordinator after the effect of any events have been applied
 type Guard func(ctx context.Context, c *coordinator, event Event) bool
 
 func behind(ctx context.Context, c *coordinator, event Event) bool {

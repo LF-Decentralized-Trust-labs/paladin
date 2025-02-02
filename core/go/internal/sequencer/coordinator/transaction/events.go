@@ -17,7 +17,9 @@ package transaction
 
 import (
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -52,22 +54,48 @@ func (_ *AssembleRequestSentEvent) Type() EventType {
 	return Event_AssembleRequestSent
 }
 
-// AssembledEvent
-type AssembledEvent struct {
+// AssembleSuccessEvent
+type AssembleSuccessEvent struct {
 	event
+	postAssembly *components.TransactionPostAssembly
 }
 
-func (_ *AssembledEvent) Type() EventType {
-	return Event_Assembled
+func (_ *AssembleSuccessEvent) Type() EventType {
+	return Event_Assemble_Success
+}
+
+// AssembleRevertEvent
+type AssembleRevertEvent struct {
+	event
+	postAssembly *components.TransactionPostAssembly
+}
+
+func (_ *AssembleRevertEvent) Type() EventType {
+	return Event_Assemble_Revert
 }
 
 // EndorsedEvent
 type EndorsedEvent struct {
 	event
+	Endorsement *prototk.AttestationResult
+	RequestID   string
 }
 
 func (_ *EndorsedEvent) Type() EventType {
 	return Event_Endorsed
+}
+
+// EndorsedRejectedEvent
+type EndorsedRejectedEvent struct {
+	event
+	RevertReason           string
+	Party                  string
+	AttestationRequestName string
+	RequestID              string
+}
+
+func (_ *EndorsedRejectedEvent) Type() EventType {
+	return Event_EndorsedRejected
 }
 
 // DispatchConfirmedEvent

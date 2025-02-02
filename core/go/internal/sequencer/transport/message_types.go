@@ -55,7 +55,7 @@ type ConfirmedTransaction struct {
 }
 
 const (
-	MessageType_DelegationRequest                = "DelegationRequest"
+	MessageType_TransactionRequest               = "TransactionRequest"
 	MessageType_HandoverRequest                  = "HandoverRequest"
 	MessageType_CoordinatorHeartbeatNotification = "CoordinatorHeartbeatNotification"
 	MessageType_DispatchConfirmationRequest      = "DispatchConfirmationRequest"
@@ -94,7 +94,7 @@ func ParseCoordinatorHeartbeatNotification(bytes []byte) (*CoordinatorHeartbeatN
 	return chn, err
 }
 
-type DelegationRequest struct {
+type TransactionRequest struct {
 	Sender          string                           `json:"sender"` //TODO this is duplicate of the ReplyTo field in the transport message.  Would it be more secure to assert that they are the same?
 	ContractAddress *tktypes.EthAddress              `json:"contractAddress"`
 	Transactions    []*components.PrivateTransaction `json:"transactions"`
@@ -121,7 +121,7 @@ func (dr *HandoverRequest) bytes() []byte {
 	return jsonBytes
 }
 
-func (dr *DelegationRequest) bytes() []byte {
+func (dr *TransactionRequest) bytes() []byte {
 	jsonBytes, _ := json.Marshal(dr)
 	return jsonBytes
 }
@@ -136,8 +136,8 @@ func (dr *DispatchConfirmationResponse) bytes() []byte {
 	return jsonBytes
 }
 
-func ParseDelegationRequest(bytes []byte) (*DelegationRequest, error) {
-	dr := &DelegationRequest{}
+func ParseTransactionRequest(bytes []byte) (*TransactionRequest, error) {
+	dr := &TransactionRequest{}
 	err := json.Unmarshal(bytes, dr)
 	return dr, err
 }

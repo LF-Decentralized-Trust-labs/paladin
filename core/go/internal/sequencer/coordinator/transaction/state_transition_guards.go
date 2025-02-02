@@ -13,16 +13,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package coordinator
+package transaction
 
 import (
 	"context"
-
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-type MessageSender interface {
-	transaction.MessageSender
-	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *tktypes.EthAddress)
+type Guard func(ctx context.Context, txn *Transaction) bool
+
+// endorsed by all required endorsers
+func guard_AttestationPlanFulfilled(ctx context.Context, txn *Transaction) bool {
+	return !txn.hasOutstandingEndorsementRequests(ctx)
 }

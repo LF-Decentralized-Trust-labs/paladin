@@ -69,10 +69,8 @@ type StateMachine struct {
 	currentState State
 	transitions  map[State]map[EventType][]Transition
 	handlers     map[State]EventHandlers
-	coordinator  coordinator
+	//coordinator  coordinator
 }
-
-type EmitEvent func(event Event)
 
 type EventHandlers struct {
 	OnTransactionsDelegated        func(ctx context.Context, event *TransactionsDelegatedEvent) error

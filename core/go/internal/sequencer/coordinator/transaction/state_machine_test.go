@@ -1,0 +1,94 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package transaction
+
+import (
+	"context"
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestStateMachineInitializeOK(t *testing.T) {
+
+	messageSender := NewMockMessageSender(t)
+	clock := sequencermocks.NewClock(t)
+	txn := NewTransaction(
+		uuid.NewString(),
+		&components.PrivateTransaction{
+			ID: uuid.New(),
+		},
+		messageSender,
+		clock,
+	)
+
+	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachinePooledToAssemblingOnSelected(t *testing.T) {
+	ctx := context.Background()
+
+	txn, mocks := NewTransactionBuilderForTesting(t, State_Pooled).BuildWithMocks()
+
+	txn.HandleEvent(ctx, &SelectedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+	})
+
+	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+	assert.Equal(t, true, mocks.sentMessageRecorder.hasSentAssembleRequest, "expected an assemble request to be sent, but none were sent")
+}
+
+func TestStateMachineAssemblingToEndorsingOnAssembleResponse(t *testing.T) {
+	ctx := context.Background()
+	txnBuilder := NewTransactionBuilderForTesting(t, State_Assembling)
+	txn, mocks := txnBuilder.BuildWithMocks()
+
+	txn.HandleEvent(ctx, &AssembleSuccessEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		postAssembly: txnBuilder.BuildPostAssembly(),
+	})
+
+	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+	assert.Equal(t, 3, mocks.sentMessageRecorder.numberOfSentEndorsementRequests, "expected 3 endorsement requests to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentEndorsementRequests)
+
+}
+
+func TestStateMachineEndorsementGatheringToConfirmingDispatchOnEndorsedIfAttestationPlanComplete(t *testing.T) {
+	ctx := context.Background()
+	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
+		NumberOfRequiredEndorsers(3).
+		NumberOfEndorsements(2)
+
+	txn, mocks := builder.BuildWithMocks()
+
+	txn.HandleEvent(ctx, &EndorsedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		Endorsement: builder.BuildEndorsement(2),
+	})
+
+	assert.Equal(t, State_Confirming_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+	assert.Equal(t, true, mocks.sentMessageRecorder.hasSentDispatchConfirmationRequest, "expected a dispatch confirmation request to be sent, but none were sent")
+
+}

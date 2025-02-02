@@ -91,6 +91,7 @@ func TestStateMachineObservingToElectOnDelegatedIfNotBehind(t *testing.T) {
 	})
 
 	assert.Equal(t, State_Elect, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	mocks.messageSender.AssertExpectations(t)
 }
 
 func TestStateMachineStandbyToElectOnNewBlockIfNotBehind(t *testing.T) {
@@ -269,7 +270,7 @@ func TestStateMachineFlushToClosingOnTransactionConfirmedIfFlushComplete(t *test
 	//We have 2 transactions in flight but only of them has passed the point of no return so we
 	// should consider the flush complete when that one is confirmed
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
-	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsed).Build()
+	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatch).Build()
 	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
 		delegation1.ID: delegation1,
 		delegation2.ID: delegation2,
