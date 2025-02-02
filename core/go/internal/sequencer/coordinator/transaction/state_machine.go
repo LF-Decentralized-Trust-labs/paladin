@@ -128,26 +128,27 @@ func (d *Transaction) InitializeStateMachine(initialState State) {
 				If: guard_AttestationPlanFulfilled,
 			}},
 		},
+		State_Confirming_Dispatch: {
+			Event_DispatchConfirmed: {{
+				To: State_Ready_For_Dispatch,
+			}},
+		},
+		State_Ready_For_Dispatch: {
+			Event_Collected: {{
+				To: State_Dispatched,
+			}},
+		},
+		State_Dispatched: {
+			Event_Submitted: {{
+				To: State_Submitted,
+			}},
+		},
+		State_Submitted: {
+			Event_Confirmed: {{
+				To: State_Confirmed,
+			}},
+		},
 	}
-
-	/*
-
-
-
-			State_Confirming_Dispatch: {
-				Event_DispatchConfirmed: State_Ready_For_Dispatch,
-			},
-			State_Ready_For_Dispatch: {
-				Event_Collected: State_Dispatched,
-			},
-			State_Dispatched: {
-				Event_Submitted: State_Submitted,
-			},
-			State_Submitted: {
-				Event_Confirmed: State_Confirmed,
-			},
-		}
-	*/
 
 	//Event handlers are functions that are called when an event is received while in a particular state,
 	//even if the event does not cause a state transition, it may still have an effect on the internal fine grained state of the coordinator

@@ -89,6 +89,80 @@ func TestStateMachineEndorsementGatheringToConfirmingDispatchOnEndorsedIfAttesta
 	})
 
 	assert.Equal(t, State_Confirming_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
-	assert.Equal(t, true, mocks.sentMessageRecorder.hasSentDispatchConfirmationRequest, "expected a dispatch confirmation request to be sent, but none were sent")
+	assert.True(t, mocks.sentMessageRecorder.hasSentDispatchConfirmationRequest, "expected a dispatch confirmation request to be sent, but none were sent")
 
+}
+
+func TestStateMachineEndorsementGatheringNoTransitionIfNotAttestationPlanComplete(t *testing.T) {
+	ctx := context.Background()
+	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
+		NumberOfRequiredEndorsers(3).
+		NumberOfEndorsements(1) //only 1 existing endorsement so the next one does not complete the attestation plan
+
+	txn, mocks := builder.BuildWithMocks()
+
+	txn.HandleEvent(ctx, &EndorsedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		Endorsement: builder.BuildEndorsement(1),
+	})
+
+	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+	assert.False(t, mocks.sentMessageRecorder.hasSentDispatchConfirmationRequest, "did not expected a dispatch confirmation request to be sent, but one was sent")
+
+}
+
+func TestStateMachineConfirmingDispatchToReadyForDispatchOnDispatchConfirmed(t *testing.T) {
+	ctx := context.Background()
+	txn := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).Build()
+
+	txn.HandleEvent(ctx, &DispatchConfirmedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+	})
+
+	assert.Equal(t, State_Ready_For_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+
+}
+
+func TestStateMachineReadyForDispatchToDispatchedOnCollected(t *testing.T) {
+	ctx := context.Background()
+	txn := NewTransactionBuilderForTesting(t, State_Ready_For_Dispatch).Build()
+
+	txn.HandleEvent(ctx, &CollectedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+	})
+
+	assert.Equal(t, State_Dispatched, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+
+}
+
+func TestStateMachineDispatchedToSubmittedOnSubmitted(t *testing.T) {
+	ctx := context.Background()
+	txn := NewTransactionBuilderForTesting(t, State_Dispatched).Build()
+
+	txn.HandleEvent(ctx, &SubmittedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+	})
+
+	assert.Equal(t, State_Submitted, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachineSubmittedToConfirmedOnConfirmed(t *testing.T) {
+	ctx := context.Background()
+	txn := NewTransactionBuilderForTesting(t, State_Submitted).Build()
+
+	txn.HandleEvent(ctx, &ConfirmedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+	})
+
+	assert.Equal(t, State_Confirmed, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
