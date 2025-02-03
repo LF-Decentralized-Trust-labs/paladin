@@ -63,9 +63,8 @@ const (
 
 )
 
-// TODO should we ever need to pass the event into the transition function?  The event should have been applied before the transition.
-func (s *State) OnTransitionTo(ctx context.Context, txn *Transaction, from State, event Event) error {
-	log.L(context.Background()).Debugf("Transitioning from %v to %v triggered by event %v", from, s, event)
+func (s *State) OnTransitionTo(ctx context.Context, txn *Transaction, from State) error {
+	log.L(context.Background()).Debugf("Transitioning from %v to %v", from, s)
 	switch *s {
 	case State_Assembling:
 		return txn.sendAssembleRequest(ctx)
@@ -247,7 +246,7 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 			if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
 				fromState := sm.currentState
 				sm.currentState = rule.To
-				err := sm.currentState.OnTransitionTo(ctx, t, fromState, event)
+				err := sm.currentState.OnTransitionTo(ctx, t, fromState)
 				if err != nil {
 					//TODO what should we do if the transition fails?  Abandon the transaction? Retry the transition?
 					//Any recoverable error should be handled by the transition function so only unrecoverable errors should be seen here
