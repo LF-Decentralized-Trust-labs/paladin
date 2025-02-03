@@ -68,17 +68,6 @@ func (s *State) OnTransitionTo(ctx context.Context, c *coordinator, from State, 
 type StateMachine struct {
 	currentState State
 	transitions  map[State]map[EventType][]Transition
-	handlers     map[State]EventHandlers
-	//coordinator  coordinator
-}
-
-type EventHandlers struct {
-	OnTransactionsDelegated        func(ctx context.Context, event *TransactionsDelegatedEvent) error
-	OnTransactionConfirmed         func(ctx context.Context, event *TransactionConfirmedEvent) error
-	OnTransactionDispatchConfirmed func(ctx context.Context, event *TransactionDispatchConfirmedEvent) error
-	OnNewBlock                     func(ctx context.Context, event *NewBlockEvent) error
-	OnHeartbeatReceived            func(ctx context.Context, event *HeartbeatReceivedEvent) error
-	OnHeartbeatInterval            func(ctx context.Context, event *HeartbeatIntervalEvent) error
 }
 
 type Transition struct {
@@ -175,60 +164,6 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 		},
 	}
 
-	//Event handlers are functions that are called when an event is received while in a particular state,
-	//even if the event does not cause a state transition, it may still have an effect on the internal fine grained state of the coordinator
-	//or its subordinate state machines (transactions)
-	sm.handlers = map[State]EventHandlers{
-		State_Active: {
-			OnTransactionsDelegated: func(ctx context.Context, delegatedEvent *TransactionsDelegatedEvent) error {
-				c.addToDelegatedTransactions(ctx, delegatedEvent.Sender, delegatedEvent.Transactions)
-				return nil
-			},
-			OnTransactionDispatchConfirmed: func(ctx context.Context, event *TransactionDispatchConfirmedEvent) error {
-				c.propagateEventToTransaction(ctx, event)
-				return nil
-			},
-		},
-		State_Elect: {
-			OnTransactionsDelegated: func(ctx context.Context, delegatedEvent *TransactionsDelegatedEvent) error {
-				c.addToDelegatedTransactions(ctx, delegatedEvent.Sender, delegatedEvent.Transactions)
-				return nil
-			},
-		},
-	}
-	//Some events are handled the same regardless of the state
-	for _, state := range allStates {
-		handler := sm.handlers[state]
-		handler.OnNewBlock = func(ctx context.Context, event *NewBlockEvent) error {
-			c.currentBlockHeight = event.BlockHeight
-			return nil
-		}
-		handler.OnHeartbeatReceived = func(ctx context.Context, event *HeartbeatReceivedEvent) error {
-			c.activeCoordinator = event.From
-			c.activeCoordinatorBlockHeight = event.BlockHeight
-			for _, flushPoint := range event.FlushPoints {
-				c.activeCoordinatorsFlushPointsBySignerNonce[flushPoint.GetSignerNonce()] = flushPoint
-			}
-			return nil
-		}
-		handler.OnTransactionConfirmed = func(ctx context.Context, event *TransactionConfirmedEvent) error {
-			//This may be a confirmation of a transaction that we have have been coordinating or it may be one that another coordinator has been coordinating
-			//if the latter, then we may or may not know about it depending on whether we have seen a heartbeat from that coordinator since last time
-			// we were loaded into memory
-			//TODO - we can't actually guarantee that we have all transactions we dispatched in memory.
-			//Even assuming that the public txmgr is in the same process (may not be true forever)  and assuming that we haven't been swapped out ( likely not to be true very soon) there is still a chance that the transaction was submitted to the base ledger, then the process restarted then we get the confirmation.				//When the process starts, we need to make sure that the coordinator is pre loaded with knowledge of all transactions that it has dispatched
-			if !c.confirmDispatchedTransaction(ctx, event.From, event.Nonce, event.Hash, event.RevertReason) {
-				c.confirmMonitoredTransaction(ctx, event.From, event.Nonce)
-			}
-			return nil
-		}
-		handler.OnHeartbeatInterval = func(ctx context.Context, event *HeartbeatIntervalEvent) error {
-			c.heartbeatIntervalsSinceStateChange++
-			return nil
-		}
-		sm.handlers[state] = handler
-	}
-
 }
 
 func (c *coordinator) HandleEvent(ctx context.Context, event Event) {
@@ -238,41 +173,30 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) {
 	// First apply the event to the update the internal fine grained state of the coordinator if there is any handler registered for the current state
 	switch event := event.(type) {
 	case *TransactionsDelegatedEvent:
-		if handler := sm.handlers[sm.currentState].OnTransactionsDelegated; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring TransactionsDelegatedEvent while in State %s", sm.currentState.String())
-		}
+		//TODO dependant on state?
+		c.addToDelegatedTransactions(ctx, event.Sender, event.Transactions)
 	case *TransactionConfirmedEvent:
-		if handler := sm.handlers[sm.currentState].OnTransactionConfirmed; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring TransactionConfirmedEvent while in State %s", sm.currentState.String())
+		//This may be a confirmation of a transaction that we have have been coordinating or it may be one that another coordinator has been coordinating
+		//if the latter, then we may or may not know about it depending on whether we have seen a heartbeat from that coordinator since last time
+		// we were loaded into memory
+		//TODO - we can't actually guarantee that we have all transactions we dispatched in memory.
+		//Even assuming that the public txmgr is in the same process (may not be true forever)  and assuming that we haven't been swapped out ( likely not to be true very soon) there is still a chance that the transaction was submitted to the base ledger, then the process restarted then we get the confirmation.				//When the process starts, we need to make sure that the coordinator is pre loaded with knowledge of all transactions that it has dispatched
+		if !c.confirmDispatchedTransaction(ctx, event.From, event.Nonce, event.Hash, event.RevertReason) {
+			c.confirmMonitoredTransaction(ctx, event.From, event.Nonce)
 		}
 	case *TransactionDispatchConfirmedEvent:
-		if handler := sm.handlers[sm.currentState].OnTransactionDispatchConfirmed; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring TransactionDispatchConfirmedEvent while in State %s", sm.currentState.String())
-		}
+		c.propagateEventToTransaction(ctx, event)
 	case *NewBlockEvent:
-		if handler := sm.handlers[sm.currentState].OnNewBlock; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring NewBlockEvent while in State %s", sm.currentState.String())
-		}
+		c.currentBlockHeight = event.BlockHeight
 	case *HeartbeatReceivedEvent:
-		if handler := sm.handlers[sm.currentState].OnHeartbeatReceived; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring HeartbeatReceivedEvent while in State %s", sm.currentState.String())
+		c.activeCoordinator = event.From
+		c.activeCoordinatorBlockHeight = event.BlockHeight
+		for _, flushPoint := range event.FlushPoints {
+			c.activeCoordinatorsFlushPointsBySignerNonce[flushPoint.GetSignerNonce()] = flushPoint
 		}
 	case *HeartbeatIntervalEvent:
-		if handler := sm.handlers[sm.currentState].OnHeartbeatInterval; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring HeartbeatIntervalEvent while in State %s", sm.currentState.String())
-		}
+		//TODO send heartbeat message
+		c.heartbeatIntervalsSinceStateChange++
 	}
 
 	//Determine whether this event triggers a state transition

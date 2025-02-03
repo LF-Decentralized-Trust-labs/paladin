@@ -80,22 +80,6 @@ func (s *State) OnTransitionTo(ctx context.Context, txn *Transaction, from State
 type StateMachine struct {
 	currentState State
 	transitions  map[State]map[EventType][]Transition
-	handlers     map[State]EventHandlers
-	//transaction  *Transaction
-}
-
-// List of functions, a subset of which can be registered with the state machine to handle events for each state
-type EventHandlers struct {
-	OnSelected            func(ctx context.Context, event *SelectedEvent) error
-	OnAssembleRequestSent func(ctx context.Context, event *AssembleRequestSentEvent) error
-	OnAssembleSuccess     func(ctx context.Context, event *AssembleSuccessEvent) error
-	OnAssembleRevert      func(ctx context.Context, event *AssembleRevertEvent) error
-	OnEndorsed            func(ctx context.Context, event *EndorsedEvent) error
-	OnDispatchConfirmed   func(ctx context.Context, event *DispatchConfirmedEvent) error
-	OnCollected           func(ctx context.Context, event *CollectedEvent) error
-	OnNonceAllocated      func(ctx context.Context, event *NonceAllocatedEvent) error
-	OnSubmitted           func(ctx context.Context, event *SubmittedEvent) error
-	OnConfirmed           func(ctx context.Context, event *ConfirmedEvent) error
 }
 
 type Transition struct {
@@ -103,14 +87,14 @@ type Transition struct {
 	If Guard
 }
 
-func (d *Transaction) InitializeStateMachine(initialState State) {
-	d.stateMachine = &StateMachine{
+func (t *Transaction) InitializeStateMachine(initialState State) {
+	t.stateMachine = &StateMachine{
 		//transaction:  d,
 		currentState: initialState,
 	}
 
 	//Transitions
-	d.stateMachine.transitions = map[State]map[EventType][]Transition{
+	t.stateMachine.transitions = map[State]map[EventType][]Transition{
 		State_Pooled: {
 			Event_Selected: {{
 				To: State_Assembling,
@@ -148,96 +132,32 @@ func (d *Transaction) InitializeStateMachine(initialState State) {
 			}},
 		},
 	}
-
-	//Event handlers are functions that are called when an event is received while in a particular state,
-	//even if the event does not cause a state transition, it may still have an effect on the internal fine grained state of the coordinator
-	//or its subordinate state machines (transactions)
-	d.stateMachine.handlers = make(map[State]EventHandlers)
-
-	//Some events are handled the same regardless of the state
-	for _, state := range allStates {
-		handler := d.stateMachine.handlers[state]
-		handler.OnAssembleSuccess = func(ctx context.Context, event *AssembleSuccessEvent) error {
-			d.PostAssembly = event.postAssembly
-			return nil
-		}
-
-		handler.OnEndorsed = func(ctx context.Context, event *EndorsedEvent) error {
-			d.applyEndorsement(ctx, event.Endorsement, event.RequestID)
-			return nil
-		}
-
-		d.stateMachine.handlers[state] = handler
-	}
-
 }
 
 func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 	sm := t.stateMachine
 
-	handlers := sm.handlers[sm.currentState]
 	switch event := event.(type) {
 	case *SelectedEvent:
-		if handler := handlers.OnSelected; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring SelectedEvent while in State %s", sm.currentState.String())
-		}
+		//TODO
 	case *AssembleRequestSentEvent:
-		if handler := handlers.OnAssembleRequestSent; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring AssembleRequestSentEvent while in State %s", sm.currentState.String())
-		}
+		//TODO
 	case *AssembleSuccessEvent:
-		if handler := handlers.OnAssembleSuccess; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring AssembleSuccessEvent while in State %s", sm.currentState.String())
-		}
+		t.PostAssembly = event.postAssembly
 	case *AssembleRevertEvent:
-		if handler := handlers.OnAssembleRevert; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring AssembleRevertEvent while in State %s", sm.currentState.String())
-		}
+		//TODO
 	case *EndorsedEvent:
-		if handler := handlers.OnEndorsed; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring EndorsedEvent while in State %s", sm.currentState.String())
-		}
+		t.applyEndorsement(ctx, event.Endorsement, event.RequestID)
 	case *DispatchConfirmedEvent:
-		if handler := handlers.OnDispatchConfirmed; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring DispatchConfirmedEvent while in State %s", sm.currentState.String())
-		}
+		//TODO
 	case *CollectedEvent:
-		if handler := handlers.OnCollected; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring CollectedEvent while in State %s", sm.currentState.String())
-		}
+		//TODO
 	case *NonceAllocatedEvent:
-		if handler := handlers.OnNonceAllocated; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring NonceAllocatedEvent while in State %s", sm.currentState.String())
-		}
+		//TODO
 	case *SubmittedEvent:
-		if handler := handlers.OnSubmitted; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring SubmittedEvent while in State %s", sm.currentState.String())
-		}
+		//TODO
 	case *ConfirmedEvent:
-		if handler := handlers.OnConfirmed; handler != nil {
-			handler(ctx, event)
-		} else {
-			log.L(ctx).Debugf("Ignoring ConfirmedEvent while in State %s", sm.currentState.String())
-		}
-
+		//TODO
 	}
 
 	//Determine whether this event triggers a state transition
