@@ -145,3 +145,12 @@ type ConfirmedEvent struct {
 func (_ *ConfirmedEvent) Type() EventType {
 	return Event_Confirmed
 }
+
+type DependencyReadyEvent struct {
+	event
+	DependencyID uuid.UUID
+}
+
+func (_ *DependencyReadyEvent) Type() EventType {
+	return Event_DependencyReady
+}

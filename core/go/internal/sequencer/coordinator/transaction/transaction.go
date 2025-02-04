@@ -351,6 +351,20 @@ func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error
 	return nil
 }
 
+func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
+	//this function is called when the transaction enters the ready for dispatch state
+	// and we have a duty to inform all the transactions that are dependent on us that we are ready in case they are otherwise ready and are blocked waiting for us
+	for _, dependent := range t.dependents {
+		dependent.HandleEvent(ctx, &DependencyReadyEvent{
+			event: event{
+				TransactionID: dependent.ID,
+			},
+			DependencyID: t.ID,
+		})
+	}
+	return nil
+}
+
 func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey string, party string, attRequest *prototk.AttestationRequest) {
 
 	err := t.messageSender.SendEndorsementRequest(

@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TODO maybe some snake case in the test names will make them more readable
 func TestStateMachineInitializeOK(t *testing.T) {
 	ctx := context.Background()
 
@@ -115,6 +116,36 @@ func TestStateMachineEndorsementGatheringNoTransitionIfNotAttestationPlanComplet
 
 }
 
+func TestStateMachineEndorsementGatheringToBlockedOnEndorsedIfAttestationPlanCompleteAndHasDependenciesNotReady(t *testing.T) {
+	ctx := context.Background()
+
+	//we need 2 transactions to know about each other so they need to share a state index
+	stateIndex := NewStateIndex(ctx)
+
+	builder1 := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
+		StateIndex(stateIndex).
+		NumberOfRequiredEndorsers(3).
+		NumberOfEndorsements(2)
+	txn1 := builder1.Build()
+
+	builder2 := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
+		StateIndex(stateIndex).
+		NumberOfRequiredEndorsers(3).
+		NumberOfEndorsements(2).
+		InputStateIDs(txn1.PostAssembly.OutputStates[0].ID)
+	txn2 := builder2.Build()
+
+	txn2.HandleEvent(ctx, &EndorsedEvent{
+		event: event{
+			TransactionID: txn2.ID,
+		},
+		Endorsement: builder2.BuildEndorsement(2),
+	})
+
+	assert.Equal(t, State_Blocked, txn2.stateMachine.currentState, "current state is %s", txn2.stateMachine.currentState.String())
+
+}
+
 func TestStateMachineConfirmingDispatchToReadyForDispatchOnDispatchConfirmed(t *testing.T) {
 	ctx := context.Background()
 	txn := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).Build()
@@ -126,6 +157,83 @@ func TestStateMachineConfirmingDispatchToReadyForDispatchOnDispatchConfirmed(t *
 	})
 
 	assert.Equal(t, State_Ready_For_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+
+}
+
+func TestStateMachineBlockedToConfirmingDispatchOnDependencyReadyIfNotHasDependenciesNotReady(t *testing.T) {
+	//TODO rethink naming of this test and/or the guard function because we end up with a double negative
+	ctx := context.Background()
+
+	//A transaction (A) is dependant on another 2 transactions (B and C).  One of which (B) is ready for dispatch and the other (C) becomes ready for dispatch,
+	// triggering a transition for A to move from blocked to confirming dispatch
+
+	//we need 3 transactions to know about each other so they need to share a state index
+	stateIndex := NewStateIndex(ctx)
+
+	builderB := NewTransactionBuilderForTesting(t, State_Ready_For_Dispatch).
+		StateIndex(stateIndex)
+	txnB := builderB.Build()
+
+	builderC := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).
+		StateIndex(stateIndex)
+	txnC := builderC.Build()
+
+	builderA := NewTransactionBuilderForTesting(t, State_Blocked).
+		StateIndex(stateIndex).
+		InputStateIDs(
+			txnB.PostAssembly.OutputStates[0].ID,
+			txnC.PostAssembly.OutputStates[0].ID,
+		)
+	txnA := builderA.Build()
+
+	//Was in 2 minds whether to a) trigger transaction A indirectly by causing C to become ready via a dispatch confirmation event or b) trigger it directly by sending a dependency ready event
+	// decided on (a) as it is slightly more white box and less brittle to future refactoring of the implementation
+
+	txnC.HandleEvent(ctx, &DispatchConfirmedEvent{
+		event: event{
+			TransactionID: txnC.ID,
+		},
+	})
+
+	assert.Equal(t, State_Confirming_Dispatch, txnA.stateMachine.currentState, "current state is %s", txnA.stateMachine.currentState.String())
+
+}
+
+func TestStateMachineBlockedNoTransitionOnDependencyReadyIfHasDependenciesNotReady(t *testing.T) {
+	ctx := context.Background()
+
+	//A transaction (A) is dependant on another 2 transactions (B and C).  Neither of which a ready for dispatch. One of them (B) becomes ready for dispatch, but the other is still not ready
+	// thus gating the triggering of a transition for A to move from blocked to confirming dispatch
+
+	//we need 3 transactions to know about each other so they need to share a state index
+	stateIndex := NewStateIndex(ctx)
+
+	builderB := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).
+		StateIndex(stateIndex)
+	txnB := builderB.Build()
+
+	builderC := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).
+		StateIndex(stateIndex)
+	txnC := builderC.Build()
+
+	builderA := NewTransactionBuilderForTesting(t, State_Blocked).
+		StateIndex(stateIndex).
+		InputStateIDs(
+			txnB.PostAssembly.OutputStates[0].ID,
+			txnC.PostAssembly.OutputStates[0].ID,
+		)
+	txnA := builderA.Build()
+
+	//Was in 2 minds whether to a) trigger transaction A indirectly by causing B to become ready via a dispatch confirmation event or b) trigger it directly by sending a dependency ready event
+	// decided on (a) as it is slightly more white box and less brittle to future refactoring of the implementation
+
+	txnB.HandleEvent(ctx, &DispatchConfirmedEvent{
+		event: event{
+			TransactionID: txnB.ID,
+		},
+	})
+
+	assert.Equal(t, State_Blocked, txnA.stateMachine.currentState, "current state is %s", txnA.stateMachine.currentState.String())
 
 }
 

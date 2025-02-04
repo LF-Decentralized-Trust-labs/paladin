@@ -125,6 +125,7 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		latestSubmissionHash: nil,
 		numberOfEndorsers:    3,
 		numberOfEndorsements: 0,
+		numberOfOutputStates: 1,
 		t:                    t,
 		state:                state,
 		sentMessageRecorder:  NewSentMessageRecorder(),
@@ -139,6 +140,17 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		latestSubmissionHash := tktypes.Bytes32(tktypes.RandBytes(32))
 		builder.latestSubmissionHash = &latestSubmissionHash
 	case State_Endorsement_Gathering:
+	case State_Blocked:
+		fallthrough
+	case State_Confirming_Dispatch:
+		fallthrough
+	case State_Ready_For_Dispatch:
+		fallthrough
+	case State_Dispatched:
+		fallthrough
+	case State_Confirmed:
+		//we are emulating a transaction that has been passed  State_Endorsement_Gathering so default to complete attestation plan
+		builder.numberOfEndorsements = builder.numberOfEndorsers
 
 	}
 	return builder
@@ -228,8 +240,11 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 	}
 
 	txn := NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.mockClock, b.stateIndex)
-	switch b.state {
-	case State_Endorsement_Gathering:
+	//Assuming a "normal" path through the state machine to the current desired state
+	if b.state == State_Endorsement_Gathering ||
+		b.state == State_Blocked ||
+		b.state == State_Confirming_Dispatch ||
+		b.state == State_Ready_For_Dispatch {
 		txn.applyPostAssembly(ctx, b.BuildPostAssembly())
 	}
 

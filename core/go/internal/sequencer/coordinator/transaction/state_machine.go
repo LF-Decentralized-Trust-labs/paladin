@@ -56,6 +56,7 @@ const (
 	Event_Assemble_Revert                      // assemble response received from the sender with a revert reason
 	Event_Endorsed                             // endorsement received from one endorser
 	Event_EndorsedRejected                     // endorsement received from one endorser with a revert reason
+	Event_DependencyReady                      //another transaction, for which this transaction has a dependency on, has become ready for dispatch
 	Event_DispatchConfirmed                    // dispatch confirmation received from the sender
 	Event_Collected                            // collected by the dispatcher thread
 	Event_NonceAllocated                       // nonce allocated by the dispatcher thread
@@ -119,6 +120,15 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 				},
 			},
 		},
+		State_Blocked: {
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_DependencyReady: {{
+					To: State_Confirming_Dispatch,
+					If: guard_And(guard_AttestationPlanFulfilled, guard_NoDependenciesNotReady),
+				}},
+			},
+		},
 		State_Confirming_Dispatch: {
 			OnTransitionTo: action_SendDispatchConfirmationRequest,
 			Transitions: map[EventType][]Transition{
@@ -128,7 +138,7 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 			},
 		},
 		State_Ready_For_Dispatch: {
-			OnTransitionTo: nil,
+			OnTransitionTo: action_NotifyDependentsOfReadiness,
 			Transitions: map[EventType][]Transition{
 				Event_Collected: {{
 					To: State_Dispatched,
@@ -154,6 +164,7 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 	}
 }
 
+// TODO break this out to 2 explicit steps a) applyEvent[InCurrentState] and b) evaluateTransition[ToNewState]
 func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 	sm := t.stateMachine
 
@@ -221,6 +232,10 @@ func action_SendDispatchConfirmationRequest(ctx context.Context, txn *Transactio
 	return txn.sendDispatchConfirmationRequest(ctx)
 }
 
+func action_NotifyDependentsOfReadiness(ctx context.Context, txn *Transaction, to, from State) error {
+	return txn.notifyDependentsOfReadiness(ctx)
+}
+
 func (s *State) String() string {
 	switch *s {
 	case State_Pooled:
@@ -229,6 +244,8 @@ func (s *State) String() string {
 		return "Assembling"
 	case State_Endorsement_Gathering:
 		return "State_Endorsement_Gathering"
+	case State_Blocked:
+		return "Blocked"
 	case State_Confirming_Dispatch:
 		return "State_Confirming_Dispatch"
 	case State_Ready_For_Dispatch:
