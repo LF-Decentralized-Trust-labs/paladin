@@ -87,7 +87,6 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 }
 
 type TransactionBuilderForTesting struct {
-	t      *testing.T //TODO remove this so that we are not using testing packages in non test files.
 	id     uuid.UUID
 	sender *identityForTesting
 
@@ -126,7 +125,6 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		numberOfEndorsers:    3,
 		numberOfEndorsements: 0,
 		numberOfOutputStates: 1,
-		t:                    t,
 		state:                state,
 		sentMessageRecorder:  NewSentMessageRecorder(),
 		mockClock:            sequencermocks.NewClock(t),
