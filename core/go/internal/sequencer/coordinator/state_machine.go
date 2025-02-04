@@ -36,8 +36,6 @@ const (
 	State_Closing
 )
 
-var allStates = []State{State_Idle, State_Observing, State_Elect, State_Standby, State_Prepared, State_Active, State_Flush, State_Closing}
-
 const (
 	Event_Activated EventType = iota
 	Event_Nominated

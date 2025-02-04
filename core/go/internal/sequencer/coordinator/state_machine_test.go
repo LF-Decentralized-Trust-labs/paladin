@@ -29,14 +29,14 @@ import (
 	"gotest.tools/assert"
 )
 
-func TestStateMachineInitializeOK(t *testing.T) {
+func TestStateMachine_InitializeOK(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 
 	assert.Equal(t, State_Idle, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
 
-func TestStateMachineIdleToActiveOnTransactionsDelegated(t *testing.T) {
+func TestStateMachine_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	assert.Equal(t, State_Idle, c.stateMachine.currentState)
@@ -50,7 +50,7 @@ func TestStateMachineIdleToActiveOnTransactionsDelegated(t *testing.T) {
 
 }
 
-func TestStateMachineIdleToObservingOnHeartbeatReceived(t *testing.T) {
+func TestStateMachine_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	assert.Equal(t, State_Idle, c.stateMachine.currentState)
@@ -61,7 +61,7 @@ func TestStateMachineIdleToObservingOnHeartbeatReceived(t *testing.T) {
 
 }
 
-func TestStateMachineObservingToStandbyOnDelegatedIfBehind(t *testing.T) {
+func TestStateMachine_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Observing
@@ -76,7 +76,7 @@ func TestStateMachineObservingToStandbyOnDelegatedIfBehind(t *testing.T) {
 	assert.Equal(t, State_Standby, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
 
-func TestStateMachineObservingToElectOnDelegatedIfNotBehind(t *testing.T) {
+func TestStateMachine_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
 	c, mocks := NewCoordinatorForUnitTest(t, ctx)
 	mocks.messageSender.On("SendHandoverRequest", mock.Anything, "activeCoordinator", c.contractAddress).Return()
@@ -94,7 +94,7 @@ func TestStateMachineObservingToElectOnDelegatedIfNotBehind(t *testing.T) {
 	mocks.messageSender.AssertExpectations(t)
 }
 
-func TestStateMachineStandbyToElectOnNewBlockIfNotBehind(t *testing.T) {
+func TestStateMachine_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
 	c, mocks := NewCoordinatorForUnitTest(t, ctx)
 	mocks.messageSender.On("SendHandoverRequest", mock.Anything, "activeCoordinator", c.contractAddress).Return()
@@ -110,7 +110,7 @@ func TestStateMachineStandbyToElectOnNewBlockIfNotBehind(t *testing.T) {
 	assert.Equal(t, State_Elect, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
 
-func TestStateMachineStandbyNotToElectOnNewBlockIfStillBehind(t *testing.T) {
+func TestStateMachine_StandbyNot_ToElect_OnNewBlock_IfStillBehind(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Standby
@@ -124,7 +124,7 @@ func TestStateMachineStandbyNotToElectOnNewBlockIfStillBehind(t *testing.T) {
 	assert.Equal(t, State_Standby, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
 
-func TestStateMachineElectToPreparedOnHandover(t *testing.T) {
+func TestStateMachine_Elect_ToPrepared_OnHandover(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Elect
@@ -134,7 +134,7 @@ func TestStateMachineElectToPreparedOnHandover(t *testing.T) {
 	assert.Equal(t, State_Prepared, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
 
-func TestStateMachinePreparedToActiveOnTransactionConfirmedIfFlushCompleted(t *testing.T) {
+func TestStateMachine_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Prepared
@@ -165,7 +165,7 @@ func TestStateMachinePreparedToActiveOnTransactionConfirmedIfFlushCompleted(t *t
 
 }
 
-func TestStateMachinePreparedNoTransitionOnTransactionConfirmedIfNotFlushCompleted(t *testing.T) {
+func TestStateMachine_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushCompleted(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Prepared
@@ -199,7 +199,7 @@ func TestStateMachinePreparedNoTransitionOnTransactionConfirmedIfNotFlushComplet
 
 }
 
-func TestStateMachineActiveToIdleOnTransactionConfirmedIfNoTransactionsInFlight(t *testing.T) {
+func TestStateMachine_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFlight(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Active
@@ -220,7 +220,7 @@ func TestStateMachineActiveToIdleOnTransactionConfirmedIfNoTransactionsInFlight(
 
 }
 
-func TestStateMachineActiveNoTransitionOnTransactionConfirmedIfNotTransactionsEmpty(t *testing.T) {
+func TestStateMachine_ActiveNoTransition_OnTransactionConfirmed_IfNotTransactionsEmpty(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Active
@@ -242,7 +242,7 @@ func TestStateMachineActiveNoTransitionOnTransactionConfirmedIfNotTransactionsEm
 	assert.Equal(t, State_Active, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
 
-func TestStateMachineActiveToFlushOnHandoverRequest(t *testing.T) {
+func TestStateMachine_Active_ToFlush_OnHandoverRequest(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Active
@@ -262,7 +262,7 @@ func TestStateMachineActiveToFlushOnHandoverRequest(t *testing.T) {
 
 }
 
-func TestStateMachineFlushToClosingOnTransactionConfirmedIfFlushComplete(t *testing.T) {
+func TestStateMachine_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Flush
@@ -286,7 +286,7 @@ func TestStateMachineFlushToClosingOnTransactionConfirmedIfFlushComplete(t *test
 
 }
 
-func TestStateMachineFlushNoTransitionOnTransactionConfirmedIfNotFlushComplete(t *testing.T) {
+func TestStateMachine_FlushNoTransition_OnTransactionConfirmed_IfNotFlushComplete(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Flush
@@ -311,7 +311,7 @@ func TestStateMachineFlushNoTransitionOnTransactionConfirmedIfNotFlushComplete(t
 
 }
 
-func TestStateMachineClosingToIdleOnHeartbeatIntervalIfClosingGracePeriodExpired(t *testing.T) {
+func TestStateMachine_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExpired(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Closing
@@ -329,7 +329,7 @@ func TestStateMachineClosingToIdleOnHeartbeatIntervalIfClosingGracePeriodExpired
 
 }
 
-func TestStateMachineClosingNoTransitionOnHeartbeatIntervalIfNotClosingGracePeriodExpired(t *testing.T) {
+func TestStateMachine_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGracePeriodExpired(t *testing.T) {
 	ctx := context.Background()
 	c, _ := NewCoordinatorForUnitTest(t, ctx)
 	c.stateMachine.currentState = State_Closing
@@ -354,12 +354,6 @@ func newPrivateTransactionsForTesting(num int) []*components.PrivateTransaction 
 		txs[i] = &components.PrivateTransaction{}
 	}
 	return txs
-}
-
-func newPrivateTransactionForTesting() *components.PrivateTransaction {
-	return &components.PrivateTransaction{
-		ID: uuid.New(),
-	}
 }
 
 type coordinatorDependencyMocks struct {

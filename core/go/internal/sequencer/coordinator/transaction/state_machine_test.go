@@ -25,8 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO maybe some snake case in the test names will make them more readable
-func TestStateMachineInitializeOK(t *testing.T) {
+func TestStateMachine_InitializeOK(t *testing.T) {
 	ctx := context.Background()
 
 	messageSender := NewMockMessageSender(t)
@@ -44,7 +43,7 @@ func TestStateMachineInitializeOK(t *testing.T) {
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
-func TestStateMachinePooledToAssemblingOnSelected(t *testing.T) {
+func TestStateMachine_Pooled_ToAssembling_OnSelected(t *testing.T) {
 	ctx := context.Background()
 
 	txn, mocks := NewTransactionBuilderForTesting(t, State_Pooled).BuildWithMocks()
@@ -59,7 +58,7 @@ func TestStateMachinePooledToAssemblingOnSelected(t *testing.T) {
 	assert.Equal(t, true, mocks.sentMessageRecorder.hasSentAssembleRequest, "expected an assemble request to be sent, but none were sent")
 }
 
-func TestStateMachineAssemblingToEndorsingOnAssembleResponse(t *testing.T) {
+func TestStateMachine_Assembling_ToEndorsing_OnAssembleResponse(t *testing.T) {
 	ctx := context.Background()
 	txnBuilder := NewTransactionBuilderForTesting(t, State_Assembling)
 	txn, mocks := txnBuilder.BuildWithMocks()
@@ -76,7 +75,7 @@ func TestStateMachineAssemblingToEndorsingOnAssembleResponse(t *testing.T) {
 
 }
 
-func TestStateMachineEndorsementGatheringToConfirmingDispatchOnEndorsedIfAttestationPlanComplete(t *testing.T) {
+func TestStateMachine_EndorsementGathering_ToConfirmingDispatch_OnEndorsed_IfAttestationPlanComplete(t *testing.T) {
 	ctx := context.Background()
 	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
 		NumberOfRequiredEndorsers(3).
@@ -96,7 +95,7 @@ func TestStateMachineEndorsementGatheringToConfirmingDispatchOnEndorsedIfAttesta
 
 }
 
-func TestStateMachineEndorsementGatheringNoTransitionIfNotAttestationPlanComplete(t *testing.T) {
+func TestStateMachine_EndorsementGatheringNoTransition_IfNotAttestationPlanComplete(t *testing.T) {
 	ctx := context.Background()
 	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
 		NumberOfRequiredEndorsers(3).
@@ -116,7 +115,7 @@ func TestStateMachineEndorsementGatheringNoTransitionIfNotAttestationPlanComplet
 
 }
 
-func TestStateMachineEndorsementGatheringToBlockedOnEndorsedIfAttestationPlanCompleteAndHasDependenciesNotReady(t *testing.T) {
+func TestStateMachine_EndorsementGathering_ToBlocked_OnEndorsed_IfAttestationPlanCompleteAndHasDependenciesNotReady(t *testing.T) {
 	ctx := context.Background()
 
 	//we need 2 transactions to know about each other so they need to share a state index
@@ -146,7 +145,7 @@ func TestStateMachineEndorsementGatheringToBlockedOnEndorsedIfAttestationPlanCom
 
 }
 
-func TestStateMachineConfirmingDispatchToReadyForDispatchOnDispatchConfirmed(t *testing.T) {
+func TestStateMachine_ConfirmingDispatch_ToReadyForDispatch_OnDispatchConfirmed(t *testing.T) {
 	ctx := context.Background()
 	txn := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).Build()
 
@@ -160,7 +159,7 @@ func TestStateMachineConfirmingDispatchToReadyForDispatchOnDispatchConfirmed(t *
 
 }
 
-func TestStateMachineBlockedToConfirmingDispatchOnDependencyReadyIfNotHasDependenciesNotReady(t *testing.T) {
+func TestStateMachine_Blocked_ToConfirmingDispatch_OnDependencyReady_IfNotHasDependenciesNotReady(t *testing.T) {
 	//TODO rethink naming of this test and/or the guard function because we end up with a double negative
 	ctx := context.Background()
 
@@ -199,7 +198,7 @@ func TestStateMachineBlockedToConfirmingDispatchOnDependencyReadyIfNotHasDepende
 
 }
 
-func TestStateMachineBlockedNoTransitionOnDependencyReadyIfHasDependenciesNotReady(t *testing.T) {
+func TestStateMachine_BlockedNoTransition_OnDependencyReady_IfHasDependenciesNotReady(t *testing.T) {
 	ctx := context.Background()
 
 	//A transaction (A) is dependant on another 2 transactions (B and C).  Neither of which a ready for dispatch. One of them (B) becomes ready for dispatch, but the other is still not ready
@@ -237,7 +236,7 @@ func TestStateMachineBlockedNoTransitionOnDependencyReadyIfHasDependenciesNotRea
 
 }
 
-func TestStateMachineReadyForDispatchToDispatchedOnCollected(t *testing.T) {
+func TestStateMachine_ReadyForDispatch_ToDispatched_OnCollected(t *testing.T) {
 	ctx := context.Background()
 	txn := NewTransactionBuilderForTesting(t, State_Ready_For_Dispatch).Build()
 
@@ -251,7 +250,7 @@ func TestStateMachineReadyForDispatchToDispatchedOnCollected(t *testing.T) {
 
 }
 
-func TestStateMachineDispatchedToSubmittedOnSubmitted(t *testing.T) {
+func TestStateMachine_Dispatched_ToSubmitted_OnSubmitted(t *testing.T) {
 	ctx := context.Background()
 	txn := NewTransactionBuilderForTesting(t, State_Dispatched).Build()
 
@@ -264,7 +263,7 @@ func TestStateMachineDispatchedToSubmittedOnSubmitted(t *testing.T) {
 	assert.Equal(t, State_Submitted, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
-func TestStateMachineSubmittedToConfirmedOnConfirmed(t *testing.T) {
+func TestStateMachine_Submitted_ToConfirmed_OnConfirmed(t *testing.T) {
 	ctx := context.Background()
 	txn := NewTransactionBuilderForTesting(t, State_Submitted).Build()
 

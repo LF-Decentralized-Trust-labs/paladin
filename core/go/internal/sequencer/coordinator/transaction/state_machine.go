@@ -138,7 +138,7 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 			},
 		},
 		State_Ready_For_Dispatch: {
-			OnTransitionTo: action_NotifyDependentsOfReadiness,
+			OnTransitionTo: action_NotifyDependentsOfReadiness, //TODO also at this point we should notify the dispatch thread to come and collect this transaction
 			Transitions: map[EventType][]Transition{
 				Event_Collected: {{
 					To: State_Dispatched,
