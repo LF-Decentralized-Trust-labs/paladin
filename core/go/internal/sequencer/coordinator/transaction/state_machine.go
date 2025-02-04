@@ -64,28 +64,21 @@ const (
 
 )
 
-func (s *State) OnTransitionTo(ctx context.Context, txn *Transaction, from State) error {
-	log.L(context.Background()).Debugf("Transitioning from %v to %v", from, s)
-	switch *s {
-	case State_Assembling:
-		return txn.sendAssembleRequest(ctx)
-	case State_Endorsement_Gathering:
-		return txn.sendEndorsementRequests(ctx)
-	case State_Confirming_Dispatch:
-		return txn.sendDispatchConfirmationRequest(ctx)
-	}
-	log.L(ctx).Infof("No transition function defined for state %v", s)
-	return nil
-}
-
 type StateMachine struct {
-	currentState State
-	transitions  map[State]map[EventType][]Transition
+	currentState     State
+	stateDefinitions map[State]StateDefinition
 }
 
 type Transition struct {
 	To State
 	If Guard
+}
+
+type OnTransitionTo func(ctx context.Context, txn *Transaction, to, from State) error
+
+type StateDefinition struct {
+	OnTransitionTo OnTransitionTo             // function to be invoked when transitioning into this state
+	Transitions    map[EventType][]Transition // rules to define when to exit this state and which state to transition to
 }
 
 func (t *Transaction) InitializeStateMachine(initialState State) {
@@ -94,48 +87,69 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 	}
 
 	//Transitions
-	t.stateMachine.transitions = map[State]map[EventType][]Transition{
+	t.stateMachine.stateDefinitions = map[State]StateDefinition{
 		State_Pooled: {
-			Event_Selected: {{
-				To: State_Assembling,
-			}},
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_Selected: {{
+					To: State_Assembling,
+				}},
+			},
 		},
 		State_Assembling: {
-			Event_Assemble_Success: {{
-				To: State_Endorsement_Gathering,
-			}},
+			OnTransitionTo: action_SendAssembleRequest,
+			Transitions: map[EventType][]Transition{
+				Event_Assemble_Success: {{
+					To: State_Endorsement_Gathering,
+				}},
+			},
 		},
 		State_Endorsement_Gathering: {
-			Event_Endorsed: {
-				{
-					To: State_Confirming_Dispatch,
-					If: guard_And(guard_AttestationPlanFulfilled, guard_NoDependenciesNotReady),
-				},
-				{
-					To: State_Blocked,
-					If: guard_And(guard_AttestationPlanFulfilled, guard_HasDependenciesNotReady),
+			OnTransitionTo: action_SendEndorsementRequests,
+			Transitions: map[EventType][]Transition{
+				Event_Endorsed: {
+					{
+						To: State_Confirming_Dispatch,
+						If: guard_And(guard_AttestationPlanFulfilled, guard_NoDependenciesNotReady),
+					},
+					{
+						To: State_Blocked,
+						If: guard_And(guard_AttestationPlanFulfilled, guard_HasDependenciesNotReady),
+					},
 				},
 			},
 		},
 		State_Confirming_Dispatch: {
-			Event_DispatchConfirmed: {{
-				To: State_Ready_For_Dispatch,
-			}},
+			OnTransitionTo: action_SendDispatchConfirmationRequest,
+			Transitions: map[EventType][]Transition{
+				Event_DispatchConfirmed: {{
+					To: State_Ready_For_Dispatch,
+				}},
+			},
 		},
 		State_Ready_For_Dispatch: {
-			Event_Collected: {{
-				To: State_Dispatched,
-			}},
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_Collected: {{
+					To: State_Dispatched,
+				}},
+			},
 		},
 		State_Dispatched: {
-			Event_Submitted: {{
-				To: State_Submitted,
-			}},
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_Submitted: {{
+					To: State_Submitted,
+				}},
+			},
 		},
 		State_Submitted: {
-			Event_Confirmed: {{
-				To: State_Confirmed,
-			}},
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_Confirmed: {{
+					To: State_Confirmed,
+				}},
+			},
 		},
 	}
 }
@@ -167,16 +181,23 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 	}
 
 	//Determine whether this event triggers a state transition
-	if transitionRules, ok := sm.transitions[sm.currentState][event.Type()]; ok {
+	transitions := sm.stateDefinitions[sm.currentState].Transitions
+	if transitionRules, ok := transitions[event.Type()]; ok {
 		for _, rule := range transitionRules {
 			if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
+				log.L(ctx).Infof("Transaction %s transitioning from %v to %v triggered by event %v", t.ID.String(), sm.currentState, rule.To, event.Type())
 				fromState := sm.currentState
 				sm.currentState = rule.To
-				err := sm.currentState.OnTransitionTo(ctx, t, fromState)
-				if err != nil {
-					//TODO what should we do if the transition fails?  Abandon the transaction? Retry the transition?
-					//Any recoverable error should be handled by the transition function so only unrecoverable errors should be seen here
-					log.L(ctx).Errorf("Error transitioning from %v to %v triggered by event %v: %v", fromState, sm.currentState, event, err)
+				newStateDefinition := sm.stateDefinitions[sm.currentState]
+				if newStateDefinition.OnTransitionTo != nil {
+					err := newStateDefinition.OnTransitionTo(ctx, t, rule.To, fromState)
+					if err != nil {
+						//TODO any recoverable errors should have been handled by the OnTransitionTo function so this is a panic or at least, abort the coordinator for this contract
+						log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
+						break
+					}
+				} else {
+					log.L(ctx).Debugf("No OnTransitionTo function defined for state %v", sm.currentState)
 				}
 				t.heartbeatIntervalsSinceStateChange = 0
 				break
@@ -186,6 +207,18 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 	} else {
 		log.L(ctx).Debugf("No transition for Event %v from State %s", event.Type(), sm.currentState.String())
 	}
+}
+
+func action_SendAssembleRequest(ctx context.Context, txn *Transaction, to, from State) error {
+	return txn.sendAssembleRequest(ctx)
+}
+
+func action_SendEndorsementRequests(ctx context.Context, txn *Transaction, to, from State) error {
+	return txn.sendEndorsementRequests(ctx)
+}
+
+func action_SendDispatchConfirmationRequest(ctx context.Context, txn *Transaction, to, from State) error {
+	return txn.sendDispatchConfirmationRequest(ctx)
 }
 
 func (s *State) String() string {

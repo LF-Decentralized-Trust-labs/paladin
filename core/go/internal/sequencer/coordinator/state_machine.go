@@ -53,28 +53,21 @@ const (
 	Event_HeartbeatInterval
 )
 
-// TODO move the transition function into the declarative map
-// need to change the types in the map to do so.e.g. map of stateType->stateDefinition where stateDefinition has an OnTransitionTo function (what happens when we enter that state) and a map of event->transition (how we exit that state)
-func (s *State) OnTransitionTo(ctx context.Context, c *coordinator, from State, event Event) {
-	log.L(context.Background()).Debugf("Transitioning from %v to %v triggered by event %v", from, s, event)
-	switch *s {
-	case State_Observing:
-		//TODO - start observing the active coordinator
-	case State_Elect:
-		c.sendHandoverRequest(ctx)
-	case State_Prepared:
-	}
-
-}
-
 type StateMachine struct {
-	currentState State
-	transitions  map[State]map[EventType][]Transition
+	currentState     State
+	stateDefinitions map[State]StateDefinition
 }
 
 type Transition struct {
 	To State
 	If Guard
+}
+
+type OnTransitionTo func(ctx context.Context, c *coordinator, to, from State)
+
+type StateDefinition struct {
+	OnTransitionTo OnTransitionTo             // function to be invoked when transitioning into this state
+	Transitions    map[EventType][]Transition // rules to define when to exit this state and which state to transition to
 }
 
 func (c *coordinator) InitializeStateMachine(initialState State) {
@@ -87,80 +80,104 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 	// Transitions can optionally be guarded by a function that returns a boolean.
 	// Guard functions are synchronous, pure functions with inputs of the event and current state (including internal fine grained state) of the coordinator after the event has been applied
 	// and outputs a boolean
-	sm.transitions = map[State]map[EventType][]Transition{
+	sm.stateDefinitions = map[State]StateDefinition{
 		State_Idle: {
-			Event_TransactionsDelegated: {
-				{
-					To: State_Active,
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_TransactionsDelegated: {
+					{
+						To: State_Active,
+					},
 				},
-			},
-			Event_HeartbeatReceived: {
-				{
-					To: State_Observing,
+				Event_HeartbeatReceived: {
+					{
+						To: State_Observing,
+					},
 				},
 			},
 		},
 		State_Observing: {
-			Event_TransactionsDelegated: {
-				{
-					To: State_Standby,
-					If: behind,
-				},
-				{
-					To: State_Elect,
-					If: notBehind,
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_TransactionsDelegated: {
+					{
+						To: State_Standby,
+						If: behind,
+					},
+					{
+						To: State_Elect,
+						If: notBehind,
+					},
 				},
 			},
 		},
 		State_Standby: {
-			Event_NewBlock: {
-				{
-					To: State_Elect,
-					If: notBehind,
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_NewBlock: {
+					{
+						To: State_Elect,
+						If: notBehind,
+					},
 				},
 			},
 		},
 		State_Elect: {
-			Event_HandoverReceived: {
-				{
-					To: State_Prepared,
+			OnTransitionTo: action_SendHandoverRequest,
+			Transitions: map[EventType][]Transition{
+				Event_HandoverReceived: {
+					{
+						To: State_Prepared,
+					},
 				},
 			},
 		},
 		State_Prepared: {
-			Event_TransactionConfirmed: {
-				{
-					To: State_Active,
-					If: activeCoordinatorFlushComplete,
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_TransactionConfirmed: {
+					{
+						To: State_Active,
+						If: activeCoordinatorFlushComplete,
+					},
 				},
 			},
 		},
 		State_Active: {
-			Event_TransactionConfirmed: {
-				{
-					To: State_Idle,
-					If: noTransactionsInflight,
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_TransactionConfirmed: {
+					{
+						To: State_Idle,
+						If: noTransactionsInflight,
+					},
 				},
-			},
-			Event_HandoverRequestReceived: {
-				{
-					To: State_Flush,
+				Event_HandoverRequestReceived: {
+					{
+						To: State_Flush,
+					},
 				},
 			},
 		},
 		State_Flush: {
-			Event_TransactionConfirmed: {
-				{
-					To: State_Closing,
-					If: flushComplete,
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_TransactionConfirmed: {
+					{
+						To: State_Closing,
+						If: flushComplete,
+					},
 				},
 			},
 		},
 		State_Closing: {
-			Event_HeartbeatInterval: {
-				{
-					To: State_Idle,
-					If: closingGracePeriodExpired,
+			OnTransitionTo: nil,
+			Transitions: map[EventType][]Transition{
+				Event_HeartbeatInterval: {
+					{
+						To: State_Idle,
+						If: closingGracePeriodExpired,
+					},
 				},
 			},
 		},
@@ -202,12 +219,19 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) {
 	}
 
 	//Determine whether this event triggers a state transition
-	if transitionRules, ok := sm.transitions[sm.currentState][event.Type()]; ok {
+	transitions := sm.stateDefinitions[sm.currentState].Transitions
+	if transitionRules, ok := transitions[event.Type()]; ok {
 		for _, rule := range transitionRules {
 			if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
+				log.L(context.Background()).Infof("Coordinator for %s transitioning from %v to %v triggered by event %v", c.contractAddress.String(), sm.currentState, rule.To, event.Type())
 				fromState := sm.currentState
 				sm.currentState = rule.To
-				sm.currentState.OnTransitionTo(ctx, c, fromState, event)
+				newStateDefinition := sm.stateDefinitions[sm.currentState]
+				if newStateDefinition.OnTransitionTo != nil {
+					newStateDefinition.OnTransitionTo(ctx, c, rule.To, fromState)
+				} else {
+					log.L(context.Background()).Debugf("No OnTransitionTo function defined for state %v", sm.currentState)
+				}
 				c.heartbeatIntervalsSinceStateChange = 0
 				break
 			}
@@ -217,6 +241,10 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) {
 		log.L(ctx).Debugf("No transition for Event %v from State %s", event.Type(), sm.currentState.String())
 	}
 
+}
+
+func action_SendHandoverRequest(ctx context.Context, c *coordinator, to, from State) {
+	c.sendHandoverRequest(ctx)
 }
 
 func (s *State) String() string {
