@@ -37,6 +37,7 @@ type coordinator struct {
 	transactionsByID                           map[uuid.UUID]*transaction.Transaction
 	currentBlockHeight                         uint64
 	activeCoordinatorsFlushPointsBySignerNonce map[string]*common.FlushPoint
+	stateIndex                                 transaction.StateIndex
 
 	/* Config */
 	blockRangeSize       uint64
@@ -58,6 +59,7 @@ func NewCoordinator(ctx context.Context, messageSender MessageSender, blockRange
 		contractAddress:                    contractAddress,
 		blockHeightTolerance:               blockHeightTolerance,
 		closingGracePeriod:                 closingGracePeriod,
+		stateIndex:                         transaction.NewStateIndex(ctx),
 	}
 	c.InitializeStateMachine(State_Idle)
 	return c
@@ -70,7 +72,7 @@ func (c *coordinator) sendHandoverRequest(ctx context.Context) {
 
 func (c *coordinator) addToDelegatedTransactions(_ context.Context, sender string, transactions []*components.PrivateTransaction) {
 	for _, txn := range transactions {
-		c.transactionsByID[txn.ID] = transaction.NewTransaction(sender, txn, c.messageSender, c.clock)
+		c.transactionsByID[txn.ID] = transaction.NewTransaction(sender, txn, c.messageSender, c.clock, c.stateIndex)
 	}
 }
 

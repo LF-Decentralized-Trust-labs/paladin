@@ -25,3 +25,22 @@ type Guard func(ctx context.Context, txn *Transaction) bool
 func guard_AttestationPlanFulfilled(ctx context.Context, txn *Transaction) bool {
 	return !txn.hasOutstandingEndorsementRequests(ctx)
 }
+
+func guard_NoDependenciesNotReady(ctx context.Context, txn *Transaction) bool {
+	return !guard_HasDependenciesNotReady(ctx, txn)
+}
+
+func guard_HasDependenciesNotReady(ctx context.Context, txn *Transaction) bool {
+	return txn.hasDependenciesNotReady(ctx)
+}
+
+func guard_And(guards ...Guard) Guard {
+	return func(ctx context.Context, txn *Transaction) bool {
+		for _, guard := range guards {
+			if !guard(ctx, txn) {
+				return false
+			}
+		}
+		return true
+	}
+}

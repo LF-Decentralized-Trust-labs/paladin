@@ -23,7 +23,6 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -52,7 +51,6 @@ type endorsementRequirement struct {
 type Transaction struct {
 	*components.PrivateTransaction
 	sender                             string //TODO what is this?  A node? An identity? An identity locator?
-	dispatchConfirmed                  bool
 	signerAddress                      *tktypes.EthAddress
 	latestSubmissionHash               *tktypes.Bytes32
 	nonce                              *uint64
@@ -60,17 +58,21 @@ type Transaction struct {
 	heartbeatIntervalsSinceStateChange int
 	pendingEndorsementRequests         map[string]map[string]*endorsementRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
 	latestError                        string
+	dependencies                       []*Transaction
+	dependents                         []*Transaction
 	// Dependencies
 	clock         common.Clock
 	messageSender MessageSender
+	stateIndex    StateIndex
 }
 
-func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock) *Transaction {
+func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, stateIndex StateIndex) *Transaction {
 	txn := &Transaction{
 		sender:             sender,
 		PrivateTransaction: pt,
 		messageSender:      messageSender,
 		clock:              clock,
+		stateIndex:         stateIndex,
 	}
 	txn.InitializeStateMachine(State_Pooled)
 	return txn
@@ -133,12 +135,15 @@ func (t *Transaction) applyEndorsement(_ context.Context, endorsement *prototk.A
 	return nil
 }
 
-func (t *Transaction) handleDispatchConfirmationResponse(_ context.Context, _ *transport.DispatchConfirmationResponse) error {
-	//TODO check that this matches a pending request
-	//TODO check that it is not a rejection
+func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *components.TransactionPostAssembly) {
+	//TODO check that this matches a pending request and that it has not timed out
 
-	t.dispatchConfirmed = true
-	return nil
+	//TODO the response from the assembler actually contains outputStatesPotential so we need to write them to the store and then add the OutputState ids to the index
+	t.PostAssembly = postAssembly
+	for _, state := range postAssembly.OutputStates {
+		t.stateIndex.AddMinter(ctx, state.ID, t)
+	}
+	t.calculateDependencies(ctx)
 }
 
 func (t *Transaction) Sender() string {
@@ -182,7 +187,7 @@ func (d *Transaction) hasOutstandingEndorsementRequests(ctx context.Context) boo
 func (d *Transaction) outstandingEndorsementRequests(ctx context.Context) []*endorsementRequirement {
 	outstandingEndorsementRequests := make([]*endorsementRequirement, 0)
 	if d.PostAssembly == nil {
-		log.L(ctx).Debugf("PostAssembly is nil so there are no outstanding endorsement requests")
+		log.L(ctx).Debug("PostAssembly is nil so there are no outstanding endorsement requests")
 		return outstandingEndorsementRequests
 	}
 	for _, attRequest := range d.PostAssembly.AttestationPlan {
@@ -214,8 +219,7 @@ func (d *Transaction) outstandingEndorsementRequests(ctx context.Context) []*end
 }
 
 func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
-	t.messageSender.SendAssembleRequest(ctx, t.sender, t.ID, t.PreAssembly)
-	return nil
+	return t.messageSender.SendAssembleRequest(ctx, t.sender, t.ID, t.PreAssembly)
 }
 
 type endorsementRequest struct {
@@ -228,6 +232,7 @@ type endorsementRequest struct {
 // Function recentlyRequested checks if the endorsement has been previously requested.  There are 3 possibilities, a) it was requested recently (retry threshold has not passed) b) it was requested but the request timed out c) it was never requested
 // if a) retry is false.  if b) retry is true and the idempotency key is provided.  if c) retry is true and a new idempotency key is generated
 func (r *endorsementRequest) checkForRetry(ctx context.Context, outstandingEndorsementRequest *endorsementRequirement) (bool, string) {
+	//TODO
 	// there is a request in the attestation plan and we do not have a response to match it
 	// first lets see if we have recently sent a request for this endorsement and just need to be patient
 	/*
@@ -268,6 +273,29 @@ func (t *Transaction) getPendingEndorsementRequest(ctx context.Context, attestat
 		return r, ok
 	}
 	return nil, false
+}
+
+// Function hasDependenciesNotReady checks if the transaction has any dependencies that themselves are not ready for dispatch
+func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
+	//TODO rethink the name of this function
+
+	//We already calculated the dependencies when we got assembled and there is no way we could have picked up new
+	// dependencies without a re-assemble
+	// some of them might have been confirmed and removed from our list to avoid a memory leak so this is not necessarily the complete list of dependencies
+	// but it should contain all the ones that are not ready for dispatch
+
+	for _, dependency := range t.dependencies {
+		//test against the list of states that we consider to be past the point of ready as there is more chance of us noticing
+		// a failing test if we add new states in the future and forget to update this list
+		if dependency.GetState() != State_Confirmed &&
+			dependency.GetState() != State_Submitted &&
+			dependency.GetState() != State_Dispatched &&
+			dependency.GetState() != State_Ready_For_Dispatch {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Function sendEndorsementRequests iterates through the attestation plan and for each endorsement request that has not been fulfilled
@@ -353,4 +381,36 @@ func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState
 		}
 	}
 	return endorsableList
+}
+
+func (t *Transaction) calculateDependencies(ctx context.Context) {
+	if t.PostAssembly == nil {
+		log.L(ctx).Errorf("Cannot calculate dependencies for transaction %s without a PostAssembly", t.ID)
+		//TODO should never get here so this is a panic or at least abort the the current contract
+		return
+	}
+
+	found := make(map[string]bool)
+	t.dependencies = make([]*Transaction, 0, len(t.PostAssembly.InputStates)+len(t.PostAssembly.ReadStates))
+	for _, state := range append(t.PostAssembly.InputStates, t.PostAssembly.ReadStates...) {
+		dependency, err := t.stateIndex.LookupMinter(ctx, state.ID)
+		if err != nil {
+			log.L(ctx).Errorf("Error looking up dependency for state %s: %s", state.ID, err)
+			//TODO no good reason to expect an error here so this is a panic or at least abort the the current contract
+			return
+		}
+		if dependency == nil {
+			log.L(ctx).Infof("No minter found for state %s", state.ID)
+			//assume the state was produced by a confirmed transaction
+			//TODO should we validate this by checking the domain context?
+			continue
+		}
+		if found[dependency.ID.String()] {
+			continue
+		}
+		found[dependency.ID.String()] = true
+		t.dependencies = append(t.dependencies, dependency)
+		//also set up the reverse association
+		dependency.dependents = append(dependency.dependents, t)
+	}
 }

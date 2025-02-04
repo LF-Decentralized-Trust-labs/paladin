@@ -53,6 +53,8 @@ const (
 	Event_HeartbeatInterval
 )
 
+// TODO move the transition function into the declarative map
+// need to change the types in the map to do so.e.g. map of stateType->stateDefinition where stateDefinition has an OnTransitionTo function (what happens when we enter that state) and a map of event->transition (how we exit that state)
 func (s *State) OnTransitionTo(ctx context.Context, c *coordinator, from State, event Event) {
 	log.L(context.Background()).Debugf("Transitioning from %v to %v triggered by event %v", from, s, event)
 	switch *s {

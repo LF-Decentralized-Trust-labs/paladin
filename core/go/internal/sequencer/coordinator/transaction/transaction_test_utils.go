@@ -87,7 +87,7 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 }
 
 type TransactionBuilderForTesting struct {
-	t      *testing.T
+	t      *testing.T //TODO remove this so that we are not using testing packages in non test files.
 	id     uuid.UUID
 	sender *identityForTesting
 
@@ -98,9 +98,13 @@ type TransactionBuilderForTesting struct {
 	state                State
 	numberOfEndorsers    int
 	numberOfEndorsements int
+	numberOfOutputStates int
+	inputStateIDs        []tktypes.HexBytes
+	readStateIDs         []tktypes.HexBytes
 	endorsers            []*identityForTesting
 	sentMessageRecorder  *SentMessageRecorder
 	mockClock            *sequencermocks.Clock
+	stateIndex           StateIndex
 }
 
 // Function NewTransactionBuilderForTesting creates a TransactionBuilderForTesting with random values for all fields
@@ -150,18 +154,44 @@ func (b *TransactionBuilderForTesting) NumberOfEndorsements(num int) *Transactio
 	return b
 }
 
-type transactionDependencyMocks struct {
+func (b *TransactionBuilderForTesting) NumberOfOutputStates(num int) *TransactionBuilderForTesting {
+	b.numberOfOutputStates = num
+	return b
+}
+
+func (b *TransactionBuilderForTesting) InputStateIDs(stateIDs ...tktypes.HexBytes) *TransactionBuilderForTesting {
+	b.inputStateIDs = stateIDs
+	return b
+}
+
+func (b *TransactionBuilderForTesting) ReadStateIDs(stateIDs ...tktypes.HexBytes) *TransactionBuilderForTesting {
+	b.readStateIDs = stateIDs
+	return b
+}
+
+func (b *TransactionBuilderForTesting) StateIndex(stateIndex StateIndex) *TransactionBuilderForTesting {
+	b.stateIndex = stateIndex
+	return b
+}
+
+type transactionDependencyFakes struct {
 	sentMessageRecorder *SentMessageRecorder
 }
 
-func (b *TransactionBuilderForTesting) BuildWithMocks() (*Transaction, *transactionDependencyMocks) {
-	mocks := &transactionDependencyMocks{
+func (b *TransactionBuilderForTesting) BuildWithMocks() (*Transaction, *transactionDependencyFakes) {
+	mocks := &transactionDependencyFakes{
 		sentMessageRecorder: b.sentMessageRecorder,
 	}
 	return b.Build(), mocks
 }
 
 func (b *TransactionBuilderForTesting) Build() *Transaction {
+	ctx := context.Background()
+	if b.stateIndex == nil {
+		b.stateIndex = &stateIndex{
+			transactionByOutputState: make(map[string]*Transaction),
+		}
+	}
 	b.endorsers = make([]*identityForTesting, b.numberOfEndorsers)
 	for i := 0; i < b.numberOfEndorsers; i++ {
 		endorserName := fmt.Sprintf("endorser-%d", i)
@@ -197,20 +227,20 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		}
 	}
 
+	txn := NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.mockClock, b.stateIndex)
 	switch b.state {
 	case State_Endorsement_Gathering:
-		privateTransaction.PostAssembly = b.BuildPostAssembly()
-
+		txn.applyPostAssembly(ctx, b.BuildPostAssembly())
 	}
+
 	//TODO: do something more useful with clock mocking
 	b.mockClock.On("Now").Return(time.Now()).Maybe()
-	d := NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.mockClock)
-	d.dispatchConfirmed = b.dispatchConfirmed
-	d.signerAddress = b.signerAddress
-	d.latestSubmissionHash = b.latestSubmissionHash
-	d.nonce = b.nonce
-	d.stateMachine.currentState = b.state
-	return d
+
+	txn.signerAddress = b.signerAddress
+	txn.latestSubmissionHash = b.latestSubmissionHash
+	txn.nonce = b.nonce
+	txn.stateMachine.currentState = b.state
+	return txn
 
 }
 
@@ -228,11 +258,45 @@ func (b *TransactionBuilderForTesting) BuildEndorsement(endorserIndex int) *prot
 	}
 }
 
-func (b *TransactionBuilderForTesting) BuildPostAssembly() *components.TransactionPostAssembly {
-	postAssembly := &components.TransactionPostAssembly{}
-	//it is normal to have one AttestationRequest for the sender to sign the pre-assembly
+func NewPostAssemblyBuilderForTesting() *PostAssemblyBuilderForTesting {
+	return &PostAssemblyBuilderForTesting{}
+}
 
-	postAssembly.AttestationPlan = make([]*prototk.AttestationRequest, b.numberOfEndorsers+1, b.numberOfEndorsers+1)
+func (b *TransactionBuilderForTesting) BuildPostAssembly() *components.TransactionPostAssembly {
+	postAssemblyBuilder := &PostAssemblyBuilderForTesting{
+		sender:               b.sender,
+		numberOfEndorsers:    b.numberOfEndorsers,
+		numberOfEndorsements: b.numberOfEndorsements,
+		endorsers:            b.endorsers,
+		numberOfOutputStates: b.numberOfOutputStates,
+		inputStateIDs:        b.inputStateIDs,
+		readStateIDs:         b.readStateIDs,
+	}
+	return postAssemblyBuilder.Build()
+
+}
+
+// TODO is it worth having this as a separate struct?
+// only time that it makes sense to explicitly create a PostAssemblyBuilder when you don't have a TransactionBuilder that you can use
+// to build the PostAssembly that you want is when you are deliberately building the wrong PostAssembly e.g. to test
+// weird error conditions
+type PostAssemblyBuilderForTesting struct {
+	sender               *identityForTesting
+	numberOfEndorsers    int
+	numberOfEndorsements int
+	numberOfOutputStates int
+	inputStateIDs        []tktypes.HexBytes
+	readStateIDs         []tktypes.HexBytes
+	endorsers            []*identityForTesting
+}
+
+func (b *PostAssemblyBuilderForTesting) Build() *components.TransactionPostAssembly {
+	postAssembly := &components.TransactionPostAssembly{
+		AssemblyResult: prototk.AssembleTransactionResponse_OK,
+	}
+
+	//it is normal to have one AttestationRequest for the sender to sign the pre-assembly
+	postAssembly.AttestationPlan = make([]*prototk.AttestationRequest, b.numberOfEndorsers+1)
 	postAssembly.AttestationPlan[0] = &prototk.AttestationRequest{
 		Name:            "sign",
 		AttestationType: prototk.AttestationType_SIGN,
@@ -274,12 +338,47 @@ func (b *TransactionBuilderForTesting) BuildPostAssembly() *components.Transacti
 
 	//TODO a bunch of other stuff needs to be populated in the post assembly?
 
-	postAssembly.Endorsements = make([]*prototk.AttestationResult, b.numberOfEndorsements, b.numberOfEndorsements)
+	for i := 0; i < b.numberOfOutputStates; i++ {
+		postAssembly.OutputStates = append(postAssembly.OutputStates, &components.FullState{
+			ID: tktypes.HexBytes(tktypes.RandBytes(32)),
+		})
+	}
+
+	for _, inputStateID := range b.inputStateIDs {
+		postAssembly.InputStates = append(postAssembly.InputStates, &components.FullState{
+			ID:     inputStateID,
+			Schema: tktypes.Bytes32(tktypes.RandBytes(32)),
+			Data:   tktypes.JSONString("{\"data\":\"hello\"}"),
+		})
+	}
+
+	for _, readStateID := range b.readStateIDs {
+		postAssembly.ReadStates = append(postAssembly.ReadStates, &components.FullState{
+			ID:     readStateID,
+			Schema: tktypes.Bytes32(tktypes.RandBytes(32)),
+			Data:   tktypes.JSONString("{\"data\":\"hello\"}"),
+		})
+	}
+
+	postAssembly.Endorsements = make([]*prototk.AttestationResult, b.numberOfEndorsements)
 	for i := 0; i < b.numberOfEndorsements; i++ {
 		postAssembly.Endorsements[i] = b.BuildEndorsement(i)
 	}
 	return postAssembly
+}
 
+func (b *PostAssemblyBuilderForTesting) BuildEndorsement(endorserIndex int) *prototk.AttestationResult {
+	return &prototk.AttestationResult{
+		Name:            fmt.Sprintf("endorse-%d", endorserIndex),
+		AttestationType: prototk.AttestationType_ENDORSE,
+		Payload:         tktypes.RandBytes(32),
+		Verifier: &prototk.ResolvedVerifier{
+			Lookup:       b.endorsers[endorserIndex].identityLocator,
+			Verifier:     b.endorsers[endorserIndex].verifier,
+			Algorithm:    algorithms.ECDSA_SECP256K1,
+			VerifierType: verifiers.ETH_ADDRESS,
+		},
+	}
 }
 
 func ptrTo[T any](v T) *T {

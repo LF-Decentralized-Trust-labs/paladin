@@ -26,6 +26,7 @@ import (
 )
 
 func TestStateMachineInitializeOK(t *testing.T) {
+	ctx := context.Background()
 
 	messageSender := NewMockMessageSender(t)
 	clock := sequencermocks.NewClock(t)
@@ -36,6 +37,7 @@ func TestStateMachineInitializeOK(t *testing.T) {
 		},
 		messageSender,
 		clock,
+		NewStateIndex(ctx),
 	)
 
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())

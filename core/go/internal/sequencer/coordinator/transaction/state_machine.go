@@ -28,6 +28,7 @@ const (
 	State_Pooled                State = iota //waiting in the pool to be assembled
 	State_Assembling                         // an assemble request has been sent but we are waiting for the response
 	State_Endorsement_Gathering              // assembled and waiting for endorsement
+	State_Blocked                            //is fully endorsed but cannot proceed due to dependencies not being ready for dispatch
 	State_Confirming_Dispatch                // endorsed and waiting for dispatch confirmation
 	State_Ready_For_Dispatch                 // dispatch confirmation received and waiting to be collected by the dispatcher thread.Going into this state is the point of no return
 	State_Dispatched                         // collected by the dispatcher thread but not yet
@@ -89,7 +90,6 @@ type Transition struct {
 
 func (t *Transaction) InitializeStateMachine(initialState State) {
 	t.stateMachine = &StateMachine{
-		//transaction:  d,
 		currentState: initialState,
 	}
 
@@ -106,10 +106,16 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 			}},
 		},
 		State_Endorsement_Gathering: {
-			Event_Endorsed: {{
-				To: State_Confirming_Dispatch,
-				If: guard_AttestationPlanFulfilled,
-			}},
+			Event_Endorsed: {
+				{
+					To: State_Confirming_Dispatch,
+					If: guard_And(guard_AttestationPlanFulfilled, guard_NoDependenciesNotReady),
+				},
+				{
+					To: State_Blocked,
+					If: guard_And(guard_AttestationPlanFulfilled, guard_HasDependenciesNotReady),
+				},
+			},
 		},
 		State_Confirming_Dispatch: {
 			Event_DispatchConfirmed: {{
@@ -143,7 +149,7 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 	case *AssembleRequestSentEvent:
 		//TODO
 	case *AssembleSuccessEvent:
-		t.PostAssembly = event.postAssembly
+		t.applyPostAssembly(ctx, event.postAssembly)
 	case *AssembleRevertEvent:
 		//TODO
 	case *EndorsedEvent:
