@@ -50,18 +50,19 @@ var allStates = []State{
 type EventType = common.EventType
 
 const (
-	Event_Selected            EventType = iota // selected from the pool as the next transaction to be assembled
-	Event_AssembleRequestSent                  // assemble request sent to the assembler
-	Event_Assemble_Success                     // assemble response received from the sender
-	Event_Assemble_Revert                      // assemble response received from the sender with a revert reason
-	Event_Endorsed                             // endorsement received from one endorser
-	Event_EndorsedRejected                     // endorsement received from one endorser with a revert reason
-	Event_DependencyReady                      //another transaction, for which this transaction has a dependency on, has become ready for dispatch
-	Event_DispatchConfirmed                    // dispatch confirmation received from the sender
-	Event_Collected                            // collected by the dispatcher thread
-	Event_NonceAllocated                       // nonce allocated by the dispatcher thread
-	Event_Submitted                            // submission made to the blockchain.  Each time this event is received, the submission hash is updated
-	Event_Confirmed                            // confirmation received from the blockchain of either a successful or reverted transaction
+	Event_Selected                     EventType = iota // selected from the pool as the next transaction to be assembled
+	Event_AssembleRequestSent                           // assemble request sent to the assembler
+	Event_Assemble_Success                              // assemble response received from the sender
+	Event_Assemble_Revert                               // assemble response received from the sender with a revert reason
+	Event_Endorsed                                      // endorsement received from one endorser
+	Event_EndorsedRejected                              // endorsement received from one endorser with a revert reason
+	Event_DependencyReady                               //another transaction, for which this transaction has a dependency on, has become ready for dispatch
+	Event_DispatchConfirmed                             // dispatch confirmation received from the sender
+	Event_DispatchConfirmationRejected                  // dispatch confirmation response received from the sender with a rejection
+	Event_Collected                                     // collected by the dispatcher thread
+	Event_NonceAllocated                                // nonce allocated by the dispatcher thread
+	Event_Submitted                                     // submission made to the blockchain.  Each time this event is received, the submission hash is updated
+	Event_Confirmed                                     // confirmation received from the blockchain of either a successful or reverted transaction
 
 )
 
@@ -180,6 +181,8 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 	case *EndorsedEvent:
 		t.applyEndorsement(ctx, event.Endorsement, event.RequestID)
 	case *DispatchConfirmedEvent:
+		t.applyDispatchConfirmation(ctx, event.RequestID)
+	case *DispatchConfirmationRejectedEvent:
 		//TODO
 	case *CollectedEvent:
 		//TODO

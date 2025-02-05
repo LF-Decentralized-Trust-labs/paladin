@@ -101,10 +101,20 @@ func (_ *EndorsedRejectedEvent) Type() EventType {
 // DispatchConfirmedEvent
 type DispatchConfirmedEvent struct {
 	event
+	RequestID uuid.UUID
 }
 
 func (_ *DispatchConfirmedEvent) Type() EventType {
 	return Event_DispatchConfirmed
+}
+
+// DispatchConfirmationRejectedEvent
+type DispatchConfirmationRejectedEvent struct {
+	event
+}
+
+func (_ *DispatchConfirmationRejectedEvent) Type() EventType {
+	return Event_DispatchConfirmationRejected
 }
 
 // CollectedEvent

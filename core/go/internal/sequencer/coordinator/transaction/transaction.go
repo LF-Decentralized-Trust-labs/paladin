@@ -56,6 +56,7 @@ type Transaction struct {
 	stateMachine                       *StateMachine
 	heartbeatIntervalsSinceStateChange int
 	pendingEndorsementRequests         map[string]map[string]*common.IdempotentRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
+	pendingDispatchConfirmationRequest *common.IdempotentRequest
 	latestError                        string
 	dependencies                       []*Transaction
 	dependents                         []*Transaction
@@ -126,6 +127,14 @@ func (t *Transaction) SignatureAttestationName() (string, error) {
 		}
 	}
 	return "", nil
+}
+
+func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uuid.UUID) error {
+	if t.pendingDispatchConfirmationRequest != nil && t.pendingDispatchConfirmationRequest.IdempotencyKey() == requestID {
+		t.pendingDispatchConfirmationRequest = nil
+	}
+
+	return nil
 }
 
 func (t *Transaction) applyEndorsement(_ context.Context, endorsement *prototk.AttestationResult, requestID string) error {
@@ -266,8 +275,7 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 		pendingRequest, ok := pendingRequestsForAttRequest[endorsementRequirement.party]
 		if !ok {
 			pendingRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey string) error {
-				t.requestEndorsement(ctx, idempotencyKey, endorsementRequirement.party, endorsementRequirement.attRequest)
-				return nil
+				return t.requestEndorsement(ctx, idempotencyKey, endorsementRequirement.party, endorsementRequirement.attRequest)
 			})
 			pendingRequestsForAttRequest[endorsementRequirement.party] = pendingRequest
 		}
@@ -282,20 +290,26 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 }
 
 func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error {
-	idempotencyKey := uuid.New().String()
-	hash, err := t.Hash(ctx)
-	if err != nil {
-		return err
-	}
-	t.messageSender.SendDispatchConfirmationRequest(
-		ctx,
-		t.sender,
-		idempotencyKey,
-		t.PreAssembly.TransactionSpecification,
-		hash,
-	)
 
-	return nil
+	if t.pendingDispatchConfirmationRequest == nil {
+		hash, err := t.Hash(ctx)
+		if err != nil {
+			return err
+		}
+		t.pendingDispatchConfirmationRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey string) error {
+
+			return t.messageSender.SendDispatchConfirmationRequest(
+				ctx,
+				t.sender,
+				idempotencyKey,
+				t.PreAssembly.TransactionSpecification,
+				hash,
+			)
+		})
+
+	}
+	return t.pendingDispatchConfirmationRequest.Nudge(ctx)
+
 }
 
 func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
@@ -312,7 +326,7 @@ func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
 	return nil
 }
 
-func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey string, party string, attRequest *prototk.AttestationRequest) {
+func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey string, party string, attRequest *prototk.AttestationRequest) error {
 
 	err := t.messageSender.SendEndorsementRequest(
 		ctx,
@@ -330,6 +344,7 @@ func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey str
 		log.L(ctx).Errorf("Failed to send endorsement request to party %s: %s", party, err)
 		t.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerEndorsementRequestError), party, err.Error())
 	}
+	return err
 }
 
 func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState {
