@@ -261,15 +261,22 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 		pendingRequestsForAttRequest, ok := t.pendingEndorsementRequests[endorsementRequirement.attRequest.Name]
 		if !ok {
 			pendingRequestsForAttRequest = make(map[string]*common.IdempotentRequest)
+			t.pendingEndorsementRequests[endorsementRequirement.attRequest.Name] = pendingRequestsForAttRequest
 		}
-		if pendingRequest, ok := pendingRequestsForAttRequest[endorsementRequirement.party]; !ok {
-			pendingRequestsForAttRequest[endorsementRequirement.party] = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey string) error {
+		pendingRequest, ok := pendingRequestsForAttRequest[endorsementRequirement.party]
+		if !ok {
+			pendingRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey string) error {
 				t.requestEndorsement(ctx, idempotencyKey, endorsementRequirement.party, endorsementRequirement.attRequest)
 				return nil
 			})
-		} else {
-			pendingRequest.Nudge(ctx)
+			pendingRequestsForAttRequest[endorsementRequirement.party] = pendingRequest
 		}
+		err := pendingRequest.Nudge(ctx)
+		if err != nil {
+			log.L(ctx).Errorf("Failed to nudge endorsement request for party %s: %s", endorsementRequirement.party, err)
+			t.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerEndorsementRequestError), endorsementRequirement.party, err.Error())
+		}
+
 	}
 	return nil
 }
