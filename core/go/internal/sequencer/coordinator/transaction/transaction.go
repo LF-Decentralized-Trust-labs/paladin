@@ -137,10 +137,23 @@ func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uui
 	return nil
 }
 
-func (t *Transaction) applyEndorsement(_ context.Context, endorsement *prototk.AttestationResult, requestID string) error {
-	//TODO check that this matches a pending request and that it has not timed out
-
-	t.PostAssembly.Endorsements = append(t.PostAssembly.Endorsements, endorsement)
+func (t *Transaction) applyEndorsement(ctx context.Context, endorsement *prototk.AttestationResult, requestID uuid.UUID) error {
+	pendingRequestsForAttRequest, ok := t.pendingEndorsementRequests[endorsement.Name]
+	if !ok {
+		log.L(ctx).Infof("Ignoring endorsement response for transaction %s from %s because no pending request found for attestation request name %s", t.ID, endorsement.Verifier.Lookup, endorsement.Name)
+		return nil
+	}
+	if pendingRequest, ok := pendingRequestsForAttRequest[endorsement.Verifier.Lookup]; ok {
+		if pendingRequest.IdempotencyKey() == requestID {
+			log.L(ctx).Infof("Endorsement received for transaction %s from %s", t.ID, endorsement.Verifier.Lookup)
+			delete(t.pendingEndorsementRequests[endorsement.Name], endorsement.Verifier.Lookup)
+			t.PostAssembly.Endorsements = append(t.PostAssembly.Endorsements, endorsement)
+		} else {
+			log.L(ctx).Infof("Ignoring endorsement response for transaction %s from %s because idempotency key %s does not match expected %s ", t.ID, endorsement.Verifier.Lookup, requestID.String(), pendingRequest.IdempotencyKey().String())
+		}
+	} else {
+		log.L(ctx).Infof("Ignoring endorsement response for transaction %s from %s because no pending request found", t.ID, endorsement.Verifier.Lookup)
+	}
 
 	return nil
 }

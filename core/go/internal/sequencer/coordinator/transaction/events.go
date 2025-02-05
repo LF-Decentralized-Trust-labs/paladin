@@ -78,7 +78,7 @@ func (_ *AssembleRevertEvent) Type() EventType {
 type EndorsedEvent struct {
 	event
 	Endorsement *prototk.AttestationResult
-	RequestID   string
+	RequestID   uuid.UUID
 }
 
 func (_ *EndorsedEvent) Type() EventType {
@@ -91,7 +91,7 @@ type EndorsedRejectedEvent struct {
 	RevertReason           string
 	Party                  string
 	AttestationRequestName string
-	RequestID              string
+	RequestID              uuid.UUID
 }
 
 func (_ *EndorsedRejectedEvent) Type() EventType {

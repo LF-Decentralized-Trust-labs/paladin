@@ -83,13 +83,7 @@ func TestStateMachine_EndorsementGathering_ToConfirmingDispatch_OnEndorsed_IfAtt
 		NumberOfEndorsements(2)
 
 	txn, mocks := builder.BuildWithMocks()
-
-	txn.HandleEvent(ctx, &EndorsedEvent{
-		event: event{
-			TransactionID: txn.ID,
-		},
-		Endorsement: builder.BuildEndorsement(2),
-	})
+	txn.HandleEvent(ctx, builder.BuildEndorsedEvent(2))
 
 	assert.Equal(t, State_Confirming_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.True(t, mocks.sentMessageRecorder.hasSentDispatchConfirmationRequest, "expected a dispatch confirmation request to be sent, but none were sent")
@@ -104,12 +98,7 @@ func TestStateMachine_EndorsementGatheringNoTransition_IfNotAttestationPlanCompl
 
 	txn, mocks := builder.BuildWithMocks()
 
-	txn.HandleEvent(ctx, &EndorsedEvent{
-		event: event{
-			TransactionID: txn.ID,
-		},
-		Endorsement: builder.BuildEndorsement(1),
-	})
+	txn.HandleEvent(ctx, builder.BuildEndorsedEvent(1))
 
 	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.False(t, mocks.sentMessageRecorder.hasSentDispatchConfirmationRequest, "did not expected a dispatch confirmation request to be sent, but one was sent")
@@ -135,12 +124,7 @@ func TestStateMachine_EndorsementGathering_ToBlocked_OnEndorsed_IfAttestationPla
 		InputStateIDs(txn1.PostAssembly.OutputStates[0].ID)
 	txn2 := builder2.Build()
 
-	txn2.HandleEvent(ctx, &EndorsedEvent{
-		event: event{
-			TransactionID: txn2.ID,
-		},
-		Endorsement: builder2.BuildEndorsement(2),
-	})
+	txn2.HandleEvent(ctx, builder2.BuildEndorsedEvent(2))
 
 	assert.Equal(t, State_Blocked, txn2.stateMachine.currentState, "current state is %s", txn2.stateMachine.currentState.String())
 

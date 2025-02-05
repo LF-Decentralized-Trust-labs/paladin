@@ -103,6 +103,7 @@ type TransactionBuilderForTesting struct {
 	sentMessageRecorder  *SentMessageRecorder
 	fakeClock            *common.FakeClockForTesting
 	stateIndex           StateIndex
+	txn                  *Transaction
 }
 
 // Function NewTransactionBuilderForTesting creates a TransactionBuilderForTesting with random values for all fields
@@ -137,6 +138,8 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		latestSubmissionHash := tktypes.Bytes32(tktypes.RandBytes(32))
 		builder.latestSubmissionHash = &latestSubmissionHash
 	case State_Endorsement_Gathering:
+		//fine grained detail in this state needed to emulate what has already happened wrt endorsement requests and responses so far
+
 	case State_Blocked:
 		fallthrough
 	case State_Confirming_Dispatch:
@@ -236,36 +239,53 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		}
 	}
 
-	txn := NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeClock.Duration(100), b.stateIndex)
+	b.txn = NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeClock.Duration(100), b.stateIndex)
 
 	//Assuming a "normal" path through the state machine to the current desired state
-	if b.state == State_Endorsement_Gathering ||
-		b.state == State_Blocked ||
-		b.state == State_Confirming_Dispatch ||
-		b.state == State_Ready_For_Dispatch {
-		txn.applyPostAssembly(ctx, b.BuildPostAssembly())
+	if b.state == State_Endorsement_Gathering {
+		b.txn.applyPostAssembly(ctx, b.BuildPostAssembly())
+		err := b.txn.sendEndorsementRequests(ctx)
+		if err != nil {
+			panic(fmt.Sprintf("Error sending endorsement requests: %v", err))
+		}
 	}
 
-	txn.signerAddress = b.signerAddress
-	txn.latestSubmissionHash = b.latestSubmissionHash
-	txn.nonce = b.nonce
-	txn.stateMachine.currentState = b.state
-	return txn
+	if b.state == State_Blocked ||
+		b.state == State_Confirming_Dispatch ||
+		b.state == State_Ready_For_Dispatch {
+		b.txn.applyPostAssembly(ctx, b.BuildPostAssembly())
+	}
+
+	b.txn.signerAddress = b.signerAddress
+	b.txn.latestSubmissionHash = b.latestSubmissionHash
+	b.txn.nonce = b.nonce
+	b.txn.stateMachine.currentState = b.state
+	return b.txn
 
 }
 
-func (b *TransactionBuilderForTesting) BuildEndorsement(endorserIndex int) *prototk.AttestationResult {
-	return &prototk.AttestationResult{
-		Name:            fmt.Sprintf("endorse-%d", endorserIndex),
-		AttestationType: prototk.AttestationType_ENDORSE,
-		Payload:         tktypes.RandBytes(32),
-		Verifier: &prototk.ResolvedVerifier{
-			Lookup:       b.endorsers[endorserIndex].identityLocator,
-			Verifier:     b.endorsers[endorserIndex].verifier,
-			Algorithm:    algorithms.ECDSA_SECP256K1,
-			VerifierType: verifiers.ETH_ADDRESS,
+func (b *TransactionBuilderForTesting) BuildEndorsedEvent(endorserIndex int) *EndorsedEvent {
+
+	attReqName := fmt.Sprintf("endorse-%d", endorserIndex)
+	return &EndorsedEvent{
+		event: event{
+			TransactionID: b.txn.ID,
+		},
+		RequestID: b.txn.pendingEndorsementRequests[attReqName][b.endorsers[endorserIndex].identityLocator].IdempotencyKey(),
+		Endorsement: &prototk.AttestationResult{
+			//TODO duplication here with func (b *PostAssemblyBuilderForTesting) BuildEndorsement
+			Name:            attReqName,
+			AttestationType: prototk.AttestationType_ENDORSE,
+			Payload:         tktypes.RandBytes(32),
+			Verifier: &prototk.ResolvedVerifier{
+				Lookup:       b.endorsers[endorserIndex].identityLocator,
+				Verifier:     b.endorsers[endorserIndex].verifier,
+				Algorithm:    algorithms.ECDSA_SECP256K1,
+				VerifierType: verifiers.ETH_ADDRESS,
+			},
 		},
 	}
+
 }
 
 func NewPostAssemblyBuilderForTesting() *PostAssemblyBuilderForTesting {
@@ -370,6 +390,8 @@ func (b *PostAssemblyBuilderForTesting) Build() *components.TransactionPostAssem
 		})
 	}
 
+	//TODO should we really add the endorsements here or would it be better to always create a sparse postassembly as per the assemble step
+	// and force the transactionBuilder to add the endorsements separately?
 	postAssembly.Endorsements = make([]*prototk.AttestationResult, b.numberOfEndorsements)
 	for i := 0; i < b.numberOfEndorsements; i++ {
 		postAssembly.Endorsements[i] = b.BuildEndorsement(i)

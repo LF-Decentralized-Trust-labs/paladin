@@ -41,6 +41,10 @@ func NewIdempotentRequest(ctx context.Context, clock Clock, timeout Duration, se
 	return r
 }
 
+func (r *IdempotentRequest) IdempotencyKey() uuid.UUID {
+	return r.idempotencyKey
+}
+
 // Prompt to check whether a retry is due and if so, send the request
 func (r *IdempotentRequest) Nudge(ctx context.Context) error {
 	if r.requestTime == nil || r.clock.HasExpired(r.requestTime, r.timeout) {

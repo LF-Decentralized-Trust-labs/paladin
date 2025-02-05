@@ -121,19 +121,8 @@ func TestTransaction_HasDependenciesNotReady(t *testing.T) {
 	assert.True(t, transaction3.hasDependenciesNotReady(context.Background()))
 
 	//move both dependencies forward
-	transaction1.HandleEvent(ctx, &EndorsedEvent{
-		event: event{
-			TransactionID: transaction1.ID,
-		},
-		Endorsement: transaction1Builder.BuildEndorsement(2),
-	})
-
-	transaction2.HandleEvent(ctx, &EndorsedEvent{
-		event: event{
-			TransactionID: transaction1.ID,
-		},
-		Endorsement: transaction1Builder.BuildEndorsement(2),
-	})
+	transaction1.HandleEvent(ctx, transaction1Builder.BuildEndorsedEvent(2))
+	transaction2.HandleEvent(ctx, transaction2Builder.BuildEndorsedEvent(2))
 
 	//Should still be blocked because dependencies have not been confirmed for dispatch yet
 	assert.Equal(t, State_Confirming_Dispatch, transaction1.stateMachine.currentState)
