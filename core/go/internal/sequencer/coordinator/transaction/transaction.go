@@ -16,7 +16,6 @@ package transaction
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -56,23 +55,25 @@ type Transaction struct {
 	nonce                              *uint64
 	stateMachine                       *StateMachine
 	heartbeatIntervalsSinceStateChange int
-	pendingEndorsementRequests         map[string]map[string]*endorsementRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
+	pendingEndorsementRequests         map[string]map[string]*common.RetriableRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
 	latestError                        string
 	dependencies                       []*Transaction
 	dependents                         []*Transaction
+	requestTimeout                     common.Duration
 	// Dependencies
 	clock         common.Clock
 	messageSender MessageSender
 	stateIndex    StateIndex
 }
 
-func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, stateIndex StateIndex) *Transaction {
+func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, requestTimeout common.Duration, stateIndex StateIndex) *Transaction {
 	txn := &Transaction{
 		sender:             sender,
 		PrivateTransaction: pt,
 		messageSender:      messageSender,
 		clock:              clock,
 		stateIndex:         stateIndex,
+		requestTimeout:     requestTimeout,
 	}
 	txn.InitializeStateMachine(State_Pooled)
 	return txn
@@ -151,7 +152,7 @@ func (t *Transaction) Sender() string {
 }
 
 func (d *Transaction) IsEndorsed(ctx context.Context) bool {
-	return !d.hasOutstandingEndorsementRequests(ctx)
+	return !d.hasUnfulfilledEndorsementRequirements(ctx)
 }
 
 func (d *Transaction) OutputStateIDs(_ context.Context) []string {
@@ -179,16 +180,16 @@ func (d *Transaction) Txn() *components.PrivateTransaction {
 }
 
 // TODO reorganize into a separate .go ( and separate struct / methods) for EndorsementRequest.
-func (d *Transaction) hasOutstandingEndorsementRequests(ctx context.Context) bool {
-	return len(d.outstandingEndorsementRequests(ctx)) > 0
+func (d *Transaction) hasUnfulfilledEndorsementRequirements(ctx context.Context) bool {
+	return len(d.unfulfilledEndorsementRequirements(ctx)) > 0
 }
 
 // TODO rework this.  There are actually 2 things to keep track of a) unfulfilled endorsement requirements.  i.e. there is a thing in the plan and we don't have an attestation for it and b) outstanding requests.  i.e. we have sent a request and not had a response yet
-func (d *Transaction) outstandingEndorsementRequests(ctx context.Context) []*endorsementRequirement {
-	outstandingEndorsementRequests := make([]*endorsementRequirement, 0)
+func (d *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []*endorsementRequirement {
+	unfulfilledEndorsementRequirements := make([]*endorsementRequirement, 0)
 	if d.PostAssembly == nil {
-		log.L(ctx).Debug("PostAssembly is nil so there are no outstanding endorsement requests")
-		return outstandingEndorsementRequests
+		log.L(ctx).Debug("PostAssembly is nil so there are no outstanding endorsement requirements")
+		return unfulfilledEndorsementRequirements
 	}
 	for _, attRequest := range d.PostAssembly.AttestationPlan {
 		if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
@@ -209,70 +210,18 @@ func (d *Transaction) outstandingEndorsementRequests(ctx context.Context) []*end
 					}
 				}
 				if !found {
-					log.L(ctx).Debugf("endorsement request for %s outstanding for transaction %s", party, d.ID)
-					outstandingEndorsementRequests = append(outstandingEndorsementRequests, &endorsementRequirement{party: party, attRequest: attRequest})
+					log.L(ctx).Debugf("endorsement requirement for %s unfulfilled for transaction %s", party, d.ID)
+					unfulfilledEndorsementRequirements = append(unfulfilledEndorsementRequirements, &endorsementRequirement{party: party, attRequest: attRequest})
 				}
 			}
 		}
 	}
-	return outstandingEndorsementRequests
+	return unfulfilledEndorsementRequirements
 }
 
 func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
+
 	return t.messageSender.SendAssembleRequest(ctx, t.sender, t.ID, t.PreAssembly)
-}
-
-type endorsementRequest struct {
-	//time the request was made
-	requestTime time.Time
-	//unique string to identify the request (non unique across retries)
-	idempotencyKey string
-}
-
-// Function recentlyRequested checks if the endorsement has been previously requested.  There are 3 possibilities, a) it was requested recently (retry threshold has not passed) b) it was requested but the request timed out c) it was never requested
-// if a) retry is false.  if b) retry is true and the idempotency key is provided.  if c) retry is true and a new idempotency key is generated
-func (r *endorsementRequest) checkForRetry(ctx context.Context, outstandingEndorsementRequest *endorsementRequirement) (bool, string) {
-	//TODO
-	// there is a request in the attestation plan and we do not have a response to match it
-	// first lets see if we have recently sent a request for this endorsement and just need to be patient
-	/*
-		previousRequestTime := time.Time{}
-		previousIdempotencyKey := ""
-		if pendingRequestsForAttRequest, ok := t.pendingEndorsementRequests[outstandingEndorsementRequest.attRequest.Name]; ok {
-			if r, ok := pendingRequestsForAttRequest[outstandingEndorsementRequest.party]; ok {
-				previousRequestTime = r.requestTime
-				previousIdempotencyKey = r.idempotencyKey
-			}
-		} else {
-			tf.pendingEndorsementRequests[outstandingEndorsementRequest.attRequest.Name] = make(map[string]*endorsementRequest)
-		}
-
-		if !previousRequestTime.IsZero() && tf.clock.Now().Before(previousRequestTime.Add(tf.requestTimeout)) {
-			//We have already sent a message for this request and the deadline has not passed
-			log.L(ctx).Debugf("Transaction %s endorsement already requested %v", tf.transaction.ID.String(), previousRequestTime)
-			return
-		}
-		if previousRequestTime.IsZero() {
-			log.L(ctx).Infof("Transaction %s endorsement has never been requested for attestation request:%s, party:%s", tf.transaction.ID.String(), outstandingEndorsementRequest.attRequest.Name, outstandingEndorsementRequest.party)
-		} else {
-			log.L(ctx).Infof("Previous endorsement request for transaction:%s, attestation request:%s, party:%s sent at %v has timed out", tf.transaction.ID.String(), outstandingEndorsementRequest.attRequest.Name, outstandingEndorsementRequest.party, previousRequestTime)
-		}
-
-		if previousIdempotencyKey != "" {
-			tf.logActionDebug(ctx, fmt.Sprintf("Previous endorsement request timed out. Sending new request with same idempotency key %s", previousIdempotencyKey))
-			idempotencyKey = previousIdempotencyKey
-		}
-	*/
-
-	return false, ""
-}
-
-func (t *Transaction) getPendingEndorsementRequest(ctx context.Context, attestationRequestName, party string) (*endorsementRequest, bool) {
-	if pendingRequestsForAttRequest, ok := t.pendingEndorsementRequests[attestationRequestName]; ok {
-		r, ok := pendingRequestsForAttRequest[party]
-		return r, ok
-	}
-	return nil, false
 }
 
 // Function hasDependenciesNotReady checks if the transaction has any dependencies that themselves are not ready for dispatch
@@ -300,36 +249,27 @@ func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
 
 // Function sendEndorsementRequests iterates through the attestation plan and for each endorsement request that has not been fulfilled
 // sends an endorsement request to the appropriate party unless there was a recent request (i.e. within the retry threshold)
+// it is safe to call this function multiple times and on a frequent basis (e.g. every heartbeat interval while in the endorsement gathering state) as it will not send duplicate requests unless they have timedout
 func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 
 	if t.pendingEndorsementRequests == nil {
-		t.pendingEndorsementRequests = make(map[string]map[string]*endorsementRequest)
+		t.pendingEndorsementRequests = make(map[string]map[string]*common.RetriableRequest)
 	}
 
-	for _, outstandingEndorsementRequest := range t.outstandingEndorsementRequests(ctx) {
-		idempotencyKey := uuid.New().String()
+	for _, endorsementRequirement := range t.unfulfilledEndorsementRequirements(ctx) {
 
-		if pendingRequestsForAttRequest, ok := t.getPendingEndorsementRequest(ctx, outstandingEndorsementRequest.attRequest.Name, outstandingEndorsementRequest.party); ok {
-			//we have a previously made a request to this party for this attestation
-			doRetry, previousIdempotencyKey := pendingRequestsForAttRequest.checkForRetry(ctx, outstandingEndorsementRequest)
-
-			if doRetry {
-				idempotencyKey = previousIdempotencyKey
-			} else {
-				//skip this endorsement request
-				continue
-			}
+		pendingRequestsForAttRequest, ok := t.pendingEndorsementRequests[endorsementRequirement.attRequest.Name]
+		if !ok {
+			pendingRequestsForAttRequest = make(map[string]*common.RetriableRequest)
 		}
-
-		t.requestEndorsement(ctx, idempotencyKey, outstandingEndorsementRequest.party, outstandingEndorsementRequest.attRequest)
-		if t.pendingEndorsementRequests[outstandingEndorsementRequest.attRequest.Name] == nil {
-			t.pendingEndorsementRequests[outstandingEndorsementRequest.attRequest.Name] = make(map[string]*endorsementRequest)
+		if pendingRequest, ok := pendingRequestsForAttRequest[endorsementRequirement.party]; !ok {
+			pendingRequestsForAttRequest[endorsementRequirement.party] = common.NewRetriableRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey string) error {
+				t.requestEndorsement(ctx, idempotencyKey, endorsementRequirement.party, endorsementRequirement.attRequest)
+				return nil
+			})
+		} else {
+			pendingRequest.Nudge(ctx)
 		}
-		t.pendingEndorsementRequests[outstandingEndorsementRequest.attRequest.Name][outstandingEndorsementRequest.party] =
-			&endorsementRequest{
-				requestTime:    t.clock.Now(),
-				idempotencyKey: idempotencyKey,
-			}
 	}
 	return nil
 }

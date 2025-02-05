@@ -20,7 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -177,7 +177,7 @@ func TestTransaction_HasDependenciesNotReady_FalseIfHasNoDependencies(t *testing
 
 type transactionDependencyMocks struct {
 	messageSender *MockMessageSender
-	clock         *sequencermocks.Clock
+	clock         *common.FakeClockForTesting
 }
 
 func newTransactionForUnitTesting(t *testing.T, stateIndex *stateIndex) (*Transaction, *transactionDependencyMocks) {
@@ -186,7 +186,7 @@ func newTransactionForUnitTesting(t *testing.T, stateIndex *stateIndex) (*Transa
 	}
 	mocks := &transactionDependencyMocks{
 		messageSender: NewMockMessageSender(t),
-		clock:         sequencermocks.NewClock(t),
+		clock:         &common.FakeClockForTesting{},
 	}
 	txn := NewTransaction(
 		uuid.NewString(),
@@ -195,6 +195,7 @@ func newTransactionForUnitTesting(t *testing.T, stateIndex *stateIndex) (*Transa
 		},
 		mocks.messageSender,
 		mocks.clock,
+		mocks.clock.Duration(1000),
 		stateIndex,
 	)
 

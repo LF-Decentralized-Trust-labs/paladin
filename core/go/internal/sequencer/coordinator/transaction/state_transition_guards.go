@@ -23,7 +23,7 @@ type Guard func(ctx context.Context, txn *Transaction) bool
 
 // endorsed by all required endorsers
 func guard_AttestationPlanFulfilled(ctx context.Context, txn *Transaction) bool {
-	return !txn.hasOutstandingEndorsementRequests(ctx)
+	return !txn.hasUnfulfilledEndorsementRequirements(ctx)
 }
 
 func guard_NoDependenciesNotReady(ctx context.Context, txn *Transaction) bool {

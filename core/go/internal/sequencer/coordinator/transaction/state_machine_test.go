@@ -21,7 +21,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +29,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 	ctx := context.Background()
 
 	messageSender := NewMockMessageSender(t)
-	clock := sequencermocks.NewClock(t)
+	clock := &common.FakeClockForTesting{}
 	txn := NewTransaction(
 		uuid.NewString(),
 		&components.PrivateTransaction{
@@ -37,6 +37,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 		},
 		messageSender,
 		clock,
+		clock.Duration(1000),
 		NewStateIndex(ctx),
 	)
 

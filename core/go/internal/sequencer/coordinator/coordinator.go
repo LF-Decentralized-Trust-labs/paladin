@@ -44,13 +44,14 @@ type coordinator struct {
 	contractAddress      *tktypes.EthAddress
 	blockHeightTolerance uint64
 	closingGracePeriod   int // expressed as a multiple of heartbeat intervals
+	requestTimeout       common.Duration
 
 	/* Dependencies */
 	messageSender MessageSender
 	clock         common.Clock
 }
 
-func NewCoordinator(ctx context.Context, messageSender MessageSender, blockRangeSize uint64, contractAddress *tktypes.EthAddress, blockHeightTolerance uint64, closingGracePeriod int) *coordinator {
+func NewCoordinator(ctx context.Context, messageSender MessageSender, clock common.Clock, requestTimeout common.Duration, blockRangeSize uint64, contractAddress *tktypes.EthAddress, blockHeightTolerance uint64, closingGracePeriod int) *coordinator {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
 		transactionsByID:                   make(map[uuid.UUID]*transaction.Transaction),
@@ -60,6 +61,8 @@ func NewCoordinator(ctx context.Context, messageSender MessageSender, blockRange
 		blockHeightTolerance:               blockHeightTolerance,
 		closingGracePeriod:                 closingGracePeriod,
 		stateIndex:                         transaction.NewStateIndex(ctx),
+		clock:                              clock,
+		requestTimeout:                     requestTimeout,
 	}
 	c.InitializeStateMachine(State_Idle)
 	return c
@@ -72,7 +75,7 @@ func (c *coordinator) sendHandoverRequest(ctx context.Context) {
 
 func (c *coordinator) addToDelegatedTransactions(_ context.Context, sender string, transactions []*components.PrivateTransaction) {
 	for _, txn := range transactions {
-		c.transactionsByID[txn.ID] = transaction.NewTransaction(sender, txn, c.messageSender, c.clock, c.stateIndex)
+		c.transactionsByID[txn.ID] = transaction.NewTransaction(sender, txn, c.messageSender, c.clock, c.requestTimeout, c.stateIndex)
 	}
 }
 

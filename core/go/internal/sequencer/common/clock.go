@@ -17,17 +17,68 @@ package common
 
 import "time"
 
-// TODO consider abstracting even more here so that we are never exposing a Time object, but instead some abstract token that might be related to real (seconds and milliseconds) time units or might just be related to some nebulous measurement of time like "heartbeats" or "clicks" (as a sub division of heartbeats)
 type Clock interface {
 	//wrapper of time.Now()
 	//primarily to allow artificial clocks to be injected for testing
-	Now() time.Time
+	Now() Time
+	HasExpired(Time, Duration) bool
+	Duration(milliseconds int) Duration
 }
+
+type Duration interface {
+}
+
+type Time interface {
+}
+
 type realClock struct{}
 
-func (c *realClock) Now() time.Time {
+func (c *realClock) Duration(milliseconds int) Duration {
+	return time.Duration(milliseconds) * time.Millisecond
+}
+func (c *realClock) Now() Time {
 	return time.Now()
 }
+
 func RealClock() Clock {
 	return &realClock{}
+}
+
+func (c *realClock) HasExpired(start Time, duration Duration) bool {
+	realStart := start.(time.Time)
+	realDuration := duration.(time.Duration)
+	return time.Now().After(realStart.Add(realDuration))
+}
+
+type FakeClockForTesting struct {
+	currentTime int
+}
+
+type fakeTime struct {
+	milliseconds int
+}
+
+type fakeDuration struct {
+	milliseconds int
+}
+
+// On the fake clock, time is just a number
+func (c *FakeClockForTesting) SetCurrentTime(currentTime int) {
+	c.currentTime = currentTime
+}
+
+func (c *FakeClockForTesting) Now() Time {
+	return &fakeTime{c.currentTime}
+}
+
+func (c *FakeClockForTesting) HasExpired(start Time, duration Duration) bool {
+	startMillis := start.(fakeTime).milliseconds
+	durationMillis := duration.(fakeDuration).milliseconds
+	nowMillis := c.currentTime
+	return nowMillis > startMillis+durationMillis
+
+}
+
+func (c *FakeClockForTesting) Duration(milliseconds int) Duration {
+	return &fakeDuration{milliseconds}
 }

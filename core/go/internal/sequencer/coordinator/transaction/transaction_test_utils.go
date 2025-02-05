@@ -20,11 +20,10 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
@@ -102,7 +101,7 @@ type TransactionBuilderForTesting struct {
 	readStateIDs         []tktypes.HexBytes
 	endorsers            []*identityForTesting
 	sentMessageRecorder  *SentMessageRecorder
-	mockClock            *sequencermocks.Clock
+	fakeClock            *common.FakeClockForTesting
 	stateIndex           StateIndex
 }
 
@@ -127,7 +126,7 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		numberOfOutputStates: 1,
 		state:                state,
 		sentMessageRecorder:  NewSentMessageRecorder(),
-		mockClock:            sequencermocks.NewClock(t),
+		fakeClock:            &common.FakeClockForTesting{},
 	}
 
 	switch state {
@@ -237,7 +236,8 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		}
 	}
 
-	txn := NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.mockClock, b.stateIndex)
+	txn := NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeClock.Duration(100), b.stateIndex)
+
 	//Assuming a "normal" path through the state machine to the current desired state
 	if b.state == State_Endorsement_Gathering ||
 		b.state == State_Blocked ||
@@ -245,9 +245,6 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		b.state == State_Ready_For_Dispatch {
 		txn.applyPostAssembly(ctx, b.BuildPostAssembly())
 	}
-
-	//TODO: do something more useful with clock mocking
-	b.mockClock.On("Now").Return(time.Now()).Maybe()
 
 	txn.signerAddress = b.signerAddress
 	txn.latestSubmissionHash = b.latestSubmissionHash
