@@ -25,9 +25,58 @@ func Test_RetriableRequestOK(t *testing.T) {
 	ctx := context.Background()
 	clock := RealClock()
 	requested := false
-	_ = NewRetriableRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+	request := NewRetriableRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
 		requested = true
 		return nil
 	})
+	err := request.Nudge(ctx)
+	assert.Nil(t, err)
 	assert.True(t, requested)
+}
+
+func Test_RetriableRequestErrorFromSend(t *testing.T) {
+	ctx := context.Background()
+	clock := RealClock()
+	request := NewRetriableRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+		return assert.AnError
+	})
+	err := request.Nudge(ctx)
+	assert.Error(t, err)
+
+}
+
+func Test_RetriableRequest_RetryOnNudgeIfExpired(t *testing.T) {
+	ctx := context.Background()
+	clock := &FakeClockForTesting{}
+	requested := 0
+	request := NewRetriableRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+		requested++
+		return nil
+	})
+	err := request.Nudge(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, requested)
+	clock.Advance(1001) //Just after expiry
+	err = request.Nudge(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, 2, requested)
+
+}
+
+func Test_RetriableRequest_NoRetryOnNudgeIfNotExpired(t *testing.T) {
+	ctx := context.Background()
+	clock := &FakeClockForTesting{}
+	requested := 0
+	request := NewRetriableRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+		requested++
+		return nil
+	})
+	err := request.Nudge(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, requested)
+	clock.Advance(999) //Just before expiry
+	err = request.Nudge(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, requested)
+
 }

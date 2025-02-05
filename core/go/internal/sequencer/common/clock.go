@@ -63,8 +63,8 @@ type fakeDuration struct {
 }
 
 // On the fake clock, time is just a number
-func (c *FakeClockForTesting) SetCurrentTime(currentTime int) {
-	c.currentTime = currentTime
+func (c *FakeClockForTesting) Advance(advance int) {
+	c.currentTime += advance
 }
 
 func (c *FakeClockForTesting) Now() Time {
@@ -72,8 +72,8 @@ func (c *FakeClockForTesting) Now() Time {
 }
 
 func (c *FakeClockForTesting) HasExpired(start Time, duration Duration) bool {
-	startMillis := start.(fakeTime).milliseconds
-	durationMillis := duration.(fakeDuration).milliseconds
+	startMillis := start.(*fakeTime).milliseconds
+	durationMillis := duration.(*fakeDuration).milliseconds
 	nowMillis := c.currentTime
 	return nowMillis > startMillis+durationMillis
 
