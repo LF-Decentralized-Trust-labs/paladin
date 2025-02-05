@@ -55,7 +55,7 @@ type Transaction struct {
 	nonce                              *uint64
 	stateMachine                       *StateMachine
 	heartbeatIntervalsSinceStateChange int
-	pendingEndorsementRequests         map[string]map[string]*common.RetriableRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
+	pendingEndorsementRequests         map[string]map[string]*common.IdempotentRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
 	latestError                        string
 	dependencies                       []*Transaction
 	dependents                         []*Transaction
@@ -253,17 +253,17 @@ func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
 func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 
 	if t.pendingEndorsementRequests == nil {
-		t.pendingEndorsementRequests = make(map[string]map[string]*common.RetriableRequest)
+		t.pendingEndorsementRequests = make(map[string]map[string]*common.IdempotentRequest)
 	}
 
 	for _, endorsementRequirement := range t.unfulfilledEndorsementRequirements(ctx) {
 
 		pendingRequestsForAttRequest, ok := t.pendingEndorsementRequests[endorsementRequirement.attRequest.Name]
 		if !ok {
-			pendingRequestsForAttRequest = make(map[string]*common.RetriableRequest)
+			pendingRequestsForAttRequest = make(map[string]*common.IdempotentRequest)
 		}
 		if pendingRequest, ok := pendingRequestsForAttRequest[endorsementRequirement.party]; !ok {
-			pendingRequestsForAttRequest[endorsementRequirement.party] = common.NewRetriableRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey string) error {
+			pendingRequestsForAttRequest[endorsementRequirement.party] = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey string) error {
 				t.requestEndorsement(ctx, idempotencyKey, endorsementRequirement.party, endorsementRequirement.attRequest)
 				return nil
 			})

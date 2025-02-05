@@ -21,11 +21,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_RetriableRequestOK(t *testing.T) {
+func Test_IdempotentRequestOK(t *testing.T) {
 	ctx := context.Background()
 	clock := RealClock()
 	requested := false
-	request := NewRetriableRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
 		requested = true
 		return nil
 	})
@@ -34,10 +34,10 @@ func Test_RetriableRequestOK(t *testing.T) {
 	assert.True(t, requested)
 }
 
-func Test_RetriableRequestErrorFromSend(t *testing.T) {
+func Test_IdempotentRequestErrorFromSend(t *testing.T) {
 	ctx := context.Background()
 	clock := RealClock()
-	request := NewRetriableRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
 		return assert.AnError
 	})
 	err := request.Nudge(ctx)
@@ -45,11 +45,11 @@ func Test_RetriableRequestErrorFromSend(t *testing.T) {
 
 }
 
-func Test_RetriableRequest_RetryOnNudgeIfExpired(t *testing.T) {
+func Test_IdempotentRequest_RetryOnNudgeIfExpired(t *testing.T) {
 	ctx := context.Background()
 	clock := &FakeClockForTesting{}
 	requested := 0
-	request := NewRetriableRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
 		requested++
 		return nil
 	})
@@ -63,11 +63,11 @@ func Test_RetriableRequest_RetryOnNudgeIfExpired(t *testing.T) {
 
 }
 
-func Test_RetriableRequest_NoRetryOnNudgeIfNotExpired(t *testing.T) {
+func Test_IdempotentRequest_NoRetryOnNudgeIfNotExpired(t *testing.T) {
 	ctx := context.Background()
 	clock := &FakeClockForTesting{}
 	requested := 0
-	request := NewRetriableRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
 		requested++
 		return nil
 	})

@@ -20,31 +20,31 @@ import (
 	"github.com/google/uuid"
 )
 
-type RetriableRequest struct {
-	id          uuid.UUID                                              //unique string to identify the request (re-used across retries)
-	requestTime Time                                                   //time the request was most recently sent
-	send        func(ctx context.Context, idempotencyKey string) error // function to send the request
-	clock       Clock
-	timeout     Duration
+type IdempotentRequest struct {
+	idempotencyKey uuid.UUID                                              //unique string to identify the request (re-used across retries)
+	requestTime    Time                                                   //time the request was most recently sent
+	send           func(ctx context.Context, idempotencyKey string) error // function to send the request
+	clock          Clock
+	timeout        Duration
 }
 
-func NewRetriableRequest(ctx context.Context, clock Clock, timeout Duration, sendRequest func(ctx context.Context, idempotencyKey string) error) *RetriableRequest {
-	id := uuid.New()
-	r := &RetriableRequest{
-		id:          id,
-		clock:       clock,
-		send:        sendRequest,
-		timeout:     timeout,
-		requestTime: nil,
+func NewIdempotentRequest(ctx context.Context, clock Clock, timeout Duration, sendRequest func(ctx context.Context, idempotencyKey string) error) *IdempotentRequest {
+	idempotencyKey := uuid.New()
+	r := &IdempotentRequest{
+		idempotencyKey: idempotencyKey,
+		clock:          clock,
+		send:           sendRequest,
+		timeout:        timeout,
+		requestTime:    nil,
 	}
 
 	return r
 }
 
 // Prompt to check whether a retry is due and if so, send the request
-func (r *RetriableRequest) Nudge(ctx context.Context) error {
+func (r *IdempotentRequest) Nudge(ctx context.Context) error {
 	if r.requestTime == nil || r.clock.HasExpired(r.requestTime, r.timeout) {
-		err := r.send(ctx, r.id.String())
+		err := r.send(ctx, r.idempotencyKey.String())
 		if err == nil {
 			r.requestTime = r.clock.Now()
 		}
