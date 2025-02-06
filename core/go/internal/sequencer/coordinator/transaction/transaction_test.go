@@ -185,6 +185,7 @@ func newTransactionForUnitTesting(t *testing.T, stateIndex *stateIndex) (*Transa
 		mocks.messageSender,
 		mocks.clock,
 		mocks.clock.Duration(1000),
+		mocks.clock.Duration(5000),
 		stateIndex,
 	)
 

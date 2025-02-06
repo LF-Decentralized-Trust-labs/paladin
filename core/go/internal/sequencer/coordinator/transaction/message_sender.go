@@ -30,13 +30,14 @@ type MessageSender interface {
 		ctx context.Context,
 		assemblingNode string,
 		transactionID uuid.UUID,
+		idempotencyID uuid.UUID,
 		transactionPreassembly *components.TransactionPreAssembly,
 	) error
 
 	//SendEndorsementRequest to either a local or remote endorser
 	SendEndorsementRequest(
 		ctx context.Context,
-		idempotencyKey string,
+		idempotencyKey uuid.UUID,
 		party string,
 		attRequest *prototk.AttestationRequest,
 		transactionSpecification *prototk.TransactionSpecification,
@@ -50,7 +51,7 @@ type MessageSender interface {
 	SendDispatchConfirmationRequest(
 		ctx context.Context,
 		transactionSender string,
-		idempotencyKey string,
+		idempotencyKey uuid.UUID,
 		transactionSpecification *prototk.TransactionSpecification,
 		hash *tktypes.Bytes32,
 	) error

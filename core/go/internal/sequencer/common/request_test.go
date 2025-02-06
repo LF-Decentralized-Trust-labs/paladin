@@ -18,6 +18,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,19 +26,19 @@ func Test_IdempotentRequestOK(t *testing.T) {
 	ctx := context.Background()
 	clock := RealClock()
 	requested := false
-	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey uuid.UUID) error {
 		requested = true
 		return nil
 	})
 	err := request.Nudge(ctx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.True(t, requested)
 }
 
 func Test_IdempotentRequestErrorFromSend(t *testing.T) {
 	ctx := context.Background()
 	clock := RealClock()
-	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey uuid.UUID) error {
 		return assert.AnError
 	})
 	err := request.Nudge(ctx)
@@ -49,16 +50,16 @@ func Test_IdempotentRequest_RetryOnNudgeIfExpired(t *testing.T) {
 	ctx := context.Background()
 	clock := &FakeClockForTesting{}
 	requested := 0
-	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey uuid.UUID) error {
 		requested++
 		return nil
 	})
 	err := request.Nudge(ctx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 1, requested)
 	clock.Advance(1001) //Just after expiry
 	err = request.Nudge(ctx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 2, requested)
 
 }
@@ -67,16 +68,36 @@ func Test_IdempotentRequest_NoRetryOnNudgeIfNotExpired(t *testing.T) {
 	ctx := context.Background()
 	clock := &FakeClockForTesting{}
 	requested := 0
-	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey string) error {
+	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey uuid.UUID) error {
 		requested++
 		return nil
 	})
 	err := request.Nudge(ctx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 1, requested)
 	clock.Advance(999) //Just before expiry
 	err = request.Nudge(ctx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 1, requested)
+
+}
+
+func Test_IdempotentRequest_FirstRequestTime(t *testing.T) {
+	ctx := context.Background()
+	clock := &FakeClockForTesting{}
+	request := NewIdempotentRequest(ctx, clock, clock.Duration(1000), func(ctx context.Context, idempotencyKey uuid.UUID) error {
+		return nil
+	})
+	err := request.Nudge(ctx)
+	assert.NoError(t, err)
+	start := clock.Now()
+	assert.Equal(t, start, request.FirstRequestTime())
+	clock.Advance(1001)
+	err = request.Nudge(ctx)
+	assert.NoError(t, err)
+	end := clock.Now()
+	assert.Equal(t, start, request.FirstRequestTime())
+	assert.Equal(t, end, request.requestTime)
+	assert.NotEqual(t, request.FirstRequestTime(), request.requestTime)
 
 }

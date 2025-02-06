@@ -48,6 +48,7 @@ func (r *SentMessageRecorder) SendAssembleRequest(
 	ctx context.Context,
 	assemblingNode string,
 	transactionID uuid.UUID,
+	idempotencyKey uuid.UUID,
 	transactionPreassembly *components.TransactionPreAssembly,
 ) error {
 	r.hasSentAssembleRequest = true
@@ -56,7 +57,7 @@ func (r *SentMessageRecorder) SendAssembleRequest(
 
 func (r *SentMessageRecorder) SendEndorsementRequest(
 	ctx context.Context,
-	idempotencyKey string,
+	idempotencyKey uuid.UUID,
 	party string,
 	attRequest *prototk.AttestationRequest,
 	transactionSpecification *prototk.TransactionSpecification,
@@ -73,7 +74,7 @@ func (r *SentMessageRecorder) SendEndorsementRequest(
 func (r *SentMessageRecorder) SendDispatchConfirmationRequest(
 	ctx context.Context,
 	transactionSender string,
-	idempotencyKey string,
+	idempotencyKey uuid.UUID,
 	transactionSpecification *prototk.TransactionSpecification,
 	hash *tktypes.Bytes32,
 ) error {
@@ -86,6 +87,7 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 }
 
 type TransactionBuilderForTesting struct {
+	//TODO this is becoming a large flat list.  Should we group these into sub-structs? or at least order the fields and/or group into some sensible sections
 	id     uuid.UUID
 	sender *identityForTesting
 
@@ -104,6 +106,8 @@ type TransactionBuilderForTesting struct {
 	fakeClock            *common.FakeClockForTesting
 	stateIndex           StateIndex
 	txn                  *Transaction
+	requestTimeout       int
+	assembleTimeout      int
 }
 
 // Function NewTransactionBuilderForTesting creates a TransactionBuilderForTesting with random values for all fields
@@ -128,6 +132,8 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		state:                state,
 		sentMessageRecorder:  NewSentMessageRecorder(),
 		fakeClock:            &common.FakeClockForTesting{},
+		assembleTimeout:      5000,
+		requestTimeout:       100,
 	}
 
 	switch state {
@@ -188,11 +194,13 @@ func (b *TransactionBuilderForTesting) StateIndex(stateIndex StateIndex) *Transa
 
 type transactionDependencyFakes struct {
 	sentMessageRecorder *SentMessageRecorder
+	clock               *common.FakeClockForTesting
 }
 
 func (b *TransactionBuilderForTesting) BuildWithMocks() (*Transaction, *transactionDependencyFakes) {
 	mocks := &transactionDependencyFakes{
 		sentMessageRecorder: b.sentMessageRecorder,
+		clock:               b.fakeClock,
 	}
 	return b.Build(), mocks
 }
@@ -239,9 +247,19 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		}
 	}
 
-	b.txn = NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeClock.Duration(100), b.stateIndex)
+	b.txn = NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeClock.Duration(b.requestTimeout), b.fakeClock.Duration(b.assembleTimeout), b.stateIndex)
 
 	//Assuming a "normal" path through the state machine to the current desired state
+
+	//TODO this could all be a lot easier if every state had a enter function and an exit function that cleaned up the object to remove all history of the previous state ( other than the contents of the private transaction).  In fact, should probably make that explicit in the structure of the struct.  Maybe fields relating to a particular state should be in the state machine struct rather than the transaction struct?
+	if b.state == State_Assembling {
+
+		err := b.txn.sendAssembleRequest(ctx)
+		if err != nil {
+			panic(fmt.Sprintf("Error sending assemble request: %v", err))
+		}
+
+	}
 	if b.state == State_Endorsement_Gathering {
 		b.txn.applyPostAssembly(ctx, b.BuildPostAssembly())
 		err := b.txn.sendEndorsementRequests(ctx)

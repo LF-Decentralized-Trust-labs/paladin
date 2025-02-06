@@ -38,6 +38,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 		messageSender,
 		clock,
 		clock.Duration(1000),
+		clock.Duration(5000),
 		NewStateIndex(ctx),
 	)
 
@@ -74,6 +75,18 @@ func TestStateMachine_Assembling_ToEndorsing_OnAssembleResponse(t *testing.T) {
 	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.Equal(t, 3, mocks.sentMessageRecorder.numberOfSentEndorsementRequests, "expected 3 endorsement requests to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentEndorsementRequests)
 
+}
+
+func TestStateMachine_Assembling_ToPooled_OnHeartbeat_IfAssembleTimeoutExpired(t *testing.T) {
+	ctx := context.Background()
+	txnBuilder := NewTransactionBuilderForTesting(t, State_Assembling)
+	txn, mocks := txnBuilder.BuildWithMocks()
+
+	mocks.clock.Advance(txnBuilder.assembleTimeout + 1)
+
+	txn.HandleEvent(ctx, &HeartbeatIntervalEvent{})
+
+	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
 func TestStateMachine_EndorsementGathering_ToConfirmingDispatch_OnEndorsed_IfAttestationPlanComplete(t *testing.T) {

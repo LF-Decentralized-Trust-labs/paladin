@@ -55,19 +55,21 @@ type Transaction struct {
 	nonce                              *uint64
 	stateMachine                       *StateMachine
 	heartbeatIntervalsSinceStateChange int
+	pendingAssembleRequest             *common.IdempotentRequest
 	pendingEndorsementRequests         map[string]map[string]*common.IdempotentRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
 	pendingDispatchConfirmationRequest *common.IdempotentRequest
 	latestError                        string
 	dependencies                       []*Transaction
 	dependents                         []*Transaction
 	requestTimeout                     common.Duration
+	assembleTimeout                    common.Duration
 	// Dependencies
 	clock         common.Clock
 	messageSender MessageSender
 	stateIndex    StateIndex
 }
 
-func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, requestTimeout common.Duration, stateIndex StateIndex) *Transaction {
+func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, requestTimeout, assembleTimeout common.Duration, stateIndex StateIndex) *Transaction {
 	txn := &Transaction{
 		sender:             sender,
 		PrivateTransaction: pt,
@@ -75,6 +77,7 @@ func NewTransaction(sender string, pt *components.PrivateTransaction, messageSen
 		clock:              clock,
 		stateIndex:         stateIndex,
 		requestTimeout:     requestTimeout,
+		assembleTimeout:    assembleTimeout,
 	}
 	txn.InitializeStateMachine(State_Pooled)
 	return txn
@@ -132,6 +135,10 @@ func (t *Transaction) SignatureAttestationName() (string, error) {
 func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uuid.UUID) error {
 	if t.pendingDispatchConfirmationRequest != nil && t.pendingDispatchConfirmationRequest.IdempotencyKey() == requestID {
 		t.pendingDispatchConfirmationRequest = nil
+	} else {
+		//TODO document the scenarios where the confirmation response does not match the request and update teh state machine with a guard to ensure that we do not move to the next state
+		// in this case
+		//... or is the above check actually the guard? And in which case, we go back to the model where the guard is a function of the transaction + the event.  And do we then need a "OnTransitionFrom" function to clear the pending request?
 	}
 
 	return nil
@@ -242,8 +249,30 @@ func (d *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []
 }
 
 func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
+	//assemble requests have a short and long timeout
+	// the short timeout is for toleration of unreliable networks whereby the action is to retry the request with the same idempotency key
+	// the long timeout is to prevent an unavailable transaction sender/assemble from holding up the entire contract / privacy group given that the assemble step is single threaded
+	// the action for the long timeout is to return the transaction to the mempool and let another transaction be selected
 
-	return t.messageSender.SendAssembleRequest(ctx, t.sender, t.ID, t.PreAssembly)
+	//We Nudge the IdempotentRequest every heartbeat to implement the short retry and the state machine will deal with the long timeout via the guard assembleTimeoutExpired
+
+	t.pendingAssembleRequest = common.NewIdempotentRequest(ctx, t.clock, t.assembleTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
+		return t.messageSender.SendAssembleRequest(ctx, t.sender, t.ID, idempotencyKey, t.PreAssembly)
+	})
+	return t.pendingAssembleRequest.Nudge(ctx)
+
+}
+
+func (t *Transaction) assembleTimeoutExceeded(ctx context.Context) bool {
+	if t.pendingAssembleRequest == nil {
+		//strange situation to be in if we get to the point of this being nil, should immediately leave the state where we ever ask this question
+		// however we go here, the answer to the question is "false" because there is no pending request to timeout but log this as it is a strange situation
+		// and might be an indicator of another issue
+		log.L(ctx).Infof("assembleTimeoutExceeded called on transaction %s with no pending assemble request", t.ID)
+		return false
+	}
+	return t.clock.HasExpired(t.pendingAssembleRequest.FirstRequestTime(), t.assembleTimeout)
+
 }
 
 // Function hasDependenciesNotReady checks if the transaction has any dependencies that themselves are not ready for dispatch
@@ -287,7 +316,7 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 		}
 		pendingRequest, ok := pendingRequestsForAttRequest[endorsementRequirement.party]
 		if !ok {
-			pendingRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey string) error {
+			pendingRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
 				return t.requestEndorsement(ctx, idempotencyKey, endorsementRequirement.party, endorsementRequirement.attRequest)
 			})
 			pendingRequestsForAttRequest[endorsementRequirement.party] = pendingRequest
@@ -309,7 +338,7 @@ func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error
 		if err != nil {
 			return err
 		}
-		t.pendingDispatchConfirmationRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey string) error {
+		t.pendingDispatchConfirmationRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
 
 			return t.messageSender.SendDispatchConfirmationRequest(
 				ctx,
@@ -339,7 +368,7 @@ func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
 	return nil
 }
 
-func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey string, party string, attRequest *prototk.AttestationRequest) error {
+func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest) error {
 
 	err := t.messageSender.SendEndorsementRequest(
 		ctx,

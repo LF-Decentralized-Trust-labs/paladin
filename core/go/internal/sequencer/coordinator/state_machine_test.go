@@ -368,6 +368,6 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context) (*coordinator,
 		clock:         &common.FakeClockForTesting{},
 	}
 
-	coordinator := NewCoordinator(ctx, mocks.messageSender, mocks.clock, mocks.clock.Duration(1000), 100, tktypes.RandAddress(), 5, 5)
+	coordinator := NewCoordinator(ctx, mocks.messageSender, mocks.clock, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, tktypes.RandAddress(), 5, 5)
 	return coordinator, mocks
 }

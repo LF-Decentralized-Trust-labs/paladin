@@ -19,6 +19,7 @@ import (
 	"context"
 )
 
+// TODO should we pass static config ( e.g. timeouts) to the guards instead of storing them in every transaction struct instance?
 type Guard func(ctx context.Context, txn *Transaction) bool
 
 // endorsed by all required endorsers
@@ -32,6 +33,10 @@ func guard_NoDependenciesNotReady(ctx context.Context, txn *Transaction) bool {
 
 func guard_HasDependenciesNotReady(ctx context.Context, txn *Transaction) bool {
 	return txn.hasDependenciesNotReady(ctx)
+}
+
+func guard_AssembleTimeoutExceeded(ctx context.Context, txn *Transaction) bool {
+	return txn.assembleTimeoutExceeded(ctx)
 }
 
 func guard_And(guards ...Guard) Guard {
