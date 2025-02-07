@@ -17,6 +17,7 @@ package transaction
 
 import (
 	"context"
+	"sync"
 
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -72,8 +73,7 @@ const (
 )
 
 type StateMachine struct {
-	currentState     State
-	stateDefinitions map[State]StateDefinition
+	currentState State
 }
 
 type Transition struct {
@@ -88,14 +88,20 @@ type StateDefinition struct {
 	Transitions    map[EventType][]Transition // rules to define when to exit this state and which state to transition to
 }
 
-func (t *Transaction) InitializeStateMachine(initialState State) {
-	t.stateMachine = &StateMachine{
-		currentState: initialState,
-	}
+// Initialize state definitions in a function to avoid circular dependencies
+var stateDefinitionsMap map[State]StateDefinition
+var stateDefinitionsLock sync.Mutex
 
-	//TODO this could be a global var which would be more efficient than creating it every time and would make it easier to navigate the code to find the initialization
-	//Transitions
-	t.stateMachine.stateDefinitions = map[State]StateDefinition{
+func stateDefinitions() map[State]StateDefinition {
+	if stateDefinitionsMap != nil {
+		return stateDefinitionsMap
+	}
+	stateDefinitionsLock.Lock()
+	defer stateDefinitionsLock.Unlock()
+	if stateDefinitionsMap != nil {
+		return stateDefinitionsMap
+	}
+	stateDefinitionsMap = map[State]StateDefinition{
 		//TODO rules for transition from initial state to either pooled (selectable) or blocked or whatever, depending on the state of dependency transactions
 		State_Pooled: {
 			OnTransitionTo: action_initializeDependencies,
@@ -184,6 +190,13 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 		},
 		//TODO add transition to final state and call cleanup
 	}
+	return stateDefinitionsMap
+}
+
+func (t *Transaction) InitializeStateMachine(initialState State) {
+	t.stateMachine = &StateMachine{
+		currentState: initialState,
+	}
 }
 
 // TODO break this out to 2 explicit steps a) applyEvent[InCurrentState] and b) evaluateTransition[ToNewState]
@@ -216,14 +229,14 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 	}
 
 	//Determine whether this event triggers a state transition
-	transitions := sm.stateDefinitions[sm.currentState].Transitions
+	transitions := stateDefinitions()[sm.currentState].Transitions
 	if transitionRules, ok := transitions[event.Type()]; ok {
 		for _, rule := range transitionRules {
 			if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
 				log.L(ctx).Infof("Transaction %s transitioning from %v to %v triggered by event %v", t.ID.String(), sm.currentState, rule.To, event.Type())
 				fromState := sm.currentState
 				sm.currentState = rule.To
-				newStateDefinition := sm.stateDefinitions[sm.currentState]
+				newStateDefinition := stateDefinitions()[sm.currentState]
 				if newStateDefinition.OnTransitionTo != nil {
 					err := newStateDefinition.OnTransitionTo(ctx, t, rule.To, fromState)
 					if err != nil {
