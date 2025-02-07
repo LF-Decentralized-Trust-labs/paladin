@@ -31,19 +31,17 @@ func TestTransaction_HasDependenciesNotReady_FalseIfNoDependencies(t *testing.T)
 }
 
 func TestTransaction_HasDependenciesNotReady_TrueOK(t *testing.T) {
-	stateIndex := &stateIndex{
-		transactionByOutputState: make(map[string]*Transaction),
-	}
+	grapher := NewGrapher(context.Background())
 
 	transaction1Builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
-		StateIndex(stateIndex).
+		Grapher(grapher).
 		NumberOfOutputStates(1).
 		NumberOfRequiredEndorsers(3).
 		NumberOfEndorsements(2)
 	transaction1 := transaction1Builder.Build()
 
 	transaction2Builder := NewTransactionBuilderForTesting(t, State_Assembling).
-		StateIndex(stateIndex).
+		Grapher(grapher).
 		InputStateIDs(transaction1.PostAssembly.OutputStates[0].ID)
 	transaction2 := transaction2Builder.Build()
 
@@ -59,19 +57,17 @@ func TestTransaction_HasDependenciesNotReady_TrueOK(t *testing.T) {
 }
 
 func TestTransaction_HasDependenciesNotReady_TrueWhenStatesAreReadOnly(t *testing.T) {
-	stateIndex := &stateIndex{
-		transactionByOutputState: make(map[string]*Transaction),
-	}
+	grapher := NewGrapher(context.Background())
 
 	transaction1Builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
-		StateIndex(stateIndex).
+		Grapher(grapher).
 		NumberOfOutputStates(1).
 		NumberOfRequiredEndorsers(3).
 		NumberOfEndorsements(2)
 	transaction1 := transaction1Builder.Build()
 
 	transaction2Builder := NewTransactionBuilderForTesting(t, State_Assembling).
-		StateIndex(stateIndex).
+		Grapher(grapher).
 		ReadStateIDs(transaction1.PostAssembly.OutputStates[0].ID)
 	transaction2 := transaction2Builder.Build()
 
@@ -88,26 +84,24 @@ func TestTransaction_HasDependenciesNotReady_TrueWhenStatesAreReadOnly(t *testin
 
 func TestTransaction_HasDependenciesNotReady(t *testing.T) {
 	ctx := context.Background()
-	stateIndex := &stateIndex{
-		transactionByOutputState: make(map[string]*Transaction),
-	}
+	grapher := NewGrapher(ctx)
 
 	transaction1Builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
-		StateIndex(stateIndex).
+		Grapher(grapher).
 		NumberOfOutputStates(1).
 		NumberOfRequiredEndorsers(3).
 		NumberOfEndorsements(2)
 	transaction1 := transaction1Builder.Build()
 
 	transaction2Builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
-		StateIndex(stateIndex).
+		Grapher(grapher).
 		NumberOfOutputStates(1).
 		NumberOfRequiredEndorsers(3).
 		NumberOfEndorsements(2)
 	transaction2 := transaction2Builder.Build()
 
 	transaction3Builder := NewTransactionBuilderForTesting(t, State_Assembling).
-		StateIndex(stateIndex).
+		Grapher(grapher).
 		InputStateIDs(transaction1.PostAssembly.OutputStates[0].ID, transaction2.PostAssembly.OutputStates[0].ID)
 	transaction3 := transaction3Builder.Build()
 
@@ -164,14 +158,40 @@ func TestTransaction_HasDependenciesNotReady_FalseIfHasNoDependencies(t *testing
 
 }
 
+func TestTransaction_AddsItselfToGrapher(t *testing.T) {
+	ctx := context.Background()
+	grapher := NewGrapher(ctx)
+
+	transaction, _ := newTransactionForUnitTesting(t, grapher)
+
+	txn, err := grapher.TransactionByID(ctx, transaction.ID)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, txn)
+}
+
+func TestTransaction_RemovesItselfFromGrapher(t *testing.T) {
+	ctx := context.Background()
+	grapher := NewGrapher(ctx)
+
+	transaction, _ := newTransactionForUnitTesting(t, grapher)
+
+	err := transaction.cleanup(ctx)
+	assert.NoError(t, err)
+
+	txn, err := grapher.TransactionByID(ctx, transaction.ID)
+	assert.NoError(t, err)
+	assert.Nil(t, txn)
+}
+
 type transactionDependencyMocks struct {
 	messageSender *MockMessageSender
 	clock         *common.FakeClockForTesting
 }
 
-func newTransactionForUnitTesting(t *testing.T, stateIndex *stateIndex) (*Transaction, *transactionDependencyMocks) {
-	if stateIndex == nil {
-		stateIndex = NewStateIndex(context.Background())
+func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, *transactionDependencyMocks) {
+	if grapher == nil {
+		grapher = NewGrapher(context.Background())
 	}
 	mocks := &transactionDependencyMocks{
 		messageSender: NewMockMessageSender(t),
@@ -186,7 +206,7 @@ func newTransactionForUnitTesting(t *testing.T, stateIndex *stateIndex) (*Transa
 		mocks.clock,
 		mocks.clock.Duration(1000),
 		mocks.clock.Duration(5000),
-		stateIndex,
+		grapher,
 	)
 
 	return txn, mocks

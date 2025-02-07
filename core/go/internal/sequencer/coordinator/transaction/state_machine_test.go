@@ -39,7 +39,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 		clock,
 		clock.Duration(1000),
 		clock.Duration(5000),
-		NewStateIndex(ctx),
+		NewGrapher(ctx),
 	)
 
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
@@ -89,6 +89,51 @@ func TestStateMachine_Assembling_ToPooled_OnHeartbeat_IfAssembleTimeoutExpired(t
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
+func TestStateMachine_Assembling_ToReverted_OnAssembleRevertResponse(t *testing.T) {
+	ctx := context.Background()
+	txnBuilder := NewTransactionBuilderForTesting(t, State_Assembling).
+		Reverts("some revert reason")
+
+	txn := txnBuilder.Build()
+
+	txn.HandleEvent(ctx, &AssembleRevertResponseEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		postAssembly: txnBuilder.BuildPostAssembly(),
+	})
+
+	assert.Equal(t, State_Reverted, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Pooled_ToPreAssemblyBlocked_OnDependencyReverted(t *testing.T) {
+	ctx := context.Background()
+
+	//we need 2 transactions to know about each other so they need to share a state index
+	grapher := NewGrapher(ctx)
+
+	builder1 := NewTransactionBuilderForTesting(t, State_Assembling).
+		Grapher(grapher).
+		Reverts("some revert reason")
+	txn1 := builder1.Build()
+
+	builder2 := NewTransactionBuilderForTesting(t, State_Pooled).
+		Grapher(grapher).
+		Sender(builder1.sender).
+		PredefinedDependencies(txn1.ID)
+	txn2 := builder2.Build()
+
+	txn1.HandleEvent(ctx, &AssembleRevertResponseEvent{
+		event: event{
+			TransactionID: txn1.ID,
+		},
+		postAssembly: builder1.BuildPostAssembly(),
+	})
+
+	assert.Equal(t, State_PreAssembly_Blocked, txn2.stateMachine.currentState, "current state is %s", txn2.stateMachine.currentState.String())
+
+}
+
 func TestStateMachine_EndorsementGathering_ToConfirmingDispatch_OnEndorsed_IfAttestationPlanComplete(t *testing.T) {
 	ctx := context.Background()
 	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
@@ -122,16 +167,16 @@ func TestStateMachine_EndorsementGathering_ToBlocked_OnEndorsed_IfAttestationPla
 	ctx := context.Background()
 
 	//we need 2 transactions to know about each other so they need to share a state index
-	stateIndex := NewStateIndex(ctx)
+	grapher := NewGrapher(ctx)
 
 	builder1 := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
-		StateIndex(stateIndex).
+		Grapher(grapher).
 		NumberOfRequiredEndorsers(3).
 		NumberOfEndorsements(2)
 	txn1 := builder1.Build()
 
 	builder2 := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
-		StateIndex(stateIndex).
+		Grapher(grapher).
 		NumberOfRequiredEndorsers(3).
 		NumberOfEndorsements(2).
 		InputStateIDs(txn1.PostAssembly.OutputStates[0].ID)
@@ -165,18 +210,18 @@ func TestStateMachine_Blocked_ToConfirmingDispatch_OnDependencyReady_IfNotHasDep
 	// triggering a transition for A to move from blocked to confirming dispatch
 
 	//we need 3 transactions to know about each other so they need to share a state index
-	stateIndex := NewStateIndex(ctx)
+	grapher := NewGrapher(ctx)
 
 	builderB := NewTransactionBuilderForTesting(t, State_Ready_For_Dispatch).
-		StateIndex(stateIndex)
+		Grapher(grapher)
 	txnB := builderB.Build()
 
 	builderC := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).
-		StateIndex(stateIndex)
+		Grapher(grapher)
 	txnC := builderC.Build()
 
 	builderA := NewTransactionBuilderForTesting(t, State_Blocked).
-		StateIndex(stateIndex).
+		Grapher(grapher).
 		InputStateIDs(
 			txnB.PostAssembly.OutputStates[0].ID,
 			txnC.PostAssembly.OutputStates[0].ID,
@@ -184,7 +229,7 @@ func TestStateMachine_Blocked_ToConfirmingDispatch_OnDependencyReady_IfNotHasDep
 	txnA := builderA.Build()
 
 	//Was in 2 minds whether to a) trigger transaction A indirectly by causing C to become ready via a dispatch confirmation event or b) trigger it directly by sending a dependency ready event
-	// decided on (a) as it is slightly more white box and less brittle to future refactoring of the implementation
+	// decided on (a) as it is slightly less white box and less brittle to future refactoring of the implementation
 
 	txnC.HandleEvent(ctx, &DispatchConfirmedEvent{
 		event: event{
@@ -203,18 +248,18 @@ func TestStateMachine_BlockedNoTransition_OnDependencyReady_IfHasDependenciesNot
 	// thus gating the triggering of a transition for A to move from blocked to confirming dispatch
 
 	//we need 3 transactions to know about each other so they need to share a state index
-	stateIndex := NewStateIndex(ctx)
+	grapher := NewGrapher(ctx)
 
 	builderB := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).
-		StateIndex(stateIndex)
+		Grapher(grapher)
 	txnB := builderB.Build()
 
 	builderC := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).
-		StateIndex(stateIndex)
+		Grapher(grapher)
 	txnC := builderC.Build()
 
 	builderA := NewTransactionBuilderForTesting(t, State_Blocked).
-		StateIndex(stateIndex).
+		Grapher(grapher).
 		InputStateIDs(
 			txnB.PostAssembly.OutputStates[0].ID,
 			txnC.PostAssembly.OutputStates[0].ID,
@@ -222,7 +267,7 @@ func TestStateMachine_BlockedNoTransition_OnDependencyReady_IfHasDependenciesNot
 	txnA := builderA.Build()
 
 	//Was in 2 minds whether to a) trigger transaction A indirectly by causing B to become ready via a dispatch confirmation event or b) trigger it directly by sending a dependency ready event
-	// decided on (a) as it is slightly more white box and less brittle to future refactoring of the implementation
+	// decided on (a) as it is slightly less white box and less brittle to future refactoring of the implementation
 
 	txnB.HandleEvent(ctx, &DispatchConfirmedEvent{
 		event: event{

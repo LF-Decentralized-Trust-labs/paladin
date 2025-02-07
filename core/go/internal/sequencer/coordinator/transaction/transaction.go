@@ -49,38 +49,46 @@ type endorsementRequirement struct {
 // Transaction represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
 type Transaction struct {
 	*components.PrivateTransaction
-	sender                             string //TODO what is this?  A node? An identity? An identity locator?
-	signerAddress                      *tktypes.EthAddress
-	latestSubmissionHash               *tktypes.Bytes32
-	nonce                              *uint64
-	stateMachine                       *StateMachine
+	sender               string //TODO what is this?  A node? An identity? An identity locator?
+	signerAddress        *tktypes.EthAddress
+	latestSubmissionHash *tktypes.Bytes32
+	nonce                *uint64
+	stateMachine         *StateMachine
+
+	//TODO move the fields that are really just fine grained state info.  Move them into the stateMachine struct ( consider separate structs for each concrete state)
 	heartbeatIntervalsSinceStateChange int
 	pendingAssembleRequest             *common.IdempotentRequest
 	pendingEndorsementRequests         map[string]map[string]*common.IdempotentRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
 	pendingDispatchConfirmationRequest *common.IdempotentRequest
 	latestError                        string
-	dependencies                       []*Transaction
-	dependents                         []*Transaction
+	dependencies                       []*Transaction //TODO replace this with ID and use Grapher when needed to lookup transaction object to simplify cleanup
+	dependents                         []*Transaction //TODO replace this with ID and use Grapher when needed to lookup transaction object to simplify cleanup.  Also rename to avoid confusion with predefined dependencies
+	preAssembleDependents              []uuid.UUID
 	requestTimeout                     common.Duration
 	assembleTimeout                    common.Duration
 	// Dependencies
 	clock         common.Clock
 	messageSender MessageSender
-	stateIndex    StateIndex
+	grapher       Grapher
 }
 
-func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, requestTimeout, assembleTimeout common.Duration, stateIndex StateIndex) *Transaction {
+func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, requestTimeout, assembleTimeout common.Duration, grapher Grapher) *Transaction {
 	txn := &Transaction{
 		sender:             sender,
 		PrivateTransaction: pt,
 		messageSender:      messageSender,
 		clock:              clock,
-		stateIndex:         stateIndex,
+		grapher:            grapher,
 		requestTimeout:     requestTimeout,
 		assembleTimeout:    assembleTimeout,
 	}
 	txn.InitializeStateMachine(State_Pooled)
+	grapher.Add(context.Background(), txn)
 	return txn
+}
+
+func (t *Transaction) cleanup(_ context.Context) error {
+	return t.grapher.Forget(t.ID)
 }
 
 func (t *Transaction) GetSignerAddress() *tktypes.EthAddress {
@@ -165,15 +173,16 @@ func (t *Transaction) applyEndorsement(ctx context.Context, endorsement *prototk
 	return nil
 }
 
-func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *components.TransactionPostAssembly) {
+func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *components.TransactionPostAssembly) error {
 	//TODO check that this matches a pending request and that it has not timed out
 
 	//TODO the response from the assembler actually contains outputStatesPotential so we need to write them to the store and then add the OutputState ids to the index
 	t.PostAssembly = postAssembly
 	for _, state := range postAssembly.OutputStates {
-		t.stateIndex.AddMinter(ctx, state.ID, t)
+		t.grapher.AddMinter(ctx, state.ID, t)
 	}
-	t.calculateDependencies(ctx)
+	t.calculatePostAssembleDependencies(ctx)
+	return nil
 }
 
 func (t *Transaction) Sender() string {
@@ -368,6 +377,43 @@ func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
 	return nil
 }
 
+func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
+	//this function is called when the transaction enters the reverted state on a revert response from assemble
+	// NOTE: at this point, we have not been assembled and therefore are not the minter of any state the only transactions that could possibly be dependent on us are those in the pool from the same sender
+	for _, dependent := range t.dependents {
+		dependent.HandleEvent(ctx, &DependencyRevertedEvent{
+			event: event{
+				TransactionID: dependent.ID,
+			},
+			DependencyID: t.ID,
+		})
+	}
+
+	//TODO combine this to the above for loop once dependents has been refactored to be an array of uuids
+	for _, dependentID := range t.preAssembleDependents {
+		dependentTxn, err := t.grapher.TransactionByID(ctx, dependentID)
+		if err != nil {
+			//TODO error
+		}
+		if dependentTxn != nil {
+			dependentTxn.HandleEvent(ctx, &DependencyRevertedEvent{
+				event: event{
+					TransactionID: dependentID,
+				},
+				DependencyID: t.ID,
+			})
+		} else {
+			// Assume that the dependent is no longer in memory and doesn't need to know about this event
+			//TODO is this a safe assumption.  Point to (write) the architecture doc that explains why this is safe
+
+			//TODO add a log here
+		}
+
+	}
+
+	return nil
+}
+
 func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest) error {
 
 	err := t.messageSender.SendEndorsementRequest(
@@ -389,6 +435,7 @@ func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey uui
 	return err
 }
 
+// TODO this is not called but should be called to build the endorsement request?
 func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState {
 	endorsableList := make([]*prototk.EndorsableState, len(states))
 	for i, input := range states {
@@ -401,7 +448,36 @@ func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState
 	return endorsableList
 }
 
-func (t *Transaction) calculateDependencies(ctx context.Context) {
+func (t *Transaction) initializeDependencies(ctx context.Context) error {
+	if t.PreAssembly == nil {
+		log.L(ctx).Errorf("Cannot calculate dependencies for transaction %s without a PreAssembly", t.ID)
+		//TODO should never get here so this is a panic or at least abort the the current contract - or replace this comment with an explanation why we don't panic or abort
+		return nil
+	}
+
+	for _, dependencyID := range t.PreAssembly.Dependencies {
+		dependencyTxn, err := t.grapher.TransactionByID(ctx, dependencyID)
+		if err != nil {
+			//TODO error message
+		}
+		if nil == dependencyTxn {
+			//assume dependency has been confirmed and no longer in memory
+			//TODO do we really need to check this against the DB / domain context or can we be sure there is no other reason that the grapher does not know about this
+			//
+			continue
+		}
+		dependencyTxn.preAssembleDependents = append(dependencyTxn.preAssembleDependents, t.ID)
+	}
+
+	return nil
+
+}
+
+func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) {
+	//Dependencies can arise because  we have been assembled to spend states that were produced by other transactions
+	// or because there are other transactions from the same sender that have not been dispatched yet or because the user has declared explicit dependencies
+	// this function calculates the dependencies relating to states and sets up the reverse association
+	// it is assumed that the other dependencies have already been set up when the transaction was first received by the coordinator TODO correct this comment line with more accurate description of when we expect the static dependencies to have been calculated.  Or make it more vague.
 	if t.PostAssembly == nil {
 		log.L(ctx).Errorf("Cannot calculate dependencies for transaction %s without a PostAssembly", t.ID)
 		//TODO should never get here so this is a panic or at least abort the the current contract
@@ -411,7 +487,7 @@ func (t *Transaction) calculateDependencies(ctx context.Context) {
 	found := make(map[string]bool)
 	t.dependencies = make([]*Transaction, 0, len(t.PostAssembly.InputStates)+len(t.PostAssembly.ReadStates))
 	for _, state := range append(t.PostAssembly.InputStates, t.PostAssembly.ReadStates...) {
-		dependency, err := t.stateIndex.LookupMinter(ctx, state.ID)
+		dependency, err := t.grapher.LookupMinter(ctx, state.ID)
 		if err != nil {
 			log.L(ctx).Errorf("Error looking up dependency for state %s: %s", state.ID, err)
 			//TODO no good reason to expect an error here so this is a panic or at least abort the the current contract

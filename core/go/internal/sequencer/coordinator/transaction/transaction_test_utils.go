@@ -91,23 +91,25 @@ type TransactionBuilderForTesting struct {
 	id     uuid.UUID
 	sender *identityForTesting
 
-	dispatchConfirmed    bool
-	signerAddress        *tktypes.EthAddress
-	latestSubmissionHash *tktypes.Bytes32
-	nonce                *uint64
-	state                State
-	numberOfEndorsers    int
-	numberOfEndorsements int
-	numberOfOutputStates int
-	inputStateIDs        []tktypes.HexBytes
-	readStateIDs         []tktypes.HexBytes
-	endorsers            []*identityForTesting
-	sentMessageRecorder  *SentMessageRecorder
-	fakeClock            *common.FakeClockForTesting
-	stateIndex           StateIndex
-	txn                  *Transaction
-	requestTimeout       int
-	assembleTimeout      int
+	dispatchConfirmed      bool
+	signerAddress          *tktypes.EthAddress
+	latestSubmissionHash   *tktypes.Bytes32
+	nonce                  *uint64
+	state                  State
+	numberOfEndorsers      int
+	numberOfEndorsements   int
+	numberOfOutputStates   int
+	inputStateIDs          []tktypes.HexBytes
+	readStateIDs           []tktypes.HexBytes
+	endorsers              []*identityForTesting
+	sentMessageRecorder    *SentMessageRecorder
+	fakeClock              *common.FakeClockForTesting
+	grapher                Grapher
+	txn                    *Transaction
+	requestTimeout         int
+	assembleTimeout        int
+	revertReason           *string
+	predefinedDependencies []uuid.UUID
 }
 
 // Function NewTransactionBuilderForTesting creates a TransactionBuilderForTesting with random values for all fields
@@ -187,8 +189,23 @@ func (b *TransactionBuilderForTesting) ReadStateIDs(stateIDs ...tktypes.HexBytes
 	return b
 }
 
-func (b *TransactionBuilderForTesting) StateIndex(stateIndex StateIndex) *TransactionBuilderForTesting {
-	b.stateIndex = stateIndex
+func (b *TransactionBuilderForTesting) Grapher(grapher Grapher) *TransactionBuilderForTesting {
+	b.grapher = grapher
+	return b
+}
+
+func (b *TransactionBuilderForTesting) Sender(sender *identityForTesting) *TransactionBuilderForTesting {
+	b.sender = sender
+	return b
+}
+
+func (b *TransactionBuilderForTesting) PredefinedDependencies(transactionIDs ...uuid.UUID) *TransactionBuilderForTesting {
+	b.predefinedDependencies = transactionIDs
+	return b
+}
+
+func (b *TransactionBuilderForTesting) Reverts(revertReason string) *TransactionBuilderForTesting {
+	b.revertReason = &revertReason
 	return b
 }
 
@@ -207,10 +224,8 @@ func (b *TransactionBuilderForTesting) BuildWithMocks() (*Transaction, *transact
 
 func (b *TransactionBuilderForTesting) Build() *Transaction {
 	ctx := context.Background()
-	if b.stateIndex == nil {
-		b.stateIndex = &stateIndex{
-			transactionByOutputState: make(map[string]*Transaction),
-		}
+	if b.grapher == nil {
+		b.grapher = NewGrapher(ctx)
 	}
 	b.endorsers = make([]*identityForTesting, b.numberOfEndorsers)
 	for i := 0; i < b.numberOfEndorsers; i++ {
@@ -247,11 +262,23 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		}
 	}
 
-	b.txn = NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeClock.Duration(b.requestTimeout), b.fakeClock.Duration(b.assembleTimeout), b.stateIndex)
+	b.txn = NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeClock.Duration(b.requestTimeout), b.fakeClock.Duration(b.assembleTimeout), b.grapher)
 
 	//Assuming a "normal" path through the state machine to the current desired state
+	if b.predefinedDependencies != nil {
+		for _, dependencyID := range b.predefinedDependencies {
+			b.txn.PreAssembly.Dependencies = append(b.txn.PreAssembly.Dependencies, dependencyID)
+		}
+	}
 
 	//TODO this could all be a lot easier if every state had a enter function and an exit function that cleaned up the object to remove all history of the previous state ( other than the contents of the private transaction).  In fact, should probably make that explicit in the structure of the struct.  Maybe fields relating to a particular state should be in the state machine struct rather than the transaction struct?
+	//TODO would at least be cleaner if the state definitions were a global variable and we could just reference the onTransition function here
+	if b.state == State_Pooled {
+		err := b.txn.initializeDependencies(ctx)
+		if err != nil {
+			panic(fmt.Sprintf("Error from initializeDependencies: %v", err))
+		}
+	}
 	if b.state == State_Assembling {
 
 		err := b.txn.sendAssembleRequest(ctx)
@@ -319,6 +346,7 @@ func (b *TransactionBuilderForTesting) BuildPostAssembly() *components.Transacti
 		numberOfOutputStates: b.numberOfOutputStates,
 		inputStateIDs:        b.inputStateIDs,
 		readStateIDs:         b.readStateIDs,
+		revertReason:         b.revertReason,
 	}
 	return postAssemblyBuilder.Build()
 
@@ -330,6 +358,7 @@ func (b *TransactionBuilderForTesting) BuildPostAssembly() *components.Transacti
 // weird error conditions
 type PostAssemblyBuilderForTesting struct {
 	sender               *identityForTesting
+	revertReason         *string
 	numberOfEndorsers    int
 	numberOfEndorsements int
 	numberOfOutputStates int
@@ -339,6 +368,12 @@ type PostAssemblyBuilderForTesting struct {
 }
 
 func (b *PostAssemblyBuilderForTesting) Build() *components.TransactionPostAssembly {
+	if b.revertReason != nil {
+		return &components.TransactionPostAssembly{
+			AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
+			RevertReason:   b.revertReason,
+		}
+	}
 	postAssembly := &components.TransactionPostAssembly{
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
 	}

@@ -25,15 +25,18 @@ import (
 type State int
 
 const (
-	State_Pooled                State = iota //waiting in the pool to be assembled
-	State_Assembling                         // an assemble request has been sent but we are waiting for the response
-	State_Endorsement_Gathering              // assembled and waiting for endorsement
-	State_Blocked                            //is fully endorsed but cannot proceed due to dependencies not being ready for dispatch
-	State_Confirming_Dispatch                // endorsed and waiting for dispatch confirmation
-	State_Ready_For_Dispatch                 // dispatch confirmation received and waiting to be collected by the dispatcher thread.Going into this state is the point of no return
-	State_Dispatched                         // collected by the dispatcher thread but not yet
-	State_Submitted                          // at least one submission has been made to the blockchain
-	State_Confirmed                          // "recently" confirmed on the base ledger.  NOTE: confirmed transactions are not held in memory for ever so getting a list of confirmed transactions will only return those confirmed recently
+	State_Pooled State = iota // waiting in the pool to be assembled
+	//TODO State_PreAssembly_Blocked is this the best name?  Should probably rename State_Blocked to State_Endorsement_Gathering_Blocked
+	State_PreAssembly_Blocked   // has not been assembled yet and cannot be assembled because a dependency never got assembled successfully - i.e. it was either Parked or Reverted is also blocked
+	State_Assembling            // an assemble request has been sent but we are waiting for the response
+	State_Reverted              // the transaction has been reverted by the assembler/sender
+	State_Endorsement_Gathering // assembled and waiting for endorsement
+	State_Blocked               // is fully endorsed but cannot proceed due to dependencies not being ready for dispatch
+	State_Confirming_Dispatch   // endorsed and waiting for dispatch confirmation
+	State_Ready_For_Dispatch    // dispatch confirmation received and waiting to be collected by the dispatcher thread.Going into this state is the point of no return
+	State_Dispatched            // collected by the dispatcher thread but not yet
+	State_Submitted             // at least one submission has been made to the blockchain
+	State_Confirmed             // "recently" confirmed on the base ledger.  NOTE: confirmed transactions are not held in memory for ever so getting a list of confirmed transactions will only return those confirmed recently
 )
 
 var allStates = []State{
@@ -53,10 +56,11 @@ const (
 	Event_Selected                     EventType = iota // selected from the pool as the next transaction to be assembled
 	Event_AssembleRequestSent                           // assemble request sent to the assembler
 	Event_Assemble_Success                              // assemble response received from the sender
-	Event_Assemble_Revert                               // assemble response received from the sender with a revert reason
+	Event_Assemble_Revert_Response                      // assemble response received from the sender with a revert reason
 	Event_Endorsed                                      // endorsement received from one endorser
 	Event_EndorsedRejected                              // endorsement received from one endorser with a revert reason
 	Event_DependencyReady                               // another transaction, for which this transaction has a dependency on, has become ready for dispatch
+	Event_DependencyReverted                            // another transaction, for which this transaction has a dependency on, has been reverted
 	Event_DispatchConfirmed                             // dispatch confirmation received from the sender
 	Event_DispatchConfirmationRejected                  // dispatch confirmation response received from the sender with a rejection
 	Event_Collected                                     // collected by the dispatcher thread
@@ -89,13 +93,18 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 		currentState: initialState,
 	}
 
+	//TODO this could be a global var which would be more efficient than creating it every time and would make it easier to navigate the code to find the initialization
 	//Transitions
 	t.stateMachine.stateDefinitions = map[State]StateDefinition{
+		//TODO rules for transition from initial state to either pooled (selectable) or blocked or whatever, depending on the state of dependency transactions
 		State_Pooled: {
-			OnTransitionTo: nil,
+			OnTransitionTo: action_initializeDependencies,
 			Transitions: map[EventType][]Transition{
 				Event_Selected: {{
 					To: State_Assembling,
+				}},
+				Event_DependencyReverted: {{
+					To: State_PreAssembly_Blocked,
 				}},
 			},
 		},
@@ -108,6 +117,9 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 				Event_HeartbeatInterval: {{
 					To: State_Pooled,
 					If: guard_AssembleTimeoutExceeded,
+				}},
+				Event_Assemble_Revert_Response: {{
+					To: State_Reverted,
 				}},
 			},
 		},
@@ -167,6 +179,10 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 				}},
 			},
 		},
+		State_Reverted: {
+			OnTransitionTo: action_NotifyDependentsOfRevert,
+		},
+		//TODO add transition to final state and call cleanup
 	}
 }
 
@@ -181,8 +197,8 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 		//TODO
 	case *AssembleSuccessEvent:
 		t.applyPostAssembly(ctx, event.postAssembly)
-	case *AssembleRevertEvent:
-		//TODO
+	case *AssembleRevertResponseEvent:
+		t.applyPostAssembly(ctx, event.postAssembly)
 	case *EndorsedEvent:
 		t.applyEndorsement(ctx, event.Endorsement, event.RequestID)
 	case *DispatchConfirmedEvent:
@@ -242,6 +258,14 @@ func action_SendDispatchConfirmationRequest(ctx context.Context, txn *Transactio
 
 func action_NotifyDependentsOfReadiness(ctx context.Context, txn *Transaction, to, from State) error {
 	return txn.notifyDependentsOfReadiness(ctx)
+}
+
+func action_NotifyDependentsOfRevert(ctx context.Context, txn *Transaction, to, from State) error {
+	return txn.notifyDependentsOfRevert(ctx)
+}
+
+func action_initializeDependencies(ctx context.Context, txn *Transaction, to, from State) error {
+	return txn.initializeDependencies(ctx)
 }
 
 func (s *State) String() string {

@@ -64,14 +64,14 @@ func (_ *AssembleSuccessEvent) Type() EventType {
 	return Event_Assemble_Success
 }
 
-// AssembleRevertEvent
-type AssembleRevertEvent struct {
+// AssembleRevertResponseEvent
+type AssembleRevertResponseEvent struct {
 	event
 	postAssembly *components.TransactionPostAssembly
 }
 
-func (_ *AssembleRevertEvent) Type() EventType {
-	return Event_Assemble_Revert
+func (_ *AssembleRevertResponseEvent) Type() EventType {
+	return Event_Assemble_Revert_Response
 }
 
 // EndorsedEvent
@@ -154,6 +154,15 @@ type ConfirmedEvent struct {
 
 func (_ *ConfirmedEvent) Type() EventType {
 	return Event_Confirmed
+}
+
+type DependencyRevertedEvent struct {
+	event
+	DependencyID uuid.UUID
+}
+
+func (_ *DependencyRevertedEvent) Type() EventType {
+	return Event_DependencyReverted
 }
 
 type DependencyReadyEvent struct {
