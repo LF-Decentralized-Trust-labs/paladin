@@ -271,34 +271,30 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		}
 	}
 
-	//TODO this could all be a lot easier if every state had a enter function and an exit function that cleaned up the object to remove all history of the previous state ( other than the contents of the private transaction).  In fact, should probably make that explicit in the structure of the struct.  Maybe fields relating to a particular state should be in the state machine struct rather than the transaction struct?
-	//TODO would at least be cleaner if the state definitions were a global variable and we could just reference the onTransition function here
-	if b.state == State_Pooled {
-		err := b.txn.initializeDependencies(ctx)
+	//Update the private transaction struct to the accumulation that resulted from what ever events that we expect to have happened leading up to the current state
+	// We don't attempt to emulate any other history of those past events but rather assert that the state machine's behavior is determined purely by its current finite state
+	// and the contents of the PrivateTransaction struct
+
+	//TODO should we do more to assert that no other history is carried across state transitions.  Maybe moving the fine grained state fields off the transaction struct and into the state machine ( or even separate structs for each concrete state a la the State pattern from GoF)
+
+	if b.state == State_Endorsement_Gathering ||
+		b.state == State_Blocked ||
+		b.state == State_Confirming_Dispatch ||
+		b.state == State_Ready_For_Dispatch {
+
+		err := b.txn.applyPostAssembly(ctx, b.BuildPostAssembly())
+		if err != nil {
+			panic("error from applyPostAssembly")
+		}
+	}
+
+	//enter the current state
+	onTransitionFunction := stateDefinitions()[b.state].OnTransitionTo
+	if onTransitionFunction != nil {
+		err := onTransitionFunction(ctx, b.txn, b.state, State_Initial)
 		if err != nil {
 			panic(fmt.Sprintf("Error from initializeDependencies: %v", err))
 		}
-	}
-	if b.state == State_Assembling {
-
-		err := b.txn.sendAssembleRequest(ctx)
-		if err != nil {
-			panic(fmt.Sprintf("Error sending assemble request: %v", err))
-		}
-
-	}
-	if b.state == State_Endorsement_Gathering {
-		b.txn.applyPostAssembly(ctx, b.BuildPostAssembly())
-		err := b.txn.sendEndorsementRequests(ctx)
-		if err != nil {
-			panic(fmt.Sprintf("Error sending endorsement requests: %v", err))
-		}
-	}
-
-	if b.state == State_Blocked ||
-		b.state == State_Confirming_Dispatch ||
-		b.state == State_Ready_For_Dispatch {
-		b.txn.applyPostAssembly(ctx, b.BuildPostAssembly())
 	}
 
 	b.txn.signerAddress = b.signerAddress

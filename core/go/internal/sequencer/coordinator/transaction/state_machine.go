@@ -26,7 +26,8 @@ import (
 type State int
 
 const (
-	State_Pooled State = iota // waiting in the pool to be assembled
+	State_Initial State = iota // Initial state before anything is calculated
+	State_Pooled               // waiting in the pool to be assembled
 	//TODO State_PreAssembly_Blocked is this the best name?  Should probably rename State_Blocked to State_Endorsement_Gathering_Blocked
 	State_PreAssembly_Blocked   // has not been assembled yet and cannot be assembled because a dependency never got assembled successfully - i.e. it was either Parked or Reverted is also blocked
 	State_Assembling            // an assemble request has been sent but we are waiting for the response
@@ -81,6 +82,7 @@ type Transition struct {
 	If Guard
 }
 
+// TODO do we need the `from` state here? Should the transition functions be forced not to care about that?
 type OnTransitionTo func(ctx context.Context, txn *Transaction, to, from State) error
 
 type StateDefinition struct {
