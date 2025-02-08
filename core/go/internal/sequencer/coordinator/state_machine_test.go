@@ -195,8 +195,6 @@ func TestStateMachine_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushComp
 
 	assert.Equal(t, State_Prepared, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
-	//TODO should have other test cases where there are multiple flush points across multiple signers ( and across multiple coordinators?)
-
 }
 
 func TestStateMachine_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFlight(t *testing.T) {

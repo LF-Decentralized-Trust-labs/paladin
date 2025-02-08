@@ -16,6 +16,7 @@ package transaction
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -179,10 +180,14 @@ func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *compo
 	//TODO the response from the assembler actually contains outputStatesPotential so we need to write them to the store and then add the OutputState ids to the index
 	t.PostAssembly = postAssembly
 	for _, state := range postAssembly.OutputStates {
-		t.grapher.AddMinter(ctx, state.ID, t)
+		err := t.grapher.AddMinter(ctx, state.ID, t)
+		if err != nil {
+			msg := fmt.Sprintf("Error adding minter for state %s: %s while applying postAssembly", state.ID, err)
+			log.L(ctx).Error(msg)
+			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
+		}
 	}
-	t.calculatePostAssembleDependencies(ctx)
-	return nil
+	return t.calculatePostAssembleDependencies(ctx)
 }
 
 func (t *Transaction) Sender() string {
@@ -393,7 +398,8 @@ func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 	for _, dependentID := range t.preAssembleDependents {
 		dependentTxn, err := t.grapher.TransactionByID(ctx, dependentID)
 		if err != nil {
-			//TODO error
+			log.L(ctx).Errorf("Error looking up dependent transaction %s: %s", dependentID, err)
+			return err
 		}
 		if dependentTxn != nil {
 			dependentTxn.HandleEvent(ctx, &DependencyRevertedEvent{
@@ -406,7 +412,7 @@ func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 			// Assume that the dependent is no longer in memory and doesn't need to know about this event
 			//TODO is this a safe assumption.  Point to (write) the architecture doc that explains why this is safe
 
-			//TODO add a log here
+			log.L(ctx).Infof("Dependent transaction %s not found in memory", dependentID)
 		}
 
 	}
@@ -450,19 +456,20 @@ func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState
 
 func (t *Transaction) initializeDependencies(ctx context.Context) error {
 	if t.PreAssembly == nil {
-		log.L(ctx).Errorf("Cannot calculate dependencies for transaction %s without a PreAssembly", t.ID)
-		//TODO should never get here so this is a panic or at least abort the the current contract - or replace this comment with an explanation why we don't panic or abort
-		return nil
+		msg := fmt.Sprintf("Cannot calculate dependencies for transaction %s without a PreAssembly", t.ID)
+		log.L(ctx).Error(msg)
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
 
 	for _, dependencyID := range t.PreAssembly.Dependencies {
 		dependencyTxn, err := t.grapher.TransactionByID(ctx, dependencyID)
 		if err != nil {
-			//TODO error message
+			log.L(ctx).Errorf("Error looking up dependency for transaction %s: %s", dependencyID, err)
+			return err
 		}
 		if nil == dependencyTxn {
 			//assume dependency has been confirmed and no longer in memory
-			//TODO do we really need to check this against the DB / domain context or can we be sure there is no other reason that the grapher does not know about this
+			//TODO do we really need to check this against the DB / domain context or can we be sure there is no other reason that the grapher does not know about this. If we think this is safe, then point at the architecture doc explaining why it is so.
 			//
 			continue
 		}
@@ -473,15 +480,15 @@ func (t *Transaction) initializeDependencies(ctx context.Context) error {
 
 }
 
-func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) {
+func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) error {
 	//Dependencies can arise because  we have been assembled to spend states that were produced by other transactions
 	// or because there are other transactions from the same sender that have not been dispatched yet or because the user has declared explicit dependencies
 	// this function calculates the dependencies relating to states and sets up the reverse association
 	// it is assumed that the other dependencies have already been set up when the transaction was first received by the coordinator TODO correct this comment line with more accurate description of when we expect the static dependencies to have been calculated.  Or make it more vague.
 	if t.PostAssembly == nil {
-		log.L(ctx).Errorf("Cannot calculate dependencies for transaction %s without a PostAssembly", t.ID)
-		//TODO should never get here so this is a panic or at least abort the the current contract
-		return
+		msg := fmt.Sprintf("Cannot calculate dependencies for transaction %s without a PostAssembly", t.ID)
+		log.L(ctx).Error(msg)
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
 
 	found := make(map[string]bool)
@@ -489,14 +496,14 @@ func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) {
 	for _, state := range append(t.PostAssembly.InputStates, t.PostAssembly.ReadStates...) {
 		dependency, err := t.grapher.LookupMinter(ctx, state.ID)
 		if err != nil {
-			log.L(ctx).Errorf("Error looking up dependency for state %s: %s", state.ID, err)
-			//TODO no good reason to expect an error here so this is a panic or at least abort the the current contract
-			return
+			errMsg := fmt.Sprintf("Error looking up dependency for state %s: %s", state.ID, err)
+			log.L(ctx).Error(errMsg)
+			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, errMsg)
 		}
 		if dependency == nil {
 			log.L(ctx).Infof("No minter found for state %s", state.ID)
 			//assume the state was produced by a confirmed transaction
-			//TODO should we validate this by checking the domain context?
+			//TODO should we validate this by checking the domain context? If not, explain why this is safe in the architecture doc
 			continue
 		}
 		if found[dependency.ID.String()] {
@@ -507,4 +514,5 @@ func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) {
 		//also set up the reverse association
 		dependency.dependents = append(dependency.dependents, t)
 	}
+	return nil
 }

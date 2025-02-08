@@ -17,16 +17,14 @@ package transaction
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
-
-// TODO is this helpful as an interface?
-//Interface Grapher defines a dependency of transaction that provides methods to look up transactions for a given state ID
-/*type Grapher interface {
-	LookupMinter(ctx context.Context, stateID tktypes.HexBytes) (*Transaction, error)
-}*/
 
 // Interface Grapher allows transactions to link to each other in a dependency graph
 // Transactions may know about their dependencies either explicitly via transactions IDs specified on the pre-assembly spec
@@ -44,8 +42,6 @@ type Grapher interface {
 	Forget(transactionID uuid.UUID) error
 }
 
-// TODO: decide whether to keep the implementation in here or move it to an upstream package e.g. as a shim around domain context
-// in which case, this simple implementation could be moved to test_utils
 type grapher struct {
 	transactionByOutputState map[string]*Transaction
 	transactionByID          map[uuid.UUID]*Transaction
@@ -69,7 +65,11 @@ func (s *grapher) LookupMinter(ctx context.Context, stateID tktypes.HexBytes) (*
 }
 
 func (s *grapher) AddMinter(ctx context.Context, stateID tktypes.HexBytes, transaction *Transaction) error {
-	//TODO return error if duplicate
+	if txn, ok := s.transactionByOutputState[stateID.String()]; ok {
+		msg := fmt.Sprintf("Duplicate minter. stateID %s already indexed as minted by %s but attempted to add minter %s", stateID.String(), txn.ID.String(), transaction.ID.String())
+		log.L(ctx).Errorf(msg)
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
+	}
 	s.transactionByOutputState[stateID.String()] = transaction
 	s.outputStatesByMinter[transaction.ID] = append(s.outputStatesByMinter[transaction.ID], stateID.String())
 	return nil
