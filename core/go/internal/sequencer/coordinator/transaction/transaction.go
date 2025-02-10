@@ -83,7 +83,7 @@ func NewTransaction(sender string, pt *components.PrivateTransaction, messageSen
 		requestTimeout:     requestTimeout,
 		assembleTimeout:    assembleTimeout,
 	}
-	txn.InitializeStateMachine(State_Pooled)
+	txn.InitializeStateMachine(State_Initial)
 	grapher.Add(context.Background(), txn)
 	return txn
 }
@@ -299,10 +299,16 @@ func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
 	// some of them might have been confirmed and removed from our list to avoid a memory leak so this is not necessarily the complete list of dependencies
 	// but it should contain all the ones that are not ready for dispatch
 
-	for _, dependencyID := range t.dependencies {
+	dependencies := t.dependencies
+	if t.PreAssembly != nil {
+		dependencies = append(dependencies, t.PreAssembly.Dependencies...)
+	}
+
+	for _, dependencyID := range dependencies {
 		dependency := t.grapher.TransactionByID(ctx, dependencyID)
 		if dependency == nil {
 			//assume the dependency has been confirmed and no longer in memory
+			//hasUnknownDependencies guard will be used to explicitly ensure the correct thing happens
 			continue
 		}
 		//test against the list of states that we consider to be past the point of ready as there is more chance of us noticing
@@ -315,6 +321,54 @@ func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
 		}
 	}
 
+	return false
+}
+
+// Function hasDependenciesNotAssembled checks if the transaction has any dependencies that have not been assembled yet
+func (t *Transaction) hasDependenciesNotAssembled(ctx context.Context) bool {
+
+	// we cannot have unassembled dependencies other than those that were provided to us in the PreAssemble.
+
+	for _, dependencyID := range t.PreAssembly.Dependencies {
+		dependency := t.grapher.TransactionByID(ctx, dependencyID)
+		if dependency == nil {
+			//assume the dependency has been confirmed and no longer in memory
+			//hasUnknownDependencies guard will be used to explicitly ensure the correct thing happens
+			continue
+		}
+		//test against the list of states that we consider to be past the point of assemble as there is more chance of us noticing
+		// a failing test if we add new states in the future and forget to update this list
+		if dependency.GetState() != State_Endorsement_Gathering &&
+			dependency.GetState() != State_Confirming_Dispatch &&
+			dependency.GetState() != State_Ready_For_Dispatch &&
+			dependency.GetState() != State_Dispatched &&
+			dependency.GetState() != State_Submitted &&
+			dependency.GetState() != State_Confirmed {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Function hasUnknownDependencies checks if the transaction has any dependencies the coordinator does not have in memory.  These might be long gone confirmed to base ledger or maybe the delegation request for them hasn't reached us yet. At this point, we don't know
+func (t *Transaction) hasUnknownDependencies(ctx context.Context) bool {
+
+	dependencies := t.dependencies
+	if t.PreAssembly != nil {
+		dependencies = append(dependencies, t.PreAssembly.Dependencies...)
+	}
+
+	for _, dependencyID := range dependencies {
+		dependency := t.grapher.TransactionByID(ctx, dependencyID)
+		if dependency == nil {
+
+			return true
+		}
+
+	}
+
+	//if there are are any dependencies declared, they are all known to the current in memory context ( grapher)
 	return false
 }
 

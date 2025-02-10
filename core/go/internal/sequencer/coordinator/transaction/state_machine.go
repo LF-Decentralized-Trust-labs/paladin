@@ -27,8 +27,8 @@ type State int
 
 const (
 	State_Initial State = iota // Initial state before anything is calculated
-	State_Pooled               // waiting in the pool to be assembled
-	//TODO State_PreAssembly_Blocked is this the best name?  Should probably rename State_Blocked to State_Endorsement_Gathering_Blocked
+	State_Pooled               // waiting in the pool to be assembled - TODO should rename to "Selectable" or "Selectable_Pooled".  Related to potential rename of `State_PreAssembly_Blocked`
+	//TODO State_PreAssembly_Blocked is this the best name?  Should probably rename State_Blocked to State_Endorsement_Gathering_Blocked.  NOTE: when renaming, also search for PreAssemblyBlocked e.g. in test func names
 	State_PreAssembly_Blocked   // has not been assembled yet and cannot be assembled because a dependency never got assembled successfully - i.e. it was either Parked or Reverted is also blocked
 	State_Assembling            // an assemble request has been sent but we are waiting for the response
 	State_Reverted              // the transaction has been reverted by the assembler/sender
@@ -55,13 +55,15 @@ var allStates = []State{
 type EventType = common.EventType
 
 const (
-	Event_Selected                     EventType = iota // selected from the pool as the next transaction to be assembled
+	Event_Received                     EventType = iota // Transaction initially received by the coordinator.  Might seem redundant explicitly modeling this as an event rather than putting this logic into the constructor, but it is useful to make the initial state transition rules explicit in the state machine definitions
+	Event_Selected                                      // selected from the pool as the next transaction to be assembled
 	Event_AssembleRequestSent                           // assemble request sent to the assembler
 	Event_Assemble_Success                              // assemble response received from the sender
 	Event_Assemble_Revert_Response                      // assemble response received from the sender with a revert reason
 	Event_Endorsed                                      // endorsement received from one endorser
 	Event_EndorsedRejected                              // endorsement received from one endorser with a revert reason
 	Event_DependencyReady                               // another transaction, for which this transaction has a dependency on, has become ready for dispatch
+	Event_DependencyAssembled                           // another transaction, for which this transaction has a dependency on, has been assembled
 	Event_DependencyReverted                            // another transaction, for which this transaction has a dependency on, has been reverted
 	Event_DispatchConfirmed                             // dispatch confirmation received from the sender
 	Event_DispatchConfirmationRejected                  // dispatch confirmation response received from the sender with a rejection
@@ -105,6 +107,28 @@ func stateDefinitions() map[State]StateDefinition {
 	}
 	stateDefinitionsMap = map[State]StateDefinition{
 		//TODO rules for transition from initial state to either pooled (selectable) or blocked or whatever, depending on the state of dependency transactions
+		State_Initial: {
+			Transitions: map[EventType][]Transition{
+				Event_Received: {
+					{
+						To: State_Pooled,
+						If: guard_And(guard_NoUnassembledDependencies, guard_NoUnknownDependencies),
+					},
+					{
+						To: State_PreAssembly_Blocked,
+						If: guard_Or(guard_HasUnassembledDependencies, guard_HasUnknownDependencies),
+					},
+				},
+			},
+		},
+		State_PreAssembly_Blocked: {
+			Transitions: map[EventType][]Transition{
+				Event_DependencyAssembled: {{
+					To: State_Pooled,
+					If: guard_NoUnassembledDependencies,
+				}},
+			},
+		},
 		State_Pooled: {
 			OnTransitionTo: action_initializeDependencies,
 			Transitions: map[EventType][]Transition{

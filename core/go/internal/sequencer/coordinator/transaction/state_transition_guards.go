@@ -39,6 +39,23 @@ func guard_AssembleTimeoutExceeded(ctx context.Context, txn *Transaction) bool {
 	return txn.assembleTimeoutExceeded(ctx)
 }
 
+func guard_NoUnassembledDependencies(ctx context.Context, txn *Transaction) bool {
+	return !txn.hasDependenciesNotAssembled(ctx)
+}
+
+func guard_HasUnassembledDependencies(ctx context.Context, txn *Transaction) bool {
+	return txn.hasDependenciesNotAssembled(ctx)
+}
+
+func guard_HasUnknownDependencies(ctx context.Context, txn *Transaction) bool {
+	return txn.hasUnknownDependencies(ctx)
+}
+
+// TODO add a guard_Not function to negate a guard
+func guard_NoUnknownDependencies(ctx context.Context, txn *Transaction) bool {
+	return !txn.hasUnknownDependencies(ctx)
+}
+
 func guard_And(guards ...Guard) Guard {
 	return func(ctx context.Context, txn *Transaction) bool {
 		for _, guard := range guards {
@@ -47,5 +64,16 @@ func guard_And(guards ...Guard) Guard {
 			}
 		}
 		return true
+	}
+}
+
+func guard_Or(guards ...Guard) Guard {
+	return func(ctx context.Context, txn *Transaction) bool {
+		for _, guard := range guards {
+			if guard(ctx, txn) {
+				return true
+			}
+		}
+		return false
 	}
 }

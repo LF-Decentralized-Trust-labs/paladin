@@ -210,3 +210,5 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 	return txn, mocks
 
 }
+
+//TODO add unit test for the guards and various different combinations of dependency not read scenarios ( e.g. pre-assemble dependencies vs post-assemble dependencies) and for those dependencies being in various different states ( the state machine test only test for "not assembled" or "not ready" but each of these "not" states actually correspond to several possible finite states.)

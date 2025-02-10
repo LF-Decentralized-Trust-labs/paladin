@@ -36,6 +36,17 @@ func (e *event) GetTransactionID() uuid.UUID {
 	return e.TransactionID
 }
 
+// TransactionReceivedEvent is "emitted" when the coordinator receives a transaction.
+// Feels slightly artificial to model this as an event because it happens every time we create a transaction object
+// but rather than bury the logic in NewTransaction func, modeling this event allows us to define the initial state transition rules in the same declarative stateDefinitions structure as all other state transitions
+type ReceivedEvent struct {
+	event
+}
+
+func (_ *ReceivedEvent) Type() EventType {
+	return Event_Received
+}
+
 // TransactionSelectedEvent
 type SelectedEvent struct {
 	event

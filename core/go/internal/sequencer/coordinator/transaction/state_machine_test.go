@@ -42,7 +42,65 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 		NewGrapher(ctx),
 	)
 
+	assert.Equal(t, State_Initial, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Initial_ToPooled_OnReceived_IfNoInflightDependencies(t *testing.T) {
+	ctx := context.Background()
+	txn := NewTransactionBuilderForTesting(t, State_Pooled).Build()
+
+	txn.HandleEvent(ctx, &ReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+	})
+
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Initial_ToPreAssemblyBlocked_OnReceived_IfDependencyNotAssembled(t *testing.T) {
+
+	ctx := context.Background()
+
+	//we need 2 transactions to know about each other so they need to share a state index
+	grapher := NewGrapher(ctx)
+
+	//transaction2 depends on transaction 1 and transaction 1 gets reverted
+	builder1 := NewTransactionBuilderForTesting(t, State_Pooled).
+		Grapher(grapher)
+
+	txn1 := builder1.Build()
+
+	builder2 := NewTransactionBuilderForTesting(t, State_Initial).
+		Grapher(grapher).
+		Sender(builder1.sender).
+		PredefinedDependencies(txn1.ID)
+	txn2 := builder2.Build()
+
+	txn2.HandleEvent(ctx, &ReceivedEvent{
+		event: event{
+			TransactionID: txn2.ID,
+		},
+	})
+
+	assert.Equal(t, State_PreAssembly_Blocked, txn2.stateMachine.currentState, "current state is %s", txn2.stateMachine.currentState.String())
+
+}
+
+func TestStateMachine_Initial_ToPreAssemblyBlocked_OnReceived_IfDependencyUnknown(t *testing.T) {
+	ctx := context.Background()
+	builder := NewTransactionBuilderForTesting(t, State_Initial).
+		PredefinedDependencies(uuid.New())
+	txn := builder.Build()
+
+	txn.HandleEvent(ctx, &ReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+	})
+
+	assert.Equal(t, State_PreAssembly_Blocked, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+
 }
 
 func TestStateMachine_Pooled_ToAssembling_OnSelected(t *testing.T) {
