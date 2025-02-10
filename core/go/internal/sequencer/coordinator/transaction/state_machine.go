@@ -106,13 +106,12 @@ func stateDefinitions() map[State]StateDefinition {
 		return stateDefinitionsMap
 	}
 	stateDefinitionsMap = map[State]StateDefinition{
-		//TODO rules for transition from initial state to either pooled (selectable) or blocked or whatever, depending on the state of dependency transactions
 		State_Initial: {
 			Transitions: map[EventType][]Transition{
 				Event_Received: {
 					{
 						To: State_Pooled,
-						If: guard_And(guard_NoUnassembledDependencies, guard_NoUnknownDependencies),
+						If: guard_And(guard_Not(guard_HasUnassembledDependencies), guard_Not(guard_HasUnknownDependencies)),
 					},
 					{
 						To: State_PreAssembly_Blocked,
@@ -125,7 +124,7 @@ func stateDefinitions() map[State]StateDefinition {
 			Transitions: map[EventType][]Transition{
 				Event_DependencyAssembled: {{
 					To: State_Pooled,
-					If: guard_NoUnassembledDependencies,
+					If: guard_Not(guard_HasUnassembledDependencies),
 				}},
 			},
 		},
@@ -161,7 +160,7 @@ func stateDefinitions() map[State]StateDefinition {
 				Event_Endorsed: {
 					{
 						To: State_Confirming_Dispatch,
-						If: guard_And(guard_AttestationPlanFulfilled, guard_NoDependenciesNotReady),
+						If: guard_And(guard_AttestationPlanFulfilled, guard_Not(guard_HasDependenciesNotReady)),
 					},
 					{
 						To: State_Blocked,
@@ -175,7 +174,7 @@ func stateDefinitions() map[State]StateDefinition {
 			Transitions: map[EventType][]Transition{
 				Event_DependencyReady: {{
 					To: State_Confirming_Dispatch,
-					If: guard_And(guard_AttestationPlanFulfilled, guard_NoDependenciesNotReady),
+					If: guard_And(guard_AttestationPlanFulfilled, guard_Not(guard_HasDependenciesNotReady)),
 				}},
 			},
 		},
