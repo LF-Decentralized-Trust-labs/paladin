@@ -112,6 +112,7 @@ func TestStateMachine_Pooled_ToPreAssemblyBlocked_OnDependencyReverted(t *testin
 	//we need 2 transactions to know about each other so they need to share a state index
 	grapher := NewGrapher(ctx)
 
+	//transaction2 depends on transaction 1 and transaction 1 gets reverted
 	builder1 := NewTransactionBuilderForTesting(t, State_Assembling).
 		Grapher(grapher).
 		Reverts("some revert reason")

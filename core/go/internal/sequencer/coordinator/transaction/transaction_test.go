@@ -164,9 +164,8 @@ func TestTransaction_AddsItselfToGrapher(t *testing.T) {
 
 	transaction, _ := newTransactionForUnitTesting(t, grapher)
 
-	txn, err := grapher.TransactionByID(ctx, transaction.ID)
+	txn := grapher.TransactionByID(ctx, transaction.ID)
 
-	assert.NoError(t, err)
 	assert.NotNil(t, txn)
 }
 
@@ -179,8 +178,7 @@ func TestTransaction_RemovesItselfFromGrapher(t *testing.T) {
 	err := transaction.cleanup(ctx)
 	assert.NoError(t, err)
 
-	txn, err := grapher.TransactionByID(ctx, transaction.ID)
-	assert.NoError(t, err)
+	txn := grapher.TransactionByID(ctx, transaction.ID)
 	assert.Nil(t, txn)
 }
 

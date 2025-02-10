@@ -36,7 +36,7 @@ import (
 // the actual graph is the emergent data structure of the transactions maintaining links to each other
 type Grapher interface {
 	Add(context.Context, *Transaction)
-	TransactionByID(ctx context.Context, transactionID uuid.UUID) (*Transaction, error)
+	TransactionByID(ctx context.Context, transactionID uuid.UUID) *Transaction
 	LookupMinter(ctx context.Context, stateID tktypes.HexBytes) (*Transaction, error)
 	AddMinter(ctx context.Context, stateID tktypes.HexBytes, transaction *Transaction) error
 	Forget(transactionID uuid.UUID) error
@@ -86,6 +86,6 @@ func (s *grapher) Forget(transactionID uuid.UUID) error {
 	return nil
 }
 
-func (s *grapher) TransactionByID(ctx context.Context, transactionID uuid.UUID) (*Transaction, error) {
-	return s.transactionByID[transactionID], nil
+func (s *grapher) TransactionByID(ctx context.Context, transactionID uuid.UUID) *Transaction {
+	return s.transactionByID[transactionID]
 }

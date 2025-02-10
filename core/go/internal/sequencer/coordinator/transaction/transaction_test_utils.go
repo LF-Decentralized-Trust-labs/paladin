@@ -264,11 +264,8 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 
 	b.txn = NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeClock.Duration(b.requestTimeout), b.fakeClock.Duration(b.assembleTimeout), b.grapher)
 
-	//Assuming a "normal" path through the state machine to the current desired state
 	if b.predefinedDependencies != nil {
-		for _, dependencyID := range b.predefinedDependencies {
-			b.txn.PreAssembly.Dependencies = append(b.txn.PreAssembly.Dependencies, dependencyID)
-		}
+		b.txn.PreAssembly.Dependencies = append(b.txn.PreAssembly.Dependencies, b.predefinedDependencies...)
 	}
 
 	//Update the private transaction struct to the accumulation that resulted from what ever events that we expect to have happened leading up to the current state

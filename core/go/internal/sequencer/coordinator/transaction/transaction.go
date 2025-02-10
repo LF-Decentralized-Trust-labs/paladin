@@ -62,8 +62,8 @@ type Transaction struct {
 	pendingEndorsementRequests         map[string]map[string]*common.IdempotentRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
 	pendingDispatchConfirmationRequest *common.IdempotentRequest
 	latestError                        string
-	dependencies                       []*Transaction //TODO replace this with ID and use Grapher when needed to lookup transaction object to simplify cleanup
-	dependents                         []*Transaction //TODO replace this with ID and use Grapher when needed to lookup transaction object to simplify cleanup.  Also rename to avoid confusion with predefined dependencies
+	dependencies                       []uuid.UUID
+	dependents                         []uuid.UUID
 	preAssembleDependents              []uuid.UUID
 	requestTimeout                     common.Duration
 	assembleTimeout                    common.Duration
@@ -242,6 +242,7 @@ func (d *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []
 					found = endorsement.Name == attRequest.Name &&
 						party == endorsement.Verifier.Lookup &&
 						attRequest.VerifierType == endorsement.Verifier.VerifierType
+
 					log.L(ctx).Infof("endorsement matched=%t: request[name=%s,party=%s,verifierType=%s] endorsement[name=%s,party=%s,verifierType=%s] verifier=%s",
 						found,
 						attRequest.Name, party, attRequest.VerifierType,
@@ -298,7 +299,12 @@ func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
 	// some of them might have been confirmed and removed from our list to avoid a memory leak so this is not necessarily the complete list of dependencies
 	// but it should contain all the ones that are not ready for dispatch
 
-	for _, dependency := range t.dependencies {
+	for _, dependencyID := range t.dependencies {
+		dependency := t.grapher.TransactionByID(ctx, dependencyID)
+		if dependency == nil {
+			//assume the dependency has been confirmed and no longer in memory
+			continue
+		}
 		//test against the list of states that we consider to be past the point of ready as there is more chance of us noticing
 		// a failing test if we add new states in the future and forget to update this list
 		if dependency.GetState() != State_Confirmed &&
@@ -371,7 +377,13 @@ func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error
 func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
 	//this function is called when the transaction enters the ready for dispatch state
 	// and we have a duty to inform all the transactions that are dependent on us that we are ready in case they are otherwise ready and are blocked waiting for us
-	for _, dependent := range t.dependents {
+	for _, dependentId := range t.dependents {
+		dependent := t.grapher.TransactionByID(ctx, dependentId)
+		if dependent == nil {
+			msg := fmt.Sprintf("notifyDependentsOfReadiness: Dependent transaction %s not found in memory", dependentId)
+			log.L(ctx).Error(msg)
+			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
+		}
 		dependent.HandleEvent(ctx, &DependencyReadyEvent{
 			event: event{
 				TransactionID: dependent.ID,
@@ -385,22 +397,10 @@ func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
 func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 	//this function is called when the transaction enters the reverted state on a revert response from assemble
 	// NOTE: at this point, we have not been assembled and therefore are not the minter of any state the only transactions that could possibly be dependent on us are those in the pool from the same sender
-	for _, dependent := range t.dependents {
-		dependent.HandleEvent(ctx, &DependencyRevertedEvent{
-			event: event{
-				TransactionID: dependent.ID,
-			},
-			DependencyID: t.ID,
-		})
-	}
 
 	//TODO combine this to the above for loop once dependents has been refactored to be an array of uuids
-	for _, dependentID := range t.preAssembleDependents {
-		dependentTxn, err := t.grapher.TransactionByID(ctx, dependentID)
-		if err != nil {
-			log.L(ctx).Errorf("Error looking up dependent transaction %s: %s", dependentID, err)
-			return err
-		}
+	for _, dependentID := range append(t.dependents, t.preAssembleDependents...) {
+		dependentTxn := t.grapher.TransactionByID(ctx, dependentID)
 		if dependentTxn != nil {
 			dependentTxn.HandleEvent(ctx, &DependencyRevertedEvent{
 				event: event{
@@ -409,10 +409,11 @@ func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 				DependencyID: t.ID,
 			})
 		} else {
-			// Assume that the dependent is no longer in memory and doesn't need to know about this event
-			//TODO is this a safe assumption.  Point to (write) the architecture doc that explains why this is safe
+			//TODO can we Assume that the dependent is no longer in memory and doesn't need to know about this event?  Point to (write) the architecture doc that explains why this is safe
 
-			log.L(ctx).Infof("Dependent transaction %s not found in memory", dependentID)
+			msg := fmt.Sprintf("notifyDependentsOfRevert: Dependent transaction %s not found in memory", dependentID)
+			log.L(ctx).Error(msg)
+			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
 
 	}
@@ -462,11 +463,8 @@ func (t *Transaction) initializeDependencies(ctx context.Context) error {
 	}
 
 	for _, dependencyID := range t.PreAssembly.Dependencies {
-		dependencyTxn, err := t.grapher.TransactionByID(ctx, dependencyID)
-		if err != nil {
-			log.L(ctx).Errorf("Error looking up dependency for transaction %s: %s", dependencyID, err)
-			return err
-		}
+		dependencyTxn := t.grapher.TransactionByID(ctx, dependencyID)
+
 		if nil == dependencyTxn {
 			//assume dependency has been confirmed and no longer in memory
 			//TODO do we really need to check this against the DB / domain context or can we be sure there is no other reason that the grapher does not know about this. If we think this is safe, then point at the architecture doc explaining why it is so.
@@ -491,8 +489,8 @@ func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) err
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
 
-	found := make(map[string]bool)
-	t.dependencies = make([]*Transaction, 0, len(t.PostAssembly.InputStates)+len(t.PostAssembly.ReadStates))
+	found := make(map[uuid.UUID]bool)
+	t.dependencies = make([]uuid.UUID, 0, len(t.PostAssembly.InputStates)+len(t.PostAssembly.ReadStates))
 	for _, state := range append(t.PostAssembly.InputStates, t.PostAssembly.ReadStates...) {
 		dependency, err := t.grapher.LookupMinter(ctx, state.ID)
 		if err != nil {
@@ -506,13 +504,13 @@ func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) err
 			//TODO should we validate this by checking the domain context? If not, explain why this is safe in the architecture doc
 			continue
 		}
-		if found[dependency.ID.String()] {
+		if found[dependency.ID] {
 			continue
 		}
-		found[dependency.ID.String()] = true
-		t.dependencies = append(t.dependencies, dependency)
+		found[dependency.ID] = true
+		t.dependencies = append(t.dependencies, dependency.ID)
 		//also set up the reverse association
-		dependency.dependents = append(dependency.dependents, t)
+		dependency.dependents = append(dependency.dependents, t.ID)
 	}
 	return nil
 }
