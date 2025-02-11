@@ -50,6 +50,7 @@ func TestTransaction_HasDependenciesNotReady_TrueOK(t *testing.T) {
 			TransactionID: transaction2.ID,
 		},
 		PostAssembly: transaction2Builder.BuildPostAssembly(),
+		RequestID:    transaction2.pendingAssembleRequest.IdempotencyKey(),
 	})
 
 	assert.True(t, transaction2.hasDependenciesNotReady(context.Background()))
@@ -76,6 +77,7 @@ func TestTransaction_HasDependenciesNotReady_TrueWhenStatesAreReadOnly(t *testin
 			TransactionID: transaction2.ID,
 		},
 		PostAssembly: transaction2Builder.BuildPostAssembly(),
+		RequestID:    transaction2.pendingAssembleRequest.IdempotencyKey(),
 	})
 
 	assert.True(t, transaction2.hasDependenciesNotReady(context.Background()))
@@ -110,6 +112,7 @@ func TestTransaction_HasDependenciesNotReady(t *testing.T) {
 			TransactionID: transaction3.ID,
 		},
 		PostAssembly: transaction3Builder.BuildPostAssembly(),
+		RequestID:    transaction3.pendingAssembleRequest.IdempotencyKey(),
 	})
 
 	assert.True(t, transaction3.hasDependenciesNotReady(context.Background()))

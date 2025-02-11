@@ -156,6 +156,7 @@ func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uui
 func (t *Transaction) applyEndorsement(ctx context.Context, endorsement *prototk.AttestationResult, requestID uuid.UUID) error {
 	pendingRequestsForAttRequest, ok := t.pendingEndorsementRequests[endorsement.Name]
 	if !ok {
+
 		log.L(ctx).Infof("Ignoring endorsement response for transaction %s from %s because no pending request found for attestation request name %s", t.ID, endorsement.Verifier.Lookup, endorsement.Name)
 		return nil
 	}
@@ -175,7 +176,6 @@ func (t *Transaction) applyEndorsement(ctx context.Context, endorsement *prototk
 }
 
 func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *components.TransactionPostAssembly) error {
-	//TODO check that this matches a pending request and that it has not timed out
 
 	//TODO the response from the assembler actually contains outputStatesPotential so we need to write them to the store and then add the OutputState ids to the index
 	t.PostAssembly = postAssembly

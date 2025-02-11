@@ -128,11 +128,26 @@ func TestStateMachine_Assembling_ToEndorsing_OnAssembleResponse(t *testing.T) {
 			TransactionID: txn.ID,
 		},
 		PostAssembly: txnBuilder.BuildPostAssembly(),
+		RequestID:    txn.pendingAssembleRequest.IdempotencyKey(),
 	})
-
 	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.Equal(t, 3, mocks.sentMessageRecorder.numberOfSentEndorsementRequests, "expected 3 endorsement requests to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentEndorsementRequests)
 
+}
+
+func TestStateMachine_Assembling_NoTransition_OnAssembleResponse_IfResponseDoesNotMatchPendingRequest(t *testing.T) {
+	ctx := context.Background()
+	txnBuilder := NewTransactionBuilderForTesting(t, State_Assembling)
+	txn := txnBuilder.Build()
+
+	txn.HandleEvent(ctx, &AssembleSuccessEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		PostAssembly: txnBuilder.BuildPostAssembly(),
+		RequestID:    uuid.New(), //generate a new random request ID so that it won't match the pending request
+	})
+	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
 func TestStateMachine_Assembling_ToPooled_OnHeartbeat_IfAssembleTimeoutExpired(t *testing.T) {
@@ -159,9 +174,28 @@ func TestStateMachine_Assembling_ToReverted_OnAssembleRevertResponse(t *testing.
 			TransactionID: txn.ID,
 		},
 		PostAssembly: txnBuilder.BuildPostAssembly(),
+		RequestID:    txn.pendingAssembleRequest.IdempotencyKey(),
 	})
 
 	assert.Equal(t, State_Reverted, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Assembling_NoTransition_OnAssembleRevertResponse_IfResponseDoesNotMatchPendingRequest(t *testing.T) {
+	ctx := context.Background()
+	txnBuilder := NewTransactionBuilderForTesting(t, State_Assembling).
+		Reverts("some revert reason")
+
+	txn := txnBuilder.Build()
+
+	txn.HandleEvent(ctx, &AssembleRevertResponseEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		PostAssembly: txnBuilder.BuildPostAssembly(),
+		RequestID:    uuid.New(), //generate a new random request ID so that it won't match the pending request,
+	})
+
+	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
 func TestStateMachine_Pooled_ToPreAssemblyBlocked_OnDependencyReverted(t *testing.T) {
@@ -187,6 +221,7 @@ func TestStateMachine_Pooled_ToPreAssemblyBlocked_OnDependencyReverted(t *testin
 			TransactionID: txn1.ID,
 		},
 		PostAssembly: builder1.BuildPostAssembly(),
+		RequestID:    txn1.pendingAssembleRequest.IdempotencyKey(),
 	})
 
 	assert.Equal(t, State_PreAssembly_Blocked, txn2.stateMachine.currentState, "current state is %s", txn2.stateMachine.currentState.String())

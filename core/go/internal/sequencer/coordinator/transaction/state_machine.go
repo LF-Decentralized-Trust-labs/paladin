@@ -114,7 +114,7 @@ func stateDefinitions() map[State]StateDefinition {
 	stateDefinitionsMap = map[State]StateDefinition{
 		State_Initial: {
 			Events: map[EventType]EventHandler{
-				Event_Received: {
+				Event_Received: { //TODO rename this event type because it is the first one we see in this struct and it seems like we are saying this is a definition related to receiving an event (at one level that is correct but it is not what is meant by Event_Received)
 					Transitions: []Transition{
 						{
 							To: State_Pooled,
@@ -158,6 +158,7 @@ func stateDefinitions() map[State]StateDefinition {
 			OnTransitionTo: action_SendAssembleRequest,
 			Events: map[EventType]EventHandler{
 				Event_Assemble_Success: {
+					Validator: validator_MatchesPendingAssembleRequest,
 					Transitions: []Transition{
 						{
 							To: State_Endorsement_Gathering,
@@ -170,6 +171,7 @@ func stateDefinitions() map[State]StateDefinition {
 					}},
 				},
 				Event_Assemble_Revert_Response: {
+					Validator: validator_MatchesPendingAssembleRequest,
 					Transitions: []Transition{{
 						To: State_Reverted,
 					}},
