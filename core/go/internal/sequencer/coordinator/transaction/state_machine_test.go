@@ -127,7 +127,7 @@ func TestStateMachine_Assembling_ToEndorsing_OnAssembleResponse(t *testing.T) {
 		event: event{
 			TransactionID: txn.ID,
 		},
-		postAssembly: txnBuilder.BuildPostAssembly(),
+		PostAssembly: txnBuilder.BuildPostAssembly(),
 	})
 
 	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
@@ -158,7 +158,7 @@ func TestStateMachine_Assembling_ToReverted_OnAssembleRevertResponse(t *testing.
 		event: event{
 			TransactionID: txn.ID,
 		},
-		postAssembly: txnBuilder.BuildPostAssembly(),
+		PostAssembly: txnBuilder.BuildPostAssembly(),
 	})
 
 	assert.Equal(t, State_Reverted, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
@@ -186,7 +186,7 @@ func TestStateMachine_Pooled_ToPreAssemblyBlocked_OnDependencyReverted(t *testin
 		event: event{
 			TransactionID: txn1.ID,
 		},
-		postAssembly: builder1.BuildPostAssembly(),
+		PostAssembly: builder1.BuildPostAssembly(),
 	})
 
 	assert.Equal(t, State_PreAssembly_Blocked, txn2.stateMachine.currentState, "current state is %s", txn2.stateMachine.currentState.String())

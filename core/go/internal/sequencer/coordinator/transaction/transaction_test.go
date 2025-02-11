@@ -49,7 +49,7 @@ func TestTransaction_HasDependenciesNotReady_TrueOK(t *testing.T) {
 		event: event{
 			TransactionID: transaction2.ID,
 		},
-		postAssembly: transaction2Builder.BuildPostAssembly(),
+		PostAssembly: transaction2Builder.BuildPostAssembly(),
 	})
 
 	assert.True(t, transaction2.hasDependenciesNotReady(context.Background()))
@@ -75,7 +75,7 @@ func TestTransaction_HasDependenciesNotReady_TrueWhenStatesAreReadOnly(t *testin
 		event: event{
 			TransactionID: transaction2.ID,
 		},
-		postAssembly: transaction2Builder.BuildPostAssembly(),
+		PostAssembly: transaction2Builder.BuildPostAssembly(),
 	})
 
 	assert.True(t, transaction2.hasDependenciesNotReady(context.Background()))
@@ -109,7 +109,7 @@ func TestTransaction_HasDependenciesNotReady(t *testing.T) {
 		event: event{
 			TransactionID: transaction3.ID,
 		},
-		postAssembly: transaction3Builder.BuildPostAssembly(),
+		PostAssembly: transaction3Builder.BuildPostAssembly(),
 	})
 
 	assert.True(t, transaction3.hasDependenciesNotReady(context.Background()))
@@ -212,3 +212,6 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 }
 
 //TODO add unit test for the guards and various different combinations of dependency not read scenarios ( e.g. pre-assemble dependencies vs post-assemble dependencies) and for those dependencies being in various different states ( the state machine test only test for "not assembled" or "not ready" but each of these "not" states actually correspond to several possible finite states.)
+
+//TODO add unit tests to assert that if a dependency arrives after its dependent, then the dependency is correctly updated with a reference to the dependent so that we can notify the dependent when the dependency state changes ( e.g. is dispatched, is assembled)
+// . - or think about whether this should this be a state machine test?

@@ -452,7 +452,6 @@ func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 	//this function is called when the transaction enters the reverted state on a revert response from assemble
 	// NOTE: at this point, we have not been assembled and therefore are not the minter of any state the only transactions that could possibly be dependent on us are those in the pool from the same sender
 
-	//TODO combine this to the above for loop once dependents has been refactored to be an array of uuids
 	for _, dependentID := range append(t.dependents, t.preAssembleDependents...) {
 		dependentTxn := t.grapher.TransactionByID(ctx, dependentID)
 		if dependentTxn != nil {
@@ -509,6 +508,7 @@ func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState
 	return endorsableList
 }
 
+// TODO rename this function because it is not clear that its main purpose is to attach this transaction to the dependency as a dependent
 func (t *Transaction) initializeDependencies(ctx context.Context) error {
 	if t.PreAssembly == nil {
 		msg := fmt.Sprintf("Cannot calculate dependencies for transaction %s without a PreAssembly", t.ID)
@@ -520,11 +520,15 @@ func (t *Transaction) initializeDependencies(ctx context.Context) error {
 		dependencyTxn := t.grapher.TransactionByID(ctx, dependencyID)
 
 		if nil == dependencyTxn {
-			//assume dependency has been confirmed and no longer in memory
-			//TODO do we really need to check this against the DB / domain context or can we be sure there is no other reason that the grapher does not know about this. If we think this is safe, then point at the architecture doc explaining why it is so.
-			//
+			//either the dependency has been confirmed and no longer in memory or there was a overtake on the network and we have not received the delegation request for the dependency yet
+			// in either case, the guards will stop this transaction from being assembled but will appear in the heartbeat messages so that the sender can take appropriate action (remove the dependency if it is confirmed, resend the dependency delegation request if it is an inflight transaction)
+
+			//This should be relatively rare so worth logging as an info
+			log.L(ctx).Infof("Dependency %s not found in memory for transaction %s", dependencyID, t.ID)
 			continue
 		}
+
+		//TODO this should be idempotent.
 		dependencyTxn.preAssembleDependents = append(dependencyTxn.preAssembleDependents, t.ID)
 	}
 

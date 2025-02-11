@@ -80,16 +80,22 @@ type StateMachine struct {
 }
 
 type Transition struct {
-	To State
-	If Guard
+	To State // State to transition to if the guard condition is met
+	If Guard // Condition to evaluate the transaction against to determine if this transition should be taken
 }
 
 // TODO do we need the `from` state here? Should the transition functions be forced not to care about that?
 type OnTransitionTo func(ctx context.Context, txn *Transaction, to, from State) error
 
+// TODO is EventHandler the best name
+type EventHandler struct {
+	Validator   func(ctx context.Context, txn *Transaction, event Event) (bool, error) // function to validate whether the event is valid for the current state of the transaction.  This is optional.  If not defined, the event is always considered valid.
+	Transitions []Transition                                                           // list of transitions that this event could trigger.  The list is ordered so the first matching transition is the one that will be taken.
+}
+
 type StateDefinition struct {
 	OnTransitionTo OnTransitionTo             // function to be invoked when transitioning into this state
-	Transitions    map[EventType][]Transition // rules to define when to exit this state and which state to transition to
+	Events         map[EventType]EventHandler // rules to define what events apply to this state and what transitions they trigger
 }
 
 // Initialize state definitions in a function to avoid circular dependencies
@@ -107,107 +113,139 @@ func stateDefinitions() map[State]StateDefinition {
 	}
 	stateDefinitionsMap = map[State]StateDefinition{
 		State_Initial: {
-			Transitions: map[EventType][]Transition{
+			Events: map[EventType]EventHandler{
 				Event_Received: {
-					{
-						To: State_Pooled,
-						If: guard_And(guard_Not(guard_HasUnassembledDependencies), guard_Not(guard_HasUnknownDependencies)),
-					},
-					{
-						To: State_PreAssembly_Blocked,
-						If: guard_Or(guard_HasUnassembledDependencies, guard_HasUnknownDependencies),
+					Transitions: []Transition{
+						{
+							To: State_Pooled,
+							If: guard_And(guard_Not(guard_HasUnassembledDependencies), guard_Not(guard_HasUnknownDependencies)),
+						},
+						{
+							To: State_PreAssembly_Blocked,
+							If: guard_Or(guard_HasUnassembledDependencies, guard_HasUnknownDependencies),
+						},
 					},
 				},
 			},
 		},
 		State_PreAssembly_Blocked: {
-			Transitions: map[EventType][]Transition{
-				Event_DependencyAssembled: {{
-					To: State_Pooled,
-					If: guard_Not(guard_HasUnassembledDependencies),
-				}},
+			Events: map[EventType]EventHandler{
+				Event_DependencyAssembled: {
+					Transitions: []Transition{{
+						To: State_Pooled,
+						If: guard_Not(guard_HasUnassembledDependencies),
+					}},
+				},
 			},
 		},
 		State_Pooled: {
 			OnTransitionTo: action_initializeDependencies,
-			Transitions: map[EventType][]Transition{
-				Event_Selected: {{
-					To: State_Assembling,
-				}},
-				Event_DependencyReverted: {{
-					To: State_PreAssembly_Blocked,
-				}},
+			Events: map[EventType]EventHandler{
+				Event_Selected: {
+					Transitions: []Transition{
+						{
+							To: State_Assembling,
+						}},
+				},
+				Event_DependencyReverted: {
+					Transitions: []Transition{{
+						To: State_PreAssembly_Blocked,
+					}},
+				},
 			},
 		},
 		State_Assembling: {
 			OnTransitionTo: action_SendAssembleRequest,
-			Transitions: map[EventType][]Transition{
-				Event_Assemble_Success: {{
-					To: State_Endorsement_Gathering,
-				}},
-				Event_HeartbeatInterval: {{
-					To: State_Pooled,
-					If: guard_AssembleTimeoutExceeded,
-				}},
-				Event_Assemble_Revert_Response: {{
-					To: State_Reverted,
-				}},
+			Events: map[EventType]EventHandler{
+				Event_Assemble_Success: {
+					Transitions: []Transition{
+						{
+							To: State_Endorsement_Gathering,
+						}},
+				},
+				Event_HeartbeatInterval: {
+					Transitions: []Transition{{
+						To: State_Pooled,
+						If: guard_AssembleTimeoutExceeded,
+					}},
+				},
+				Event_Assemble_Revert_Response: {
+					Transitions: []Transition{{
+						To: State_Reverted,
+					}},
+				},
 			},
 		},
 		State_Endorsement_Gathering: {
 			OnTransitionTo: action_SendEndorsementRequests,
-			Transitions: map[EventType][]Transition{
+			Events: map[EventType]EventHandler{
 				Event_Endorsed: {
-					{
-						To: State_Confirming_Dispatch,
-						If: guard_And(guard_AttestationPlanFulfilled, guard_Not(guard_HasDependenciesNotReady)),
-					},
-					{
-						To: State_Blocked,
-						If: guard_And(guard_AttestationPlanFulfilled, guard_HasDependenciesNotReady),
+					Transitions: []Transition{
+						{
+							To: State_Confirming_Dispatch,
+							If: guard_And(guard_AttestationPlanFulfilled, guard_Not(guard_HasDependenciesNotReady)),
+						},
+						{
+							To: State_Blocked,
+							If: guard_And(guard_AttestationPlanFulfilled, guard_HasDependenciesNotReady),
+						},
 					},
 				},
 			},
 		},
 		State_Blocked: {
 			OnTransitionTo: nil,
-			Transitions: map[EventType][]Transition{
-				Event_DependencyReady: {{
-					To: State_Confirming_Dispatch,
-					If: guard_And(guard_AttestationPlanFulfilled, guard_Not(guard_HasDependenciesNotReady)),
-				}},
+			Events: map[EventType]EventHandler{
+				Event_DependencyReady: {
+					Transitions: []Transition{{
+						To: State_Confirming_Dispatch,
+						If: guard_And(guard_AttestationPlanFulfilled, guard_Not(guard_HasDependenciesNotReady)),
+					}},
+				},
 			},
 		},
 		State_Confirming_Dispatch: {
 			OnTransitionTo: action_SendDispatchConfirmationRequest,
-			Transitions: map[EventType][]Transition{
-				Event_DispatchConfirmed: {{
-					To: State_Ready_For_Dispatch,
-				}},
+			Events: map[EventType]EventHandler{
+				Event_DispatchConfirmed: {
+					Transitions: []Transition{
+						{
+							To: State_Ready_For_Dispatch,
+						}},
+				},
 			},
 		},
 		State_Ready_For_Dispatch: {
 			OnTransitionTo: action_NotifyDependentsOfReadiness, //TODO also at this point we should notify the dispatch thread to come and collect this transaction
-			Transitions: map[EventType][]Transition{
-				Event_Collected: {{
-					To: State_Dispatched,
-				}},
+			Events: map[EventType]EventHandler{
+				Event_Collected: {
+					Transitions: []Transition{
+						{
+							To: State_Dispatched,
+						}},
+				},
 			},
 		},
 		State_Dispatched: {
 			OnTransitionTo: nil,
-			Transitions: map[EventType][]Transition{
-				Event_Submitted: {{
-					To: State_Submitted,
-				}},
+			Events: map[EventType]EventHandler{
+				Event_Submitted: {
+					Transitions: []Transition{
+						{
+							To: State_Submitted,
+						}},
+				},
 			},
 		},
 		State_Submitted: {
 			OnTransitionTo: nil,
-			Transitions: map[EventType][]Transition{
-				Event_Confirmed: {{
-					To: State_Confirmed,
-				}},
+			Events: map[EventType]EventHandler{
+				Event_Confirmed: {
+					Transitions: []Transition{
+						{
+							To: State_Confirmed,
+						}},
+				},
 			},
 		},
 		State_Reverted: {
@@ -228,15 +266,40 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 	sm := t.stateMachine
 
+	//Determine if and how this event applies in the current state and which, if any, transition it triggers
+	eventHandlers := stateDefinitions()[sm.currentState].Events
+	eventHandler, isHandlerDefined := eventHandlers[event.Type()]
+	if isHandlerDefined {
+		//By default all events in the list are applied unless there is a validator function and it returns false
+		if eventHandler.Validator != nil {
+			valid, err := eventHandler.Validator(ctx, t, event)
+			if err != nil {
+				log.L(ctx).Errorf("Error validating event %v: %v", event.Type(), err)
+				//TODO abort
+				return
+			}
+			if !valid {
+				//This is perfectly normal sometimes an event happens and is no longer relevant to the transaction so we just ignore it and move on
+				log.L(ctx).Debugf("Event %v is not valid: %v", event.Type(), valid)
+				return
+			}
+		}
+	} else {
+		// no event handler defined for this event while in this state
+		log.L(ctx).Debugf("No event handler defined for Event %v in State %s", event.Type(), sm.currentState.String())
+	}
+
+	//If we get here, the state machine has defined a rule for handling this event in the current state and the event is deemed to be valid so we shall apply it to the transaction now
+
 	switch event := event.(type) {
 	case *SelectedEvent:
 		//TODO
 	case *AssembleRequestSentEvent:
 		//TODO
 	case *AssembleSuccessEvent:
-		t.applyPostAssembly(ctx, event.postAssembly)
+		t.applyPostAssembly(ctx, event.PostAssembly)
 	case *AssembleRevertResponseEvent:
-		t.applyPostAssembly(ctx, event.postAssembly)
+		t.applyPostAssembly(ctx, event.PostAssembly)
 	case *EndorsedEvent:
 		t.applyEndorsement(ctx, event.Endorsement, event.RequestID)
 	case *DispatchConfirmedEvent:
@@ -253,32 +316,26 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 		//TODO
 	}
 
-	//Determine whether this event triggers a state transition
-	transitions := stateDefinitions()[sm.currentState].Transitions
-	if transitionRules, ok := transitions[event.Type()]; ok {
-		for _, rule := range transitionRules {
-			if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
-				log.L(ctx).Infof("Transaction %s transitioning from %v to %v triggered by event %v", t.ID.String(), sm.currentState, rule.To, event.Type())
-				fromState := sm.currentState
-				sm.currentState = rule.To
-				newStateDefinition := stateDefinitions()[sm.currentState]
-				if newStateDefinition.OnTransitionTo != nil {
-					err := newStateDefinition.OnTransitionTo(ctx, t, rule.To, fromState)
-					if err != nil {
-						//TODO any recoverable errors should have been handled by the OnTransitionTo function so this is a panic or at least, abort the coordinator for this contract
-						log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
-						break
-					}
-				} else {
-					log.L(ctx).Debugf("No OnTransitionTo function defined for state %v", sm.currentState)
+	transitionRules := eventHandler.Transitions
+	for _, rule := range transitionRules {
+		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
+			log.L(ctx).Infof("Transaction %s transitioning from %v to %v triggered by event %v", t.ID.String(), sm.currentState, rule.To, event.Type())
+			fromState := sm.currentState
+			sm.currentState = rule.To
+			newStateDefinition := stateDefinitions()[sm.currentState]
+			if newStateDefinition.OnTransitionTo != nil {
+				err := newStateDefinition.OnTransitionTo(ctx, t, rule.To, fromState)
+				if err != nil {
+					//TODO any recoverable errors should have been handled by the OnTransitionTo function so this is a panic or at least, abort the coordinator for this contract
+					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
+					break
 				}
-				t.heartbeatIntervalsSinceStateChange = 0
-				break
+			} else {
+				log.L(ctx).Debugf("No OnTransitionTo function defined for state %v", sm.currentState)
 			}
+			t.heartbeatIntervalsSinceStateChange = 0
+			break
 		}
-
-	} else {
-		log.L(ctx).Debugf("No transition for Event %v from State %s", event.Type(), sm.currentState.String())
 	}
 }
 

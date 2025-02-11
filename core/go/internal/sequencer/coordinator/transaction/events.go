@@ -68,7 +68,8 @@ func (_ *AssembleRequestSentEvent) Type() EventType {
 // AssembleSuccessEvent
 type AssembleSuccessEvent struct {
 	event
-	postAssembly *components.TransactionPostAssembly
+	PostAssembly *components.TransactionPostAssembly
+	RequestID    uuid.UUID
 }
 
 func (_ *AssembleSuccessEvent) Type() EventType {
@@ -78,7 +79,8 @@ func (_ *AssembleSuccessEvent) Type() EventType {
 // AssembleRevertResponseEvent
 type AssembleRevertResponseEvent struct {
 	event
-	postAssembly *components.TransactionPostAssembly
+	PostAssembly *components.TransactionPostAssembly
+	RequestID    uuid.UUID
 }
 
 func (_ *AssembleRevertResponseEvent) Type() EventType {
