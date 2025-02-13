@@ -104,6 +104,7 @@ type TransactionBuilderForTesting struct {
 	endorsers              []*identityForTesting
 	sentMessageRecorder    *SentMessageRecorder
 	fakeClock              *common.FakeClockForTesting
+	fakeStateIntegration   *common.FakeStateIntegrationForTesting
 	grapher                Grapher
 	txn                    *Transaction
 	requestTimeout         int
@@ -134,6 +135,7 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		state:                state,
 		sentMessageRecorder:  NewSentMessageRecorder(),
 		fakeClock:            &common.FakeClockForTesting{},
+		fakeStateIntegration: &common.FakeStateIntegrationForTesting{},
 		assembleTimeout:      5000,
 		requestTimeout:       100,
 	}
@@ -212,12 +214,14 @@ func (b *TransactionBuilderForTesting) Reverts(revertReason string) *Transaction
 type transactionDependencyFakes struct {
 	sentMessageRecorder *SentMessageRecorder
 	clock               *common.FakeClockForTesting
+	stateIntegration    *common.FakeStateIntegrationForTesting
 }
 
 func (b *TransactionBuilderForTesting) BuildWithMocks() (*Transaction, *transactionDependencyFakes) {
 	mocks := &transactionDependencyFakes{
 		sentMessageRecorder: b.sentMessageRecorder,
 		clock:               b.fakeClock,
+		stateIntegration:    b.fakeStateIntegration,
 	}
 	return b.Build(), mocks
 }
@@ -262,7 +266,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		}
 	}
 
-	b.txn = NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeClock.Duration(b.requestTimeout), b.fakeClock.Duration(b.assembleTimeout), b.grapher)
+	b.txn = NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeStateIntegration, b.fakeClock.Duration(b.requestTimeout), b.fakeClock.Duration(b.assembleTimeout), b.grapher)
 
 	if b.predefinedDependencies != nil {
 		b.txn.PreAssembly.Dependencies = append(b.txn.PreAssembly.Dependencies, b.predefinedDependencies...)

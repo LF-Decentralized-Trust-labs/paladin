@@ -210,6 +210,7 @@ func stateDefinitions() map[State]StateDefinition {
 			OnTransitionTo: action_SendDispatchConfirmationRequest,
 			Events: map[EventType]EventHandler{
 				Event_DispatchConfirmed: {
+					Validator: validator_MatchesPendingDispatchConfirmationRequest,
 					Transitions: []Transition{
 						{
 							To: State_Ready_For_Dispatch,
@@ -293,6 +294,7 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 
 	//If we get here, the state machine has defined a rule for handling this event in the current state and the event is deemed to be valid so we shall apply it to the transaction now
 
+	//TODO reconsider moving these back into the state machine definition.
 	switch event := event.(type) {
 	case *SelectedEvent:
 		//TODO
@@ -300,6 +302,7 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 		//TODO
 	case *AssembleSuccessEvent:
 		t.applyPostAssembly(ctx, event.PostAssembly)
+		t.writeLockAndDistributeStates(ctx)
 	case *AssembleRevertResponseEvent:
 		t.applyPostAssembly(ctx, event.PostAssembly)
 	case *EndorsedEvent:

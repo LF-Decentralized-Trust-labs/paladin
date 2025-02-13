@@ -30,5 +30,12 @@ func validator_MatchesPendingAssembleRequest(ctx context.Context, txn *Transacti
 		return txn.pendingAssembleRequest != nil && txn.pendingAssembleRequest.IdempotencyKey() == event.RequestID, nil
 	}
 	return false, nil
+}
 
+func validator_MatchesPendingDispatchConfirmationRequest(ctx context.Context, txn *Transaction, event Event) (bool, error) {
+	switch event := event.(type) {
+	case *DispatchConfirmedEvent:
+		return txn.pendingDispatchConfirmationRequest != nil && txn.pendingDispatchConfirmationRequest.IdempotencyKey() == event.RequestID, nil
+	}
+	return false, nil
 }

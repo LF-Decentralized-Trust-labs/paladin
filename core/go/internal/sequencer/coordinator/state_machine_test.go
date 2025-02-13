@@ -24,6 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	mock "github.com/stretchr/testify/mock"
 	"gotest.tools/assert"
@@ -355,17 +356,19 @@ func newPrivateTransactionsForTesting(num int) []*components.PrivateTransaction 
 }
 
 type coordinatorDependencyMocks struct {
-	messageSender *MockMessageSender
-	clock         *common.FakeClockForTesting
+	messageSender    *MockMessageSender
+	clock            *common.FakeClockForTesting
+	stateIntegration *sequencermocks.StateIntegration
 }
 
 func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context) (*coordinator, *coordinatorDependencyMocks) {
 
 	mocks := &coordinatorDependencyMocks{
-		messageSender: NewMockMessageSender(t),
-		clock:         &common.FakeClockForTesting{},
+		messageSender:    NewMockMessageSender(t),
+		clock:            &common.FakeClockForTesting{},
+		stateIntegration: sequencermocks.NewStateIntegration(t),
 	}
 
-	coordinator := NewCoordinator(ctx, mocks.messageSender, mocks.clock, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, tktypes.RandAddress(), 5, 5)
+	coordinator := NewCoordinator(ctx, mocks.messageSender, mocks.clock, mocks.stateIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, tktypes.RandAddress(), 5, 5)
 	return coordinator, mocks
 }

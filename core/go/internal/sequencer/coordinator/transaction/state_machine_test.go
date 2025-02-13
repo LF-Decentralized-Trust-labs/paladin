@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,6 +31,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 
 	messageSender := NewMockMessageSender(t)
 	clock := &common.FakeClockForTesting{}
+	stateIntegration := sequencermocks.NewStateIntegration(t)
 	txn := NewTransaction(
 		uuid.NewString(),
 		&components.PrivateTransaction{
@@ -37,6 +39,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 		},
 		messageSender,
 		clock,
+		stateIntegration,
 		clock.Duration(1000),
 		clock.Duration(5000),
 		NewGrapher(ctx),
@@ -132,6 +135,7 @@ func TestStateMachine_Assembling_ToEndorsing_OnAssembleResponse(t *testing.T) {
 	})
 	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.Equal(t, 3, mocks.sentMessageRecorder.numberOfSentEndorsementRequests, "expected 3 endorsement requests to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentEndorsementRequests)
+	//TODO some assertions that WriteLockAndDistributeStatesForTransaction was called with the expected states
 
 }
 
@@ -290,10 +294,24 @@ func TestStateMachine_ConfirmingDispatch_ToReadyForDispatch_OnDispatchConfirmed(
 		event: event{
 			TransactionID: txn.ID,
 		},
+		RequestID: txn.pendingDispatchConfirmationRequest.IdempotencyKey(),
 	})
 
 	assert.Equal(t, State_Ready_For_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
 
+func TestStateMachine_ConfirmingDispatch_NoTransition_OnDispatchConfirmed_IfResponseDoesNotMatchPendingRequest(t *testing.T) {
+	ctx := context.Background()
+	txn := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).Build()
+
+	txn.HandleEvent(ctx, &DispatchConfirmedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		RequestID: uuid.New(),
+	})
+
+	assert.Equal(t, State_Confirming_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
 func TestStateMachine_Blocked_ToConfirmingDispatch_OnDependencyReady_IfNotHasDependenciesNotReady(t *testing.T) {
@@ -329,6 +347,7 @@ func TestStateMachine_Blocked_ToConfirmingDispatch_OnDependencyReady_IfNotHasDep
 		event: event{
 			TransactionID: txnC.ID,
 		},
+		RequestID: txnC.pendingDispatchConfirmationRequest.IdempotencyKey(),
 	})
 
 	assert.Equal(t, State_Confirming_Dispatch, txnA.stateMachine.currentState, "current state is %s", txnA.stateMachine.currentState.String())
@@ -367,6 +386,7 @@ func TestStateMachine_BlockedNoTransition_OnDependencyReady_IfHasDependenciesNot
 		event: event{
 			TransactionID: txnB.ID,
 		},
+		RequestID: txnB.pendingDispatchConfirmationRequest.IdempotencyKey(),
 	})
 
 	assert.Equal(t, State_Blocked, txnA.stateMachine.currentState, "current state is %s", txnA.stateMachine.currentState.String())

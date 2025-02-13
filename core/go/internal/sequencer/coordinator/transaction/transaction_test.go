@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -131,6 +132,7 @@ func TestTransaction_HasDependenciesNotReady(t *testing.T) {
 		event: event{
 			TransactionID: transaction1.ID,
 		},
+		RequestID: transaction1.pendingDispatchConfirmationRequest.IdempotencyKey(),
 	})
 
 	//Should still be blocked because not all dependencies have been confirmed for dispatch yet
@@ -143,6 +145,7 @@ func TestTransaction_HasDependenciesNotReady(t *testing.T) {
 		event: event{
 			TransactionID: transaction2.ID,
 		},
+		RequestID: transaction2.pendingDispatchConfirmationRequest.IdempotencyKey(),
 	})
 
 	//Should still be blocked because not all dependencies have been confirmed for dispatch yet
@@ -186,8 +189,9 @@ func TestTransaction_RemovesItselfFromGrapher(t *testing.T) {
 }
 
 type transactionDependencyMocks struct {
-	messageSender *MockMessageSender
-	clock         *common.FakeClockForTesting
+	messageSender    *MockMessageSender
+	clock            *common.FakeClockForTesting
+	stateIntegration *sequencermocks.StateIntegration
 }
 
 func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, *transactionDependencyMocks) {
@@ -195,8 +199,9 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		grapher = NewGrapher(context.Background())
 	}
 	mocks := &transactionDependencyMocks{
-		messageSender: NewMockMessageSender(t),
-		clock:         &common.FakeClockForTesting{},
+		messageSender:    NewMockMessageSender(t),
+		clock:            &common.FakeClockForTesting{},
+		stateIntegration: sequencermocks.NewStateIntegration(t),
 	}
 	txn := NewTransaction(
 		uuid.NewString(),
@@ -205,6 +210,7 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		},
 		mocks.messageSender,
 		mocks.clock,
+		mocks.stateIntegration,
 		mocks.clock.Duration(1000),
 		mocks.clock.Duration(5000),
 		grapher,

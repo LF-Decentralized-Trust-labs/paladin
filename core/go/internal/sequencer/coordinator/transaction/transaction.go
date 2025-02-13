@@ -68,12 +68,13 @@ type Transaction struct {
 	requestTimeout                     common.Duration
 	assembleTimeout                    common.Duration
 	// Dependencies
-	clock         common.Clock
-	messageSender MessageSender
-	grapher       Grapher
+	clock            common.Clock
+	messageSender    MessageSender
+	grapher          Grapher
+	stateIntegration common.StateIntegration
 }
 
-func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, requestTimeout, assembleTimeout common.Duration, grapher Grapher) *Transaction {
+func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, grapher Grapher) *Transaction {
 	txn := &Transaction{
 		sender:             sender,
 		PrivateTransaction: pt,
@@ -82,6 +83,7 @@ func NewTransaction(sender string, pt *components.PrivateTransaction, messageSen
 		grapher:            grapher,
 		requestTimeout:     requestTimeout,
 		assembleTimeout:    assembleTimeout,
+		stateIntegration:   stateIntegration,
 	}
 	txn.InitializeStateMachine(State_Initial)
 	grapher.Add(context.Background(), txn)
@@ -141,22 +143,15 @@ func (t *Transaction) SignatureAttestationName() (string, error) {
 	return "", nil
 }
 
+// TODO would this be more obvious as a state exit/cleanup function?
 func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uuid.UUID) error {
-	if t.pendingDispatchConfirmationRequest != nil && t.pendingDispatchConfirmationRequest.IdempotencyKey() == requestID {
-		t.pendingDispatchConfirmationRequest = nil
-	} else {
-		//TODO document the scenarios where the confirmation response does not match the request and update teh state machine with a guard to ensure that we do not move to the next state
-		// in this case
-		//... or is the above check actually the guard? And in which case, we go back to the model where the guard is a function of the transaction + the event.  And do we then need a "OnTransitionFrom" function to clear the pending request?
-	}
-
+	t.pendingDispatchConfirmationRequest = nil
 	return nil
 }
 
 func (t *Transaction) applyEndorsement(ctx context.Context, endorsement *prototk.AttestationResult, requestID uuid.UUID) error {
 	pendingRequestsForAttRequest, ok := t.pendingEndorsementRequests[endorsement.Name]
 	if !ok {
-
 		log.L(ctx).Infof("Ignoring endorsement response for transaction %s from %s because no pending request found for attestation request name %s", t.ID, endorsement.Verifier.Lookup, endorsement.Name)
 		return nil
 	}
@@ -571,4 +566,8 @@ func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) err
 		dependency.dependents = append(dependency.dependents, t.ID)
 	}
 	return nil
+}
+
+func (t *Transaction) writeLockAndDistributeStates(ctx context.Context) error {
+	return t.stateIntegration.WriteLockAndDistributeStatesForTransaction(ctx, t.PrivateTransaction)
 }
