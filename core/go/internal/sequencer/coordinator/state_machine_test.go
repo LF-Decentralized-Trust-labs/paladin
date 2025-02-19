@@ -350,7 +350,12 @@ func TestStateMachine_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGraceP
 func newPrivateTransactionsForTesting(num int) []*components.PrivateTransaction {
 	txs := make([]*components.PrivateTransaction, num)
 	for i := 0; i < num; i++ {
-		txs[i] = &components.PrivateTransaction{}
+		txs[i] = &components.PrivateTransaction{
+			ID:          uuid.New(),
+			Domain:      "testDomain",
+			Address:     *tktypes.RandAddress(),
+			PreAssembly: &components.TransactionPreAssembly{},
+		}
 	}
 	return txs
 }
