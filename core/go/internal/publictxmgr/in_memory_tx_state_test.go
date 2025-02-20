@@ -26,22 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// import (
-// 	"context"
-// 	"encoding/json"
-// 	"testing"
-
-// 	"github.com/google/uuid"
-// 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
-// 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-// 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-// 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-// 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-// 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-
-// 	"github.com/stretchr/testify/assert"
-// )
-
 const testTransactionData string = "0x7369676e6564206d657373616765"
 
 func NewTestInMemoryTxState(t *testing.T) InMemoryTxStateManager {
@@ -189,5 +173,203 @@ func TestSettersAndGetters(t *testing.T) {
 	assert.Nil(t, imts.GetGasPriceObject().GasPrice)
 	assert.Equal(t, maxFeePerGas.Int(), imts.GetGasPriceObject().MaxFeePerGas.Int())
 	assert.Equal(t, maxPriorityFeePerGas.Int(), imts.GetGasPriceObject().MaxPriorityFeePerGas.Int())
+
+}
+
+func TestUpdateTransaction(t *testing.T) {
+	oldTo := tktypes.MustEthAddress("0xb3d9cf8e163bbc840195a97e81f8a34e295b8f39")
+	oldGas := uint64(1000)
+	oldValue := tktypes.Uint64ToUint256(100)
+	oldData := tktypes.MustParseHexBytes("0x1234")
+	oldFixedGasPricing := tktypes.JSONString(pldapi.PublicTxGasPricing{
+		GasPrice:             tktypes.Uint64ToUint256(100),
+		MaxPriorityFeePerGas: tktypes.Uint64ToUint256(100),
+		MaxFeePerGas:         tktypes.Uint64ToUint256(100),
+	})
+
+	ptx := &DBPublicTxn{
+		To:              oldTo,
+		Gas:             oldGas,
+		Value:           oldValue,
+		Data:            oldData,
+		FixedGasPricing: oldFixedGasPricing,
+	}
+	imtxs := inMemoryTxState{
+		mtx: &managedTx{
+			ptx: ptx,
+		},
+	}
+
+	// no changes- only default values
+	imtxs.UpdateTransaction(&DBPublicTxn{})
+
+	assert.Equal(t, oldTo, ptx.To)
+	assert.Equal(t, oldGas, ptx.Gas)
+	assert.Equal(t, oldValue, ptx.Value)
+	assert.Equal(t, oldData, ptx.Data)
+	assert.Equal(t, oldFixedGasPricing, ptx.FixedGasPricing)
+
+	newTo := tktypes.MustEthAddress("0x1f9090aae28b8a3dceadf281b0f12828e676c326")
+	newGas := uint64(2000)
+	newValue := tktypes.Uint64ToUint256(200)
+	newData := tktypes.MustParseHexBytes("0x5678")
+	newFixedGasPricing := tktypes.JSONString(pldapi.PublicTxGasPricing{
+		GasPrice:             tktypes.Uint64ToUint256(200),
+		MaxPriorityFeePerGas: tktypes.Uint64ToUint256(200),
+		MaxFeePerGas:         tktypes.Uint64ToUint256(200),
+	})
+
+	// all new values
+	imtxs.UpdateTransaction(&DBPublicTxn{
+		To:              newTo,
+		Gas:             newGas,
+		Value:           newValue,
+		Data:            newData,
+		FixedGasPricing: newFixedGasPricing,
+	})
+
+	assert.Equal(t, newTo, ptx.To)
+	assert.Equal(t, newGas, ptx.Gas)
+	assert.Equal(t, newValue, ptx.Value)
+	assert.Equal(t, newData, ptx.Data)
+	assert.Equal(t, newFixedGasPricing, ptx.FixedGasPricing)
+}
+
+func TestIsUpdate(t *testing.T) {
+	ptx := &DBPublicTxn{
+		To:  tktypes.MustEthAddress("0xb3d9cf8e163bbc840195a97e81f8a34e295b8f39"),
+		Gas: 1000,
+	}
+	imtxs := inMemoryTxState{
+		mtx: &managedTx{
+			ptx: ptx,
+		},
+	}
+
+	// no changes
+	assert.False(t, imtxs.IsTransactionUpdate(&DBPublicTxn{}))
+
+	// new to
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		To: tktypes.MustEthAddress("0x1f9090aae28b8a3dceadf281b0f12828e676c326"),
+	}))
+	// same to
+	assert.False(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		To: tktypes.MustEthAddress("0xb3d9cf8e163bbc840195a97e81f8a34e295b8f39"),
+	}))
+
+	// new gas
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		Gas: 2000,
+	}))
+	// same gas
+	assert.False(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		Gas: 1000,
+	}))
+
+	// value not previously set
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		Value: tktypes.Uint64ToUint256(100),
+	}))
+	ptx.Value = tktypes.Uint64ToUint256(100)
+	// new value
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		Value: tktypes.Uint64ToUint256(200),
+	}))
+	// same value
+	assert.False(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		Value: tktypes.Uint64ToUint256(100),
+	}))
+
+	// data not previously set
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		Data: tktypes.MustParseHexBytes("0x1234"),
+	}))
+	ptx.Data = tktypes.MustParseHexBytes("0x1234")
+	// new data
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		Data: tktypes.MustParseHexBytes("0x123456"),
+	}))
+	// same data
+	assert.False(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		Data: tktypes.MustParseHexBytes("0x1234"),
+	}))
+
+	// fixed gas pricing not previously set
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			GasPrice: tktypes.Uint64ToUint256(100),
+		}),
+	}))
+	imtxs.mtx.ptx.Data = tktypes.MustParseHexBytes("0x1234")
+
+	// gas price not previously set
+	ptx.FixedGasPricing = tktypes.JSONString(pldapi.PublicTxGasPricing{})
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			GasPrice: tktypes.Uint64ToUint256(100),
+		}),
+	}))
+	// new gas price
+	ptx.FixedGasPricing = tktypes.JSONString(pldapi.PublicTxGasPricing{
+		GasPrice: tktypes.Uint64ToUint256(100),
+	})
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			GasPrice: tktypes.Uint64ToUint256(200),
+		}),
+	}))
+	// same gas price
+	assert.False(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			GasPrice: tktypes.Uint64ToUint256(100),
+		}),
+	}))
+
+	// max priority gas fee not previously set
+	ptx.FixedGasPricing = tktypes.JSONString(pldapi.PublicTxGasPricing{})
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(100),
+		}),
+	}))
+	// new max priority gas fee
+	ptx.FixedGasPricing = tktypes.JSONString(pldapi.PublicTxGasPricing{
+		MaxPriorityFeePerGas: tktypes.Uint64ToUint256(100),
+	})
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(200),
+		}),
+	}))
+	// same max priority gas fee
+	assert.False(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(100),
+		}),
+	}))
+
+	// max fee per gas not previously set
+	ptx.FixedGasPricing = tktypes.JSONString(pldapi.PublicTxGasPricing{})
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			MaxFeePerGas: tktypes.Uint64ToUint256(100),
+		}),
+	}))
+	// new  max fee per gas
+	ptx.FixedGasPricing = tktypes.JSONString(pldapi.PublicTxGasPricing{
+		MaxFeePerGas: tktypes.Uint64ToUint256(100),
+	})
+	assert.True(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			MaxFeePerGas: tktypes.Uint64ToUint256(200),
+		}),
+	}))
+	// same  max fee per gas
+	assert.False(t, imtxs.IsTransactionUpdate(&DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			MaxFeePerGas: tktypes.Uint64ToUint256(100),
+		}),
+	}))
 
 }

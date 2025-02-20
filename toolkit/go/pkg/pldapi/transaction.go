@@ -128,6 +128,21 @@ type TransactionFull struct {
 	// TODO: PrivateTransactions object list
 }
 
+// Subset of fields that can be updated on a transaction
+type TransactionUpdate struct {
+	ID           *uuid.UUID          `docstruct:"TransactionUpdate" json:"id,omitempty"`           // server generated UUID for this transaction (query only)
+	To           *tktypes.EthAddress `docstruct:"TransactionUpdate" json:"to,omitempty"`           // the target contract, or null for a deploy
+	Data         tktypes.RawJSON     `docstruct:"TransactionUpdate" json:"data,omitempty"`         // pre-encoded array with/without function selector, array, or object input
+	Function     string              `docstruct:"TransactionUpdate" json:"function,omitempty"`     // inferred from definition if not supplied. Resolved to full signature and stored. Required with abiReference on input if not constructor
+	ABI          abi.ABI             `docstruct:"TransactionUpdate" json:"abi,omitempty"`          // required if abiReference not supplied
+	ABIReference *tktypes.Bytes32    `docstruct:"TransactionUpdate" json:"abiReference,omitempty"` // calculated if not supplied (ABI will be stored for you)
+	PublicTxOptions
+}
+
+type TransactionUpdateOptions struct {
+	EstimateGas *bool `docstruct:"TransactionUpdateOptions" json:"estimateGas,omitempty"` // if true, the gas limit will be estimated using the new transaction values- default false
+}
+
 type ABIDecodedData struct {
 	Data       tktypes.RawJSON `docstruct:"ABIDecodedData" json:"data"`
 	Summary    string          `docstruct:"ABIDecodedData" json:"summary,omitempty"` // errors only

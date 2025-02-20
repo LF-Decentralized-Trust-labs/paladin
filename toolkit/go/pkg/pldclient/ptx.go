@@ -33,6 +33,7 @@ type PTX interface {
 	SendTransactions(ctx context.Context, txs []*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
 	PrepareTransaction(ctx context.Context, tx *pldapi.TransactionInput) (txID *uuid.UUID, err error)
 	PrepareTransactions(ctx context.Context, txs []*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
+	UpdateTransaction(ctx context.Context, tx *pldapi.TransactionUpdate) (txID *uuid.UUID, err error)
 	Call(ctx context.Context, tx *pldapi.TransactionCall) (data tktypes.RawJSON, err error)
 
 	GetTransaction(ctx context.Context, txID uuid.UUID) (receipt *pldapi.Transaction, err error)
@@ -95,6 +96,10 @@ var ptxInfo = &rpcModuleInfo{
 		"ptx_prepareTransactions": {
 			Inputs: []string{"transactions"},
 			Output: "transactionIds",
+		},
+		"ptx_updateTransaction": {
+			Inputs: []string{"transactionUpdate"},
+			Output: "transactionId",
 		},
 		"ptx_call": {
 			Inputs: []string{"transaction"},
@@ -236,6 +241,11 @@ func (p *ptx) PrepareTransaction(ctx context.Context, tx *pldapi.TransactionInpu
 
 func (p *ptx) PrepareTransactions(ctx context.Context, txs []*pldapi.TransactionInput) (txIDs []uuid.UUID, err error) {
 	err = p.c.CallRPC(ctx, &txIDs, "ptx_prepareTransactions", txs)
+	return
+}
+
+func (p *ptx) UpdateTransaction(ctx context.Context, tx *pldapi.TransactionUpdate) (txID *uuid.UUID, err error) {
+	err = p.c.CallRPC(ctx, &txID, "ptx_updateTransaction", tx)
 	return
 }
 

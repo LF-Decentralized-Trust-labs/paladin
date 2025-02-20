@@ -6,7 +6,7 @@
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * Unless required by applicaptm law or agreed to in writing, software distributed under the License is distributed on
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
  *
@@ -35,7 +35,7 @@ import (
 )
 
 func newTestOrchestrator(t *testing.T, cbs ...func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig)) (context.Context, *orchestrator, *mocksAndTestControl, func()) {
-	ctx, ble, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+	ctx, ptm, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		mocks.disableManagerStart = true // we don't want the manager running - this gives us a fake nonce manager too
 		for _, cb := range cbs {
 			cb(mocks, conf)
@@ -43,7 +43,7 @@ func newTestOrchestrator(t *testing.T, cbs ...func(mocks *mocksAndTestControl, c
 	})
 
 	signingAddress := tktypes.EthAddress(tktypes.RandBytes(20))
-	o := NewOrchestrator(ble, signingAddress, ble.conf)
+	o := NewOrchestrator(ptm, signingAddress, ptm.conf)
 
 	return ctx, o, m, done
 

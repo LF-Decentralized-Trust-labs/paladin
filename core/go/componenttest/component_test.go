@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/componenttest/domains"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -45,12 +46,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TODO: these tests can be updated to use the paladin client and receipts rather than JSON RPC calls and hooking in to the block indexer
+
 func TestRunSimpleStorageEthTransaction(t *testing.T) {
-	//TODO refactor this to be more black box by using JSONRPC interface to invoke the public contract
 	ctx := context.Background()
 	logrus.SetLevel(logrus.DebugLevel)
 
-	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil)
+	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil, false)
 	cm := instance.cm
 	c := pldclient.Wrap(instance.client).ReceiptPollingInterval(250 * time.Millisecond)
 
@@ -122,6 +124,76 @@ func TestRunSimpleStorageEthTransaction(t *testing.T) {
 
 }
 
+func TestUpdatePublicTransaction(t *testing.T) {
+	ctx := context.Background()
+	logrus.SetLevel(logrus.DebugLevel)
+
+	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil, true)
+	c := pldclient.Wrap(instance.client)
+
+	// set up the receipt listener
+	success, err := c.PTX().CreateReceiptListener(ctx, &pldapi.TransactionReceiptListener{
+		Name: "listener1",
+	})
+	require.NoError(t, err)
+	require.True(t, success)
+
+	wsClient, err := c.WebSocket(ctx, instance.wsConfig)
+	require.NoError(t, err)
+
+	sub, err := wsClient.PTX().SubscribeReceipts(ctx, "listener1")
+	require.NoError(t, err)
+
+	build, err := solutils.LoadBuild(ctx, simpleStorageBuildJSON)
+	require.NoError(t, err)
+
+	simpleStorage := c.ForABI(ctx, build.ABI).Public().From("key1")
+
+	res := simpleStorage.Clone().
+		Constructor().
+		Bytecode(build.Bytecode).
+		Inputs(`{"x":11223344}`).
+		PublicTxOptions(pldapi.PublicTxOptions{
+			Gas: confutil.P(tktypes.HexUint64(100)),
+		}).
+		Send()
+	require.NoError(t, res.Error())
+	require.NotNil(t, res.ID())
+
+	_, err = c.PTX().UpdateTransaction(ctx, &pldapi.TransactionUpdate{
+		ID: res.ID(),
+		PublicTxOptions: pldapi.PublicTxOptions{
+			Gas: confutil.P(tktypes.HexUint64(10000000)),
+		},
+	})
+	require.NoError(t, err)
+
+	var receipt *pldapi.TransactionReceiptFull
+
+	for receipt == nil {
+		select {
+		case subNotification, ok := <-sub.Notifications():
+			if ok {
+				var batch pldapi.TransactionReceiptBatch
+				json.Unmarshal(subNotification.Result, &batch)
+				for _, r := range batch.Receipts {
+					if *res.ID() == r.ID {
+						receipt = r
+					}
+				}
+				subNotification.Ack(ctx)
+			}
+		}
+	}
+
+	tx, err := c.PTX().GetTransactionFull(ctx, *res.ID())
+	require.NoError(t, err)
+	require.NotNil(t, tx.Receipt)
+	require.True(t, tx.Receipt.Success)
+	require.Len(t, tx.Public, 1)
+	assert.Equal(t, tx.Public[0].Submissions[0].TransactionHash.HexString(), receipt.TransactionHash.HexString())
+}
+
 func TestPrivateTransactionsDeployAndExecute(t *testing.T) {
 	// Coarse grained black box test of the core component manager
 	// no mocking although it does use a simple domain implementation that exists solely for testing
@@ -132,7 +204,7 @@ func TestPrivateTransactionsDeployAndExecute(t *testing.T) {
 	// The bootstrap code that is the entry point to the java side is not tested here, we bootstrap the component manager by hand
 
 	ctx := context.Background()
-	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil)
+	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil, false)
 	rpcClient := instance.client
 
 	// Check there are no transactions before we start
@@ -222,7 +294,7 @@ func TestPrivateTransactionsMintThenTransfer(t *testing.T) {
 	// Invoke 2 transactions on the same contract where the second transaction relies on the state created by the first
 
 	ctx := context.Background()
-	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil)
+	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil, false)
 	rpcClient := instance.client
 
 	// Check there are no transactions before we start
@@ -328,7 +400,7 @@ func TestPrivateTransactionRevertedAssembleFailed(t *testing.T) {
 	// Invoke a transaction that will fail to assemble
 	// in this case, we use the simple token domain and attempt to transfer from a wallet that has no tokens
 	ctx := context.Background()
-	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil)
+	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil, false)
 	rpcClient := instance.client
 
 	var dplyTxID uuid.UUID
@@ -438,13 +510,13 @@ func TestDeployOnOneNodeInvokeOnAnother(t *testing.T) {
 
 	domainRegistryAddress := deployDomainRegistry(t)
 
-	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, nil, nil, nil)
+	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, nil, nil, nil, false)
 	client1 := instance1.client
 	aliceIdentity := "wallets.org1.alice"
 	aliceAddress := instance1.resolveEthereumAddress(aliceIdentity)
 	t.Logf("Alice address: %s", aliceAddress)
 
-	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, nil, nil, nil)
+	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, nil, nil, nil, false)
 	client2 := instance2.client
 	bobIdentity := "wallets.org2.bob"
 	bobAddress := instance2.resolveEthereumAddress(bobIdentity)
@@ -553,13 +625,13 @@ func TestResolveIdentityFromRemoteNode(t *testing.T) {
 	aliceNodeConfig := newNodeConfiguration(t, "alice")
 	bobNodeConfig := newNodeConfiguration(t, "bob")
 
-	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, aliceNodeConfig, []*nodeConfiguration{bobNodeConfig}, nil)
+	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, aliceNodeConfig, []*nodeConfiguration{bobNodeConfig}, nil, false)
 	client1 := instance1.client
 	aliceIdentity := "wallets.org1.alice@" + instance1.name
 	aliceAddress := instance1.resolveEthereumAddress(aliceIdentity)
 	t.Logf("Alice address: %s", aliceAddress)
 
-	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig}, nil)
+	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig}, nil, false)
 	client2 := instance2.client
 	bobUnqualifiedIdentity := "wallets.org2.bob"
 	bobIdentity := bobUnqualifiedIdentity + "@" + instance2.name
@@ -702,14 +774,14 @@ func TestNotaryDelegated(t *testing.T) {
 
 	domainRegistryAddress := deployDomainRegistry(t)
 
-	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, aliceNodeConfig, []*nodeConfiguration{bobNodeConfig, notaryNodeConfig}, nil)
+	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, aliceNodeConfig, []*nodeConfiguration{bobNodeConfig, notaryNodeConfig}, nil, false)
 	client1 := instance1.client
 	aliceIdentity := "wallets.org1.alice@" + instance1.name
 
-	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig, notaryNodeConfig}, nil)
+	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig, notaryNodeConfig}, nil, false)
 	bobIdentity := "wallets.org2.bob@" + instance2.name
 
-	instance3 := newInstanceForComponentTesting(t, domainRegistryAddress, notaryNodeConfig, []*nodeConfiguration{aliceNodeConfig, bobNodeConfig}, nil)
+	instance3 := newInstanceForComponentTesting(t, domainRegistryAddress, notaryNodeConfig, []*nodeConfiguration{aliceNodeConfig, bobNodeConfig}, nil, false)
 	client3 := instance3.client
 	notaryIdentity := "wallets.org3.notary@" + instance3.name
 
@@ -813,14 +885,14 @@ func TestNotaryDelegatedPrepare(t *testing.T) {
 
 	domainRegistryAddress := deployDomainRegistry(t)
 
-	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, aliceNodeConfig, []*nodeConfiguration{bobNodeConfig, notaryNodeConfig}, nil)
+	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, aliceNodeConfig, []*nodeConfiguration{bobNodeConfig, notaryNodeConfig}, nil, false)
 	client1 := instance1.client
 	aliceIdentity := "wallets.org1.alice@" + instance1.name
 
-	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig, notaryNodeConfig}, nil)
+	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig, notaryNodeConfig}, nil, false)
 	bobIdentity := "wallets.org2.bob@" + instance2.name
 
-	instance3 := newInstanceForComponentTesting(t, domainRegistryAddress, notaryNodeConfig, []*nodeConfiguration{aliceNodeConfig, bobNodeConfig}, nil)
+	instance3 := newInstanceForComponentTesting(t, domainRegistryAddress, notaryNodeConfig, []*nodeConfiguration{aliceNodeConfig, bobNodeConfig}, nil, false)
 	client3 := instance3.client
 	notaryIdentity := "wallets.org3.notary@" + instance3.name
 
@@ -944,7 +1016,7 @@ func TestSingleNodeSelfEndorseConcurrentSpends(t *testing.T) {
 	// if there is no contention, each transfer should be able to spend a coin each
 
 	ctx := context.Background()
-	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil)
+	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil, false)
 	rpcClient := instance.client
 
 	var dplyTxID uuid.UUID
@@ -1070,7 +1142,7 @@ func TestSingleNodeSelfEndorseSeriesOfTransfers(t *testing.T) {
 	//where each transaction relies on the state created by the previous
 
 	ctx := context.Background()
-	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil)
+	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil, false)
 	rpcClient := instance.client
 
 	// Check there are no transactions before we start
@@ -1217,14 +1289,14 @@ func TestNotaryEndorseConcurrentSpends(t *testing.T) {
 
 	domainRegistryAddress := deployDomainRegistry(t)
 
-	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, aliceNodeConfig, []*nodeConfiguration{bobNodeConfig, notaryNodeConfig}, nil)
+	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, aliceNodeConfig, []*nodeConfiguration{bobNodeConfig, notaryNodeConfig}, nil, false)
 	client1 := instance1.client
 	aliceIdentity := "wallets.org1.alice@" + instance1.name
 
-	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig, notaryNodeConfig}, nil)
+	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig, notaryNodeConfig}, nil, false)
 	bobIdentity := "wallets.org2.bob@" + instance2.name
 
-	instance3 := newInstanceForComponentTesting(t, domainRegistryAddress, notaryNodeConfig, []*nodeConfiguration{aliceNodeConfig, bobNodeConfig}, nil)
+	instance3 := newInstanceForComponentTesting(t, domainRegistryAddress, notaryNodeConfig, []*nodeConfiguration{aliceNodeConfig, bobNodeConfig}, nil, false)
 	client3 := instance3.client
 	notaryIdentity := "wallets.org3.notary@" + instance3.name
 
@@ -1355,15 +1427,15 @@ func TestNotaryEndorseSeriesOfTransfers(t *testing.T) {
 
 	domainRegistryAddress := deployDomainRegistry(t)
 
-	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, aliceNodeConfig, []*nodeConfiguration{bobNodeConfig, notaryNodeConfig}, nil)
+	instance1 := newInstanceForComponentTesting(t, domainRegistryAddress, aliceNodeConfig, []*nodeConfiguration{bobNodeConfig, notaryNodeConfig}, nil, false)
 	client1 := instance1.client
 	aliceIdentity := "wallets.org1.alice@" + instance1.name
 
-	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig, notaryNodeConfig}, nil)
+	instance2 := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig, notaryNodeConfig}, nil, false)
 	client2 := instance2.client
 	bobIdentity := "wallets.org2.bob@" + instance2.name
 
-	instance3 := newInstanceForComponentTesting(t, domainRegistryAddress, notaryNodeConfig, []*nodeConfiguration{aliceNodeConfig, bobNodeConfig}, nil)
+	instance3 := newInstanceForComponentTesting(t, domainRegistryAddress, notaryNodeConfig, []*nodeConfiguration{aliceNodeConfig, bobNodeConfig}, nil, false)
 	client3 := instance3.client
 	notaryIdentity := "wallets.org3.notary@" + instance3.name
 

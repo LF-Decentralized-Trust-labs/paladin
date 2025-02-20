@@ -271,6 +271,8 @@ type InMemoryTxStateReadOnly interface {
 	GetSignerNonce() string
 	GetGasLimit() uint64
 	IsReadyToExit() bool
+	IsComplete() bool
+	IsTransactionUpdate(newPtx *DBPublicTxn) bool
 }
 type InMemoryTxStateManager interface {
 	InMemoryTxStateReadOnly
@@ -279,6 +281,8 @@ type InMemoryTxStateManager interface {
 
 type InMemoryTxStateSetters interface {
 	ApplyInMemoryUpdates(ctx context.Context, txUpdates *BaseTXUpdates)
+	UpdateTransaction(newPtx *DBPublicTxn)
+	ResetTransactionHash()
 }
 
 type StageOutput struct {
@@ -323,10 +327,10 @@ type PersistenceOutput struct {
 }
 
 type InFlightStageActionTriggers interface {
-	TriggerRetrieveGasPrice(ctx context.Context) error
-	TriggerSignTx(ctx context.Context) error
-	TriggerSubmitTx(ctx context.Context, signedMessage []byte) error
-	TriggerStatusUpdate(ctx context.Context) error
+	TriggerRetrieveGasPrice(ctx context.Context, versionID int) error
+	TriggerSignTx(ctx context.Context, versionID int) error
+	TriggerSubmitTx(ctx context.Context, versionID int, signedMessage []byte) error
+	TriggerStatusUpdate(ctx context.Context, versionID int) error
 }
 
 // RunningStageContext is the context for an individual run of the transaction process
@@ -396,14 +400,30 @@ type TransientPreviousStageOutputs struct {
 type InFlightTransactionStateManager interface {
 	// tx state management
 	InMemoryTxStateReadOnly
+	InMemoryTxStateSetters
 	CanSubmit(ctx context.Context, cost *big.Int) bool
 	CanBeRemoved(ctx context.Context) bool
 	GetInFlightStatus() InFlightStatus
+	SetOrchestratorContext(ctx context.Context, tec *OrchestratorContext)
+	GetStage(ctx context.Context) InFlightTxStage
+
+	// version management
+	GetVersions(ctx context.Context) []InFlightTransactionStateVersion
+	GetVersion(ctx context.Context, id int) InFlightTransactionStateVersion
+	GetCurrentVersion(ctx context.Context) InFlightTransactionStateVersion
+	NewVersion(ctx context.Context)
+}
+
+type InFlightTransactionStateVersion interface {
+	GetID(ctx context.Context) int
+	Cancel(ctx context.Context)
+	IsCancelled(ctx context.Context) bool
+	SetCurrent(ctx context.Context, current bool)
+	IsCurrent(ctx context.Context) bool
 
 	// stage management
-	StartNewStageContext(ctx context.Context, stage InFlightTxStage, substatus BaseTxSubStatus)
+	StartNewStageContext(ctx context.Context, stageType InFlightTxStage, substatus BaseTxSubStatus)
 	GetStage(ctx context.Context) InFlightTxStage
-	SetOrchestratorContext(ctx context.Context, tec *OrchestratorContext)
 	SetTransientPreviousStageOutputs(tpso *TransientPreviousStageOutputs)
 	GetRunningStageContext(ctx context.Context) *RunningStageContext
 	GetStageTriggerError(ctx context.Context) error

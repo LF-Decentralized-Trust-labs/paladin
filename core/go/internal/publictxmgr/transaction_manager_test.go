@@ -18,6 +18,7 @@ package publictxmgr
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"testing"
@@ -33,8 +34,8 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/keymanager"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/mocks/ethclientmocks"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
@@ -205,7 +206,7 @@ func TestInit(t *testing.T) {
 }
 
 func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
-	ctx, ble, m, done := newTestPublicTxManager(t, true, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+	ctx, ptm, m, done := newTestPublicTxManager(t, true, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Manager.Interval = confutil.P("50ms")
 		conf.Orchestrator.Interval = confutil.P("50ms")
 		conf.Manager.OrchestratorIdleTimeout = confutil.P("1ms")
@@ -231,7 +232,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 		txIDs[i] = uuid.New()
 
 		// We do the public TX manager's job for it in this test
-		fakeTxManagerInsert(t, ble.p.DB(), txIDs[i], "signer1")
+		fakeTxManagerInsert(t, ptm.p.DB(), txIDs[i], "signer2")
 
 		txs[i] = &components.PublicTxSubmission{
 			Bindings: []*components.PaladinTXReference{
@@ -253,17 +254,17 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 		Return(confutil.P(tktypes.HexUint64(baseNonce)), nil).Once()
 
 	// For the first one we do a one-off
-	singleTx, err := ble.SingleTransactionSubmit(ctx, txs[0])
+	singleTx, err := ptm.SingleTransactionSubmit(ctx, txs[0])
 	require.NoError(t, err)
 
 	// The rest we submit as as batch
 	for _, tx := range txs[1:] {
-		err := ble.ValidateTransaction(ctx, ble.p.NOTX(), tx)
+		err := ptm.ValidateTransaction(ctx, ptm.p.NOTX(), tx)
 		require.NoError(t, err)
 	}
 	var batch []*pldapi.PublicTx
-	err = ble.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
-		batch, err = ble.WriteNewTransactions(ctx, dbTX, txs[1:])
+	err = ptm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		batch, err = ptm.WriteNewTransactions(ctx, dbTX, txs[1:])
 		return err
 	})
 	require.NoError(t, err)
@@ -273,18 +274,18 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	}
 
 	// Get one back again by ID
-	txRead, err := ble.QueryPublicTxWithBindings(ctx, ble.p.NOTX(), query.NewQueryBuilder().Equal("localId", *batch[1].LocalID).Limit(1).Query())
+	txRead, err := ptm.QueryPublicTxWithBindings(ctx, ptm.p.NOTX(), query.NewQueryBuilder().Equal("localId", *batch[1].LocalID).Limit(1).Query())
 	require.NoError(t, err)
 	require.Len(t, txRead, 1)
 	require.Equal(t, batch[1].Data, txRead[0].Data)
 
 	// Record activity on one TX
 	for i, tx := range append([]*pldapi.PublicTx{singleTx}, batch...) {
-		ble.addActivityRecord(*tx.LocalID, fmt.Sprintf("activity %d", i))
+		ptm.addActivityRecord(*tx.LocalID, fmt.Sprintf("activity %d", i))
 	}
 
 	// Query to check we now have all of these
-	queryTxs, err := ble.QueryPublicTxWithBindings(ctx, ble.p.NOTX(),
+	queryTxs, err := ptm.QueryPublicTxWithBindings(ctx, ptm.p.NOTX(),
 		query.NewQueryBuilder().Sort("localId").Query())
 	require.NoError(t, err)
 	assert.Len(t, queryTxs, len(txs))
@@ -296,7 +297,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	}
 
 	// Query scoped to one TX
-	byTxn, err := ble.QueryPublicTxForTransactions(ctx, ble.p.NOTX(), txIDs, nil)
+	byTxn, err := ptm.QueryPublicTxForTransactions(ctx, ptm.p.NOTX(), txIDs, nil)
 	require.NoError(t, err)
 	for _, tx := range txs {
 		queryTxs := byTxn[tx.Bindings[0].TransactionID]
@@ -304,7 +305,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	}
 
 	// Check we can select to just see confirmed (which this isn't yet)
-	byTxn, err = ble.QueryPublicTxForTransactions(ctx, ble.p.NOTX(), txIDs,
+	byTxn, err = ptm.QueryPublicTxForTransactions(ctx, ptm.p.NOTX(), txIDs,
 		query.NewQueryBuilder().NotNull("transactionHash").Query())
 	require.NoError(t, err)
 	for _, tx := range txs {
@@ -350,7 +351,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 			gatheredConfirmations = append(gatheredConfirmations, confirmation)
 
 			// Check we can query the public txn by this submission (even before the confirm)
-			ptxQuery, err := ble.GetPublicTransactionForHash(ctx, ble.p.NOTX(), confirmation.Hash)
+			ptxQuery, err := ptm.GetPublicTransactionForHash(ctx, ptm.p.NOTX(), confirmation.Hash)
 			require.NoError(t, err)
 			require.NotNil(t, ptxQuery)
 			require.Len(t, ptxQuery.Submissions, 1)
@@ -366,7 +367,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	var allMatches []*components.PublicTxMatch
 	confirmationsMatched := make(map[uuid.UUID]*components.PublicTxMatch)
 	for _, confirmation := range gatheredConfirmations {
-		matches, err := ble.MatchUpdateConfirmedTransactions(ctx, ble.p.NOTX(), []*blockindexer.IndexedTransactionNotify{confirmation})
+		matches, err := ptm.MatchUpdateConfirmedTransactions(ctx, ptm.p.NOTX(), []*blockindexer.IndexedTransactionNotify{confirmation})
 		require.NoError(t, err)
 		// NOTE: This is a good test that we definitely persist _before_ we submit as
 		// otherwise we could miss notifying users of their transactions completing.
@@ -381,7 +382,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	}
 
 	// Check we can select to just see just unconfirmed
-	byTxn, err = ble.QueryPublicTxForTransactions(ctx, ble.p.NOTX(), txIDs,
+	byTxn, err = ptm.QueryPublicTxForTransactions(ctx, ptm.p.NOTX(), txIDs,
 		query.NewQueryBuilder().Null("transactionHash").Query())
 	require.NoError(t, err)
 	for _, tx := range txs {
@@ -391,10 +392,10 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 
 	// phase 2 of the update, happens after the DB TX commits, so we can wake up the
 	// orchestrators to remove the in-flight TXns
-	ble.NotifyConfirmPersisted(ctx, allMatches)
+	ptm.NotifyConfirmPersisted(ctx, allMatches)
 
 	// Now the inflights should all exit, so we wait for the orchestrator to exit
-	for ble.getOrchestratorCount() > 0 {
+	for ptm.getOrchestratorCount() > 0 {
 		<-ticker.C
 		if t.Failed() {
 			return
@@ -420,14 +421,14 @@ func fakeTxManagerInsert(t *testing.T, db *gorm.DB, txID uuid.UUID, fromStr stri
 }
 
 func TestSubmitFailures(t *testing.T) {
-	ctx, ble, m, done := newTestPublicTxManager(t, false)
+	ctx, ptm, m, done := newTestPublicTxManager(t, false)
 	defer done()
 
 	// estimation failure - for non-revert
 	m.db.ExpectBegin()
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
 		Return(ethclient.EstimateGasResult{}, fmt.Errorf("GasEstimate error")).Once()
-	_, err := ble.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
+	_, err := ptm.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
 		PublicTxInput: pldapi.PublicTxInput{
 			From: tktypes.RandAddress(),
 		},
@@ -442,7 +443,7 @@ func TestSubmitFailures(t *testing.T) {
 		Return(ethclient.EstimateGasResult{
 			RevertData: sampleRevertData,
 		}, fmt.Errorf("execution reverted")).Once()
-	_, err = ble.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
+	_, err = ptm.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
 		PublicTxInput: pldapi.PublicTxInput{
 			From: tktypes.RandAddress(),
 		},
@@ -452,34 +453,34 @@ func TestSubmitFailures(t *testing.T) {
 }
 
 func TestAddActivityDisabled(t *testing.T) {
-	_, ble, _, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+	_, ptm, _, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Manager.ActivityRecords.RecordsPerTransaction = confutil.P(0)
 	})
 	defer done()
 
-	ble.addActivityRecord(12345, "message")
+	ptm.addActivityRecord(12345, "message")
 
-	assert.Empty(t, ble.getActivityRecords(12345))
+	assert.Empty(t, ptm.getActivityRecords(12345))
 }
 
 func TestAddActivityWrap(t *testing.T) {
-	_, ble, _, done := newTestPublicTxManager(t, false)
+	_, ptm, _, done := newTestPublicTxManager(t, false)
 	defer done()
 
 	for i := 0; i < 100; i++ {
-		ble.addActivityRecord(12345, fmt.Sprintf("message %.2d", i))
+		ptm.addActivityRecord(12345, fmt.Sprintf("message %.2d", i))
 	}
 
-	activityRecords := ble.getActivityRecords(12345)
+	activityRecords := ptm.getActivityRecords(12345)
 	assert.Equal(t, "message 99", activityRecords[0].Message)
 	assert.Equal(t, "message 98", activityRecords[1].Message)
-	assert.Len(t, activityRecords, ble.maxActivityRecordsPerTx)
+	assert.Len(t, activityRecords, ptm.maxActivityRecordsPerTx)
 
 }
 
 func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 	ctx := context.Background()
-	_, ble, _, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+	_, ptm, _, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		mocks.db.MatchExpectationsInOrder(false)
 		mocks.db.ExpectBegin()
 		mocks.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{}))
@@ -489,7 +490,7 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 	defer done()
 
 	// create transaction succeeded
-	tx, err := ble.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
+	tx, err := ptm.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
 		PublicTxInput: pldapi.PublicTxInput{
 			From: tktypes.RandAddress(),
 			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
@@ -507,7 +508,7 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 
 func TestEngineSuspendResumeRealDB(t *testing.T) {
 
-	ctx, ble, m, done := newTestPublicTxManager(t, true, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+	ctx, ptm, m, done := newTestPublicTxManager(t, true, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Manager.Interval = confutil.P("50ms")
 		conf.Orchestrator.Interval = confutil.P("50ms")
 		conf.Manager.OrchestratorIdleTimeout = confutil.P("1ms")
@@ -539,7 +540,7 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 	// ... but attempting to get it onto the chain is going to block failing
 	m.ethClient.On("SendRawTransaction", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop")).Maybe()
 
-	_, err = ble.SingleTransactionSubmit(ctx, pubTx)
+	_, err = ptm.SingleTransactionSubmit(ctx, pubTx)
 	require.NoError(t, err)
 
 	ticker := time.NewTicker(50 * time.Millisecond)
@@ -554,7 +555,7 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 			if t.Failed() {
 				panic("test failed")
 			}
-			o = ble.getOrchestratorForAddress(resolvedKey)
+			o = ptm.getOrchestratorForAddress(resolvedKey)
 			if o != nil {
 				ift = o.getFirstInFlight()
 			}
@@ -564,11 +565,11 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 	txNonce := getIFT().stateManager.GetNonce()
 
 	// suspend the TX
-	err = ble.SuspendTransaction(ctx, resolvedKey, txNonce)
+	err = ptm.SuspendTransaction(ctx, resolvedKey, txNonce)
 	require.NoError(t, err)
 
 	// wait to flush out the whole orchestrator as this is the only thing in flight
-	for ble.getOrchestratorCount() > 0 {
+	for ptm.getOrchestratorCount() > 0 {
 		<-ticker.C
 		if t.Failed() {
 			return
@@ -576,7 +577,7 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 	}
 
 	// resume the txn
-	err = ble.ResumeTransaction(ctx, resolvedKey, txNonce)
+	err = ptm.ResumeTransaction(ctx, resolvedKey, txNonce)
 	require.NoError(t, err)
 
 	// check the orchestrator comes back
@@ -585,9 +586,227 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 
 }
 
+func TestUpdateTransactionRealDB(t *testing.T) {
+	ctx, ptm, m, done := newTestPublicTxManager(t, true, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+		conf.Manager.Interval = confutil.P("50ms")
+		conf.Orchestrator.Interval = confutil.P("50ms")
+		conf.Manager.OrchestratorIdleTimeout = confutil.P("1ms")
+		conf.GasPrice.FixedGasPrice = nil
+	})
+	defer done()
+
+	keyMapping, err := m.keyManager.ResolveKeyNewDatabaseTX(ctx, "signer1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	require.NoError(t, err)
+	resolvedKey := tktypes.MustEthAddress(keyMapping.Verifier.Verifier)
+
+	// Mock a gas price
+	chainID, _ := rand.Int(rand.Reader, big.NewInt(100000000000000))
+	m.ethClient.On("ChainID").Return(chainID.Int64())
+	m.ethClient.On("GasPrice", mock.Anything).Return(tktypes.MustParseHexUint256("1000000000000000"), nil)
+
+	txID := uuid.New()
+	pubTxSub := &components.PublicTxSubmission{
+		Bindings: []*components.PaladinTXReference{
+			{TransactionID: txID, TransactionType: pldapi.TransactionTypePublic.Enum()},
+		},
+		PublicTxInput: pldapi.PublicTxInput{
+			From: resolvedKey,
+			PublicTxOptions: pldapi.PublicTxOptions{
+				Gas: confutil.P(tktypes.HexUint64(1223451)),
+			},
+		},
+	}
+
+	m.ethClient.On("GetTransactionCount", mock.Anything, mock.Anything).Return(confutil.P(tktypes.HexUint64(1122334455)), nil)
+
+	confirmations := make(chan *blockindexer.IndexedTransactionNotify, 1)
+	srtx := m.ethClient.On("SendRawTransaction", mock.Anything, mock.Anything)
+	srtx.Run(func(args mock.Arguments) {
+		signedMessage := args[1].(tktypes.HexBytes)
+
+		signer, ethTx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(signedMessage), m.ethClient.ChainID())
+		require.NoError(t, err)
+		assert.Equal(t, *resolvedKey, tktypes.EthAddress(*signer))
+
+		if ethTx.GasLimit.Int64() == int64(2223451) {
+			// We need to decode the TX to find the nonce
+			txHash := calculateTransactionHash(signedMessage)
+			confirmation := &blockindexer.IndexedTransactionNotify{
+				IndexedTransaction: pldapi.IndexedTransaction{
+					Hash:             *txHash,
+					BlockNumber:      11223344,
+					TransactionIndex: 10,
+					From:             resolvedKey,
+					To:               (*tktypes.EthAddress)(ethTx.To),
+					Nonce:            ethTx.Nonce.Uint64(),
+					Result:           pldapi.TXResult_SUCCESS.Enum(),
+				},
+			}
+			confirmations <- confirmation
+
+			srtx.Return(&confirmation.Hash, nil)
+		} else {
+			srtx.Return(nil, fmt.Errorf("pop"))
+		}
+	})
+
+	pubTx, err := ptm.SingleTransactionSubmit(ctx, pubTxSub)
+	require.NoError(t, err)
+
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	// Wait for the orchestrator to kick off and pick this TX up
+	var ift *inFlightTransactionStageController
+	for ift == nil {
+		<-ticker.C
+		if t.Failed() {
+			panic("test failed")
+		}
+		o := ptm.getOrchestratorForAddress(*resolvedKey)
+		if o != nil {
+			ift = o.getFirstInFlight()
+		}
+	}
+
+	// pub_txn_id not found
+	err = ptm.UpdateTransaction(ctx, uint64(2), resolvedKey, &pldapi.TransactionUpdate{
+		PublicTxOptions: pldapi.PublicTxOptions{
+			Gas: confutil.P(tktypes.HexUint64(2223451)),
+		},
+	}, nil, nil, func(dbTX persistence.DBTX) error { return nil })
+
+	require.Error(t, err)
+
+	// validation error
+	err = ptm.UpdateTransaction(ctx, *pubTx.LocalID, resolvedKey, &pldapi.TransactionUpdate{
+		PublicTxOptions: pldapi.PublicTxOptions{
+			Gas: confutil.P(tktypes.HexUint64(2223451)),
+		},
+	}, &pldapi.TransactionUpdateOptions{
+		EstimateGas: confutil.P(true),
+	}, nil, func(dbTX persistence.DBTX) error { return nil })
+
+	require.Error(t, err)
+
+	// txmgr db write fails
+	err = ptm.UpdateTransaction(ctx, *pubTx.LocalID, resolvedKey, &pldapi.TransactionUpdate{
+		PublicTxOptions: pldapi.PublicTxOptions{
+			Gas: confutil.P(tktypes.HexUint64(2223451)),
+		},
+	}, nil, nil, func(dbTX persistence.DBTX) error { return errors.New("db write failed") })
+
+	require.Error(t, err)
+
+	// update the transaction
+	err = ptm.UpdateTransaction(ctx, *pubTx.LocalID, resolvedKey, &pldapi.TransactionUpdate{
+		PublicTxOptions: pldapi.PublicTxOptions{
+			Gas: confutil.P(tktypes.HexUint64(2223451)),
+		},
+	}, nil, nil, func(dbTX persistence.DBTX) error { return nil })
+
+	require.NoError(t, err)
+
+	// simulate the confirmation so we can check that the inflight transaction is able to complete and be removed
+	// we don't want any previous state to block this
+	waitingForConfirmation := true
+	for waitingForConfirmation {
+		select {
+		case confirmation := <-confirmations:
+			match, err := ptm.MatchUpdateConfirmedTransactions(ctx, ptm.p.NOTX(), []*blockindexer.IndexedTransactionNotify{confirmation})
+			require.NoError(t, err)
+			ptm.NotifyConfirmPersisted(ctx, match)
+			waitingForConfirmation = false
+
+		case <-ticker.C:
+			if t.Failed() {
+				return
+			}
+		}
+	}
+
+	// wait to flush out the whole orchestrator as this is the only thing in flight
+	for ptm.getOrchestratorCount() > 0 {
+		<-ticker.C
+		if t.Failed() {
+			return
+		}
+	}
+
+	txs, err := ptm.QueryPublicTxForTransactions(ctx, ptm.p.NOTX(), []uuid.UUID{txID}, nil)
+	require.NoError(t, err)
+	require.Len(t, txs[txID], 1)
+	tx := txs[txID][0]
+	require.Len(t, tx.Submissions, 2)
+	for _, activity := range tx.Activity {
+		assert.NotContains(t, activity.Message, "ERROR")
+	}
+}
+
+func TestValidateUpdateTransaction(t *testing.T) {
+	ctx, ptm, _, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+		conf.Manager.Interval = confutil.P("50ms")
+		conf.Orchestrator.Interval = confutil.P("50ms")
+		conf.Manager.OrchestratorIdleTimeout = confutil.P("1ms")
+		conf.GasPrice.FixedGasPrice = nil
+	})
+	defer done()
+
+	from := tktypes.MustEthAddress(tktypes.RandHex(20))
+	oldPtx := &DBPublicTxn{
+		To:    tktypes.MustEthAddress(tktypes.RandHex(20)),
+		Gas:   uint64(10000),
+		Value: tktypes.Uint64ToUint256(100),
+		Data:  []byte("data"),
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			GasPrice:             tktypes.Uint64ToUint256(200),
+			MaxFeePerGas:         tktypes.Uint64ToUint256(300),
+			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(400),
+		}),
+	}
+
+	// no changes
+	newPtx, err := ptm.validateUpdateTransaction(ctx, from, oldPtx, &pldapi.TransactionUpdate{}, nil, nil)
+	require.NoError(t, err)
+	assert.Empty(t, newPtx.To)
+	assert.Empty(t, newPtx.Gas)
+	assert.Empty(t, newPtx.Value)
+	assert.Empty(t, newPtx.Data)
+	assert.Empty(t, newPtx.FixedGasPricing)
+
+	// everything changed
+	txu := &pldapi.TransactionUpdate{
+		To: tktypes.MustEthAddress(tktypes.RandHex(20)),
+		PublicTxOptions: pldapi.PublicTxOptions{
+			Gas:   confutil.P(tktypes.HexUint64(20000)),
+			Value: tktypes.Uint64ToUint256(200),
+			PublicTxGasPricing: pldapi.PublicTxGasPricing{
+				GasPrice:             tktypes.Uint64ToUint256(500),
+				MaxFeePerGas:         tktypes.Uint64ToUint256(600),
+				MaxPriorityFeePerGas: tktypes.Uint64ToUint256(700),
+			},
+		},
+	}
+
+	newPtx, err = ptm.validateUpdateTransaction(ctx, from, oldPtx, txu, nil, []byte("new data"))
+	require.NoError(t, err)
+	assert.Equal(t, txu.To, newPtx.To)
+	assert.Equal(t, uint64(20000), newPtx.Gas)
+	assert.Equal(t, tktypes.Uint64ToUint256(200), newPtx.Value)
+	assert.Equal(t, "0x6e65772064617461", newPtx.Data.String())
+	assert.Equal(t, tktypes.JSONString(txu.PublicTxGasPricing), newPtx.FixedGasPricing)
+
+	// TODO AM: finish tests
+	// gas estimate failure with revert data
+
+	// gas estimate failure without revert data
+
+	// gas estimate success
+}
+
 func TestGasEstimateFactor(t *testing.T) {
 	ctx := context.Background()
-	_, ble, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+	_, ptm, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.GasLimit.GasEstimateFactor = confutil.P(2.0)
 	})
 	defer done()
@@ -602,6 +821,6 @@ func TestGasEstimateFactor(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, ble.ValidateTransaction(ctx, ble.p.NOTX(), tx))
+	require.NoError(t, ptm.ValidateTransaction(ctx, ptm.p.NOTX(), tx))
 	assert.Equal(t, tktypes.MustParseHexUint64("0xc5f0"), *tx.Gas)
 }
