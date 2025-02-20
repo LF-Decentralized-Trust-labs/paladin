@@ -139,6 +139,10 @@ type TransactionUpdate struct {
 	PublicTxOptions
 }
 
+type TransactionUpdateOptions struct {
+	EstimateGas *bool `docstruct:"TransactionUpdateOptions" json:"estimateGas,omitempty"` // if true, the gas limit will be estimated using the new transaction values- default false
+}
+
 type ABIDecodedData struct {
 	Data       tktypes.RawJSON `docstruct:"ABIDecodedData" json:"data"`
 	Summary    string          `docstruct:"ABIDecodedData" json:"summary,omitempty"` // errors only

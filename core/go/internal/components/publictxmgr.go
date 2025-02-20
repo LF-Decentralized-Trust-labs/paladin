@@ -71,5 +71,5 @@ type PublicTxManager interface {
 	MatchUpdateConfirmedTransactions(ctx context.Context, dbTX persistence.DBTX, itxs []*blockindexer.IndexedTransactionNotify) ([]*PublicTxMatch, error)
 	NotifyConfirmPersisted(ctx context.Context, confirms []*PublicTxMatch)
 
-	UpdateTransaction(ctx context.Context, pubTXID uint64, from *tktypes.EthAddress, txu *pldapi.TransactionUpdate, publicTxData []byte, dbUpdate func(dbTX persistence.DBTX) error) error
+	UpdateTransaction(ctx context.Context, pubTXID uint64, from *tktypes.EthAddress, txu *pldapi.TransactionUpdate, options *pldapi.TransactionUpdateOptions, publicTxData []byte, dbUpdate func(dbTX persistence.DBTX) error) error
 }

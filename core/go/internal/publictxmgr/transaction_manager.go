@@ -248,7 +248,6 @@ func (ptm *pubTxManager) SingleTransactionSubmit(ctx context.Context, txi *compo
 	return tx, err
 }
 
-// TODO AM: do we need some validation on the update?
 func (ptm *pubTxManager) ValidateTransaction(ctx context.Context, dbTX persistence.DBTX, txi *components.PublicTxSubmission) error {
 	log.L(ctx).Tracef("PrepareSubmission transaction: %+v", txi)
 
@@ -600,29 +599,137 @@ func (ptm *pubTxManager) ResumeTransaction(ctx context.Context, from tktypes.Eth
 	return nil
 }
 
-func (ptm *pubTxManager) UpdateTransaction(ctx context.Context, pubTXID uint64, from *tktypes.EthAddress, txu *pldapi.TransactionUpdate, publicTxData []byte, publicDBUpdate func(dbTX persistence.DBTX) error) error {
-	newPtx := &DBPublicTxn{
-		To:    txu.To,
-		Value: txu.Value,
-		Data:  publicTxData,
+func (ptm *pubTxManager) validateUpdateTransaction(ctx context.Context, from *tktypes.EthAddress, oldPtx *DBPublicTxn, txu *pldapi.TransactionUpdate, updateOptions *pldapi.TransactionUpdateOptions, publicTxData []byte) (*DBPublicTxn, error) {
+	newPtx := &DBPublicTxn{}
+	estimateGas := updateOptions != nil && updateOptions.EstimateGas != nil && *updateOptions.EstimateGas
+
+	// the fields needed to reestimate gas
+	var to *tktypes.EthAddress
+	var data tktypes.HexBytes
+	options := &pldapi.PublicTxOptions{}
+
+	if txu.To != nil {
+		newPtx.To = txu.To
+		to = txu.To
+	} else {
+		to = oldPtx.To
 	}
+
+	if publicTxData != nil {
+		newPtx.Data = publicTxData
+		data = publicTxData
+	} else {
+		data = oldPtx.Data
+	}
+
+	if txu.Value != nil {
+		newPtx.Value = txu.Value
+		options.Value = txu.Value
+	} else {
+		options.Value = oldPtx.Value
+	}
+
 	if txu.Gas != nil {
 		newPtx.Gas = txu.Gas.Uint64()
+		if estimateGas {
+			return nil, i18n.NewError(ctx, msgs.MsgGasAndEstimateGas)
+		}
+		options.Gas = txu.Gas
+	} else {
+		options.Gas = confutil.P(tktypes.HexUint64(oldPtx.Gas))
 	}
-	if txu.PublicTxGasPricing.GasPrice != nil || txu.PublicTxGasPricing.MaxFeePerGas != nil || txu.PublicTxGasPricing.MaxPriorityFeePerGas != nil {
-		newPtx.FixedGasPricing = tktypes.JSONString(txu.PublicTxGasPricing)
+
+	// Because the gas pricing options are stored as stringified JSON in the database
+	// we need to merge the new values with the old ones - but we still only want to update
+	// newPtx if there are actual changes
+	newPublicTxGasPricing := pldapi.PublicTxGasPricing{}
+	oldPublicTxGasPricing := recoverGasPriceOptions([]byte(oldPtx.FixedGasPricing))
+	changed := false
+
+	if txu.PublicTxGasPricing.GasPrice != nil {
+		newPublicTxGasPricing.GasPrice = txu.PublicTxGasPricing.GasPrice
+		changed = true
+	} else {
+		newPublicTxGasPricing.GasPrice = oldPublicTxGasPricing.GasPrice
+	}
+	if txu.PublicTxGasPricing.MaxFeePerGas != nil {
+		newPublicTxGasPricing.MaxFeePerGas = txu.PublicTxGasPricing.MaxFeePerGas
+		changed = true
+	} else {
+		newPublicTxGasPricing.MaxFeePerGas = oldPublicTxGasPricing.MaxFeePerGas
+	}
+	if txu.PublicTxGasPricing.MaxPriorityFeePerGas != nil {
+		newPublicTxGasPricing.MaxPriorityFeePerGas = txu.PublicTxGasPricing.MaxPriorityFeePerGas
+		changed = true
+	} else {
+		newPublicTxGasPricing.MaxPriorityFeePerGas = oldPublicTxGasPricing.MaxPriorityFeePerGas
+	}
+
+	if changed {
+		newPtx.FixedGasPricing = tktypes.JSONString(newPublicTxGasPricing)
+	}
+	options.PublicTxGasPricing = newPublicTxGasPricing
+
+	if estimateGas {
+		gasEstimateResult, err := ptm.ethClient.EstimateGasNoResolve(ctx, buildEthTX(
+			*from,
+			nil, /* nonce not important for the estimate */
+			to,
+			data,
+			options))
+
+		if err != nil {
+			log.L(ctx).Errorf("UpdateTransaction error estimating gas for transaction: %+v, request: (%+v)", err, txu.ID)
+			if ethclient.MapSubmissionRejected(err) {
+				// transaction is rejected. We can build a useful error message hopefully by processing the rejection info
+				if len(gasEstimateResult.RevertData) > 0 {
+					// we can use the error dictionary callback to TXManager to look up the ABI
+					err = ptm.rootTxMgr.CalculateRevertError(ctx, ptm.p.NOTX(), gasEstimateResult.RevertData)
+					log.L(ctx).Warnf("Estimate gas reverted: %s", err.Error())
+				}
+			}
+			return nil, err
+		}
+		factoredGasLimit := tktypes.HexUint64((float64)(gasEstimateResult.GasLimit) * ptm.gasEstimateFactor)
+		newPtx.Gas = factoredGasLimit.Uint64()
+		log.L(ctx).Tracef("UpdateTransaction using the estimated gas limit %s multiplied by the gas estimate factor %.f (=%s) for transaction: %+v", gasEstimateResult.GasLimit, ptm.gasEstimateFactor, factoredGasLimit, txu.ID)
+	}
+
+	return newPtx, nil
+}
+
+func (ptm *pubTxManager) UpdateTransaction(ctx context.Context, pubTXID uint64, from *tktypes.EthAddress, txu *pldapi.TransactionUpdate, options *pldapi.TransactionUpdateOptions, publicTxData []byte, txmgrDBUpdate func(dbTX persistence.DBTX) error) error {
+	ptxs := []*DBPublicTxn{}
+	err := ptm.p.DB().
+		WithContext(ctx).
+		Table("public_txns").
+		Where(`"pub_txn_id" = ?`, pubTXID).
+		Limit(1).
+		Find(&ptxs).
+		Error
+	if err != nil {
+		return err
+	}
+	if len(ptxs) == 0 {
+		// TODO AM: this is a good place for a warning log
+		return i18n.NewError(ctx, msgs.MsgPublicTransactionNotFound, pubTXID)
+	}
+
+	newPtx, err := ptm.validateUpdateTransaction(ctx, from, ptxs[0], txu, options, publicTxData)
+	if err != nil {
+		return err
 	}
 
 	dbUpdate := func() error {
 		return ptm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
-			if err := publicDBUpdate(dbTX); err != nil {
+			if err := txmgrDBUpdate(dbTX); err != nil {
 				return err
 			}
 			return ptm.writeUpdatedTransaction(ctx, dbTX, pubTXID, *from, newPtx)
 		})
 	}
 
-	if err := ptm.dispatchUpdate(ctx, pubTXID, from, newPtx, dbUpdate); err != nil {
+	if err = ptm.dispatchUpdate(ctx, pubTXID, from, newPtx, dbUpdate); err != nil {
 		return err
 	}
 	return nil

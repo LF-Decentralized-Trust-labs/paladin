@@ -18,6 +18,7 @@ package publictxmgr
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"testing"
@@ -668,12 +669,41 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 		}
 	}
 
+	// pub_txn_id not found
+	err = ptm.UpdateTransaction(ctx, uint64(2), resolvedKey, &pldapi.TransactionUpdate{
+		PublicTxOptions: pldapi.PublicTxOptions{
+			Gas: confutil.P(tktypes.HexUint64(2223451)),
+		},
+	}, nil, nil, func(dbTX persistence.DBTX) error { return nil })
+
+	require.Error(t, err)
+
+	// validation error
+	err = ptm.UpdateTransaction(ctx, *pubTx.LocalID, resolvedKey, &pldapi.TransactionUpdate{
+		PublicTxOptions: pldapi.PublicTxOptions{
+			Gas: confutil.P(tktypes.HexUint64(2223451)),
+		},
+	}, &pldapi.TransactionUpdateOptions{
+		EstimateGas: confutil.P(true),
+	}, nil, func(dbTX persistence.DBTX) error { return nil })
+
+	require.Error(t, err)
+
+	// txmgr db write fails
+	err = ptm.UpdateTransaction(ctx, *pubTx.LocalID, resolvedKey, &pldapi.TransactionUpdate{
+		PublicTxOptions: pldapi.PublicTxOptions{
+			Gas: confutil.P(tktypes.HexUint64(2223451)),
+		},
+	}, nil, nil, func(dbTX persistence.DBTX) error { return errors.New("db write failed") })
+
+	require.Error(t, err)
+
 	// update the transaction
 	err = ptm.UpdateTransaction(ctx, *pubTx.LocalID, resolvedKey, &pldapi.TransactionUpdate{
 		PublicTxOptions: pldapi.PublicTxOptions{
 			Gas: confutil.P(tktypes.HexUint64(2223451)),
 		},
-	}, nil, func(dbTX persistence.DBTX) error { return nil })
+	}, nil, nil, func(dbTX persistence.DBTX) error { return nil })
 
 	require.NoError(t, err)
 
@@ -711,6 +741,67 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 	for _, activity := range tx.Activity {
 		assert.NotContains(t, activity.Message, "ERROR")
 	}
+}
+
+func TestValidateUpdateTransaction(t *testing.T) {
+	ctx, ptm, _, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+		conf.Manager.Interval = confutil.P("50ms")
+		conf.Orchestrator.Interval = confutil.P("50ms")
+		conf.Manager.OrchestratorIdleTimeout = confutil.P("1ms")
+		conf.GasPrice.FixedGasPrice = nil
+	})
+	defer done()
+
+	from := tktypes.MustEthAddress(tktypes.RandHex(20))
+	oldPtx := &DBPublicTxn{
+		To:    tktypes.MustEthAddress(tktypes.RandHex(20)),
+		Gas:   uint64(10000),
+		Value: tktypes.Uint64ToUint256(100),
+		Data:  []byte("data"),
+		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
+			GasPrice:             tktypes.Uint64ToUint256(200),
+			MaxFeePerGas:         tktypes.Uint64ToUint256(300),
+			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(400),
+		}),
+	}
+
+	// no changes
+	newPtx, err := ptm.validateUpdateTransaction(ctx, from, oldPtx, &pldapi.TransactionUpdate{}, nil, nil)
+	require.NoError(t, err)
+	assert.Empty(t, newPtx.To)
+	assert.Empty(t, newPtx.Gas)
+	assert.Empty(t, newPtx.Value)
+	assert.Empty(t, newPtx.Data)
+	assert.Empty(t, newPtx.FixedGasPricing)
+
+	// everything changed
+	txu := &pldapi.TransactionUpdate{
+		To: tktypes.MustEthAddress(tktypes.RandHex(20)),
+		PublicTxOptions: pldapi.PublicTxOptions{
+			Gas:   confutil.P(tktypes.HexUint64(20000)),
+			Value: tktypes.Uint64ToUint256(200),
+			PublicTxGasPricing: pldapi.PublicTxGasPricing{
+				GasPrice:             tktypes.Uint64ToUint256(500),
+				MaxFeePerGas:         tktypes.Uint64ToUint256(600),
+				MaxPriorityFeePerGas: tktypes.Uint64ToUint256(700),
+			},
+		},
+	}
+
+	newPtx, err = ptm.validateUpdateTransaction(ctx, from, oldPtx, txu, nil, []byte("new data"))
+	require.NoError(t, err)
+	assert.Equal(t, txu.To, newPtx.To)
+	assert.Equal(t, uint64(20000), newPtx.Gas)
+	assert.Equal(t, tktypes.Uint64ToUint256(200), newPtx.Value)
+	assert.Equal(t, "0x6e65772064617461", newPtx.Data.String())
+	assert.Equal(t, tktypes.JSONString(txu.PublicTxGasPricing), newPtx.FixedGasPricing)
+
+	// TODO AM: finish tests
+	// gas estimate failure with revert data
+
+	// gas estimate failure without revert data
+
+	// gas estimate success
 }
 
 func TestGasEstimateFactor(t *testing.T) {

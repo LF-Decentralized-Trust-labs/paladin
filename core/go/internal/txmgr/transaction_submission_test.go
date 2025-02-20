@@ -1119,7 +1119,7 @@ func TestUpdateTransactionNoID(t *testing.T) {
 	ctx, txm, done := newTestTransactionManager(t, false, mockEmptyReceiptListeners)
 	defer done()
 
-	_, err := txm.UpdateTransaction(ctx, &pldapi.TransactionUpdate{})
+	_, err := txm.UpdateTransaction(ctx, &pldapi.TransactionUpdate{}, nil)
 	assert.ErrorContains(t, err, "PD011910")
 }
 
@@ -1136,7 +1136,7 @@ func TestUpdateTransactionDBReadError(t *testing.T) {
 	id := uuid.New()
 	_, err := txm.UpdateTransaction(ctx, &pldapi.TransactionUpdate{
 		ID: &id,
-	})
+	}, nil)
 	assert.ErrorContains(t, err, "pop")
 }
 
@@ -1153,7 +1153,7 @@ func TestUpdateTransactionNotFound(t *testing.T) {
 	id := uuid.New()
 	_, err := txm.UpdateTransaction(ctx, &pldapi.TransactionUpdate{
 		ID: &id,
-	})
+	}, nil)
 	assert.ErrorContains(t, err, "PD012245")
 }
 
@@ -1172,7 +1172,7 @@ func TestUpdateTransactionPrivate(t *testing.T) {
 	id := uuid.New()
 	_, err := txm.UpdateTransaction(ctx, &pldapi.TransactionUpdate{
 		ID: &id,
-	})
+	}, nil)
 	assert.ErrorContains(t, err, "PD012246")
 }
 
@@ -1196,7 +1196,7 @@ func TestUpdateTransactionErrorQueryingPublicTX(t *testing.T) {
 	id := uuid.New()
 	_, err := txm.UpdateTransaction(ctx, &pldapi.TransactionUpdate{
 		ID: &id,
-	})
+	}, nil)
 	assert.ErrorContains(t, err, "pop")
 
 }
@@ -1224,7 +1224,7 @@ func TestUpdateTransactionPublicTXNotFound(t *testing.T) {
 
 	_, err := txm.UpdateTransaction(ctx, &pldapi.TransactionUpdate{
 		ID: &id,
-	})
+	}, nil)
 	assert.ErrorContains(t, err, "PD011911")
 }
 
@@ -1252,7 +1252,7 @@ func TestUpdateTransactionFailResolve(t *testing.T) {
 	_, err := txm.UpdateTransaction(ctx, &pldapi.TransactionUpdate{
 		ID:       &id,
 		Function: "set",
-	})
+	}, nil)
 	assert.ErrorContains(t, err, "PD012244")
 }
 
@@ -1285,7 +1285,7 @@ func TestUpdateTransactionKeyResolutionError(t *testing.T) {
 		PublicTxOptions: pldapi.PublicTxOptions{
 			Gas: confutil.P(tktypes.HexUint64(1000)),
 		},
-	})
+	}, nil)
 	assert.ErrorContains(t, err, "pop")
 }
 
@@ -1323,7 +1323,7 @@ func TestUpdateTransactionKeyParseError(t *testing.T) {
 		PublicTxOptions: pldapi.PublicTxOptions{
 			Gas: confutil.P(tktypes.HexUint64(1000)),
 		},
-	})
+	}, nil)
 	assert.ErrorContains(t, err, "bad address")
 }
 
@@ -1371,6 +1371,7 @@ func TestUpdateTransactionCallPublicTXUpdate(t *testing.T) {
 				uint64(1),
 				from,
 				txu,
+				mock.Anything, // TODO AM: gas estimation will want to be covered in a test
 				pubTxData,
 				mock.Anything,
 			).Return(nil)
@@ -1378,7 +1379,7 @@ func TestUpdateTransactionCallPublicTXUpdate(t *testing.T) {
 	)
 	defer done()
 
-	_, err := txm.UpdateTransaction(ctx, txu)
+	_, err := txm.UpdateTransaction(ctx, txu, nil)
 	assert.NoError(t, err)
 }
 
@@ -1419,11 +1420,12 @@ func TestUpdateTransactionCallPublicTXUpdateNoChange(t *testing.T) {
 				uint64(1),
 				from,
 				txu,
+				(*pldapi.TransactionUpdateOptions)(nil),
 				[]byte(nil),
 				mock.Anything,
 			).Return(nil)
 			mockUpdateTX.Run(func(args mock.Arguments) {
-				dbUpdateFunc := args.Get(5).(func(dbTX persistence.DBTX) error)
+				dbUpdateFunc := args.Get(6).(func(dbTX persistence.DBTX) error)
 				err := dbUpdateFunc(nil)
 				assert.NoError(t, err)
 			})
@@ -1431,7 +1433,7 @@ func TestUpdateTransactionCallPublicTXUpdateNoChange(t *testing.T) {
 	)
 	defer done()
 
-	_, err := txm.UpdateTransaction(ctx, txu)
+	_, err := txm.UpdateTransaction(ctx, txu, nil)
 	assert.NoError(t, err)
 }
 

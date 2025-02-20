@@ -133,7 +133,7 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 			return publicTxns, nil
 		}),
 		func(tmc *pldconf.TxManagerConfig, mc *mockComponents) {
-			mc.publicTxMgr.On("UpdateTransaction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			mc.publicTxMgr.On("UpdateTransaction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			mc.keyManager.On("ResolveEthAddressNewDatabaseTX", mock.Anything, "sender1").Return(senderAddr, nil) // used in call
 
 			unconnected := ethclient.NewUnconnectedRPCClient(context.Background(), &pldconf.EthClientConfig{}, 0)
@@ -289,7 +289,7 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 			Gas: &gas,
 		},
 	}
-	err = rpcClient.CallRPC(ctx, nil, "ptx_updateTransaction", txUpdate)
+	err = rpcClient.CallRPC(ctx, nil, "ptx_updateTransaction", txUpdate, &pldapi.TransactionUpdateOptions{})
 	require.NoError(t, err)
 
 	// Finalize the deploy as a success

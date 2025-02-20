@@ -671,7 +671,7 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX persistence.DB
 	return rowsAffected, nil
 }
 
-func (tm *txManager) UpdateTransaction(ctx context.Context, txu *pldapi.TransactionUpdate) (*uuid.UUID, error) {
+func (tm *txManager) UpdateTransaction(ctx context.Context, txu *pldapi.TransactionUpdate, uto *pldapi.TransactionUpdateOptions) (*uuid.UUID, error) {
 	if txu.ID == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgMissingTransactionID)
 	}
@@ -734,7 +734,7 @@ func (tm *txManager) UpdateTransaction(ctx context.Context, txu *pldapi.Transact
 		return nil, err
 	}
 
-	err = tm.publicTxMgr.UpdateTransaction(ctx, pubTXID, from, txu, publicTxData, func(dbTX persistence.DBTX) error {
+	err = tm.publicTxMgr.UpdateTransaction(ctx, pubTXID, from, txu, uto, publicTxData, func(dbTX persistence.DBTX) error {
 		return tm.processUpdatedTransaction(ctx, dbTX, tx.ID, validatedTransaction)
 	})
 
