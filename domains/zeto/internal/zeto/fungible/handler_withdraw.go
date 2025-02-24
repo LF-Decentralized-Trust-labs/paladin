@@ -26,7 +26,6 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
@@ -34,7 +33,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/proto"
@@ -44,15 +42,12 @@ var _ types.DomainHandler = &withdrawHandler{}
 
 type withdrawHandler struct {
 	baseHandler
-	callbacks            plugintk.DomainCallbacks
-	coinSchema           *pb.StateSchema
-	merkleTreeRootSchema *prototk.StateSchema
-	merkleTreeNodeSchema *prototk.StateSchema
+	callbacks plugintk.DomainCallbacks
 }
 
 var withdrawABI = &abi.Entry{
 	Type: abi.Function,
-	Name: "withdraw",
+	Name: types.METHOD_WITHDRAW,
 	Inputs: abi.ParameterArray{
 		{Name: "amount", Type: "uint256"},
 		{Name: "inputs", Type: "uint256[]"},
@@ -64,7 +59,7 @@ var withdrawABI = &abi.Entry{
 
 var withdrawABI_nullifiers = &abi.Entry{
 	Type: abi.Function,
-	Name: "withdraw",
+	Name: types.METHOD_WITHDRAW,
 	Inputs: abi.ParameterArray{
 		{Name: "amount", Type: "uint256"},
 		{Name: "nullifiers", Type: "uint256[]"},
@@ -79,11 +74,13 @@ func NewWithdrawHandler(name string, callbacks plugintk.DomainCallbacks, coinSch
 	return &withdrawHandler{
 		baseHandler: baseHandler{
 			name: name,
+			stateSchemas: &common.StateSchemas{
+				CoinSchema:           coinSchema,
+				MerkleTreeRootSchema: merkleTreeRootSchema,
+				MerkleTreeNodeSchema: merkleTreeNodeSchema,
+			},
 		},
-		callbacks:            callbacks,
-		coinSchema:           coinSchema,
-		merkleTreeRootSchema: merkleTreeRootSchema,
-		merkleTreeNodeSchema: merkleTreeNodeSchema,
+		callbacks: callbacks,
 	}
 }
 
@@ -135,7 +132,7 @@ func (h *withdrawHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
 	}
-	payloadBytes, err := h.formatProvingRequest(ctx, inputCoins, outputCoin, tx.DomainConfig.CircuitId, tx.DomainConfig.TokenName, req.StateQueryContext, contractAddress)
+	payloadBytes, err := h.formatProvingRequest(ctx, inputCoins, outputCoin, (*tx.DomainConfig.Circuits)[types.METHOD_WITHDRAW], tx.DomainConfig.TokenName, req.StateQueryContext, contractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorFormatProvingReq, err)
 	}
@@ -205,7 +202,7 @@ func (h *withdrawHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	}
 	output := hash.String()
 
-	data, err := common.EncodeTransactionData(ctx, req.Transaction, types.ZetoTransactionData_V0)
+	data, err := common.EncodeTransactionData(ctx, req.Transaction)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorEncodeTxData, err)
 	}
@@ -243,7 +240,7 @@ func (h *withdrawHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 
 func (h *withdrawHandler) prepareInputs(ctx context.Context, useNullifiers bool, stateQueryContext, senderKey string, amount *tktypes.HexUint256) ([]*types.ZetoCoin, []*pb.StateRef, *big.Int, *big.Int, error) {
 	expectedTotal := amount.Int()
-	return buildInputsForExpectedTotal(ctx, h.callbacks, h.coinSchema, useNullifiers, stateQueryContext, senderKey, expectedTotal)
+	return buildInputsForExpectedTotal(ctx, h.callbacks, h.stateSchemas.CoinSchema, useNullifiers, stateQueryContext, senderKey, expectedTotal, false)
 }
 
 func (h *withdrawHandler) prepareOutput(ctx context.Context, amount *tktypes.HexUint256, resolvedRecipient *pb.ResolvedVerifier) (*types.ZetoCoin, *pb.NewState, error) {
@@ -260,14 +257,14 @@ func (h *withdrawHandler) prepareOutput(ctx context.Context, amount *tktypes.Hex
 		Amount: amount,
 	}
 
-	newState, err := makeNewState(ctx, h.coinSchema, false, newCoin, h.name, resolvedRecipient.Lookup)
+	newState, err := makeNewState(ctx, h.stateSchemas.CoinSchema, false, newCoin, h.name, resolvedRecipient.Lookup)
 	if err != nil {
 		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorCreateNewState, err)
 	}
 	return newCoin, newState, nil
 }
 
-func (h *withdrawHandler) formatProvingRequest(ctx context.Context, inputCoins []*types.ZetoCoin, outputCoin *types.ZetoCoin, circuitId, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
+func (h *withdrawHandler) formatProvingRequest(ctx context.Context, inputCoins []*types.ZetoCoin, outputCoin *types.ZetoCoin, circuit *zetosignerapi.Circuit, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
 	inputSize := common.GetInputSize(len(inputCoins))
 	inputCommitments := make([]string, inputSize)
 	inputValueInts := make([]uint64, inputSize)
@@ -299,8 +296,8 @@ func (h *withdrawHandler) formatProvingRequest(ctx context.Context, inputCoins [
 	outputOwner := outputCoin.Owner.String()
 
 	var extras []byte
-	if common.IsFungibleNullifiersCircuit(circuitId) {
-		proofs, extrasObj, err := generateMerkleProofs(ctx, h.callbacks, h.merkleTreeRootSchema, h.merkleTreeNodeSchema, tokenName, stateQueryContext, contractAddress, inputCoins)
+	if circuit.UsesNullifiers {
+		proofs, extrasObj, err := generateMerkleProofs(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, tokenName, stateQueryContext, contractAddress, inputCoins, false)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorGenerateMTP, err)
 		}
@@ -322,7 +319,7 @@ func (h *withdrawHandler) formatProvingRequest(ctx context.Context, inputCoins [
 
 	// marshalValues
 	payload := &corepb.ProvingRequest{
-		CircuitId: getCircuitId(tokenName),
+		Circuit: circuit.ToProto(),
 		Common: &corepb.ProvingRequestCommon{
 			InputCommitments:  inputCommitments,
 			InputSalts:        inputSalts,
@@ -340,16 +337,6 @@ func (h *withdrawHandler) formatProvingRequest(ctx context.Context, inputCoins [
 	}
 
 	return proto.Marshal(payload)
-}
-
-func getCircuitId(tokenName string) string {
-	isNullifier := common.IsNullifiersToken(tokenName)
-
-	if isNullifier {
-		return constants.CIRCUIT_WITHDRAW_NULLIFIER
-	} else {
-		return constants.CIRCUIT_WITHDRAW
-	}
 }
 
 func getWithdrawABI(tokenName string) *abi.Entry {

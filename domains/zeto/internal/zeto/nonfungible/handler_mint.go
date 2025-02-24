@@ -30,7 +30,7 @@ import (
 
 var mintABI = &abi.Entry{
 	Type: abi.Function,
-	Name: "mint",
+	Name: types.METHOD_MINT,
 	Inputs: abi.ParameterArray{
 		{Name: "utxos", Type: "uint256[]"},
 		{Name: "data", Type: "bytes"},
@@ -137,7 +137,7 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 		outputs[i] = hash.String()
 	}
 
-	data, err := encodeTransactionDataFunc(ctx, req.Transaction, types.ZetoTransactionData_V0)
+	data, err := encodeTransactionDataFunc(ctx, req.Transaction)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorEncodeTxData, err)
 	}

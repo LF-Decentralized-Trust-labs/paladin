@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	internalZeto "github.com/kaleido-io/paladin/domains/zeto/internal/zeto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
@@ -32,6 +33,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
@@ -125,7 +127,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	rpcerr = s.rpc.CallRPC(ctx, &controllerAddr, "ptx_resolveVerifier", controllerName, zetosignerapi.AlgoDomainZetoSnarkBJJ(s.domainName), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
 	require.Nil(t, rpcerr)
 
-	coins := findAvailableCoins(t, ctx, s.rpc, s.domain, zetoAddress, nil, isNullifiersToken)
+	coins := findAvailableCoins(t, ctx, s.rpc, s.domain, zetoAddress, isNullifiersToken)
 	require.Len(t, coins, 2)
 	assert.Equal(t, int64(10), coins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, controllerAddr.String(), coins[0].Data.Owner.String())
@@ -165,7 +167,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	}
 
 	// check that we now only have one unspent coin, of value 5
-	coins = findAvailableCoins(t, ctx, s.rpc, s.domain, zetoAddress, nil, isNullifiersToken)
+	coins = findAvailableCoins(t, ctx, s.rpc, s.domain, zetoAddress, isNullifiersToken)
 	// one for the controller from the successful transaction as change (value=5)
 	// one for the recipient (value=25)
 	expectedCoins := 2
@@ -208,13 +210,91 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	require.NoError(t, err)
 
 	expectedCoins += 2 // the deposit call produces 2 output UTXOs for the receiver
-	coins = findAvailableCoins(t, ctx, s.rpc, s.domain, zetoAddress, nil, isNullifiersToken)
+	coins = findAvailableCoins(t, ctx, s.rpc, s.domain, zetoAddress, isNullifiersToken)
 	require.Len(t, coins, expectedCoins)
 
 	log.L(ctx).Info("*************************************")
 	log.L(ctx).Infof("Withdraw back to ERC20 balance from Zeto")
 	log.L(ctx).Info("*************************************")
 	_, err = s.withdraw(ctx, zetoAddress, controllerName, 100)
+	require.NoError(t, err)
+
+	if tokenName != constants.TOKEN_ANON {
+		return
+	}
+
+	log.L(ctx).Info("*************************************")
+	log.L(ctx).Infof("Lock some UTXOs and delegate the lock to recipient1")
+	log.L(ctx).Info("*************************************")
+	// the delegate being recipient1 is just for testing purposes, in a real scenario the delegate would be
+	// a smart contract (such as playing the role of a trade orchestrator or escrow)
+	var recipient1EthAddrStr string
+	rpcerr = s.rpc.CallRPC(ctx, &recipient1EthAddrStr, "ptx_resolveVerifier", recipient1Name, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	require.Nil(t, rpcerr)
+	recipient1EthAddr := tktypes.MustEthAddress(recipient1EthAddrStr)
+	_, err = s.lock(ctx, zetoAddress, controllerName, 1, recipient1EthAddr)
+	require.NoError(t, err)
+	_, err = s.lock(ctx, zetoAddress, controllerName, 1, recipient1EthAddr)
+	require.NoError(t, err)
+
+	coins = findAvailableCoins(t, ctx, s.rpc, s.domain, zetoAddress, isNullifiersToken, true /* locked */)
+	require.Len(t, coins, 2)
+	locked1, _ := coins[0].Data.Hash(ctx)
+	locked2, _ := coins[1].Data.Hash(ctx)
+
+	// for now unlock only works properly for the ANON token
+	log.L(ctx).Info("*************************************")
+	log.L(ctx).Infof("Recipient1 unlocks one of the locked UTXOs %s", locked2.String())
+	log.L(ctx).Info("*************************************")
+	// unlocking by calling transferlocked()
+	_, err = s.TransferLocked(ctx, &zetoAddress, locked2, recipient1Name, controllerName, controllerName, 1)
+	require.NoError(t, err)
+
+	log.L(ctx).Info("*************************************")
+	log.L(ctx).Infof("Recipient1 delegates the lock to recipient2")
+	log.L(ctx).Info("*************************************")
+	var recipient2EthAddrStr string
+	rpcerr = s.rpc.CallRPC(ctx, &recipient2EthAddrStr, "ptx_resolveVerifier", recipient2Name, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	require.Nil(t, rpcerr)
+	txInput := map[string]any{
+		"utxos":    []string{locked1.String()},
+		"delegate": recipient2EthAddrStr,
+		"data":     "0x",
+	}
+	txInputJson, err := json.Marshal(txInput)
+	require.NoError(t, err)
+	// submit a public transaction to delegate the lock
+	build, err := getZetoAnonSpec()
+	require.NoError(t, err)
+	_, err = s.tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			Type:     pldapi.TransactionTypePublic.Enum(),
+			From:     recipient1Name,
+			To:       &zetoAddress,
+			Function: "delegateLock",
+			Data:     txInputJson,
+		},
+		ABI: build.ABI,
+	})
+	require.NoError(t, err)
+
+	log.L(ctx).Info("*************************************")
+	log.L(ctx).Infof("Transfer locked UTXO %s to recipient3", locked1.String())
+	log.L(ctx).Info("*************************************")
+	// the owner of the locked UTXO is the controller, who needs to generate the proof for the transfer.
+	result, err := s.PrepareTransferLocked(ctx, &zetoAddress, locked1, recipient2Name, controllerName, recipient3Name, 1)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	_, err = s.tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			Type:     pldapi.TransactionTypePublic.Enum(),
+			From:     recipient2Name,
+			To:       &zetoAddress,
+			Function: "transferLocked",
+			Data:     result.PreparedTransaction.Data,
+		},
+		ABI: build.ABI,
+	})
 	require.NoError(t, err)
 }
 
@@ -382,10 +462,91 @@ func (s *fungibleTestSuiteHelper) approveERC20(ctx context.Context, erc20Address
 	return err
 }
 
-func findAvailableCoins(t *testing.T, ctx context.Context, rpc rpcclient.Client, zeto zeto.Zeto, address tktypes.EthAddress, jq *query.QueryJSON, useNullifiers bool) []*types.ZetoCoinState {
-	if jq == nil {
-		jq = query.NewQueryBuilder().Limit(100).Query()
+func (s *fungibleTestSuiteHelper) lock(ctx context.Context, zetoAddress tktypes.EthAddress, sender string, amount int, delegate *tktypes.EthAddress) (*testbed.TransactionResult, error) {
+	var invokeResult testbed.TransactionResult
+	params := types.LockParams{
+		Amount:   tktypes.Uint64ToUint256(uint64(amount)),
+		Delegate: delegate,
 	}
+	paramsJson, _ := json.Marshal(&params)
+	rpcerr := s.rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     sender,
+			To:       &zetoAddress,
+			Function: "lock",
+			Data:     paramsJson,
+		},
+		ABI: types.ZetoFungibleABI,
+	}, true)
+	if rpcerr != nil {
+		return nil, rpcerr
+	}
+	return &invokeResult, nil
+}
+
+func (s *fungibleTestSuiteHelper) TransferLocked(ctx context.Context, zetoAddress *tktypes.EthAddress, lockedInput *tktypes.HexUint256, delegate, sender, receiver string, amount int) (*testbed.TransactionResult, error) {
+	params := &types.FungibleTransferLockedParams{
+		LockedInputs: []*tktypes.HexUint256{lockedInput},
+		Delegate:     delegate,
+		Transfers: []*types.FungibleTransferParamEntry{
+			{
+				To:     receiver,
+				Amount: tktypes.Uint64ToUint256(uint64(amount)),
+			},
+		},
+	}
+	paramsJson, _ := json.Marshal(params)
+	tx := &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			To:       zetoAddress,
+			From:     sender,
+			Function: "transferLocked",
+			Data:     paramsJson,
+		},
+		ABI: types.ZetoFungibleABI,
+	}
+
+	var result testbed.TransactionResult
+	rpcerr := s.rpc.CallRPC(ctx, &result, "testbed_invoke", tx, true)
+	if rpcerr != nil {
+		return nil, rpcerr
+	}
+	return &result, nil
+}
+
+func (s *fungibleTestSuiteHelper) PrepareTransferLocked(ctx context.Context, zetoAddress *tktypes.EthAddress, lockedInput *tktypes.HexUint256, delegate, sender, receiver string, amount int) (*testbed.TransactionResult, error) {
+	params := &types.FungibleTransferLockedParams{
+		LockedInputs: []*tktypes.HexUint256{lockedInput},
+		Delegate:     delegate,
+		Transfers: []*types.FungibleTransferParamEntry{
+			{
+				To:     receiver,
+				Amount: tktypes.Uint64ToUint256(uint64(amount)),
+			},
+		},
+	}
+	paramsJson, _ := json.Marshal(params)
+	tx := &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			To:       zetoAddress,
+			From:     sender,
+			Function: "transferLocked",
+			Data:     paramsJson,
+		},
+		ABI: types.ZetoFungibleABI,
+	}
+
+	var result testbed.TransactionResult
+	rpcerr := s.rpc.CallRPC(ctx, &result, "testbed_prepare", tx)
+	if rpcerr != nil {
+		return nil, rpcerr
+	}
+	return &result, nil
+}
+
+func findAvailableCoins(t *testing.T, ctx context.Context, rpc rpcclient.Client, zeto zeto.Zeto, address tktypes.EthAddress, useNullifiers bool, locked ...bool) []*types.ZetoCoinState {
+	isLocked := len(locked) > 0 && locked[0]
+	jq := query.NewQueryBuilder().Limit(100).Equal("locked", isLocked).Query()
 	methodName := "pstate_queryContractStates"
 	if useNullifiers {
 		methodName = "pstate_queryContractNullifiers"
@@ -437,6 +598,11 @@ func getERC20Spec() (*solutils.SolidityBuild, error) {
 	return build, nil
 }
 
+func getZetoAnonSpec() (*solutils.SolidityBuild, error) {
+	build := solutils.MustLoadBuild(zetoAnonAbi)
+	return build, nil
+}
+
 func deployERC20(ctx context.Context, rpc rpcclient.Client, controllerAddr string) (*tktypes.EthAddress, error) {
 	build, err := getERC20Spec()
 	if err != nil {
@@ -449,5 +615,8 @@ func deployERC20(ctx context.Context, rpc rpcclient.Client, controllerAddr strin
 		return nil, rpcerr.RPCError()
 	}
 	return tktypes.MustEthAddress(addr), nil
+}
 
+func functionBuilder(ctx context.Context, pld pldclient.PaladinClient, abi abi.ABI, functionName string) pldclient.TxBuilder {
+	return pld.ForABI(ctx, abi).Function(functionName)
 }

@@ -41,18 +41,18 @@ type domainContracts struct {
 }
 
 type domainContract struct {
-	Name                  string         `yaml:"name"`
-	Verifier              string         `yaml:"verifier"`
-	BatchVerifier         string         `yaml:"batchVerifier"`
-	DepositVerifier       string         `yaml:"depositVerifier"`
-	WithdrawVerifier      string         `yaml:"withdrawVerifier"`
-	BatchWithdrawVerifier string         `yaml:"batchWithdrawVerifier"`
-	LockVerifier          string         `yaml:"lockVerifier"`
-	BatchLockVerifier     string         `yaml:"batchLockVerifier"`
-	CircuitId             string         `yaml:"circuitId"`
-	AbiAndBytecode        abiAndBytecode `yaml:"abiAndBytecode"`
-	Libraries             []string       `yaml:"libraries"`
-	Cloneable             bool           `yaml:"cloneable"`
+	Name                  string                  `yaml:"name"`
+	Verifier              string                  `yaml:"verifier"`
+	BatchVerifier         string                  `yaml:"batchVerifier"`
+	DepositVerifier       string                  `yaml:"depositVerifier"`
+	WithdrawVerifier      string                  `yaml:"withdrawVerifier"`
+	BatchWithdrawVerifier string                  `yaml:"batchWithdrawVerifier"`
+	LockVerifier          string                  `yaml:"lockVerifier"`
+	BatchLockVerifier     string                  `yaml:"batchLockVerifier"`
+	Circuits              *zetosignerapi.Circuits `yaml:"circuits"`
+	AbiAndBytecode        abiAndBytecode          `yaml:"abiAndBytecode"`
+	Libraries             []string                `yaml:"libraries"`
+	Cloneable             bool                    `yaml:"cloneable"`
 }
 
 type abiAndBytecode struct {
@@ -65,7 +65,11 @@ type setImplementationParams struct {
 }
 
 type implementationInfo struct {
-	Implementation        string `json:"implementation"`
+	Implementation string        `json:"implementation"`
+	Verifiers      verifiersInfo `json:"verifiers"`
+}
+
+type verifiersInfo struct {
 	Verifier              string `json:"verifier"`
 	BatchVerifier         string `json:"batchVerifier"`
 	DepositVerifier       string `json:"depositVerifier"`
@@ -110,9 +114,10 @@ func PrepareZetoConfig(t *testing.T, domainContracts *ZetoDomainContracts, zkpDi
 
 	var impls []*zetotypes.DomainContract
 	for name, implContract := range domainContracts.cloneableContracts {
+		implContract.circuits.Init()
 		contract := zetotypes.DomainContract{
-			Name:      name,
-			CircuitId: implContract.circuitId,
+			Name:     name,
+			Circuits: implContract.circuits,
 		}
 		impls = append(impls, &contract)
 	}

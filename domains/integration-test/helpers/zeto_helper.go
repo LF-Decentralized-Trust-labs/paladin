@@ -18,13 +18,20 @@ package helpers
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"testing"
 
+	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
+	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
+
+//go:embed abis/Zeto_Anon.json
+var ZetoAnonABIJSON []byte
 
 type ZetoHelper struct {
 	t       *testing.T
@@ -82,12 +89,46 @@ func (n *ZetoHelperFungible) Transfer(ctx context.Context, to string, amount uin
 	}))
 }
 
-func (z *ZetoHelperFungible) Lock(ctx context.Context, delegate *tktypes.EthAddress, call []byte) *DomainTransactionHelper {
+func (n *ZetoHelper) TransferLocked(ctx context.Context, lockedUtxo *tktypes.HexUint256, delegate string, to string, amount uint64) *DomainTransactionHelper {
+	fn := types.ZetoFungibleABI.Functions()["transferLocked"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.FungibleTransferLockedParams{
+		LockedInputs: []*tktypes.HexUint256{lockedUtxo},
+		Delegate:     delegate,
+		Transfers: []*types.FungibleTransferParamEntry{
+			{
+				To:     to,
+				Amount: tktypes.Uint64ToUint256(amount),
+			},
+		},
+	}))
+}
+
+func (z *ZetoHelper) Lock(ctx context.Context, delegate *tktypes.EthAddress, amount int) *DomainTransactionHelper {
 	fn := types.ZetoFungibleABI.Functions()["lock"]
 	return NewDomainTransactionHelper(ctx, z.t, z.rpc, z.Address, fn, toJSON(z.t, &types.LockParams{
 		Delegate: delegate,
-		Call:     call,
+		Amount:   tktypes.Uint64ToUint256(uint64(amount)),
 	}))
+}
+
+func (z *ZetoHelper) DelegateLock(ctx context.Context, tb testbed.Testbed, lockedUtxo *tktypes.HexUint256, delegate *tktypes.EthAddress, sender string) {
+	txInput := map[string]any{
+		"utxos":    []string{lockedUtxo.String()},
+		"delegate": delegate.String(),
+		"data":     "0x",
+	}
+	txInputJson, _ := json.Marshal(txInput)
+	_, err := tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			Type:     pldapi.TransactionTypePublic.Enum(),
+			From:     sender,
+			To:       z.Address,
+			Function: "delegateLock",
+			Data:     txInputJson,
+		},
+		ABI: solutils.MustLoadBuild(ZetoAnonABIJSON).ABI,
+	})
+	assert.NoError(z.t, err)
 }
 
 // =============================================================================

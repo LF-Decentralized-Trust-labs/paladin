@@ -428,8 +428,15 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 	require.NoError(t, err)
 
 	log.L(ctx).Infof("Prepare the Zeto transfer")
-	transferZeto := zeto.Transfer(ctx, alice, 1).Prepare(bob)
-	zeto.Lock(ctx, tktypes.MustEthAddress(bobKey.Verifier.Verifier), transferZeto.EncodedCall).SignAndSend(bob).Wait()
+	zeto.Lock(ctx, tktypes.MustEthAddress(bobKey.Verifier.Verifier), 1).SignAndSend(bob).Wait()
+
+	jq := query.NewQueryBuilder().Limit(100).Equal("locked", true).Query()
+	lockedZetoCoins := findAvailableCoins(t, ctx, rpc, zetoDomain.Name(), zetoDomain.CoinSchemaID(), zeto.Address, jq, func(coins []*zetotypes.ZetoCoinState) bool {
+		return len(coins) >= 1
+	})
+	lockedZeto, _ := lockedZetoCoins[0].Data.Hash(ctx)
+
+	transferZeto := zeto.TransferLocked(ctx, lockedZeto, bobKey.Verifier.Verifier, alice, 1).Prepare(bob)
 
 	// TODO: this should actually be a Pente state transition
 	log.L(ctx).Infof("Prepare the trade execute")
@@ -488,7 +495,7 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 		Unlock:   unlockParams,
 		Delegate: transferAtom.Address,
 	}).SignAndSend(alice).Wait()
-	zeto.Lock(ctx, transferAtom.Address, transferZeto.EncodedCall).SignAndSend(bob).Wait()
+	zeto.DelegateLock(ctx, tb, lockedZeto, transferAtom.Address, bobKey.Identifier)
 
 	log.L(ctx).Infof("Execute the atomic operation")
 	sent = transferAtom.Execute(ctx).SignAndSend(alice).Wait(5 * time.Second)
@@ -508,9 +515,9 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 	zetoCoins = findAvailableCoins[zetotypes.ZetoCoinState](t, ctx, rpc, zetoDomain.Name(), zetoDomain.CoinSchemaID(), zeto.Address, nil)
 	require.NoError(t, err)
 	require.Len(t, zetoCoins, 2)
-	assert.Equal(t, int64(1), zetoCoins[0].Data.Amount.Int().Int64())
+	assert.Equal(t, int64(1), zetoCoins[1].Data.Amount.Int().Int64())
 	alicesKey := resolveZetoKey(t, ctx, rpc, zetoDomain.Name(), alice)
-	assert.Equal(t, alicesKey, zetoCoins[0].Data.Owner.String())
-	assert.Equal(t, int64(9), zetoCoins[1].Data.Amount.Int().Int64())
-	assert.Equal(t, bobsKey, zetoCoins[1].Data.Owner.String())
+	assert.Equal(t, alicesKey, zetoCoins[1].Data.Owner.String())
+	assert.Equal(t, int64(9), zetoCoins[0].Data.Amount.Int().Int64())
+	assert.Equal(t, bobsKey, zetoCoins[0].Data.Owner.String())
 }
