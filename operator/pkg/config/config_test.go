@@ -88,7 +88,7 @@ func TestLoadConfig_Success(t *testing.T) {
 	assert.Equal(t, "ssd", config.Paladin.NodeSelector["disktype"], "Paladin.NodeSelectors['disktype'] mismatch")
 
 	require.NotNil(t, config.Paladin.SecurityContext, "Expected Paladin.SecurityContext to be set")
-	assert.NotNil(t, config.Paladin.SecurityContext.RunAsUser, "Expected Paladin.SecurityContext.RunAsUser to be set")
+	require.NotNil(t, config.Paladin.SecurityContext.RunAsUser, "Expected Paladin.SecurityContext.RunAsUser to be set")
 	assert.Equal(t, int64(1000), *config.Paladin.SecurityContext.RunAsUser, "Paladin.SecurityContext.RunAsUser mismatch")
 }
 
