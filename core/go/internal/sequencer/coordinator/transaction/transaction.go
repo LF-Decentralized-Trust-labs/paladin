@@ -62,19 +62,27 @@ type Transaction struct {
 	pendingEndorsementRequests         map[string]map[string]*common.IdempotentRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
 	pendingDispatchConfirmationRequest *common.IdempotentRequest
 	latestError                        string
-	dependencies                       []uuid.UUID
+	dependencies                       []uuid.UUID //TODO figure out naming of these fields and their relationship with the PrivateTransaction fields
 	dependents                         []uuid.UUID
 	preAssembleDependents              []uuid.UUID
-	requestTimeout                     common.Duration
-	assembleTimeout                    common.Duration
+	previousTransaction                *Transaction
+	nextTransaction                    *Transaction
+
+	requestTimeout  common.Duration
+	assembleTimeout common.Duration
+	errorCount      int
 	// Dependencies
-	clock            common.Clock
-	messageSender    MessageSender
-	grapher          Grapher
-	stateIntegration common.StateIntegration
+	clock              common.Clock
+	messageSender      MessageSender
+	grapher            Grapher
+	stateIntegration   common.StateIntegration
+	notifyOfTransition OnStateTransition
 }
 
-func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, grapher Grapher) *Transaction {
+// TODO think about naming of this compared to the OnTransitionTo func in the state machine
+type OnStateTransition func(ctx context.Context, t *Transaction, to, from State) // function to be invoked when transitioning into this state.  Called after transitioning event has been applied and any actions have fired
+
+func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, grapher Grapher, onStateTransition OnStateTransition) *Transaction {
 	txn := &Transaction{
 		sender:             sender,
 		PrivateTransaction: pt,
@@ -84,6 +92,7 @@ func NewTransaction(sender string, pt *components.PrivateTransaction, messageSen
 		requestTimeout:     requestTimeout,
 		assembleTimeout:    assembleTimeout,
 		stateIntegration:   stateIntegration,
+		notifyOfTransition: onStateTransition,
 	}
 	txn.InitializeStateMachine(State_Initial)
 	grapher.Add(context.Background(), txn)
@@ -131,6 +140,18 @@ func (t *Transaction) Hash(ctx context.Context) (*tktypes.Bytes32, error) {
 	_ = hash.Sum(h32[0:0])
 	return &h32, nil
 
+}
+
+func (t *Transaction) SetPreviousTransaction(ctx context.Context, previousTransaction *Transaction) {
+	//TODO consider moving this to the PreAssembly part of PrivateTransaction and specifying a responsibility of the sender to set this.
+	// this is probably part of the decision on whether we expect the sender to include all current inflight transactions in every delegation request.
+	t.previousTransaction = previousTransaction
+}
+
+func (t *Transaction) SetNextTransaction(ctx context.Context, nextTransaction *Transaction) {
+	//TODO consider moving this to the PreAssembly part of PrivateTransaction and specifying a responsibility of the sender to set this.
+	// this is probably part of the decision on whether we expect the sender to include all current inflight transactions in every delegation request.
+	t.nextTransaction = nextTransaction
 }
 
 // SignatureAttestationName is a method of Transaction that returns the name of the attestation in the attestation plan that is a signature
@@ -285,6 +306,15 @@ func (t *Transaction) assembleTimeoutExceeded(ctx context.Context) bool {
 
 }
 
+func (t *Transaction) isNotReady() bool {
+	//test against the list of states that we consider to be past the point of ready as there is more chance of us noticing
+	// a failing test if we add new states in the future and forget to update this list
+	return t.GetState() != State_Confirmed &&
+		t.GetState() != State_Submitted &&
+		t.GetState() != State_Dispatched &&
+		t.GetState() != State_Ready_For_Dispatch
+}
+
 // Function hasDependenciesNotReady checks if the transaction has any dependencies that themselves are not ready for dispatch
 func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
 	//TODO rethink the name of this function
@@ -293,6 +323,10 @@ func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
 	// dependencies without a re-assemble
 	// some of them might have been confirmed and removed from our list to avoid a memory leak so this is not necessarily the complete list of dependencies
 	// but it should contain all the ones that are not ready for dispatch
+
+	if t.previousTransaction != nil && t.previousTransaction.isNotReady() {
+		return true
+	}
 
 	dependencies := t.dependencies
 	if t.PreAssembly != nil {
@@ -306,12 +340,8 @@ func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
 			//hasUnknownDependencies guard will be used to explicitly ensure the correct thing happens
 			continue
 		}
-		//test against the list of states that we consider to be past the point of ready as there is more chance of us noticing
-		// a failing test if we add new states in the future and forget to update this list
-		if dependency.GetState() != State_Confirmed &&
-			dependency.GetState() != State_Submitted &&
-			dependency.GetState() != State_Dispatched &&
-			dependency.GetState() != State_Ready_For_Dispatch {
+
+		if dependency.isNotReady() {
 			return true
 		}
 	}
@@ -319,10 +349,25 @@ func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
 	return false
 }
 
+func (t *Transaction) isNotAssembled() bool {
+	//test against the list of states that we consider to be past the point of assemble as there is more chance of us noticing
+	// a failing test if we add new states in the future and forget to update this list
+
+	return t.GetState() != State_Endorsement_Gathering &&
+		t.GetState() != State_Confirming_Dispatch &&
+		t.GetState() != State_Ready_For_Dispatch &&
+		t.GetState() != State_Dispatched &&
+		t.GetState() != State_Submitted &&
+		t.GetState() != State_Confirmed
+}
+
 // Function hasDependenciesNotAssembled checks if the transaction has any dependencies that have not been assembled yet
 func (t *Transaction) hasDependenciesNotAssembled(ctx context.Context) bool {
 
-	// we cannot have unassembled dependencies other than those that were provided to us in the PreAssemble.
+	// we cannot have unassembled dependencies other than those that were provided to us in the PreAssemble or the one we determined as previousTransaction when we initially received an ordered list of delegated transactions.
+	if t.previousTransaction != nil && t.previousTransaction.isNotAssembled() {
+		return true
+	}
 
 	for _, dependencyID := range t.PreAssembly.Dependencies {
 		dependency := t.grapher.TransactionByID(ctx, dependencyID)
@@ -331,14 +376,7 @@ func (t *Transaction) hasDependenciesNotAssembled(ctx context.Context) bool {
 			//hasUnknownDependencies guard will be used to explicitly ensure the correct thing happens
 			continue
 		}
-		//test against the list of states that we consider to be past the point of assemble as there is more chance of us noticing
-		// a failing test if we add new states in the future and forget to update this list
-		if dependency.GetState() != State_Endorsement_Gathering &&
-			dependency.GetState() != State_Confirming_Dispatch &&
-			dependency.GetState() != State_Ready_For_Dispatch &&
-			dependency.GetState() != State_Dispatched &&
-			dependency.GetState() != State_Submitted &&
-			dependency.GetState() != State_Confirmed {
+		if dependency.isNotAssembled() {
 			return true
 		}
 	}
@@ -421,6 +459,43 @@ func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error
 	}
 	return t.pendingDispatchConfirmationRequest.Nudge(ctx)
 
+}
+
+func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
+	//this function is called when the transaction is successfully assembled
+	// and we have a duty to inform all the transactions that are ordered behind us
+	if t.nextTransaction != nil {
+		err := t.nextTransaction.HandleEvent(ctx, &DependencyAssembledEvent{
+			event: event{
+				TransactionID: t.nextTransaction.ID,
+			},
+			DependencyID: t.ID,
+		})
+		if err != nil {
+			log.L(ctx).Errorf("Error notifying next transaction %s of assembly of transaction %s: %s", t.nextTransaction.ID, t.ID, err)
+			return err
+		}
+	}
+
+	for _, dependentId := range t.dependents {
+		dependent := t.grapher.TransactionByID(ctx, dependentId)
+		if dependent == nil {
+			msg := fmt.Sprintf("notifyDependentsOfReadiness: Dependent transaction %s not found in memory", dependentId)
+			log.L(ctx).Error(msg)
+			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
+		}
+		err := dependent.HandleEvent(ctx, &DependencyAssembledEvent{
+			event: event{
+				TransactionID: t.nextTransaction.ID,
+			},
+			DependencyID: t.ID,
+		})
+		if err != nil {
+			log.L(ctx).Errorf("Error notifying dependent transaction %s of assembly of transaction %s: %s", dependent.ID, t.ID, err)
+			return err
+		}
+	}
+	return nil
 }
 
 func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
@@ -570,4 +645,9 @@ func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) err
 
 func (t *Transaction) writeLockAndDistributeStates(ctx context.Context) error {
 	return t.stateIntegration.WriteLockAndDistributeStatesForTransaction(ctx, t.PrivateTransaction)
+}
+
+func (t *Transaction) incrementAssembleErrors(ctx context.Context) error {
+	t.errorCount++
+	return nil
 }

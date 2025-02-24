@@ -19,6 +19,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
@@ -183,15 +184,18 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 
 }
 
-func (c *coordinator) HandleEvent(ctx context.Context, event Event) {
+func (c *coordinator) HandleEvent(ctx context.Context, event Event) error {
 
 	sm := c.stateMachine
-
+	var err error
 	// First apply the event to the update the internal fine grained state of the coordinator if there is any handler registered for the current state
 	switch event := event.(type) {
 	case *TransactionsDelegatedEvent:
 		//TODO dependant on state?
-		c.addToDelegatedTransactions(ctx, event.Sender, event.Transactions)
+		err = c.addToDelegatedTransactions(ctx, event.Sender, event.Transactions)
+		if err == nil && sm.currentState == State_Active {
+			err = c.selectNextTransaction(ctx)
+		}
 	case *TransactionConfirmedEvent:
 		//This may be a confirmation of a transaction that we have have been coordinating or it may be one that another coordinator has been coordinating
 		//if the latter, then we may or may not know about it depending on whether we have seen a heartbeat from that coordinator since last time
@@ -201,6 +205,13 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) {
 		if !c.confirmDispatchedTransaction(ctx, event.From, event.Nonce, event.Hash, event.RevertReason) {
 			c.confirmMonitoredTransaction(ctx, event.From, event.Nonce)
 		}
+
+	case *transaction.AssembleSuccessEvent:
+		c.propagateEventToTransaction(ctx, event)
+		err = c.selectNextTransaction(ctx)
+	case *transaction.AssembleRevertResponseEvent:
+		c.propagateEventToTransaction(ctx, event)
+		err = c.selectNextTransaction(ctx)
 	case *TransactionDispatchConfirmedEvent:
 		c.propagateEventToTransaction(ctx, event)
 	case *NewBlockEvent:
@@ -216,12 +227,18 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) {
 		c.heartbeatIntervalsSinceStateChange++
 	}
 
+	if err != nil {
+		log.L(ctx).Errorf("Error handling event %v: %v", event.Type(), err)
+		return err
+	}
+
 	//Determine whether this event triggers a state transition
 	transitions := sm.stateDefinitions[sm.currentState].Transitions
 	if transitionRules, ok := transitions[event.Type()]; ok {
 		for _, rule := range transitionRules {
 			if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
-				log.L(context.Background()).Infof("Coordinator for %s transitioning from %v to %v triggered by event %v", c.contractAddress.String(), sm.currentState, rule.To, event.Type())
+				log.L(context.Background()).Infof("Coordinator for %s transitioning from %s to %s triggered by event %T", c.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
+
 				fromState := sm.currentState
 				sm.currentState = rule.To
 				newStateDefinition := sm.stateDefinitions[sm.currentState]
@@ -234,10 +251,11 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) {
 				break
 			}
 		}
-
 	} else {
 		log.L(ctx).Debugf("No transition for Event %v from State %s", event.Type(), sm.currentState.String())
 	}
+
+	return nil
 
 }
 
@@ -263,7 +281,6 @@ func (s *State) String() string {
 		return "Flush"
 	case State_Closing:
 		return "Closing"
-
 	}
 	return "Unknown"
 }

@@ -214,13 +214,18 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		mocks.clock.Duration(1000),
 		mocks.clock.Duration(5000),
 		grapher,
+		func(ctx context.Context, txn *Transaction, from, to State) {
+		},
 	)
 
 	return txn, mocks
 
 }
 
-//TODO add unit test for the guards and various different combinations of dependency not read scenarios ( e.g. pre-assemble dependencies vs post-assemble dependencies) and for those dependencies being in various different states ( the state machine test only test for "not assembled" or "not ready" but each of these "not" states actually correspond to several possible finite states.)
+//TODO add unit test for the guards and various different combinations of dependency not ready scenarios ( e.g. pre-assemble dependencies vs post-assemble dependencies) and for those dependencies being in various different states ( the state machine test only test for "not assembled" or "not ready" but each of these "not" states actually correspond to several possible finite states.)
 
 //TODO add unit tests to assert that if a dependency arrives after its dependent, then the dependency is correctly updated with a reference to the dependent so that we can notify the dependent when the dependency state changes ( e.g. is dispatched, is assembled)
 // . - or think about whether this should this be a state machine test?
+
+//TODO add unit test for notification function being called
+// - it should be able to cause a sequencer abend if it hits an error

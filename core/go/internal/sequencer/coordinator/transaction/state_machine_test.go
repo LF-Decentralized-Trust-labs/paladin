@@ -43,6 +43,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 		clock.Duration(1000),
 		clock.Duration(5000),
 		NewGrapher(ctx),
+		nil,
 	)
 
 	assert.Equal(t, State_Initial, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
@@ -164,6 +165,7 @@ func TestStateMachine_Assembling_ToPooled_OnHeartbeat_IfAssembleTimeoutExpired(t
 	txn.HandleEvent(ctx, &HeartbeatIntervalEvent{})
 
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+	assert.Equal(t, 1, txn.errorCount, "expected error count to be 1, but it was %d", txn.errorCount)
 }
 
 func TestStateMachine_Assembling_ToReverted_OnAssembleRevertResponse(t *testing.T) {
@@ -280,9 +282,24 @@ func TestStateMachine_EndorsementGathering_ToBlocked_OnEndorsed_IfAttestationPla
 		InputStateIDs(txn1.PostAssembly.OutputStates[0].ID)
 	txn2 := builder2.Build()
 
-	txn2.HandleEvent(ctx, builder2.BuildEndorsedEvent(2))
+	err := txn2.HandleEvent(ctx, builder2.BuildEndorsedEvent(2))
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Blocked, txn2.stateMachine.currentState, "current state is %s", txn2.stateMachine.currentState.String())
+
+}
+
+func TestStateMachine_EndorsementGathering_ToPooled_OnEndorseRejected(t *testing.T) {
+	ctx := context.Background()
+	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
+		NumberOfRequiredEndorsers(3).
+		NumberOfEndorsements(2)
+
+	txn := builder.Build()
+	txn.HandleEvent(ctx, builder.BuildEndorseRejectedEvent(2))
+
+	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+	assert.Equal(t, 1, txn.errorCount, "expected error count to be 1, but it was %d", txn.errorCount)
 
 }
 

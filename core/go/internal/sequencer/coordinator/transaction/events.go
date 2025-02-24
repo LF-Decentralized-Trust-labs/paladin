@@ -169,6 +169,15 @@ func (_ *ConfirmedEvent) Type() EventType {
 	return Event_Confirmed
 }
 
+type DependencyAssembledEvent struct {
+	event
+	DependencyID uuid.UUID
+}
+
+func (_ *DependencyAssembledEvent) Type() EventType {
+	return Event_DependencyAssembled
+}
+
 type DependencyRevertedEvent struct {
 	event
 	DependencyID uuid.UUID

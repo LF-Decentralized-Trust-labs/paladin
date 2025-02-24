@@ -77,12 +77,49 @@ func (c *coordinator) sendHandoverRequest(ctx context.Context) {
 	c.messageSender.SendHandoverRequest(ctx, c.activeCoordinator, c.contractAddress)
 }
 
-func (c *coordinator) addToDelegatedTransactions(_ context.Context, sender string, transactions []*components.PrivateTransaction) {
+// TODO consider renaming to setDelegatedTransactionsForSender to make it clear that we expect senders to include all inflight transactions in every delegation request and therefore this is
+// a replace, not an add.  Need to finalize the decision about whether we expect the sender to include all infight delegated transactions in every delegation request. Currently the code assumes we do so need to make the spec clear on that point and
+// record a decision record to explain why.  Every  time we come back to this point, we will be tempted to reverse that decision so we need to make sure we have a record of the known consequences.
+func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender string, transactions []*components.PrivateTransaction) error {
+
+	//TODO should remove any transactions from the same sender that we already have but are not in this list
+
+	var previousTransaction *transaction.Transaction
 	for _, txn := range transactions {
-		c.transactionsByID[txn.ID] = transaction.NewTransaction(sender, txn, c.messageSender, c.clock, c.stateIntegration, c.requestTimeout, c.assembleTimeout, c.grapher)
+		newTransaction := transaction.NewTransaction(
+			sender,
+			txn,
+			c.messageSender,
+			c.clock,
+			c.stateIntegration,
+			c.requestTimeout,
+			c.assembleTimeout,
+			c.grapher,
+			func(ctx context.Context, t *transaction.Transaction, to, from transaction.State) {
+				//callback function to notify us when the transaction changes state
+				log.L(ctx).Debugf("Transaction %s moved from %s to %s", t.ID.String(), from.String(), to.String())
+
+			})
+
+		if previousTransaction != nil {
+			newTransaction.SetPreviousTransaction(ctx, previousTransaction)
+			previousTransaction.SetNextTransaction(ctx, newTransaction)
+		}
+		c.transactionsByID[txn.ID] = newTransaction
+		previousTransaction = newTransaction
+
+		receivedEvent := &transaction.ReceivedEvent{}
+		receivedEvent.TransactionID = txn.ID
+		err := c.transactionsByID[txn.ID].HandleEvent(context.Background(), receivedEvent)
+		if err != nil {
+			log.L(ctx).Errorf("Error handling ReceivedEvent for transaction %s: %v", txn.ID.String(), err)
+			return err
+		}
 	}
+	return nil
 }
 
+// TODO return error?
 func (c *coordinator) propagateEventToTransaction(ctx context.Context, event transaction.Event) {
 	if txn := c.transactionsByID[event.GetTransactionID()]; txn != nil {
 		txn.HandleEvent(ctx, event)

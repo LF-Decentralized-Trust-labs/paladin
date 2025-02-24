@@ -17,6 +17,7 @@ package transaction
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
@@ -79,13 +80,15 @@ type StateMachine struct {
 	currentState State
 }
 
+// Actions can be specified for transition to a state either as the OnTransitionTo function that will run for all transitions to that state or as the On field in the Transition struct if the action applies
+// for a specific transition
+type Action func(ctx context.Context, txn *Transaction) error
+
 type Transition struct {
 	To State // State to transition to if the guard condition is met
 	If Guard // Condition to evaluate the transaction against to determine if this transition should be taken
+	On Action
 }
-
-// TODO do we need the `from` state here? Should the transition functions be forced not to care about that?
-type OnTransitionTo func(ctx context.Context, txn *Transaction, to, from State) error
 
 // TODO is EventHandler the best name
 type EventHandler struct {
@@ -94,7 +97,7 @@ type EventHandler struct {
 }
 
 type StateDefinition struct {
-	OnTransitionTo OnTransitionTo             // function to be invoked when transitioning into this state
+	OnTransitionTo Action                     // function to be invoked when transitioning into this state.  This is invoked after any transition specific actions have been invoked
 	Events         map[EventType]EventHandler // rules to define what events apply to this state and what transitions they trigger
 }
 
@@ -162,12 +165,14 @@ func stateDefinitions() map[State]StateDefinition {
 					Transitions: []Transition{
 						{
 							To: State_Endorsement_Gathering,
+							On: action_NotifyDependentsOfAssembled,
 						}},
 				},
 				Event_HeartbeatInterval: {
 					Transitions: []Transition{{
 						To: State_Pooled,
 						If: guard_AssembleTimeoutExceeded,
+						On: action_IncrementAssembleErrors,
 					}},
 				},
 				Event_Assemble_Revert_Response: {
@@ -190,6 +195,15 @@ func stateDefinitions() map[State]StateDefinition {
 						{
 							To: State_Blocked,
 							If: guard_And(guard_AttestationPlanFulfilled, guard_HasDependenciesNotReady),
+						},
+					},
+				},
+				Event_EndorsedRejected: {
+					Transitions: []Transition{
+						{
+							To: State_Pooled,
+							//TODO is there a case for a dependencies checking guard here?
+							On: action_IncrementAssembleErrors,
 						},
 					},
 				},
@@ -266,7 +280,8 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 }
 
 // TODO break this out to 2 explicit steps a) applyEvent[InCurrentState] and b) evaluateTransition[ToNewState]
-func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
+// TODO refactor this so that we can have good unit tests for this function using a fake set of state definitions
+func (t *Transaction) HandleEvent(ctx context.Context, event Event) error {
 	sm := t.stateMachine
 
 	//Determine if and how this event applies in the current state and which, if any, transition it triggers
@@ -277,14 +292,15 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 		if eventHandler.Validator != nil {
 			valid, err := eventHandler.Validator(ctx, t, event)
 			if err != nil {
+				//This is an unexpected error.  If the event is invalid, the validator should return false and not an error
 				log.L(ctx).Errorf("Error validating event %v: %v", event.Type(), err)
 				//TODO abort
-				return
+				return err
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the transaction so we just ignore it and move on
 				log.L(ctx).Debugf("Event %v is not valid: %v", event.Type(), valid)
-				return
+				return nil
 			}
 		}
 	} else {
@@ -324,56 +340,88 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) {
 	transitionRules := eventHandler.Transitions
 	for _, rule := range transitionRules {
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
-			log.L(ctx).Infof("Transaction %s transitioning from %v to %v triggered by event %v", t.ID.String(), sm.currentState, rule.To, event.Type())
-			fromState := sm.currentState
+			log.L(ctx).Infof("Transaction %s transitioning from %s to %s triggered by event %T", t.ID.String(), sm.currentState.String(), rule.To.String(), event)
+			previousState := sm.currentState
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitions()[sm.currentState]
-			if newStateDefinition.OnTransitionTo != nil {
-				err := newStateDefinition.OnTransitionTo(ctx, t, rule.To, fromState)
+			//run any actions specific to the transition first
+			if rule.On != nil {
+				err := rule.On(ctx, t)
 				if err != nil {
-					//TODO any recoverable errors should have been handled by the OnTransitionTo function so this is a panic or at least, abort the coordinator for this contract
+					//any recoverable errors should have been handled by the action function so this is a panic or at least, abort the coordinator for this contract
 					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
-					break
+					return err
+				}
+			}
+
+			// then run any actions for the state entry
+			if newStateDefinition.OnTransitionTo != nil {
+				err := newStateDefinition.OnTransitionTo(ctx, t)
+				if err != nil {
+					// any recoverable errors should have been handled by the OnTransitionTo function so this is a panic or at least, abort the coordinator for this contract
+					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
+					return err
 				}
 			} else {
 				log.L(ctx).Debugf("No OnTransitionTo function defined for state %v", sm.currentState)
+			}
+
+			// if there is a state change notification function, run it
+			if t.notifyOfTransition != nil {
+				t.notifyOfTransition(ctx, t, previousState, sm.currentState)
+
 			}
 			t.heartbeatIntervalsSinceStateChange = 0
 			break
 		}
 	}
+	return nil
 }
 
-func action_SendAssembleRequest(ctx context.Context, txn *Transaction, to, from State) error {
+func action_SendAssembleRequest(ctx context.Context, txn *Transaction) error {
 	return txn.sendAssembleRequest(ctx)
 }
 
-func action_SendEndorsementRequests(ctx context.Context, txn *Transaction, to, from State) error {
+func action_SendEndorsementRequests(ctx context.Context, txn *Transaction) error {
 	return txn.sendEndorsementRequests(ctx)
 }
 
-func action_SendDispatchConfirmationRequest(ctx context.Context, txn *Transaction, to, from State) error {
+func action_SendDispatchConfirmationRequest(ctx context.Context, txn *Transaction) error {
 	return txn.sendDispatchConfirmationRequest(ctx)
 }
 
-func action_NotifyDependentsOfReadiness(ctx context.Context, txn *Transaction, to, from State) error {
+func action_NotifyDependentsOfAssembled(ctx context.Context, txn *Transaction) error {
+	return txn.notifyDependentsOfAssembled(ctx)
+}
+
+func action_NotifyDependentsOfReadiness(ctx context.Context, txn *Transaction) error {
 	return txn.notifyDependentsOfReadiness(ctx)
 }
 
-func action_NotifyDependentsOfRevert(ctx context.Context, txn *Transaction, to, from State) error {
+func action_NotifyDependentsOfRevert(ctx context.Context, txn *Transaction) error {
 	return txn.notifyDependentsOfRevert(ctx)
 }
 
-func action_initializeDependencies(ctx context.Context, txn *Transaction, to, from State) error {
+func action_initializeDependencies(ctx context.Context, txn *Transaction) error {
 	return txn.initializeDependencies(ctx)
+}
+
+func action_IncrementAssembleErrors(ctx context.Context, txn *Transaction) error {
+	return txn.incrementAssembleErrors(ctx)
 }
 
 func (s *State) String() string {
 	switch *s {
+	case State_Initial:
+		return "Initial"
 	case State_Pooled:
 		return "Pooled"
+	case State_PreAssembly_Blocked:
+		return "PreAssembly_Blocked"
 	case State_Assembling:
 		return "Assembling"
+	case State_Reverted:
+		return "Reverted"
 	case State_Endorsement_Gathering:
 		return "State_Endorsement_Gathering"
 	case State_Blocked:
@@ -389,5 +437,5 @@ func (s *State) String() string {
 	case State_Confirmed:
 		return "Confirmed"
 	}
-	return "Unknown"
+	return fmt.Sprintf("Unknown (%d)", *s)
 }

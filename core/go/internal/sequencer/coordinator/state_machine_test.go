@@ -44,7 +44,7 @@ func TestStateMachine_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 
 	c.HandleEvent(ctx, &TransactionsDelegatedEvent{
 		Sender:       "sender",
-		Transactions: newPrivateTransactionsForTesting(1),
+		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
 	})
 
 	assert.Equal(t, State_Active, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
@@ -71,7 +71,7 @@ func TestStateMachine_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 
 	c.HandleEvent(ctx, &TransactionsDelegatedEvent{
 		Sender:       "sender",
-		Transactions: newPrivateTransactionsForTesting(1),
+		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
 	})
 
 	assert.Equal(t, State_Standby, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
@@ -88,7 +88,7 @@ func TestStateMachine_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 
 	c.HandleEvent(ctx, &TransactionsDelegatedEvent{
 		Sender:       "sender",
-		Transactions: newPrivateTransactionsForTesting(1),
+		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
 	})
 
 	assert.Equal(t, State_Elect, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
@@ -347,13 +347,16 @@ func TestStateMachine_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGraceP
 
 }
 
-func newPrivateTransactionsForTesting(num int) []*components.PrivateTransaction {
+func newPrivateTransactionsForTesting(address *tktypes.EthAddress, num int) []*components.PrivateTransaction {
 	txs := make([]*components.PrivateTransaction, num)
+	if address == nil {
+		address = tktypes.RandAddress()
+	}
 	for i := 0; i < num; i++ {
 		txs[i] = &components.PrivateTransaction{
 			ID:          uuid.New(),
 			Domain:      "testDomain",
-			Address:     *tktypes.RandAddress(),
+			Address:     *address,
 			PreAssembly: &components.TransactionPreAssembly{},
 		}
 	}

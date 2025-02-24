@@ -266,7 +266,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		}
 	}
 
-	b.txn = NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeStateIntegration, b.fakeClock.Duration(b.requestTimeout), b.fakeClock.Duration(b.assembleTimeout), b.grapher)
+	b.txn = NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeStateIntegration, b.fakeClock.Duration(b.requestTimeout), b.fakeClock.Duration(b.assembleTimeout), b.grapher, nil)
 
 	if b.predefinedDependencies != nil {
 		b.txn.PreAssembly.Dependencies = append(b.txn.PreAssembly.Dependencies, b.predefinedDependencies...)
@@ -292,7 +292,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 	//enter the current state
 	onTransitionFunction := stateDefinitions()[b.state].OnTransitionTo
 	if onTransitionFunction != nil {
-		err := onTransitionFunction(ctx, b.txn, b.state, State_Initial)
+		err := onTransitionFunction(ctx, b.txn)
 		if err != nil {
 			panic(fmt.Sprintf("Error from initializeDependencies: %v", err))
 		}
@@ -326,6 +326,21 @@ func (b *TransactionBuilderForTesting) BuildEndorsedEvent(endorserIndex int) *En
 				VerifierType: verifiers.ETH_ADDRESS,
 			},
 		},
+	}
+
+}
+
+func (b *TransactionBuilderForTesting) BuildEndorseRejectedEvent(endorserIndex int) *EndorsedRejectedEvent {
+
+	attReqName := fmt.Sprintf("endorse-%d", endorserIndex)
+	return &EndorsedRejectedEvent{
+		event: event{
+			TransactionID: b.txn.ID,
+		},
+		RevertReason:           "some reason for rejection",
+		AttestationRequestName: attReqName,
+		RequestID:              b.txn.pendingEndorsementRequests[attReqName][b.endorsers[endorserIndex].identityLocator].IdempotencyKey(),
+		Party:                  b.endorsers[endorserIndex].identityLocator,
 	}
 
 }
