@@ -91,21 +91,21 @@ type Schema struct {
 }
 
 type StateBase struct {
-	ID              tktypes.HexBytes   `docstruct:"State" json:"id"                  gorm:"primaryKey"`
-	Created         tktypes.Timestamp  `docstruct:"State" json:"created"             gorm:"autoCreateTime:nano"`
-	DomainName      string             `docstruct:"State" json:"domain"              gorm:"primaryKey"`
-	Schema          tktypes.Bytes32    `docstruct:"State" json:"schema"`
-	ContractAddress tktypes.EthAddress `docstruct:"State" json:"contractAddress"`
-	Data            tktypes.RawJSON    `docstruct:"State" json:"data"`
+	ID              tktypes.HexBytes    `docstruct:"State" json:"id"                  gorm:"primaryKey"`
+	Created         tktypes.Timestamp   `docstruct:"State" json:"created"             gorm:"autoCreateTime:nano"`
+	DomainName      string              `docstruct:"State" json:"domain"              gorm:"primaryKey"`
+	Schema          tktypes.Bytes32     `docstruct:"State" json:"schema"`
+	ContractAddress *tktypes.EthAddress `docstruct:"State" json:"contractAddress"`
+	Data            tktypes.RawJSON     `docstruct:"State" json:"data"`
 }
 
 // Like StateBase, but encodes Data as HexBytes
 type StateEncoded struct {
-	ID              tktypes.HexBytes   `json:"id"`
-	DomainName      string             `json:"domain"`
-	Schema          tktypes.Bytes32    `json:"schema"`
-	ContractAddress tktypes.EthAddress `json:"contractAddress"`
-	Data            tktypes.HexBytes   `json:"data"`
+	ID              tktypes.HexBytes    `json:"id"`
+	DomainName      string              `json:"domain"`
+	Schema          tktypes.Bytes32     `json:"schema"`
+	ContractAddress *tktypes.EthAddress `json:"contractAddress"` // nil used for states like privacy group genesis that exists before state creation
+	Data            tktypes.HexBytes    `json:"data"`
 }
 
 type State struct {

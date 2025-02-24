@@ -26,12 +26,14 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestPersistStateMissingSchema(t *testing.T) {
@@ -45,7 +47,7 @@ func TestPersistStateMissingSchema(t *testing.T) {
 
 	upserts := []*components.StateUpsertOutsideContext{
 		{
-			ContractAddress: *tktypes.RandAddress(),
+			ContractAddress: tktypes.RandAddress(),
 			SchemaID:        tktypes.Bytes32Keccak(([]byte)("test")),
 		},
 	}
@@ -71,7 +73,7 @@ func TestPersistStateInvalidState(t *testing.T) {
 
 	upserts := []*components.StateUpsertOutsideContext{
 		{
-			ContractAddress: *tktypes.RandAddress(),
+			ContractAddress: tktypes.RandAddress(),
 			SchemaID:        schemaID,
 		},
 	}
@@ -89,8 +91,8 @@ func TestGetStateMissing(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	contractAddress := tktypes.RandAddress()
-	_, err := ss.GetState(ctx, ss.p.NOTX(), "domain1", *contractAddress, tktypes.Bytes32Keccak(([]byte)("state1")).Bytes(), true, false)
+	stateID := tktypes.Bytes32Keccak(([]byte)("state1")).Bytes()
+	_, err := ss.GetStatesByID(ctx, ss.p.NOTX(), "domain1", nil, []tktypes.HexBytes{stateID}, true, false)
 	assert.Regexp(t, "PD010112", err)
 }
 
@@ -101,7 +103,7 @@ func TestFindStatesMissingSchema(t *testing.T) {
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
 	contractAddress := tktypes.RandAddress()
-	_, err := ss.FindContractStates(ctx, ss.p.NOTX(), "domain1", *contractAddress, tktypes.Bytes32Keccak(([]byte)("schema1")), &query.QueryJSON{}, "all")
+	_, err := ss.FindContractStates(ctx, ss.p.NOTX(), "domain1", contractAddress, tktypes.Bytes32Keccak(([]byte)("schema1")), &query.QueryJSON{}, "all")
 	assert.Regexp(t, "PD010106", err)
 }
 
@@ -116,7 +118,7 @@ func TestFindStatesBadQuery(t *testing.T) {
 	})
 
 	contractAddress := tktypes.RandAddress()
-	_, err := ss.FindContractStates(ctx, ss.p.NOTX(), "domain1", *contractAddress, schemaID, &query.QueryJSON{
+	_, err := ss.FindContractStates(ctx, ss.p.NOTX(), "domain1", contractAddress, schemaID, &query.QueryJSON{
 		Statements: query.Statements{
 			Ops: query.Ops{
 				Equal: []*query.OpSingleVal{
@@ -143,7 +145,7 @@ func TestFindStatesFail(t *testing.T) {
 	db.ExpectQuery("SELECT.*created").WillReturnError(fmt.Errorf("pop"))
 
 	contractAddress := tktypes.RandAddress()
-	_, err := ss.FindContractStates(ctx, ss.p.NOTX(), "domain1", *contractAddress, schemaID, &query.QueryJSON{
+	_, err := ss.FindContractStates(ctx, ss.p.NOTX(), "domain1", contractAddress, schemaID, &query.QueryJSON{
 		Statements: query.Statements{
 			Ops: query.Ops{
 				GreaterThan: []*query.OpSingleVal{
@@ -164,7 +166,7 @@ func TestFindStatesUnknownContext(t *testing.T) {
 
 	schemaID := tktypes.Bytes32Keccak(([]byte)("schema1"))
 	contractAddress := tktypes.RandAddress()
-	_, err := ss.FindContractStates(ctx, ss.p.NOTX(), "domain1", *contractAddress, schemaID, &query.QueryJSON{
+	_, err := ss.FindContractStates(ctx, ss.p.NOTX(), "domain1", contractAddress, schemaID, &query.QueryJSON{
 		Statements: query.Statements{
 			Ops: query.Ops{
 				GreaterThan: []*query.OpSingleVal{
@@ -316,5 +318,36 @@ func TestFindNullifiersUnknownContext(t *testing.T) {
 		},
 	}, pldapi.StateStatusQualifier(uuid.NewString()))
 	assert.Regexp(t, "PD010123", err)
+
+}
+
+func TestFindStatesWithAdvancedDBQueryModifier(t *testing.T) {
+	ctx, ss, mdb, _, done := newDBMockStateManager(t)
+	defer done()
+
+	mockGetSchemaOK(mdb)
+	mdb.ExpectQuery(`SELECT.*FROM "states".*LEFT JOIN "another_table".*"j"."state_id" IS NOT NULL`).
+		WillReturnError(fmt.Errorf("called"))
+
+	_, err := ss.FindStates(ctx, ss.p.NOTX(), "domain1", tktypes.RandBytes32(), query.NewQueryBuilder().Query(), &components.StateQueryOptions{
+		QueryModifier: func(db persistence.DBTX, query *gorm.DB) *gorm.DB {
+			return query.
+				Joins(`LEFT JOIN "another_table" AS "j" WHERE "j"."state_id" = "states"."id"`).
+				Where(`"j"."state_id" IS NOT NULL`)
+		},
+	})
+	assert.Regexp(t, "called", err)
+
+}
+
+func TestFindStatesWithNilOptions(t *testing.T) {
+	ctx, ss, mdb, _, done := newDBMockStateManager(t)
+	defer done()
+
+	mockGetSchemaOK(mdb)
+	mdb.ExpectQuery(`SELECT.*FROM`).WillReturnError(fmt.Errorf("called"))
+
+	_, err := ss.FindStates(ctx, ss.p.NOTX(), "domain1", tktypes.RandBytes32(), query.NewQueryBuilder().Query(), nil)
+	assert.Regexp(t, "called", err)
 
 }

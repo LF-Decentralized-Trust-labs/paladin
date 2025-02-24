@@ -384,7 +384,7 @@ func (tb *testbed) execPrivateTransaction(ctx context.Context, tx *testbedTransa
 func mapTransactionState(state *components.FullState, tx *testbedTransaction) *pldapi.StateEncoded {
 	return &pldapi.StateEncoded{
 		DomainName:      tx.ptx.Domain,
-		ContractAddress: tx.ptx.Address,
+		ContractAddress: &tx.ptx.Address,
 		ID:              state.ID,
 		Schema:          state.Schema,
 		Data:            state.Data.Bytes(),

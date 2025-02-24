@@ -252,7 +252,7 @@ func TestHandleEventBatch(t *testing.T) {
 			{
 				ID:              tktypes.MustParseHexBytes(fakeHash1),
 				Data:            tktypes.RawJSON(`{"color": "blue"}`),
-				ContractAddress: *contract2,
+				ContractAddress: contract2,
 				SchemaID:        fakeSchema,
 			},
 		}).Return(nil, nil)

@@ -155,13 +155,13 @@ func (tm *txManager) UpsertABI(ctx context.Context, dbTX persistence.DBTX, a abi
 }
 
 func (tm *txManager) queryABIs(ctx context.Context, jq *query.QueryJSON) ([]*pldapi.StoredABI, error) {
-	qw := &queryWrapper[PersistedABI, pldapi.StoredABI]{
-		p:           tm.p,
-		table:       "abis",
-		defaultSort: "-created",
-		filters:     abiFilters,
-		query:       jq,
-		mapResult: func(pa *PersistedABI) (*pldapi.StoredABI, error) {
+	qw := &filters.QueryWrapper[PersistedABI, pldapi.StoredABI]{
+		P:           tm.p,
+		Table:       "abis",
+		DefaultSort: "-created",
+		Filters:     abiFilters,
+		Query:       jq,
+		MapResult: func(pa *PersistedABI) (*pldapi.StoredABI, error) {
 			var a abi.ABI
 			err := json.Unmarshal(pa.ABI, &a)
 			return &pldapi.StoredABI{
@@ -170,5 +170,5 @@ func (tm *txManager) queryABIs(ctx context.Context, jq *query.QueryJSON) ([]*pld
 			}, err
 		},
 	}
-	return qw.run(ctx, nil)
+	return qw.Run(ctx, nil)
 }

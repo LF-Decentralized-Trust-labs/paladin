@@ -19,11 +19,9 @@
  import com.fasterxml.jackson.annotation.JsonProperty;
  import com.fasterxml.jackson.databind.JsonNode;
  import io.kaleido.paladin.logging.PaladinLogging;
- import io.kaleido.paladin.toolkit.JsonABI;
- import io.kaleido.paladin.toolkit.JsonHex;
+ import io.kaleido.paladin.toolkit.*;
  import io.kaleido.paladin.toolkit.JsonHex.Address;
  import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
- import io.kaleido.paladin.toolkit.ToDomain;
  import org.apache.logging.log4j.Logger;
  import org.web3j.abi.TypeDecoder;
  import org.web3j.abi.TypeEncoder;
@@ -309,7 +307,7 @@
          return domainName;
      }
  
-     synchronized void initFromConfig(ToDomain.ConfigureDomainRequest configReq) {
+     synchronized void initFromConfig(ConfigureDomainRequest configReq) {
          this.domainName = configReq.getName();
          this.chainId = configReq.getChainId();
      }
@@ -321,7 +319,7 @@
          );
      }
  
-     synchronized void schemasInitialized(List<ToDomain.StateSchema> schemas) {
+     synchronized void schemasInitialized(List<StateSchema> schemas) {
          var schemaDefs = allPenteSchemas();
          if (schemas.size() != schemaDefs.size()) {
              throw new IllegalStateException("expected %d schemas, received %d".formatted(schemaDefs.size(), schemas.size()));

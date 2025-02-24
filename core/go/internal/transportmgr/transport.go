@@ -125,13 +125,7 @@ func protoToJSON(m proto.Message) (s string) {
 	return
 }
 
-// Transport callback to the transport manager when a message is received
-func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
-	if err := t.checkInit(ctx); err != nil {
-		return nil, err
-	}
-
-	msg := req.Message
+func parseReceivedMessage(ctx context.Context, fromNode string, msg *prototk.PaladinMsg) (*components.ReceivedMessage, error) {
 	if msg == nil || len(msg.Payload) == 0 || len(msg.MessageType) == 0 {
 		log.L(ctx).Errorf("Invalid message from transport: %s", protoToJSON(msg))
 		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
@@ -153,24 +147,42 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 		correlationID = &parsedUUID
 	}
 
-	p, err := t.tm.getPeer(ctx, req.FromNode, false /* we do not require a connection for sending here */)
-	if err != nil {
-		return nil, err
-	}
-	p.updateReceivedStats(msg)
-
-	log.L(ctx).Debugf("transport %s message received from %s id=%s (cid=%s)", t.name, p.Name, msgID, tktypes.StrOrEmpty(msg.CorrelationId))
-	if log.IsTraceEnabled() {
-		log.L(ctx).Tracef("transport %s message received: %s", t.name, protoToJSON(msg))
-	}
-
-	if err := t.deliverMessage(ctx, p, msg.Component, &components.ReceivedMessage{
-		FromNode:      req.FromNode,
+	return &components.ReceivedMessage{
+		FromNode:      fromNode,
 		MessageID:     msgID,
 		CorrelationID: correlationID,
 		MessageType:   msg.MessageType,
 		Payload:       msg.Payload,
-	}); err != nil {
+	}, nil
+
+}
+
+// Transport callback to the transport manager when a message is received
+func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+	if err := t.checkInit(ctx); err != nil {
+		return nil, err
+	}
+
+	msg := req.Message
+
+	rMsg, err := parseReceivedMessage(ctx, req.FromNode, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	p, err := t.tm.getPeer(ctx, req.FromNode, false /* we do not require a connection for sending here */)
+	if err != nil {
+		return nil, err
+	}
+
+	p.updateReceivedStats(msg)
+
+	log.L(ctx).Debugf("transport %s message received from %s id=%s (cid=%s)", t.name, p.Name, rMsg.MessageID, tktypes.StrOrEmpty(msg.CorrelationId))
+	if log.IsTraceEnabled() {
+		log.L(ctx).Tracef("transport %s message received: %s", t.name, protoToJSON(msg))
+	}
+
+	if err := t.deliverMessage(ctx, p, msg.Component, rMsg); err != nil {
 		return nil, err
 	}
 

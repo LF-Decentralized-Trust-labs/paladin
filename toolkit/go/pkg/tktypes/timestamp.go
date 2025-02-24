@@ -71,6 +71,14 @@ func ParseTimeString(str string) (Timestamp, error) {
 	return Timestamp(t.UnixNano()), nil
 }
 
+func MustParseTimeString(str string) Timestamp {
+	t, err := ParseTimeString(str)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
 func (ts Timestamp) Time() time.Time {
 	return time.Unix(0, (int64)(ts))
 }

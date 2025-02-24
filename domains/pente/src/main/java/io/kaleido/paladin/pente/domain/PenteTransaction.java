@@ -112,7 +112,7 @@
      private Values values;
      private PenteDomain.AssemblyAccountLoader accountLoader;
  
-     PenteTransaction(PenteDomain domain, ToDomain.TransactionSpecification tx) throws IOException, IllegalArgumentException {
+     PenteTransaction(PenteDomain domain, TransactionSpecification tx) throws IOException, IllegalArgumentException {
          this.domain = domain;
          contractAddress = new Address(tx.getContractInfo().getContractAddress());
          contractConfig = new ObjectMapper().readValue(tx.getContractInfo().getContractConfigJson(), PenteConfiguration.ContractConfig.class);
@@ -212,19 +212,19 @@
  
      byte[] getEncodedCallData() throws IOException, IllegalStateException, ExecutionException, InterruptedException {
          String paramsJSON = new ObjectMapper().writeValueAsString(getValues().inputs);
-         FromDomain.EncodeDataRequest request;
+         EncodeDataRequest request;
          switch (abiEntryType) {
              case ABIEntryType.DEPLOY -> {
-                 request = FromDomain.EncodeDataRequest.newBuilder().
-                         setEncodingType(FromDomain.EncodingType.TUPLE).
+                 request = EncodeDataRequest.newBuilder().
+                         setEncodingType(EncodingType.TUPLE).
                          setDefinition(defs.inputs.toJSON(false)).
                          setBody(paramsJSON).
                          build();
              }
              case ABIEntryType.CUSTOM_FUNCTION -> {
                  JsonABI.Entry functionEntry = JsonABI.newFunction(functionDef.name(), defs.inputs.components(), JsonABI.newParameters());
-                 request = FromDomain.EncodeDataRequest.newBuilder().
-                         setEncodingType(FromDomain.EncodingType.FUNCTION_CALL_DATA).
+                 request = EncodeDataRequest.newBuilder().
+                         setEncodingType(EncodingType.FUNCTION_CALL_DATA).
                          setDefinition(functionEntry.toJSON(false)).
                          setBody(paramsJSON).
                          build();
@@ -237,8 +237,8 @@
  
      String decodeOutput(byte[] outputData) throws IllegalStateException, ExecutionException, InterruptedException {
          JsonABI.Parameter outputsEntry = JsonABI.newTuple("", "", functionDef.outputs());
-         var request = FromDomain.DecodeDataRequest.newBuilder().
-                 setEncodingType(FromDomain.EncodingType.TUPLE).
+         var request = DecodeDataRequest.newBuilder().
+                 setEncodingType(EncodingType.TUPLE).
                  setDefinition(outputsEntry.toJSON(false)).
                  setData(ByteString.copyFrom(outputData)).
                  build();
@@ -247,8 +247,8 @@
      }
  
      byte[] getSignedRawTransaction(PenteEVMTransaction ethTXJson) throws IOException, IllegalStateException, ExecutionException, InterruptedException {
-         var request = FromDomain.EncodeDataRequest.newBuilder().
-                 setEncodingType(FromDomain.EncodingType.ETH_TRANSACTION_SIGNED).
+         var request = EncodeDataRequest.newBuilder().
+                 setEncodingType(EncodingType.ETH_TRANSACTION_SIGNED).
                  setDefinition(defs.inputs.toJSON(false)).
                  setBody(new ObjectMapper().writeValueAsString(ethTXJson)).
                  setDefinition("eip-1559").
@@ -284,7 +284,7 @@
          return defs;
      }
  
-     Address getFromVerifier(List<ToDomain.ResolvedVerifier> verifiers) {
+     Address getFromVerifier(List<ResolvedVerifier> verifiers) {
          for (var verifier : verifiers) {
              if (verifier.getAlgorithm().equals(Algorithms.ECDSA_SECP256K1) &&
                      verifier.getVerifierType().equals(Verifiers.ETH_ADDRESS) &&
@@ -310,7 +310,7 @@
              JsonHex.Bytes rawTransaction
      ) {}
  
-     ToDomain.AssembledTransaction buildAssembledTransaction(
+     AssembledTransaction buildAssembledTransaction(
              EVMRunner evm,
              PenteDomain.AssemblyAccountLoader accountLoader,
              PenteEVMTransaction evmTxn,
@@ -319,19 +319,19 @@
  
          var latestAccountSchemaId = domain.getConfig().schemaId_AccountStateLatest();
          var latestTransactionInputSchemaId = domain.getConfig().schemaId_TransactionInputStateLatest();
-         var result = ToDomain.AssembledTransaction.newBuilder();
+         var result = AssembledTransaction.newBuilder();
          var committedUpdates = evm.getWorld().getCommittedAccountUpdates();
          var loadedAccountStates = accountLoader.getLoadedAccountStates();
          var lookups = buildGroupScopeIdentityLookups(getValues().group().salt(), getValues().group().members());
-         var inputStates = new ArrayDeque<ToDomain.StateRef>();
-         var readStates = new ArrayDeque<ToDomain.StateRef>();
-         var outputStates = new ArrayDeque<ToDomain.NewState>();
+         var inputStates = new ArrayDeque<StateRef>();
+         var readStates = new ArrayDeque<StateRef>();
+         var outputStates = new ArrayDeque<NewState>();
          for (var loadedAccount : loadedAccountStates.keySet()) {
              var inputState = loadedAccountStates.get(loadedAccount);
              var lastOp = committedUpdates.get(loadedAccount);
              if (lastOp == DynamicLoadWorldState.LastOpType.DELETED || lastOp == DynamicLoadWorldState.LastOpType.UPDATED) {
                  if (inputState != null) {
-                     inputStates.add(ToDomain.StateRef.newBuilder().
+                     inputStates.add(StateRef.newBuilder().
                              setSchemaId(inputState.getSchemaId()).
                              setId(inputState.getId()).
                              build());
@@ -339,7 +339,7 @@
                  if (lastOp == DynamicLoadWorldState.LastOpType.UPDATED) {
                      LOGGER.info("Writing new state for account {} (existing={})", loadedAccount, inputState);
                      var updatedAccount = evm.getWorld().get(loadedAccount);
-                     outputStates.add(ToDomain.NewState.newBuilder().
+                     outputStates.add(NewState.newBuilder().
                              setSchemaId(latestAccountSchemaId).
                              setStateDataJsonBytes(ByteString.copyFrom(
                                      updatedAccount.serialize(JsonHex.randomBytes32())
@@ -352,7 +352,7 @@
              } else if (loadedAccount != null) {
                  // Note a read of an account with no state at this block is not tracked on-chain
                  LOGGER.info("Read of state for account {} (existing={})", loadedAccount, inputState);
-                 readStates.add(ToDomain.StateRef.newBuilder().
+                 readStates.add(StateRef.newBuilder().
                          setSchemaId(inputState.getSchemaId()).
                          setId(inputState.getId()).
                          build());
@@ -365,7 +365,7 @@
              new JsonHexNum.Uint256(evmTxn.getBytecodeLen()),
              new JsonHex.Bytes(encodedTxn)
          );
-         var txInputState = ToDomain.NewState.newBuilder().
+         var txInputState = NewState.newBuilder().
                  setSchemaId(latestTransactionInputSchemaId).
                  setStateDataJsonBytes(ByteString.copyFrom(new ObjectMapper().writeValueAsBytes(txInput))).
                  addAllDistributionList(lookups).
@@ -483,8 +483,8 @@
                  put("externalCalls", externalCalls);
              }});
          }};
-         var encoded = domain.encodeData(FromDomain.EncodeDataRequest.newBuilder().
-                 setEncodingType(FromDomain.EncodingType.TYPED_DATA_V4).
+         var encoded = domain.encodeData(EncodeDataRequest.newBuilder().
+                 setEncodingType(EncodingType.TYPED_DATA_V4).
                  setBody(new ObjectMapper().writeValueAsString(typedDataRequest)).
                  build()).get();
          return encoded.getData().toByteArray();

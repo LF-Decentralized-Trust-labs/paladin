@@ -15,22 +15,19 @@
 
  package io.kaleido.paladin.loader;
 
- import io.grpc.ManagedChannel;
- import io.grpc.stub.StreamObserver;
- import io.kaleido.paladin.diagnostics.VirtualMachineDiagnostics;
- import io.kaleido.paladin.logging.PaladinLogging;
- import io.kaleido.paladin.toolkit.GRPCTargetConnector;
- import io.kaleido.paladin.toolkit.PluginControllerGrpc;
- import io.kaleido.paladin.toolkit.Service;
- import io.kaleido.paladin.toolkit.Service.PluginLoad;
- import org.apache.logging.log4j.Logger;
- import org.apache.logging.log4j.message.FormattedMessage;
- 
- import java.util.HashMap;
- import java.util.Map;
- import java.util.UUID;
- import java.util.concurrent.CompletableFuture;
- import java.util.concurrent.TimeUnit;
+import io.grpc.ManagedChannel;
+import io.grpc.stub.StreamObserver;
+import io.kaleido.paladin.diagnostics.VirtualMachineDiagnostics;
+import io.kaleido.paladin.logging.PaladinLogging;
+import io.kaleido.paladin.toolkit.*;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.message.FormattedMessage;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
  
  public class PluginLoader implements StreamObserver<PluginLoad> {
  
@@ -103,7 +100,7 @@
                  channel = GRPCTargetConnector.connect(grpcTarget);
                  stub = PluginControllerGrpc.newStub(channel);
              }
-             Service.PluginLoaderInit req = Service.PluginLoaderInit.newBuilder().
+             PluginLoaderInit req = PluginLoaderInit.newBuilder().
                      setId(instanceId.toString()).
                      build();
              stub.initLoader(req, this);
@@ -163,7 +160,7 @@
              case C_SHARED -> loadJNA(info, loadInstruction);
              default -> {
                  LOGGER.error("Unexpected load instruction type {}", loadInstruction.getLibType());
-                 stub.loadFailed(Service.PluginLoadFailed.newBuilder()
+                 stub.loadFailed(PluginLoadFailed.newBuilder()
                          .setPlugin(loadInstruction.getPlugin())
                          .setErrorMessage("unknown library type")
                          .build(),
@@ -197,7 +194,7 @@
              resetReconnectCount();
          } catch(Throwable t) {
              LOGGER.error("plugin load failed", t);
-             stub.loadFailed(Service.PluginLoadFailed.newBuilder()
+             stub.loadFailed(PluginLoadFailed.newBuilder()
                              .setPlugin(loadInstruction.getPlugin())
                              .setErrorMessage(t.getMessage())
                              .build(),

@@ -1341,3 +1341,186 @@ func TestGetDomainReceiptLookupError(t *testing.T) {
 	assert.Regexp(t, "pop", err)
 
 }
+
+func TestDomainInitPrivacyGroupOK(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	functionABI := &abi.Entry{Type: abi.Function, Name: "initPrivacyGroup"}
+	addr := tktypes.RandAddress()
+	td.tp.Functions.InitPrivacyGroup = func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+		var props []*abi.Parameter
+		err := json.Unmarshal([]byte(ipgr.PropertiesAbiJson), &props)
+		require.NoError(t, err)
+		require.JSONEq(t, `{"name": "group1"}`, ipgr.PropertiesJson)
+		return &prototk.InitPrivacyGroupResponse{
+			Transaction: &prototk.PreparedTransaction{
+				Type:            prototk.PreparedTransaction_PUBLIC, // less likely than private
+				ContractAddress: confutil.P(addr.String()),          // less likely than deploy
+				RequiredSigner:  confutil.P("some.signer"),          // less likely than rndom assignment
+				ParamsJson:      `{"tx": "input"}`,
+				FunctionAbiJson: tktypes.JSONString(functionABI).Pretty(),
+			},
+			GenesisStateJson: `{
+			   "name": "group1",
+			   "version": "100"
+			}`,
+			GenesisAbiStateSchemaJson: tktypes.JSONString(abi.Parameter{
+				Type:         "tuple",
+				InternalType: "struct MyPrivacyGroup;",
+				Components: append(props, &abi.Parameter{
+					Name: "version",
+					Type: "uint256",
+				}),
+			}).Pretty(),
+		}, nil
+	}
+
+	domain := td.d
+	tx, err := domain.InitPrivacyGroup(td.ctx, &pldapi.PrivacyGroupInput{
+		Domain:     "domain1",
+		Members:    []string{"me@node1", "you@node2"},
+		Properties: tktypes.RawJSON(`{"name":"group1"}`),
+		PropertiesABI: abi.ParameterArray{
+			{Type: "string", Name: "name"},
+		},
+	})
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"name": "group1",
+		"version": "100"
+	}`, string(tx.GenesisState))
+	require.Equal(t, &abi.Parameter{
+		Type:         "tuple",
+		InternalType: "struct MyPrivacyGroup;",
+		Components: []*abi.Parameter{
+			{Type: "string", Name: "name"},
+			{Type: "uint256", Name: "version"},
+		},
+	}, tx.GenesisSchema)
+	require.Equal(t, &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:   "some.signer",
+			To:     addr,
+			Type:   pldapi.TransactionTypePublic.Enum(),
+			Data:   tktypes.RawJSON(`{"tx": "input"}`),
+			Domain: "test1",
+		},
+		ABI: abi.ABI{functionABI},
+	}, tx.TX)
+
+}
+
+func TestDomainInitPrivacyGroupError(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	td.tp.Functions.InitPrivacyGroup = func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	domain := td.d
+	_, err := domain.InitPrivacyGroup(td.ctx, &pldapi.PrivacyGroupInput{
+		Domain:     "domain1",
+		Members:    []string{"me@node1", "you@node2"},
+		Properties: tktypes.RawJSON(`{"name":"group1"}`),
+		PropertiesABI: abi.ParameterArray{
+			{Type: "string", Name: "name"},
+		},
+	})
+	assert.Regexp(t, "pop", err)
+
+}
+
+func TestDomainInitPrivacyGroupBadResSchema(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	td.tp.Functions.InitPrivacyGroup = func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+		return &prototk.InitPrivacyGroupResponse{}, nil
+	}
+
+	domain := td.d
+	_, err := domain.InitPrivacyGroup(td.ctx, &pldapi.PrivacyGroupInput{
+		Domain:     "domain1",
+		Members:    []string{"me@node1", "you@node2"},
+		Properties: tktypes.RawJSON(`{"name":"group1"}`),
+		PropertiesABI: abi.ParameterArray{
+			{Type: "string", Name: "name"},
+		},
+	})
+	assert.Regexp(t, "PD011664", err)
+
+}
+
+func TestDomainInitPrivacyGroupBadResFunctionABI(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	td.tp.Functions.InitPrivacyGroup = func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+		return &prototk.InitPrivacyGroupResponse{
+			GenesisStateJson: `{
+				"name": "group1",
+				"version": "100"
+			 }`,
+			GenesisAbiStateSchemaJson: tktypes.JSONString(abi.Parameter{
+				Type:         "tuple",
+				InternalType: "struct MyPrivacyGroup;",
+				Components:   abi.ParameterArray{},
+			}).Pretty(),
+			Transaction: &prototk.PreparedTransaction{},
+		}, nil
+	}
+
+	domain := td.d
+	_, err := domain.InitPrivacyGroup(td.ctx, &pldapi.PrivacyGroupInput{
+		Domain:     "domain1",
+		Members:    []string{"me@node1", "you@node2"},
+		Properties: tktypes.RawJSON(`{"name":"group1"}`),
+		PropertiesABI: abi.ParameterArray{
+			{Type: "string", Name: "name"},
+		},
+	})
+	assert.Regexp(t, "PD011607", err)
+
+}
+
+func TestDomainInitPrivacyGroupBadResFromAddr(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	td.tp.Functions.InitPrivacyGroup = func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+		return &prototk.InitPrivacyGroupResponse{
+			GenesisStateJson: `{
+				"name": "group1",
+				"version": "100"
+			 }`,
+			GenesisAbiStateSchemaJson: tktypes.JSONString(abi.Parameter{
+				Type:         "tuple",
+				InternalType: "struct MyPrivacyGroup;",
+				Components:   abi.ParameterArray{},
+			}).Pretty(),
+			Transaction: &prototk.PreparedTransaction{
+				FunctionAbiJson: tktypes.JSONString(&abi.Entry{Type: abi.Function, Name: "initPrivacyGroup"}).Pretty(),
+				ContractAddress: confutil.P("wrong"),
+			},
+		}, nil
+	}
+
+	domain := td.d
+	_, err := domain.InitPrivacyGroup(td.ctx, &pldapi.PrivacyGroupInput{
+		Domain:     "domain1",
+		Members:    []string{"me@node1", "you@node2"},
+		Properties: tktypes.RawJSON(`{"name":"group1"}`),
+		PropertiesABI: abi.ParameterArray{
+			{Type: "string", Name: "name"},
+		},
+	})
+	assert.Regexp(t, "bad address", err)
+
+}

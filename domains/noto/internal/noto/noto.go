@@ -764,3 +764,11 @@ func (n *Noto) InitCall(ctx context.Context, req *prototk.InitCallRequest) (*pro
 func (n *Noto) ExecCall(ctx context.Context, req *prototk.ExecCallRequest) (*prototk.ExecCallResponse, error) {
 	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
 }
+
+func (n *Noto) InitPrivacyGroup(ctx context.Context, req *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+}
+
+func (n *Noto) WrapPrivacyGroupTransaction(ctx context.Context, req *prototk.WrapPrivacyGroupTransactionRequest) (*prototk.WrapPrivacyGroupTransactionResponse, error) {
+	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+}

@@ -18,13 +18,13 @@
  import io.kaleido.paladin.logging.PaladinLogging;
  import org.apache.logging.log4j.Logger;
  
- public abstract class DomainBase extends PluginBase<Service.DomainMessage> {
+ public abstract class DomainBase extends PluginBase<DomainMessage> {
      private static final Logger LOGGER = PaladinLogging.getLogger(DomainBase.class);
  
      protected abstract DomainInstance newDomainInstance(String grpcTarget, String instanceId);
  
      @Override
-     final PluginInstance<Service.DomainMessage> newPluginInstance(String grpcTarget, String instanceId) {
+     final PluginInstance<DomainMessage> newPluginInstance(String grpcTarget, String instanceId) {
          LOGGER.info("Starting new domain instance {} connecting to {}", instanceId, grpcTarget);
          return newDomainInstance(grpcTarget, instanceId);
      }

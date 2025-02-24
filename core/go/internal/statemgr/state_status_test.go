@@ -72,7 +72,7 @@ func genWidget(t *testing.T, schemaID tktypes.Bytes32, txID *uuid.UUID, withoutS
 	}
 }
 
-func makeWidgets(t *testing.T, ctx context.Context, ss *stateManager, domainName string, contractAddress tktypes.EthAddress, schemaID tktypes.Bytes32, withoutSalt []string) []*pldapi.State {
+func makeWidgets(t *testing.T, ctx context.Context, ss *stateManager, domainName string, contractAddress *tktypes.EthAddress, schemaID tktypes.Bytes32, withoutSalt []string) []*pldapi.State {
 	states := make([]*pldapi.State, len(withoutSalt))
 	for i, w := range withoutSalt {
 		withSalt := genWidget(t, schemaID, nil, w)
@@ -102,13 +102,13 @@ func syncFlushContext(t *testing.T, dc components.DomainContext) {
 	require.NoError(t, err)
 }
 
-func newTestDomainContext(t *testing.T, ctx context.Context, ss *stateManager, name string, customHashFunction bool) (tktypes.EthAddress, *domainContext) {
+func newTestDomainContext(t *testing.T, ctx context.Context, ss *stateManager, name string, customHashFunction bool) (*tktypes.EthAddress, *domainContext) {
 	md := componentmocks.NewDomain(t)
 	md.On("Name").Return(name)
 	md.On("CustomHashFunction").Return(customHashFunction)
 	contractAddress := tktypes.RandAddress()
 	dc := ss.NewDomainContext(ctx, md, *contractAddress)
-	return *contractAddress, dc.(*domainContext)
+	return contractAddress, dc.(*domainContext)
 }
 
 func TestStateLockingQuery(t *testing.T) {

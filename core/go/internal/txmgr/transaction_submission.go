@@ -248,9 +248,9 @@ func (tm *txManager) prepareTransactionNewDBTX(ctx context.Context, tx *pldapi.T
 	return &txIDs[0], nil
 }
 
-func (tm *txManager) CallTransaction(ctx context.Context, result any, call *pldapi.TransactionCall) (err error) {
+func (tm *txManager) CallTransaction(ctx context.Context, dbTX persistence.DBTX, result any, call *pldapi.TransactionCall) (err error) {
 
-	txi, err := tm.resolveNewTransaction(ctx, tm.p.NOTX(), &call.TransactionInput, pldapi.SubmitModeCall)
+	txi, err := tm.resolveNewTransaction(ctx, dbTX, &call.TransactionInput, pldapi.SubmitModeCall)
 	if err != nil {
 		return err
 	}
@@ -536,13 +536,8 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX persistence
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrInvalidTXType)
 	}
 
-	fn, err := tm.resolveFunction(ctx, dbTX, tx.ABI, tx.ABIReference, tx.Function, tx.To)
-	if err != nil {
-		return nil, err
-	}
-
 	var publicTxData []byte
-	cv, normalizedJSON, err := tm.parseInputs(ctx, fn.Definition, tx.Type, tx.Data, tx.Bytecode)
+	fn, cv, normalizedJSON, err := tm.ResolveTransactionInputs(ctx, dbTX, tx)
 	if err == nil && tx.Type.V() == pldapi.TransactionTypePublic {
 		publicTxData, err = tm.getPublicTxData(ctx, fn.Definition, tx.Bytecode, cv)
 	}
@@ -578,6 +573,20 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX persistence
 		},
 		PublicTxData: publicTxData,
 	}, nil
+}
+
+func (tm *txManager) ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*components.ResolvedFunction, *abi.ComponentValue, tktypes.RawJSON, error) {
+	fn, err := tm.resolveFunction(ctx, dbTX, tx.ABI, tx.ABIReference, tx.Function, tx.To)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	cv, normalizedJSON, err := tm.parseInputs(ctx, fn.Definition, tx.Type, tx.Data, tx.Bytecode)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return fn, cv, normalizedJSON, nil
 }
 
 func (tm *txManager) getPublicTxData(ctx context.Context, fnDef *abi.Entry, bytecode []byte, cv *abi.ComponentValue) ([]byte, error) {

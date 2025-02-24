@@ -102,7 +102,7 @@ func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, signer string,
 }
 
 func (tb *testbed) ExecBaseLedgerCall(ctx context.Context, result any, tx *pldapi.TransactionCall) error {
-	return tb.Components().TxManager().CallTransaction(ctx, result, tx)
+	return tb.Components().TxManager().CallTransaction(ctx, tb.c.Persistence().NOTX(), result, tx)
 }
 
 func (tb *testbed) ResolveKey(ctx context.Context, fqLookup, algorithm, verifierType string) (resolvedKey *pldapi.KeyMappingAndVerifier, err error) {

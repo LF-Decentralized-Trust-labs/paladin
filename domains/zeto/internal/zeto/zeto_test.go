@@ -590,7 +590,7 @@ func TestSign(t *testing.T) {
 	_, err = z.Sign(context.Background(), req)
 	assert.ErrorContains(t, err, "PD210023: Failed to sign. PD210088: 'bad algo' does not match supported algorithm")
 
-	bytes, err := hex.DecodeString("7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
+	_, err = hex.DecodeString("7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
 	assert.NoError(t, err)
 	alice := signer.NewTestKeypair()
 	bob := signer.NewTestKeypair()
@@ -614,7 +614,7 @@ func TestSign(t *testing.T) {
 		InputValues:  inputValueInts,
 		OutputValues: outputValueInts,
 	}
-	bytes, err = json.Marshal(&s)
+	bytes, err := json.Marshal(&s)
 	require.NoError(t, err)
 
 	provingReq := protoz.ProvingRequest{

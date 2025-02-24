@@ -119,7 +119,7 @@ func (ss *stateManager) processInsertStates(ctx context.Context, dbTX persistenc
 
 	processedStates = make([]*pldapi.State, len(inStates))
 	for i, inState := range inStates {
-		schema, err := ss.GetSchema(ctx, dbTX, d.Name(), inState.SchemaID, true)
+		schema, err := ss.getSchemaByID(ctx, dbTX, d.Name(), inState.SchemaID, true)
 		if err != nil {
 			return nil, err
 		}
@@ -183,23 +183,25 @@ func (ss *stateManager) writeStates(ctx context.Context, dbTX persistence.DBTX, 
 	return err
 }
 
-func (ss *stateManager) GetState(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress tktypes.EthAddress, stateID tktypes.HexBytes, failNotFound, withLabels bool) (*pldapi.State, error) {
+func (ss *stateManager) GetStatesByID(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress *tktypes.EthAddress, stateIDs []tktypes.HexBytes, failNotFound, withLabels bool) ([]*pldapi.State, error) {
 	q := dbTX.DB().Table("states")
 	if withLabels {
 		q = q.Preload("Labels").Preload("Int64Labels")
 	}
 	var states []*pldapi.State
-	err := q.
+	q = q.
 		Where("domain_name = ?", domainName).
-		Where("contract_address = ?", contractAddress).
-		Where("id = ?", stateID).
-		Limit(1).
+		Where("id IN ( ? )", stateIDs)
+	if contractAddress != nil {
+		q = q.Where("contract_address = ?", contractAddress)
+	}
+	err := q.
 		Find(&states).
 		Error
-	if err == nil && len(states) == 0 && failNotFound {
-		return nil, i18n.NewError(ctx, msgs.MsgStateNotFound, stateID)
+	if err == nil && len(states) != len(stateIDs) && failNotFound {
+		return nil, i18n.NewError(ctx, msgs.MsgStateNotFound, stateIDs)
 	}
-	return states[0], err
+	return states, err
 }
 
 // Built in fields all start with "." as that prevents them
@@ -241,13 +243,13 @@ func (ss *stateManager) labelSetFor(schema components.Schema) *trackingLabelSet 
 	return &tls
 }
 
-func (ss *stateManager) FindContractStates(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress tktypes.EthAddress, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
-	_, s, err = ss.findStates(ctx, dbTX, domainName, &contractAddress, schemaID, query, status)
+func (ss *stateManager) FindContractStates(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress *tktypes.EthAddress, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
+	_, s, err = ss.findStates(ctx, dbTX, domainName, contractAddress, schemaID, query, &components.StateQueryOptions{StatusQualifier: status})
 	return s, err
 }
 
-func (ss *stateManager) FindStates(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
-	_, s, err = ss.findStates(ctx, dbTX, domainName, nil, schemaID, query, status)
+func (ss *stateManager) FindStates(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, query *query.QueryJSON, options *components.StateQueryOptions) (s []*pldapi.State, err error) {
+	_, s, err = ss.findStates(ctx, dbTX, domainName, nil, schemaID, query, options)
 	return s, err
 }
 
@@ -268,28 +270,37 @@ func (ss *stateManager) findStates(
 	contractAddress *tktypes.EthAddress,
 	schemaID tktypes.Bytes32,
 	jq *query.QueryJSON,
-	status pldapi.StateStatusQualifier,
-	excluded ...tktypes.HexBytes,
+	options *components.StateQueryOptions,
 ) (schema components.Schema, s []*pldapi.State, err error) {
-	whereClause, isPlainDB := whereClauseForQual(dbTX.DB(), status, "Spent")
+	if options == nil {
+		options = &components.StateQueryOptions{}
+	}
+	if options.StatusQualifier == "" {
+		options.StatusQualifier = pldapi.StateStatusAll
+	}
+	whereClause, isPlainDB := whereClauseForQual(dbTX.DB(), options.StatusQualifier, "Spent")
 	if isPlainDB {
-		return ss.findStatesCommon(ctx, dbTX, domainName, contractAddress, schemaID, jq, func(q *gorm.DB) *gorm.DB {
+		return ss.findStatesCommon(ctx, dbTX, domainName, contractAddress, schemaID, jq, func(dbTX persistence.DBTX, q *gorm.DB) *gorm.DB {
 			q = q.Joins("Confirmed", dbTX.DB().Select("transaction")).
 				Joins("Spent", dbTX.DB().Select("transaction"))
 
-			if len(excluded) > 0 {
-				q = q.Not(`"states"."id" IN(?)`, excluded)
+			if len(options.ExcludedIDs) > 0 {
+				q = q.Not(`"states"."id" IN(?)`, options.ExcludedIDs)
 			}
 
 			// Scope the query based on the status qualifier
 			q = q.Where(whereClause)
+
+			if options.QueryModifier != nil {
+				q = options.QueryModifier(dbTX, q)
+			}
 			return q
 		})
 	}
 
 	// Otherwise, we need to run it against the specified domain context
 	var dc components.DomainContext
-	dcID, err := uuid.Parse(string(status))
+	dcID, err := uuid.Parse(string(options.StatusQualifier))
 	if err == nil {
 		if dc = ss.GetDomainContext(ctx, dcID); dc == nil {
 			err = i18n.NewError(ctx, msgs.MsgStateDomainContextNotActive, dcID)
@@ -314,7 +325,7 @@ func (ss *stateManager) findNullifiers(
 ) (schema components.Schema, s []*pldapi.State, err error) {
 	whereClause, isPlainDB := whereClauseForQual(dbTX.DB(), status, "Nullifier__Spent")
 	if isPlainDB {
-		return ss.findStatesCommon(ctx, dbTX, domainName, contractAddress, schemaID, jq, func(q *gorm.DB) *gorm.DB {
+		return ss.findStatesCommon(ctx, dbTX, domainName, contractAddress, schemaID, jq, func(dbTX persistence.DBTX, q *gorm.DB) *gorm.DB {
 			hasNullifier := dbTX.DB().Where(`"Nullifier"."id" IS NOT NULL`)
 
 			q = q.Joins("Confirmed", dbTX.DB().Select("transaction")).
@@ -356,13 +367,13 @@ func (ss *stateManager) findStatesCommon(
 	contractAddress *tktypes.EthAddress,
 	schemaID tktypes.Bytes32,
 	jq *query.QueryJSON,
-	addQuery func(q *gorm.DB) *gorm.DB,
+	modifyQuery func(dbTX persistence.DBTX, q *gorm.DB) *gorm.DB,
 ) (schema components.Schema, s []*pldapi.State, err error) {
 	if len(jq.Sort) == 0 {
 		jq.Sort = []string{".created"}
 	}
 
-	schema, err = ss.GetSchema(ctx, dbTX, domainName, schemaID, true)
+	schema, err = ss.getSchemaByID(ctx, dbTX, domainName, schemaID, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -389,7 +400,7 @@ func (ss *stateManager) findStatesCommon(
 	if contractAddress != nil {
 		q = q.Where("states.contract_address = ?", contractAddress)
 	}
-	q = addQuery(q)
+	q = modifyQuery(dbTX, q)
 
 	var states []*pldapi.State
 	q = q.Find(&states)

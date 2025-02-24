@@ -76,8 +76,12 @@ func (ss *stateManager) persistSchemas(ctx context.Context, dbTX persistence.DBT
 		Error
 }
 
-func (ss *stateManager) GetSchema(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (components.Schema, error) {
-	return ss.getSchemaByID(ctx, dbTX, domainName, schemaID, failNotFound)
+func (ss *stateManager) GetSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (*pldapi.Schema, error) {
+	s, err := ss.getSchemaByID(ctx, dbTX, domainName, schemaID, failNotFound)
+	if err != nil || s == nil {
+		return nil, err
+	}
+	return s.Persisted(), nil
 }
 
 func (ss *stateManager) getSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (components.Schema, error) {

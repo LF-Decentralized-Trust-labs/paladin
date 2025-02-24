@@ -127,6 +127,7 @@ func TestInitOK(t *testing.T) {
 	assert.NotNil(t, cm.PrivateTxManager())
 	assert.NotNil(t, cm.PublicTxManager())
 	assert.NotNil(t, cm.TxManager())
+	assert.NotNil(t, cm.GroupManager())
 	assert.NotNil(t, cm.IdentityResolver())
 
 	// Check we can send a request for a javadump - even just after init (not start)
@@ -201,6 +202,10 @@ func TestStartOK(t *testing.T) {
 	mockTxManager.On("Start").Return(nil)
 	mockTxManager.On("Stop").Return()
 
+	mockGroupManager := componentmocks.NewGroupManager(t)
+	mockGroupManager.On("Start").Return(nil)
+	mockGroupManager.On("Stop").Return()
+
 	mockStateManager := componentmocks.NewStateManager(t)
 	mockStateManager.On("Start").Return(nil)
 	mockStateManager.On("Stop").Return()
@@ -237,6 +242,7 @@ func TestStartOK(t *testing.T) {
 	cm.publicTxManager = mockPublicTxManager
 	cm.privateTxManager = mockPrivateTxManager
 	cm.txManager = mockTxManager
+	cm.groupManager = mockGroupManager
 	cm.additionalManagers = append(cm.additionalManagers, mockExtraManager)
 
 	err := cm.StartManagers()

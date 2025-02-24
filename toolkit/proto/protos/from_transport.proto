@@ -19,6 +19,8 @@ package io.kaleido.paladin.toolkit;
 
 import "to_transport.proto";
 
+option java_multiple_files = true;
+
 message ReceiveMessageRequest {
     string from_node = 1;
     PaladinMsg message = 2;

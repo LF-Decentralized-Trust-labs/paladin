@@ -51,7 +51,7 @@ func writeStates(t *testing.T, txm *txManager, dbTX persistence.DBTX, testSchema
 	for i := range stateInputs {
 		stateInputs[i] = &components.StateUpsertOutsideContext{
 			SchemaID:        tktypes.Bytes32(testSchemaID),
-			ContractAddress: fakeContractAddr,
+			ContractAddress: &fakeContractAddr,
 			Data: tktypes.JSONString(map[string]any{
 				"salt":   tktypes.RandHex(32),
 				"owner":  tktypes.RandAddress(),
@@ -252,7 +252,7 @@ func TestQueryPreparedTransactionFailNoLimit(t *testing.T) {
 	defer done()
 
 	_, err := txm.QueryPreparedTransactions(ctx, txm.p.NOTX(), query.NewQueryBuilder().Query())
-	assert.Regexp(t, "PD012200", err)
+	assert.Regexp(t, "PD010721", err)
 
 }
 
@@ -264,7 +264,7 @@ func TestQueryPreparedTransactionWithRefsFailNoLimit(t *testing.T) {
 	defer done()
 
 	_, err := txm.QueryPreparedTransactionsWithRefs(ctx, txm.p.NOTX(), query.NewQueryBuilder().Query())
-	assert.Regexp(t, "PD012200", err)
+	assert.Regexp(t, "PD010721", err)
 
 }
 

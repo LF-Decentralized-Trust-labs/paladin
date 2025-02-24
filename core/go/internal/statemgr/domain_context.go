@@ -266,7 +266,9 @@ func (dc *domainContext) GetStatesByID(dbTX persistence.DBTX, schemaID tktypes.B
 		idsAny[i] = id
 	}
 	query := query.NewQueryBuilder().In(".id", idsAny).Sort(".created").Query()
-	schema, matches, err := dc.ss.findStates(dc, dbTX, dc.domainName, &dc.contractAddress, schemaID, query, pldapi.StateStatusAll)
+	schema, matches, err := dc.ss.findStates(dc, dbTX, dc.domainName, &dc.contractAddress, schemaID, query, &components.StateQueryOptions{
+		StatusQualifier: pldapi.StateStatusAll,
+	})
 	if err == nil {
 		var memMatches []*components.StateWithLabels
 		memMatches, err = dc.mergeUnFlushed(schema, matches, query, false /* locked states are fine */, false /* nullifiers not required */)
@@ -289,7 +291,10 @@ func (dc *domainContext) FindAvailableStates(dbTX persistence.DBTX, schemaID tkt
 	}
 
 	// Run the query against the DB
-	schema, states, err := dc.ss.findStates(dc, dbTX, dc.domainName, &dc.contractAddress, schemaID, query, pldapi.StateStatusAvailable, spending...)
+	schema, states, err := dc.ss.findStates(dc, dbTX, dc.domainName, &dc.contractAddress, schemaID, query, &components.StateQueryOptions{
+		StatusQualifier: pldapi.StateStatusAvailable,
+		ExcludedIDs:     spending,
+	})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -336,12 +341,12 @@ func (dc *domainContext) upsertStates(dbTX persistence.DBTX, holdingLock bool, s
 	withValues := make([]*components.StateWithLabels, len(stateUpserts))
 	toMakeAvailable := make([]*components.StateWithLabels, 0, len(stateUpserts))
 	for i, ns := range stateUpserts {
-		schema, err := dc.ss.GetSchema(dc, dbTX, dc.domainName, ns.Schema, true)
+		schema, err := dc.ss.getSchemaByID(dc, dbTX, dc.domainName, ns.Schema, true)
 		if err != nil {
 			return nil, err
 		}
 
-		vs, err := schema.ProcessState(dc, dc.contractAddress, ns.Data, ns.ID, dc.customHashFunction)
+		vs, err := schema.ProcessState(dc, &dc.contractAddress, ns.Data, ns.ID, dc.customHashFunction)
 		if err != nil {
 			return nil, err
 		}

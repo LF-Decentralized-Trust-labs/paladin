@@ -558,6 +558,15 @@ func (z *Zeto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 	// TODO: Event logs for transfers would be great for Noto
 	return nil, i18n.NewError(ctx, msgs.MsgNoDomainReceipt)
 }
+
+func (z *Zeto) InitPrivacyGroup(ctx context.Context, req *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+}
+
+func (z *Zeto) WrapPrivacyGroupTransaction(ctx context.Context, req *prototk.WrapPrivacyGroupTransactionRequest) (*prototk.WrapPrivacyGroupTransactionResponse, error) {
+	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+}
+
 func getStateSchemas(ctx context.Context) ([]string, error) {
 	var schemas []string
 	coinJSON, err := json.Marshal(types.ZetoCoinABI)

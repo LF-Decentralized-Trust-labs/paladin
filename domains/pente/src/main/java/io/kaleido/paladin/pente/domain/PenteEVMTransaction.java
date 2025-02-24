@@ -23,10 +23,8 @@
  import io.kaleido.paladin.pente.evmrunner.EVMRunner;
  import io.kaleido.paladin.pente.evmrunner.EVMVersion;
  import io.kaleido.paladin.pente.evmstate.AccountLoader;
- import io.kaleido.paladin.toolkit.FromDomain;
- import io.kaleido.paladin.toolkit.JsonHex;
+ import io.kaleido.paladin.toolkit.*;
  import io.kaleido.paladin.toolkit.JsonHex.Address;
- import io.kaleido.paladin.toolkit.JsonHexNum;
  import org.apache.logging.log4j.Logger;
  import org.apache.tuweni.bytes.Bytes;
  import org.hyperledger.besu.evm.frame.MessageFrame;
@@ -155,8 +153,8 @@
          var txInputState = objectMapper.readValue(txInputBytes, PenteTransaction.TransactionInputInfoState.class);
  
          // Decode the rawTransaction data
-         var request = FromDomain.DecodeDataRequest.newBuilder().
-                 setEncodingType(FromDomain.EncodingType.ETH_TRANSACTION_SIGNED).
+         var request = DecodeDataRequest.newBuilder().
+                 setEncodingType(EncodingType.ETH_TRANSACTION_SIGNED).
                  setData(ByteString.copyFrom(txInputState.rawTransaction().getBytes())).
                  build();
          var response = domain.decodeData(request).get();

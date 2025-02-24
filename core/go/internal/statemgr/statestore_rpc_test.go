@@ -72,7 +72,7 @@ func TestRPC(t *testing.T) {
 
 	var abiParam abi.Parameter
 	err := json.Unmarshal([]byte(widgetABI), &abiParam)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	schema, err := newABISchema(ctx, "domain1", &abiParam)
 	assert.NoError(t, err)
 	err = ss.persistSchemas(ctx, ss.p.NOTX(), []*pldapi.Schema{schema.Schema})
@@ -85,6 +85,11 @@ func TestRPC(t *testing.T) {
 	assert.Len(t, schemas, 1)
 	assert.Equal(t, pldapi.SchemaTypeABI, schemas[0].Type.V())
 	assert.Equal(t, "0x3612029bf239cbed1e27548e9211ecfe72496dfec4183fd3ea79a3a54eb126be", schemas[0].ID.String())
+
+	var rpcSchema *pldapi.Schema
+	rpcErr = c.CallRPC(ctx, &rpcSchema, "pstate_getSchemaById", "domain1", schemas[0].ID)
+	require.NoError(t, rpcErr)
+	require.NotNil(t, rpcSchema)
 
 	contractAddress := tktypes.RandAddress()
 	var state *pldapi.State

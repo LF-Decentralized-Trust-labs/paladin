@@ -425,6 +425,40 @@ func TestDomainFunction_BuildReceipt(t *testing.T) {
 	})
 }
 
+func TestDomainFunction_InitPrivacyGroup(t *testing.T) {
+	_, exerciser, funcs, _, _, done := setupDomainTests(t)
+	defer done()
+
+	// InitPrivacyGroup - paladin to domain
+	funcs.InitPrivacyGroup = func(ctx context.Context, cdr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+		return &prototk.InitPrivacyGroupResponse{}, nil
+	}
+	exerciser.doExchangeToPlugin(func(req *prototk.DomainMessage) {
+		req.RequestToDomain = &prototk.DomainMessage_InitPrivacyGroup{
+			InitPrivacyGroup: &prototk.InitPrivacyGroupRequest{},
+		}
+	}, func(res *prototk.DomainMessage) {
+		assert.IsType(t, &prototk.DomainMessage_InitPrivacyGroupRes{}, res.ResponseFromDomain)
+	})
+}
+
+func TestDomainFunction_WrapPrivacyGroupTransaction(t *testing.T) {
+	_, exerciser, funcs, _, _, done := setupDomainTests(t)
+	defer done()
+
+	// WrapPrivacyGroupTransaction - paladin to domain
+	funcs.WrapPrivacyGroupTransaction = func(ctx context.Context, cdr *prototk.WrapPrivacyGroupTransactionRequest) (*prototk.WrapPrivacyGroupTransactionResponse, error) {
+		return &prototk.WrapPrivacyGroupTransactionResponse{}, nil
+	}
+	exerciser.doExchangeToPlugin(func(req *prototk.DomainMessage) {
+		req.RequestToDomain = &prototk.DomainMessage_WrapPrivacyGroupTransaction{
+			WrapPrivacyGroupTransaction: &prototk.WrapPrivacyGroupTransactionRequest{},
+		}
+	}, func(res *prototk.DomainMessage) {
+		assert.IsType(t, &prototk.DomainMessage_WrapPrivacyGroupTransactionRes{}, res.ResponseFromDomain)
+	})
+}
+
 func TestDomainRequestError(t *testing.T) {
 	_, exerciser, _, _, _, done := setupDomainTests(t)
 	defer done()

@@ -11,7 +11,7 @@ title: State
     "created": 0,
     "domain": "",
     "schema": "0x0000000000000000000000000000000000000000000000000000000000000000",
-    "contractAddress": "0x0000000000000000000000000000000000000000",
+    "contractAddress": null,
     "data": null
 }
 ```

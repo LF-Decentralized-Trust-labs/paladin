@@ -71,9 +71,9 @@
  
      abstract CompletableFuture<MSG> handleRequest(MSG msg);
  
-     abstract Service.Header getHeader(MSG msg);
+     abstract Header getHeader(MSG msg);
  
-     abstract MSG buildMessage(Service.Header header);
+     abstract MSG buildMessage(Header header);
  
      public final synchronized void shutdown() {
          LOGGER.info("plugin shutdown pluginId={}", pluginId);
@@ -100,7 +100,7 @@
              this.sendStream = connect(new StreamHandler());
              // Send the register - which will kick the server to send use messages to process
              LOGGER.info("Plugin connected and sending register pluginId={}", pluginId);
-             Service.Header registerHeader = newHeader(Service.Header.MessageType.REGISTER);
+             Header registerHeader = newHeader(Header.MessageType.REGISTER);
              this.sendStream.onNext(buildMessage(registerHeader));
              reconnectCount = 0;
          } catch(Throwable t) {
@@ -109,24 +109,24 @@
          }
      }
  
-     private final Service.Header newHeader(Service.Header.MessageType msgType)  {
-         return Service.Header.newBuilder().
+     private final Header newHeader(Header.MessageType msgType)  {
+         return Header.newBuilder().
                  setPluginId(pluginId).
                  setMessageId(UUID.randomUUID().toString()).
                  setMessageType(msgType).
                  build();
      }
  
-     final Service.Header newRequestHeader()  {
-         return newHeader(Service.Header.MessageType.REQUEST_FROM_PLUGIN);
+     final Header newRequestHeader()  {
+         return newHeader(Header.MessageType.REQUEST_FROM_PLUGIN);
      }
  
-     final Service.Header getReplyHeader(MSG req) {
-         return Service.Header.newBuilder().
+     final Header getReplyHeader(MSG req) {
+         return Header.newBuilder().
                  setPluginId(pluginId).
                  setMessageId(UUID.randomUUID().toString()).
                  setCorrelationId(getHeader(req).getMessageId()).
-                 setMessageType(Service.Header.MessageType.RESPONSE_FROM_PLUGIN).
+                 setMessageType(Header.MessageType.RESPONSE_FROM_PLUGIN).
                  build();
      }
  
@@ -159,7 +159,7 @@
          }, CompletableFuture.delayedExecutor(delay, TimeUnit.MILLISECONDS, reconnectExecutor));
      }
  
-     private UUID getCorrelationUUID(Service.Header header) {
+     private UUID getCorrelationUUID(Header header) {
          try {
              return UUID.fromString(header.getCorrelationId());
          } catch(IllegalArgumentException e) {
@@ -173,12 +173,12 @@
          return null;
      }
  
-     private synchronized Void sendErrorReply(Service.Header reqHeader, Throwable t) {
-         Service.Header resHeader = Service.Header.newBuilder().
+     private synchronized Void sendErrorReply(Header reqHeader, Throwable t) {
+         Header resHeader = Header.newBuilder().
                  setPluginId(pluginId).
                  setMessageId(UUID.randomUUID().toString()).
                  setCorrelationId(reqHeader.getMessageId()).
-                 setMessageType(Service.Header.MessageType.ERROR_RESPONSE).
+                 setMessageType(Header.MessageType.ERROR_RESPONSE).
                  setErrorMessage(t.getMessage()).
                  build();
          LOGGER.error(new FormattedMessage("sending error reply {} to {}", resHeader.getMessageId(), reqHeader.getMessageId()), t);
@@ -190,23 +190,23 @@
          @Override
          public void onNext(MSG msg) {
              // See if this is a request, or a response
-             Service.Header header = getHeader(msg);
+             Header header = getHeader(msg);
              switch (header.getMessageType()) {
-                 case Service.Header.MessageType.RESPONSE_TO_PLUGIN -> {
+                 case Header.MessageType.RESPONSE_TO_PLUGIN -> {
                      UUID cid = getCorrelationUUID(header);
                      if (cid != null) {
                          LOGGER.debug("Received reply {} to {} type {}", header.getMessageId(), cid, header.getMessageType());
                          inflightRequests.completeRequest(cid, msg);
                      }
                  }
-                 case Service.Header.MessageType.ERROR_RESPONSE -> {
+                 case Header.MessageType.ERROR_RESPONSE -> {
                      UUID cid = getCorrelationUUID(header);
                      if (cid != null) {
                          LOGGER.debug("Received reply {} to {} type {}", header.getMessageId(), cid, header.getMessageType());
                          inflightRequests.failRequest(cid, new Exception(header.getErrorMessage()));
                      }
                  }
-                 case Service.Header.MessageType.REQUEST_TO_PLUGIN -> {
+                 case Header.MessageType.REQUEST_TO_PLUGIN -> {
                      // Dispatch for async handling of the request (do not block this thread at all)
                      CompletableFuture.runAsync(() -> handleRequest(msg)
                              .thenApply(PluginInstance.this::send)

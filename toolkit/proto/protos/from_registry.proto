@@ -19,6 +19,8 @@ package io.kaleido.paladin.toolkit;
 
 import "on_chain_events.proto";
 
+option java_multiple_files = true;
+
 message UpsertRegistryRecordsRequest {
   repeated RegistryEntry entries = 1;
   repeated RegistryProperty properties = 2;

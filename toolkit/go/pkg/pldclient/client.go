@@ -59,6 +59,9 @@ type PaladinClient interface {
 
 	// Paladin block index
 	BlockIndex() BlockIndex
+
+	// Paladin pgroup RPC interface
+	PrivacyGroups() PrivacyGroups
 }
 
 type RPCModule interface {

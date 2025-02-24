@@ -53,6 +53,7 @@ type transportManager struct {
 	txManager        components.TXManager
 	privateTxManager components.PrivateTxManager
 	identityResolver components.IdentityResolver
+	groupManager     components.GroupManager
 	persistence      persistence.Persistence
 
 	transportsByID   map[uuid.UUID]*transport
@@ -116,6 +117,7 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 	tm.txManager = c.TxManager()
 	tm.privateTxManager = c.PrivateTxManager()
 	tm.identityResolver = c.IdentityResolver()
+	tm.groupManager = c.GroupManager()
 	tm.persistence = c.Persistence()
 	tm.reliableMsgWriter = flushwriter.NewWriter(tm.bgCtx, tm.handleReliableMsgBatch, tm.persistence,
 		&tm.conf.ReliableMessageWriter, &pldconf.TransportManagerDefaults.ReliableMessageWriter)

@@ -451,7 +451,7 @@ func TestPublicTransactionPassthroughQueries(t *testing.T) {
 
 	// Query missing limit
 	err = rpcClient.CallRPC(ctx, &txns, "ptx_queryPublicTransactions", query.NewQueryBuilder().Query())
-	require.Regexp(t, "PD012200", err)
+	require.Regexp(t, "PD010721", err)
 
 	// Query fail
 	mockQuery = func(_ *query.QueryJSON) ([]*pldapi.PublicTxWithBinding, error) { return nil, fmt.Errorf("pop") }

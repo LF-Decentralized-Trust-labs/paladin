@@ -3,7 +3,6 @@ module github.com/kaleido-io/paladin/registries/static
 go 1.22.5
 
 require (
-	github.com/hyperledger/firefly-common v1.4.14
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/crypto v0.31.0
@@ -15,6 +14,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/hyperledger/firefly-common v1.4.14 // indirect
 	github.com/hyperledger/firefly-signer v1.1.19 // indirect
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000 // indirect
 	github.com/kr/text v0.2.0 // indirect

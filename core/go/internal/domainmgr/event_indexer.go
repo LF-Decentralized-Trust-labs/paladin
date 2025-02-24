@@ -342,7 +342,7 @@ func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX persisten
 		newStates = append(newStates, &components.StateUpsertOutsideContext{
 			ID:              id,
 			SchemaID:        schemaID,
-			ContractAddress: addr,
+			ContractAddress: &addr,
 			Data:            tktypes.RawJSON(state.StateDataJson),
 		})
 

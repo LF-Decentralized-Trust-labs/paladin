@@ -55,6 +55,10 @@ type Domain interface {
 	Configuration() *prototk.DomainConfig
 	CustomHashFunction() bool
 
+	// Specific to domains that support privacy groups (domain should return error if it does not).
+	// Validates the input properties, and turns it into the full genesis configuration for a group
+	InitPrivacyGroup(ctx context.Context, pgInput *pldapi.PrivacyGroupInput) (tx *PreparedGroupInitTransaction, err error)
+
 	InitDeploy(ctx context.Context, tx *PrivateContractDeploy) error
 	PrepareDeploy(ctx context.Context, tx *PrivateContractDeploy) error
 
@@ -81,6 +85,12 @@ type DomainSmartContract interface {
 
 	InitCall(ctx context.Context, tx *ResolvedTransaction) ([]*prototk.ResolveVerifierRequest, error)
 	ExecCall(dCtx DomainContext, readTX persistence.DBTX, tx *ResolvedTransaction, verifiers []*prototk.ResolvedVerifier) (*abi.ComponentValue, error)
+
+	WrapPrivacyGroupTransaction(ctx context.Context, pg *pldapi.PrivacyGroupWithABI, fnDef *abi.Entry, pgInput *pldapi.TransactionInput) (err error)
+}
+
+type DomainPrivacyGroupConfig struct {
+	DefaultSchemaABI *abi.Parameter
 }
 
 type EndorsementResult struct {

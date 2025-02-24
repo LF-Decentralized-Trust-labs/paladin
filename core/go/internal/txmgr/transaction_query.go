@@ -88,24 +88,24 @@ func (tm *txManager) mapPersistedTXResolved(pt *persistedTransaction) *component
 }
 
 func (tm *txManager) QueryTransactions(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*pldapi.Transaction, error) {
-	qw := &queryWrapper[persistedTransaction, pldapi.Transaction]{
-		p:           tm.p,
-		table:       "transactions",
-		defaultSort: "-created",
-		filters:     transactionFilters,
-		query:       jq,
-		finalize: func(q *gorm.DB) *gorm.DB {
+	qw := &filters.QueryWrapper[persistedTransaction, pldapi.Transaction]{
+		P:           tm.p,
+		Table:       "transactions",
+		DefaultSort: "-created",
+		Filters:     transactionFilters,
+		Query:       jq,
+		Finalize: func(q *gorm.DB) *gorm.DB {
 			if pending {
 				q = q.Joins("TransactionReceipt").
 					Where(`"TransactionReceipt"."transaction" IS NULL`)
 			}
 			return q
 		},
-		mapResult: func(pt *persistedTransaction) (*pldapi.Transaction, error) {
+		MapResult: func(pt *persistedTransaction) (*pldapi.Transaction, error) {
 			return tm.mapPersistedTXBase(pt), nil
 		},
 	}
-	return qw.run(ctx, dbTX)
+	return qw.Run(ctx, dbTX)
 }
 
 func (tm *txManager) QueryTransactionsFull(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) (results []*pldapi.TransactionFull, err error) {
@@ -113,13 +113,13 @@ func (tm *txManager) QueryTransactionsFull(ctx context.Context, jq *query.QueryJ
 }
 
 func (tm *txManager) QueryTransactionsResolved(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*components.ResolvedTransaction, error) {
-	qw := &queryWrapper[persistedTransaction, components.ResolvedTransaction]{
-		p:           tm.p,
-		table:       "transactions",
-		defaultSort: "-created",
-		filters:     transactionFilters,
-		query:       jq,
-		finalize: func(q *gorm.DB) *gorm.DB {
+	qw := &filters.QueryWrapper[persistedTransaction, components.ResolvedTransaction]{
+		P:           tm.p,
+		Table:       "transactions",
+		DefaultSort: "-created",
+		Filters:     transactionFilters,
+		Query:       jq,
+		Finalize: func(q *gorm.DB) *gorm.DB {
 			q = q.
 				Preload("TransactionDeps").
 				Joins("TransactionReceipt")
@@ -129,11 +129,11 @@ func (tm *txManager) QueryTransactionsResolved(ctx context.Context, jq *query.Qu
 			}
 			return q
 		},
-		mapResult: func(pt *persistedTransaction) (*components.ResolvedTransaction, error) {
+		MapResult: func(pt *persistedTransaction) (*components.ResolvedTransaction, error) {
 			return tm.mapPersistedTXResolved(pt), nil
 		},
 	}
-	ptxs, err := qw.run(ctx, dbTX)
+	ptxs, err := qw.Run(ctx, dbTX)
 	if err != nil {
 		return nil, err
 	}
@@ -141,13 +141,13 @@ func (tm *txManager) QueryTransactionsResolved(ctx context.Context, jq *query.Qu
 }
 
 func (tm *txManager) QueryTransactionsFullTx(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*pldapi.TransactionFull, error) {
-	qw := &queryWrapper[persistedTransaction, pldapi.TransactionFull]{
-		p:           tm.p,
-		table:       "transactions",
-		defaultSort: "-created",
-		filters:     transactionFilters,
-		query:       jq,
-		finalize: func(q *gorm.DB) *gorm.DB {
+	qw := &filters.QueryWrapper[persistedTransaction, pldapi.TransactionFull]{
+		P:           tm.p,
+		Table:       "transactions",
+		DefaultSort: "-created",
+		Filters:     transactionFilters,
+		Query:       jq,
+		Finalize: func(q *gorm.DB) *gorm.DB {
 			q = q.
 				Preload("TransactionDeps").
 				Joins("TransactionReceipt")
@@ -157,11 +157,11 @@ func (tm *txManager) QueryTransactionsFullTx(ctx context.Context, jq *query.Quer
 			}
 			return q
 		},
-		mapResult: func(pt *persistedTransaction) (*pldapi.TransactionFull, error) {
+		MapResult: func(pt *persistedTransaction) (*pldapi.TransactionFull, error) {
 			return tm.mapPersistedTXFull(pt), nil
 		},
 	}
-	ptxs, err := qw.run(ctx, dbTX)
+	ptxs, err := qw.Run(ctx, dbTX)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +273,7 @@ func (tm *txManager) GetTransactionDependencies(ctx context.Context, id uuid.UUI
 }
 
 func (tm *txManager) queryPublicTransactions(ctx context.Context, jq *query.QueryJSON) ([]*pldapi.PublicTxWithBinding, error) {
-	if err := checkLimitSet(ctx, jq); err != nil {
+	if err := filters.CheckLimitSet(ctx, jq); err != nil {
 		return nil, err
 	}
 	return tm.publicTxMgr.QueryPublicTxWithBindings(ctx, tm.p.NOTX(), jq)

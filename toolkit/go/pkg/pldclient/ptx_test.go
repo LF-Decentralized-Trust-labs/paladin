@@ -25,7 +25,7 @@ func TestPTXModule(t *testing.T) {
 	testRPCModule(t, func(c PaladinClient) RPCModule { return c.PTX() })
 }
 
-func TestSubscribe(t *testing.T) {
+func TestPTXSubscribe(t *testing.T) {
 	ctx, c, _, done := newTestClientAndServerWebSockets(t)
 	defer done()
 
@@ -33,7 +33,7 @@ func TestSubscribe(t *testing.T) {
 	require.Regexp(t, "PD020702", err)
 }
 
-func TestSubscribeNotWS(t *testing.T) {
+func TestPTXSubscribeNotWS(t *testing.T) {
 	ctx, c, _, done := newTestClientAndServerHTTP(t)
 	defer done()
 

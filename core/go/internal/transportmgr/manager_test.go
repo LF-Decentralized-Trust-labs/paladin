@@ -46,6 +46,7 @@ type mockComponents struct {
 	txManager        *componentmocks.TXManager
 	privateTxManager *componentmocks.PrivateTxManager
 	identityResolver *componentmocks.IdentityResolver
+	groupManager     *componentmocks.GroupManager
 }
 
 func newMockComponents(t *testing.T, realDB bool) *mockComponents {
@@ -57,6 +58,7 @@ func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	mc.txManager = componentmocks.NewTXManager(t)
 	mc.privateTxManager = componentmocks.NewPrivateTxManager(t)
 	mc.identityResolver = componentmocks.NewIdentityResolver(t)
+	mc.groupManager = componentmocks.NewGroupManager(t)
 	if realDB {
 		p, cleanup, err := persistence.NewUnitTestPersistence(context.Background(), "transportmgr")
 		require.NoError(t, err)
@@ -76,6 +78,7 @@ func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	mc.c.On("TxManager").Return(mc.txManager).Maybe()
 	mc.c.On("PrivateTxManager").Return(mc.privateTxManager).Maybe()
 	mc.c.On("IdentityResolver").Return(mc.identityResolver).Maybe()
+	mc.c.On("GroupManager").Return(mc.groupManager).Maybe()
 	return mc
 }
 

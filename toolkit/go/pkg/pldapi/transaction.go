@@ -112,11 +112,23 @@ type TransactionInput struct {
 	Bytecode  tktypes.HexBytes `docstruct:"TransactionInput" json:"bytecode,omitempty"`  // for deploy this is prepended to the encoded data inputs
 }
 
+// Transaction for a privacy group
+type PrivacyGroupTransactionInput struct {
+	GroupID tktypes.HexBytes `docstruct:"TransactionInput" json:"groupId,omitempty"`
+	TransactionInput
+}
+
 // Call also provides some options on how to execute the call
 type TransactionCall struct {
 	TransactionInput
 	PublicCallOptions
 	DataFormat tktypes.JSONFormatOptions `docstruct:"TransactionCall" json:"dataFormat"` // formatting options for the result data
+}
+
+// Call for a privacy group
+type PrivacyGroupTransactionCall struct {
+	GroupID tktypes.HexBytes `docstruct:"TransactionInput" json:"groupId,omitempty"`
+	TransactionCall
 }
 
 // Additional fields returned on output when "full" specified

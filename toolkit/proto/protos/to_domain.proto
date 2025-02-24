@@ -19,6 +19,9 @@ package io.kaleido.paladin.toolkit;
 
 import "on_chain_events.proto";
 
+// This is necessary to avoid ToDomain.java being >2.5MB in size
+option java_multiple_files = true;
+
 // **CONFIGURE** happens once when the domain is loaded into Paladin
 message ConfigureDomainRequest {
   string name = 1; // The name
@@ -228,6 +231,28 @@ message ValidateStateHashesResponse {
   repeated string state_ids = 1; // the validates ids in the same order as the states supplied (if any states were invalid, return an error instead)
 }
 
+message InitPrivacyGroupRequest {
+  string properties_json = 1; // The JSON encoded properties that conform to the properties schema provided
+  string properties_abi_json = 2; // ABI parameter array that specifies the user-supplied properties that go into the creation of the group
+  repeated string members = 3; // Array of members for the privacy group
+}
+
+message InitPrivacyGroupResponse {
+  string genesis_state_json = 1; // The full definition of the group, encoding the properties, the members, and any needed configuration for all members
+  string genesis_abi_state_schema_json = 2; // The ABI definition that must be distributed alongside the state to decode and index it in the state store
+  PreparedTransaction transaction = 3; // The transaction that will result from this against the domain
+}
+
+message WrapPrivacyGroupTransactionRequest {
+  EndorsableState genesis_state = 1; // the full genesis state of the transaction
+  string genesis_abi_json = 2; // the full ABI of the genesis state
+  PrivacyGroupTransaction transaction = 3; // the transaction to wrap
+}
+
+message WrapPrivacyGroupTransactionResponse {
+  PreparedTransaction transaction = 1; // The transaction that will result from this against the domain
+}
+
 message DomainConfig {
   bool custom_hash_function = 1; // If true then the ValidateStateHashes function must be implemeted, and all states must come with a pre-caclculated ID
   repeated string abi_state_schemas_json = 2; // A list of Schema definitions (in ABI parameter format) the domain requires for all state types it interacts with
@@ -241,7 +266,7 @@ message ContractInfo {
 }
 
 message ContractConfig {
-  string contract_config_json = 1; // Arbitray JSON configuration parsed by the domain itself - opaque to Paladin beyond being valid JSON. Passed back on all transaction calls
+  string contract_config_json = 1; // Arbitrary JSON configuration parsed by the domain itself - opaque to Paladin beyond being valid JSON. Passed back on all transaction calls
   
   enum CoordinatorSelection {
       COORDINATOR_STATIC = 0; // The coordinator is fixed for the smart contract by the configuration
@@ -284,6 +309,16 @@ message TransactionSpecification {
   string function_params_json = 6; // The parameters supplied in the invocation in normalized JSON format, after validation against the ABI the caller supplied
   int64 base_block = 7; // The block number on the base ledger, upon which this transaction is being assembled
   Intent intent = 8; // The sender's intended outcome (a submitted transaction or only a call)
+}
+
+message PrivacyGroupTransaction {
+  ContractInfo contract_info = 1; // Details of the privacy group smart contract
+  string from = 2; // The unresolved sender identity
+  optional string to = 3; // The ethereum identifier specified in the to of the transaction. Null for deployment
+  string function_signature = 4; // The calculated signature of the function ABI the caller is attempting to invoke
+  string function_abi_json = 5; // The function ABI (asserted by the caller) they wish to inovoke on the smart contract
+  string function_params_json = 6; // The parameters supplied in the invocation in normalized JSON format, after validation against the ABI the caller supplied
+  optional bytes bytecode = 7; // For deployment transactions only 
 }
 
 message AssembledTransaction {

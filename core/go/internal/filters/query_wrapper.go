@@ -13,12 +13,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package txmgr
+package filters
 
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
@@ -26,64 +25,44 @@ import (
 	"gorm.io/gorm"
 )
 
-type queryWrapper[PT, T any] struct {
-	p           persistence.Persistence
-	table       string
-	defaultSort string
-	filters     filters.FieldMap
-	query       *query.QueryJSON
-	finalize    func(db *gorm.DB) *gorm.DB
-	mapResult   func(*PT) (*T, error)
+type QueryWrapper[PT, T any] struct {
+	P           persistence.Persistence
+	Table       string
+	DefaultSort string
+	Filters     FieldMap
+	Query       *query.QueryJSON
+	Finalize    func(db *gorm.DB) *gorm.DB
+	MapResult   func(*PT) (*T, error)
 }
 
-func stringOrEmpty(ps *string) string {
-	if ps == nil {
-		return ""
-	}
-	return *ps
-}
-
-func notEmptyOrNull(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-func int64OrZero(pi *int64) int64 {
-	if pi == nil {
-		return 0
-	}
-	return *pi
-}
-
-func checkLimitSet(ctx context.Context, jq *query.QueryJSON) error {
+func CheckLimitSet(ctx context.Context, jq *query.QueryJSON) error {
 	if jq.Limit == nil || *jq.Limit <= 0 {
-		return i18n.NewError(ctx, msgs.MsgTxMgrQueryLimitRequired)
+		return i18n.NewError(ctx, msgs.MsgFiltersQueryLimitRequired)
 	}
 	return nil
 }
 
-func (qw *queryWrapper[PT, T]) run(ctx context.Context, dbTX persistence.DBTX) ([]*T, error) {
-	if err := checkLimitSet(ctx, qw.query); err != nil {
+func (qw *QueryWrapper[PT, T]) Run(ctx context.Context, dbTX persistence.DBTX) ([]*T, error) {
+	if err := CheckLimitSet(ctx, qw.Query); err != nil {
 		return nil, err
 	}
-	if len(qw.query.Sort) == 0 {
+	if len(qw.Query.Sort) == 0 {
 		// By default return the newest in descending order
-		qw.query.Sort = []string{qw.defaultSort}
+		qw.Query.Sort = []string{qw.DefaultSort}
 	}
 
 	// Build the query
 	var dbResults []*PT
 	if dbTX == nil {
-		dbTX = qw.p.NOTX()
+		dbTX = qw.P.NOTX()
 	}
-	q := filters.BuildGORM(ctx,
-		qw.query,
-		dbTX.DB().Table(qw.table).WithContext(ctx),
-		qw.filters)
-	if qw.finalize != nil {
-		q = qw.finalize(q)
+	q := dbTX.DB().WithContext(ctx)
+	if qw.Table != "" {
+		q = q.Table(qw.Table)
+	}
+	q = BuildGORM(ctx, qw.Query, q, qw.Filters)
+	if qw.Finalize != nil {
+		q = qw.Finalize(q)
 	}
 	err := q.Find(&dbResults).Error
 	if err != nil {
@@ -92,7 +71,7 @@ func (qw *queryWrapper[PT, T]) run(ctx context.Context, dbTX persistence.DBTX) (
 
 	finalResults := make([]*T, len(dbResults))
 	for i, r := range dbResults {
-		if finalResults[i], err = qw.mapResult(r); err != nil {
+		if finalResults[i], err = qw.MapResult(r); err != nil {
 			return nil, err
 		}
 	}

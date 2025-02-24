@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"gorm.io/gorm"
 )
 
 type StateManager interface {
@@ -42,6 +43,9 @@ type StateManager interface {
 	// Ensure ABI schemas upserts all the specified schemas, using the given DB transaction
 	EnsureABISchemas(ctx context.Context, dbTX persistence.DBTX, domainName string, defs []*abi.Parameter) ([]Schema, error)
 
+	// Get an individual schema by ID
+	GetSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (*pldapi.Schema, error)
+
 	// State finalizations are written on the DB context of the block indexer, by the domain manager.
 	WriteStateFinalizations(ctx context.Context, dbTX persistence.DBTX, spends []*pldapi.StateSpendRecord, reads []*pldapi.StateReadRecord, confirms []*pldapi.StateConfirmRecord, infoRecords []*pldapi.StateInfoRecord) (err error)
 
@@ -55,11 +59,20 @@ type StateManager interface {
 	// Write a batch of nullifiers that correspond to states just received
 	WriteNullifiersForReceivedStates(ctx context.Context, dbTX persistence.DBTX, domainName string, nullifiers []*NullifierUpsert) error
 
-	// GetState returns a state by ID, with optional labels
-	GetState(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress tktypes.EthAddress, stateID tktypes.HexBytes, failNotFound, withLabels bool) (*pldapi.State, error)
+	// Find states from outside of a domain context (noting you can reference a domain context by ID)
+	FindStates(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, query *query.QueryJSON, extQueryOptions *StateQueryOptions) (s []*pldapi.State, err error)
+
+	// GetState returns state by ID, with optional labels
+	GetStatesByID(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress *tktypes.EthAddress, stateIDs []tktypes.HexBytes, failNotFound, withLabels bool) ([]*pldapi.State, error)
 
 	// Get all states created, read or spent by a confirmed transaction
 	GetTransactionStates(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID) (*pldapi.TransactionStates, error)
+}
+
+type StateQueryOptions struct {
+	StatusQualifier pldapi.StateStatusQualifier
+	ExcludedIDs     []tktypes.HexBytes
+	QueryModifier   func(db persistence.DBTX, query *gorm.DB) *gorm.DB
 }
 
 type DomainContextInfo struct {
@@ -186,7 +199,7 @@ type StateUpsert struct {
 type StateUpsertOutsideContext struct {
 	ID              tktypes.HexBytes
 	SchemaID        tktypes.Bytes32
-	ContractAddress tktypes.EthAddress
+	ContractAddress *tktypes.EthAddress
 	Data            tktypes.RawJSON
 }
 
@@ -210,6 +223,6 @@ type Schema interface {
 	ID() tktypes.Bytes32
 	Signature() string
 	Persisted() *pldapi.Schema
-	ProcessState(ctx context.Context, contractAddress tktypes.EthAddress, data tktypes.RawJSON, id tktypes.HexBytes, customHash bool) (*StateWithLabels, error)
+	ProcessState(ctx context.Context, contractAddress *tktypes.EthAddress, data tktypes.RawJSON, id tktypes.HexBytes, customHash bool) (*StateWithLabels, error)
 	RecoverLabels(ctx context.Context, s *pldapi.State) (*StateWithLabels, error)
 }

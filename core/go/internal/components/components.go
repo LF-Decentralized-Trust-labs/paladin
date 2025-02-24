@@ -51,6 +51,7 @@ type Managers interface {
 	TxManager() TXManager
 	StateManager() StateManager
 	IdentityResolver() IdentityResolver
+	GroupManager() GroupManager
 }
 
 // All managers conform to a standard lifecycle

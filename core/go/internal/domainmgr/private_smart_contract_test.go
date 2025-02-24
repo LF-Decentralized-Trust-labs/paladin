@@ -1570,3 +1570,252 @@ func TestGetPSCInitError(t *testing.T) {
 	require.Regexp(t, "pop", err) // domain no longer configured
 	assert.Nil(t, psc)
 }
+
+func goodWrapPGTxCall(psc *domainContract, salt tktypes.Bytes32) (*pldapi.TransactionInput, error) {
+	tx := &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			IdempotencyKey: "tx1",
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			Domain:         "domain1",
+			Function:       "doAThing",
+			From:           "from.addr",
+			To:             confutil.P(psc.Address()),
+			Data: tktypes.JSONString(map[string]any{
+				"who":   tktypes.MustEthAddress("0x09ec006415815b28538d5b9b2d3c0b5d7f43e7f6"),
+				"thing": "stuff",
+			}),
+		},
+	}
+	return tx, psc.WrapPrivacyGroupTransaction(context.Background(), &pldapi.PrivacyGroupWithABI{
+		PrivacyGroup: &pldapi.PrivacyGroup{
+			ID: tktypes.RandBytes(32),
+			Genesis: tktypes.JSONString(map[string]any{
+				"name": "pg1",
+				"salt": salt,
+			}),
+		},
+		GenesisABI: &abi.Parameter{
+			Type:         "tuple",
+			Name:         "MyPrivacyGroup",
+			InternalType: "struct MyPrivacyGroup;",
+			Components: abi.ParameterArray{
+				{Type: "string", Name: "name"},
+				{Type: "bytes32", Name: "salt"},
+			},
+		},
+	}, &abi.Entry{
+		Type: abi.Function,
+		Name: "doAThing",
+		Inputs: abi.ParameterArray{
+			{Type: "address", Name: "who"},
+			{Type: "string", Name: "thing"},
+		},
+	}, tx)
+}
+
+func TestWrapPGTxOk(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupTransaction = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupTransactionRequest) (*prototk.WrapPrivacyGroupTransactionResponse, error) {
+		var genesisABI abi.Parameter
+		err := json.Unmarshal([]byte(wpgtr.GenesisAbiJson), &genesisABI)
+		require.NoError(t, err)
+		var genesisData map[string]interface{}
+		err = json.Unmarshal([]byte(wpgtr.GenesisState.StateDataJson), &genesisData)
+		require.NoError(t, err)
+		genesisABI.Name = "pgDetails"
+		var fnDef abi.Entry
+		err = json.Unmarshal([]byte(wpgtr.Transaction.FunctionAbiJson), &fnDef)
+		require.NoError(t, err)
+		return &prototk.WrapPrivacyGroupTransactionResponse{
+			Transaction: &prototk.PreparedTransaction{
+				ContractAddress: confutil.P(psc.Address().String()),
+				Type:            prototk.PreparedTransaction_PRIVATE,
+				RequiredSigner:  confutil.P("pgroup.signer"),
+				FunctionAbiJson: tktypes.JSONString(&abi.Entry{
+					Type: abi.Function,
+					Name: "wrappedDoThing",
+					Inputs: abi.ParameterArray{
+						&genesisABI,
+						{Name: "wrappedParamsJSON", Type: "tuple", Components: fnDef.Inputs},
+					},
+				}).Pretty(),
+				ParamsJson: tktypes.JSONString(map[string]any{
+					"pgDetails":         tktypes.RawJSON(wpgtr.GenesisState.StateDataJson),
+					"wrappedParamsJSON": tktypes.RawJSON(wpgtr.Transaction.FunctionParamsJson),
+				}).Pretty(),
+			},
+		}, nil
+	}
+
+	salt := tktypes.RandBytes32()
+	tx, err := goodWrapPGTxCall(psc, salt)
+	require.NoError(t, err)
+
+	require.JSONEq(t, fmt.Sprintf(`{
+		"idempotencyKey": "tx1",
+		"type":           "private",
+		"domain":         "domain1",
+		"function":       "wrappedDoThing",
+		"from":           "pgroup.signer",
+		"to":             "%s",
+		"data": {
+			"pgDetails": {
+				"name": "pg1",
+				"salt": "%s"
+			},
+			"wrappedParamsJSON": {
+			   "who": "0x09ec006415815b28538d5b9b2d3c0b5d7f43e7f6",
+			   "thing": "stuff"
+			}
+		},
+		"abi": [{
+			"type": "function",
+			"name": "wrappedDoThing",
+			"inputs": [
+				{
+					"components": [
+						{
+							"name": "name",
+							"type": "string"
+						},
+						{
+							"name": "salt",
+							"type": "bytes32"
+						}
+					],
+					"internalType": "struct MyPrivacyGroup;",
+					"name": "pgDetails",
+					"type": "tuple"
+				},
+				{
+					"components": [
+						{
+							"name": "who",
+							"type": "address"
+						},
+						{
+							"name": "thing",
+							"type": "string"
+						}
+					],
+					"name": "wrappedParamsJSON",
+					"type": "tuple"
+				}
+			],
+			"outputs": null
+		}]
+	}`, psc.Address(), salt), tktypes.JSONString(tx).Pretty())
+}
+
+func TestWrapPGFail(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupTransaction = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupTransactionRequest) (*prototk.WrapPrivacyGroupTransactionResponse, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	require.Regexp(t, "pop", err)
+}
+
+func TestWrapPGBadInput(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	err := psc.WrapPrivacyGroupTransaction(context.Background(), &pldapi.PrivacyGroupWithABI{}, &abi.Entry{}, &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			Data: tktypes.RawJSON(`{badness`),
+		},
+	})
+	require.Regexp(t, "PD011612", err)
+}
+
+func TestWrapPGBadTxType(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupTransaction = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupTransactionRequest) (*prototk.WrapPrivacyGroupTransactionResponse, error) {
+		return &prototk.WrapPrivacyGroupTransactionResponse{
+			Transaction: &prototk.PreparedTransaction{
+				Type: prototk.PreparedTransaction_PUBLIC,
+			},
+		}, nil
+	}
+
+	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	require.Regexp(t, "PD011665", err)
+}
+
+func TestWrapPGBadToAddr(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupTransaction = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupTransactionRequest) (*prototk.WrapPrivacyGroupTransactionResponse, error) {
+		return &prototk.WrapPrivacyGroupTransactionResponse{
+			Transaction: &prototk.PreparedTransaction{
+				Type:            prototk.PreparedTransaction_PRIVATE,
+				ContractAddress: confutil.P("wrong"),
+			},
+		}, nil
+	}
+
+	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	require.Regexp(t, "bad address", err)
+}
+
+func TestWrapPGWrongToAddr(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupTransaction = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupTransactionRequest) (*prototk.WrapPrivacyGroupTransactionResponse, error) {
+		return &prototk.WrapPrivacyGroupTransactionResponse{
+			Transaction: &prototk.PreparedTransaction{
+				Type:            prototk.PreparedTransaction_PRIVATE,
+				ContractAddress: confutil.P(tktypes.RandAddress().String()),
+			},
+		}, nil
+	}
+
+	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	require.Regexp(t, "PD011666", err)
+}
+
+func TestWrapPGBadData(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupTransaction = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupTransactionRequest) (*prototk.WrapPrivacyGroupTransactionResponse, error) {
+		return &prototk.WrapPrivacyGroupTransactionResponse{
+			Transaction: &prototk.PreparedTransaction{
+				Type: prototk.PreparedTransaction_PRIVATE,
+			},
+		}, nil
+	}
+
+	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	require.Regexp(t, "PD011612", err)
+}

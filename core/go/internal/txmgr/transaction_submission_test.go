@@ -792,7 +792,7 @@ func TestCallTransactionNoFrom(t *testing.T) {
 	require.NoError(t, tx.Error())
 
 	var result any
-	err := txm.CallTransaction(ctx, &result, tx.CallTX())
+	err := txm.CallTransaction(ctx, txm.p.NOTX(), &result, tx.CallTX())
 	require.Regexp(t, "PD011517", err) // means we successfully submitted it to the client
 
 }
@@ -832,7 +832,7 @@ func TestCallTransactionWithFrom(t *testing.T) {
 	require.NoError(t, tx.Error())
 
 	var result any
-	err := txm.CallTransaction(ctx, &result, tx.CallTX())
+	err := txm.CallTransaction(ctx, txm.p.NOTX(), &result, tx.CallTX())
 	require.Regexp(t, "PD011517", err) // means we successfully submitted it to the client
 
 }
@@ -844,7 +844,7 @@ func TestCallTransactionBadTX(t *testing.T) {
 	defer done()
 
 	var result any
-	err := txm.CallTransaction(ctx, &result, &pldapi.TransactionCall{})
+	err := txm.CallTransaction(ctx, txm.p.NOTX(), &result, &pldapi.TransactionCall{})
 	require.Regexp(t, "PD012211", err)
 
 }
@@ -882,7 +882,7 @@ func TestCallTransactionPrivOk(t *testing.T) {
 	require.NoError(t, tx.Error())
 
 	var result tktypes.RawJSON
-	err := txm.CallTransaction(ctx, &result, tx.CallTX())
+	err := txm.CallTransaction(ctx, txm.p.NOTX(), &result, tx.CallTX())
 	require.NoError(t, err)
 	require.JSONEq(t, `[42]`, result.Pretty())
 
@@ -909,7 +909,7 @@ func TestCallTransactionPrivFail(t *testing.T) {
 	require.NoError(t, tx.Error())
 
 	var result tktypes.RawJSON
-	err := txm.CallTransaction(ctx, &result, tx.CallTX())
+	err := txm.CallTransaction(ctx, txm.p.NOTX(), &result, tx.CallTX())
 	assert.Regexp(t, "snap", err)
 
 }
@@ -920,7 +920,7 @@ func TestCallTransactionPrivMissingTo(t *testing.T) {
 		mockInsertABIBeginCommit)
 	defer done()
 
-	err := txm.CallTransaction(ctx, nil, &pldapi.TransactionCall{
+	err := txm.CallTransaction(ctx, txm.p.NOTX(), nil, &pldapi.TransactionCall{
 		TransactionInput: pldapi.TransactionInput{
 			TransactionBase: pldapi.TransactionBase{
 				Type:   pldapi.TransactionTypePrivate.Enum(),
@@ -938,7 +938,7 @@ func TestCallTransactionBadSerializer(t *testing.T) {
 		mockInsertABIBeginCommit)
 	defer done()
 
-	err := txm.CallTransaction(ctx, nil, &pldapi.TransactionCall{
+	err := txm.CallTransaction(ctx, txm.p.NOTX(), nil, &pldapi.TransactionCall{
 		TransactionInput: pldapi.TransactionInput{
 			TransactionBase: pldapi.TransactionBase{
 				Type:   pldapi.TransactionTypePrivate.Enum(),

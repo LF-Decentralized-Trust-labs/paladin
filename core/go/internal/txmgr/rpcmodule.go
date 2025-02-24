@@ -107,7 +107,7 @@ func (tm *txManager) rpcCall() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		tx *pldapi.TransactionCall,
 	) (result tktypes.RawJSON, err error) {
-		err = tm.CallTransaction(ctx, &result, tx)
+		err = tm.CallTransaction(ctx, tm.p.NOTX(), &result, tx)
 		return
 	})
 }

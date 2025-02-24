@@ -171,13 +171,13 @@ func (tm *txManager) QueryPreparedTransactionsWithRefs(ctx context.Context, dbTX
 }
 
 func (tm *txManager) queryPreparedTransactionsBase(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.PreparedTransactionBase, error) {
-	qw := &queryWrapper[preparedTransaction, pldapi.PreparedTransactionBase]{
-		p:           tm.p,
-		table:       "prepared_txns",
-		defaultSort: "-created",
-		filters:     preparedTransactionFilters,
-		query:       jq,
-		mapResult: func(pt *preparedTransaction) (*pldapi.PreparedTransactionBase, error) {
+	qw := &filters.QueryWrapper[preparedTransaction, pldapi.PreparedTransactionBase]{
+		P:           tm.p,
+		Table:       "prepared_txns",
+		DefaultSort: "-created",
+		Filters:     preparedTransactionFilters,
+		Query:       jq,
+		MapResult: func(pt *preparedTransaction) (*pldapi.PreparedTransactionBase, error) {
 			preparedTx := &pldapi.PreparedTransactionBase{
 				ID:       pt.ID,
 				Domain:   pt.Domain,
@@ -187,7 +187,7 @@ func (tm *txManager) queryPreparedTransactionsBase(ctx context.Context, dbTX per
 			return preparedTx, json.Unmarshal(pt.Transaction, &preparedTx.Transaction)
 		},
 	}
-	return qw.run(ctx, dbTX)
+	return qw.Run(ctx, dbTX)
 }
 
 func (tm *txManager) enrichPreparedTransactionsFull(ctx context.Context, dbTX persistence.DBTX, basePTs []*pldapi.PreparedTransactionBase) ([]*pldapi.PreparedTransaction, error) {

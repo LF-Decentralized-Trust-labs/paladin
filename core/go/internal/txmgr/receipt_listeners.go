@@ -49,6 +49,7 @@ type persistedReceiptListener struct {
 var receiptListenerFilters = filters.FieldMap{
 	"name":    filters.StringField("name"),
 	"created": filters.TimestampField("created"),
+	"started": filters.BooleanField("started"),
 }
 
 func (persistedReceiptListener) TableName() string {
@@ -260,17 +261,17 @@ func (tm *txManager) DeleteReceiptListener(ctx context.Context, name string) err
 }
 
 func (tm *txManager) QueryReceiptListeners(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.TransactionReceiptListener, error) {
-	qw := &queryWrapper[persistedReceiptListener, pldapi.TransactionReceiptListener]{
-		p:           tm.p,
-		table:       "receipt_listeners",
-		defaultSort: "-created",
-		filters:     receiptListenerFilters,
-		query:       jq,
-		mapResult: func(pl *persistedReceiptListener) (*pldapi.TransactionReceiptListener, error) {
+	qw := &filters.QueryWrapper[persistedReceiptListener, pldapi.TransactionReceiptListener]{
+		P:           tm.p,
+		Table:       "receipt_listeners",
+		DefaultSort: "-created",
+		Filters:     receiptListenerFilters,
+		Query:       jq,
+		MapResult: func(pl *persistedReceiptListener) (*pldapi.TransactionReceiptListener, error) {
 			return tm.mapListener(ctx, pl)
 		},
 	}
-	return qw.run(ctx, dbTX)
+	return qw.Run(ctx, dbTX)
 }
 
 func (tm *txManager) notifyNewReceipts(receipts []*transactionReceipt) {
@@ -315,7 +316,7 @@ func (tm *txManager) loadReceiptListeners() error {
 		}
 
 		if len(page) < tm.receiptListenersLoadPageSize {
-			log.L(ctx).Infof("loaded %d receipted listeners", len(tm.receiptListeners))
+			log.L(ctx).Infof("loaded %d receipt listeners", len(tm.receiptListeners))
 			return nil
 		}
 

@@ -22,83 +22,85 @@
  
  import java.util.concurrent.CompletableFuture;
  
- public abstract class DomainInstance extends PluginInstance<Service.DomainMessage> {
+ public abstract class DomainInstance extends PluginInstance<DomainMessage> {
  
      private static final Logger LOGGER = PaladinLogging.getLogger(DomainInstance.class);
  
-     protected abstract CompletableFuture<ToDomain.ConfigureDomainResponse> configureDomain(ToDomain.ConfigureDomainRequest request);
-     protected abstract CompletableFuture<ToDomain.InitDomainResponse> initDomain(ToDomain.InitDomainRequest request);
-     protected abstract CompletableFuture<ToDomain.InitDeployResponse> initDeploy(ToDomain.InitDeployRequest request);
-     protected abstract CompletableFuture<ToDomain.PrepareDeployResponse> prepareDeploy(ToDomain.PrepareDeployRequest request);
-     protected abstract CompletableFuture<ToDomain.InitContractResponse> initContract(ToDomain.InitContractRequest request);
-     protected abstract CompletableFuture<ToDomain.InitTransactionResponse> initTransaction(ToDomain.InitTransactionRequest request);
-     protected abstract CompletableFuture<ToDomain.AssembleTransactionResponse> assembleTransaction(ToDomain.AssembleTransactionRequest request);
-     protected abstract CompletableFuture<ToDomain.EndorseTransactionResponse> endorseTransaction(ToDomain.EndorseTransactionRequest request);
-     protected abstract CompletableFuture<ToDomain.PrepareTransactionResponse> prepareTransaction(ToDomain.PrepareTransactionRequest request);
-     protected abstract CompletableFuture<ToDomain.HandleEventBatchResponse> handleEventBatch(ToDomain.HandleEventBatchRequest request);
-     protected abstract CompletableFuture<ToDomain.SignResponse> sign(ToDomain.SignRequest request);
-     protected abstract CompletableFuture<ToDomain.GetVerifierResponse> getVerifier(ToDomain.GetVerifierRequest request);
-     protected abstract CompletableFuture<ToDomain.ValidateStateHashesResponse> validateStateHashes(ToDomain.ValidateStateHashesRequest request);
-     protected abstract CompletableFuture<ToDomain.InitCallResponse> initCall(ToDomain.InitCallRequest request);
-     protected abstract CompletableFuture<ToDomain.ExecCallResponse> execCall(ToDomain.ExecCallRequest request);
-     protected abstract CompletableFuture<ToDomain.BuildReceiptResponse> buildReceipt(ToDomain.BuildReceiptRequest request);
- 
+     protected abstract CompletableFuture<ConfigureDomainResponse> configureDomain(ConfigureDomainRequest request);
+     protected abstract CompletableFuture<InitDomainResponse> initDomain(InitDomainRequest request);
+     protected abstract CompletableFuture<InitDeployResponse> initDeploy(InitDeployRequest request);
+     protected abstract CompletableFuture<PrepareDeployResponse> prepareDeploy(PrepareDeployRequest request);
+     protected abstract CompletableFuture<InitContractResponse> initContract(InitContractRequest request);
+     protected abstract CompletableFuture<InitTransactionResponse> initTransaction(InitTransactionRequest request);
+     protected abstract CompletableFuture<AssembleTransactionResponse> assembleTransaction(AssembleTransactionRequest request);
+     protected abstract CompletableFuture<EndorseTransactionResponse> endorseTransaction(EndorseTransactionRequest request);
+     protected abstract CompletableFuture<PrepareTransactionResponse> prepareTransaction(PrepareTransactionRequest request);
+     protected abstract CompletableFuture<HandleEventBatchResponse> handleEventBatch(HandleEventBatchRequest request);
+     protected abstract CompletableFuture<SignResponse> sign(SignRequest request);
+     protected abstract CompletableFuture<GetVerifierResponse> getVerifier(GetVerifierRequest request);
+     protected abstract CompletableFuture<ValidateStateHashesResponse> validateStateHashes(ValidateStateHashesRequest request);
+     protected abstract CompletableFuture<InitCallResponse> initCall(InitCallRequest request);
+     protected abstract CompletableFuture<ExecCallResponse> execCall(ExecCallRequest request);
+     protected abstract CompletableFuture<BuildReceiptResponse> buildReceipt(BuildReceiptRequest request);
+     protected abstract CompletableFuture<InitPrivacyGroupResponse> initPrivacyGroup(InitPrivacyGroupRequest request);
+     protected abstract CompletableFuture<WrapPrivacyGroupTransactionResponse> wrapPrivacyGroupTransaction(WrapPrivacyGroupTransactionRequest request);
+
      protected DomainInstance(String grpcTarget, String instanceId) {
          super(grpcTarget, instanceId);
      }
  
-     public CompletableFuture<FromDomain.FindAvailableStatesResponse> findAvailableStates(FromDomain.FindAvailableStatesRequest request) {
-         Service.DomainMessage message = Service.DomainMessage.newBuilder().
+     public CompletableFuture<FindAvailableStatesResponse> findAvailableStates(FindAvailableStatesRequest request) {
+         DomainMessage message = DomainMessage.newBuilder().
                  setHeader(newRequestHeader()).
                  setFindAvailableStates(request).
                  build();
-         return requestReply(message).thenApply(Service.DomainMessage::getFindAvailableStatesRes);
+         return requestReply(message).thenApply(DomainMessage::getFindAvailableStatesRes);
      }
  
-     public CompletableFuture<FromDomain.EncodeDataResponse> encodeData(FromDomain.EncodeDataRequest request) {
-         Service.DomainMessage message = Service.DomainMessage.newBuilder().
+     public CompletableFuture<EncodeDataResponse> encodeData(EncodeDataRequest request) {
+         DomainMessage message = DomainMessage.newBuilder().
                  setHeader(newRequestHeader()).
                  setEncodeData(request).
                  build();
-         return requestReply(message).thenApply(Service.DomainMessage::getEncodeDataRes);
+         return requestReply(message).thenApply(DomainMessage::getEncodeDataRes);
      }
  
-     public CompletableFuture<FromDomain.DecodeDataResponse> decodeData(FromDomain.DecodeDataRequest request) {
-         Service.DomainMessage message = Service.DomainMessage.newBuilder().
+     public CompletableFuture<DecodeDataResponse> decodeData(DecodeDataRequest request) {
+         DomainMessage message = DomainMessage.newBuilder().
                  setHeader(newRequestHeader()).
                  setDecodeData(request).
                  build();
-         return requestReply(message).thenApply(Service.DomainMessage::getDecodeDataRes);
+         return requestReply(message).thenApply(DomainMessage::getDecodeDataRes);
      }
  
-     public CompletableFuture<FromDomain.RecoverSignerResponse> recoverSigner(FromDomain.RecoverSignerRequest request) {
-         Service.DomainMessage message = Service.DomainMessage.newBuilder().
+     public CompletableFuture<RecoverSignerResponse> recoverSigner(RecoverSignerRequest request) {
+         DomainMessage message = DomainMessage.newBuilder().
                  setHeader(newRequestHeader()).
                  setRecoverSigner(request).
                  build();
-         return requestReply(message).thenApply(Service.DomainMessage::getRecoverSignerRes);
+         return requestReply(message).thenApply(DomainMessage::getRecoverSignerRes);
      }
  
      @Override
-     final StreamObserver<Service.DomainMessage> connect(StreamObserver<Service.DomainMessage> observer) {
+     final StreamObserver<DomainMessage> connect(StreamObserver<DomainMessage> observer) {
          LOGGER.info("connecting domain gRPC to Paladin");
          return stub.connectDomain(observer);
      }
  
      @Override
-     final Service.Header getHeader(Service.DomainMessage domainMessage) {
+     final Header getHeader(DomainMessage domainMessage) {
          return domainMessage.getHeader();
      }
  
      @Override
-     final Service.DomainMessage buildMessage(Service.Header header) {
-         return Service.DomainMessage.newBuilder().setHeader(header).build();
+     final DomainMessage buildMessage(Header header) {
+         return DomainMessage.newBuilder().setHeader(header).build();
      }
  
      @Override
-     final CompletableFuture<Service.DomainMessage> handleRequest(Service.DomainMessage request) {
+     final CompletableFuture<DomainMessage> handleRequest(DomainMessage request) {
          LOGGER.info("JAVA_PLUGIN_REQUEST - pluginId={} type={} msgId={}", pluginId, request.getRequestToDomainCase().toString(), request.getHeader().getMessageId());
-         Service.DomainMessage.Builder response = Service.DomainMessage.newBuilder();
+         DomainMessage.Builder response = DomainMessage.newBuilder();
          try {
              CompletableFuture<?> resultApplied = switch (request.getRequestToDomainCase()) {
                  case CONFIGURE_DOMAIN -> configureDomain(request.getConfigureDomain()).thenApply(response::setConfigureDomainRes);
@@ -117,6 +119,8 @@
                  case INIT_CALL -> initCall(request.getInitCall()).thenApply(response::setInitCallRes);
                  case EXEC_CALL -> execCall(request.getExecCall()).thenApply(response::setExecCallRes);
                  case BUILD_RECEIPT -> buildReceipt(request.getBuildReceipt()).thenApply(response::setBuildReceiptRes);
+                 case INIT_PRIVACY_GROUP -> initPrivacyGroup(request.getInitPrivacyGroup()).thenApply(response::setInitPrivacyGroupRes);
+                 case WRAP_PRIVACY_GROUP_TRANSACTION -> wrapPrivacyGroupTransaction(request.getWrapPrivacyGroupTransaction()).thenApply(response::setWrapPrivacyGroupTransactionRes);
                  default -> throw new IllegalArgumentException("unknown request: %s".formatted(request.getRequestToDomainCase()));
              };
              return resultApplied.thenApply((ra) -> {

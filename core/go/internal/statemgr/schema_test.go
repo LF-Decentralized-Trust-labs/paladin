@@ -33,9 +33,38 @@ func TestGetSchemaNotFoundNil(t *testing.T) {
 
 	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{}))
 
-	s, err := ss.GetSchema(ctx, ss.p.NOTX(), "domain1", tktypes.Bytes32Keccak(([]byte)("test")), false)
+	s, err := ss.GetSchemaByID(ctx, ss.p.NOTX(), "domain1", tktypes.Bytes32Keccak(([]byte)("test")), false)
 	require.NoError(t, err)
 	assert.Nil(t, s)
+}
+
+func mockGetSchemaOK(mdb sqlmock.Sqlmock) {
+	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{
+		"id",
+		"type",
+		"domain",
+		"definition",
+	}).AddRow(
+		tktypes.RandBytes32(),
+		pldapi.SchemaTypeABI.Enum(),
+		"domain1",
+		`{
+		  "type": "tuple",
+		  "internalType": "struct MyType;",
+		  "components": []
+		}`,
+	))
+}
+
+func TestGetSchemaK(t *testing.T) {
+	ctx, ss, mdb, _, done := newDBMockStateManager(t)
+	defer done()
+
+	mockGetSchemaOK(mdb)
+
+	s, err := ss.GetSchemaByID(ctx, ss.p.NOTX(), "domain1", tktypes.Bytes32Keccak(([]byte)("test")), false)
+	require.NoError(t, err)
+	assert.NotNil(t, s)
 }
 
 func TestGetSchemaNotFoundError(t *testing.T) {
@@ -44,7 +73,7 @@ func TestGetSchemaNotFoundError(t *testing.T) {
 
 	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{}))
 
-	_, err := ss.GetSchema(ctx, ss.p.NOTX(), "domain1", tktypes.Bytes32Keccak(([]byte)("test")), true)
+	_, err := ss.GetSchemaByID(ctx, ss.p.NOTX(), "domain1", tktypes.Bytes32Keccak(([]byte)("test")), true)
 	assert.Regexp(t, "PD010106", err)
 }
 

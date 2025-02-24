@@ -840,3 +840,59 @@ func (d *domain) GetStatesByID(ctx context.Context, req *prototk.GetStatesByIDRe
 		States: toProtoStates(states),
 	}, err
 }
+
+func (d *domain) InitPrivacyGroup(ctx context.Context, pgInput *pldapi.PrivacyGroupInput) (tx *components.PreparedGroupInitTransaction, err error) {
+
+	// This one is a straight forward pass-through to the domain - the Privacy Group manager does the
+	// hard work in validating the data returned against the genesis ABI spec returned.
+	res, err := d.api.InitPrivacyGroup(ctx, &prototk.InitPrivacyGroupRequest{
+		PropertiesJson:    pgInput.Properties.String(),
+		PropertiesAbiJson: tktypes.JSONString(pgInput.PropertiesABI).String(),
+		Members:           pgInput.Members,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var abiSchema abi.Parameter
+	if err := json.Unmarshal([]byte(res.GenesisAbiStateSchemaJson), &abiSchema); err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgDomainInvalidPGroupGenesisABI)
+	}
+
+	signer := ""
+	if res.Transaction.RequiredSigner != nil {
+		signer = *res.Transaction.RequiredSigner
+	}
+	txType := pldapi.TransactionTypePrivate.Enum()
+	if res.Transaction.Type == prototk.PreparedTransaction_PUBLIC {
+		txType = pldapi.TransactionTypePublic.Enum()
+	}
+
+	var functionABI abi.Entry
+	if err := json.Unmarshal(([]byte)(res.Transaction.FunctionAbiJson), &functionABI); err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
+	}
+	var optionalContractAddr *tktypes.EthAddress
+	if res.Transaction.ContractAddress != nil {
+		optionalContractAddr, err = tktypes.ParseEthAddress(*res.Transaction.ContractAddress)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &components.PreparedGroupInitTransaction{
+		TX: &pldapi.TransactionInput{
+			TransactionBase: pldapi.TransactionBase{
+				From:   signer,
+				To:     optionalContractAddr,
+				Type:   txType,
+				Data:   tktypes.RawJSON(res.Transaction.ParamsJson),
+				Domain: d.name,
+			},
+			ABI: abi.ABI{&functionABI},
+		},
+		GenesisState:  tktypes.RawJSON(res.GenesisStateJson),
+		GenesisSchema: &abiSchema,
+	}, nil
+
+}

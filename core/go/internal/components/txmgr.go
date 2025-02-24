@@ -92,6 +92,7 @@ type TXManager interface {
 	DecodeCall(ctx context.Context, dbTX persistence.DBTX, callData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
 	DecodeEvent(ctx context.Context, dbTX persistence.DBTX, topics []tktypes.Bytes32, eventData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
 	SendTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
+	ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*ResolvedFunction, *abi.ComponentValue, tktypes.RawJSON, error)
 	PrepareTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (*pldapi.Transaction, error)
 	GetResolvedTransactionByID(ctx context.Context, id uuid.UUID) (*ResolvedTransaction, error) // cache optimized
@@ -109,7 +110,7 @@ type TXManager interface {
 	GetPreparedTransactionWithRefsByID(ctx context.Context, dbTX persistence.DBTX, id uuid.UUID) (*PreparedTransactionWithRefs, error)
 	QueryPreparedTransactions(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.PreparedTransaction, error)
 	QueryPreparedTransactionsWithRefs(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*PreparedTransactionWithRefs, error)
-	CallTransaction(ctx context.Context, result any, tx *pldapi.TransactionCall) (err error)
+	CallTransaction(ctx context.Context, dbTX persistence.DBTX, result any, tx *pldapi.TransactionCall) (err error)
 	UpsertABI(ctx context.Context, dbTX persistence.DBTX, a abi.ABI) (*pldapi.StoredABI, error)
 	CreateReceiptListener(ctx context.Context, spec *pldapi.TransactionReceiptListener) error
 	GetReceiptListener(ctx context.Context, name string) *pldapi.TransactionReceiptListener

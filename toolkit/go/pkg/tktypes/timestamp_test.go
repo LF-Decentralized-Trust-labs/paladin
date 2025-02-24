@@ -185,3 +185,10 @@ func TestTimestampParseValue(t *testing.T) {
 	assert.Regexp(t, "PD020018", err)
 
 }
+
+func TestParseTimeString(t *testing.T) {
+	require.Equal(t, int64(1621108144123000000), MustParseTimeString("2021-05-15T19:49:04.123Z").UnixNano())
+	assert.Panics(t, func() {
+		_ = MustParseTimeString(".... wrong")
+	})
+}
