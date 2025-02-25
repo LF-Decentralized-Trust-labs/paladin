@@ -22,7 +22,67 @@ import (
 )
 
 func (c *coordinator) selectNextTransaction(ctx context.Context) error {
-	selectableTransactions := c.getTransactionsInStates(ctx, []transaction.State{transaction.State_Pooled})
+	txn, err := c.transactionSelector.SelectNextTransaction(ctx)
+	if txn == nil || err != nil {
+		return err
+	}
+
+	transactionSelectedEvent := &transaction.SelectedEvent{}
+	transactionSelectedEvent.TransactionID = txn.ID
+	err = txn.HandleEvent(ctx, transactionSelectedEvent)
+	return err
+
+}
+
+/* Functions of the TransactionPool interface required by the transactionSelector */
+func (c *coordinator) GetPooledTransactionsBySenderNodeAndIdentity(ctx context.Context) map[string]map[string]*transaction.Transaction {
+	pooledTransactions := c.getTransactionsInStates(ctx, []transaction.State{transaction.State_Pooled})
+	transactionsBySenderNodeAndIdentity := make(map[string]map[string]*transaction.Transaction)
+	for _, txn := range pooledTransactions {
+
+		if _, ok := transactionsBySenderNodeAndIdentity[txn.SenderNode()]; !ok {
+			transactionsBySenderNodeAndIdentity[txn.SenderIdentity()] = make(map[string]*transaction.Transaction)
+		}
+		transactionsBySenderNodeAndIdentity[txn.SenderNode()][txn.SenderIdentity()] = txn
+	}
+	return transactionsBySenderNodeAndIdentity
+}
+
+func (c *coordinator) GetCommittee(ctx context.Context) map[string][]string {
+	return c.committee
+}
+
+// define the interface for the transaction selector algorithm
+// we inject into the algorithm a dependency that allows it to query the state of the transaction pool under the control of the coordinator
+type TransactionSelector interface {
+	SelectNextTransaction(ctx context.Context) (*transaction.Transaction, error)
+}
+
+// define the interface that the transaction selector algorithm uses to query the state of the transaction pool
+type TransactionPool interface {
+	//return a list of all transactions in that are in the State_Pooled state, keyed by the sender node and identifier
+	GetPooledTransactionsBySenderNodeAndIdentity(ctx context.Context) map[string]map[string]*transaction.Transaction
+
+	//return a list of all members of the committee organized by their node identity
+	GetCommittee(ctx context.Context) map[string][]string
+}
+
+type transactionSelector struct {
+	transactionPool TransactionPool
+	nextNodeIndex   int
+	nextSenderIndex int
+}
+
+func NewTransactionSelector(ctx context.Context, transactionPool TransactionPool) TransactionSelector {
+
+	return &transactionSelector{
+		nextNodeIndex:   0,
+		nextSenderIndex: 0,
+		transactionPool: transactionPool,
+	}
+}
+
+func (ts *transactionSelector) SelectNextTransaction(ctx context.Context) (*transaction.Transaction, error) {
 
 	//Super simple algorithm for fair (across senders) selection algorithm that biases against transaction from a sender that is unresponsive or has been tending to assemble transactions that are not getting endorsed
 	//Transactions get added to the queue when they enter the State_Pooled state
@@ -33,14 +93,18 @@ func (c *coordinator) selectNextTransaction(ctx context.Context) error {
 
 	//NOTE This algorithm currently only biases against the current transaction for each faulty sender.  As soon as that transaction is successful, the next transaction from the same sender is treated just like any other transaction.
 
+	selectableTransactionsMap := ts.transactionPool.GetPooledTransactionsBySenderNodeAndIdentity(ctx)
+	selectableTransactions := make([]*transaction.Transaction, 0)
+	for _, transactions := range selectableTransactionsMap {
+		for _, transaction := range transactions {
+			selectableTransactions = append(selectableTransactions, transaction)
+		}
+	}
+
 	if len(selectableTransactions) > 0 {
 		selectedTransaction := selectableTransactions[0]
-		transactionSelectedEvent := &transaction.SelectedEvent{}
-		transactionSelectedEvent.TransactionID = selectedTransaction.ID
 
-		err := selectedTransaction.HandleEvent(ctx, transactionSelectedEvent)
-		return err
+		return selectedTransaction, nil
 	}
-	return nil
-
+	return nil, nil
 }

@@ -27,23 +27,25 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	mock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
 )
 
 func TestStateMachine_InitializeOK(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 
 	assert.Equal(t, State_Idle, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
 
 func TestStateMachine_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	sender := "sender@senderNode"
+	c, _ := NewCoordinatorForUnitTest(t, ctx, []string{sender})
 	assert.Equal(t, State_Idle, c.stateMachine.currentState)
 
 	c.HandleEvent(ctx, &TransactionsDelegatedEvent{
-		Sender:       "sender",
+		Sender:       sender,
 		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
 	})
 
@@ -53,7 +55,7 @@ func TestStateMachine_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 
 func TestStateMachine_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	assert.Equal(t, State_Idle, c.stateMachine.currentState)
 
 	c.HandleEvent(ctx, &HeartbeatReceivedEvent{})
@@ -64,13 +66,14 @@ func TestStateMachine_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 
 func TestStateMachine_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	sender := "sender@senderNode"
+	c, _ := NewCoordinatorForUnitTest(t, ctx, []string{sender})
 	c.stateMachine.currentState = State_Observing
 	c.currentBlockHeight = 194 // default tolerance is 5 in the test setup so this is behind
 	c.activeCoordinatorBlockHeight = 200
 
 	c.HandleEvent(ctx, &TransactionsDelegatedEvent{
-		Sender:       "sender",
+		Sender:       sender,
 		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
 	})
 
@@ -79,7 +82,8 @@ func TestStateMachine_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 
 func TestStateMachine_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
-	c, mocks := NewCoordinatorForUnitTest(t, ctx)
+	sender := "sender@senderNode"
+	c, mocks := NewCoordinatorForUnitTest(t, ctx, []string{sender})
 	mocks.messageSender.On("SendHandoverRequest", mock.Anything, "activeCoordinator", c.contractAddress).Return()
 	c.stateMachine.currentState = State_Observing
 	c.activeCoordinator = "activeCoordinator"
@@ -97,7 +101,7 @@ func TestStateMachine_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 
 func TestStateMachine_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
-	c, mocks := NewCoordinatorForUnitTest(t, ctx)
+	c, mocks := NewCoordinatorForUnitTest(t, ctx, nil)
 	mocks.messageSender.On("SendHandoverRequest", mock.Anything, "activeCoordinator", c.contractAddress).Return()
 	c.stateMachine.currentState = State_Standby
 	c.activeCoordinator = "activeCoordinator"
@@ -113,7 +117,7 @@ func TestStateMachine_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 
 func TestStateMachine_StandbyNot_ToElect_OnNewBlock_IfStillBehind(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Standby
 	c.currentBlockHeight = 193
 	c.activeCoordinatorBlockHeight = 200
@@ -127,7 +131,7 @@ func TestStateMachine_StandbyNot_ToElect_OnNewBlock_IfStillBehind(t *testing.T) 
 
 func TestStateMachine_Elect_ToPrepared_OnHandover(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Elect
 
 	c.HandleEvent(ctx, &HandoverReceivedEvent{})
@@ -137,7 +141,7 @@ func TestStateMachine_Elect_ToPrepared_OnHandover(t *testing.T) {
 
 func TestStateMachine_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Prepared
 	c.activeCoordinator = "activeCoordinator"
 	flushPointTransactionID := uuid.New()
@@ -168,7 +172,7 @@ func TestStateMachine_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(
 
 func TestStateMachine_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushCompleted(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Prepared
 	c.activeCoordinator = "activeCoordinator"
 	flushPointTransactionID := uuid.New()
@@ -200,7 +204,7 @@ func TestStateMachine_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushComp
 
 func TestStateMachine_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFlight(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Active
 
 	soleTransaction := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
@@ -221,7 +225,7 @@ func TestStateMachine_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFli
 
 func TestStateMachine_ActiveNoTransition_OnTransactionConfirmed_IfNotTransactionsEmpty(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Active
 
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
@@ -243,7 +247,7 @@ func TestStateMachine_ActiveNoTransition_OnTransactionConfirmed_IfNotTransaction
 
 func TestStateMachine_Active_ToFlush_OnHandoverRequest(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Active
 
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
@@ -263,7 +267,7 @@ func TestStateMachine_Active_ToFlush_OnHandoverRequest(t *testing.T) {
 
 func TestStateMachine_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Flush
 
 	//We have 2 transactions in flight but only of them has passed the point of no return so we
@@ -287,7 +291,7 @@ func TestStateMachine_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *
 
 func TestStateMachine_FlushNoTransition_OnTransactionConfirmed_IfNotFlushComplete(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Flush
 
 	//We have 2 transactions in flight and passed the point of no return but only one of them will be confirmed so we should not
@@ -312,7 +316,7 @@ func TestStateMachine_FlushNoTransition_OnTransactionConfirmed_IfNotFlushComplet
 
 func TestStateMachine_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExpired(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Closing
 
 	d := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
@@ -330,7 +334,7 @@ func TestStateMachine_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExp
 
 func TestStateMachine_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGracePeriodExpired(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx)
+	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Closing
 
 	d := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
@@ -369,7 +373,7 @@ type coordinatorDependencyMocks struct {
 	stateIntegration *sequencermocks.StateIntegration
 }
 
-func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context) (*coordinator, *coordinatorDependencyMocks) {
+func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, committeeMembers []string) (*coordinator, *coordinatorDependencyMocks) {
 
 	mocks := &coordinatorDependencyMocks{
 		messageSender:    NewMockMessageSender(t),
@@ -377,6 +381,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context) (*coordinator,
 		stateIntegration: sequencermocks.NewStateIntegration(t),
 	}
 
-	coordinator := NewCoordinator(ctx, mocks.messageSender, mocks.clock, mocks.stateIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, tktypes.RandAddress(), 5, 5)
+	coordinator, err := NewCoordinator(ctx, mocks.messageSender, committeeMembers, mocks.clock, mocks.stateIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, tktypes.RandAddress(), 5, 5)
+	require.NoError(t, err)
 	return coordinator, mocks
 }

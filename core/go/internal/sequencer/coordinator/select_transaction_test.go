@@ -32,7 +32,7 @@ func TestSelectTransaction_PreserveOrderWithinSender(t *testing.T) {
 	ctx := context.Background()
 	testSender := "alice@node1"
 
-	coordinator, mocks := NewCoordinatorForUnitTest(t, ctx)
+	coordinator, mocks := NewCoordinatorForUnitTest(t, ctx, []string{testSender})
 
 	// send a significant number of transactions from the same sender so that we don't luckily get the right order
 	txns := newPrivateTransactionsForTesting(coordinator.contractAddress, 5)
@@ -94,7 +94,7 @@ func TestSelectTransaction_SlowQueue(t *testing.T) {
 	testSenderC := "carol@node3"
 	testSenderD := "dave@node4"
 
-	coordinator, mocks := NewCoordinatorForUnitTest(t, ctx)
+	coordinator, mocks := NewCoordinatorForUnitTest(t, ctx, []string{testSenderA, testSenderB, testSenderC, testSenderD})
 
 	// first transaction from sender B fails to assemble. It should be placed at the end of the slow queue.
 	// so we get through the second transaction from other senders before coming back that transaction
@@ -190,7 +190,7 @@ func TestSelectTransaction_FairnessAcrossSenders(t *testing.T) {
 	testSenderC := "carol@node3"
 	testSenderD := "dave@node4"
 
-	coordinator, mocks := NewCoordinatorForUnitTest(t, ctx)
+	coordinator, mocks := NewCoordinatorForUnitTest(t, ctx, []string{testSenderA, testSenderB, testSenderC, testSenderD})
 
 	// first transaction from sender A fails to assemble. It should be placed at the end of the slow queue.
 	// so we get through the second transaction from other senders before coming back that transaction

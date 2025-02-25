@@ -46,14 +46,18 @@ type coordinator struct {
 	closingGracePeriod   int // expressed as a multiple of heartbeat intervals
 	requestTimeout       common.Duration
 	assembleTimeout      common.Duration
+	committee            map[string][]string
 
 	/* Dependencies */
 	messageSender    MessageSender
 	clock            common.Clock
 	stateIntegration common.StateIntegration
+
+	/*Algorithms*/
+	transactionSelector TransactionSelector
 }
 
-func NewCoordinator(ctx context.Context, messageSender MessageSender, clock common.Clock, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, blockRangeSize uint64, contractAddress *tktypes.EthAddress, blockHeightTolerance uint64, closingGracePeriod int) *coordinator {
+func NewCoordinator(ctx context.Context, messageSender MessageSender, committeeMembers []string, clock common.Clock, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, blockRangeSize uint64, contractAddress *tktypes.EthAddress, blockHeightTolerance uint64, closingGracePeriod int) (*coordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
 		transactionsByID:                   make(map[uuid.UUID]*transaction.Transaction),
@@ -68,8 +72,31 @@ func NewCoordinator(ctx context.Context, messageSender MessageSender, clock comm
 		assembleTimeout:                    assembleTimeout,
 		stateIntegration:                   stateIntegration,
 	}
+	c.committee = make(map[string][]string)
+	for _, member := range committeeMembers {
+		memberLocator := tktypes.PrivateIdentityLocator(member)
+		memberNode, err := memberLocator.Node(ctx, false)
+		if err != nil {
+			log.L(ctx).Errorf("Error resolving node for member %s: %v", member, err)
+			return nil, err
+		}
+
+		memberIdentity, err := memberLocator.Identity(ctx)
+		if err != nil {
+			log.L(ctx).Errorf("Error resolving identity for member %s: %v", member, err)
+			return nil, err
+		}
+
+		if _, ok := c.committee[memberNode]; !ok {
+			c.committee[memberNode] = make([]string, 0)
+		}
+
+		c.committee[memberNode] = append(c.committee[memberNode], memberIdentity)
+
+	}
 	c.InitializeStateMachine(State_Idle)
-	return c
+	c.transactionSelector = NewTransactionSelector(ctx, c)
+	return c, nil
 
 }
 
@@ -78,7 +105,7 @@ func (c *coordinator) sendHandoverRequest(ctx context.Context) {
 }
 
 // TODO consider renaming to setDelegatedTransactionsForSender to make it clear that we expect senders to include all inflight transactions in every delegation request and therefore this is
-// a replace, not an add.  Need to finalize the decision about whether we expect the sender to include all infight delegated transactions in every delegation request. Currently the code assumes we do so need to make the spec clear on that point and
+// a replace, not an add.  Need to finalize the decision about whether we expect the sender to include all inflight delegated transactions in every delegation request. Currently the code assumes we do so need to make the spec clear on that point and
 // record a decision record to explain why.  Every  time we come back to this point, we will be tempted to reverse that decision so we need to make sure we have a record of the known consequences.
 func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender string, transactions []*components.PrivateTransaction) error {
 
