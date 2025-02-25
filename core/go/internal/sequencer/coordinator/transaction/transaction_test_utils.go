@@ -266,7 +266,11 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		}
 	}
 
-	b.txn = NewTransaction(b.sender.identity, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeStateIntegration, b.fakeClock.Duration(b.requestTimeout), b.fakeClock.Duration(b.assembleTimeout), b.grapher, nil)
+	txn, err := NewTransaction(ctx, b.sender.identityLocator, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeStateIntegration, b.fakeClock.Duration(b.requestTimeout), b.fakeClock.Duration(b.assembleTimeout), b.grapher, nil)
+	if err != nil {
+		panic(fmt.Sprintf("Error from NewTransaction: %v", err))
+	}
+	b.txn = txn
 
 	if b.predefinedDependencies != nil {
 		b.txn.PreAssembly.Dependencies = append(b.txn.PreAssembly.Dependencies, b.predefinedDependencies...)

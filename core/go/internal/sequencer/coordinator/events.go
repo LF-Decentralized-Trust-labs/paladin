@@ -34,7 +34,7 @@ func (_ *CoordinatorStateEventActivated) Type() EventType {
 }
 
 type TransactionsDelegatedEvent struct {
-	Sender             string
+	Sender             string // Fully qualified identity locator for the sender
 	Transactions       []*components.PrivateTransaction
 	SendersBlockHeight uint64
 }

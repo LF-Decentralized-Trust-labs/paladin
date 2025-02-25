@@ -32,8 +32,9 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 	messageSender := NewMockMessageSender(t)
 	clock := &common.FakeClockForTesting{}
 	stateIntegration := sequencermocks.NewStateIntegration(t)
-	txn := NewTransaction(
-		uuid.NewString(),
+	txn, err := NewTransaction(
+		ctx,
+		"sender@node1",
 		&components.PrivateTransaction{
 			ID: uuid.New(),
 		},
@@ -45,6 +46,8 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 		NewGrapher(ctx),
 		nil,
 	)
+	assert.NoError(t, err)
+	assert.NotNil(t, txn)
 
 	assert.Equal(t, State_Initial, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }

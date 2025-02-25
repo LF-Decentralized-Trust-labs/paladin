@@ -50,7 +50,9 @@ type endorsementRequirement struct {
 // Transaction represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
 type Transaction struct {
 	*components.PrivateTransaction
-	sender               string //TODO what is this?  A node? An identity? An identity locator?
+	sender               string
+	senderIdentity       string
+	senderNode           string
 	signerAddress        *tktypes.EthAddress
 	latestSubmissionHash *tktypes.Bytes32
 	nonce                *uint64
@@ -82,9 +84,16 @@ type Transaction struct {
 // TODO think about naming of this compared to the OnTransitionTo func in the state machine
 type OnStateTransition func(ctx context.Context, t *Transaction, to, from State) // function to be invoked when transitioning into this state.  Called after transitioning event has been applied and any actions have fired
 
-func NewTransaction(sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, grapher Grapher, onStateTransition OnStateTransition) *Transaction {
+func NewTransaction(ctx context.Context, sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, grapher Grapher, onStateTransition OnStateTransition) (*Transaction, error) {
+	senderIdentity, senderNode, err := tktypes.PrivateIdentityLocator(sender).Validate(ctx, "", false)
+	if err != nil {
+		log.L(ctx).Errorf("Error validating sender %s: %s", sender, err)
+		return nil, err
+	}
 	txn := &Transaction{
 		sender:             sender,
+		senderIdentity:     senderIdentity,
+		senderNode:         senderNode,
 		PrivateTransaction: pt,
 		messageSender:      messageSender,
 		clock:              clock,
@@ -96,7 +105,7 @@ func NewTransaction(sender string, pt *components.PrivateTransaction, messageSen
 	}
 	txn.InitializeStateMachine(State_Initial)
 	grapher.Add(context.Background(), txn)
-	return txn
+	return txn, nil
 }
 
 func (t *Transaction) cleanup(_ context.Context) error {
@@ -208,6 +217,14 @@ func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *compo
 
 func (t *Transaction) Sender() string {
 	return t.sender
+}
+
+func (t *Transaction) SenderNode() string {
+	return t.senderNode
+}
+
+func (t *Transaction) SenderIdentity() string {
+	return t.senderIdentity
 }
 
 func (d *Transaction) IsEndorsed(ctx context.Context) bool {

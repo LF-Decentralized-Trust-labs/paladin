@@ -41,7 +41,7 @@ func (c *coordinator) GetPooledTransactionsBySenderNodeAndIdentity(ctx context.C
 	for _, txn := range pooledTransactions {
 
 		if _, ok := transactionsBySenderNodeAndIdentity[txn.SenderNode()]; !ok {
-			transactionsBySenderNodeAndIdentity[txn.SenderIdentity()] = make(map[string]*transaction.Transaction)
+			transactionsBySenderNodeAndIdentity[txn.SenderNode()] = make(map[string]*transaction.Transaction)
 		}
 		transactionsBySenderNodeAndIdentity[txn.SenderNode()][txn.SenderIdentity()] = txn
 	}

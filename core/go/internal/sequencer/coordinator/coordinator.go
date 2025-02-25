@@ -107,13 +107,15 @@ func (c *coordinator) sendHandoverRequest(ctx context.Context) {
 // TODO consider renaming to setDelegatedTransactionsForSender to make it clear that we expect senders to include all inflight transactions in every delegation request and therefore this is
 // a replace, not an add.  Need to finalize the decision about whether we expect the sender to include all inflight delegated transactions in every delegation request. Currently the code assumes we do so need to make the spec clear on that point and
 // record a decision record to explain why.  Every  time we come back to this point, we will be tempted to reverse that decision so we need to make sure we have a record of the known consequences.
+// sender must be a fully qualified identity locator otherwise an error will be returned
 func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender string, transactions []*components.PrivateTransaction) error {
 
 	//TODO should remove any transactions from the same sender that we already have but are not in this list
 
 	var previousTransaction *transaction.Transaction
 	for _, txn := range transactions {
-		newTransaction := transaction.NewTransaction(
+		newTransaction, err := transaction.NewTransaction(
+			ctx,
 			sender,
 			txn,
 			c.messageSender,
@@ -127,6 +129,10 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 				log.L(ctx).Debugf("Transaction %s moved from %s to %s", t.ID.String(), from.String(), to.String())
 
 			})
+		if err != nil {
+			log.L(ctx).Errorf("Error creating transaction: %v", err)
+			return err
+		}
 
 		if previousTransaction != nil {
 			newTransaction.SetPreviousTransaction(ctx, previousTransaction)
@@ -137,7 +143,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 
 		receivedEvent := &transaction.ReceivedEvent{}
 		receivedEvent.TransactionID = txn.ID
-		err := c.transactionsByID[txn.ID].HandleEvent(context.Background(), receivedEvent)
+		err = c.transactionsByID[txn.ID].HandleEvent(context.Background(), receivedEvent)
 		if err != nil {
 			log.L(ctx).Errorf("Error handling ReceivedEvent for transaction %s: %v", txn.ID.String(), err)
 			return err

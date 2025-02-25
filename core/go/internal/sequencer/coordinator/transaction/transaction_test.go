@@ -16,6 +16,7 @@ package transaction
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -23,6 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTransaction_HasDependenciesNotReady_FalseIfNoDependencies(t *testing.T) {
@@ -203,8 +205,9 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		clock:            &common.FakeClockForTesting{},
 		stateIntegration: sequencermocks.NewStateIntegration(t),
 	}
-	txn := NewTransaction(
-		uuid.NewString(),
+	txn, err := NewTransaction(
+		context.Background(),
+		fmt.Sprintf("%s@%s", uuid.NewString(), uuid.NewString()),
 		&components.PrivateTransaction{
 			ID: uuid.New(),
 		},
@@ -217,6 +220,7 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		func(ctx context.Context, txn *Transaction, from, to State) {
 		},
 	)
+	require.NoError(t, err)
 
 	return txn, mocks
 

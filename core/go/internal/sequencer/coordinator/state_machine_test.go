@@ -91,7 +91,7 @@ func TestStateMachine_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 	c.activeCoordinatorBlockHeight = 200
 
 	c.HandleEvent(ctx, &TransactionsDelegatedEvent{
-		Sender:       "sender",
+		Sender:       sender,
 		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
 	})
 
@@ -375,6 +375,9 @@ type coordinatorDependencyMocks struct {
 
 func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, committeeMembers []string) (*coordinator, *coordinatorDependencyMocks) {
 
+	if committeeMembers == nil {
+		committeeMembers = []string{"member1@node1"}
+	}
 	mocks := &coordinatorDependencyMocks{
 		messageSender:    NewMockMessageSender(t),
 		clock:            &common.FakeClockForTesting{},
