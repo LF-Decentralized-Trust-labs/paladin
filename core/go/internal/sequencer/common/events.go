@@ -17,6 +17,17 @@ package common
 
 type EventType int
 
+const (
+	Event_HeartbeatInterval EventType = iota // emitted on a regular basis, interval defined by the sequencer config a
+)
+
 type Event interface {
 	Type() EventType
+}
+
+type HeartbeatIntervalEvent struct {
+}
+
+func (_ *HeartbeatIntervalEvent) Type() EventType {
+	return Event_HeartbeatInterval
 }

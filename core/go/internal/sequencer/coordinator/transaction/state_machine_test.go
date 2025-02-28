@@ -165,7 +165,7 @@ func TestStateMachine_Assembling_ToPooled_OnHeartbeat_IfAssembleTimeoutExpired(t
 
 	mocks.clock.Advance(txnBuilder.assembleTimeout + 1)
 
-	txn.HandleEvent(ctx, &HeartbeatIntervalEvent{})
+	txn.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
 
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.Equal(t, 1, txn.errorCount, "expected error count to be 1, but it was %d", txn.errorCount)

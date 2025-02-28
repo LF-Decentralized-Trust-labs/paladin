@@ -30,7 +30,7 @@ const (
 	State_Idle      State = iota //Not acting as a coordinator and not aware of any other active coordinators
 	State_Observing              //Not acting as a coordinator but aware of another node acting as a coordinator
 	State_Elect                  //Elected to take over from another coordinator and waiting for handover information
-	State_Standby                //
+	State_Standby                //TODO comments to describe these
 	State_Prepared
 	State_Active
 	State_Flush
@@ -38,7 +38,7 @@ const (
 )
 
 const (
-	Event_Activated EventType = iota
+	Event_Activated EventType = iota //TODO comments to describe these
 	Event_Nominated
 	Event_Flushed
 	Event_Closed
@@ -49,7 +49,7 @@ const (
 	Event_NewBlock
 	Event_HandoverRequestReceived
 	Event_HandoverReceived
-	Event_HeartbeatInterval
+	Event_TransactionStateTransition
 )
 
 type StateMachine struct {
@@ -143,7 +143,7 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 			},
 		},
 		State_Active: {
-			OnTransitionTo: nil,
+			OnTransitionTo: action_SelectTransaction,
 			Transitions: map[EventType][]Transition{
 				Event_TransactionConfirmed: {
 					{
@@ -172,7 +172,7 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 		State_Closing: {
 			OnTransitionTo: nil,
 			Transitions: map[EventType][]Transition{
-				Event_HeartbeatInterval: {
+				common.Event_HeartbeatInterval: {
 					{
 						To: State_Idle,
 						If: closingGracePeriodExpired,
@@ -193,9 +193,7 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) error {
 	case *TransactionsDelegatedEvent:
 		//TODO dependant on state?
 		err = c.addToDelegatedTransactions(ctx, event.Sender, event.Transactions)
-		if err == nil && sm.currentState == State_Active {
-			err = c.selectNextTransaction(ctx)
-		}
+
 	case *TransactionConfirmedEvent:
 		//This may be a confirmation of a transaction that we have have been coordinating or it may be one that another coordinator has been coordinating
 		//if the latter, then we may or may not know about it depending on whether we have seen a heartbeat from that coordinator since last time
@@ -208,10 +206,10 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) error {
 
 	case *transaction.AssembleSuccessEvent:
 		c.propagateEventToTransaction(ctx, event)
-		err = c.selectNextTransaction(ctx)
+
 	case *transaction.AssembleRevertResponseEvent:
 		c.propagateEventToTransaction(ctx, event)
-		err = c.selectNextTransaction(ctx)
+
 	case *TransactionDispatchConfirmedEvent:
 		c.propagateEventToTransaction(ctx, event)
 	case *NewBlockEvent:
@@ -222,9 +220,12 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) error {
 		for _, flushPoint := range event.FlushPoints {
 			c.activeCoordinatorsFlushPointsBySignerNonce[flushPoint.GetSignerNonce()] = flushPoint
 		}
-	case *HeartbeatIntervalEvent:
+	case *common.HeartbeatIntervalEvent:
 		//TODO send heartbeat message
+
 		c.heartbeatIntervalsSinceStateChange++
+		err = c.propagateEventToAllTransactions(ctx, event)
+
 	}
 
 	if err != nil {
@@ -261,6 +262,10 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) error {
 
 func action_SendHandoverRequest(ctx context.Context, c *coordinator, to, from State) {
 	c.sendHandoverRequest(ctx)
+}
+
+func action_SelectTransaction(ctx context.Context, c *coordinator, to, from State) {
+	c.selectNextTransaction(ctx, nil)
 }
 
 func (s *State) String() string {

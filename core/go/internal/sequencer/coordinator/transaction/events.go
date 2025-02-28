@@ -196,11 +196,13 @@ func (_ *DependencyReadyEvent) Type() EventType {
 	return Event_DependencyReady
 }
 
-// TODO should we really have a separate event for transaction scoped heartbeat? Or just update the transaction statemachine to handle the generic heartbeat event (which would need to move to common)
-type HeartbeatIntervalEvent struct {
+// events emitted by the transaction state machine whenever a state transition occurs
+type StateTransitionEvent struct {
 	event
+	FromState State
+	ToState   State
 }
 
-func (_ *HeartbeatIntervalEvent) Type() EventType {
-	return Event_HeartbeatInterval
+func (_ *StateTransitionEvent) Type() EventType {
+	return Event_StateTransition
 }

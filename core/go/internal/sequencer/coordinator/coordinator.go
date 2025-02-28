@@ -127,7 +127,19 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			func(ctx context.Context, t *transaction.Transaction, to, from transaction.State) {
 				//callback function to notify us when the transaction changes state
 				log.L(ctx).Debugf("Transaction %s moved from %s to %s", t.ID.String(), from.String(), to.String())
-
+				if c.stateMachine.currentState == State_Active {
+					if from == transaction.State_Assembling {
+						err := c.selectNextTransaction(ctx, &TransactionStateTransitionEvent{
+							TransactionID: t.ID,
+							From:          from,
+							To:            to,
+						})
+						if err != nil {
+							log.L(ctx).Errorf("Error selecting next transaction after transaction %s moved from %s to %s: %v", t.ID.String(), from.String(), to.String(), err)
+							//TODO figure out how to get this to the abend handler
+						}
+					}
+				}
 			})
 		if err != nil {
 			log.L(ctx).Errorf("Error creating transaction: %v", err)
@@ -159,6 +171,17 @@ func (c *coordinator) propagateEventToTransaction(ctx context.Context, event tra
 	} else {
 		log.L(ctx).Debugf("Ignoring Event because transaction not known to this coordinator %s", event.GetTransactionID().String())
 	}
+}
+
+func (c *coordinator) propagateEventToAllTransactions(ctx context.Context, event common.Event) error {
+	for _, txn := range c.transactionsByID {
+		err := txn.HandleEvent(ctx, event)
+		if err != nil {
+			log.L(ctx).Errorf("Error handling event %v for transaction %s: %v", event.Type(), txn.ID.String(), err)
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *coordinator) getTransactionsInStates(ctx context.Context, states []transaction.State) []*transaction.Transaction {

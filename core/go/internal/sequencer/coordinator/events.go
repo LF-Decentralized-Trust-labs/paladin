@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
@@ -103,9 +104,12 @@ func (_ *HandoverReceivedEvent) Type() EventType {
 	return Event_HandoverReceived
 }
 
-type HeartbeatIntervalEvent struct {
+type TransactionStateTransitionEvent struct {
+	TransactionID uuid.UUID
+	From          transaction.State
+	To            transaction.State
 }
 
-func (_ *HeartbeatIntervalEvent) Type() EventType {
-	return Event_HeartbeatInterval
+func (_ *TransactionStateTransitionEvent) Type() EventType {
+	return Event_TransactionStateTransition
 }

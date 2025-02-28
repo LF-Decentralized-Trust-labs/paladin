@@ -41,7 +41,14 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 func TestStateMachine_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
-	c, _ := NewCoordinatorForUnitTest(t, ctx, []string{sender})
+	c, mocks := NewCoordinatorForUnitTest(t, ctx, []string{sender})
+	mocks.messageSender.On("SendAssembleRequest",
+		mock.Anything, //context
+		mock.Anything, //assemblingNode
+		mock.Anything, //transactionID
+		mock.Anything, //idempotencyID
+		mock.Anything, //transactionPreassembly
+	).Return(nil).Maybe()
 	assert.Equal(t, State_Idle, c.stateMachine.currentState)
 
 	c.HandleEvent(ctx, &TransactionsDelegatedEvent{
@@ -326,7 +333,7 @@ func TestStateMachine_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExp
 	//one heartbeat interval away from the grace period expiring
 	c.heartbeatIntervalsSinceStateChange = 4
 
-	c.HandleEvent(ctx, &HeartbeatIntervalEvent{})
+	c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
 
 	assert.Equal(t, State_Idle, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
@@ -345,7 +352,7 @@ func TestStateMachine_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGraceP
 	//two heartbeat intervals away from the grace period expiring
 	c.heartbeatIntervalsSinceStateChange = 3
 
-	c.HandleEvent(ctx, &HeartbeatIntervalEvent{})
+	c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
 
 	assert.Equal(t, State_Closing, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
@@ -384,7 +391,10 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, committeeMembe
 		stateIntegration: sequencermocks.NewStateIntegration(t),
 	}
 
+	//TODO: should we use the fake message sender as we do in the transaction tests?
+
 	coordinator, err := NewCoordinator(ctx, mocks.messageSender, committeeMembers, mocks.clock, mocks.stateIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, tktypes.RandAddress(), 5, 5)
 	require.NoError(t, err)
+
 	return coordinator, mocks
 }

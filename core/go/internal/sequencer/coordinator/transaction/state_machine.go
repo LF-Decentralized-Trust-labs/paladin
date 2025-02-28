@@ -72,8 +72,7 @@ const (
 	Event_NonceAllocated                                // nonce allocated by the dispatcher thread
 	Event_Submitted                                     // submission made to the blockchain.  Each time this event is received, the submission hash is updated
 	Event_Confirmed                                     // confirmation received from the blockchain of either a successful or reverted transaction
-	Event_HeartbeatInterval                             // heartbeat interval has passed since the last state change or since the last heartbeat interval
-
+	Event_StateTransition                               // event emitted by the state machine when a state transition occurs.  TODO should this be a separate enum?
 )
 
 type StateMachine struct {
@@ -92,8 +91,8 @@ type Transition struct {
 
 // TODO is EventHandler the best name
 type EventHandler struct {
-	Validator   func(ctx context.Context, txn *Transaction, event Event) (bool, error) // function to validate whether the event is valid for the current state of the transaction.  This is optional.  If not defined, the event is always considered valid.
-	Transitions []Transition                                                           // list of transitions that this event could trigger.  The list is ordered so the first matching transition is the one that will be taken.
+	Validator   func(ctx context.Context, txn *Transaction, event common.Event) (bool, error) // function to validate whether the event is valid for the current state of the transaction.  This is optional.  If not defined, the event is always considered valid.
+	Transitions []Transition                                                                  // list of transitions that this event could trigger.  The list is ordered so the first matching transition is the one that will be taken.
 }
 
 type StateDefinition struct {
@@ -168,7 +167,7 @@ func stateDefinitions() map[State]StateDefinition {
 							On: action_NotifyDependentsOfAssembled,
 						}},
 				},
-				Event_HeartbeatInterval: {
+				common.Event_HeartbeatInterval: { //TODO if assemble timeout is much less than the heartbeat interval, this will not transition in a timely manner.  Could think about having a `tick` event that is defined to be a much smaller quantum of time than a heartbeat but not actually propagate events every tick unless we know there is a guard that it likely to hit true. Could end up more complex than it is worth so alternative would be to model the event as "timeoutPeriodPassed" and the guard as "noResponseReceived"
 					Transitions: []Transition{{
 						To: State_Pooled,
 						If: guard_AssembleTimeoutExceeded,
@@ -281,7 +280,7 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 
 // TODO break this out to 2 explicit steps a) applyEvent[InCurrentState] and b) evaluateTransition[ToNewState]
 // TODO refactor this so that we can have good unit tests for this function using a fake set of state definitions
-func (t *Transaction) HandleEvent(ctx context.Context, event Event) error {
+func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error {
 	sm := t.stateMachine
 
 	//Determine if and how this event applies in the current state and which, if any, transition it triggers
@@ -368,7 +367,7 @@ func (t *Transaction) HandleEvent(ctx context.Context, event Event) error {
 
 			// if there is a state change notification function, run it
 			if t.notifyOfTransition != nil {
-				t.notifyOfTransition(ctx, t, previousState, sm.currentState)
+				t.notifyOfTransition(ctx, t, sm.currentState, previousState)
 
 			}
 			t.heartbeatIntervalsSinceStateChange = 0

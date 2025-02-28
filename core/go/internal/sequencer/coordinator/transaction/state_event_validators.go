@@ -17,11 +17,13 @@ package transaction
 
 import (
 	"context"
+
+	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 )
 
 type EventValidator func(ctx context.Context, txn *Transaction, event Event) (bool, error)
 
-func validator_MatchesPendingAssembleRequest(ctx context.Context, txn *Transaction, event Event) (bool, error) {
+func validator_MatchesPendingAssembleRequest(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
 	//TODO is there some generics magic that would make this more elegant
 	switch event := event.(type) {
 	case *AssembleSuccessEvent:
@@ -32,7 +34,7 @@ func validator_MatchesPendingAssembleRequest(ctx context.Context, txn *Transacti
 	return false, nil
 }
 
-func validator_MatchesPendingDispatchConfirmationRequest(ctx context.Context, txn *Transaction, event Event) (bool, error) {
+func validator_MatchesPendingDispatchConfirmationRequest(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
 	switch event := event.(type) {
 	case *DispatchConfirmedEvent:
 		return txn.pendingDispatchConfirmationRequest != nil && txn.pendingDispatchConfirmationRequest.IdempotencyKey() == event.RequestID, nil
