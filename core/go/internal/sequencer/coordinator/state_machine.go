@@ -184,9 +184,25 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 
 }
 
-func (c *coordinator) HandleEvent(ctx context.Context, event Event) error {
+func (c *coordinator) HandleEvent(ctx context.Context, event common.Event) error {
 
-	sm := c.stateMachine
+	//Apply the event to the coordinator to update the internal state
+	// so that the guards and actions defined in the state machine can reference the new internal state of the coordinator
+	err := c.applyEvent(ctx, event)
+	if err != nil {
+		return err
+	}
+
+	//Determine whether this event triggers a state transition
+	err = c.evaluateTransitions(ctx, event)
+	return err
+
+}
+
+// Function applyEvent updates the internal state of the coordinator with information from the event
+// this happens before the state machine is evaluated for transitions that may be triggered by the event
+// so that any guards on the transition rules can take into account the new internal state of the coordinator after this event has been applied
+func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error {
 	var err error
 	// First apply the event to the update the internal fine grained state of the coordinator if there is any handler registered for the current state
 	switch event := event.(type) {
@@ -229,11 +245,14 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) error {
 	}
 
 	if err != nil {
-		log.L(ctx).Errorf("Error handling event %v: %v", event.Type(), err)
-		return err
+		log.L(ctx).Errorf("Error applying event %v: %v", event.Type(), err)
 	}
+	return err
+}
 
-	//Determine whether this event triggers a state transition
+func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Event) error {
+	sm := c.stateMachine
+
 	transitions := sm.stateDefinitions[sm.currentState].Transitions
 	if transitionRules, ok := transitions[event.Type()]; ok {
 		for _, rule := range transitionRules {
@@ -255,9 +274,7 @@ func (c *coordinator) HandleEvent(ctx context.Context, event Event) error {
 	} else {
 		log.L(ctx).Debugf("No transition for Event %v from State %s", event.Type(), sm.currentState.String())
 	}
-
 	return nil
-
 }
 
 func action_SendHandoverRequest(ctx context.Context, c *coordinator, to, from State) {

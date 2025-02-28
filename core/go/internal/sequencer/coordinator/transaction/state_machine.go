@@ -278,9 +278,28 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 	}
 }
 
-// TODO break this out to 2 explicit steps a) applyEvent[InCurrentState] and b) evaluateTransition[ToNewState]
 // TODO refactor this so that we can have good unit tests for this function using a fake set of state definitions
 func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error {
+
+	eventHandler, err := t.evaluateEvent(ctx, event)
+	if err != nil || eventHandler == nil {
+		return err
+	}
+
+	//If we get here, the state machine has defined a rule for handling this event in the current state and the event is deemed to be valid so we shall apply it to the transaction now
+	err = t.applyEvent(ctx, event)
+	if err != nil {
+		return err
+	}
+
+	//Determine whether this event triggers a state transition
+	err = t.evaluateTransitions(ctx, event, *eventHandler)
+	return err
+
+}
+
+// Function evaluateEvent evaluates whether the event is relevant given the current state of the transaction
+func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*EventHandler, error) {
 	sm := t.stateMachine
 
 	//Determine if and how this event applies in the current state and which, if any, transition it triggers
@@ -294,36 +313,45 @@ func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error
 				//This is an unexpected error.  If the event is invalid, the validator should return false and not an error
 				log.L(ctx).Errorf("Error validating event %v: %v", event.Type(), err)
 				//TODO abort
-				return err
+				return nil, err
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the transaction so we just ignore it and move on
 				log.L(ctx).Debugf("Event %v is not valid: %v", event.Type(), valid)
-				return nil
+				return nil, nil
 			}
 		}
+		return &eventHandler, nil
 	} else {
 		// no event handler defined for this event while in this state
 		log.L(ctx).Debugf("No event handler defined for Event %v in State %s", event.Type(), sm.currentState.String())
+		return nil, nil
 	}
 
-	//If we get here, the state machine has defined a rule for handling this event in the current state and the event is deemed to be valid so we shall apply it to the transaction now
+}
 
+// Function applyEvent updates the internal state of the Transaction with information from the event
+// this happens before the state machine is evaluated for transitions that may be triggered by the event
+// so that any guards on the transition rules can take into account the new internal state of the Transaction after this event has been applied
+func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error {
 	//TODO reconsider moving these back into the state machine definition.
+	var err error
 	switch event := event.(type) {
 	case *SelectedEvent:
 		//TODO
 	case *AssembleRequestSentEvent:
 		//TODO
 	case *AssembleSuccessEvent:
-		t.applyPostAssembly(ctx, event.PostAssembly)
-		t.writeLockAndDistributeStates(ctx)
+		err = t.applyPostAssembly(ctx, event.PostAssembly)
+		if err == nil {
+			err = t.writeLockAndDistributeStates(ctx)
+		}
 	case *AssembleRevertResponseEvent:
-		t.applyPostAssembly(ctx, event.PostAssembly)
+		err = t.applyPostAssembly(ctx, event.PostAssembly)
 	case *EndorsedEvent:
-		t.applyEndorsement(ctx, event.Endorsement, event.RequestID)
+		err = t.applyEndorsement(ctx, event.Endorsement, event.RequestID)
 	case *DispatchConfirmedEvent:
-		t.applyDispatchConfirmation(ctx, event.RequestID)
+		err = t.applyDispatchConfirmation(ctx, event.RequestID)
 	case *DispatchConfirmationRejectedEvent:
 		//TODO
 	case *CollectedEvent:
@@ -335,9 +363,12 @@ func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error
 	case *ConfirmedEvent:
 		//TODO
 	}
+	return err
+}
 
-	transitionRules := eventHandler.Transitions
-	for _, rule := range transitionRules {
+func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Event, eventHandler EventHandler) error {
+	sm := t.stateMachine
+	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
 			log.L(ctx).Infof("Transaction %s transitioning from %s to %s triggered by event %T", t.ID.String(), sm.currentState.String(), rule.To.String(), event)
 			previousState := sm.currentState
@@ -347,7 +378,7 @@ func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error
 			if rule.On != nil {
 				err := rule.On(ctx, t)
 				if err != nil {
-					//any recoverable errors should have been handled by the action function so this is a panic or at least, abort the coordinator for this contract
+					//any recoverable errors should have been handled by the action function
 					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
 					return err
 				}
@@ -357,7 +388,7 @@ func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error
 			if newStateDefinition.OnTransitionTo != nil {
 				err := newStateDefinition.OnTransitionTo(ctx, t)
 				if err != nil {
-					// any recoverable errors should have been handled by the OnTransitionTo function so this is a panic or at least, abort the coordinator for this contract
+					// any recoverable errors should have been handled by the OnTransitionTo function
 					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
 					return err
 				}
