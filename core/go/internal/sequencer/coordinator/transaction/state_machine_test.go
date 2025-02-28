@@ -56,11 +56,12 @@ func TestStateMachine_Initial_ToPooled_OnReceived_IfNoInflightDependencies(t *te
 	ctx := context.Background()
 	txn := NewTransactionBuilderForTesting(t, State_Pooled).Build()
 
-	txn.HandleEvent(ctx, &ReceivedEvent{
+	err := txn.HandleEvent(ctx, &ReceivedEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
@@ -84,11 +85,12 @@ func TestStateMachine_Initial_ToPreAssemblyBlocked_OnReceived_IfDependencyNotAss
 		PredefinedDependencies(txn1.ID)
 	txn2 := builder2.Build()
 
-	txn2.HandleEvent(ctx, &ReceivedEvent{
+	err := txn2.HandleEvent(ctx, &ReceivedEvent{
 		event: event{
 			TransactionID: txn2.ID,
 		},
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_PreAssembly_Blocked, txn2.stateMachine.currentState, "current state is %s", txn2.stateMachine.currentState.String())
 
@@ -100,11 +102,12 @@ func TestStateMachine_Initial_ToPreAssemblyBlocked_OnReceived_IfDependencyUnknow
 		PredefinedDependencies(uuid.New())
 	txn := builder.Build()
 
-	txn.HandleEvent(ctx, &ReceivedEvent{
+	err := txn.HandleEvent(ctx, &ReceivedEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_PreAssembly_Blocked, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 
@@ -115,11 +118,12 @@ func TestStateMachine_Pooled_ToAssembling_OnSelected(t *testing.T) {
 
 	txn, mocks := NewTransactionBuilderForTesting(t, State_Pooled).BuildWithMocks()
 
-	txn.HandleEvent(ctx, &SelectedEvent{
+	err := txn.HandleEvent(ctx, &SelectedEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.Equal(t, true, mocks.sentMessageRecorder.hasSentAssembleRequest, "expected an assemble request to be sent, but none were sent")
@@ -130,13 +134,14 @@ func TestStateMachine_Assembling_ToEndorsing_OnAssembleResponse(t *testing.T) {
 	txnBuilder := NewTransactionBuilderForTesting(t, State_Assembling)
 	txn, mocks := txnBuilder.BuildWithMocks()
 
-	txn.HandleEvent(ctx, &AssembleSuccessEvent{
+	err := txn.HandleEvent(ctx, &AssembleSuccessEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 		PostAssembly: txnBuilder.BuildPostAssembly(),
 		RequestID:    txn.pendingAssembleRequest.IdempotencyKey(),
 	})
+	assert.NoError(t, err)
 	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.Equal(t, 3, mocks.sentMessageRecorder.numberOfSentEndorsementRequests, "expected 3 endorsement requests to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentEndorsementRequests)
 	//TODO some assertions that WriteLockAndDistributeStatesForTransaction was called with the expected states
@@ -148,13 +153,14 @@ func TestStateMachine_Assembling_NoTransition_OnAssembleResponse_IfResponseDoesN
 	txnBuilder := NewTransactionBuilderForTesting(t, State_Assembling)
 	txn := txnBuilder.Build()
 
-	txn.HandleEvent(ctx, &AssembleSuccessEvent{
+	err := txn.HandleEvent(ctx, &AssembleSuccessEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 		PostAssembly: txnBuilder.BuildPostAssembly(),
 		RequestID:    uuid.New(), //generate a new random request ID so that it won't match the pending request
 	})
+	assert.NoError(t, err)
 	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
@@ -165,7 +171,8 @@ func TestStateMachine_Assembling_ToPooled_OnHeartbeat_IfAssembleTimeoutExpired(t
 
 	mocks.clock.Advance(txnBuilder.assembleTimeout + 1)
 
-	txn.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
+	err := txn.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.Equal(t, 1, txn.errorCount, "expected error count to be 1, but it was %d", txn.errorCount)
@@ -178,13 +185,14 @@ func TestStateMachine_Assembling_ToReverted_OnAssembleRevertResponse(t *testing.
 
 	txn := txnBuilder.Build()
 
-	txn.HandleEvent(ctx, &AssembleRevertResponseEvent{
+	err := txn.HandleEvent(ctx, &AssembleRevertResponseEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 		PostAssembly: txnBuilder.BuildPostAssembly(),
 		RequestID:    txn.pendingAssembleRequest.IdempotencyKey(),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Reverted, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
@@ -196,13 +204,14 @@ func TestStateMachine_Assembling_NoTransition_OnAssembleRevertResponse_IfRespons
 
 	txn := txnBuilder.Build()
 
-	txn.HandleEvent(ctx, &AssembleRevertResponseEvent{
+	err := txn.HandleEvent(ctx, &AssembleRevertResponseEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 		PostAssembly: txnBuilder.BuildPostAssembly(),
 		RequestID:    uuid.New(), //generate a new random request ID so that it won't match the pending request,
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
@@ -225,13 +234,14 @@ func TestStateMachine_Pooled_ToPreAssemblyBlocked_OnDependencyReverted(t *testin
 		PredefinedDependencies(txn1.ID)
 	txn2 := builder2.Build()
 
-	txn1.HandleEvent(ctx, &AssembleRevertResponseEvent{
+	err := txn1.HandleEvent(ctx, &AssembleRevertResponseEvent{
 		event: event{
 			TransactionID: txn1.ID,
 		},
 		PostAssembly: builder1.BuildPostAssembly(),
 		RequestID:    txn1.pendingAssembleRequest.IdempotencyKey(),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_PreAssembly_Blocked, txn2.stateMachine.currentState, "current state is %s", txn2.stateMachine.currentState.String())
 
@@ -244,7 +254,8 @@ func TestStateMachine_EndorsementGathering_ToConfirmingDispatch_OnEndorsed_IfAtt
 		NumberOfEndorsements(2)
 
 	txn, mocks := builder.BuildWithMocks()
-	txn.HandleEvent(ctx, builder.BuildEndorsedEvent(2))
+	err := txn.HandleEvent(ctx, builder.BuildEndorsedEvent(2))
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Confirming_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.True(t, mocks.sentMessageRecorder.hasSentDispatchConfirmationRequest, "expected a dispatch confirmation request to be sent, but none were sent")
@@ -259,7 +270,8 @@ func TestStateMachine_EndorsementGatheringNoTransition_IfNotAttestationPlanCompl
 
 	txn, mocks := builder.BuildWithMocks()
 
-	txn.HandleEvent(ctx, builder.BuildEndorsedEvent(1))
+	err := txn.HandleEvent(ctx, builder.BuildEndorsedEvent(1))
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.False(t, mocks.sentMessageRecorder.hasSentDispatchConfirmationRequest, "did not expected a dispatch confirmation request to be sent, but one was sent")
@@ -299,7 +311,8 @@ func TestStateMachine_EndorsementGathering_ToPooled_OnEndorseRejected(t *testing
 		NumberOfEndorsements(2)
 
 	txn := builder.Build()
-	txn.HandleEvent(ctx, builder.BuildEndorseRejectedEvent(2))
+	err := txn.HandleEvent(ctx, builder.BuildEndorseRejectedEvent(2))
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.Equal(t, 1, txn.errorCount, "expected error count to be 1, but it was %d", txn.errorCount)
@@ -310,12 +323,13 @@ func TestStateMachine_ConfirmingDispatch_ToReadyForDispatch_OnDispatchConfirmed(
 	ctx := context.Background()
 	txn := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).Build()
 
-	txn.HandleEvent(ctx, &DispatchConfirmedEvent{
+	err := txn.HandleEvent(ctx, &DispatchConfirmedEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 		RequestID: txn.pendingDispatchConfirmationRequest.IdempotencyKey(),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Ready_For_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
@@ -324,12 +338,13 @@ func TestStateMachine_ConfirmingDispatch_NoTransition_OnDispatchConfirmed_IfResp
 	ctx := context.Background()
 	txn := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch).Build()
 
-	txn.HandleEvent(ctx, &DispatchConfirmedEvent{
+	err := txn.HandleEvent(ctx, &DispatchConfirmedEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 		RequestID: uuid.New(),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Confirming_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
@@ -363,12 +378,13 @@ func TestStateMachine_Blocked_ToConfirmingDispatch_OnDependencyReady_IfNotHasDep
 	//Was in 2 minds whether to a) trigger transaction A indirectly by causing C to become ready via a dispatch confirmation event or b) trigger it directly by sending a dependency ready event
 	// decided on (a) as it is slightly less white box and less brittle to future refactoring of the implementation
 
-	txnC.HandleEvent(ctx, &DispatchConfirmedEvent{
+	err := txnC.HandleEvent(ctx, &DispatchConfirmedEvent{
 		event: event{
 			TransactionID: txnC.ID,
 		},
 		RequestID: txnC.pendingDispatchConfirmationRequest.IdempotencyKey(),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Confirming_Dispatch, txnA.stateMachine.currentState, "current state is %s", txnA.stateMachine.currentState.String())
 
@@ -402,12 +418,13 @@ func TestStateMachine_BlockedNoTransition_OnDependencyReady_IfHasDependenciesNot
 	//Was in 2 minds whether to a) trigger transaction A indirectly by causing B to become ready via a dispatch confirmation event or b) trigger it directly by sending a dependency ready event
 	// decided on (a) as it is slightly less white box and less brittle to future refactoring of the implementation
 
-	txnB.HandleEvent(ctx, &DispatchConfirmedEvent{
+	err := txnB.HandleEvent(ctx, &DispatchConfirmedEvent{
 		event: event{
 			TransactionID: txnB.ID,
 		},
 		RequestID: txnB.pendingDispatchConfirmationRequest.IdempotencyKey(),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Blocked, txnA.stateMachine.currentState, "current state is %s", txnA.stateMachine.currentState.String())
 
@@ -417,11 +434,12 @@ func TestStateMachine_ReadyForDispatch_ToDispatched_OnCollected(t *testing.T) {
 	ctx := context.Background()
 	txn := NewTransactionBuilderForTesting(t, State_Ready_For_Dispatch).Build()
 
-	txn.HandleEvent(ctx, &CollectedEvent{
+	err := txn.HandleEvent(ctx, &CollectedEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Dispatched, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 
@@ -431,11 +449,12 @@ func TestStateMachine_Dispatched_ToSubmitted_OnSubmitted(t *testing.T) {
 	ctx := context.Background()
 	txn := NewTransactionBuilderForTesting(t, State_Dispatched).Build()
 
-	txn.HandleEvent(ctx, &SubmittedEvent{
+	err := txn.HandleEvent(ctx, &SubmittedEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Submitted, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
@@ -444,11 +463,12 @@ func TestStateMachine_Submitted_ToConfirmed_OnConfirmed(t *testing.T) {
 	ctx := context.Background()
 	txn := NewTransactionBuilderForTesting(t, State_Submitted).Build()
 
-	txn.HandleEvent(ctx, &ConfirmedEvent{
+	err := txn.HandleEvent(ctx, &ConfirmedEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Confirmed, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }

@@ -525,12 +525,16 @@ func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
 			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
-		dependent.HandleEvent(ctx, &DependencyReadyEvent{
+		err := dependent.HandleEvent(ctx, &DependencyReadyEvent{
 			event: event{
 				TransactionID: dependent.ID,
 			},
 			DependencyID: t.ID,
 		})
+		if err != nil {
+			log.L(ctx).Errorf("Error notifying dependent transaction %s of readiness of transaction %s: %s", dependent.ID, t.ID, err)
+			return err
+		}
 	}
 	return nil
 }
@@ -542,12 +546,16 @@ func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 	for _, dependentID := range append(t.dependents, t.preAssembleDependents...) {
 		dependentTxn := t.grapher.TransactionByID(ctx, dependentID)
 		if dependentTxn != nil {
-			dependentTxn.HandleEvent(ctx, &DependencyRevertedEvent{
+			err := dependentTxn.HandleEvent(ctx, &DependencyRevertedEvent{
 				event: event{
 					TransactionID: dependentID,
 				},
 				DependencyID: t.ID,
 			})
+			if err != nil {
+				log.L(ctx).Errorf("Error notifying dependent transaction %s of revert of transaction %s: %s", dependentID, t.ID, err)
+				return err
+			}
 		} else {
 			//TODO can we Assume that the dependent is no longer in memory and doesn't need to know about this event?  Point to (write) the architecture doc that explains why this is safe
 

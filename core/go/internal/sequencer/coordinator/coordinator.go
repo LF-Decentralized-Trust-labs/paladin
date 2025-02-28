@@ -164,13 +164,13 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 	return nil
 }
 
-// TODO return error?
-func (c *coordinator) propagateEventToTransaction(ctx context.Context, event transaction.Event) {
+func (c *coordinator) propagateEventToTransaction(ctx context.Context, event transaction.Event) error {
 	if txn := c.transactionsByID[event.GetTransactionID()]; txn != nil {
-		txn.HandleEvent(ctx, event)
+		return txn.HandleEvent(ctx, event)
 	} else {
 		log.L(ctx).Debugf("Ignoring Event because transaction not known to this coordinator %s", event.GetTransactionID().String())
 	}
+	return nil
 }
 
 func (c *coordinator) propagateEventToAllTransactions(ctx context.Context, event common.Event) error {
@@ -227,7 +227,7 @@ func (c *coordinator) findTransactionBySignerNonce(ctx context.Context, signer *
 	return nil
 }
 
-func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, from *tktypes.EthAddress, nonce uint64, hash tktypes.Bytes32, revertReason tktypes.HexBytes) bool {
+func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, from *tktypes.EthAddress, nonce uint64, hash tktypes.Bytes32, revertReason tktypes.HexBytes) (bool, error) {
 	// First check whether it is one that we have been coordinating
 	if dispatchedTransaction := c.findTransactionBySignerNonce(ctx, from, nonce); dispatchedTransaction != nil {
 		if dispatchedTransaction.GetLatestSubmissionHash() == nil || *(dispatchedTransaction.GetLatestSubmissionHash()) != hash {
@@ -241,12 +241,14 @@ func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, from *tk
 			RevertReason: revertReason,
 		}
 		event.TransactionID = dispatchedTransaction.ID
-		dispatchedTransaction.HandleEvent(ctx, event)
-
-		return true
-
+		err := dispatchedTransaction.HandleEvent(ctx, event)
+		if err != nil {
+			log.L(ctx).Errorf("Error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
+			return false, err
+		}
+		return true, nil
 	}
-	return false
+	return false, nil
 
 }
 

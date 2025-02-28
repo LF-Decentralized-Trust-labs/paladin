@@ -42,17 +42,6 @@ const (
 	State_Confirmed             // "recently" confirmed on the base ledger.  NOTE: confirmed transactions are not held in memory for ever so getting a list of confirmed transactions will only return those confirmed recently
 )
 
-var allStates = []State{
-	State_Pooled,
-	State_Assembling,
-	State_Endorsement_Gathering,
-	State_Confirming_Dispatch,
-	State_Ready_For_Dispatch,
-	State_Dispatched,
-	State_Submitted,
-	State_Confirmed,
-}
-
 type EventType = common.EventType
 
 const (

@@ -62,10 +62,12 @@ type Transition struct {
 	If Guard
 }
 
-type OnTransitionTo func(ctx context.Context, c *coordinator, to, from State)
+// Actions can be specified for transition to a state either as the OnTransitionTo function that will run for all transitions to that state or as the On field in the Transition struct if the action applies
+// for a specific transition
+type Action func(ctx context.Context, c *coordinator) error
 
 type StateDefinition struct {
-	OnTransitionTo OnTransitionTo             // function to be invoked when transitioning into this state
+	OnTransitionTo Action                     // function to be invoked when transitioning into this state
 	Transitions    map[EventType][]Transition // rules to define when to exit this state and which state to transition to
 }
 
@@ -216,18 +218,23 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 		// we were loaded into memory
 		//TODO - we can't actually guarantee that we have all transactions we dispatched in memory.
 		//Even assuming that the public txmgr is in the same process (may not be true forever)  and assuming that we haven't been swapped out ( likely not to be true very soon) there is still a chance that the transaction was submitted to the base ledger, then the process restarted then we get the confirmation.				//When the process starts, we need to make sure that the coordinator is pre loaded with knowledge of all transactions that it has dispatched
-		if !c.confirmDispatchedTransaction(ctx, event.From, event.Nonce, event.Hash, event.RevertReason) {
+		isDispatchedTransaction, err := c.confirmDispatchedTransaction(ctx, event.From, event.Nonce, event.Hash, event.RevertReason)
+		if err != nil {
+			log.L(ctx).Errorf("Error confirming transaction From: %s , Nonce: %d, Hash: %v: %v", event.From, event.Nonce, event.Hash, err)
+			return err
+		}
+		if !isDispatchedTransaction {
 			c.confirmMonitoredTransaction(ctx, event.From, event.Nonce)
 		}
 
 	case *transaction.AssembleSuccessEvent:
-		c.propagateEventToTransaction(ctx, event)
+		err = c.propagateEventToTransaction(ctx, event)
 
 	case *transaction.AssembleRevertResponseEvent:
-		c.propagateEventToTransaction(ctx, event)
+		err = c.propagateEventToTransaction(ctx, event)
 
 	case *TransactionDispatchConfirmedEvent:
-		c.propagateEventToTransaction(ctx, event)
+		err = c.propagateEventToTransaction(ctx, event)
 	case *NewBlockEvent:
 		c.currentBlockHeight = event.BlockHeight
 	case *HeartbeatReceivedEvent:
@@ -257,15 +264,18 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 	if transitionRules, ok := transitions[event.Type()]; ok {
 		for _, rule := range transitionRules {
 			if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
-				log.L(context.Background()).Infof("Coordinator for %s transitioning from %s to %s triggered by event %T", c.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
+				log.L(ctx).Infof("Coordinator for %s transitioning from %s to %s triggered by event %T", c.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
 
-				fromState := sm.currentState
 				sm.currentState = rule.To
 				newStateDefinition := sm.stateDefinitions[sm.currentState]
 				if newStateDefinition.OnTransitionTo != nil {
-					newStateDefinition.OnTransitionTo(ctx, c, rule.To, fromState)
+					err := newStateDefinition.OnTransitionTo(ctx, c)
+					if err != nil {
+						log.L(ctx).Errorf("Error executing OnTransitionTo function for state %v: %v", sm.currentState, err)
+						return err
+					}
 				} else {
-					log.L(context.Background()).Debugf("No OnTransitionTo function defined for state %v", sm.currentState)
+					log.L(ctx).Debugf("No OnTransitionTo function defined for state %v", sm.currentState)
 				}
 				c.heartbeatIntervalsSinceStateChange = 0
 				break
@@ -277,12 +287,13 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 	return nil
 }
 
-func action_SendHandoverRequest(ctx context.Context, c *coordinator, to, from State) {
+func action_SendHandoverRequest(ctx context.Context, c *coordinator) error {
 	c.sendHandoverRequest(ctx)
+	return nil
 }
 
-func action_SelectTransaction(ctx context.Context, c *coordinator, to, from State) {
-	c.selectNextTransaction(ctx, nil)
+func action_SelectTransaction(ctx context.Context, c *coordinator) error {
+	return c.selectNextTransaction(ctx, nil)
 }
 
 func (s *State) String() string {
