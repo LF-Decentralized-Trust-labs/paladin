@@ -301,7 +301,6 @@ func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*E
 			if err != nil {
 				//This is an unexpected error.  If the event is invalid, the validator should return false and not an error
 				log.L(ctx).Errorf("Error validating event %v: %v", event.Type(), err)
-				//TODO abort
 				return nil, err
 			}
 			if !valid {
