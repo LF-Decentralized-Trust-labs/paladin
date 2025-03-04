@@ -142,6 +142,7 @@ func (_ *CollectedEvent) Type() EventType {
 // NonceAllocatedEvent
 type NonceAllocatedEvent struct {
 	event
+	Nonce uint64
 }
 
 func (_ *NonceAllocatedEvent) Type() EventType {

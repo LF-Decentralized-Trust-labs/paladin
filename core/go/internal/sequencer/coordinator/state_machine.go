@@ -209,7 +209,6 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 	// First apply the event to the update the internal fine grained state of the coordinator if there is any handler registered for the current state
 	switch event := event.(type) {
 	case *TransactionsDelegatedEvent:
-		//TODO dependant on state?
 		err = c.addToDelegatedTransactions(ctx, event.Sender, event.Transactions)
 
 	case *TransactionConfirmedEvent:
@@ -244,11 +243,8 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 			c.activeCoordinatorsFlushPointsBySignerNonce[flushPoint.GetSignerNonce()] = flushPoint
 		}
 	case *common.HeartbeatIntervalEvent:
-		//TODO send heartbeat message
-
 		c.heartbeatIntervalsSinceStateChange++
 		err = c.propagateEventToAllTransactions(ctx, event)
-
 	}
 
 	if err != nil {

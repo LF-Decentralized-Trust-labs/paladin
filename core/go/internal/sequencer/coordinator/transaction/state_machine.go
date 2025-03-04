@@ -325,10 +325,6 @@ func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error 
 	//TODO reconsider moving these back into the state machine definition.
 	var err error
 	switch event := event.(type) {
-	case *SelectedEvent:
-		//TODO
-	case *AssembleRequestSentEvent:
-		//TODO
 	case *AssembleSuccessEvent:
 		err = t.applyPostAssembly(ctx, event.PostAssembly)
 		if err == nil {
@@ -340,16 +336,11 @@ func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error 
 		err = t.applyEndorsement(ctx, event.Endorsement, event.RequestID)
 	case *DispatchConfirmedEvent:
 		err = t.applyDispatchConfirmation(ctx, event.RequestID)
-	case *DispatchConfirmationRejectedEvent:
-		//TODO
-	case *CollectedEvent:
-		//TODO
 	case *NonceAllocatedEvent:
-		//TODO
-	case *SubmittedEvent:
-		//TODO
-	case *ConfirmedEvent:
-		//TODO
+		t.nonce = &event.Nonce
+	default:
+		//other events may trigger actions and/or state transitions but not require any internal state to be updated
+		log.L(ctx).Debugf("no internal state to apply for event type %T", event)
 	}
 	return err
 }
