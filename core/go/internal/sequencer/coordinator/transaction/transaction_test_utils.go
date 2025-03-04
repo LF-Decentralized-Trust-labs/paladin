@@ -242,7 +242,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 	}
 
 	//enter the current state
-	onTransitionFunction := stateDefinitions()[b.state].OnTransitionTo
+	onTransitionFunction := stateDefinitionsMap[b.state].OnTransitionTo
 	if onTransitionFunction != nil {
 		err := onTransitionFunction(ctx, b.txn)
 		if err != nil {

@@ -26,9 +26,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 )
 
 func TestStateMachine_InitializeOK(t *testing.T) {
@@ -51,10 +51,11 @@ func TestStateMachine_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 	).Return(nil).Maybe()
 	assert.Equal(t, State_Idle, c.stateMachine.currentState)
 
-	c.HandleEvent(ctx, &TransactionsDelegatedEvent{
+	err := c.HandleEvent(ctx, &TransactionsDelegatedEvent{
 		Sender:       sender,
 		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Active, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
@@ -65,8 +66,8 @@ func TestStateMachine_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	assert.Equal(t, State_Idle, c.stateMachine.currentState)
 
-	c.HandleEvent(ctx, &HeartbeatReceivedEvent{})
-
+	err := c.HandleEvent(ctx, &HeartbeatReceivedEvent{})
+	assert.NoError(t, err)
 	assert.Equal(t, State_Observing, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
 }
@@ -79,10 +80,11 @@ func TestStateMachine_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 	c.currentBlockHeight = 194 // default tolerance is 5 in the test setup so this is behind
 	c.activeCoordinatorBlockHeight = 200
 
-	c.HandleEvent(ctx, &TransactionsDelegatedEvent{
+	err := c.HandleEvent(ctx, &TransactionsDelegatedEvent{
 		Sender:       sender,
 		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Standby, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
@@ -97,10 +99,11 @@ func TestStateMachine_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 	c.currentBlockHeight = 195 // default tolerance is 5 in the test setup so we are not behind
 	c.activeCoordinatorBlockHeight = 200
 
-	c.HandleEvent(ctx, &TransactionsDelegatedEvent{
+	err := c.HandleEvent(ctx, &TransactionsDelegatedEvent{
 		Sender:       sender,
 		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Elect, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 	mocks.messageSender.AssertExpectations(t)
@@ -115,9 +118,10 @@ func TestStateMachine_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 	c.currentBlockHeight = 194
 	c.activeCoordinatorBlockHeight = 200
 
-	c.HandleEvent(ctx, &NewBlockEvent{
+	err := c.HandleEvent(ctx, &NewBlockEvent{
 		BlockHeight: 195, // default tolerance is 5 in the test setup so we are not behind
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Elect, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
@@ -129,9 +133,10 @@ func TestStateMachine_StandbyNot_ToElect_OnNewBlock_IfStillBehind(t *testing.T) 
 	c.currentBlockHeight = 193
 	c.activeCoordinatorBlockHeight = 200
 
-	c.HandleEvent(ctx, &NewBlockEvent{
+	err := c.HandleEvent(ctx, &NewBlockEvent{
 		BlockHeight: 194, // default tolerance is 5 in the test setup so this is still behind
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Standby, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
@@ -141,7 +146,8 @@ func TestStateMachine_Elect_ToPrepared_OnHandover(t *testing.T) {
 	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 	c.stateMachine.currentState = State_Elect
 
-	c.HandleEvent(ctx, &HandoverReceivedEvent{})
+	err := c.HandleEvent(ctx, &HandoverReceivedEvent{})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Prepared, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
@@ -164,11 +170,12 @@ func TestStateMachine_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(
 		},
 	}
 
-	c.HandleEvent(ctx, &TransactionConfirmedEvent{
+	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
 		From:  flushPointSignerAddress,
 		Nonce: flushPointNonce,
 		Hash:  flushPointHash,
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Active, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
@@ -199,11 +206,12 @@ func TestStateMachine_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushComp
 		},
 	}
 
-	c.HandleEvent(ctx, &TransactionConfirmedEvent{
+	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
 		From:  flushPointSignerAddress,
 		Nonce: otherNonce,
 		Hash:  otherHash,
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Prepared, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
@@ -220,12 +228,12 @@ func TestStateMachine_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFli
 		soleTransaction.ID: soleTransaction,
 	}
 
-	c.HandleEvent(ctx, &TransactionConfirmedEvent{
+	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
 		From:  soleTransaction.GetSignerAddress(),
 		Nonce: *soleTransaction.GetNonce(),
 		Hash:  *soleTransaction.GetLatestSubmissionHash(),
 	})
-
+	assert.NoError(t, err)
 	assert.Equal(t, State_Idle, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
 }
@@ -243,11 +251,12 @@ func TestStateMachine_ActiveNoTransition_OnTransactionConfirmed_IfNotTransaction
 		delegation2.ID: delegation2,
 	}
 
-	c.HandleEvent(ctx, &TransactionConfirmedEvent{
+	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
 		From:  delegation1.GetSignerAddress(),
 		Nonce: *delegation1.GetNonce(),
 		Hash:  *delegation1.GetLatestSubmissionHash(),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Active, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 }
@@ -264,9 +273,10 @@ func TestStateMachine_Active_ToFlush_OnHandoverRequest(t *testing.T) {
 		delegation2.ID: delegation2,
 	}
 
-	c.HandleEvent(ctx, &HandoverRequestEvent{
+	err := c.HandleEvent(ctx, &HandoverRequestEvent{
 		Requester: "newCoordinator",
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Flush, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
@@ -286,11 +296,12 @@ func TestStateMachine_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *
 		delegation2.ID: delegation2,
 	}
 
-	c.HandleEvent(ctx, &TransactionConfirmedEvent{
+	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
 		From:  delegation1.GetSignerAddress(),
 		Nonce: *delegation1.GetNonce(),
 		Hash:  *delegation1.GetLatestSubmissionHash(),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Closing, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
@@ -311,11 +322,12 @@ func TestStateMachine_FlushNoTransition_OnTransactionConfirmed_IfNotFlushComplet
 		delegation2.ID: delegation2,
 	}
 
-	c.HandleEvent(ctx, &TransactionConfirmedEvent{
+	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
 		From:  delegation1.GetSignerAddress(),
 		Nonce: *delegation1.GetNonce(),
 		Hash:  *delegation1.GetLatestSubmissionHash(),
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Flush, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
@@ -333,7 +345,8 @@ func TestStateMachine_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExp
 	//one heartbeat interval away from the grace period expiring
 	c.heartbeatIntervalsSinceStateChange = 4
 
-	c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
+	err := c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Idle, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 
@@ -352,7 +365,8 @@ func TestStateMachine_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGraceP
 	//two heartbeat intervals away from the grace period expiring
 	c.heartbeatIntervalsSinceStateChange = 3
 
-	c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
+	err := c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
+	assert.NoError(t, err)
 
 	assert.Equal(t, State_Closing, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
 

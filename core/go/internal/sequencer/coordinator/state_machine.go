@@ -53,152 +53,202 @@ const (
 )
 
 type StateMachine struct {
-	currentState     State
-	stateDefinitions map[State]StateDefinition
-}
-
-type Transition struct {
-	To State
-	If Guard
+	currentState State
 }
 
 // Actions can be specified for transition to a state either as the OnTransitionTo function that will run for all transitions to that state or as the On field in the Transition struct if the action applies
 // for a specific transition
 type Action func(ctx context.Context, c *coordinator) error
 
+type Transition struct {
+	To State // State to transition to if the guard condition is met
+	If Guard // Condition to evaluate the transaction against to determine if this transition should be taken
+	On Action
+}
+
+type EventHandler struct {
+	Validator   func(ctx context.Context, txn *coordinator, event common.Event) (bool, error) // function to validate whether the event is valid for the current state of the coordinator.  This is optional.  If not defined, the event is always considered valid.
+	Transitions []Transition                                                                  // list of transitions that this event could trigger.  The list is ordered so the first matching transition is the one that will be taken.
+}
+
 type StateDefinition struct {
-	OnTransitionTo Action                     // function to be invoked when transitioning into this state
-	Transitions    map[EventType][]Transition // rules to define when to exit this state and which state to transition to
+	OnTransitionTo Action                     // function to be invoked when transitioning into this state.  This is invoked after any transition specific actions have been invoked
+	Events         map[EventType]EventHandler // rules to define what events apply to this state and what transitions they trigger.  Any events not in this list are ignored while in this state.
+}
+
+var stateDefinitionsMap map[State]StateDefinition
+
+func init() {
+	// Initialize state definitions in init function to avoid circular dependencies
+	stateDefinitionsMap = map[State]StateDefinition{
+		State_Idle: {
+			Events: map[EventType]EventHandler{
+
+				Event_TransactionsDelegated: {
+					Transitions: []Transition{{
+						To: State_Active,
+					}},
+				},
+				Event_HeartbeatReceived: {
+					Transitions: []Transition{{
+						To: State_Observing,
+					}},
+				},
+			},
+		},
+		State_Observing: {
+			Events: map[EventType]EventHandler{
+				common.Event_HeartbeatInterval: {},
+				Event_TransactionsDelegated: {
+					Transitions: []Transition{
+						{
+							To: State_Standby,
+							If: behind,
+						},
+						{
+							To: State_Elect,
+							If: notBehind,
+						},
+					},
+				},
+			},
+		},
+		State_Standby: {
+			Events: map[EventType]EventHandler{
+				common.Event_HeartbeatInterval: {},
+				Event_TransactionsDelegated:    {},
+				Event_NewBlock: {
+					Transitions: []Transition{{
+						To: State_Elect,
+						If: notBehind,
+					}},
+				},
+			},
+		},
+		State_Elect: {
+			OnTransitionTo: action_SendHandoverRequest,
+			Events: map[EventType]EventHandler{
+				common.Event_HeartbeatInterval: {},
+				Event_TransactionsDelegated:    {},
+				Event_HandoverReceived: {
+					Transitions: []Transition{{
+						To: State_Prepared,
+					}},
+				},
+			},
+		},
+		State_Prepared: {
+			Events: map[EventType]EventHandler{
+				common.Event_HeartbeatInterval: {},
+				Event_TransactionsDelegated:    {},
+				Event_TransactionConfirmed: {
+					Transitions: []Transition{{
+						To: State_Active,
+						If: activeCoordinatorFlushComplete,
+					}},
+				},
+			},
+		},
+		State_Active: {
+			OnTransitionTo: action_SelectTransaction,
+			Events: map[EventType]EventHandler{
+				common.Event_HeartbeatInterval: {},
+				Event_TransactionsDelegated:    {},
+				Event_TransactionConfirmed: {
+					Transitions: []Transition{{
+						To: State_Idle,
+						If: noTransactionsInflight,
+					}},
+				},
+				Event_HandoverRequestReceived: {
+					Transitions: []Transition{{
+						To: State_Flush,
+					}},
+				},
+			},
+		},
+		State_Flush: {
+			//TODO should we move to active if we get delegated transactions while in flush?
+			Events: map[EventType]EventHandler{
+				common.Event_HeartbeatInterval: {},
+				Event_TransactionConfirmed: {
+					Transitions: []Transition{{
+						To: State_Closing,
+						If: flushComplete,
+					}},
+				},
+			},
+		},
+		State_Closing: {
+			//TODO should we move to active if we get delegated transactions while in closing?
+			Events: map[EventType]EventHandler{
+				common.Event_HeartbeatInterval: {
+					Transitions: []Transition{{
+						To: State_Idle,
+						If: closingGracePeriodExpired,
+					}},
+				},
+			},
+		},
+	}
 }
 
 func (c *coordinator) InitializeStateMachine(initialState State) {
 	c.stateMachine = &StateMachine{
 		currentState: initialState,
 	}
-	sm := c.stateMachine
-
-	//Transition rules determine which state to transition to when a particular event is received depending on the current state
-	// Transitions can optionally be guarded by a function that returns a boolean.
-	// Guard functions are synchronous, pure functions with inputs of the event and current state (including internal fine grained state) of the coordinator after the event has been applied
-	// and outputs a boolean
-	sm.stateDefinitions = map[State]StateDefinition{
-		State_Idle: {
-			OnTransitionTo: nil,
-			Transitions: map[EventType][]Transition{
-				Event_TransactionsDelegated: {
-					{
-						To: State_Active,
-					},
-				},
-				Event_HeartbeatReceived: {
-					{
-						To: State_Observing,
-					},
-				},
-			},
-		},
-		State_Observing: {
-			OnTransitionTo: nil,
-			Transitions: map[EventType][]Transition{
-				Event_TransactionsDelegated: {
-					{
-						To: State_Standby,
-						If: behind,
-					},
-					{
-						To: State_Elect,
-						If: notBehind,
-					},
-				},
-			},
-		},
-		State_Standby: {
-			OnTransitionTo: nil,
-			Transitions: map[EventType][]Transition{
-				Event_NewBlock: {
-					{
-						To: State_Elect,
-						If: notBehind,
-					},
-				},
-			},
-		},
-		State_Elect: {
-			OnTransitionTo: action_SendHandoverRequest,
-			Transitions: map[EventType][]Transition{
-				Event_HandoverReceived: {
-					{
-						To: State_Prepared,
-					},
-				},
-			},
-		},
-		State_Prepared: {
-			OnTransitionTo: nil,
-			Transitions: map[EventType][]Transition{
-				Event_TransactionConfirmed: {
-					{
-						To: State_Active,
-						If: activeCoordinatorFlushComplete,
-					},
-				},
-			},
-		},
-		State_Active: {
-			OnTransitionTo: action_SelectTransaction,
-			Transitions: map[EventType][]Transition{
-				Event_TransactionConfirmed: {
-					{
-						To: State_Idle,
-						If: noTransactionsInflight,
-					},
-				},
-				Event_HandoverRequestReceived: {
-					{
-						To: State_Flush,
-					},
-				},
-			},
-		},
-		State_Flush: {
-			OnTransitionTo: nil,
-			Transitions: map[EventType][]Transition{
-				Event_TransactionConfirmed: {
-					{
-						To: State_Closing,
-						If: flushComplete,
-					},
-				},
-			},
-		},
-		State_Closing: {
-			OnTransitionTo: nil,
-			Transitions: map[EventType][]Transition{
-				common.Event_HeartbeatInterval: {
-					{
-						To: State_Idle,
-						If: closingGracePeriodExpired,
-					},
-				},
-			},
-		},
-	}
-
 }
 
 func (c *coordinator) HandleEvent(ctx context.Context, event common.Event) error {
 
+	//determine whether this event is valid for the current state
+	eventHandler, err := c.evaluateEvent(ctx, event)
+	if err != nil || eventHandler == nil {
+		return err
+	}
+
+	//If we get here, the state machine has defined a rule for handling this event
 	//Apply the event to the coordinator to update the internal state
 	// so that the guards and actions defined in the state machine can reference the new internal state of the coordinator
-	err := c.applyEvent(ctx, event)
+	err = c.applyEvent(ctx, event)
 	if err != nil {
 		return err
 	}
 
 	//Determine whether this event triggers a state transition
-	err = c.evaluateTransitions(ctx, event)
+	err = c.evaluateTransitions(ctx, event, *eventHandler)
 	return err
 
+}
+
+// Function evaluateEvent evaluates whether the event is relevant given the current state of the coordinator
+func (c *coordinator) evaluateEvent(ctx context.Context, event common.Event) (*EventHandler, error) {
+	sm := c.stateMachine
+
+	//Determine if and how this event applies in the current state and which, if any, transition it triggers
+	eventHandlers := stateDefinitionsMap[sm.currentState].Events
+	eventHandler, isHandlerDefined := eventHandlers[event.Type()]
+	if isHandlerDefined {
+		//By default all events in the list are applied unless there is a validator function and it returns false
+		if eventHandler.Validator != nil {
+			valid, err := eventHandler.Validator(ctx, c, event)
+			if err != nil {
+				//This is an unexpected error.  If the event is invalid, the validator should return false and not an error
+				log.L(ctx).Errorf("Error validating event %v: %v", event.Type(), err)
+				return nil, err
+			}
+			if !valid {
+				//This is perfectly normal sometimes an event happens and is no longer relevant to the coordinator so we just ignore it and move on
+				log.L(ctx).Debugf("Event %v is not valid: %v", event.Type(), valid)
+				return nil, nil
+			}
+		}
+		return &eventHandler, nil
+	} else {
+		// no event handler defined for this event while in this state
+		log.L(ctx).Debugf("No event handler defined for Event %v in State %s", event.Type(), sm.currentState.String())
+		return nil, nil
+	}
 }
 
 // Function applyEvent updates the internal state of the coordinator with information from the event
@@ -210,7 +260,6 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 	switch event := event.(type) {
 	case *TransactionsDelegatedEvent:
 		err = c.addToDelegatedTransactions(ctx, event.Sender, event.Transactions)
-
 	case *TransactionConfirmedEvent:
 		//This may be a confirmation of a transaction that we have have been coordinating or it may be one that another coordinator has been coordinating
 		//if the latter, then we may or may not know about it depending on whether we have seen a heartbeat from that coordinator since last time
@@ -225,13 +274,10 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 		if !isDispatchedTransaction {
 			c.confirmMonitoredTransaction(ctx, event.From, event.Nonce)
 		}
-
 	case *transaction.AssembleSuccessEvent:
 		err = c.propagateEventToTransaction(ctx, event)
-
 	case *transaction.AssembleRevertResponseEvent:
 		err = c.propagateEventToTransaction(ctx, event)
-
 	case *TransactionDispatchConfirmedEvent:
 		err = c.propagateEventToTransaction(ctx, event)
 	case *NewBlockEvent:
@@ -246,41 +292,48 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 		c.heartbeatIntervalsSinceStateChange++
 		err = c.propagateEventToAllTransactions(ctx, event)
 	}
-
 	if err != nil {
 		log.L(ctx).Errorf("Error applying event %v: %v", event.Type(), err)
 	}
 	return err
 }
 
-func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Event) error {
+func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Event, eventHandler EventHandler) error {
 	sm := c.stateMachine
 
-	transitions := sm.stateDefinitions[sm.currentState].Transitions
-	if transitionRules, ok := transitions[event.Type()]; ok {
-		for _, rule := range transitionRules {
-			if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
-				log.L(ctx).Infof("Coordinator for %s transitioning from %s to %s triggered by event %T", c.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
-
-				sm.currentState = rule.To
-				newStateDefinition := sm.stateDefinitions[sm.currentState]
-				if newStateDefinition.OnTransitionTo != nil {
-					err := newStateDefinition.OnTransitionTo(ctx, c)
-					if err != nil {
-						log.L(ctx).Errorf("Error executing OnTransitionTo function for state %v: %v", sm.currentState, err)
-						return err
-					}
-				} else {
-					log.L(ctx).Debugf("No OnTransitionTo function defined for state %v", sm.currentState)
+	for _, rule := range eventHandler.Transitions {
+		if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
+			log.L(ctx).Infof("Coordinator for address %s transitioning from %s to %s triggered by event %T", c.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
+			sm.currentState = rule.To
+			newStateDefinition := stateDefinitionsMap[sm.currentState]
+			//run any actions specific to the transition first
+			if rule.On != nil {
+				err := rule.On(ctx, c)
+				if err != nil {
+					//any recoverable errors should have been handled by the action function
+					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
+					return err
 				}
-				c.heartbeatIntervalsSinceStateChange = 0
-				break
 			}
+
+			// then run any actions for the state entry
+			if newStateDefinition.OnTransitionTo != nil {
+				err := newStateDefinition.OnTransitionTo(ctx, c)
+				if err != nil {
+					// any recoverable errors should have been handled by the OnTransitionTo function
+					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
+					return err
+				}
+			} else {
+				log.L(ctx).Debugf("No OnTransitionTo function defined for state %v", sm.currentState)
+			}
+
+			c.heartbeatIntervalsSinceStateChange = 0
+			break
 		}
-	} else {
-		log.L(ctx).Debugf("No transition for Event %v from State %s", event.Type(), sm.currentState.String())
 	}
 	return nil
+
 }
 
 func action_SendHandoverRequest(ctx context.Context, c *coordinator) error {

@@ -18,7 +18,6 @@ package transaction
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -78,7 +77,6 @@ type Transition struct {
 	On Action
 }
 
-// TODO is EventHandler the best name
 type EventHandler struct {
 	Validator   func(ctx context.Context, txn *Transaction, event common.Event) (bool, error) // function to validate whether the event is valid for the current state of the transaction.  This is optional.  If not defined, the event is always considered valid.
 	Transitions []Transition                                                                  // list of transitions that this event could trigger.  The list is ordered so the first matching transition is the one that will be taken.
@@ -86,22 +84,13 @@ type EventHandler struct {
 
 type StateDefinition struct {
 	OnTransitionTo Action                     // function to be invoked when transitioning into this state.  This is invoked after any transition specific actions have been invoked
-	Events         map[EventType]EventHandler // rules to define what events apply to this state and what transitions they trigger
+	Events         map[EventType]EventHandler // rules to define what events apply to this state and what transitions they trigger.  Any events not in this list are ignored while in this state.
 }
 
-// Initialize state definitions in a function to avoid circular dependencies
 var stateDefinitionsMap map[State]StateDefinition
-var stateDefinitionsLock sync.Mutex
 
-func stateDefinitions() map[State]StateDefinition {
-	if stateDefinitionsMap != nil {
-		return stateDefinitionsMap
-	}
-	stateDefinitionsLock.Lock()
-	defer stateDefinitionsLock.Unlock()
-	if stateDefinitionsMap != nil {
-		return stateDefinitionsMap
-	}
+func init() {
+	// Initialize state definitions in init function to avoid circular dependencies
 	stateDefinitionsMap = map[State]StateDefinition{
 		State_Initial: {
 			Events: map[EventType]EventHandler{
@@ -198,7 +187,6 @@ func stateDefinitions() map[State]StateDefinition {
 			},
 		},
 		State_Blocked: {
-			OnTransitionTo: nil,
 			Events: map[EventType]EventHandler{
 				Event_DependencyReady: {
 					Transitions: []Transition{{
@@ -232,7 +220,6 @@ func stateDefinitions() map[State]StateDefinition {
 			},
 		},
 		State_Dispatched: {
-			OnTransitionTo: nil,
 			Events: map[EventType]EventHandler{
 				Event_Submitted: {
 					Transitions: []Transition{
@@ -243,7 +230,6 @@ func stateDefinitions() map[State]StateDefinition {
 			},
 		},
 		State_Submitted: {
-			OnTransitionTo: nil,
 			Events: map[EventType]EventHandler{
 				Event_Confirmed: {
 					Transitions: []Transition{
@@ -258,7 +244,6 @@ func stateDefinitions() map[State]StateDefinition {
 		},
 		//TODO add transition to final state and call cleanup
 	}
-	return stateDefinitionsMap
 }
 
 func (t *Transaction) InitializeStateMachine(initialState State) {
@@ -270,12 +255,15 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 // TODO refactor this so that we can have good unit tests for this function using a fake set of state definitions
 func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error {
 
+	//determine whether this event is valid for the current state
 	eventHandler, err := t.evaluateEvent(ctx, event)
 	if err != nil || eventHandler == nil {
 		return err
 	}
 
-	//If we get here, the state machine has defined a rule for handling this event in the current state and the event is deemed to be valid so we shall apply it to the transaction now
+	//If we get here, the state machine has defined a rule for handling this event
+	//Apply the event to the transaction to update the internal state
+	// so that the guards and actions defined in the state machine can reference the new internal state of the coordinator
 	err = t.applyEvent(ctx, event)
 	if err != nil {
 		return err
@@ -292,7 +280,7 @@ func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*E
 	sm := t.stateMachine
 
 	//Determine if and how this event applies in the current state and which, if any, transition it triggers
-	eventHandlers := stateDefinitions()[sm.currentState].Events
+	eventHandlers := stateDefinitionsMap[sm.currentState].Events
 	eventHandler, isHandlerDefined := eventHandlers[event.Type()]
 	if isHandlerDefined {
 		//By default all events in the list are applied unless there is a validator function and it returns false
@@ -352,7 +340,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 			log.L(ctx).Infof("Transaction %s transitioning from %s to %s triggered by event %T", t.ID.String(), sm.currentState.String(), rule.To.String(), event)
 			previousState := sm.currentState
 			sm.currentState = rule.To
-			newStateDefinition := stateDefinitions()[sm.currentState]
+			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first
 			if rule.On != nil {
 				err := rule.On(ctx, t)
