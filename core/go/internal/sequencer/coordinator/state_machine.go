@@ -201,6 +201,10 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 
 func (c *coordinator) HandleEvent(ctx context.Context, event common.Event) error {
 
+	if transactionEvent, ok := event.(transaction.Event); ok {
+		return c.propagateEventToTransaction(ctx, transactionEvent)
+	}
+
 	//determine whether this event is valid for the current state
 	eventHandler, err := c.evaluateEvent(ctx, event)
 	if err != nil || eventHandler == nil {

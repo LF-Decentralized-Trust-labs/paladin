@@ -20,10 +20,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/testutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -111,7 +109,6 @@ func TestSelectTransaction_PreserveOrderWithinSender(t *testing.T) {
 }
 
 func TestSelectTransaction_SlowQueue(t *testing.T) {
-	log.SetLevel("debug")
 	ctx := context.Background()
 	testSenderA := "alice@node1"
 	testSenderB := "bob@node2"
@@ -190,14 +187,18 @@ func TestSelectTransaction_SlowQueue(t *testing.T) {
 		mock.MatchedBy(privateTransactionMatcher(txnsA[0].ID, txnsC[0].ID, txnsD[0].ID, txnsA[1].ID, txnsC[1].ID, txnsD[1].ID)), //match both transactions from A, C and D
 	).Return(nil)
 
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
+		assert.NotEqual(t, uuid.Nil, assemblingTxnID)
 
 		if assemblingTxnID == txnsB[0].ID {
 			assert.LessOrEqual(t, i, 3)
 			//Simulate the passage of time then trigger a heartbeat
 			mocks.clock.Advance(5001) //because NewCoordinatorForUnitTest sets the assemble timeout to be 5000 TODO use a builder and make this more explicit
-			heartbeatEvent := &common.HeartbeatIntervalEvent{}
-			err = coordinator.HandleEvent(ctx, heartbeatEvent)
+			requestTimeoutEvent := &transaction.RequestTimeoutEvent{}
+			requestTimeoutEvent.TransactionID = assemblingTxnID
+			requestTimeoutEvent.IdempotencyKey = assembleRequestID
+			assemblingTxnID = uuid.Nil
+			err = coordinator.HandleEvent(ctx, requestTimeoutEvent)
 			assert.NoError(t, err)
 
 		} else {
@@ -223,6 +224,7 @@ func TestSelectTransaction_SlowQueue(t *testing.T) {
 				assembleResponseEvent.PostAssembly = buildersD[1].BuildPostAssembly()
 
 			}
+			assemblingTxnID = uuid.Nil
 			err = coordinator.propagateEventToTransaction(ctx, assembleResponseEvent)
 			assert.NoError(t, err)
 		}

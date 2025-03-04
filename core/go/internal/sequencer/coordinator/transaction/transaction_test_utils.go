@@ -38,6 +38,8 @@ type identityForTesting struct {
 
 type SentMessageRecorder struct {
 	hasSentAssembleRequest             bool
+	sentAssembleRequestIdempotencyKey  uuid.UUID
+	numberOfSentAssembleRequests       int
 	hasSentDispatchConfirmationRequest bool
 	numberOfSentEndorsementRequests    int
 }
@@ -50,6 +52,8 @@ func (r *SentMessageRecorder) SendAssembleRequest(
 	transactionPreassembly *components.TransactionPreAssembly,
 ) error {
 	r.hasSentAssembleRequest = true
+	r.sentAssembleRequestIdempotencyKey = idempotencyKey
+	r.numberOfSentAssembleRequests++
 	return nil
 }
 
@@ -218,7 +222,19 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 
 	privateTransaction := b.privateTransactionBuilder.Build()
 
-	txn, err := NewTransaction(ctx, b.sender.identityLocator, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.fakeStateIntegration, b.fakeClock.Duration(b.requestTimeout), b.fakeClock.Duration(b.assembleTimeout), b.grapher, nil)
+	txn, err := NewTransaction(
+		ctx,
+		b.sender.identityLocator,
+		privateTransaction,
+		b.sentMessageRecorder,
+		b.fakeClock,
+		func(_ common.Event) {},
+		b.fakeStateIntegration,
+		b.fakeClock.Duration(b.requestTimeout),
+		b.fakeClock.Duration(b.assembleTimeout),
+		b.grapher,
+		nil,
+	)
 	if err != nil {
 		panic(fmt.Sprintf("Error from NewTransaction: %v", err))
 	}

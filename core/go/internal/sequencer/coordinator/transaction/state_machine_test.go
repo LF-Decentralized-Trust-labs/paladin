@@ -40,6 +40,10 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 		},
 		messageSender,
 		clock,
+		func(event common.Event) {
+			//don't expect any events during initialize
+			assert.Failf(t, "unexpected event", "%T", event)
+		},
 		stateIntegration,
 		clock.Duration(1000),
 		clock.Duration(5000),
@@ -164,14 +168,39 @@ func TestStateMachine_Assembling_NoTransition_OnAssembleResponse_IfResponseDoesN
 	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
-func TestStateMachine_Assembling_ToPooled_OnHeartbeat_IfAssembleTimeoutExpired(t *testing.T) {
+func TestStateMachine_Assembling_NoTransition_OnRequestTimeout_IfNotAssembleTimeoutExpired(t *testing.T) {
+	ctx := context.Background()
+	txnBuilder := NewTransactionBuilderForTesting(t, State_Assembling)
+	txn, mocks := txnBuilder.BuildWithMocks()
+
+	mocks.clock.Advance(txnBuilder.assembleTimeout - 1)
+
+	assert.Equal(t, 1, mocks.sentMessageRecorder.numberOfSentAssembleRequests, "expected 1 assemble request to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentAssembleRequests)
+	err := txn.HandleEvent(ctx, &RequestTimeoutEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		IdempotencyKey: mocks.sentMessageRecorder.sentAssembleRequestIdempotencyKey,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, mocks.sentMessageRecorder.numberOfSentAssembleRequests, "expected 2 assemble request to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentAssembleRequests)
+
+	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Assembling_ToPooled_OnRequestTimeout_IfAssembleTimeoutExpired(t *testing.T) {
 	ctx := context.Background()
 	txnBuilder := NewTransactionBuilderForTesting(t, State_Assembling)
 	txn, mocks := txnBuilder.BuildWithMocks()
 
 	mocks.clock.Advance(txnBuilder.assembleTimeout + 1)
 
-	err := txn.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
+	err := txn.HandleEvent(ctx, &RequestTimeoutEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		IdempotencyKey: mocks.sentMessageRecorder.sentAssembleRequestIdempotencyKey,
+	})
 	assert.NoError(t, err)
 
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())

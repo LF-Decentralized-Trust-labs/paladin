@@ -17,6 +17,9 @@ package common
 
 type EventType int
 
+// function that can be used to emit events from the internals of the sequencer to feed back into the state machine
+type EmitEvent func(event Event)
+
 const (
 	Event_HeartbeatInterval EventType = iota // emitted on a regular basis, interval defined by the sequencer config a
 )

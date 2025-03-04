@@ -392,6 +392,7 @@ type coordinatorDependencyMocks struct {
 	messageSender    *MockMessageSender
 	clock            *common.FakeClockForTesting
 	stateIntegration *sequencermocks.StateIntegration
+	emit             common.EmitEvent
 }
 
 func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, committeeMembers []string) (*coordinator, *coordinatorDependencyMocks) {
@@ -403,11 +404,12 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, committeeMembe
 		messageSender:    NewMockMessageSender(t),
 		clock:            &common.FakeClockForTesting{},
 		stateIntegration: sequencermocks.NewStateIntegration(t),
+		emit:             func(event common.Event) {}, //TODO do something useful to allow tests to receive events from the state machine
 	}
 
 	//TODO: should we use the fake message sender as we do in the transaction tests?
 
-	coordinator, err := NewCoordinator(ctx, mocks.messageSender, committeeMembers, mocks.clock, mocks.stateIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, tktypes.RandAddress(), 5, 5)
+	coordinator, err := NewCoordinator(ctx, mocks.messageSender, committeeMembers, mocks.clock, mocks.emit, mocks.stateIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, tktypes.RandAddress(), 5, 5)
 	require.NoError(t, err)
 
 	return coordinator, mocks

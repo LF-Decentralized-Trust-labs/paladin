@@ -52,12 +52,13 @@ type coordinator struct {
 	messageSender    MessageSender
 	clock            common.Clock
 	stateIntegration common.StateIntegration
+	emit             common.EmitEvent
 
 	/*Algorithms*/
 	transactionSelector TransactionSelector
 }
 
-func NewCoordinator(ctx context.Context, messageSender MessageSender, committeeMembers []string, clock common.Clock, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, blockRangeSize uint64, contractAddress *tktypes.EthAddress, blockHeightTolerance uint64, closingGracePeriod int) (*coordinator, error) {
+func NewCoordinator(ctx context.Context, messageSender MessageSender, committeeMembers []string, clock common.Clock, emit common.EmitEvent, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, blockRangeSize uint64, contractAddress *tktypes.EthAddress, blockHeightTolerance uint64, closingGracePeriod int) (*coordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
 		transactionsByID:                   make(map[uuid.UUID]*transaction.Transaction),
@@ -71,6 +72,7 @@ func NewCoordinator(ctx context.Context, messageSender MessageSender, committeeM
 		requestTimeout:                     requestTimeout,
 		assembleTimeout:                    assembleTimeout,
 		stateIntegration:                   stateIntegration,
+		emit:                               emit,
 	}
 	c.committee = make(map[string][]string)
 	for _, member := range committeeMembers {
@@ -120,6 +122,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			txn,
 			c.messageSender,
 			c.clock,
+			c.emit,
 			c.stateIntegration,
 			c.requestTimeout,
 			c.assembleTimeout,

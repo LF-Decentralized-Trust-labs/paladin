@@ -60,7 +60,9 @@ const (
 	Event_NonceAllocated                                // nonce allocated by the dispatcher thread
 	Event_Submitted                                     // submission made to the blockchain.  Each time this event is received, the submission hash is updated
 	Event_Confirmed                                     // confirmation received from the blockchain of either a successful or reverted transaction
+	Event_RequestTimeout                                // event emitted by the state machine when a request timeout period has passed since we sent the a request message without receiving a response
 	Event_StateTransition                               // event emitted by the state machine when a state transition occurs.  TODO should this be a separate enum?
+	Event_AssembleTimeout                               // the assemble timeout period has passed since we sent the first assemble request
 )
 
 type StateMachine struct {
@@ -77,8 +79,14 @@ type Transition struct {
 	On Action
 }
 
+type ActionRule struct {
+	Action Action
+	If     Guard
+}
+
 type EventHandler struct {
 	Validator   func(ctx context.Context, txn *Transaction, event common.Event) (bool, error) // function to validate whether the event is valid for the current state of the transaction.  This is optional.  If not defined, the event is always considered valid.
+	Actions     []ActionRule                                                                  // list of actions to be taken when this event is received.  These actions are run before any transition specific actions
 	Transitions []Transition                                                                  // list of transitions that this event could trigger.  The list is ordered so the first matching transition is the one that will be taken.
 }
 
@@ -145,7 +153,11 @@ func init() {
 							On: action_NotifyDependentsOfAssembled,
 						}},
 				},
-				common.Event_HeartbeatInterval: { //TODO if assemble timeout is much less than the heartbeat interval, this will not transition in a timely manner.  Could think about having a `tick` event that is defined to be a much smaller quantum of time than a heartbeat but not actually propagate events every tick unless we know there is a guard that it likely to hit true. Could end up more complex than it is worth so alternative would be to model the event as "timeoutPeriodPassed" and the guard as "noResponseReceived"
+				Event_RequestTimeout: {
+					Actions: []ActionRule{{
+						Action: action_NudgeAssembleRequest,
+						If:     guard_Not(guard_AssembleTimeoutExceeded),
+					}},
 					Transitions: []Transition{{
 						To: State_Pooled,
 						If: guard_AssembleTimeoutExceeded,
@@ -269,6 +281,11 @@ func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error
 		return err
 	}
 
+	err = t.performActions(ctx, *eventHandler)
+	if err != nil {
+		return err
+	}
+
 	//Determine whether this event triggers a state transition
 	err = t.evaluateTransitions(ctx, event, *eventHandler)
 	return err
@@ -333,6 +350,20 @@ func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error 
 	return err
 }
 
+func (t *Transaction) performActions(ctx context.Context, eventHandler EventHandler) error {
+	for _, rule := range eventHandler.Actions {
+		if rule.If == nil || rule.If(ctx, t) {
+			err := rule.Action(ctx, t)
+			if err != nil {
+				//any recoverable errors should have been handled by the action function
+				log.L(ctx).Errorf("Error applying action: %v", err)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Event, eventHandler EventHandler) error {
 	sm := t.stateMachine
 	for _, rule := range eventHandler.Transitions {
@@ -377,6 +408,10 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 
 func action_SendAssembleRequest(ctx context.Context, txn *Transaction) error {
 	return txn.sendAssembleRequest(ctx)
+}
+
+func action_NudgeAssembleRequest(ctx context.Context, txn *Transaction) error {
+	return txn.nudgeAssembleRequest(ctx)
 }
 
 func action_SendEndorsementRequests(ctx context.Context, txn *Transaction) error {

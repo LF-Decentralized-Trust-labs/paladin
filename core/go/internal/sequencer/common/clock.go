@@ -15,7 +15,10 @@
 
 package common
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type Clock interface {
 	//wrapper of time.Now()
@@ -23,6 +26,7 @@ type Clock interface {
 	Now() Time
 	HasExpired(Time, Duration) bool
 	Duration(milliseconds int) Duration
+	Schedule(context.Context, Duration, func()) (cancel func())
 }
 
 type Duration interface {
@@ -48,6 +52,18 @@ func (c *realClock) HasExpired(start Time, duration Duration) bool {
 	realStart := start.(time.Time)
 	realDuration := duration.(time.Duration)
 	return time.Now().After(realStart.Add(realDuration))
+}
+
+func (c *realClock) Schedule(ctx context.Context, duration Duration, f func()) (cancel func()) {
+	realDuration := duration.(time.Duration)
+	timer := time.NewTimer(realDuration)
+	go func() {
+		<-timer.C
+		f()
+	}()
+	return func() {
+		timer.Stop()
+	}
 }
 
 type FakeClockForTesting struct {
@@ -77,6 +93,11 @@ func (c *FakeClockForTesting) HasExpired(start Time, duration Duration) bool {
 	nowMillis := c.currentTime
 	return nowMillis > startMillis+durationMillis
 
+}
+
+func (c *FakeClockForTesting) Schedule(context.Context, Duration, func()) (cancel func()) {
+	//TODO - do something useful to allow tests to emulate the passage of time to trigger scheduled events
+	return func() {}
 }
 
 func (c *FakeClockForTesting) Duration(milliseconds int) Duration {

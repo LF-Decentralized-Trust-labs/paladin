@@ -61,6 +61,7 @@ type Transaction struct {
 	//TODO move the fields that are really just fine grained state info.  Move them into the stateMachine struct ( consider separate structs for each concrete state)
 	heartbeatIntervalsSinceStateChange int
 	pendingAssembleRequest             *common.IdempotentRequest
+	cancelAssembleTimeoutSchedule      func()
 	pendingEndorsementRequests         map[string]map[string]*common.IdempotentRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
 	pendingDispatchConfirmationRequest *common.IdempotentRequest
 	latestError                        string
@@ -79,12 +80,13 @@ type Transaction struct {
 	grapher            Grapher
 	stateIntegration   common.StateIntegration
 	notifyOfTransition OnStateTransition
+	emit               common.EmitEvent
 }
 
 // TODO think about naming of this compared to the OnTransitionTo func in the state machine
 type OnStateTransition func(ctx context.Context, t *Transaction, to, from State) // function to be invoked when transitioning into this state.  Called after transitioning event has been applied and any actions have fired
 
-func NewTransaction(ctx context.Context, sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, grapher Grapher, onStateTransition OnStateTransition) (*Transaction, error) {
+func NewTransaction(ctx context.Context, sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, emit common.EmitEvent, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, grapher Grapher, onStateTransition OnStateTransition) (*Transaction, error) {
 	senderIdentity, senderNode, err := tktypes.PrivateIdentityLocator(sender).Validate(ctx, "", false)
 	if err != nil {
 		log.L(ctx).Errorf("Error validating sender %s: %s", sender, err)
@@ -102,6 +104,7 @@ func NewTransaction(ctx context.Context, sender string, pt *components.PrivateTr
 		assembleTimeout:    assembleTimeout,
 		stateIntegration:   stateIntegration,
 		notifyOfTransition: onStateTransition,
+		emit:               emit,
 	}
 	txn.InitializeStateMachine(State_Initial)
 	grapher.Add(context.Background(), txn)
@@ -204,6 +207,10 @@ func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *compo
 
 	//TODO the response from the assembler actually contains outputStatesPotential so we need to write them to the store and then add the OutputState ids to the index
 	t.PostAssembly = postAssembly
+	if t.cancelAssembleTimeoutSchedule != nil {
+		t.cancelAssembleTimeoutSchedule()
+		t.cancelAssembleTimeoutSchedule = nil
+	}
 	for _, state := range postAssembly.OutputStates {
 		err := t.grapher.AddMinter(ctx, state.ID, t)
 		if err != nil {
@@ -302,13 +309,27 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 	// the long timeout is to prevent an unavailable transaction sender/assemble from holding up the entire contract / privacy group given that the assemble step is single threaded
 	// the action for the long timeout is to return the transaction to the mempool and let another transaction be selected
 
-	//We Nudge the IdempotentRequest every heartbeat to implement the short retry and the state machine will deal with the long timeout via the guard assembleTimeoutExpired
+	//When we first send the request, we start a ticker to emit a requestTimeout event for each tick
+	// we and nudge the request every requestTimeout event implement the short retry.
+	// the state machine will deal with the long timeout via the guard assembleTimeoutExpired
 
-	t.pendingAssembleRequest = common.NewIdempotentRequest(ctx, t.clock, t.assembleTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
+	t.pendingAssembleRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
 		return t.messageSender.SendAssembleRequest(ctx, t.sender, t.ID, idempotencyKey, t.PreAssembly)
 	})
-	return t.pendingAssembleRequest.Nudge(ctx)
+	t.cancelAssembleTimeoutSchedule = t.clock.Schedule(ctx, t.requestTimeout, func() {
+		t.emit(&RequestTimeoutEvent{
+			event: event{
+				TransactionID: t.ID,
+			},
+			IdempotencyKey: t.pendingAssembleRequest.IdempotencyKey(),
+		})
 
+	})
+	return t.pendingAssembleRequest.Nudge(ctx)
+}
+
+func (t *Transaction) nudgeAssembleRequest(ctx context.Context) error {
+	return t.pendingAssembleRequest.Nudge(ctx)
 }
 
 func (t *Transaction) assembleTimeoutExceeded(ctx context.Context) bool {
