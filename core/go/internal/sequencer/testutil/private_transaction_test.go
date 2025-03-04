@@ -59,3 +59,22 @@ func TestPrivateTransactionBuilder_FullyEndorsed(t *testing.T) {
 	tx := builder.Build()
 	assert.Len(t, tx.PostAssembly.Endorsements, 3)
 }
+
+func TestPrivateTransactionBuilderList_SameSenderAndAddress(t *testing.T) {
+	builders := NewPrivateTransactionBuilderListForTesting(3).Sender("alice@node1")
+
+	txns := builders.BuildSparse()
+	require.NotNil(t, txns)
+	assert.Len(t, txns, 3)
+	for _, tx := range txns {
+		assert.NotEqual(t, "", tx.Domain)
+		assert.NotEqual(t, uuid.Nil, tx.ID)
+		assert.NotEqual(t, tktypes.EthAddress{}, tx.Address)
+
+		require.NotNil(t, tx.PreAssembly)
+		assert.Len(t, tx.PreAssembly.RequiredVerifiers, 4)
+		assert.Len(t, tx.PreAssembly.Verifiers, 4)
+
+		assert.Nil(t, tx.PostAssembly)
+	}
+}

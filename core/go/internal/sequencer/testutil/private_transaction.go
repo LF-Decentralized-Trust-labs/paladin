@@ -18,6 +18,7 @@ package testutil
 // This file contains utilities to abstract the complexities of the PrivateTransaction struct for use in tests to help make them more readable
 // and to reduce the amount of boilerplate code needed to create a Transaction
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -38,7 +39,11 @@ type identityForTesting struct {
 
 type PrivateTransactionBuilderForTesting struct {
 	id                     uuid.UUID
+	senderName             string
+	senderNode             string
 	sender                 *identityForTesting
+	domain                 string
+	address                tktypes.EthAddress
 	signerAddress          *tktypes.EthAddress
 	numberOfEndorsers      int
 	numberOfEndorsements   int
@@ -46,24 +51,70 @@ type PrivateTransactionBuilderForTesting struct {
 	inputStateIDs          []tktypes.HexBytes
 	readStateIDs           []tktypes.HexBytes
 	endorsers              []*identityForTesting
-	txn                    *components.PrivateTransaction
 	revertReason           *string
 	predefinedDependencies []uuid.UUID
+}
+
+// useful for creating multiple transactions in a test, from the same sender
+type PrivateTransactionBuilderListForTesting []*PrivateTransactionBuilderForTesting
+
+func NewPrivateTransactionBuilderListForTesting(num int) PrivateTransactionBuilderListForTesting {
+
+	builders := make(PrivateTransactionBuilderListForTesting, num)
+	for i := 0; i < num; i++ {
+		builders[i] = NewPrivateTransactionBuilderForTesting()
+	}
+	return builders
+}
+
+// Function BuildSparse creates a slice of PrivateTransactions with only the PreAssembly populated
+func (b PrivateTransactionBuilderListForTesting) BuildSparse() []*components.PrivateTransaction {
+	transactions := make([]*components.PrivateTransaction, len(b))
+	for i, builder := range b {
+		transactions[i] = builder.BuildSparse()
+	}
+	return transactions
+}
+
+func (b PrivateTransactionBuilderListForTesting) Address(address tktypes.EthAddress) PrivateTransactionBuilderListForTesting {
+	for _, builder := range b {
+		builder.Address(address)
+	}
+	return b
+}
+
+// initialize sender identity locator e.g. name@node
+func (b PrivateTransactionBuilderListForTesting) Sender(sender string) PrivateTransactionBuilderListForTesting {
+	for _, builder := range b {
+		builder.Sender(sender)
+	}
+	return b
+}
+
+func (b PrivateTransactionBuilderListForTesting) SenderName(senderName string) PrivateTransactionBuilderListForTesting {
+	for _, builder := range b {
+		builder.SenderName(senderName)
+	}
+	return b
+}
+
+func (b PrivateTransactionBuilderListForTesting) SenderNode(senderNode string) PrivateTransactionBuilderListForTesting {
+	for _, builder := range b {
+		builder.SenderNode(senderNode)
+	}
+	return b
 }
 
 // Function NewTransactionBuilderForTesting creates a TransactionBuilderForTesting with random values for all fields
 // use the builder methods to set specific values for fields before calling Build to create a new Transaction
 func NewPrivateTransactionBuilderForTesting() *PrivateTransactionBuilderForTesting {
-	senderName := "sender"
-	senderNode := "senderNode"
+
 	builder := &PrivateTransactionBuilderForTesting{
-		id: uuid.New(),
-		sender: &identityForTesting{
-			identityLocator: fmt.Sprintf("%s@%s", senderName, senderNode),
-			identity:        senderName,
-			verifier:        tktypes.RandAddress().String(),
-			keyHandle:       senderName + "_KeyHandle",
-		},
+		id:                   uuid.New(),
+		domain:               "defaultDomain",
+		address:              *tktypes.RandAddress(),
+		senderName:           "sender",
+		senderNode:           "senderNode",
 		signerAddress:        nil,
 		numberOfEndorsers:    3,
 		numberOfEndorsements: 0,
@@ -71,6 +122,33 @@ func NewPrivateTransactionBuilderForTesting() *PrivateTransactionBuilderForTesti
 	}
 
 	return builder
+}
+
+func (b *PrivateTransactionBuilderForTesting) Address(address tktypes.EthAddress) *PrivateTransactionBuilderForTesting {
+	b.address = address
+	return b
+}
+
+func (b *PrivateTransactionBuilderForTesting) Sender(sender string) *PrivateTransactionBuilderForTesting {
+
+	name, node, err := tktypes.PrivateIdentityLocator(sender).Validate(context.Background(), "", false)
+	if err != nil {
+		//this is only used for testing so panic is fine
+		panic(err)
+	}
+	b.senderName = name
+	b.senderName = node
+	return b
+}
+
+func (b *PrivateTransactionBuilderForTesting) SenderName(senderName string) *PrivateTransactionBuilderForTesting {
+	b.senderName = senderName
+	return b
+}
+
+func (b *PrivateTransactionBuilderForTesting) SenderNode(senderNode string) *PrivateTransactionBuilderForTesting {
+	b.senderNode = senderNode
+	return b
 }
 
 func (b *PrivateTransactionBuilderForTesting) NumberOfRequiredEndorsers(num int) *PrivateTransactionBuilderForTesting {
@@ -103,11 +181,6 @@ func (b *PrivateTransactionBuilderForTesting) ReadStateIDs(stateIDs ...tktypes.H
 	return b
 }
 
-func (b *PrivateTransactionBuilderForTesting) Sender(sender *identityForTesting) *PrivateTransactionBuilderForTesting {
-	b.sender = sender
-	return b
-}
-
 func (b *PrivateTransactionBuilderForTesting) PredefinedDependencies(transactionIDs ...uuid.UUID) *PrivateTransactionBuilderForTesting {
 	b.predefinedDependencies = transactionIDs
 	return b
@@ -126,11 +199,17 @@ func (b *PrivateTransactionBuilderForTesting) GetEndorserIdentityLocator(endorse
 	return b.endorsers[endorserIndex].identityLocator
 }
 
-// Function Build creates a new complete private transaction with all fields populated as per the builder's configuration using defaults
-// for any values not explicitly set by the builder
-// To create a partial transaction (e.g. with no PostAssembly) use the BuildPreAssembly etc methods
-func (b *PrivateTransactionBuilderForTesting) Build() *components.PrivateTransaction {
+func (b *PrivateTransactionBuilderForTesting) initializeSender() {
 
+	b.sender = &identityForTesting{
+		identityLocator: fmt.Sprintf("%s@%s", b.senderName, b.senderNode),
+		identity:        b.senderName,
+		verifier:        tktypes.RandAddress().String(),
+		keyHandle:       b.senderName + "_KeyHandle",
+	}
+}
+
+func (b *PrivateTransactionBuilderForTesting) initializeEndorsers() {
 	b.endorsers = make([]*identityForTesting, b.numberOfEndorsers)
 	for i := 0; i < b.numberOfEndorsers; i++ {
 		endorserName := fmt.Sprintf("endorser-%d", i)
@@ -142,19 +221,38 @@ func (b *PrivateTransactionBuilderForTesting) Build() *components.PrivateTransac
 			keyHandle:       endorserName + "KeyHandle",
 		}
 	}
+}
 
-	privateTransaction := &components.PrivateTransaction{
+// Function Build creates a new complete private transaction with all fields populated as per the builder's configuration using defaults
+// for any values not explicitly set by the builder
+// To create a partial transaction (e.g. with no PostAssembly) use the BuildPreAssembly etc methods
+func (b *PrivateTransactionBuilderForTesting) Build() *components.PrivateTransaction {
+
+	b.initializeSender()
+	b.initializeEndorsers()
+	return &components.PrivateTransaction{
 		ID:           b.id,
-		Domain:       "defaultDomain",
-		Address:      *tktypes.RandAddress(),
+		Domain:       b.domain,
+		Address:      b.address,
 		PreAssembly:  b.BuildPreAssembly(),
 		PostAssembly: b.BuildPostAssembly(),
 	}
 
-	return privateTransaction
-
 }
 
+// Function BuildSparse creates a new private transaction with only the PreAssembly populated
+func (b *PrivateTransactionBuilderForTesting) BuildSparse() *components.PrivateTransaction {
+	b.initializeSender()
+	b.initializeEndorsers()
+	return &components.PrivateTransaction{
+		ID:          b.id,
+		Domain:      b.domain,
+		Address:     b.address,
+		PreAssembly: b.BuildPreAssembly(),
+	}
+}
+
+// Function BuildPreAssembly creates a new PreAssembly with all fields populated as per the builder's configuration using defaults unless explicitly set
 func (b *PrivateTransactionBuilderForTesting) BuildPreAssembly() *components.TransactionPreAssembly {
 	preAssembly := &components.TransactionPreAssembly{
 		RequiredVerifiers: make([]*prototk.ResolveVerifierRequest, b.numberOfEndorsers+1),
@@ -195,6 +293,7 @@ func (b *PrivateTransactionBuilderForTesting) BuildPreAssembly() *components.Tra
 	return preAssembly
 }
 
+// Function BuildEndorsement creates a new AttestationResult for the given endorserIndex
 func (b *PrivateTransactionBuilderForTesting) BuildEndorsement(endorserIndex int) *prototk.AttestationResult {
 
 	attReqName := b.GetEndorsementName(endorserIndex)
@@ -211,6 +310,7 @@ func (b *PrivateTransactionBuilderForTesting) BuildEndorsement(endorserIndex int
 	}
 }
 
+// Function BuildPostAssembly creates a new PostAssembly with all fields populated as per the builder's configuration using defaults unless explicitly set
 func (b *PrivateTransactionBuilderForTesting) BuildPostAssembly() *components.TransactionPostAssembly {
 
 	if b.revertReason != nil {
