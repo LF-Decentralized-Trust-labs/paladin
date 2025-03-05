@@ -37,11 +37,15 @@ type identityForTesting struct {
 }
 
 type SentMessageRecorder struct {
-	hasSentAssembleRequest             bool
-	sentAssembleRequestIdempotencyKey  uuid.UUID
-	numberOfSentAssembleRequests       int
-	hasSentDispatchConfirmationRequest bool
-	numberOfSentEndorsementRequests    int
+	hasSentAssembleRequest                        bool
+	sentAssembleRequestIdempotencyKey             uuid.UUID
+	numberOfSentAssembleRequests                  int
+	hasSentDispatchConfirmationRequest            bool
+	numberOfSentEndorsementRequests               int
+	sentEndorsementRequestsForPartyIdempotencyKey map[string]uuid.UUID
+	numberOfEndorsementRequestsForParty           map[string]int
+	sentDispatchConfirmationRequestIdempotencyKey uuid.UUID
+	numberOfSentDispatchConfirmationRequests      int
 }
 
 func (r *SentMessageRecorder) SendAssembleRequest(
@@ -70,6 +74,12 @@ func (r *SentMessageRecorder) SendEndorsementRequest(
 	infoStates []*components.FullState,
 ) error {
 	r.numberOfSentEndorsementRequests++
+	if _, ok := r.numberOfEndorsementRequestsForParty[party]; ok {
+		r.numberOfEndorsementRequestsForParty[party]++
+	} else {
+		r.numberOfEndorsementRequestsForParty[party] = 1
+		r.sentEndorsementRequestsForPartyIdempotencyKey[party] = idempotencyKey
+	}
 	return nil
 }
 
@@ -81,11 +91,16 @@ func (r *SentMessageRecorder) SendDispatchConfirmationRequest(
 	hash *tktypes.Bytes32,
 ) error {
 	r.hasSentDispatchConfirmationRequest = true
+	r.sentDispatchConfirmationRequestIdempotencyKey = idempotencyKey
+	r.numberOfSentDispatchConfirmationRequests++
 	return nil
 }
 
 func NewSentMessageRecorder() *SentMessageRecorder {
-	return &SentMessageRecorder{}
+	return &SentMessageRecorder{
+		sentEndorsementRequestsForPartyIdempotencyKey: make(map[string]uuid.UUID),
+		numberOfEndorsementRequestsForParty:           make(map[string]int),
+	}
 }
 
 type TransactionBuilderForTesting struct {
@@ -138,7 +153,6 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		builder.latestSubmissionHash = &latestSubmissionHash
 	case State_Endorsement_Gathering:
 		//fine grained detail in this state needed to emulate what has already happened wrt endorsement requests and responses so far
-
 	case State_Blocked:
 		fallthrough
 	case State_Confirming_Dispatch:
@@ -197,6 +211,14 @@ func (b *TransactionBuilderForTesting) Grapher(grapher Grapher) *TransactionBuil
 func (b *TransactionBuilderForTesting) Sender(sender *identityForTesting) *TransactionBuilderForTesting {
 	b.sender = sender
 	return b
+}
+
+func (b *TransactionBuilderForTesting) GetEndorsers() []string {
+	endorsers := make([]string, b.privateTransactionBuilder.GetNumberOfEndorsers())
+	for i := range endorsers {
+		endorsers[i] = b.privateTransactionBuilder.GetEndorserIdentityLocator(i)
+	}
+	return endorsers
 }
 
 type transactionDependencyFakes struct {

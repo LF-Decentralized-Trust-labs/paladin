@@ -197,13 +197,12 @@ func (_ *DependencyReadyEvent) Type() EventType {
 	return Event_DependencyReady
 }
 
-type RequestTimeoutEvent struct {
+type RequestTimeoutIntervalEvent struct {
 	event
-	IdempotencyKey uuid.UUID
 }
 
-func (_ *RequestTimeoutEvent) Type() EventType {
-	return Event_RequestTimeout
+func (_ *RequestTimeoutIntervalEvent) Type() EventType {
+	return Event_RequestTimeoutInterval
 }
 
 // events emitted by the transaction state machine whenever a state transition occurs

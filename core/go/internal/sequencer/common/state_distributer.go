@@ -69,7 +69,6 @@ func (s *stateIntegration) WriteLockAndDistributeStatesForTransaction(ctx contex
 			// which is most likely a programming error in the domain or the domain manager or the sequencer
 			errorMessage := fmt.Sprintf("Failed to write potential states: %s", err)
 			log.L(ctx).Error(errorMessage)
-			//TODO abort
 			return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, errorMessage)
 		} else {
 			log.L(ctx).Debugf("Potential states written %s", s.domainContext.Info().ID)

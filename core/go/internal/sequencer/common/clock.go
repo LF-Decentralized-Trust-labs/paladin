@@ -26,7 +26,7 @@ type Clock interface {
 	Now() Time
 	HasExpired(Time, Duration) bool
 	Duration(milliseconds int) Duration
-	Schedule(context.Context, Duration, func()) (cancel func())
+	ScheduleInterval(context.Context, Duration, func()) (cancel func())
 }
 
 type Duration interface {
@@ -54,15 +54,15 @@ func (c *realClock) HasExpired(start Time, duration Duration) bool {
 	return time.Now().After(realStart.Add(realDuration))
 }
 
-func (c *realClock) Schedule(ctx context.Context, duration Duration, f func()) (cancel func()) {
+func (c *realClock) ScheduleInterval(ctx context.Context, duration Duration, f func()) (cancel func()) {
 	realDuration := duration.(time.Duration)
-	timer := time.NewTimer(realDuration)
+	ticker := time.NewTicker(realDuration)
 	go func() {
-		<-timer.C
+		<-ticker.C
 		f()
 	}()
 	return func() {
-		timer.Stop()
+		ticker.Stop()
 	}
 }
 
@@ -95,7 +95,7 @@ func (c *FakeClockForTesting) HasExpired(start Time, duration Duration) bool {
 
 }
 
-func (c *FakeClockForTesting) Schedule(context.Context, Duration, func()) (cancel func()) {
+func (c *FakeClockForTesting) ScheduleInterval(context.Context, Duration, func()) (cancel func()) {
 	//TODO - do something useful to allow tests to emulate the passage of time to trigger scheduled events
 	return func() {}
 }

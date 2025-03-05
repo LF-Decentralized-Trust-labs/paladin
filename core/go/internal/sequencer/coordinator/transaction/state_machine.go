@@ -60,7 +60,7 @@ const (
 	Event_NonceAllocated                                // nonce allocated by the dispatcher thread
 	Event_Submitted                                     // submission made to the blockchain.  Each time this event is received, the submission hash is updated
 	Event_Confirmed                                     // confirmation received from the blockchain of either a successful or reverted transaction
-	Event_RequestTimeout                                // event emitted by the state machine when a request timeout period has passed since we sent the a request message without receiving a response
+	Event_RequestTimeoutInterval                        // event emitted by the state machine on a regular period while we have pending requests
 	Event_StateTransition                               // event emitted by the state machine when a state transition occurs.  TODO should this be a separate enum?
 	Event_AssembleTimeout                               // the assemble timeout period has passed since we sent the first assemble request
 )
@@ -153,7 +153,7 @@ func init() {
 							On: action_NotifyDependentsOfAssembled,
 						}},
 				},
-				Event_RequestTimeout: {
+				Event_RequestTimeoutInterval: {
 					Actions: []ActionRule{{
 						Action: action_NudgeAssembleRequest,
 						If:     guard_Not(guard_AssembleTimeoutExceeded),
@@ -192,9 +192,14 @@ func init() {
 						{
 							To: State_Pooled,
 							//TODO is there a case for a dependencies checking guard here?
-							On: action_IncrementAssembleErrors,
+							On: action_IncrementAssembleErrors, //TODO should this be done as part of applyEvent?
 						},
 					},
+				},
+				Event_RequestTimeoutInterval: {
+					Actions: []ActionRule{{
+						Action: action_NudgeEndorsementRequests,
+					}},
 				},
 			},
 		},
@@ -217,6 +222,11 @@ func init() {
 						{
 							To: State_Ready_For_Dispatch,
 						}},
+				},
+				Event_RequestTimeoutInterval: {
+					Actions: []ActionRule{{
+						Action: action_NudgeDispatchConfirmationRequest,
+					}},
 				},
 			},
 		},
@@ -418,8 +428,16 @@ func action_SendEndorsementRequests(ctx context.Context, txn *Transaction) error
 	return txn.sendEndorsementRequests(ctx)
 }
 
+func action_NudgeEndorsementRequests(ctx context.Context, txn *Transaction) error {
+	return txn.sendEndorsementRequests(ctx)
+}
+
 func action_SendDispatchConfirmationRequest(ctx context.Context, txn *Transaction) error {
 	return txn.sendDispatchConfirmationRequest(ctx)
+}
+
+func action_NudgeDispatchConfirmationRequest(ctx context.Context, txn *Transaction) error {
+	return txn.nudgeDispatchConfirmationRequest(ctx)
 }
 
 func action_NotifyDependentsOfAssembled(ctx context.Context, txn *Transaction) error {

@@ -59,17 +59,19 @@ type Transaction struct {
 	stateMachine         *StateMachine
 
 	//TODO move the fields that are really just fine grained state info.  Move them into the stateMachine struct ( consider separate structs for each concrete state)
-	heartbeatIntervalsSinceStateChange int
-	pendingAssembleRequest             *common.IdempotentRequest
-	cancelAssembleTimeoutSchedule      func()
-	pendingEndorsementRequests         map[string]map[string]*common.IdempotentRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
-	pendingDispatchConfirmationRequest *common.IdempotentRequest
-	latestError                        string
-	dependencies                       []uuid.UUID //TODO figure out naming of these fields and their relationship with the PrivateTransaction fields
-	dependents                         []uuid.UUID
-	preAssembleDependents              []uuid.UUID
-	previousTransaction                *Transaction
-	nextTransaction                    *Transaction
+	heartbeatIntervalsSinceStateChange               int
+	pendingAssembleRequest                           *common.IdempotentRequest
+	cancelAssembleTimeoutSchedule                    func()
+	cancelEndorsementRequestTimeoutSchedule          func()
+	cancelDispatchConfirmationRequestTimeoutSchedule func()
+	pendingEndorsementRequests                       map[string]map[string]*common.IdempotentRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
+	pendingDispatchConfirmationRequest               *common.IdempotentRequest
+	latestError                                      string
+	dependencies                                     []uuid.UUID //TODO figure out naming of these fields and their relationship with the PrivateTransaction fields
+	dependents                                       []uuid.UUID
+	preAssembleDependents                            []uuid.UUID
+	previousTransaction                              *Transaction
+	nextTransaction                                  *Transaction
 
 	requestTimeout  common.Duration
 	assembleTimeout common.Duration
@@ -316,19 +318,20 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 	t.pendingAssembleRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
 		return t.messageSender.SendAssembleRequest(ctx, t.sender, t.ID, idempotencyKey, t.PreAssembly)
 	})
-	t.cancelAssembleTimeoutSchedule = t.clock.Schedule(ctx, t.requestTimeout, func() {
-		t.emit(&RequestTimeoutEvent{
+	t.cancelAssembleTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
+		t.emit(&RequestTimeoutIntervalEvent{
 			event: event{
 				TransactionID: t.ID,
 			},
-			IdempotencyKey: t.pendingAssembleRequest.IdempotencyKey(),
 		})
-
 	})
 	return t.pendingAssembleRequest.Nudge(ctx)
 }
 
 func (t *Transaction) nudgeAssembleRequest(ctx context.Context) error {
+	if t.pendingAssembleRequest == nil {
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "nudgeAssembleRequest called with no pending request")
+	}
 	return t.pendingAssembleRequest.Nudge(ctx)
 }
 
@@ -449,6 +452,15 @@ func (t *Transaction) hasUnknownDependencies(ctx context.Context) bool {
 func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 
 	if t.pendingEndorsementRequests == nil {
+		//we are starting a new round of endorsement requests so set an interval to remind us to resend any requests that have not been fulfilled on a periodic basis
+		//this is done by emitting events rather so that this behavior is obvious from the state machine definition
+		t.cancelEndorsementRequestTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
+			t.emit(&RequestTimeoutIntervalEvent{
+				event: event{
+					TransactionID: t.ID,
+				},
+			})
+		})
 		t.pendingEndorsementRequests = make(map[string]map[string]*common.IdempotentRequest)
 	}
 
@@ -473,6 +485,7 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 		}
 
 	}
+
 	return nil
 }
 
@@ -493,10 +506,24 @@ func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error
 				hash,
 			)
 		})
-
+		t.cancelDispatchConfirmationRequestTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
+			t.emit(&RequestTimeoutIntervalEvent{
+				event: event{
+					TransactionID: t.ID,
+				},
+			})
+		})
 	}
+
 	return t.pendingDispatchConfirmationRequest.Nudge(ctx)
 
+}
+func (t *Transaction) nudgeDispatchConfirmationRequest(ctx context.Context) error {
+	if t.pendingDispatchConfirmationRequest == nil {
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "nudgeDispatchConfirmationRequest called with no pending request")
+	}
+
+	return t.pendingDispatchConfirmationRequest.Nudge(ctx)
 }
 
 func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {

@@ -199,6 +199,10 @@ func (b *PrivateTransactionBuilderForTesting) GetEndorserIdentityLocator(endorse
 	return b.endorsers[endorserIndex].identityLocator
 }
 
+func (b *PrivateTransactionBuilderForTesting) GetNumberOfEndorsers() int {
+	return b.numberOfEndorsers
+}
+
 func (b *PrivateTransactionBuilderForTesting) initializeSender() {
 
 	b.sender = &identityForTesting{

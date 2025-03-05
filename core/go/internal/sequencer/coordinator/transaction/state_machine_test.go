@@ -130,7 +130,7 @@ func TestStateMachine_Pooled_ToAssembling_OnSelected(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
-	assert.Equal(t, true, mocks.sentMessageRecorder.hasSentAssembleRequest, "expected an assemble request to be sent, but none were sent")
+	assert.Equal(t, true, mocks.sentMessageRecorder.hasSentAssembleRequest)
 }
 
 func TestStateMachine_Assembling_ToEndorsing_OnAssembleResponse(t *testing.T) {
@@ -147,7 +147,7 @@ func TestStateMachine_Assembling_ToEndorsing_OnAssembleResponse(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
-	assert.Equal(t, 3, mocks.sentMessageRecorder.numberOfSentEndorsementRequests, "expected 3 endorsement requests to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentEndorsementRequests)
+	assert.Equal(t, 3, mocks.sentMessageRecorder.numberOfSentEndorsementRequests)
 	//TODO some assertions that WriteLockAndDistributeStatesForTransaction was called with the expected states
 
 }
@@ -175,15 +175,14 @@ func TestStateMachine_Assembling_NoTransition_OnRequestTimeout_IfNotAssembleTime
 
 	mocks.clock.Advance(txnBuilder.assembleTimeout - 1)
 
-	assert.Equal(t, 1, mocks.sentMessageRecorder.numberOfSentAssembleRequests, "expected 1 assemble request to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentAssembleRequests)
-	err := txn.HandleEvent(ctx, &RequestTimeoutEvent{
+	assert.Equal(t, 1, mocks.sentMessageRecorder.numberOfSentAssembleRequests)
+	err := txn.HandleEvent(ctx, &RequestTimeoutIntervalEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
-		IdempotencyKey: mocks.sentMessageRecorder.sentAssembleRequestIdempotencyKey,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, 2, mocks.sentMessageRecorder.numberOfSentAssembleRequests, "expected 2 assemble request to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentAssembleRequests)
+	assert.Equal(t, 2, mocks.sentMessageRecorder.numberOfSentAssembleRequests)
 
 	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
@@ -195,11 +194,10 @@ func TestStateMachine_Assembling_ToPooled_OnRequestTimeout_IfAssembleTimeoutExpi
 
 	mocks.clock.Advance(txnBuilder.assembleTimeout + 1)
 
-	err := txn.HandleEvent(ctx, &RequestTimeoutEvent{
+	err := txn.HandleEvent(ctx, &RequestTimeoutIntervalEvent{
 		event: event{
 			TransactionID: txn.ID,
 		},
-		IdempotencyKey: mocks.sentMessageRecorder.sentAssembleRequestIdempotencyKey,
 	})
 	assert.NoError(t, err)
 
@@ -276,6 +274,62 @@ func TestStateMachine_Pooled_ToPreAssemblyBlocked_OnDependencyReverted(t *testin
 
 }
 
+func TestStateMachine_EndorsementGathering_NudgeRequests_OnRequestTimeout_IfPendingRequests(t *testing.T) {
+	ctx := context.Background()
+	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
+		NumberOfRequiredEndorsers(3)
+
+	txn, mocks := builder.BuildWithMocks()
+	assert.Equal(t, 3, mocks.sentMessageRecorder.numberOfSentEndorsementRequests)
+
+	mocks.clock.Advance(builder.requestTimeout + 1)
+
+	err := txn.HandleEvent(ctx, &RequestTimeoutIntervalEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 6, mocks.sentMessageRecorder.numberOfSentEndorsementRequests)
+
+	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+
+}
+
+func TestStateMachine_EndorsementGathering_NudgeRequests_OnRequestTimeout_IfPendingRequests_Partial(t *testing.T) {
+	//emulate the case where only a subset of the endorsement requests have timed out
+	ctx := context.Background()
+	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
+		NumberOfRequiredEndorsers(4)
+
+	txn, mocks := builder.BuildWithMocks()
+	assert.Equal(t, 4, mocks.sentMessageRecorder.numberOfSentEndorsementRequests)
+
+	//2 endorsements come back in a timely manner
+	err := txn.HandleEvent(ctx, builder.BuildEndorsedEvent(0))
+	assert.NoError(t, err)
+
+	err = txn.HandleEvent(ctx, builder.BuildEndorsedEvent(1))
+	assert.NoError(t, err)
+
+	mocks.clock.Advance(builder.requestTimeout + 1)
+
+	err = txn.HandleEvent(ctx, &RequestTimeoutIntervalEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 6, mocks.sentMessageRecorder.numberOfSentEndorsementRequests) // the 4 original requests plus 2 nudge requests
+	assert.Equal(t, 1, mocks.sentMessageRecorder.numberOfEndorsementRequestsForParty[builder.GetEndorsers()[0]])
+	assert.Equal(t, 1, mocks.sentMessageRecorder.numberOfEndorsementRequestsForParty[builder.GetEndorsers()[1]])
+	assert.Equal(t, 2, mocks.sentMessageRecorder.numberOfEndorsementRequestsForParty[builder.GetEndorsers()[2]])
+	assert.Equal(t, 2, mocks.sentMessageRecorder.numberOfEndorsementRequestsForParty[builder.GetEndorsers()[3]])
+
+	assert.Equal(t, State_Endorsement_Gathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+
+}
+
 func TestStateMachine_EndorsementGathering_ToConfirmingDispatch_OnEndorsed_IfAttestationPlanComplete(t *testing.T) {
 	ctx := context.Background()
 	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering).
@@ -346,6 +400,25 @@ func TestStateMachine_EndorsementGathering_ToPooled_OnEndorseRejected(t *testing
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	assert.Equal(t, 1, txn.errorCount, "expected error count to be 1, but it was %d", txn.errorCount)
 
+}
+
+func TestStateMachine_ConfirmingDispatch_NudgeRequest_OnRequestTimeout(t *testing.T) {
+	ctx := context.Background()
+	builder := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch)
+	txn, mocks := builder.BuildWithMocks()
+	assert.Equal(t, 1, mocks.sentMessageRecorder.numberOfSentDispatchConfirmationRequests, "expected 1 confirm dispatch request to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentDispatchConfirmationRequests)
+
+	mocks.clock.Advance(builder.requestTimeout + 1)
+
+	err := txn.HandleEvent(ctx, &RequestTimeoutIntervalEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, 2, mocks.sentMessageRecorder.numberOfSentDispatchConfirmationRequests, "expected 2 confirm dispatch request to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentDispatchConfirmationRequests)
+	assert.Equal(t, State_Confirming_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
 func TestStateMachine_ConfirmingDispatch_ToReadyForDispatch_OnDispatchConfirmed(t *testing.T) {

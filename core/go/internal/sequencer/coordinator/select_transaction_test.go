@@ -194,11 +194,10 @@ func TestSelectTransaction_SlowQueue(t *testing.T) {
 			assert.LessOrEqual(t, i, 3)
 			//Simulate the passage of time then trigger a heartbeat
 			mocks.clock.Advance(5001) //because NewCoordinatorForUnitTest sets the assemble timeout to be 5000 TODO use a builder and make this more explicit
-			requestTimeoutEvent := &transaction.RequestTimeoutEvent{}
-			requestTimeoutEvent.TransactionID = assemblingTxnID
-			requestTimeoutEvent.IdempotencyKey = assembleRequestID
+			requestTimeoutIntervalEvent := &transaction.RequestTimeoutIntervalEvent{}
+			requestTimeoutIntervalEvent.TransactionID = assemblingTxnID
 			assemblingTxnID = uuid.Nil
-			err = coordinator.HandleEvent(ctx, requestTimeoutEvent)
+			err = coordinator.HandleEvent(ctx, requestTimeoutIntervalEvent)
 			assert.NoError(t, err)
 
 		} else {
