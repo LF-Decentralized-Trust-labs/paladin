@@ -16,7 +16,6 @@ package transaction
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -151,18 +150,6 @@ func (t *Transaction) Hash(ctx context.Context) (*tktypes.Bytes32, error) {
 
 }
 
-func (t *Transaction) SetPreviousTransaction(ctx context.Context, previousTransaction *Transaction) {
-	//TODO consider moving this to the PreAssembly part of PrivateTransaction and specifying a responsibility of the sender to set this.
-	// this is probably part of the decision on whether we expect the sender to include all current inflight transactions in every delegation request.
-	t.previousTransaction = previousTransaction
-}
-
-func (t *Transaction) SetNextTransaction(ctx context.Context, nextTransaction *Transaction) {
-	//TODO consider moving this to the PreAssembly part of PrivateTransaction and specifying a responsibility of the sender to set this.
-	// this is probably part of the decision on whether we expect the sender to include all current inflight transactions in every delegation request.
-	t.nextTransaction = nextTransaction
-}
-
 // SignatureAttestationName is a method of Transaction that returns the name of the attestation in the attestation plan that is a signature
 func (t *Transaction) SignatureAttestationName() (string, error) {
 	for _, attRequest := range t.PostAssembly.AttestationPlan {
@@ -207,76 +194,4 @@ func (d *Transaction) InputStateIDs(_ context.Context) []string {
 
 func (d *Transaction) Txn() *components.PrivateTransaction {
 	return d.PrivateTransaction
-}
-
-// Function hasDependenciesNotAssembled checks if the transaction has any dependencies that have not been assembled yet
-func (t *Transaction) hasDependenciesNotAssembled(ctx context.Context) bool {
-
-	// we cannot have unassembled dependencies other than those that were provided to us in the PreAssemble or the one we determined as previousTransaction when we initially received an ordered list of delegated transactions.
-	if t.previousTransaction != nil && t.previousTransaction.isNotAssembled() {
-		return true
-	}
-
-	for _, dependencyID := range t.PreAssembly.Dependencies {
-		dependency := t.grapher.TransactionByID(ctx, dependencyID)
-		if dependency == nil {
-			//assume the dependency has been confirmed and no longer in memory
-			//hasUnknownDependencies guard will be used to explicitly ensure the correct thing happens
-			continue
-		}
-		if dependency.isNotAssembled() {
-			return true
-		}
-	}
-
-	return false
-}
-
-// Function hasUnknownDependencies checks if the transaction has any dependencies the coordinator does not have in memory.  These might be long gone confirmed to base ledger or maybe the delegation request for them hasn't reached us yet. At this point, we don't know
-func (t *Transaction) hasUnknownDependencies(ctx context.Context) bool {
-
-	dependencies := t.dependencies
-	if t.PreAssembly != nil {
-		dependencies = append(dependencies, t.PreAssembly.Dependencies...)
-	}
-
-	for _, dependencyID := range dependencies {
-		dependency := t.grapher.TransactionByID(ctx, dependencyID)
-		if dependency == nil {
-
-			return true
-		}
-
-	}
-
-	//if there are are any dependencies declared, they are all known to the current in memory context ( grapher)
-	return false
-}
-
-// TODO rename this function because it is not clear that its main purpose is to attach this transaction to the dependency as a dependent
-func (t *Transaction) initializeDependencies(ctx context.Context) error {
-	if t.PreAssembly == nil {
-		msg := fmt.Sprintf("Cannot calculate dependencies for transaction %s without a PreAssembly", t.ID)
-		log.L(ctx).Error(msg)
-		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
-	}
-
-	for _, dependencyID := range t.PreAssembly.Dependencies {
-		dependencyTxn := t.grapher.TransactionByID(ctx, dependencyID)
-
-		if nil == dependencyTxn {
-			//either the dependency has been confirmed and no longer in memory or there was a overtake on the network and we have not received the delegation request for the dependency yet
-			// in either case, the guards will stop this transaction from being assembled but will appear in the heartbeat messages so that the sender can take appropriate action (remove the dependency if it is confirmed, resend the dependency delegation request if it is an inflight transaction)
-
-			//This should be relatively rare so worth logging as an info
-			log.L(ctx).Infof("Dependency %s not found in memory for transaction %s", dependencyID, t.ID)
-			continue
-		}
-
-		//TODO this should be idempotent.
-		dependencyTxn.preAssembleDependents = append(dependencyTxn.preAssembleDependents, t.ID)
-	}
-
-	return nil
-
 }

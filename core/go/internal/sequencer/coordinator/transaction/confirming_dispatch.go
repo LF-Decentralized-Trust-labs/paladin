@@ -73,3 +73,11 @@ func validator_MatchesPendingDispatchConfirmationRequest(ctx context.Context, tx
 	}
 	return false, nil
 }
+
+func action_SendDispatchConfirmationRequest(ctx context.Context, txn *Transaction) error {
+	return txn.sendDispatchConfirmationRequest(ctx)
+}
+
+func action_NudgeDispatchConfirmationRequest(ctx context.Context, txn *Transaction) error {
+	return txn.nudgeDispatchConfirmationRequest(ctx)
+}

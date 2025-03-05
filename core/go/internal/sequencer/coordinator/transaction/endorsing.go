@@ -172,3 +172,16 @@ func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState
 	}
 	return endorsableList
 }
+
+func action_SendEndorsementRequests(ctx context.Context, txn *Transaction) error {
+	return txn.sendEndorsementRequests(ctx)
+}
+
+func action_NudgeEndorsementRequests(ctx context.Context, txn *Transaction) error {
+	return txn.sendEndorsementRequests(ctx)
+}
+
+// endorsed by all required endorsers
+func guard_AttestationPlanFulfilled(ctx context.Context, txn *Transaction) bool {
+	return !txn.hasUnfulfilledEndorsementRequirements(ctx)
+}

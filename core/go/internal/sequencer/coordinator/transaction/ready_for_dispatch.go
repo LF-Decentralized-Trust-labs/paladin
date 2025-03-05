@@ -89,3 +89,7 @@ func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
 	}
 	return nil
 }
+
+func action_NotifyDependentsOfReadiness(ctx context.Context, txn *Transaction) error {
+	return txn.notifyDependentsOfReadiness(ctx)
+}

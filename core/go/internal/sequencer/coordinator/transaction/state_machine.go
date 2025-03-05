@@ -73,6 +73,9 @@ type StateMachine struct {
 // for a specific transition
 type Action func(ctx context.Context, txn *Transaction) error
 
+// TODO should we pass static config ( e.g. timeouts) to the guards instead of storing them in every transaction struct instance?
+type Guard func(ctx context.Context, txn *Transaction) bool
+
 type Transition struct {
 	To State // State to transition to if the guard condition is met
 	If Guard // Condition to evaluate the transaction against to determine if this transition should be taken
@@ -416,48 +419,32 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 	return nil
 }
 
-func action_SendAssembleRequest(ctx context.Context, txn *Transaction) error {
-	return txn.sendAssembleRequest(ctx)
+func guard_Not(guard Guard) Guard {
+	return func(ctx context.Context, txn *Transaction) bool {
+		return !guard(ctx, txn)
+	}
 }
 
-func action_NudgeAssembleRequest(ctx context.Context, txn *Transaction) error {
-	return txn.nudgeAssembleRequest(ctx)
+func guard_And(guards ...Guard) Guard {
+	return func(ctx context.Context, txn *Transaction) bool {
+		for _, guard := range guards {
+			if !guard(ctx, txn) {
+				return false
+			}
+		}
+		return true
+	}
 }
 
-func action_SendEndorsementRequests(ctx context.Context, txn *Transaction) error {
-	return txn.sendEndorsementRequests(ctx)
-}
-
-func action_NudgeEndorsementRequests(ctx context.Context, txn *Transaction) error {
-	return txn.sendEndorsementRequests(ctx)
-}
-
-func action_SendDispatchConfirmationRequest(ctx context.Context, txn *Transaction) error {
-	return txn.sendDispatchConfirmationRequest(ctx)
-}
-
-func action_NudgeDispatchConfirmationRequest(ctx context.Context, txn *Transaction) error {
-	return txn.nudgeDispatchConfirmationRequest(ctx)
-}
-
-func action_NotifyDependentsOfAssembled(ctx context.Context, txn *Transaction) error {
-	return txn.notifyDependentsOfAssembled(ctx)
-}
-
-func action_NotifyDependentsOfReadiness(ctx context.Context, txn *Transaction) error {
-	return txn.notifyDependentsOfReadiness(ctx)
-}
-
-func action_NotifyDependentsOfRevert(ctx context.Context, txn *Transaction) error {
-	return txn.notifyDependentsOfRevert(ctx)
-}
-
-func action_initializeDependencies(ctx context.Context, txn *Transaction) error {
-	return txn.initializeDependencies(ctx)
-}
-
-func action_IncrementAssembleErrors(ctx context.Context, txn *Transaction) error {
-	return txn.incrementAssembleErrors(ctx)
+func guard_Or(guards ...Guard) Guard {
+	return func(ctx context.Context, txn *Transaction) bool {
+		for _, guard := range guards {
+			if guard(ctx, txn) {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 func (s *State) String() string {

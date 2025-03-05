@@ -222,3 +222,27 @@ func validator_MatchesPendingAssembleRequest(ctx context.Context, txn *Transacti
 	}
 	return false, nil
 }
+
+func action_SendAssembleRequest(ctx context.Context, txn *Transaction) error {
+	return txn.sendAssembleRequest(ctx)
+}
+
+func action_NudgeAssembleRequest(ctx context.Context, txn *Transaction) error {
+	return txn.nudgeAssembleRequest(ctx)
+}
+
+func action_NotifyDependentsOfAssembled(ctx context.Context, txn *Transaction) error {
+	return txn.notifyDependentsOfAssembled(ctx)
+}
+
+func action_NotifyDependentsOfRevert(ctx context.Context, txn *Transaction) error {
+	return txn.notifyDependentsOfRevert(ctx)
+}
+
+func action_IncrementAssembleErrors(ctx context.Context, txn *Transaction) error {
+	return txn.incrementAssembleErrors(ctx)
+}
+
+func guard_AssembleTimeoutExceeded(ctx context.Context, txn *Transaction) bool {
+	return txn.assembleTimeoutExceeded(ctx)
+}
