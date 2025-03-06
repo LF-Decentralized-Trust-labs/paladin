@@ -26,19 +26,18 @@ import (
 type State int
 
 const (
-	State_Initial State = iota // Initial state before anything is calculated
-	State_Pooled               // waiting in the pool to be assembled - TODO should rename to "Selectable" or "Selectable_Pooled".  Related to potential rename of `State_PreAssembly_Blocked`
-	//TODO State_PreAssembly_Blocked is this the best name?  Should probably rename State_Blocked to State_Endorsement_Gathering_Blocked.  NOTE: when renaming, also search for PreAssemblyBlocked e.g. in test func names
-	State_PreAssembly_Blocked   // has not been assembled yet and cannot be assembled because a dependency never got assembled successfully - i.e. it was either Parked or Reverted is also blocked
-	State_Assembling            // an assemble request has been sent but we are waiting for the response
-	State_Reverted              // the transaction has been reverted by the assembler/sender
-	State_Endorsement_Gathering // assembled and waiting for endorsement
-	State_Blocked               // is fully endorsed but cannot proceed due to dependencies not being ready for dispatch
-	State_Confirming_Dispatch   // endorsed and waiting for dispatch confirmation
-	State_Ready_For_Dispatch    // dispatch confirmation received and waiting to be collected by the dispatcher thread.Going into this state is the point of no return
-	State_Dispatched            // collected by the dispatcher thread but not yet
-	State_Submitted             // at least one submission has been made to the blockchain
-	State_Confirmed             // "recently" confirmed on the base ledger.  NOTE: confirmed transactions are not held in memory for ever so getting a list of confirmed transactions will only return those confirmed recently
+	State_Initial               State = iota // Initial state before anything is calculated
+	State_Pooled                             // waiting in the pool to be assembled - TODO should rename to "Selectable" or "Selectable_Pooled".  Related to potential rename of `State_PreAssembly_Blocked`
+	State_PreAssembly_Blocked                // has not been assembled yet and cannot be assembled because a dependency never got assembled successfully - i.e. it was either Parked or Reverted is also blocked
+	State_Assembling                         // an assemble request has been sent but we are waiting for the response
+	State_Reverted                           // the transaction has been reverted by the assembler/sender
+	State_Endorsement_Gathering              // assembled and waiting for endorsement
+	State_Blocked                            // is fully endorsed but cannot proceed due to dependencies not being ready for dispatch
+	State_Confirming_Dispatch                // endorsed and waiting for dispatch confirmation
+	State_Ready_For_Dispatch                 // dispatch confirmation received and waiting to be collected by the dispatcher thread.Going into this state is the point of no return
+	State_Dispatched                         // collected by the dispatcher thread but not yet
+	State_Submitted                          // at least one submission has been made to the blockchain
+	State_Confirmed                          // "recently" confirmed on the base ledger.  NOTE: confirmed transactions are not held in memory for ever so getting a list of confirmed transactions will only return those confirmed recently
 )
 
 type EventType = common.EventType
@@ -194,8 +193,7 @@ func init() {
 					Transitions: []Transition{
 						{
 							To: State_Pooled,
-							//TODO is there a case for a dependencies checking guard here?
-							On: action_IncrementAssembleErrors, //TODO should this be done as part of applyEvent?
+							On: action_IncrementAssembleErrors,
 						},
 					},
 				},
@@ -277,7 +275,6 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 	}
 }
 
-// TODO refactor this so that we can have good unit tests for this function using a fake set of state definitions
 func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error {
 
 	//determine whether this event is valid for the current state
@@ -352,6 +349,8 @@ func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error 
 		err = t.applyPostAssembly(ctx, event.PostAssembly)
 	case *EndorsedEvent:
 		err = t.applyEndorsement(ctx, event.Endorsement, event.RequestID)
+	case *EndorsedRejectedEvent:
+		err = t.applyEndorsementRejection(ctx, event.RevertReason, event.Party, event.AttestationRequestName)
 	case *DispatchConfirmedEvent:
 		err = t.applyDispatchConfirmation(ctx, event.RequestID)
 	case *NonceAllocatedEvent:

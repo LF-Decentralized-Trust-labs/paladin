@@ -52,6 +52,12 @@ func (t *Transaction) applyEndorsement(ctx context.Context, endorsement *prototk
 	return nil
 }
 
+func (t *Transaction) applyEndorsementRejection(ctx context.Context, revertReason string, party string, attestationRequestName string) error {
+	//The endorsement rejection is not currently stored in the PrivateTransaction struct.
+	//  Only thing that the state machine currently cares about is the error count (which may be used as part of the logic to select transactions from the pool for assembly) and that is incremented in the transition functions
+	return nil
+}
+
 func (d *Transaction) IsEndorsed(ctx context.Context) bool {
 	return !d.hasUnfulfilledEndorsementRequirements(ctx)
 }
