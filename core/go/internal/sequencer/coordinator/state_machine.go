@@ -30,7 +30,7 @@ const (
 	State_Idle      State = iota //Not acting as a coordinator and not aware of any other active coordinators
 	State_Observing              //Not acting as a coordinator but aware of another node acting as a coordinator
 	State_Elect                  //Elected to take over from another coordinator and waiting for handover information
-	State_Standby                //TODO comments to describe these
+	State_Standby
 	State_Prepared
 	State_Active
 	State_Flush
@@ -67,8 +67,8 @@ type Transition struct {
 }
 
 type EventHandler struct {
-	Validator   func(ctx context.Context, txn *coordinator, event common.Event) (bool, error) // function to validate whether the event is valid for the current state of the coordinator.  This is optional.  If not defined, the event is always considered valid.
-	Transitions []Transition                                                                  // list of transitions that this event could trigger.  The list is ordered so the first matching transition is the one that will be taken.
+	Validator   func(ctx context.Context, c *coordinator, event common.Event) (bool, error) // function to validate whether the event is valid for the current state of the coordinator.  This is optional.  If not defined, the event is always considered valid.
+	Transitions []Transition                                                                // list of transitions that this event could trigger.  The list is ordered so the first matching transition is the one that will be taken.
 }
 
 type StateDefinition struct {
@@ -103,11 +103,11 @@ func init() {
 					Transitions: []Transition{
 						{
 							To: State_Standby,
-							If: behind,
+							If: guard_Behind,
 						},
 						{
 							To: State_Elect,
-							If: notBehind,
+							If: guard_Not(guard_Behind),
 						},
 					},
 				},
@@ -120,7 +120,7 @@ func init() {
 				Event_NewBlock: {
 					Transitions: []Transition{{
 						To: State_Elect,
-						If: notBehind,
+						If: guard_Not(guard_Behind),
 					}},
 				},
 			},
@@ -144,7 +144,7 @@ func init() {
 				Event_TransactionConfirmed: {
 					Transitions: []Transition{{
 						To: State_Active,
-						If: activeCoordinatorFlushComplete,
+						If: guard_ActiveCoordinatorFlushComplete,
 					}},
 				},
 			},
@@ -157,7 +157,7 @@ func init() {
 				Event_TransactionConfirmed: {
 					Transitions: []Transition{{
 						To: State_Idle,
-						If: noTransactionsInflight,
+						If: guard_Not(guard_HasTransactionsInflight),
 					}},
 				},
 				Event_HandoverRequestReceived: {
@@ -174,7 +174,7 @@ func init() {
 				Event_TransactionConfirmed: {
 					Transitions: []Transition{{
 						To: State_Closing,
-						If: flushComplete,
+						If: guard_FlushComplete,
 					}},
 				},
 			},
@@ -185,7 +185,7 @@ func init() {
 				common.Event_HeartbeatInterval: {
 					Transitions: []Transition{{
 						To: State_Idle,
-						If: closingGracePeriodExpired,
+						If: guard_ClosingGracePeriodExpired,
 					}},
 				},
 			},
