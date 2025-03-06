@@ -43,9 +43,9 @@ type MessageSender interface {
 		transactionSpecification *prototk.TransactionSpecification,
 		verifiers []*prototk.ResolvedVerifier,
 		signatures []*prototk.AttestationResult,
-		inputStates []*components.FullState,
-		outputStates []*components.FullState,
-		infoStates []*components.FullState,
+		inputStates []*prototk.EndorsableState,
+		outputStates []*prototk.EndorsableState,
+		infoStates []*prototk.EndorsableState,
 	) error
 
 	SendDispatchConfirmationRequest(

@@ -60,7 +60,6 @@ func (d *Transaction) hasUnfulfilledEndorsementRequirements(ctx context.Context)
 	return len(d.unfulfilledEndorsementRequirements(ctx)) > 0
 }
 
-// TODO rework this.  There are actually 2 things to keep track of a) unfulfilled endorsement requirements.  i.e. there is a thing in the plan and we don't have an attestation for it and b) outstanding requests.  i.e. we have sent a request and not had a response yet
 func (d *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []*endorsementRequirement {
 	unfulfilledEndorsementRequirements := make([]*endorsementRequirement, 0)
 	if d.PostAssembly == nil {
@@ -149,9 +148,9 @@ func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey uui
 		t.PreAssembly.TransactionSpecification,
 		t.PreAssembly.Verifiers,
 		t.PostAssembly.Signatures,
-		t.PostAssembly.InputStates,
-		t.PostAssembly.OutputStates,
-		t.PostAssembly.InfoStates,
+		toEndorsableList(t.PostAssembly.InputStates),
+		toEndorsableList(t.PostAssembly.OutputStates),
+		toEndorsableList(t.PostAssembly.InfoStates),
 	)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to send endorsement request to party %s: %s", party, err)
@@ -160,7 +159,6 @@ func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey uui
 	return err
 }
 
-// TODO this is not called but should be called to build the endorsement request?
 func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState {
 	endorsableList := make([]*prototk.EndorsableState, len(states))
 	for i, input := range states {
