@@ -398,7 +398,7 @@ func TestStateMachine_EndorsementGathering_ToPooled_OnEndorseRejected(t *testing
 	assert.NoError(t, err)
 
 	assert.Equal(t, State_Pooled, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
-	assert.Equal(t, 1, txn.errorCount, "expected error count to be 1, but it was %d", txn.errorCount)
+	assert.Equal(t, 1, txn.errorCount)
 
 }
 
@@ -406,7 +406,7 @@ func TestStateMachine_ConfirmingDispatch_NudgeRequest_OnRequestTimeout(t *testin
 	ctx := context.Background()
 	builder := NewTransactionBuilderForTesting(t, State_Confirming_Dispatch)
 	txn, mocks := builder.BuildWithMocks()
-	assert.Equal(t, 1, mocks.sentMessageRecorder.numberOfSentDispatchConfirmationRequests, "expected 1 confirm dispatch request to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentDispatchConfirmationRequests)
+	assert.Equal(t, 1, mocks.sentMessageRecorder.numberOfSentDispatchConfirmationRequests)
 
 	mocks.clock.Advance(builder.requestTimeout + 1)
 
@@ -417,7 +417,7 @@ func TestStateMachine_ConfirmingDispatch_NudgeRequest_OnRequestTimeout(t *testin
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, 2, mocks.sentMessageRecorder.numberOfSentDispatchConfirmationRequests, "expected 2 confirm dispatch request to be sent, but %d were sent", mocks.sentMessageRecorder.numberOfSentDispatchConfirmationRequests)
+	assert.Equal(t, 2, mocks.sentMessageRecorder.numberOfSentDispatchConfirmationRequests)
 	assert.Equal(t, State_Confirming_Dispatch, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
