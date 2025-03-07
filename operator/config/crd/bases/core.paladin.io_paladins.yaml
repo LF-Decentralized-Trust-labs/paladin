@@ -159,6 +159,11 @@ spec:
                 description: Settings from this config will be loaded as YAML and
                   used as the base of the configuration.
                 type: string
+              customLabels:
+                additionalProperties:
+                  type: string
+                description: Custom labels. To be applied to generated resources
+                type: object
               database:
                 description: |-
                   Database section k8s native functions for setting up the database
