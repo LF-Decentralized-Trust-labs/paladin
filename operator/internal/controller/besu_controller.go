@@ -171,6 +171,11 @@ func (r *BesuReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1alpha1.Besu{}).
+		Owns(&appsv1.StatefulSet{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Secret{}).
+		Owns(&policyv1.PodDisruptionBudget{}).
 		Complete(r)
 }
 
@@ -529,9 +534,14 @@ func (r *BesuReconciler) createPDB(ctx context.Context, node *corev1alpha1.Besu,
 		setCondition(&node.Status.Conditions, corev1alpha1.ConditionPDB, metav1.ConditionTrue, corev1alpha1.ReasonPDBCreated, fmt.Sprintf("Name: %s", name))
 		log.FromContext(ctx).Info("Created Besu pod disruption budget", "Name", name)
 	} else if err != nil {
-		return nil, err
+  	  return nil, err
 	}
-	return &foundPDB, nil
+
+	if err := r.Create(ctx, pdb); err != nil {
+		return pdb, err
+	}
+	setCondition(&node.Status.Conditions, corev1alpha1.ConditionPDB, metav1.ConditionTrue, corev1alpha1.ReasonPDBCreated, fmt.Sprintf("Name: %s", name))
+	return pdb, nil
 }
 
 func (r *BesuReconciler) generateStatefulSetTemplate(node *corev1alpha1.Besu, name, configSum string) *appsv1.StatefulSet {
