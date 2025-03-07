@@ -8,7 +8,8 @@ title: TransactionFull
 ```json
 {
     "receipt": null,
-    "public": null
+    "public": null,
+    "history": null
 }
 ```
 
@@ -35,6 +36,7 @@ title: TransactionFull
 | `dependsOn` | Transactions registered as dependencies when the transaction was created | [`UUID[]`](simpletypes.md#uuid) |
 | `receipt` | Transaction receipt data - available if the transaction has reached a final state | [`TransactionReceiptData`](#transactionreceiptdata) |
 | `public` | List of public transactions associated with this transaction | [`PublicTx[]`](publictx.md#publictx) |
+| `history` | List transaction values that have previously been provided for this transaction | [`TransactionHistory[]`](#transactionhistory) |
 
 ## TransactionReceiptData
 
@@ -52,5 +54,8 @@ title: TransactionFull
 | `failureMessage` | Failure message - set if transaction reverted | `string` |
 | `revertData` | Encoded revert data - if available | [`HexBytes`](simpletypes.md#hexbytes) |
 | `contractAddress` | New contract address - to be used in the 'To' field for subsequent invoke transactions | [`EthAddress`](simpletypes.md#ethaddress) |
+
+
+## TransactionHistory
 
 

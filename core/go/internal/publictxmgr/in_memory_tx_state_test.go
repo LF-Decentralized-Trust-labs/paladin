@@ -26,22 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// import (
-// 	"context"
-// 	"encoding/json"
-// 	"testing"
-
-// 	"github.com/google/uuid"
-// 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
-// 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-// 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-// 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-// 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-// 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-
-// 	"github.com/stretchr/testify/assert"
-// )
-
 const testTransactionData string = "0x7369676e6564206d657373616765"
 
 func NewTestInMemoryTxState(t *testing.T) InMemoryTxStateManager {
@@ -190,4 +174,50 @@ func TestSettersAndGetters(t *testing.T) {
 	assert.Equal(t, maxFeePerGas.Int(), imts.GetGasPriceObject().MaxFeePerGas.Int())
 	assert.Equal(t, maxPriorityFeePerGas.Int(), imts.GetGasPriceObject().MaxPriorityFeePerGas.Int())
 
+}
+
+func TestValidateUpdate(t *testing.T) {
+	ctx := context.Background()
+	gasPricing := pldapi.PublicTxGasPricing{
+		GasPrice:     tktypes.Uint64ToUint256(0x10),
+		MaxFeePerGas: tktypes.Uint64ToUint256(0x10),
+	}
+	imtxs := inMemoryTxState{
+		mtx: &managedTx{
+			ptx: &DBPublicTxn{},
+		},
+	}
+
+	// no change- fixed pricing not being used before or after
+	assert.NoError(t, imtxs.ValidateUpdate(ctx, &DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString("{}"),
+	}))
+
+	// invalid switch from fixed pricing to not fixed pricing
+	imtxs.mtx.GasPricing = gasPricing
+	imtxs.mtx.ptx.FixedGasPricing = tktypes.JSONString(gasPricing)
+	assert.Regexp(t, "PD011940", imtxs.ValidateUpdate(ctx, &DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString("{}"),
+	}))
+
+	// gas price lower
+	assert.Regexp(t, "PD011938.*0x10.*0x05", imtxs.ValidateUpdate(ctx, &DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(&pldapi.PublicTxGasPricing{
+			GasPrice: tktypes.Uint64ToUint256(0x5),
+		}),
+	}))
+
+	// max fee per gas lower
+	assert.Regexp(t, "PD011939.*0x10.*0x05", imtxs.ValidateUpdate(ctx, &DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(&pldapi.PublicTxGasPricing{
+			MaxFeePerGas: tktypes.Uint64ToUint256(0x5),
+		}),
+	}))
+
+	// valid increase
+	assert.NoError(t, imtxs.ValidateUpdate(ctx, &DBPublicTxn{
+		FixedGasPricing: tktypes.JSONString(&pldapi.PublicTxGasPricing{
+			GasPrice: tktypes.Uint64ToUint256(0x20),
+		}),
+	}))
 }

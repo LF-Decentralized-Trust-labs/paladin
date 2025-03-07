@@ -148,14 +148,14 @@ type orchestrator struct {
 const veryShortMinimum = 50 * time.Millisecond
 
 func NewOrchestrator(
-	ble *pubTxManager,
+	ptm *pubTxManager,
 	signingAddress tktypes.EthAddress,
 	conf *pldconf.PublicTxManagerConfig,
 ) *orchestrator {
-	ctx := ble.ctx
+	ctx := ptm.ctx
 
 	newOrchestrator := &orchestrator{
-		pubTxManager:                ble,
+		pubTxManager:                ptm,
 		orchestratorBirthTime:       time.Now(),
 		orchestratorPollingInterval: confutil.DurationMin(conf.Orchestrator.Interval, veryShortMinimum, *pldconf.PublicTxManagerDefaults.Orchestrator.Interval),
 		maxInFlightTxs:              confutil.IntMin(conf.Orchestrator.MaxInFlight, 1, *pldconf.PublicTxManagerDefaults.Orchestrator.MaxInFlight),
@@ -173,11 +173,11 @@ func NewOrchestrator(
 		// submission retry
 		transactionSubmissionRetry: retry.NewRetryLimited(&conf.Orchestrator.SubmissionRetry),
 		staleTimeout:               confutil.DurationMin(conf.Orchestrator.StaleTimeout, 0, *pldconf.PublicTxManagerDefaults.Orchestrator.StaleTimeout),
-		hasZeroGasPrice:            ble.gasPriceClient.HasZeroGasPrice(ctx),
+		hasZeroGasPrice:            ptm.gasPriceClient.HasZeroGasPrice(ctx),
 		InFlightTxsStale:           make(chan bool, 1),
 		stopProcess:                make(chan bool, 1),
-		ethClient:                  ble.ethClient,
-		bIndexer:                   ble.bIndexer,
+		ethClient:                  ptm.ethClient,
+		bIndexer:                   ptm.bIndexer,
 	}
 
 	log.L(ctx).Debugf("NewOrchestrator for signing address %s created: %+v", newOrchestrator.signingAddress, newOrchestrator)

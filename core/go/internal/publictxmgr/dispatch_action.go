@@ -17,7 +17,10 @@ package publictxmgr
 
 import (
 	"context"
+	"time"
 
+	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
@@ -30,9 +33,9 @@ const (
 	ActionCompleted
 )
 
-func (pte *pubTxManager) persistSuspendedFlag(ctx context.Context, from tktypes.EthAddress, nonce uint64, suspended bool) error {
+func (ptm *pubTxManager) persistSuspendedFlag(ctx context.Context, from tktypes.EthAddress, nonce uint64, suspended bool) error {
 	log.L(ctx).Infof("Setting suspend status to '%t' for transaction %s:%d", suspended, from, nonce)
-	return pte.p.DB().
+	return ptm.p.DB().
 		WithContext(ctx).
 		Table("public_txns").
 		Where(`"from" = ?`, from).
@@ -41,10 +44,15 @@ func (pte *pubTxManager) persistSuspendedFlag(ctx context.Context, from tktypes.
 		Error
 }
 
-func (pte *pubTxManager) dispatchAction(ctx context.Context, from tktypes.EthAddress, nonce uint64, action AsyncRequestType) error {
-	pte.inFlightOrchestratorMux.Lock()
-	defer pte.inFlightOrchestratorMux.Unlock()
-	inFlightOrchestrator, orchestratorInFlight := pte.inFlightOrchestrators[from]
+// TODO: this code needs to stop using from and nonce as the way of identifying a transaction. It didn't get edited
+// with the move to delayed nonce assignment, where pubTXID became the primary key for a public transaction instead
+// of from and nonce as a composite primary key. This isn't a problem for dispatching a confirm action because a
+// confirmed transaction must have a nonce, but it isn't guaranteed to work for suspend and resume. Those actions
+// have been copied across but aren't wired up above this level so they aren't obviously broken yet.
+func (ptm *pubTxManager) dispatchAction(ctx context.Context, from tktypes.EthAddress, nonce uint64, action AsyncRequestType) error {
+	ptm.inFlightOrchestratorMux.Lock()
+	defer ptm.inFlightOrchestratorMux.Unlock()
+	inFlightOrchestrator, orchestratorInFlight := ptm.inFlightOrchestrators[from]
 	switch action {
 	case ActionCompleted:
 		// Only need to pass this on if there's an orchestrator in flight for this signing address
@@ -58,7 +66,7 @@ func (pte *pubTxManager) dispatchAction(ctx context.Context, from tktypes.EthAdd
 		}
 		if !orchestratorInFlight {
 			// no in-flight orchestrator for the signing address, it's OK to update the DB directly
-			return pte.persistSuspendedFlag(ctx, from, nonce, suspended)
+			return ptm.persistSuspendedFlag(ctx, from, nonce, suspended)
 		}
 		// has to be done in the context of the orchestrator
 		return inFlightOrchestrator.dispatchAction(ctx, nonce, action)
@@ -97,4 +105,48 @@ func (oc *orchestrator) dispatchAction(ctx context.Context, nonce uint64, action
 		oc.MarkInFlightTxStale()
 	}
 	return err
+}
+
+func (ptm *pubTxManager) dispatchUpdate(ctx context.Context, pubTXID uint64, from *tktypes.EthAddress, newPtx *DBPublicTxn, dbUpdate func() error) error {
+	response := make(chan error, 1)
+	startTime := time.Now()
+	go func() {
+		ptm.inFlightOrchestratorMux.Lock()
+		defer ptm.inFlightOrchestratorMux.Unlock()
+		inFlightOrchestrator, orchestratorInFlight := ptm.inFlightOrchestrators[*from]
+		if !orchestratorInFlight {
+			// no in-flight orchestrator for the signing address, it's OK to update the DB directly
+			// the postcommit hook on the dbUpdate will handle an orchestrator being scheduled for this signer
+			response <- dbUpdate()
+		} else {
+			inFlightOrchestrator.dispatchUpdate(ctx, pubTXID, newPtx, dbUpdate, response)
+		}
+	}()
+
+	select {
+	case err := <-response:
+		return err
+	case <-ctx.Done():
+		return i18n.NewError(ctx, msgs.MsgTransactionEngineRequestTimeout, time.Since(startTime).Seconds())
+	}
+}
+
+func (oc *orchestrator) dispatchUpdate(ctx context.Context, pubTXID uint64, newPtx *DBPublicTxn, dbUpdate func() error, response chan error) {
+	oc.inFlightTxsMux.Lock()
+	defer oc.inFlightTxsMux.Unlock()
+	var pending *inFlightTransactionStageController
+	for _, inflight := range oc.inFlightTxs {
+		if inflight.stateManager.GetPubTxnID() == pubTXID {
+			pending = inflight
+			break
+		}
+	}
+	if pending != nil {
+		pending.UpdateTransaction(ctx, newPtx, dbUpdate, response)
+		oc.MarkInFlightTxStale()
+	} else {
+		// make the update straight to the db
+		response <- dbUpdate()
+	}
+
 }

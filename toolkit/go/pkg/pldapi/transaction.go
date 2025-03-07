@@ -119,12 +119,18 @@ type TransactionCall struct {
 	DataFormat tktypes.JSONFormatOptions `docstruct:"TransactionCall" json:"dataFormat"` // formatting options for the result data
 }
 
+type TransactionHistory struct {
+	Created tktypes.Timestamp `docstruct:"TransactionHistory" json:"created,omitempty"` // server generated creation timestamp for this transaction (query only)
+	TransactionBase
+}
+
 // Additional fields returned on output when "full" specified
 type TransactionFull struct {
 	*Transaction
 	DependsOn []uuid.UUID             `docstruct:"TransactionFull" json:"dependsOn,omitempty"` // transactions registered as dependencies when the transaction was created
 	Receipt   *TransactionReceiptData `docstruct:"TransactionFull" json:"receipt"`             // available if the transaction has reached a final state
 	Public    []*PublicTx             `docstruct:"TransactionFull" json:"public"`              // list of public transactions associated
+	History   []*TransactionHistory   `docstruct:"TransactionFull" json:"history"`             // list of public transactions associated
 	// TODO: PrivateTransactions object list
 }
 

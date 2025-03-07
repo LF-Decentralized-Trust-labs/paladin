@@ -126,6 +126,7 @@ var (
 	TransactionFullDependsOn                      = pdm("TransactionFull.dependsOn", "Transactions registered as dependencies when the transaction was created")
 	TransactionFullReceipt                        = pdm("TransactionFull.receipt", "Transaction receipt data - available if the transaction has reached a final state")
 	TransactionFullPublic                         = pdm("TransactionFull.public", "List of public transactions associated with this transaction")
+	TransactionFullHistory                        = pdm("TransactionFull.history", "List transaction values that have previously been provided for this transaction")
 	TransactionReceiptID                          = pdm("TransactionReceipt.id", "Transaction ID")
 	TransactionReceiptDataOnchainTransactionHash  = pdm("TransactionReceiptDataOnchain.transactionHash", "Transaction hash")
 	TransactionReceiptDataOnchainBlockNumber      = pdm("TransactionReceiptDataOnchain.blockNumber", "Block number")
