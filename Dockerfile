@@ -41,7 +41,7 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     xz-utils \
     && apt-get clean
-
+  
 # Install JDK
 RUN JAVA_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "aarch64"; else echo -n "x64"; fi ) && \
     curl -sLo - https://api.adoptium.net/v3/binary/version/jdk-${JAVA_VERSION}/${TARGETOS}/${JAVA_ARCH}/jdk/${JVM_TYPE}/${JVM_HEAP}/eclipse | \
@@ -151,6 +151,7 @@ ARG GO_MIGRATE_VERSION
 RUN apt-get update && apt-get install -y \
     libgomp1 \
     curl \
+    postgresql-client \
     && apt-get clean
 
 # Set environment variables
@@ -170,6 +171,7 @@ RUN JAVA_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "aarch64"; else ec
 RUN GO_MIRGATE_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "arm64"; else echo -n "amd64"; fi ) && \
     curl -sLo - https://github.com/golang-migrate/migrate/releases/download/v$GO_MIGRATE_VERSION/migrate.${TARGETOS}-${GO_MIRGATE_ARCH}.tar.gz | \
     tar -C /usr/local/bin -xzf - migrate
+
 
 # Copy Wasmer shared libraries to the runtime container
 COPY --from=full-builder /usr/local/wasmer/lib/libwasmer.so /usr/local/wasmer/lib/libwasmer.so
