@@ -18,9 +18,10 @@ package fungible
 import (
 	"context"
 	"encoding/json"
+	"slices"
+	"strings"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
@@ -31,7 +32,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/proto"
 )
@@ -40,47 +40,68 @@ var _ types.DomainHandler = &lockHandler{}
 
 type lockHandler struct {
 	baseHandler
-	callbacks  plugintk.DomainCallbacks
-	coinSchema *pb.StateSchema
+	callbacks plugintk.DomainCallbacks
 }
 
-type TransferParams struct {
-	Inputs  []interface{}             `json:"inputs"`
-	Outputs []interface{}             `json:"outputs"`
-	Proof   map[string]any            `json:"proof"`
-	Data    ethtypes.HexBytes0xPrefix `json:"data"`
+type lockedStatesInfo struct {
+	Size *tktypes.HexUint64 `json:"size"`
 }
 
-var lockStatesABI = &abi.Entry{
+var lockABI = &abi.Entry{
 	Type: abi.Function,
-	Name: "lockStates",
+	Name: types.METHOD_LOCK,
 	Inputs: abi.ParameterArray{
-		{Name: "utxos", Type: "uint256[]"},
+		{Name: "inputs", Type: "uint256[]"},
+		{Name: "outputs", Type: "uint256[]"},
+		{Name: "lockedOutputs", Type: "uint256[]"},
 		{Name: "proof", Type: "tuple", InternalType: "struct Commonlib.Proof", Components: common.ProofComponents},
 		{Name: "delegate", Type: "address"},
 		{Name: "data", Type: "bytes"},
 	},
 }
 
-func NewLockHandler(name string, callbacks plugintk.DomainCallbacks, coinSchema *pb.StateSchema) *lockHandler {
+var lockABINullifiers = &abi.Entry{
+	Type: abi.Function,
+	Name: types.METHOD_LOCK,
+	Inputs: abi.ParameterArray{
+		{Name: "nullifiers", Type: "uint256[]"},
+		{Name: "outputs", Type: "uint256[]"},
+		{Name: "lockedOutputs", Type: "uint256[]"},
+		{Name: "root", Type: "uint256"},
+		{Name: "proof", Type: "tuple", InternalType: "struct Commonlib.Proof", Components: common.ProofComponents},
+		{Name: "delegate", Type: "address"},
+		{Name: "data", Type: "bytes"},
+	},
+}
+
+func NewLockHandler(name string, callbacks plugintk.DomainCallbacks, coinSchema, merkleTreeRootSchema, merkleTreeNodeSchema, infoSchema *pb.StateSchema) *lockHandler {
 	return &lockHandler{
 		baseHandler: baseHandler{
 			name: name,
+			stateSchemas: &common.StateSchemas{
+				CoinSchema:           coinSchema,
+				MerkleTreeRootSchema: merkleTreeRootSchema,
+				MerkleTreeNodeSchema: merkleTreeNodeSchema,
+				LockInfoSchema:       infoSchema,
+			},
 		},
-		coinSchema: coinSchema,
-		callbacks:  callbacks,
+		callbacks: callbacks,
 	}
 }
 
 func (h *lockHandler) ValidateParams(ctx context.Context, config *types.DomainInstanceConfig, params string) (interface{}, error) {
 	var lockParams types.LockParams
 	if err := json.Unmarshal([]byte(params), &lockParams); err != nil {
-		return nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalLockProofParams, err)
+		return nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalLockParams, err)
 	}
-	// the lockProof() function expects an encoded call to the transfer() function
-	_, err := h.decodeTransferCall(ctx, config, lockParams.Call)
-	if err != nil {
-		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeTransferCall, err)
+	if lockParams.Amount == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgNoParamAmount, 0)
+	}
+	if lockParams.Amount.Int().Sign() != 1 {
+		return nil, i18n.NewError(ctx, msgs.MsgParamTotalAmountInRange)
+	}
+	if lockParams.Amount.Int().Cmp(MAX_TRANSFER_AMOUNT) >= 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgParamTotalAmountInRange)
 	}
 	return &lockParams, nil
 }
@@ -97,91 +118,56 @@ func (h *lockHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req
 	}, nil
 }
 
-func (h *lockHandler) decodeTransferCall(ctx context.Context, config *types.DomainInstanceConfig, encodedCall []byte) (*TransferParams, error) {
-	transferABI := getTransferABI(config.TokenName)
-	if transferABI == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgUnknownFunction, "transfer")
-	}
-	paramsJSON, err := decodeParams(ctx, transferABI, encodedCall)
-	if err != nil {
-		return nil, err
-	}
-	var params TransferParams
-	err = json.Unmarshal(paramsJSON, &params)
-	return &params, err
-}
-
-func (h *lockHandler) loadCoins(ctx context.Context, ids []any, stateQueryContext string) ([]*types.ZetoCoin, []*prototk.StateRef, error) {
-	inputIDs := make([]any, 0, len(ids))
-	stateRefs := make([]*prototk.StateRef, 0, len(ids))
-	for _, input := range ids {
-		parsed, err := tktypes.ParseHexUint256(ctx, input.(string))
-		if err != nil {
-			return nil, nil, err
-		}
-		if !parsed.NilOrZero() {
-			inputIDs = append(inputIDs, parsed)
-			stateRefs = append(stateRefs, &prototk.StateRef{
-				Id:       parsed.String(),
-				SchemaId: h.coinSchema.Id,
-			})
-		}
-	}
-
-	// TODO: this should probably query all states and not just available ones
-	queryBuilder := query.NewQueryBuilder().In(".id", inputIDs)
-	inputStates, err := findAvailableStates(ctx, h.callbacks, h.coinSchema, false, stateQueryContext, queryBuilder.Query().String())
-	if err != nil {
-		return nil, nil, err
-	}
-	if len(inputStates) != len(inputIDs) {
-		missingStates := make([]*tktypes.HexUint256, 0, len(inputIDs))
-		for _, id := range inputIDs {
-			idInt := id.(*tktypes.HexUint256)
-			found := false
-			for _, state := range inputStates {
-				if state.Id == idInt.String() {
-					found = true
-				}
-			}
-			if !found {
-				missingStates = append(missingStates, idInt)
-			}
-		}
-		return nil, nil, i18n.NewError(ctx, msgs.MsgStatesNotFound, missingStates)
-	}
-
-	inputCoins := make([]*types.ZetoCoin, len(inputStates))
-	for i, state := range inputStates {
-		err := json.Unmarshal([]byte(state.DataJson), &inputCoins[i])
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	return inputCoins, stateRefs, nil
-}
-
 func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.LockParams)
-	decodedTransfer, err := h.decodeTransferCall(context.Background(), tx.DomainConfig, params.Call)
-	if err != nil {
-		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeTransferCall, err)
-	}
-	inputCoins, inputStates, err := h.loadCoins(ctx, decodedTransfer.Inputs, req.StateQueryContext)
-	if err != nil {
-		return nil, err
-	}
-
 	resolvedSender := domain.FindVerifier(tx.Transaction.From, h.getAlgoZetoSnarkBJJ(), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X, req.ResolvedVerifiers)
 	if resolvedSender == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorResolveVerifier, tx.Transaction.From)
 	}
 
+	useNullifiers := common.IsNullifiersToken(tx.DomainConfig.TokenName)
+	inputCoins, inputStates, _, remainder, err := buildInputsForExpectedTotal(ctx, h.callbacks, h.stateSchemas.CoinSchema, useNullifiers, req.StateQueryContext, resolvedSender.Verifier, params.Amount.Int(), false)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxInputs, err)
+	}
+
+	var outputCoins []*types.ZetoCoin
+	var outputStates []*pb.NewState
+	if remainder.Sign() > 0 {
+		remainderOutputEntries := []*types.FungibleTransferParamEntry{
+			{
+				To:     tx.Transaction.From, // remainder outputs are for the sender themselves
+				Amount: tktypes.Uint64ToUint256(remainder.Uint64()),
+			},
+		}
+		outputCoins, outputStates, err = prepareOutputsForTransfer(ctx, useNullifiers, remainderOutputEntries, req.ResolvedVerifiers, h.stateSchemas.CoinSchema, h.name)
+		if err != nil {
+			return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxOutputs, err)
+		}
+	}
+
+	lockedOutputEntries := []*types.FungibleTransferParamEntry{
+		{
+			To:     tx.Transaction.From, // locked outputs are for the sender themselves
+			Amount: params.Amount,
+		},
+	}
+	lockedOutputCoins, lockedOutputStates, err := prepareOutputsForTransfer(ctx, useNullifiers, lockedOutputEntries, req.ResolvedVerifiers, h.stateSchemas.CoinSchema, h.name, true)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxOutputs, err)
+	}
+	outputStates = append(outputStates, lockedOutputStates...)
+
+	// use the info states to record the sizes of the unlocked vs. locked states
+	infoStates := h.newInfoStates(lockedOutputStates)
+
 	contractAddress, err := tktypes.ParseEthAddress(req.Transaction.ContractInfo.ContractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
 	}
-	payloadBytes, err := h.formatProvingRequest(ctx, inputCoins, "check_utxos_owner", req.StateQueryContext, contractAddress)
+	allOutputCoins := slices.Concat(outputCoins, lockedOutputCoins)
+	circuit := (*tx.DomainConfig.Circuits)[types.METHOD_TRANSFER] // use the transfer circuit for locking proofs
+	payloadBytes, err := formatTransferProvingRequest(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, inputCoins, allOutputCoins, circuit, tx.DomainConfig.TokenName, req.StateQueryContext, contractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorFormatProvingReq, err)
 	}
@@ -189,7 +175,10 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	return &prototk.AssembleTransactionResponse{
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
 		AssembledTransaction: &prototk.AssembledTransaction{
-			ReadStates: inputStates,
+			InputStates:  inputStates,
+			OutputStates: outputStates,
+			InfoStates:   infoStates,
+			ReadStates:   inputStates,
 		},
 		AttestationPlan: []*prototk.AttestationRequest{
 			{
@@ -209,21 +198,7 @@ func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	return nil, nil
 }
 
-func decodeParams(ctx context.Context, abi *abi.Entry, encodedCall []byte) ([]byte, error) {
-	callData, err := abi.DecodeCallDataCtx(ctx, encodedCall)
-	if err != nil {
-		return nil, err
-	}
-	return tktypes.StandardABISerializer().SerializeJSON(callData)
-}
-
 func (h *lockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	params := tx.Params.(*types.LockParams)
-	decodedTransfer, err := h.decodeTransferCall(context.Background(), tx.DomainConfig, params.Call)
-	if err != nil {
-		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeTransferCall, err)
-	}
-
 	var proofRes corepb.ProvingResponse
 	result := domain.FindAttestation("sender", req.AttestationResult)
 	if result == nil {
@@ -233,70 +208,92 @@ func (h *lockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 		return nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalProvingRes, err)
 	}
 
-	data, err := common.EncodeTransactionData(ctx, req.Transaction, types.ZetoTransactionData_V0)
+	inputSize := common.GetInputSize(len(req.InputStates))
+	inputs, err := utxosFromInputStates(ctx, req.InputStates, inputSize)
+	if err != nil {
+		return nil, err
+	}
+
+	lockedInfo, err := parseInfoStatesJson(req.InfoStates[0].StateDataJson)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorParseInfoStates, err)
+	}
+	unlockedOutputStates := req.OutputStates[:len(req.OutputStates)-int(lockedInfo.Size.Uint64())]
+	lockedOutputStates := req.OutputStates[len(req.OutputStates)-int(lockedInfo.Size.Uint64()):]
+
+	outputs, err := utxosFromOutputStates(ctx, unlockedOutputStates, inputSize)
+	if err != nil {
+		return nil, err
+	}
+	outputs = trimZeroUtxos(outputs)
+
+	lockedOutputs, err := utxosFromOutputStates(ctx, lockedOutputStates, inputSize)
+	if err != nil {
+		return nil, err
+	}
+	lockedOutputs = trimZeroUtxos(lockedOutputs)
+
+	data, err := common.EncodeTransactionData(ctx, req.Transaction)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorEncodeTxData, err)
 	}
-	LockParams := map[string]interface{}{
-		"utxos":    decodedTransfer.Inputs,
-		"proof":    common.EncodeProof(proofRes.Proof),
-		"delegate": params.Delegate,
-		"data":     data,
+	params := map[string]any{
+		"inputs":        inputs,
+		"outputs":       outputs,
+		"lockedOutputs": lockedOutputs,
+		"proof":         common.EncodeProof(proofRes.Proof),
+		"delegate":      tx.Params.(*types.LockParams).Delegate.String(),
+		"data":          data,
 	}
-	paramsJSON, err := json.Marshal(LockParams)
+	transferFunction := getLockABI(tx.DomainConfig.TokenName)
+	if common.IsNullifiersToken(tx.DomainConfig.TokenName) {
+		delete(params, "inputs")
+		params["nullifiers"] = strings.Split(proofRes.PublicInputs["nullifiers"], ",")
+		params["root"] = proofRes.PublicInputs["root"]
+	}
+	paramsJSON, err := json.Marshal(params)
 	if err != nil {
-		return nil, err
+		return nil, i18n.NewError(ctx, msgs.MsgErrorMarshalPrepedParams, err)
 	}
-	functionJSON, err := json.Marshal(lockStatesABI)
+	functionJSON, err := json.Marshal(transferFunction)
 	if err != nil {
 		return nil, err
 	}
 
-	return &prototk.PrepareTransactionResponse{
-		Transaction: &prototk.PreparedTransaction{
+	return &pb.PrepareTransactionResponse{
+		Transaction: &pb.PreparedTransaction{
 			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
-			RequiredSigner:  &tx.Transaction.From,
 		},
 	}, nil
 }
-
-func (h *lockHandler) formatProvingRequest(ctx context.Context, inputCoins []*types.ZetoCoin, circuitId, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
-	inputSize := common.GetInputSize(len(inputCoins))
-	inputCommitments := make([]string, inputSize)
-	inputValueInts := make([]uint64, inputSize)
-	inputSalts := make([]string, inputSize)
-	inputOwner := inputCoins[0].Owner.String()
-	for i := 0; i < inputSize; i++ {
-		if i < len(inputCoins) {
-			coin := inputCoins[i]
-			hash, err := coin.Hash(ctx)
-			if err != nil {
-				return nil, i18n.NewError(ctx, msgs.MsgErrorHashInputState, err)
-			}
-			inputCommitments[i] = hash.Int().Text(16)
-			inputValueInts[i] = coin.Amount.Int().Uint64()
-			inputSalts[i] = coin.Salt.Int().Text(16)
-		} else {
-			inputCommitments[i] = "0"
-			inputSalts[i] = "0"
-		}
-	}
-
-	tokenSecrets, err := marshalTokenSecrets(inputValueInts, []uint64{})
-	if err != nil {
-		return nil, i18n.NewError(ctx, msgs.MsgErrorMarshalValuesFungible, err)
-	}
-
-	payload := &corepb.ProvingRequest{
-		CircuitId: circuitId,
-		Common: &corepb.ProvingRequestCommon{
-			InputCommitments: inputCommitments,
-			InputSalts:       inputSalts,
-			InputOwner:       inputOwner,
-			TokenSecrets:     tokenSecrets,
-			TokenType:        corepb.TokenType_fungible,
+func (h *lockHandler) newInfoStates(lockedOutputStates []*pb.NewState) []*pb.NewState {
+	size := tktypes.HexUint64(uint64(len(lockedOutputStates)))
+	lockedStatesInfoBytes, _ := json.Marshal(&lockedStatesInfo{
+		Size: &size,
+	})
+	randId := (tktypes.RandHex(32))
+	return []*pb.NewState{
+		{
+			SchemaId:      h.stateSchemas.LockInfoSchema.Id,
+			Id:            &randId,
+			StateDataJson: string(lockedStatesInfoBytes),
 		},
 	}
-	return proto.Marshal(payload)
+}
+
+func getLockABI(tokenName string) *abi.Entry {
+	transferFunction := lockABI
+	if common.IsNullifiersToken(tokenName) {
+		transferFunction = lockABINullifiers
+	}
+	return transferFunction
+}
+
+func parseInfoStatesJson(statesJson string) (*lockedStatesInfo, error) {
+	var info lockedStatesInfo
+	if err := json.Unmarshal([]byte(statesJson), &info); err != nil {
+		return nil, err
+	}
+	return &info, nil
 }

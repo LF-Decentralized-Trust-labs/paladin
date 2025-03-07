@@ -11,28 +11,28 @@ spec:
   txType: public
   toTemplate: '{{ index .status.resolvedContractAddresses "zeto-factory" }}'
   requiredContractDeployments:
-  - "zeto-factory"
-  - "zeto-impl-anon-enc"
-  - "zeto-g16-check-hashes-value"
-  - "zeto-g16-check-inputs-outputs"
-  - "zeto-g16-check-inputs-outputs-batch"
-  - "zeto-g16-verifier-anon-enc"
-  - "zeto-g16-verifier-anon-enc-batch"
-  - "zeto-g16-check-utxos-owner"
-  - "zeto-g16-check-utxos-owner-batch"
+    - 'zeto-factory'
+    - 'zeto-impl-anon-enc'
+    - 'zeto-g16-deposit'
+    - 'zeto-g16-withdraw'
+    - 'zeto-g16-withdraw-batch'
+    - 'zeto-g16-anon-enc'
+    - 'zeto-g16-anon-enc-batch'
   function: registerImplementation
   paramsJSONTemplate: |
     {
       "name": "Zeto_AnonEnc",
       "implementation": {
         "implementation":        "{{ index .status.resolvedContractAddresses "zeto-impl-anon-enc" }}",
-        "depositVerifier":       "{{ index .status.resolvedContractAddresses "zeto-g16-check-hashes-value" }}",
-        "withdrawVerifier":      "{{ index .status.resolvedContractAddresses "zeto-g16-check-inputs-outputs" }}",
-        "batchWithdrawVerifier": "{{ index .status.resolvedContractAddresses "zeto-g16-check-inputs-outputs-batch" }}",
-        "verifier":              "{{ index .status.resolvedContractAddresses "zeto-g16-verifier-anon-enc" }}",
-        "batchVerifier":         "{{ index .status.resolvedContractAddresses "zeto-g16-verifier-anon-enc-batch" }}",
-        "lockVerifier":          "{{ index .status.resolvedContractAddresses "zeto-g16-check-utxos-owner" }}",
-        "batchLockVerifier":     "{{ index .status.resolvedContractAddresses "zeto-g16-check-utxos-owner-batch" }}"
+        "verifiers": {
+          "verifier":              "{{ index .status.resolvedContractAddresses "zeto-g16-anon-enc" }}",
+          "depositVerifier":       "{{ index .status.resolvedContractAddresses "zeto-g16-deposit" }}",
+          "withdrawVerifier":      "{{ index .status.resolvedContractAddresses "zeto-g16-withdraw" }}",
+          "batchVerifier":         "{{ index .status.resolvedContractAddresses "zeto-g16-anon-enc-batch" }}",
+          "batchWithdrawVerifier": "{{ index .status.resolvedContractAddresses "zeto-g16-withdraw-batch" }}",
+          "lockVerifier":          "0x0000000000000000000000000000000000000000",
+          "batchLockVerifier":     "0x0000000000000000000000000000000000000000"
+        }
       }
     }
   abiJSON: |
@@ -52,39 +52,45 @@ spec:
                 "type": "address"
               },
               {
-                "internalType": "address",
-                "name": "depositVerifier",
-                "type": "address"
-              },
-              {
-                "internalType": "address",
-                "name": "withdrawVerifier",
-                "type": "address"
-              },
-              {
-                "internalType": "address",
-                "name": "lockVerifier",
-                "type": "address"
-              },
-              {
-                "internalType": "address",
-                "name": "verifier",
-                "type": "address"
-              },
-              {
-                "internalType": "address",
-                "name": "batchVerifier",
-                "type": "address"
-              },
-              {
-                "internalType": "address",
-                "name": "batchWithdrawVerifier",
-                "type": "address"
-              },
-              {
-                "internalType": "address",
-                "name": "batchLockVerifier",
-                "type": "address"
+                "name": "verifiers",
+                "type": "tuple",
+                "components": [
+                  {
+                    "internalType": "address",
+                    "name": "verifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "depositVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "withdrawVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "batchVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "batchWithdrawVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "lockVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "batchLockVerifier",
+                    "type": "address"
+                  }
+                ]
               }
             ],
             "internalType": "struct ZetoTokenFactory.ImplementationInfo",

@@ -30,10 +30,14 @@ import (
 //go:embed abis/SampleERC20.json
 var erc20ABI []byte
 
+//go:embed abis/Zeto_Anon.json
+var zetoAnonAbi []byte
+
 var (
 	controllerName = "controller"
 	recipient1Name = "recipient1"
 	recipient2Name = "recipient2"
+	recipient3Name = "recipient3"
 )
 
 // This is the path to the contracts file

@@ -5,17 +5,20 @@ contracts:
   # the Zeto factory is a CloneFactory, which needs implementation
   # contracts to be set
   implementations:
-    - name: Zeto_NfAnon
-      verifier: Groth16Verifier_NfAnon
-      lockVerifier: Groth16Verifier_CheckUtxosOwner
-      circuitId: nf_anon
-      cloneable: true
-      abiAndBytecode:
-        path: ./abis/Zeto_NfAnon.json
-    - name: Groth16Verifier_CheckUtxosOwner
-      abiAndBytecode:
-        path: ./abis/Groth16Verifier_CheckUtxosOwner.json
     - name: Groth16Verifier_NfAnon
       abiAndBytecode:
         path: ./abis/Groth16Verifier_NfAnon.json
- 
+    - name: Zeto_NfAnon
+      verifier: Groth16Verifier_NfAnon
+      circuits:
+        transfer:
+          name: nf_anon
+        transferLocked:
+          name: nf_anon
+        deposit:
+          name: not_implemented
+        withdraw:
+          name: not_implemented
+      cloneable: true
+      abiAndBytecode:
+        path: ./abis/Zeto_NfAnon.json

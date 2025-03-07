@@ -24,7 +24,7 @@ ext {
     goFilesE2E = fileTree(".") {
         include "integration-test/**/*.go"
     }
-    targetCoverage = 92.0
+    targetCoverage = 92.5 // temporary
     maxCoverageBarGap = 1
     coveragePackages = [
         "github.com/kaleido-io/paladin/domains/zeto/internal/...",
@@ -32,7 +32,7 @@ ext {
         "github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner",
     ]
 
-    zetoVersion = "v0.0.11"
+    zetoVersion = "v0.0.12"
     zetoHost = "hyperledger-labs"
     zkpOut = "${projectDir}/zkp"
     toolsOut = "${projectDir}/tools"

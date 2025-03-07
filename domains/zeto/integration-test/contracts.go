@@ -23,6 +23,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
@@ -42,7 +43,7 @@ type ZetoDomainContracts struct {
 }
 
 type cloneableContract struct {
-	circuitId             string
+	circuits              *zetosignerapi.Circuits
 	verifier              string
 	batchVerifier         string
 	depositVerifier       string
@@ -95,7 +96,7 @@ func findCloneableContracts(config *domainConfig) map[string]cloneableContract {
 	for _, contract := range config.DomainContracts.Implementations {
 		if contract.Cloneable {
 			cloneableContracts[contract.Name] = cloneableContract{
-				circuitId:             contract.CircuitId,
+				circuits:              contract.Circuits,
 				verifier:              contract.Verifier,
 				batchVerifier:         contract.BatchVerifier,
 				depositVerifier:       contract.DepositVerifier,
@@ -205,8 +206,8 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 	if !ok {
 		return fmt.Errorf("verifier contract %s not found among the deployed contracts", verifierName)
 	}
-	params.Implementation.Verifier = verifierAddr.String()
-	if params.Implementation.Verifier == "" {
+	params.Implementation.Verifiers.Verifier = verifierAddr.String()
+	if params.Implementation.Verifiers.Verifier == "" {
 		return nil
 	}
 
@@ -215,7 +216,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("batch verifier contract %s not found among the deployed contracts", batchVerifierName)
 		}
-		params.Implementation.BatchVerifier = batchVerifierAddr.String()
+		params.Implementation.Verifiers.BatchVerifier = batchVerifierAddr.String()
 	}
 
 	if depositVerifierName != "" {
@@ -223,7 +224,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("deposit verifier contract not found among the deployed contracts")
 		}
-		params.Implementation.DepositVerifier = depositVerifierAddr.String()
+		params.Implementation.Verifiers.DepositVerifier = depositVerifierAddr.String()
 	}
 
 	if withdrawVerifierName != "" {
@@ -231,7 +232,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("withdraw verifier contract not found among the deployed contracts")
 		}
-		params.Implementation.WithdrawVerifier = withdrawVerifierAddr.String()
+		params.Implementation.Verifiers.WithdrawVerifier = withdrawVerifierAddr.String()
 	}
 
 	if batchWithdrawVerifierName != "" {
@@ -239,7 +240,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("batch withdraw verifier contract not found among the deployed contracts")
 		}
-		params.Implementation.BatchWithdrawVerifier = batchWithdrawVerifierAddr.String()
+		params.Implementation.Verifiers.BatchWithdrawVerifier = batchWithdrawVerifierAddr.String()
 	}
 
 	if lockVerifierName != "" {
@@ -247,7 +248,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("lock verifier contract not found among the deployed contracts")
 		}
-		params.Implementation.LockVerifier = lockVerifierAddr.String()
+		params.Implementation.Verifiers.LockVerifier = lockVerifierAddr.String()
 	}
 
 	if batchLockVerifierName != "" {
@@ -255,7 +256,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("batch lock verifier contract not found among the deployed contracts")
 		}
-		params.Implementation.BatchLockVerifier = batchLockVerifierAddr.String()
+		params.Implementation.Verifiers.BatchLockVerifier = batchLockVerifierAddr.String()
 	}
 
 	_, err := tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/iden3/go-rapidsnark/witness/v2"
 	"github.com/iden3/go-rapidsnark/witness/wasmer"
@@ -57,4 +58,12 @@ func loadCircuit(ctx context.Context, circuitName string, config *zetosignerapi.
 	}
 
 	return calc, zkeyBytes, err
+}
+
+func getBatchCircuit(circuitId string) string {
+	return fmt.Sprintf("%s_batch", circuitId)
+}
+
+func IsBatchCircuit(circuitId string) bool {
+	return strings.HasSuffix(circuitId, "_batch")
 }

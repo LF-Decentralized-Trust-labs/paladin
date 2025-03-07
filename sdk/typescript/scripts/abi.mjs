@@ -19,3 +19,8 @@ await copyFile(
   "../../solidity/artifacts/contracts/domains/interfaces/IZetoFungible.sol/IZetoFungible.json",
   "src/domains/abis/IZetoFungible.json"
 );
+
+await copyFile(
+  "../../domains/zeto/integration-test/abis/Zeto_Anon.json",
+  "src/domains/abis/Zeto_Anon.json"
+);

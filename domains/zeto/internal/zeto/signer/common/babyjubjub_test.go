@@ -1,4 +1,4 @@
-package signer
+package common
 
 import (
 	"encoding/hex"

@@ -418,6 +418,7 @@ task cleanCluster(type: Exec) {
 
 task clean {
     dependsOn cleanCluster
+    delete 'test/e2e/abis'
 }
 
 // The 'e2e' task runs the whole flow
@@ -438,7 +439,7 @@ task e2e(type: Exec, dependsOn: [deploy]) {
 }
 
 // Existing 'make' task
-task make(type: Exec, dependsOn: copySolidity) {
+task make(type: Exec, dependsOn: [copySolidity, copyZetoSolidity]) {
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.notoGo)
     inputs.files(configurations.zetoGo)
