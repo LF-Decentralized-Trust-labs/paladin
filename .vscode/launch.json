@@ -36,8 +36,10 @@
             "program": "${workspaceRoot}/operator/cmd/main.go",
             "env": { 
                 "KUBE_LOCAL": "true",
-                "WATCH_NAMESPACE": "default"
+                "WATCH_NAMESPACE": "default",
+                "CONFIG_PATH": "hack/v3/"
             },
+            "args": ["--metrics-bind-address=:8083", "--health-probe-bind-address=:8084"],
             "presentation": {
                 "hidden": false
             }

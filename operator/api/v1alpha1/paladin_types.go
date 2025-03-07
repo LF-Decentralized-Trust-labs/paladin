@@ -62,7 +62,11 @@ type PaladinSpec struct {
 
 	// Transports are configured individually on each node, as they reference security details specific to that node
 	Transports []TransportConfig `json:"transports"`
+
+	// Custom labels. To be applied to generated resources
+	CustomLabels map[string]string `json:"customLabels,omitempty"`
 }
+
 type BaseLedgerEndpointType string
 
 const (

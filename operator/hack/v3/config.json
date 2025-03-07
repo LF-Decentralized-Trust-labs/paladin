@@ -1,0 +1,31 @@
+{
+    "paladin": {
+      "image": "docker.io/lfdecentralizedtrustlabs/paladin:v0.1.0",
+      "imagePullPolicy": "Always",
+      "labels": {"app":"paladin"},
+      "annotations": null,
+      "envs": null,
+      "tolerations": [{"effect":"NoSchedule","key":"kld-workload","operator":"Equal","value":"true"}],
+      "affinity": null,
+      "nodeSelector": null,
+      "securityContext": null
+    },
+    "besu": {
+      "image": "hyperledger/besu:latest",
+      "imagePullPolicy": "Always",
+      "labels": {"app":"besu"},
+      "annotations": null,
+      "envs": null,
+      "tolerations": null,
+      "affinity": null,
+      "nodeSelector": null,
+      "securityContext": null
+    },
+    "postgres": {
+      "image": "postgres:latest",
+      "imagePullPolicy": "Always",
+      "labels": null,
+      "annotations": null,
+      "envs": null
+    }
+}

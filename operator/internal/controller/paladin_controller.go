@@ -686,6 +686,7 @@ func (r *PaladinReconciler) generateConfigMap(ctx context.Context, node *corev1a
 // generatePaladinConfig converts the Paladin CR spec to a Paladin YAML configuration
 func (r *PaladinReconciler) generatePaladinConfig(ctx context.Context, node *corev1alpha1.Paladin, name string) (string, []string, error) {
 	var pldConf pldconf.PaladinConfig
+
 	if node.Spec.Config != nil {
 		err := yaml.Unmarshal([]byte(*node.Spec.Config), &pldConf)
 		if err != nil {
@@ -1311,6 +1312,12 @@ func (r *PaladinReconciler) getLabels(node *corev1alpha1.Paladin, extraLabels ..
 	for k, v := range r.config.Paladin.Labels {
 		l[k] = v
 	}
+
+	//paladin node specific custom labels
+	for k, v := range node.Spec.CustomLabels {
+		l[k] = v
+	}
+
 	for _, e := range extraLabels {
 		for k, v := range e {
 			l[k] = v
