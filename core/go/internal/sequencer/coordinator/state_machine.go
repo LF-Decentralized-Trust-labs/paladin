@@ -59,6 +59,10 @@ type StateMachine struct {
 // Actions can be specified for transition to a state either as the OnTransitionTo function that will run for all transitions to that state or as the On field in the Transition struct if the action applies
 // for a specific transition
 type Action func(ctx context.Context, c *coordinator) error
+type ActionRule struct {
+	Action Action
+	If     Guard
+}
 
 type Transition struct {
 	To State // State to transition to if the guard condition is met
@@ -68,6 +72,7 @@ type Transition struct {
 
 type EventHandler struct {
 	Validator   func(ctx context.Context, c *coordinator, event common.Event) (bool, error) // function to validate whether the event is valid for the current state of the coordinator.  This is optional.  If not defined, the event is always considered valid.
+	Actions     []ActionRule                                                                // list of actions to be taken when this event is received.  These actions are run before any transition specific actions
 	Transitions []Transition                                                                // list of transitions that this event could trigger.  The list is ordered so the first matching transition is the one that will be taken.
 }
 
