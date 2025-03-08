@@ -20,3 +20,8 @@ func action_SendSignRequestToSigningModule(ctx context.Context, txn *Transaction
 	// TODO
 	return nil
 }
+
+func action_SendAssembleSuccessResponse(ctx context.Context, txn *Transaction) error {
+	// TODO
+	return nil
+}

@@ -21,10 +21,6 @@ func action_SendAssembleRequestToDomain(ctx context.Context, txn *Transaction) e
 	return nil
 }
 
-func action_SendAssembleSuccessResponse(ctx context.Context, txn *Transaction) error {
-	// TODO
-	return nil
-}
 func action_SendAssembleRevertResponse(ctx context.Context, txn *Transaction) error {
 	// TODO
 	return nil
