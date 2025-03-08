@@ -39,6 +39,7 @@ const (
 	// Need to make a decision and document it in a README
 	State_Delegated  // the transaction has been sent to the current active coordinator
 	State_Assembling // the coordinator has sent an assemble request that we have not replied to yet
+	State_Signing    // we have assembled the transaction and are waiting for the signing module to sign it before we respond to the coordinator with the signed assembled transaction
 	State_Prepared   // we know that the coordinator has got as far as preparing a public transaction and we have sent a positive response to a coordinator's dispatch confirmation request but have not yet received a heartbeat that notifies us that the coordinator has dispatched the transaction to a public transaction manager for submission
 	State_Dispatched // the active coordinator that this transaction was delegated to has dispatched the transaction to a public transaction manager for submission
 	State_Confirmed  // the public transaction has been confirmed by the blockchain as successful
@@ -62,6 +63,7 @@ const (
 	Event_Assemble_Success                                        // we have successfully assembled the transaction
 	Event_Assemble_Revert                                         // we have failed to assemble the transaction
 	Event_Assemble_Park                                           // we have parked the transaction
+	Event_Signed                                                  // signing module has signed the assembled transaction
 	Event_Dispatched                                              // coordinator has dispatched the transaction to a public transaction manager
 	Event_Dispatch_Confirmation_Request_Received                  // coordinator has requested confirmation that the transaction has been dispatched
 	Event_Resumed                                                 // Received an RPC call to resume a parked transaction
@@ -155,8 +157,7 @@ func init() {
 				Event_Assemble_Success: {
 					Transitions: []Transition{
 						{
-							To: State_Delegated,
-							On: action_SendAssembleSuccessResponse,
+							To: State_Signing,
 						},
 					},
 				},
@@ -173,6 +174,19 @@ func init() {
 						{
 							To: State_Parked,
 							On: action_SendAssembleParkResponse,
+						},
+					},
+				},
+			},
+		},
+		State_Signing: {
+			OnTransitionTo: action_SendSignRequestToSigningModule,
+			Events: map[EventType]EventHandler{
+				Event_Signed: {
+					Transitions: []Transition{
+						{
+							To: State_Delegated,
+							On: action_SendAssembleSuccessResponse,
 						},
 					},
 				},
