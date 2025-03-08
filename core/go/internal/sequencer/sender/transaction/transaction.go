@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 )
 
 // Transaction represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
@@ -26,10 +27,19 @@ type Transaction struct {
 	*components.PrivateTransaction
 }
 
-func NewTransaction(ctx context.Context, pt *components.PrivateTransaction) (*Transaction, error) {
+func NewTransaction(
+	ctx context.Context,
+	pt *components.PrivateTransaction,
+	messageSender MessageSender,
+	clock common.Clock,
+	emit common.EmitEvent,
+	stateIntegration common.StateIntegration,
+) (*Transaction, error) {
 	txn := &Transaction{
 		PrivateTransaction: pt,
 	}
+
+	txn.InitializeStateMachine(State_Initial)
 
 	return txn, nil
 }

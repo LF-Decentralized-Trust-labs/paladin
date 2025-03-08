@@ -33,10 +33,10 @@ func (e *event) GetTransactionID() uuid.UUID {
 	return e.TransactionID
 }
 
-type ConfirmedEvent struct {
+type ConfirmedSuccessEvent struct {
 	event
 }
 
-func (_ *ConfirmedEvent) Type() EventType {
-	return Event_Confirmed
+func (_ *ConfirmedSuccessEvent) Type() EventType {
+	return Event_Confirmed_Success
 }

@@ -109,7 +109,7 @@ func (s *sender) propagateEventToTransaction(ctx context.Context, event transact
 }
 
 func (s *sender) createTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
-	newTxn, err := transaction.NewTransaction(ctx, txn)
+	newTxn, err := transaction.NewTransaction(ctx, txn, s.messageSender, s.clock, s.emit, s.stateIntegration)
 	if err != nil {
 		log.L(ctx).Errorf("Error creating transaction: %v", err)
 		return err

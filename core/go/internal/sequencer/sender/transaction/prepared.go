@@ -12,17 +12,13 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
-package sender
+package transaction
 
 import (
 	"context"
-
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
 )
 
-type MessageSender interface {
-	transaction.MessageSender
-	SendDelegationRequest(ctx context.Context, Transactions []*components.PrivateTransaction, SendersBlockHeight uint64)
+func action_ResendDispatchConfirmationResponse(ctx context.Context, txn *Transaction) error {
+	// TODO
+	return nil
 }

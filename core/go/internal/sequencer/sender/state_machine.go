@@ -19,7 +19,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
@@ -33,11 +33,12 @@ const (
 )
 
 const (
-	Event_HeartbeatInterval    EventType = iota + 300 // the heartbeat interval has passed since the last time a heartbeat was received or the last time this event was received
-	Event_HeartbeatReceived                           // a heartbeat message was received from the current active coordinator
-	Event_TransactionCreated                          // a new transaction has been created and is ready to be sent to the coordinator TODO maybe name something like Intent created?
-	Event_TransactionConfirmed                        // a transaction, that was send by this sender, has been confirmed on the base ledger
-	Event_NewBlock                                    // a new block has been mined on the base ledger
+	Event_HeartbeatInterval                EventType = iota + 300 // the heartbeat interval has passed since the last time a heartbeat was received or the last time this event was received
+	Event_HeartbeatReceived                                       // a heartbeat message was received from the current active coordinator
+	Event_TransactionCreated                                      // a new transaction has been created and is ready to be sent to the coordinator TODO maybe name something like Intent created?
+	Event_TransactionConfirmed                                    // a transaction, that was send by this sender, has been confirmed on the base ledger
+	Event_NewBlock                                                // a new block has been mined on the base ledger
+	Event_Base_Ledger_Transaction_Reverted                        // A transaction has moved from the dispatched to pending state because it was reverted on the base ledger
 )
 
 type StateMachine struct {
@@ -124,6 +125,11 @@ func init() {
 				},
 				Event_NewBlock:          {},
 				Event_HeartbeatReceived: {},
+				Event_Base_Ledger_Transaction_Reverted: {
+					Actions: []ActionRule{{
+						Action: action_SendDelegationRequest,
+					}},
+				},
 			},
 		},
 	}

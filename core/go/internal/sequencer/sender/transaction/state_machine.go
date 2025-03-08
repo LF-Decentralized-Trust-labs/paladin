@@ -27,15 +27,44 @@ type State int
 
 const (
 	State_Initial State = iota // Initial state before anything is calculated
+	State_Pending              // Intent for the transaction has been created in the database and has been assigned a unique ID but is not currently known to be being processed by a coordinator
+	//TODO currently Pending doesn't really make sense as a state because it is an instantaneous state.  It is the state of the transaction when it is first created and then immediately transitions to Delegated.
+	// States only really make sense when the transaction is waiting for something to happen.  We could remove this state and just have the transaction start in the Delegated state
+	// However, there may be a need for the sender to only delegate a subset of the transactions ( e.g. maybe there is an absolute ordering requirement and the only way to achieve that is by holding back until the dependency is confirmed)
+	// It is also slightly complicated by the fact that the delegation request is sent by an action of the sender state machine because it sends the delegation request for multiple transactions at once.
+	// Need a decision point on whether that is done by a) transaction emitting and event that triggers the sender to send the delegation request or b) the transaction state machine action makes a syncronous call to the sender to include that transaction in a new delegation request.
+	// NOTE: initially there was a thought that we needed a pending state in case there is no current active coordinator so we can't go straight to delegated.  However, the current model is that we don't actually wait for any response from the coordinator.  We simply send the delegation request and assume that it is delegated at that point.
+	// We only resend the request if we don't see the heartbeat.
+	// Might need to rethink this and allow for some ack and shorter retry interval to tolerate less reliable networks,
+	// Need to make a decision and document it in a README
+	State_Delegated  // the transaction has been sent to the current active coordinator
+	State_Assembling // the coordinator has sent an assemble request that we have not replied to yet
+	State_Prepared   // we know that the coordinator has got as far as preparing a public transaction and we have sent a positive response to a coordinator's dispatch confirmation request but have not yet received a heartbeat that notifies us that the coordinator has dispatched the transaction to a public transaction manager for submission
+	State_Dispatched // the active coordinator that this transaction was delegated to has dispatched the transaction to a public transaction manager for submission
+	State_Confirmed  // the public transaction has been confirmed by the blockchain as successful
+	State_Reverted   // upon attempting to assemble the transaction, the domain code has determined that the intent is not valid and the transaction is finalized as reverted
+	State_Parked     // upon attempting to assemble the transaction, the domain code has determined that the transaction is not ready to be assembled and it is parked for later processing.  All remaining transactions for the current sender can continue - unless they have an explicit dependency on this transaction
 
 )
 
 type EventType = common.EventType
 
 const (
-	Event_Received  EventType = iota // Transaction initially received by the sender.
-	Event_Confirmed                  // confirmation received from the blockchain of either a successful or reverted transaction
-
+	Event_HeartbeatInterval                      EventType = iota // the heartbeat interval has passed since the last time a heartbeat was received or the last time this event was received
+	Event_HeartbeatReceived                                       // a heartbeat message was received from the current active coordinator
+	Event_DispatchHeartbeatReceived                               // a heartbeat message was received from the current active coordinator with this transaction in the list of dispatched transactions
+	Event_CoordinatorChanged                                      // the coordinator has changed
+	Event_Created                                                 // Transaction initially received by the sender or has been loaded from the database after a restart / swap-in
+	Event_Confirmed_Success                                       // confirmation received from the blockchain of base ledge transaction successful completion
+	Event_Confirmed_Reverted                                      // confirmation received from the blockchain of base ledge transaction failure
+	Event_Delegated                                               // transaction has been delegated to a coordinator
+	Event_AssembleRequestReceived                                 // coordinator has requested that we assemble the transaction
+	Event_Assemble_Success                                        // we have successfully assembled the transaction
+	Event_Assemble_Revert                                         // we have failed to assemble the transaction
+	Event_Assemble_Park                                           // we have parked the transaction
+	Event_Dispatched                                              // coordinator has dispatched the transaction to a public transaction manager
+	Event_Dispatch_Confirmation_Request_Received                  // coordinator has requested confirmation that the transaction has been dispatched
+	Event_Resumed                                                 // Received an RPC call to resume a parked transaction
 )
 
 type StateMachine struct {
@@ -78,8 +107,155 @@ func init() {
 	stateDefinitionsMap = map[State]StateDefinition{
 		State_Initial: {
 			Events: map[EventType]EventHandler{
-				Event_Received: { //TODO rename this event type because it is the first one we see in this struct and it seems like we are saying this is a definition related to receiving an event (at one level that is correct but it is not what is meant by Event_Received)
-
+				Event_Created: {
+					Transitions: []Transition{
+						{
+							To: State_Pending,
+						},
+					},
+				},
+			},
+		},
+		State_Pending: {
+			Events: map[EventType]EventHandler{
+				Event_Delegated: {
+					Transitions: []Transition{
+						{
+							To: State_Delegated,
+						},
+					},
+				},
+			},
+		},
+		State_Delegated: {
+			Events: map[EventType]EventHandler{
+				Event_AssembleRequestReceived: {
+					Validator: validator_AssembleRequestMatchesDelegationIntent,
+					Transitions: []Transition{
+						{
+							To: State_Assembling,
+						},
+					},
+				},
+				Event_CoordinatorChanged: {},
+				Event_Dispatch_Confirmation_Request_Received: {
+					Validator: validator_DispatchConfirmationRequestMatchesAssembledDelegation,
+					Transitions: []Transition{
+						{
+							To: State_Prepared,
+							On: action_SendDispatchConfirmationResponse,
+						},
+					},
+				},
+			},
+		},
+		State_Assembling: {
+			OnTransitionTo: action_SendAssembleRequestToDomain,
+			Events: map[EventType]EventHandler{
+				Event_Assemble_Success: {
+					Transitions: []Transition{
+						{
+							To: State_Delegated,
+							On: action_SendAssembleSuccessResponse,
+						},
+					},
+				},
+				Event_Assemble_Revert: {
+					Transitions: []Transition{
+						{
+							To: State_Reverted,
+							On: action_SendAssembleRevertResponse,
+						},
+					},
+				},
+				Event_Assemble_Park: {
+					Transitions: []Transition{
+						{
+							To: State_Parked,
+							On: action_SendAssembleParkResponse,
+						},
+					},
+				},
+			},
+		},
+		State_Prepared: {
+			Events: map[EventType]EventHandler{
+				Event_DispatchHeartbeatReceived: {
+					//Note: no validator here although this event may or may not match the most recent dispatch confirmation response.
+					// It is possible that we timed out  on Prepared state, delegated to another coordinator, got as far as prepared again and now just learning that
+					// the original coordinator has dispatched the transaction.
+					// We can't do anything to stop that, but it is interesting to apply the information from event to our state machine because we don't know which of
+					// the many base ledger transactions will eventually be confirmed and we are actually not too fussy about which one does
+					Transitions: []Transition{
+						{
+							To: State_Dispatched,
+						},
+					},
+				},
+				Event_Dispatch_Confirmation_Request_Received: {
+					Validator: validator_DispatchConfirmationRequestMatchesAssembledDelegation,
+					// This means that we have already sent a dispatch confirmation response and we get another one.
+					// 3 possibilities, 1) the response got lost and the same coordinator is retrying -> compare the request idempotency key and or validator_DispatchConfirmationRequestMatchesAssembledDelegation
+					//                  2) There is a coordinator that we previously delegated to, and assembled for, but since assumed had become unavailable and changed to another coordinator, but the first coordinator is somehow limping along and has got as far as endorsing that previously assembled transaction. But we have already chosen our new horse for this transaction so reject.
+					//                  3) There is a bug somewhere.  Don't attempt to distinguish between 2 and 3.  Just reject the request and let the coordinator deal with it.
+					Actions: []ActionRule{
+						{
+							Action: action_ResendDispatchConfirmationResponse,
+						},
+					},
+				},
+				Event_CoordinatorChanged: {
+					Transitions: []Transition{
+						{
+							To: State_Delegated,
+						},
+					},
+					// this is a particularly interesting case because the coordinator has been changed ( most likely because the previous coordinator has stopped sending heartbeats)
+					// just as we are about at the point of no return.  We have already sent a dispatch confirmation response and are waiting for the dispatch heartbeat
+					// only option is to go with the new coordinator.  Assuming the old coordinator didn't receive the confirmation response, or has went offline before dispatching the transactions to a public transaction manager
+					// worst case scenario, it has already dispatched the transaction and the base ledger double intent protection will cause one of the transactions to fail
+				},
+			},
+		},
+		State_Dispatched: {
+			Events: map[EventType]EventHandler{
+				Event_Confirmed_Success: {
+					Transitions: []Transition{{
+						To: State_Dispatched,
+					}},
+				},
+				Event_Confirmed_Reverted: {
+					Transitions: []Transition{{
+						To: State_Pending,
+					}},
+				},
+				Event_CoordinatorChanged: {
+					// coordinator has changed after we have seen the transaction dispatched.
+					// we will either see the dispatched transaction confirmed or reverted by the blockchain but that might not be for a long long time
+					// the fact that the coordinator has been changed on us means that we have lost contact with the original coordinator.  That may or may not have lost contact with the base ledger. If so, it may be days or months before it reconnects and managed to submit the transaction.
+					// rather than waiting in hope, we carry on with the new coordinator.  The double intent protection in the base ledger will ensure that only one of the coordinators manages to get the transaction through
+					// and the other one will revert.  We just need to make sure that we don't overreact when we see a revert.
+					//We _could_ introduce a new state that we transition here to give some time, after realizing the coordinator has gone AWOL in case the transaction has made it to that coordinator's
+					// EVM node which is actively trying to get it into a block and we just don't get heartbeats for that.
+					// However, by waiting, we would need to delaying other transactions from being delegated and assembled or risk things happening out of order
+					// and the only downside of not waiting is that we plough ahead with a new assembly of things that will never get to the base ledger because the txn at the front will cause a double intent
+					// so we need to redo them all - which isn't much worse than waiting and then redoing them all. On the other hand, if we plough ahead, there is a chance that new assembly does get to the base ledger
+					// and there would have been no point waiting
+					Transitions: []Transition{
+						{
+							To: State_Delegated,
+						},
+					},
+				},
+			},
+		},
+		State_Parked: {
+			Events: map[EventType]EventHandler{
+				Event_Resumed: {
+					Transitions: []Transition{{
+						To: State_Delegated,
+						On: action_SendDelegationRequest,
+					}},
 				},
 			},
 		},

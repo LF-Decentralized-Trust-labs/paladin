@@ -19,9 +19,11 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
 )
 
 type SentMessageRecorder struct {
+	transaction.SentMessageRecorder
 	hasSentDelegationRequest bool
 }
 
