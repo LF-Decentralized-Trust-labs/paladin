@@ -74,7 +74,7 @@ type Transaction struct {
 	clock              common.Clock
 	messageSender      MessageSender
 	grapher            Grapher
-	stateIntegration   common.StateIntegration
+	engineIntegration  common.EngineIntegration
 	notifyOfTransition OnStateTransition
 	emit               common.EmitEvent
 }
@@ -82,7 +82,7 @@ type Transaction struct {
 // TODO think about naming of this compared to the OnTransitionTo func in the state machine
 type OnStateTransition func(ctx context.Context, t *Transaction, to, from State) // function to be invoked when transitioning into this state.  Called after transitioning event has been applied and any actions have fired
 
-func NewTransaction(ctx context.Context, sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, emit common.EmitEvent, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, grapher Grapher, onStateTransition OnStateTransition) (*Transaction, error) {
+func NewTransaction(ctx context.Context, sender string, pt *components.PrivateTransaction, messageSender MessageSender, clock common.Clock, emit common.EmitEvent, engineIntegration common.EngineIntegration, requestTimeout, assembleTimeout common.Duration, grapher Grapher, onStateTransition OnStateTransition) (*Transaction, error) {
 	senderIdentity, senderNode, err := tktypes.PrivateIdentityLocator(sender).Validate(ctx, "", false)
 	if err != nil {
 		log.L(ctx).Errorf("Error validating sender %s: %s", sender, err)
@@ -98,7 +98,7 @@ func NewTransaction(ctx context.Context, sender string, pt *components.PrivateTr
 		grapher:            grapher,
 		requestTimeout:     requestTimeout,
 		assembleTimeout:    assembleTimeout,
-		stateIntegration:   stateIntegration,
+		engineIntegration:  engineIntegration,
 		notifyOfTransition: onStateTransition,
 		emit:               emit,
 	}

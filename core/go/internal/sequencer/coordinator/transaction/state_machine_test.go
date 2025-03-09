@@ -31,7 +31,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 
 	messageSender := NewMockMessageSender(t)
 	clock := &common.FakeClockForTesting{}
-	stateIntegration := sequencermocks.NewStateIntegration(t)
+	engineIntegration := sequencermocks.NewEngineIntegration(t)
 	txn, err := NewTransaction(
 		ctx,
 		"sender@node1",
@@ -44,7 +44,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 			//don't expect any events during initialize
 			assert.Failf(t, "unexpected event", "%T", event)
 		},
-		stateIntegration,
+		engineIntegration,
 		clock.Duration(1000),
 		clock.Duration(5000),
 		NewGrapher(ctx),

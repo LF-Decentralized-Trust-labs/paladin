@@ -49,16 +49,16 @@ type coordinator struct {
 	committee            map[string][]string
 
 	/* Dependencies */
-	messageSender    MessageSender
-	clock            common.Clock
-	stateIntegration common.StateIntegration
-	emit             common.EmitEvent
+	messageSender     MessageSender
+	clock             common.Clock
+	engineIntegration common.EngineIntegration
+	emit              common.EmitEvent
 
 	/*Algorithms*/
 	transactionSelector TransactionSelector
 }
 
-func NewCoordinator(ctx context.Context, messageSender MessageSender, committeeMembers []string, clock common.Clock, emit common.EmitEvent, stateIntegration common.StateIntegration, requestTimeout, assembleTimeout common.Duration, blockRangeSize uint64, contractAddress *tktypes.EthAddress, blockHeightTolerance uint64, closingGracePeriod int) (*coordinator, error) {
+func NewCoordinator(ctx context.Context, messageSender MessageSender, committeeMembers []string, clock common.Clock, emit common.EmitEvent, engineIntegration common.EngineIntegration, requestTimeout, assembleTimeout common.Duration, blockRangeSize uint64, contractAddress *tktypes.EthAddress, blockHeightTolerance uint64, closingGracePeriod int) (*coordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
 		transactionsByID:                   make(map[uuid.UUID]*transaction.Transaction),
@@ -71,7 +71,7 @@ func NewCoordinator(ctx context.Context, messageSender MessageSender, committeeM
 		clock:                              clock,
 		requestTimeout:                     requestTimeout,
 		assembleTimeout:                    assembleTimeout,
-		stateIntegration:                   stateIntegration,
+		engineIntegration:                  engineIntegration,
 		emit:                               emit,
 	}
 	c.committee = make(map[string][]string)
@@ -123,7 +123,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			c.messageSender,
 			c.clock,
 			c.emit,
-			c.stateIntegration,
+			c.engineIntegration,
 			c.requestTimeout,
 			c.assembleTimeout,
 			c.grapher,

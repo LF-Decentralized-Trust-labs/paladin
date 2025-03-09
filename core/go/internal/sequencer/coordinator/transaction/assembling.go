@@ -204,7 +204,7 @@ func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) err
 }
 
 func (t *Transaction) writeLockAndDistributeStates(ctx context.Context) error {
-	return t.stateIntegration.WriteLockAndDistributeStatesForTransaction(ctx, t.PrivateTransaction)
+	return t.engineIntegration.WriteLockAndDistributeStatesForTransaction(ctx, t.PrivateTransaction)
 }
 
 func (t *Transaction) incrementAssembleErrors(ctx context.Context) error {

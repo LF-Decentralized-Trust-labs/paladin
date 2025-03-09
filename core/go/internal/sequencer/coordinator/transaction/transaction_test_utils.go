@@ -113,7 +113,7 @@ type TransactionBuilderForTesting struct {
 	state                     State
 	sentMessageRecorder       *SentMessageRecorder
 	fakeClock                 *common.FakeClockForTesting
-	fakeStateIntegration      *common.FakeStateIntegrationForTesting
+	fakeStateIntegration      *common.FakeEngineIntegrationForTesting
 	grapher                   Grapher
 	txn                       *Transaction
 	requestTimeout            int
@@ -138,7 +138,7 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		state:                     state,
 		sentMessageRecorder:       NewSentMessageRecorder(),
 		fakeClock:                 &common.FakeClockForTesting{},
-		fakeStateIntegration:      &common.FakeStateIntegrationForTesting{},
+		fakeStateIntegration:      &common.FakeEngineIntegrationForTesting{},
 		assembleTimeout:           5000,
 		requestTimeout:            100,
 		privateTransactionBuilder: testutil.NewPrivateTransactionBuilderForTesting(),
@@ -224,14 +224,14 @@ func (b *TransactionBuilderForTesting) GetEndorsers() []string {
 type transactionDependencyFakes struct {
 	sentMessageRecorder *SentMessageRecorder
 	clock               *common.FakeClockForTesting
-	stateIntegration    *common.FakeStateIntegrationForTesting
+	engineIntegration   *common.FakeEngineIntegrationForTesting
 }
 
 func (b *TransactionBuilderForTesting) BuildWithMocks() (*Transaction, *transactionDependencyFakes) {
 	mocks := &transactionDependencyFakes{
 		sentMessageRecorder: b.sentMessageRecorder,
 		clock:               b.fakeClock,
-		stateIntegration:    b.fakeStateIntegration,
+		engineIntegration:   b.fakeStateIntegration,
 	}
 	return b.Build(), mocks
 }

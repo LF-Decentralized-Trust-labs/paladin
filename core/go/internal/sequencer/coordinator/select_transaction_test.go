@@ -61,7 +61,7 @@ func TestSelectTransaction_PreserveOrderWithinSender(t *testing.T) {
 	builders := testutil.NewPrivateTransactionBuilderListForTesting(5).Address(*coordinator.contractAddress).Sender(testSender)
 	txns := builders.BuildSparse()
 
-	mocks.stateIntegration.On(
+	mocks.engineIntegration.On(
 		"WriteLockAndDistributeStatesForTransaction",
 		mock.Anything, // ctx
 		mock.MatchedBy(privateTransactionMatcher(txns[0].ID)), // transaction
@@ -81,7 +81,7 @@ func TestSelectTransaction_PreserveOrderWithinSender(t *testing.T) {
 		assert.Len(t, transactionsInAssembling, 1)
 		assert.Equal(t, txns[i].ID, transactionsInAssembling[0].ID)
 
-		mocks.stateIntegration.On(
+		mocks.engineIntegration.On(
 			"WriteLockAndDistributeStatesForTransaction",
 			mock.Anything, // ctx
 			mock.MatchedBy(privateTransactionMatcher(txns[i].ID)), // transaction
@@ -181,7 +181,7 @@ func TestSelectTransaction_SlowQueue(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	mocks.stateIntegration.On(
+	mocks.engineIntegration.On(
 		"WriteLockAndDistributeStatesForTransaction",
 		mock.Anything, // ctx
 		mock.MatchedBy(privateTransactionMatcher(txnsA[0].ID, txnsC[0].ID, txnsD[0].ID, txnsA[1].ID, txnsC[1].ID, txnsD[1].ID)), //match both transactions from A, C and D
@@ -322,7 +322,7 @@ func TestSelectTransaction_FairnessAcrossSenders(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	mocks.stateIntegration.On(
+	mocks.engineIntegration.On(
 		"WriteLockAndDistributeStatesForTransaction",
 		mock.Anything, // ctx
 		mock.MatchedBy(privateTransactionMatcher(txnsA[0].ID, txnsB[0].ID, txnsC[0].ID, txnsD[0].ID)),
@@ -369,7 +369,7 @@ func TestSelectTransaction_FairnessAcrossSenders(t *testing.T) {
 	assert.Contains(t, endorsingTransactionIDs, txnsD[0].ID)
 
 	//do another round of 4 transactions and ensure we get the next transactions from each sender
-	mocks.stateIntegration.On(
+	mocks.engineIntegration.On(
 		"WriteLockAndDistributeStatesForTransaction",
 		mock.Anything, // ctx
 		mock.MatchedBy(privateTransactionMatcher(txnsA[1].ID, txnsB[1].ID, txnsC[1].ID, txnsD[1].ID)), //match the second transactions from each sender

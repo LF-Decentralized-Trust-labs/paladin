@@ -198,9 +198,9 @@ func TestTransaction_RemovesItselfFromGrapher(t *testing.T) {
 }
 
 type transactionDependencyMocks struct {
-	messageSender    *MockMessageSender
-	clock            *common.FakeClockForTesting
-	stateIntegration *sequencermocks.StateIntegration
+	messageSender     *MockMessageSender
+	clock             *common.FakeClockForTesting
+	engineIntegration *sequencermocks.EngineIntegration
 }
 
 func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, *transactionDependencyMocks) {
@@ -208,9 +208,9 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		grapher = NewGrapher(context.Background())
 	}
 	mocks := &transactionDependencyMocks{
-		messageSender:    NewMockMessageSender(t),
-		clock:            &common.FakeClockForTesting{},
-		stateIntegration: sequencermocks.NewStateIntegration(t),
+		messageSender:     NewMockMessageSender(t),
+		clock:             &common.FakeClockForTesting{},
+		engineIntegration: sequencermocks.NewEngineIntegration(t),
 	}
 	txn, err := NewTransaction(
 		context.Background(),
@@ -221,7 +221,7 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		mocks.messageSender,
 		mocks.clock,
 		func(_ common.Event) {},
-		mocks.stateIntegration,
+		mocks.engineIntegration,
 		mocks.clock.Duration(1000),
 		mocks.clock.Duration(5000),
 		grapher,
