@@ -53,7 +53,7 @@ type ConfirmedSuccessEvent struct {
 }
 
 func (_ *ConfirmedSuccessEvent) Type() EventType {
-	return Event_Confirmed_Success
+	return Event_ConfirmedSuccess
 }
 
 type CreatedEvent struct {
@@ -81,6 +81,7 @@ func (event *DelegatedEvent) ApplyToTransaction(_ context.Context, txn *Transact
 
 type AssembleRequestReceivedEvent struct {
 	event
+	RequestID               uuid.UUID
 	Coordinator             string
 	CoordinatorsBlockHeight int64
 	StateLocksJSON          []byte
@@ -97,7 +98,40 @@ func (event *AssembleRequestReceivedEvent) ApplyToTransaction(_ context.Context,
 	txn.inprogressAssembleRequest = &assembleRequestFromCoordinator{
 		coordinatorsBlockHeight: event.CoordinatorsBlockHeight,
 		stateLocksJSON:          event.StateLocksJSON,
+		requestID:               event.RequestID,
 	}
 
 	return nil
+}
+
+type AssembleAndSignSuccessEvent struct {
+	event
+}
+
+func (_ *AssembleAndSignSuccessEvent) Type() EventType {
+	return Event_AssembleAndSignSuccess
+}
+
+type AssembleRevertEvent struct {
+	event
+}
+
+func (_ *AssembleRevertEvent) Type() EventType {
+	return Event_AssembleRevert
+}
+
+type AssembleParkEvent struct {
+	event
+}
+
+func (_ *AssembleParkEvent) Type() EventType {
+	return Event_AssemblePark
+}
+
+type AssembleErrorEvent struct {
+	event
+}
+
+func (_ *AssembleErrorEvent) Type() EventType {
+	return Event_AssembleError
 }

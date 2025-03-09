@@ -20,6 +20,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
@@ -37,19 +38,39 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 	}
 
 	txn.PostAssembly = postAssembly
+	switch postAssembly.AssemblyResult {
+	case prototk.AssembleTransactionResponse_OK:
+		txn.emit(&AssembleAndSignSuccessEvent{
+			event: event{
+				TransactionID: txn.ID,
+			},
+		})
+	case prototk.AssembleTransactionResponse_REVERT:
+		txn.emit(&AssembleRevertEvent{
+			event: event{
+				TransactionID: txn.ID,
+			},
+		})
+	case prototk.AssembleTransactionResponse_PARK:
+		txn.emit(&AssembleParkEvent{
+			event: event{
+				TransactionID: txn.ID,
+			},
+		})
+	}
 	return nil
 }
 
 func action_SendAssembleRevertResponse(ctx context.Context, txn *Transaction) error {
-	// TODO
+	txn.messageSender.SendAssembleResponse(ctx, txn.inprogressAssembleRequest.requestID, txn.PostAssembly)
 	return nil
 }
 func action_SendAssembleParkResponse(ctx context.Context, txn *Transaction) error {
-	//TODO
+	txn.messageSender.SendAssembleResponse(ctx, txn.inprogressAssembleRequest.requestID, txn.PostAssembly)
 	return nil
 }
 
 func action_SendAssembleSuccessResponse(ctx context.Context, txn *Transaction) error {
-	// TODO
+	txn.messageSender.SendAssembleResponse(ctx, txn.inprogressAssembleRequest.requestID, txn.PostAssembly)
 	return nil
 }

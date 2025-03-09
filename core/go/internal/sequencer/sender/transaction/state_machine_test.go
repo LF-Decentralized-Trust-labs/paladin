@@ -75,12 +75,43 @@ func TestStateMachine_Pending_ToDelegated_OnDelegated(t *testing.T) {
 func TestStateMachine_Delegated_OnAssembleRequestReceived_AfterAssembleCompletesOK(t *testing.T) {
 	ctx := context.Background()
 	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
-	//TODO move following complexity into utils e.g. using builder pattern as we do with coordianator.Transaction
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordinator.Transaction
 	coordinator := uuid.New().String()
 	txn.currentDelegate = coordinator
 	txn.stateMachine.currentState = State_Delegated
 
 	mocks.mockForAssembleAndSignRequestOK().Once()
+	requestID := uuid.New()
+
+	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		RequestID:   requestID,
+		Coordinator: coordinator,
+	})
+	assert.NoError(t, err)
+	assert.True(t, mocks.engineIntegration.AssertExpectations(t))
+
+	require.Len(t, mocks.emittedEvents, 1)
+	require.IsType(t, &AssembleAndSignSuccessEvent{}, mocks.emittedEvents[0])
+
+	err = txn.HandleEvent(ctx, mocks.emittedEvents[0])
+	assert.NoError(t, err)
+
+	assert.True(t, mocks.messageSender.HasSentAssembleSuccessResponse(), "assemble success response was not sent back to coordinator")
+	assert.Equal(t, State_Delegated, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Delegated_ToReverted_OnAssembleRequestReceived_AfterAssembleCompletesRevert(t *testing.T) {
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordianator.Transaction
+	coordinator := uuid.New().String()
+	txn.currentDelegate = coordinator
+	txn.stateMachine.currentState = State_Delegated
+
+	mocks.mockForAssembleAndSignRequestRevert().Once()
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
 		event: event{
@@ -90,7 +121,44 @@ func TestStateMachine_Delegated_OnAssembleRequestReceived_AfterAssembleCompletes
 	})
 	assert.NoError(t, err)
 	assert.True(t, mocks.engineIntegration.AssertExpectations(t))
-	assert.Equal(t, State_Delegated, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+
+	require.Len(t, mocks.emittedEvents, 1)
+	require.IsType(t, &AssembleRevertEvent{}, mocks.emittedEvents[0])
+	err = txn.HandleEvent(ctx, mocks.emittedEvents[0])
+	assert.NoError(t, err)
+
+	assert.True(t, mocks.messageSender.HasSentAssembleRevertResponse(), "assemble revert response was not sent back to coordinator")
+	assert.Equal(t, State_Reverted, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+	//TODO assert that transaction was finalized as Reverted in the database
+}
+
+func TestStateMachine_Delegated_ToParked_OnAssembleRequestReceived_AfterAssembleCompletesPark(t *testing.T) {
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordianator.Transaction
+	coordinator := uuid.New().String()
+	txn.currentDelegate = coordinator
+	txn.stateMachine.currentState = State_Delegated
+
+	mocks.mockForAssembleAndSignRequestPark().Once()
+
+	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		Coordinator: coordinator,
+	})
+	assert.NoError(t, err)
+	assert.True(t, mocks.engineIntegration.AssertExpectations(t))
+
+	require.Len(t, mocks.emittedEvents, 1)
+	require.IsType(t, &AssembleParkEvent{}, mocks.emittedEvents[0])
+	err = txn.HandleEvent(ctx, mocks.emittedEvents[0])
+	assert.NoError(t, err)
+
+	assert.True(t, mocks.messageSender.HasSentAssembleParkResponse(), "assemble park response was not sent back to coordinator")
+	assert.Equal(t, State_Parked, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+	//TODO assert that transaction was finalized as Parked in the database
 }
 
 type transactionDependencyMocks struct {
@@ -99,6 +167,7 @@ type transactionDependencyMocks struct {
 	engineIntegration *sequencermocks.EngineIntegration
 	emit              common.EmitEvent
 	transactionID     uuid.UUID
+	emittedEvents     []common.Event
 }
 
 func NewTransactionForUnitTest(t *testing.T, ctx context.Context, pt *components.PrivateTransaction) (*Transaction, *transactionDependencyMocks) {
@@ -107,7 +176,10 @@ func NewTransactionForUnitTest(t *testing.T, ctx context.Context, pt *components
 		messageSender:     NewSentMessageRecorder(),
 		clock:             &common.FakeClockForTesting{},
 		engineIntegration: sequencermocks.NewEngineIntegration(t),
-		emit:              func(event common.Event) {}, //TODO do something useful to allow tests to receive events from the state machine
+	}
+	mocks.emit = func(event common.Event) {
+		mocks.emittedEvents = append(mocks.emittedEvents, event)
+
 	}
 
 	txn, err := NewTransaction(ctx, pt, mocks.messageSender, mocks.clock, mocks.emit, mocks.engineIntegration)
@@ -129,5 +201,35 @@ func (m *transactionDependencyMocks) mockForAssembleAndSignRequestOK() *mock.Cal
 		mock.Anything, //blockHeight int64
 	).Return(&components.TransactionPostAssembly{
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
+	}, nil)
+}
+
+func (m *transactionDependencyMocks) mockForAssembleAndSignRequestRevert() *mock.Call {
+
+	return m.engineIntegration.On(
+		"AssembleAndSign",
+		mock.Anything, //ctx context.Contex
+		m.transactionID,
+		mock.Anything, //preAssembly *components.TransactionPreAssembly
+		mock.Anything, //stateLocksJSON []byte
+		mock.Anything, //blockHeight int64
+	).Return(&components.TransactionPostAssembly{
+		AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
+		RevertReason:   ptrTo("test revert reason"),
+	}, nil)
+}
+
+func (m *transactionDependencyMocks) mockForAssembleAndSignRequestPark() *mock.Call {
+
+	return m.engineIntegration.On(
+		"AssembleAndSign",
+		mock.Anything, //ctx context.Contex
+		m.transactionID,
+		mock.Anything, //preAssembly *components.TransactionPreAssembly
+		mock.Anything, //stateLocksJSON []byte
+		mock.Anything, //blockHeight int64
+	).Return(&components.TransactionPostAssembly{
+		AssemblyResult: prototk.AssembleTransactionResponse_PARK,
+		RevertReason:   ptrTo("test revert reason"),
 	}, nil)
 }

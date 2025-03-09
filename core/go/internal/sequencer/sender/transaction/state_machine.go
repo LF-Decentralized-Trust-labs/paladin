@@ -56,14 +56,14 @@ const (
 	Event_DispatchHeartbeatReceived                               // a heartbeat message was received from the current active coordinator with this transaction in the list of dispatched transactions
 	Event_CoordinatorChanged                                      // the coordinator has changed
 	Event_Created                                                 // Transaction initially received by the sender or has been loaded from the database after a restart / swap-in
-	Event_Confirmed_Success                                       // confirmation received from the blockchain of base ledge transaction successful completion
-	Event_Confirmed_Reverted                                      // confirmation received from the blockchain of base ledge transaction failure
+	Event_ConfirmedSuccess                                        // confirmation received from the blockchain of base ledge transaction successful completion
+	Event_ConfirmedReverted                                       // confirmation received from the blockchain of base ledge transaction failure
 	Event_Delegated                                               // transaction has been delegated to a coordinator
 	Event_AssembleRequestReceived                                 // coordinator has requested that we assemble the transaction
-	Event_Assemble_Success                                        // we have successfully assembled the transaction
-	Event_Assemble_Revert                                         // we have failed to assemble the transaction
-	Event_Assemble_Park                                           // we have parked the transaction
-	Event_Signed                                                  // signing module has signed the assembled transaction
+	Event_AssembleAndSignSuccess                                  // we have successfully assembled the transaction and signing module has signed the assembled transaction
+	Event_AssembleRevert                                          // we have failed to assemble the transaction
+	Event_AssemblePark                                            // we have parked the transaction
+	Event_AssembleError                                           // an unexpected error occurred while trying to assemble the transaction
 	Event_Dispatched                                              // coordinator has dispatched the transaction to a public transaction manager
 	Event_Dispatch_Confirmation_Request_Received                  // coordinator has requested confirmation that the transaction has been dispatched
 	Event_Resumed                                                 // Received an RPC call to resume a parked transaction
@@ -147,7 +147,7 @@ func init() {
 						},
 					},
 				},
-				Event_Assemble_Success: {
+				Event_AssembleAndSignSuccess: {
 					Transitions: []Transition{
 						{
 							To: State_Delegated,
@@ -155,7 +155,7 @@ func init() {
 						},
 					},
 				},
-				Event_Assemble_Revert: {
+				Event_AssembleRevert: {
 					Transitions: []Transition{
 						{
 							To: State_Reverted,
@@ -163,7 +163,7 @@ func init() {
 						},
 					},
 				},
-				Event_Assemble_Park: {
+				Event_AssemblePark: {
 					Transitions: []Transition{
 						{
 							To: State_Parked,
@@ -214,12 +214,12 @@ func init() {
 		},
 		State_Dispatched: {
 			Events: map[EventType]EventHandler{
-				Event_Confirmed_Success: {
+				Event_ConfirmedSuccess: {
 					Transitions: []Transition{{
 						To: State_Dispatched,
 					}},
 				},
-				Event_Confirmed_Reverted: {
+				Event_ConfirmedReverted: {
 					Transitions: []Transition{{
 						To: State_Pending,
 					}},
