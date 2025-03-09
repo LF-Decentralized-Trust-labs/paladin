@@ -132,12 +132,10 @@ func init() {
 		State_Delegated: {
 			Events: map[EventType]EventHandler{
 				Event_AssembleRequestReceived: {
-					Validator: validator_AssembleRequestMatchesDelegationIntent,
-					Transitions: []Transition{
-						{
-							To: State_Assembling,
-						},
-					},
+					Validator: validator_AssembleRequestMatches,
+					Actions: []ActionRule{{
+						Action: action_AssembleAndSign,
+					}},
 				},
 				Event_CoordinatorChanged: {},
 				Event_Dispatch_Confirmation_Request_Received: {
@@ -149,15 +147,11 @@ func init() {
 						},
 					},
 				},
-			},
-		},
-		State_Assembling: {
-			OnTransitionTo: action_SendAssembleRequestToDomain,
-			Events: map[EventType]EventHandler{
 				Event_Assemble_Success: {
 					Transitions: []Transition{
 						{
-							To: State_Signing,
+							To: State_Delegated,
+							On: action_SendAssembleSuccessResponse,
 						},
 					},
 				},
@@ -174,19 +168,6 @@ func init() {
 						{
 							To: State_Parked,
 							On: action_SendAssembleParkResponse,
-						},
-					},
-				},
-			},
-		},
-		State_Signing: {
-			OnTransitionTo: action_SendSignRequestToSigningModule,
-			Events: map[EventType]EventHandler{
-				Event_Signed: {
-					Transitions: []Transition{
-						{
-							To: State_Delegated,
-							On: action_SendAssembleSuccessResponse,
 						},
 					},
 				},
@@ -249,7 +230,7 @@ func init() {
 					// the fact that the coordinator has been changed on us means that we have lost contact with the original coordinator.  That may or may not have lost contact with the base ledger. If so, it may be days or months before it reconnects and managed to submit the transaction.
 					// rather than waiting in hope, we carry on with the new coordinator.  The double intent protection in the base ledger will ensure that only one of the coordinators manages to get the transaction through
 					// and the other one will revert.  We just need to make sure that we don't overreact when we see a revert.
-					//We _could_ introduce a new state that we transition here to give some time, after realizing the coordinator has gone AWOL in case the transaction has made it to that coordinator's
+					// We _could_ introduce a new state that we transition here to give some time, after realizing the coordinator has gone AWOL in case the transaction has made it to that coordinator's
 					// EVM node which is actively trying to get it into a block and we just don't get heartbeats for that.
 					// However, by waiting, we would need to delaying other transactions from being delegated and assembled or risk things happening out of order
 					// and the only downside of not waiting is that we plough ahead with a new assembly of things that will never get to the base ledger because the txn at the front will cause a double intent
@@ -293,6 +274,7 @@ func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error
 	//If we get here, the state machine has defined a rule for handling this event
 	//Apply the event to the transaction to update the internal state
 	// so that the guards and actions defined in the state machine can reference the new internal state of the coordinator
+
 	err = t.applyEvent(ctx, event)
 	if err != nil {
 		return err
@@ -344,9 +326,10 @@ func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*E
 // this happens before the state machine is evaluated for transitions that may be triggered by the event
 // so that any guards on the transition rules can take into account the new internal state of the Transaction after this event has been applied
 func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error {
-	//TODO reconsider moving these back into the state machine definition.
 	var err error
 	switch event := event.(type) {
+	case Event:
+		err = event.ApplyToTransaction(ctx, t)
 
 	default:
 		//other events may trigger actions and/or state transitions but not require any internal state to be updated

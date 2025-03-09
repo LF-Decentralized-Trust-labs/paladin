@@ -21,10 +21,20 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 )
 
+type assembleRequestFromCoordinator struct {
+	coordinatorsBlockHeight int64
+	stateLocksJSON          []byte
+}
+
 // Transaction represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
 type Transaction struct {
 	stateMachine *StateMachine
 	*components.PrivateTransaction
+	engineIntegration common.EngineIntegration
+	//domainSmartContract components.DomainSmartContract
+	components                components.AllComponents
+	currentDelegate           string
+	inprogressAssembleRequest *assembleRequestFromCoordinator
 }
 
 func NewTransaction(
@@ -33,10 +43,15 @@ func NewTransaction(
 	messageSender MessageSender,
 	clock common.Clock,
 	emit common.EmitEvent,
-	stateIntegration common.StateIntegration,
+	//engineIntegration common.EngineIntegration,
+	//domainSmartContract components.DomainSmartContract,
+	engineIntegration common.EngineIntegration,
+
 ) (*Transaction, error) {
 	txn := &Transaction{
 		PrivateTransaction: pt,
+		//domainSmartContract: domainSmartContract,
+		engineIntegration: engineIntegration,
 	}
 
 	txn.InitializeStateMachine(State_Initial)

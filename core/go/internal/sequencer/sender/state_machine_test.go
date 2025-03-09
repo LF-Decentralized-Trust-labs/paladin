@@ -113,10 +113,10 @@ func TestStateMachine_Observing_NoTransition_OnHeartbeatInterval_IfHeartbeatThre
 
 // TODO should we move this to common and reuse it in e.g. coordinator tests?
 type senderDependencyMocks struct {
-	messageSender    *SentMessageRecorder
-	clock            *common.FakeClockForTesting
-	stateIntegration *sequencermocks.StateIntegration
-	emit             common.EmitEvent
+	messageSender     *SentMessageRecorder
+	clock             *common.FakeClockForTesting
+	engineIntegration *sequencermocks.EngineIntegration
+	emit              common.EmitEvent
 }
 
 func NewSenderForUnitTest(t *testing.T, ctx context.Context, committeeMembers []string) (*sender, *senderDependencyMocks) {
@@ -125,13 +125,13 @@ func NewSenderForUnitTest(t *testing.T, ctx context.Context, committeeMembers []
 		committeeMembers = []string{"member1@node1"}
 	}
 	mocks := &senderDependencyMocks{
-		messageSender:    NewSentMessageRecorder(),
-		clock:            &common.FakeClockForTesting{},
-		stateIntegration: sequencermocks.NewStateIntegration(t),
-		emit:             func(event common.Event) {}, //TODO do something useful to allow tests to receive events from the state machine
+		messageSender:     NewSentMessageRecorder(),
+		clock:             &common.FakeClockForTesting{},
+		engineIntegration: sequencermocks.NewEngineIntegration(t),
+		emit:              func(event common.Event) {}, //TODO do something useful to allow tests to receive events from the state machine
 	}
 
-	coordinator, err := NewSender(ctx, mocks.messageSender, committeeMembers, mocks.clock, mocks.emit, mocks.stateIntegration, 100, tktypes.RandAddress(), TestDefault_HeartbeatIntervalMs, TestDefault_HeartbeatThreshold)
+	coordinator, err := NewSender(ctx, mocks.messageSender, committeeMembers, mocks.clock, mocks.emit, mocks.engineIntegration, 100, tktypes.RandAddress(), TestDefault_HeartbeatIntervalMs, TestDefault_HeartbeatThreshold)
 	require.NoError(t, err)
 
 	return coordinator, mocks

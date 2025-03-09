@@ -45,10 +45,10 @@ type sender struct {
 	heartbeatThresholdMs common.Duration
 
 	/* Dependencies */
-	messageSender    MessageSender
-	clock            common.Clock
-	stateIntegration common.StateIntegration
-	emit             common.EmitEvent
+	messageSender     MessageSender
+	clock             common.Clock
+	engineIntegration common.EngineIntegration
+	emit              common.EmitEvent
 }
 
 func NewSender(
@@ -57,7 +57,7 @@ func NewSender(
 	committeeMembers []string,
 	clock common.Clock,
 	emit common.EmitEvent,
-	stateIntegration common.StateIntegration,
+	engineIntegration common.EngineIntegration,
 	blockRangeSize uint64,
 	contractAddress *tktypes.EthAddress,
 	heartbeatPeriodMs int,
@@ -69,7 +69,7 @@ func NewSender(
 		blockRangeSize:       blockRangeSize,
 		contractAddress:      contractAddress,
 		clock:                clock,
-		stateIntegration:     stateIntegration,
+		engineIntegration:    engineIntegration,
 		emit:                 emit,
 		heartbeatThresholdMs: clock.Duration(heartbeatPeriodMs * heartbeatThresholdIntervals),
 	}
@@ -109,12 +109,19 @@ func (s *sender) propagateEventToTransaction(ctx context.Context, event transact
 }
 
 func (s *sender) createTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
-	newTxn, err := transaction.NewTransaction(ctx, txn, s.messageSender, s.clock, s.emit, s.stateIntegration)
+	newTxn, err := transaction.NewTransaction(ctx, txn, s.messageSender, s.clock, s.emit, s.engineIntegration)
 	if err != nil {
 		log.L(ctx).Errorf("Error creating transaction: %v", err)
 		return err
 	}
 	s.transactionsByID[txn.ID] = newTxn
+	transactionCreatedEvent := &transaction.CreatedEvent{}
+	transactionCreatedEvent.TransactionID = txn.ID
+
+	err = newTxn.HandleEvent(ctx, transactionCreatedEvent)
+	if err != nil {
+		log.L(ctx).Errorf("Error applying transaction created event: %v", err)
+	}
 	s.transactionsOrdered = append(s.transactionsOrdered, &txn.ID)
 
 	return nil

@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 func action_SendDelegationRequest(ctx context.Context, txn *Transaction) error {
@@ -30,14 +31,19 @@ func action_SendDispatchConfirmationResponse(ctx context.Context, txn *Transacti
 	return nil
 }
 
-func validator_AssembleRequestMatchesDelegationIntent(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
-	//TODO validate the event and send an error response to the coordinator if it doesn't match the delegation intent
-	// will also need to add code to the coordinator to handle this case (e.g. by abending itself)
-	return true, nil
+func validator_AssembleRequestMatches(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
+	assembleRequestEvent, ok := event.(*AssembleRequestReceivedEvent)
+	if !ok {
+		log.L(ctx).Errorf("expected event type *AssembleRequestReceivedEvent, got %T", event)
+		return false, nil
+	}
+
+	return assembleRequestEvent.Coordinator == txn.currentDelegate, nil
+
 }
 
 func validator_DispatchConfirmationRequestMatchesAssembledDelegation(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
 	//TODO validate the event and send an error response to the coordinator if it doesn't match the hash of the most recent assembled revision of this transaction
 	// will also need to add code to the coordinator to handle this case (e.g. by abending itself)
-	return true, nil
+	return false, nil
 }
