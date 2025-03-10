@@ -499,6 +499,113 @@ func TestStateMachine_EndorsementGathering_ToDelegated_OnCoordinatorChanged(t *t
 
 }
 
+func TestStateMachine_Prepared_ToDispatched_OnDispatchHeartbeatReceived(t *testing.T) {
+	ctx := context.Background()
+	txn, _ := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	txn.stateMachine.currentState = State_Prepared
+
+	err := txn.HandleEvent(ctx, &DispatchHeartbeatReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, State_Dispatched, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Prepared_NoTransition_Do_Resend_OnDispatchConfirmationRequestReceivedIfMatches(t *testing.T) {
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	txn.stateMachine.currentState = State_Prepared
+	coordinator := uuid.New().String()
+	txn.currentDelegate = coordinator
+	hash, err := txn.Hash(ctx)
+	require.NoError(t, err)
+
+	err = txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		Coordinator:      coordinator,
+		PostAssemblyHash: hash,
+	})
+	assert.NoError(t, err)
+
+	assert.True(t, mocks.messageSender.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was not sent back to coordinator")
+	assert.Equal(t, State_Prepared, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Prepared_Ignore_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongCoordinator(t *testing.T) {
+
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordinator.Transaction
+	coordinator1 := uuid.New().String()
+	coordinator2 := uuid.New().String()
+	txn.currentDelegate = coordinator1
+	txn.stateMachine.currentState = State_Prepared
+	hash, err := txn.Hash(ctx)
+	require.NoError(t, err)
+
+	err = txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		Coordinator:      coordinator2,
+		PostAssemblyHash: hash,
+	})
+	assert.NoError(t, err)
+
+	assert.False(t, mocks.messageSender.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
+	assert.Equal(t, State_Prepared, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Prepared_Ignore_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
+
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordinator.Transaction
+	coordinator1 := uuid.New().String()
+	coordinator2 := uuid.New().String()
+	txn.currentDelegate = coordinator1
+	txn.stateMachine.currentState = State_Prepared
+	hash := tktypes.Bytes32(tktypes.RandBytes(32))
+
+	err := txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		Coordinator:      coordinator2,
+		PostAssemblyHash: &hash,
+	})
+	assert.NoError(t, err)
+
+	assert.False(t, mocks.messageSender.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
+	assert.Equal(t, State_Prepared, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Prepared_ToDelegated_OnCoordinatorChanged(t *testing.T) {
+	ctx := context.Background()
+	txn, _ := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordinator.Transaction
+	coordinator1 := uuid.New().String()
+	coordinator2 := uuid.New().String()
+	txn.currentDelegate = coordinator1
+	txn.stateMachine.currentState = State_Prepared
+
+	err := txn.HandleEvent(ctx, &CoordinatorChangedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		Coordinator: coordinator2,
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, State_Delegated, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+
+}
+
 type transactionDependencyMocks struct {
 	messageSender     *SentMessageRecorder
 	clock             *common.FakeClockForTesting

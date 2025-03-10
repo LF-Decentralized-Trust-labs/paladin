@@ -184,3 +184,11 @@ func (event *CoordinatorChangedEvent) ApplyToTransaction(_ context.Context, txn 
 	txn.currentDelegate = event.Coordinator
 	return nil
 }
+
+type DispatchHeartbeatReceivedEvent struct {
+	event
+}
+
+func (_ *DispatchHeartbeatReceivedEvent) Type() EventType {
+	return Event_DispatchHeartbeatReceived
+}

@@ -19,6 +19,5 @@ import (
 )
 
 func action_ResendDispatchConfirmationResponse(ctx context.Context, txn *Transaction) error {
-	// TODO
-	return nil
+	return action_SendDispatchConfirmationResponse(ctx, txn)
 }
