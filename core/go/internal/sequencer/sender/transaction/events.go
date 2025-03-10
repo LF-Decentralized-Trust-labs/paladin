@@ -57,6 +57,14 @@ func (_ *ConfirmedSuccessEvent) Type() EventType {
 	return Event_ConfirmedSuccess
 }
 
+type ConfirmedRevertedEvent struct {
+	event
+}
+
+func (_ *ConfirmedRevertedEvent) Type() EventType {
+	return Event_ConfirmedReverted
+}
+
 type CreatedEvent struct {
 	event
 	PrivateTransaction *components.PrivateTransaction
@@ -191,4 +199,12 @@ type DispatchHeartbeatReceivedEvent struct {
 
 func (_ *DispatchHeartbeatReceivedEvent) Type() EventType {
 	return Event_DispatchHeartbeatReceived
+}
+
+type ResumedEvent struct {
+	event
+}
+
+func (_ *ResumedEvent) Type() EventType {
+	return Event_Resumed
 }

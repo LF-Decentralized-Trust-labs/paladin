@@ -252,7 +252,7 @@ func init() {
 			Events: map[EventType]EventHandler{
 				Event_ConfirmedSuccess: {
 					Transitions: []Transition{{
-						To: State_Dispatched,
+						To: State_Confirmed,
 					}},
 				},
 				Event_ConfirmedReverted: {
@@ -293,7 +293,6 @@ func init() {
 				Event_Resumed: {
 					Transitions: []Transition{{
 						To: State_Delegated,
-						On: action_SendDelegationRequest,
 					}},
 				},
 			},

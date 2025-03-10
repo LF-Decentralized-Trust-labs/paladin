@@ -21,11 +21,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-func action_SendDelegationRequest(ctx context.Context, txn *Transaction) error {
-	// TODO
-	return nil
-}
-
 func action_SendDispatchConfirmationResponse(ctx context.Context, txn *Transaction) error {
 	txn.messageSender.SendDispatchConfirmationResponse(ctx)
 	return nil
