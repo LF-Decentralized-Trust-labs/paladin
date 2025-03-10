@@ -95,8 +95,7 @@ func (_ *AssembleRequestReceivedEvent) Type() EventType {
 func (event *AssembleRequestReceivedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.currentDelegate = event.Coordinator
 
-	//TODO move this complexity into utils e.g. using builder pattern as we do for coordinator.Transaction
-	txn.inprogressAssembleRequest = &assembleRequestFromCoordinator{
+	txn.latestAssembleRequest = &assembleRequestFromCoordinator{
 		coordinatorsBlockHeight: event.CoordinatorsBlockHeight,
 		stateLocksJSON:          event.StateLocksJSON,
 		requestID:               event.RequestID,
@@ -108,6 +107,7 @@ func (event *AssembleRequestReceivedEvent) ApplyToTransaction(_ context.Context,
 type AssembleAndSignSuccessEvent struct {
 	event
 	PostAssembly *components.TransactionPostAssembly
+	RequestID    uuid.UUID
 }
 
 func (_ *AssembleAndSignSuccessEvent) Type() EventType {
@@ -116,12 +116,14 @@ func (_ *AssembleAndSignSuccessEvent) Type() EventType {
 
 func (event *AssembleAndSignSuccessEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.PostAssembly = event.PostAssembly
+	txn.latestFulfilledAssembleRequestID = event.RequestID
 	return nil
 }
 
 type AssembleRevertEvent struct {
 	event
 	PostAssembly *components.TransactionPostAssembly
+	RequestID    uuid.UUID
 }
 
 func (_ *AssembleRevertEvent) Type() EventType {
@@ -130,12 +132,14 @@ func (_ *AssembleRevertEvent) Type() EventType {
 
 func (event *AssembleRevertEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.PostAssembly = event.PostAssembly
+	txn.latestFulfilledAssembleRequestID = event.RequestID
 	return nil
 }
 
 type AssembleParkEvent struct {
 	event
 	PostAssembly *components.TransactionPostAssembly
+	RequestID    uuid.UUID
 }
 
 func (_ *AssembleParkEvent) Type() EventType {
@@ -144,6 +148,7 @@ func (_ *AssembleParkEvent) Type() EventType {
 
 func (event *AssembleParkEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.PostAssembly = event.PostAssembly
+	txn.latestFulfilledAssembleRequestID = event.RequestID
 	return nil
 }
 

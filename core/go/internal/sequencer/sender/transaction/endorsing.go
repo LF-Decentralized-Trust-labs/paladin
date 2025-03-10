@@ -16,16 +16,21 @@ package transaction
 
 import (
 	"context"
-	"errors"
 )
 
-// Actions can be specified for transition to a state either as the OnTransitionTo function that will run for all transitions to that state or as the On field in the Transition struct if the action applies
-// for a specific transition
 func action_ResendAssembleSuccessResponse(ctx context.Context, txn *Transaction) error {
-	return errors.New("not implemented")
+	return action_SendAssembleSuccessResponse(ctx, txn)
 }
 
-func guard_AssembleRequestMatchesPreviousResponse(ctx context.Context, txn *Transaction) bool {
-	return false
+func action_ResendAssembleRevertResponse(ctx context.Context, txn *Transaction) error {
+	return action_SendAssembleRevertResponse(ctx, txn)
+}
 
+func action_ResendAssembleParkResponse(ctx context.Context, txn *Transaction) error {
+	return action_SendAssembleParkResponse(ctx, txn)
+}
+
+// True if the most recent assemble request has the same idempotency key as the most recent fulfilled assemble request
+func guard_AssembleRequestMatchesPreviousResponse(ctx context.Context, txn *Transaction) bool {
+	return txn.latestAssembleRequest.requestID == txn.latestFulfilledAssembleRequestID
 }

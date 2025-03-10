@@ -282,11 +282,31 @@ func init() {
 		},
 		State_Parked: {
 			Events: map[EventType]EventHandler{
+				Event_AssembleRequestReceived: {
+					Actions: []ActionRule{
+						{
+							//it seems like the coordinator had not got the response in time and has resent the assemble request, we simply reply with the same response as before
+							If:     guard_AssembleRequestMatchesPreviousResponse,
+							Action: action_ResendAssembleParkResponse,
+						}},
+				},
 				Event_Resumed: {
 					Transitions: []Transition{{
 						To: State_Delegated,
 						On: action_SendDelegationRequest,
 					}},
+				},
+			},
+		},
+		State_Reverted: {
+			Events: map[EventType]EventHandler{
+				Event_AssembleRequestReceived: {
+					Actions: []ActionRule{
+						{
+							//it seems like the coordinator had not got the response in time and has resent the assemble request, we simply reply with the same response as before
+							If:     guard_AssembleRequestMatchesPreviousResponse,
+							Action: action_ResendAssembleRevertResponse,
+						}},
 				},
 			},
 		},

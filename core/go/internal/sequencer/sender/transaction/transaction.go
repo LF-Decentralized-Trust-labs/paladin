@@ -36,11 +36,12 @@ type assembleRequestFromCoordinator struct {
 type Transaction struct {
 	stateMachine *StateMachine
 	*components.PrivateTransaction
-	engineIntegration         common.EngineIntegration
-	messageSender             MessageSender
-	currentDelegate           string
-	inprogressAssembleRequest *assembleRequestFromCoordinator
-	emit                      common.EmitEvent
+	engineIntegration                common.EngineIntegration
+	messageSender                    MessageSender
+	currentDelegate                  string
+	latestAssembleRequest            *assembleRequestFromCoordinator
+	latestFulfilledAssembleRequestID uuid.UUID
+	emit                             common.EmitEvent
 }
 
 func NewTransaction(

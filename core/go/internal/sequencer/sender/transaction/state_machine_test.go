@@ -165,7 +165,7 @@ func TestStateMachine_Assembling_ToEndorsementGathering_OnAssembleAndSignSuccess
 	assembleRequestID := uuid.New()
 	txn.currentDelegate = coordinator
 	txn.stateMachine.currentState = State_Assembling
-	txn.inprogressAssembleRequest = &assembleRequestFromCoordinator{
+	txn.latestAssembleRequest = &assembleRequestFromCoordinator{
 		requestID: assembleRequestID,
 	}
 
@@ -192,7 +192,7 @@ func TestStateMachine_Assembling_ToReverted_OnAssembleRevert(t *testing.T) {
 	assembleRequestID := uuid.New()
 	txn.currentDelegate = coordinator
 	txn.stateMachine.currentState = State_Assembling
-	txn.inprogressAssembleRequest = &assembleRequestFromCoordinator{
+	txn.latestAssembleRequest = &assembleRequestFromCoordinator{
 		requestID: assembleRequestID,
 	}
 
@@ -219,7 +219,7 @@ func TestStateMachine_Assembling_ToParked_OnAssemblePark(t *testing.T) {
 	assembleRequestID := uuid.New()
 	txn.currentDelegate = coordinator
 	txn.stateMachine.currentState = State_Assembling
-	txn.inprogressAssembleRequest = &assembleRequestFromCoordinator{
+	txn.latestAssembleRequest = &assembleRequestFromCoordinator{
 		requestID: assembleRequestID,
 	}
 
@@ -295,6 +295,90 @@ func TestStateMachine_Delegated_ToParked_OnAssembleRequestReceived_AfterAssemble
 	//TODO assert that transaction was finalized as Parked in the database
 }
 
+func TestStateMachine_EndorsementGathering_NoTransition_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	// NOTE we do not mock AssembleAndSign function because we expect to resend the previous response
+
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordinator.Transaction
+	coordinator := uuid.New().String()
+	txn.currentDelegate = coordinator
+	txn.stateMachine.currentState = State_EndorsementGathering
+	txn.latestFulfilledAssembleRequestID = uuid.New()
+
+	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		RequestID:   txn.latestFulfilledAssembleRequestID,
+		Coordinator: coordinator,
+	})
+	assert.NoError(t, err)
+
+	assert.True(t, mocks.messageSender.HasSentAssembleSuccessResponse(), "assemble success response was not sent back to coordinator")
+	assert.Equal(t, State_EndorsementGathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Reverted_NoTransition_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	// NOTE we do not mock AssembleAndSign function because we expect to resend the previous response
+
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordinator.Transaction
+	coordinator := uuid.New().String()
+	txn.currentDelegate = coordinator
+	txn.stateMachine.currentState = State_Reverted
+	txn.latestFulfilledAssembleRequestID = uuid.New()
+	txn.PostAssembly = &components.TransactionPostAssembly{
+		AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
+		RevertReason:   ptrTo("test revert reason"),
+	}
+
+	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		RequestID:   txn.latestFulfilledAssembleRequestID,
+		Coordinator: coordinator,
+	})
+	assert.NoError(t, err)
+
+	assert.True(t, mocks.messageSender.HasSentAssembleRevertResponse(), "assemble revert response was not sent back to coordinator")
+	assert.Equal(t, State_Reverted, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Parked_NoTransition_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	// NOTE we do not mock AssembleAndSign function because we expect to resend the previous response
+
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordinator.Transaction
+	coordinator := uuid.New().String()
+	txn.currentDelegate = coordinator
+	txn.stateMachine.currentState = State_Parked
+	txn.latestFulfilledAssembleRequestID = uuid.New()
+	txn.PostAssembly = &components.TransactionPostAssembly{
+		AssemblyResult: prototk.AssembleTransactionResponse_PARK,
+	}
+
+	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		RequestID:   txn.latestFulfilledAssembleRequestID,
+		Coordinator: coordinator,
+	})
+	assert.NoError(t, err)
+
+	assert.True(t, mocks.messageSender.HasSentAssembleParkResponse(), "assemble park response was not sent back to coordinator")
+	assert.Equal(t, State_Parked, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+
+}
+
+func TestStateMachine_EndorsementGathering_ToAssembling_OnAssembleRequest_IfNotMatchesPreviousRequest(t *testing.T) {
+
+}
+
 func TestStateMachine_EndorsementGathering_ToPrepared_OnDispatchConfirmationRequestReceivedIfMatches(t *testing.T) {
 	ctx := context.Background()
 	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
@@ -343,7 +427,7 @@ func TestStateMachine_EndorsementGathering_NoTransition_OnDispatchConfirmationRe
 	assert.Equal(t, State_EndorsementGathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
-func TestStateMachine_Delegated_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
+func TestStateMachine_EndorsementGathering_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
 
 	ctx := context.Background()
 	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
