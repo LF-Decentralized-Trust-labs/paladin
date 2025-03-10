@@ -22,6 +22,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type Event interface {
@@ -134,4 +135,15 @@ type AssembleErrorEvent struct {
 
 func (_ *AssembleErrorEvent) Type() EventType {
 	return Event_AssembleError
+}
+
+type DispatchConfirmationRequestReceivedEvent struct {
+	event
+	RequestID        uuid.UUID
+	Coordinator      string
+	PostAssemblyHash *tktypes.Bytes32
+}
+
+func (_ *DispatchConfirmationRequestReceivedEvent) Type() EventType {
+	return Event_DispatchConfirmationRequestReceived
 }

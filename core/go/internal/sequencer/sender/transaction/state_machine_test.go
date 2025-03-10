@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/sequencer/testutil"
 	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -159,6 +160,78 @@ func TestStateMachine_Delegated_ToParked_OnAssembleRequestReceived_AfterAssemble
 	assert.True(t, mocks.messageSender.HasSentAssembleParkResponse(), "assemble park response was not sent back to coordinator")
 	assert.Equal(t, State_Parked, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 	//TODO assert that transaction was finalized as Parked in the database
+}
+
+func TestStateMachine_Delegated_ToPrepared_OnDispatchConfirmationRequestReceivedIfMatches(t *testing.T) {
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordianator.Transaction
+	coordinator := uuid.New().String()
+	txn.currentDelegate = coordinator
+	txn.stateMachine.currentState = State_Delegated
+	hash, err := txn.Hash(ctx)
+	require.NoError(t, err)
+
+	err = txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		Coordinator:      coordinator,
+		PostAssemblyHash: hash,
+	})
+	assert.NoError(t, err)
+
+	assert.True(t, mocks.messageSender.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was not sent back to coordinator")
+	assert.Equal(t, State_Prepared, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Delegated_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongCoordinator(t *testing.T) {
+
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordianator.Transaction
+	coordinator1 := uuid.New().String()
+	coordinator2 := uuid.New().String()
+	txn.currentDelegate = coordinator1
+	txn.stateMachine.currentState = State_Delegated
+	hash, err := txn.Hash(ctx)
+	require.NoError(t, err)
+
+	err = txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		Coordinator:      coordinator2,
+		PostAssemblyHash: hash,
+	})
+	assert.NoError(t, err)
+
+	assert.False(t, mocks.messageSender.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
+	assert.Equal(t, State_Delegated, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+}
+
+func TestStateMachine_Delegated_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
+
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordianator.Transaction
+	coordinator1 := uuid.New().String()
+	coordinator2 := uuid.New().String()
+	txn.currentDelegate = coordinator1
+	txn.stateMachine.currentState = State_Delegated
+	hash := tktypes.Bytes32(tktypes.RandBytes(32))
+
+	err := txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		Coordinator:      coordinator2,
+		PostAssemblyHash: &hash,
+	})
+	assert.NoError(t, err)
+
+	assert.False(t, mocks.messageSender.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
+	assert.Equal(t, State_Delegated, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
 type transactionDependencyMocks struct {

@@ -18,8 +18,12 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"golang.org/x/crypto/sha3"
 )
 
 type assembleRequestFromCoordinator struct {
@@ -58,6 +62,28 @@ func NewTransaction(
 	txn.InitializeStateMachine(State_Initial)
 
 	return txn, nil
+}
+
+func (t *Transaction) Hash(ctx context.Context) (*tktypes.Bytes32, error) {
+	if t.PrivateTransaction == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without PrivateTransaction")
+	}
+	if t.PostAssembly == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without PostAssembly")
+	}
+
+	if len(t.PostAssembly.Signatures) == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without at least one Signature")
+	}
+
+	hash := sha3.NewLegacyKeccak256()
+	for _, signature := range t.PostAssembly.Signatures {
+		hash.Write(signature.Payload)
+	}
+	var h32 tktypes.Bytes32
+	_ = hash.Sum(h32[0:0])
+	return &h32, nil
+
 }
 
 func ptrTo[T any](v T) *T {

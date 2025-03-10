@@ -51,22 +51,22 @@ const (
 type EventType = common.EventType
 
 const (
-	Event_HeartbeatInterval                      EventType = iota // the heartbeat interval has passed since the last time a heartbeat was received or the last time this event was received
-	Event_HeartbeatReceived                                       // a heartbeat message was received from the current active coordinator
-	Event_DispatchHeartbeatReceived                               // a heartbeat message was received from the current active coordinator with this transaction in the list of dispatched transactions
-	Event_CoordinatorChanged                                      // the coordinator has changed
-	Event_Created                                                 // Transaction initially received by the sender or has been loaded from the database after a restart / swap-in
-	Event_ConfirmedSuccess                                        // confirmation received from the blockchain of base ledge transaction successful completion
-	Event_ConfirmedReverted                                       // confirmation received from the blockchain of base ledge transaction failure
-	Event_Delegated                                               // transaction has been delegated to a coordinator
-	Event_AssembleRequestReceived                                 // coordinator has requested that we assemble the transaction
-	Event_AssembleAndSignSuccess                                  // we have successfully assembled the transaction and signing module has signed the assembled transaction
-	Event_AssembleRevert                                          // we have failed to assemble the transaction
-	Event_AssemblePark                                            // we have parked the transaction
-	Event_AssembleError                                           // an unexpected error occurred while trying to assemble the transaction
-	Event_Dispatched                                              // coordinator has dispatched the transaction to a public transaction manager
-	Event_Dispatch_Confirmation_Request_Received                  // coordinator has requested confirmation that the transaction has been dispatched
-	Event_Resumed                                                 // Received an RPC call to resume a parked transaction
+	Event_HeartbeatInterval                   EventType = iota // the heartbeat interval has passed since the last time a heartbeat was received or the last time this event was received
+	Event_HeartbeatReceived                                    // a heartbeat message was received from the current active coordinator
+	Event_DispatchHeartbeatReceived                            // a heartbeat message was received from the current active coordinator with this transaction in the list of dispatched transactions
+	Event_CoordinatorChanged                                   // the coordinator has changed
+	Event_Created                                              // Transaction initially received by the sender or has been loaded from the database after a restart / swap-in
+	Event_ConfirmedSuccess                                     // confirmation received from the blockchain of base ledge transaction successful completion
+	Event_ConfirmedReverted                                    // confirmation received from the blockchain of base ledge transaction failure
+	Event_Delegated                                            // transaction has been delegated to a coordinator
+	Event_AssembleRequestReceived                              // coordinator has requested that we assemble the transaction
+	Event_AssembleAndSignSuccess                               // we have successfully assembled the transaction and signing module has signed the assembled transaction
+	Event_AssembleRevert                                       // we have failed to assemble the transaction
+	Event_AssemblePark                                         // we have parked the transaction
+	Event_AssembleError                                        // an unexpected error occurred while trying to assemble the transaction
+	Event_Dispatched                                           // coordinator has dispatched the transaction to a public transaction manager
+	Event_DispatchConfirmationRequestReceived                  // coordinator has requested confirmation that the transaction has been dispatched
+	Event_Resumed                                              // Received an RPC call to resume a parked transaction
 )
 
 type StateMachine struct {
@@ -138,7 +138,7 @@ func init() {
 					}},
 				},
 				Event_CoordinatorChanged: {},
-				Event_Dispatch_Confirmation_Request_Received: {
+				Event_DispatchConfirmationRequestReceived: {
 					Validator: validator_DispatchConfirmationRequestMatchesAssembledDelegation,
 					Transitions: []Transition{
 						{
@@ -187,7 +187,7 @@ func init() {
 						},
 					},
 				},
-				Event_Dispatch_Confirmation_Request_Received: {
+				Event_DispatchConfirmationRequestReceived: {
 					Validator: validator_DispatchConfirmationRequestMatchesAssembledDelegation,
 					// This means that we have already sent a dispatch confirmation response and we get another one.
 					// 3 possibilities, 1) the response got lost and the same coordinator is retrying -> compare the request idempotency key and or validator_DispatchConfirmationRequestMatchesAssembledDelegation

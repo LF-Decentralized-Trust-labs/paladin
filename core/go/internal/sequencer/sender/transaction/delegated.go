@@ -27,7 +27,7 @@ func action_SendDelegationRequest(ctx context.Context, txn *Transaction) error {
 }
 
 func action_SendDispatchConfirmationResponse(ctx context.Context, txn *Transaction) error {
-	// TODO
+	txn.messageSender.SendDispatchConfirmationResponse(ctx)
 	return nil
 }
 
@@ -43,7 +43,23 @@ func validator_AssembleRequestMatches(ctx context.Context, txn *Transaction, eve
 }
 
 func validator_DispatchConfirmationRequestMatchesAssembledDelegation(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
-	//TODO validate the event and send an error response to the coordinator if it doesn't match the hash of the most recent assembled revision of this transaction
-	// will also need to add code to the coordinator to handle this case (e.g. by abending itself)
-	return false, nil
+	dispatchConfirmationRequestEvent, ok := event.(*DispatchConfirmationRequestReceivedEvent)
+	if !ok {
+		log.L(ctx).Errorf("expected event type *DispatchConfirmationRequestReceivedEvent, got %T", event)
+		return false, nil
+	}
+	txnHash, err := txn.Hash(ctx)
+	if err != nil {
+		log.L(ctx).Errorf("error hashing transaction: %s", err)
+		return false, err
+	}
+	if dispatchConfirmationRequestEvent.Coordinator != txn.currentDelegate {
+		log.L(ctx).Debugf("DispatchConfirmationRequest invalid for transaction %s.  Expected coordinator %s, got %s", txn.ID.String(), txn.currentDelegate, dispatchConfirmationRequestEvent.Coordinator)
+		return false, nil
+	}
+	if !txnHash.Equals(dispatchConfirmationRequestEvent.PostAssemblyHash) {
+		log.L(ctx).Debugf("DispatchConfirmationRequest invalid for transaction %s.  Transaction hash does not match.", txn.ID.String())
+		return false, nil
+	}
+	return true, nil
 }
