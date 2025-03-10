@@ -376,6 +376,33 @@ func TestStateMachine_Parked_NoTransition_OnAssembleRequest_IfMatchesPreviousReq
 }
 
 func TestStateMachine_EndorsementGathering_ToAssembling_OnAssembleRequest_IfNotMatchesPreviousRequest(t *testing.T) {
+	ctx := context.Background()
+	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	// This should trigger a re-assembly
+	mocks.mockForAssembleAndSignRequestOK().Once()
+
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordinator.Transaction
+	coordinator := uuid.New().String()
+	txn.currentDelegate = coordinator
+	txn.stateMachine.currentState = State_EndorsementGathering
+	txn.latestFulfilledAssembleRequestID = uuid.New()
+
+	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		RequestID:   uuid.New(),
+		Coordinator: coordinator,
+	})
+	assert.NoError(t, err)
+
+	assert.True(t, mocks.engineIntegration.AssertExpectations(t))
+
+	require.Len(t, mocks.emittedEvents, 1)
+	require.IsType(t, &AssembleAndSignSuccessEvent{}, mocks.emittedEvents[0])
+
+	//We haven't fed that event back into the state machine yet, so the state should still be Assembling
+	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 
 }
 
