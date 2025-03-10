@@ -37,14 +37,15 @@ const (
 	// We only resend the request if we don't see the heartbeat.
 	// Might need to rethink this and allow for some ack and shorter retry interval to tolerate less reliable networks,
 	// Need to make a decision and document it in a README
-	State_Delegated  // the transaction has been sent to the current active coordinator
-	State_Assembling // the coordinator has sent an assemble request that we have not replied to yet
-	State_Signing    // we have assembled the transaction and are waiting for the signing module to sign it before we respond to the coordinator with the signed assembled transaction
-	State_Prepared   // we know that the coordinator has got as far as preparing a public transaction and we have sent a positive response to a coordinator's dispatch confirmation request but have not yet received a heartbeat that notifies us that the coordinator has dispatched the transaction to a public transaction manager for submission
-	State_Dispatched // the active coordinator that this transaction was delegated to has dispatched the transaction to a public transaction manager for submission
-	State_Confirmed  // the public transaction has been confirmed by the blockchain as successful
-	State_Reverted   // upon attempting to assemble the transaction, the domain code has determined that the intent is not valid and the transaction is finalized as reverted
-	State_Parked     // upon attempting to assemble the transaction, the domain code has determined that the transaction is not ready to be assembled and it is parked for later processing.  All remaining transactions for the current sender can continue - unless they have an explicit dependency on this transaction
+	State_Delegated            // the transaction has been sent to the current active coordinator
+	State_Assembling           // the coordinator has sent an assemble request that we have not replied to yet
+	State_EndorsementGathering //we have responded to an assemble request and are waiting the coordinator to gather endorsements and send us a dispatch confirmation request
+	State_Signing              // we have assembled the transaction and are waiting for the signing module to sign it before we respond to the coordinator with the signed assembled transaction
+	State_Prepared             // we know that the coordinator has got as far as preparing a public transaction and we have sent a positive response to a coordinator's dispatch confirmation request but have not yet received a heartbeat that notifies us that the coordinator has dispatched the transaction to a public transaction manager for submission
+	State_Dispatched           // the active coordinator that this transaction was delegated to has dispatched the transaction to a public transaction manager for submission
+	State_Confirmed            // the public transaction has been confirmed by the blockchain as successful
+	State_Reverted             // upon attempting to assemble the transaction, the domain code has determined that the intent is not valid and the transaction is finalized as reverted
+	State_Parked               // upon attempting to assemble the transaction, the domain code has determined that the transaction is not ready to be assembled and it is parked for later processing.  All remaining transactions for the current sender can continue - unless they have an explicit dependency on this transaction
 
 )
 
@@ -133,24 +134,22 @@ func init() {
 			Events: map[EventType]EventHandler{
 				Event_AssembleRequestReceived: {
 					Validator: validator_AssembleRequestMatches,
-					Actions: []ActionRule{{
-						Action: action_AssembleAndSign,
-					}},
-				},
-				Event_CoordinatorChanged: {},
-				Event_DispatchConfirmationRequestReceived: {
-					Validator: validator_DispatchConfirmationRequestMatchesAssembledDelegation,
 					Transitions: []Transition{
 						{
-							To: State_Prepared,
-							On: action_SendDispatchConfirmationResponse,
+							To: State_Assembling,
 						},
 					},
 				},
+				Event_CoordinatorChanged: {},
+			},
+		},
+		State_Assembling: {
+			OnTransitionTo: action_AssembleAndSign,
+			Events: map[EventType]EventHandler{
 				Event_AssembleAndSignSuccess: {
 					Transitions: []Transition{
 						{
-							To: State_Delegated,
+							To: State_EndorsementGathering,
 							On: action_SendAssembleSuccessResponse,
 						},
 					},
@@ -168,6 +167,43 @@ func init() {
 						{
 							To: State_Parked,
 							On: action_SendAssembleParkResponse,
+						},
+					},
+				},
+				Event_CoordinatorChanged: {
+					//would be very strange to have missed a bunch of heartbeats and switched coordinators if we recently received an assemble request but it is possible so we need to handle it
+				},
+			},
+		},
+		State_EndorsementGathering: {
+			Events: map[EventType]EventHandler{
+				Event_AssembleRequestReceived: {
+					Validator: validator_AssembleRequestMatches,
+					Actions: []ActionRule{
+						{
+							//We thought we had got as far as endorsement but it seems like the coordinator had not got the response in time and has resent the assemble request, we simply reply with the same response as before
+							If:     guard_AssembleRequestMatchesPreviousResponse,
+							Action: action_ResendAssembleSuccessResponse,
+						}},
+					Transitions: []Transition{{
+						//This is different from the previous request. The coordinator must have decided that it was necessary to re-assemble with different available states so we go back to assembling state for a do-over
+						If: guard_Not(guard_AssembleRequestMatchesPreviousResponse),
+						To: State_Assembling,
+					}},
+				},
+				Event_CoordinatorChanged: {
+					Transitions: []Transition{
+						{
+							To: State_Delegated,
+						},
+					},
+				},
+				Event_DispatchConfirmationRequestReceived: {
+					Validator: validator_DispatchConfirmationRequestMatchesAssembledDelegation,
+					Transitions: []Transition{
+						{
+							To: State_Prepared,
+							On: action_SendDispatchConfirmationResponse,
 						},
 					},
 				},

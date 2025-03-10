@@ -107,26 +107,44 @@ func (event *AssembleRequestReceivedEvent) ApplyToTransaction(_ context.Context,
 
 type AssembleAndSignSuccessEvent struct {
 	event
+	PostAssembly *components.TransactionPostAssembly
 }
 
 func (_ *AssembleAndSignSuccessEvent) Type() EventType {
 	return Event_AssembleAndSignSuccess
 }
 
+func (event *AssembleAndSignSuccessEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
+	txn.PostAssembly = event.PostAssembly
+	return nil
+}
+
 type AssembleRevertEvent struct {
 	event
+	PostAssembly *components.TransactionPostAssembly
 }
 
 func (_ *AssembleRevertEvent) Type() EventType {
 	return Event_AssembleRevert
 }
 
+func (event *AssembleRevertEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
+	txn.PostAssembly = event.PostAssembly
+	return nil
+}
+
 type AssembleParkEvent struct {
 	event
+	PostAssembly *components.TransactionPostAssembly
 }
 
 func (_ *AssembleParkEvent) Type() EventType {
 	return Event_AssemblePark
+}
+
+func (event *AssembleParkEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
+	txn.PostAssembly = event.PostAssembly
+	return nil
 }
 
 type AssembleErrorEvent struct {

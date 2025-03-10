@@ -31,6 +31,7 @@ func action_SendDispatchConfirmationResponse(ctx context.Context, txn *Transacti
 	return nil
 }
 
+// Validate that the assemble request matches the current delegate
 func validator_AssembleRequestMatches(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
 	assembleRequestEvent, ok := event.(*AssembleRequestReceivedEvent)
 	if !ok {
