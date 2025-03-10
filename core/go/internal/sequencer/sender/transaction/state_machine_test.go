@@ -478,6 +478,27 @@ func TestStateMachine_EndorsementGathering_NoTransition_OnDispatchConfirmationRe
 	assert.Equal(t, State_EndorsementGathering, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
 }
 
+func TestStateMachine_EndorsementGathering_ToDelegated_OnCoordinatorChanged(t *testing.T) {
+	ctx := context.Background()
+	txn, _ := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
+	//TODO move following complexity into utils e.g. using builder pattern as we do with coordinator.Transaction
+	coordinator1 := uuid.New().String()
+	coordinator2 := uuid.New().String()
+	txn.currentDelegate = coordinator1
+	txn.stateMachine.currentState = State_EndorsementGathering
+
+	err := txn.HandleEvent(ctx, &CoordinatorChangedEvent{
+		event: event{
+			TransactionID: txn.ID,
+		},
+		Coordinator: coordinator2,
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, State_Delegated, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+
+}
+
 type transactionDependencyMocks struct {
 	messageSender     *SentMessageRecorder
 	clock             *common.FakeClockForTesting

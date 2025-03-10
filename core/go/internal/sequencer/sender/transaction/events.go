@@ -170,3 +170,17 @@ type DispatchConfirmationRequestReceivedEvent struct {
 func (_ *DispatchConfirmationRequestReceivedEvent) Type() EventType {
 	return Event_DispatchConfirmationRequestReceived
 }
+
+type CoordinatorChangedEvent struct {
+	event
+	Coordinator string
+}
+
+func (_ *CoordinatorChangedEvent) Type() EventType {
+	return Event_CoordinatorChanged
+}
+
+func (event *CoordinatorChangedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
+	txn.currentDelegate = event.Coordinator
+	return nil
+}
