@@ -259,7 +259,7 @@ func TestMapToStruct(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err, "Expected an error but got none")
 			} else {
-				assert.NoError(t, err, "Did not expect an error but got one")
+				require.NoError(t, err, "Did not expect an error but got one")
 			}
 
 			if !tt.wantErr {
