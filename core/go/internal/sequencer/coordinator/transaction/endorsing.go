@@ -111,7 +111,7 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 		//this is done by emitting events rather so that this behavior is obvious from the state machine definition
 		t.cancelEndorsementRequestTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
 			t.emit(&RequestTimeoutIntervalEvent{
-				event: event{
+				BaseEvent: BaseEvent{
 					TransactionID: t.ID,
 				},
 			})

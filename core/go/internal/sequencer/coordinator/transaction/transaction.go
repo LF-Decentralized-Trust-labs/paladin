@@ -195,3 +195,14 @@ func (d *Transaction) InputStateIDs(_ context.Context) []string {
 func (d *Transaction) Txn() *components.PrivateTransaction {
 	return d.PrivateTransaction
 }
+
+//TODO the following getter methods are not safe to call on anything other than the sequencer goroutine because they are reading data structures that are being modified by the state machine.
+// We should consider making them safe to call from any goroutine by reading maintaining a copy of the data structures that are updated async from the sequencer thread under a mutex
+
+func (t *Transaction) GetCurrentState() State {
+	return t.stateMachine.currentState
+}
+
+func (t *Transaction) GetErrorCount() int {
+	return t.errorCount
+}

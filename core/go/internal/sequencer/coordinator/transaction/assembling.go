@@ -60,7 +60,7 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 	})
 	t.cancelAssembleTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
 		t.emit(&RequestTimeoutIntervalEvent{
-			event: event{
+			BaseEvent: BaseEvent{
 				TransactionID: t.ID,
 			},
 		})
@@ -104,7 +104,7 @@ func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
 	// and we have a duty to inform all the transactions that are ordered behind us
 	if t.nextTransaction != nil {
 		err := t.nextTransaction.HandleEvent(ctx, &DependencyAssembledEvent{
-			event: event{
+			BaseEvent: BaseEvent{
 				TransactionID: t.nextTransaction.ID,
 			},
 			DependencyID: t.ID,
@@ -123,7 +123,7 @@ func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
 		err := dependent.HandleEvent(ctx, &DependencyAssembledEvent{
-			event: event{
+			BaseEvent: BaseEvent{
 				TransactionID: t.nextTransaction.ID,
 			},
 			DependencyID: t.ID,
@@ -144,7 +144,7 @@ func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 		dependentTxn := t.grapher.TransactionByID(ctx, dependentID)
 		if dependentTxn != nil {
 			err := dependentTxn.HandleEvent(ctx, &DependencyRevertedEvent{
-				event: event{
+				BaseEvent: BaseEvent{
 					TransactionID: dependentID,
 				},
 				DependencyID: t.ID,

@@ -49,7 +49,7 @@ func TestTransaction_HasDependenciesNotReady_TrueOK(t *testing.T) {
 	transaction2 := transaction2Builder.Build()
 
 	err := transaction2.HandleEvent(context.Background(), &AssembleSuccessEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: transaction2.ID,
 		},
 		PostAssembly: transaction2Builder.BuildPostAssembly(),
@@ -77,7 +77,7 @@ func TestTransaction_HasDependenciesNotReady_TrueWhenStatesAreReadOnly(t *testin
 	transaction2 := transaction2Builder.Build()
 
 	err := transaction2.HandleEvent(context.Background(), &AssembleSuccessEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: transaction2.ID,
 		},
 		PostAssembly: transaction2Builder.BuildPostAssembly(),
@@ -113,7 +113,7 @@ func TestTransaction_HasDependenciesNotReady(t *testing.T) {
 	transaction3 := transaction3Builder.Build()
 
 	err := transaction3.HandleEvent(context.Background(), &AssembleSuccessEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: transaction3.ID,
 		},
 		PostAssembly: transaction3Builder.BuildPostAssembly(),
@@ -136,7 +136,7 @@ func TestTransaction_HasDependenciesNotReady(t *testing.T) {
 
 	//move one dependency to ready to dispatch
 	err = transaction1.HandleEvent(ctx, &DispatchConfirmedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: transaction1.ID,
 		},
 		RequestID: transaction1.pendingDispatchConfirmationRequest.IdempotencyKey(),
@@ -150,7 +150,7 @@ func TestTransaction_HasDependenciesNotReady(t *testing.T) {
 
 	//finally move the last dependency to ready to dispatch
 	err = transaction2.HandleEvent(ctx, &DispatchConfirmedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: transaction2.ID,
 		},
 		RequestID: transaction2.pendingDispatchConfirmationRequest.IdempotencyKey(),

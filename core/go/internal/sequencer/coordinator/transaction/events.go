@@ -28,11 +28,11 @@ type Event interface {
 	GetTransactionID() uuid.UUID
 }
 
-type event struct {
+type BaseEvent struct {
 	TransactionID uuid.UUID
 }
 
-func (e *event) GetTransactionID() uuid.UUID {
+func (e *BaseEvent) GetTransactionID() uuid.UUID {
 	return e.TransactionID
 }
 
@@ -40,7 +40,7 @@ func (e *event) GetTransactionID() uuid.UUID {
 // Feels slightly artificial to model this as an event because it happens every time we create a transaction object
 // but rather than bury the logic in NewTransaction func, modeling this event allows us to define the initial state transition rules in the same declarative stateDefinitions structure as all other state transitions
 type ReceivedEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *ReceivedEvent) Type() EventType {
@@ -49,7 +49,7 @@ func (_ *ReceivedEvent) Type() EventType {
 
 // TransactionSelectedEvent
 type SelectedEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *SelectedEvent) Type() EventType {
@@ -58,7 +58,7 @@ func (_ *SelectedEvent) Type() EventType {
 
 // AssembleRequestSentEvent
 type AssembleRequestSentEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *AssembleRequestSentEvent) Type() EventType {
@@ -67,7 +67,7 @@ func (_ *AssembleRequestSentEvent) Type() EventType {
 
 // AssembleSuccessEvent
 type AssembleSuccessEvent struct {
-	event
+	BaseEvent
 	PostAssembly *components.TransactionPostAssembly
 	RequestID    uuid.UUID
 }
@@ -78,7 +78,7 @@ func (_ *AssembleSuccessEvent) Type() EventType {
 
 // AssembleRevertResponseEvent
 type AssembleRevertResponseEvent struct {
-	event
+	BaseEvent
 	PostAssembly *components.TransactionPostAssembly
 	RequestID    uuid.UUID
 }
@@ -89,7 +89,7 @@ func (_ *AssembleRevertResponseEvent) Type() EventType {
 
 // EndorsedEvent
 type EndorsedEvent struct {
-	event
+	BaseEvent
 	Endorsement *prototk.AttestationResult
 	RequestID   uuid.UUID
 }
@@ -100,7 +100,7 @@ func (_ *EndorsedEvent) Type() EventType {
 
 // EndorsedRejectedEvent
 type EndorsedRejectedEvent struct {
-	event
+	BaseEvent
 	RevertReason           string
 	Party                  string
 	AttestationRequestName string
@@ -113,7 +113,7 @@ func (_ *EndorsedRejectedEvent) Type() EventType {
 
 // DispatchConfirmedEvent
 type DispatchConfirmedEvent struct {
-	event
+	BaseEvent
 	RequestID uuid.UUID
 }
 
@@ -123,7 +123,7 @@ func (_ *DispatchConfirmedEvent) Type() EventType {
 
 // DispatchConfirmationRejectedEvent
 type DispatchConfirmationRejectedEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *DispatchConfirmationRejectedEvent) Type() EventType {
@@ -132,7 +132,7 @@ func (_ *DispatchConfirmationRejectedEvent) Type() EventType {
 
 // CollectedEvent
 type CollectedEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *CollectedEvent) Type() EventType {
@@ -141,7 +141,7 @@ func (_ *CollectedEvent) Type() EventType {
 
 // NonceAllocatedEvent
 type NonceAllocatedEvent struct {
-	event
+	BaseEvent
 	Nonce uint64
 }
 
@@ -151,7 +151,7 @@ func (_ *NonceAllocatedEvent) Type() EventType {
 
 // SubmittedEvent
 type SubmittedEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *SubmittedEvent) Type() EventType {
@@ -160,7 +160,7 @@ func (_ *SubmittedEvent) Type() EventType {
 
 // ConfirmedEvent
 type ConfirmedEvent struct {
-	event
+	BaseEvent
 	Nonce        uint64
 	Hash         tktypes.Bytes32
 	RevertReason tktypes.HexBytes
@@ -171,7 +171,7 @@ func (_ *ConfirmedEvent) Type() EventType {
 }
 
 type DependencyAssembledEvent struct {
-	event
+	BaseEvent
 	DependencyID uuid.UUID
 }
 
@@ -180,7 +180,7 @@ func (_ *DependencyAssembledEvent) Type() EventType {
 }
 
 type DependencyRevertedEvent struct {
-	event
+	BaseEvent
 	DependencyID uuid.UUID
 }
 
@@ -189,7 +189,7 @@ func (_ *DependencyRevertedEvent) Type() EventType {
 }
 
 type DependencyReadyEvent struct {
-	event
+	BaseEvent
 	DependencyID uuid.UUID
 }
 
@@ -198,7 +198,7 @@ func (_ *DependencyReadyEvent) Type() EventType {
 }
 
 type RequestTimeoutIntervalEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *RequestTimeoutIntervalEvent) Type() EventType {
@@ -207,7 +207,7 @@ func (_ *RequestTimeoutIntervalEvent) Type() EventType {
 
 // events emitted by the transaction state machine whenever a state transition occurs
 type StateTransitionEvent struct {
-	event
+	BaseEvent
 	FromState State
 	ToState   State
 }

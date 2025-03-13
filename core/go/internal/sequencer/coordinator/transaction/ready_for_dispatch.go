@@ -77,7 +77,7 @@ func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
 		err := dependent.HandleEvent(ctx, &DependencyReadyEvent{
-			event: event{
+			BaseEvent: BaseEvent{
 				TransactionID: dependent.ID,
 			},
 			DependencyID: t.ID,

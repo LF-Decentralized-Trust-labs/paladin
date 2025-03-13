@@ -48,7 +48,7 @@ func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error
 		})
 		t.cancelDispatchConfirmationRequestTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
 			t.emit(&RequestTimeoutIntervalEvent{
-				event: event{
+				BaseEvent: BaseEvent{
 					TransactionID: t.ID,
 				},
 			})

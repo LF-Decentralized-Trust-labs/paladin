@@ -48,6 +48,42 @@ type SentMessageRecorder struct {
 	numberOfSentDispatchConfirmationRequests      int
 }
 
+func (r *SentMessageRecorder) HasSentAssembleRequest() bool {
+	return r.hasSentAssembleRequest
+}
+
+func (r *SentMessageRecorder) HasSentDispatchConfirmationRequest() bool {
+	return r.hasSentDispatchConfirmationRequest
+}
+
+func (r *SentMessageRecorder) NumberOfSentAssembleRequests() int {
+	return r.numberOfSentAssembleRequests
+}
+
+func (r *SentMessageRecorder) NumberOfSentEndorsementRequests() int {
+	return r.numberOfSentEndorsementRequests
+}
+
+func (r *SentMessageRecorder) SentEndorsementRequestsForPartyIdempotencyKey(party string) uuid.UUID {
+	return r.sentEndorsementRequestsForPartyIdempotencyKey[party]
+}
+
+func (r *SentMessageRecorder) NumberOfEndorsementRequestsForParty(party string) int {
+	return r.numberOfEndorsementRequestsForParty[party]
+}
+
+func (r *SentMessageRecorder) NumberOfSentDispatchConfirmationRequests() int {
+	return r.numberOfSentDispatchConfirmationRequests
+}
+
+func (r *SentMessageRecorder) SentAssembleRequestIdempotencyKey() uuid.UUID {
+	return r.sentAssembleRequestIdempotencyKey
+}
+
+func (r *SentMessageRecorder) SentDispatchConfirmationRequestIdempotencyKey() uuid.UUID {
+	return r.sentDispatchConfirmationRequestIdempotencyKey
+}
+
 func (r *SentMessageRecorder) SendAssembleRequest(
 	ctx context.Context,
 	assemblingNode string,
@@ -213,6 +249,18 @@ func (b *TransactionBuilderForTesting) Sender(sender *identityForTesting) *Trans
 	return b
 }
 
+func (b *TransactionBuilderForTesting) GetSender() *identityForTesting {
+	return b.sender
+}
+
+func (b *TransactionBuilderForTesting) GetAssembleTimeout() int {
+	return b.assembleTimeout
+}
+
+func (b *TransactionBuilderForTesting) GetRequestTimeout() int {
+	return b.requestTimeout
+}
+
 func (b *TransactionBuilderForTesting) GetEndorsers() []string {
 	endorsers := make([]string, b.privateTransactionBuilder.GetNumberOfEndorsers())
 	for i := range endorsers {
@@ -222,16 +270,16 @@ func (b *TransactionBuilderForTesting) GetEndorsers() []string {
 }
 
 type transactionDependencyFakes struct {
-	sentMessageRecorder *SentMessageRecorder
-	clock               *common.FakeClockForTesting
-	engineIntegration   *common.FakeEngineIntegrationForTesting
+	SentMessageRecorder *SentMessageRecorder
+	Clock               *common.FakeClockForTesting
+	EngineIntegration   *common.FakeEngineIntegrationForTesting
 }
 
 func (b *TransactionBuilderForTesting) BuildWithMocks() (*Transaction, *transactionDependencyFakes) {
 	mocks := &transactionDependencyFakes{
-		sentMessageRecorder: b.sentMessageRecorder,
-		clock:               b.fakeClock,
-		engineIntegration:   b.fakeEngineIntegration,
+		SentMessageRecorder: b.sentMessageRecorder,
+		Clock:               b.fakeClock,
+		EngineIntegration:   b.fakeEngineIntegration,
 	}
 	return b.Build(), mocks
 }
@@ -299,7 +347,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 func (b *TransactionBuilderForTesting) BuildEndorsedEvent(endorserIndex int) *EndorsedEvent {
 
 	return &EndorsedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: b.txn.ID,
 		},
 		RequestID:   b.txn.pendingEndorsementRequests[b.privateTransactionBuilder.GetEndorsementName(endorserIndex)][b.privateTransactionBuilder.GetEndorserIdentityLocator(endorserIndex)].IdempotencyKey(),
@@ -312,7 +360,7 @@ func (b *TransactionBuilderForTesting) BuildEndorseRejectedEvent(endorserIndex i
 
 	attReqName := fmt.Sprintf("endorse-%d", endorserIndex)
 	return &EndorsedRejectedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: b.txn.ID,
 		},
 		RevertReason:           "some reason for rejection",
