@@ -15,18 +15,62 @@ spec:
   configJSON: |
     {
       "domainContracts": {
-        "Implementations": [
+        "implementations": [
           {
-            "CircuitId": "anon",
-            "Name": "Zeto_Anon"
+            "name": "Zeto_Anon",
+            "circuits": {
+              "deposit": {
+                "name": "deposit"
+              },
+              "withdraw": {
+                "name": "withdraw"
+              },
+              "transfer": {
+                "name": "anon"
+              },
+              "transferLocked": {
+                "name": "anon"
+              }
+            }
           },
           {
-            "CircuitId": "anon_enc",
-            "Name": "Zeto_AnonEnc"
+            "name": "Zeto_AnonEnc",
+            "circuits": {
+              "deposit": {
+                "name": "deposit"
+              },
+              "withdraw": {
+                "name": "withdraw"
+              },
+              "transfer": {
+                "name": "anon_enc",
+                "usesEncryption": true
+              },
+              "transferLocked": {
+                "name": "anon_enc",
+                "usesEncryption": true
+              }
+            }
           },
           {
-            "CircuitId": "anon_nullifier",
-            "Name": "Zeto_AnonNullifier"
+            "name": "Zeto_AnonNullifier",
+            "circuits": {
+              "deposit": {
+                "name": "deposit"
+              },
+              "withdraw": {
+                "name": "withdraw_nullifier",
+                "usesNullifiers": true
+              },
+              "transfer": {
+                "name": "anon_nullifier_transfer",
+                "usesNullifiers": true
+              },
+              "transferLocked": {
+                "name": "anon_nullifier_transferLocked",
+                "usesNullifiers": true
+              }
+            }
           }
         ]
       },

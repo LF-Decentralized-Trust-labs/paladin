@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/signer"
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/signer/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	protoz "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -100,7 +101,12 @@ func TestConfigureDomain(t *testing.T) {
 
 func TestDecodeDomainConfig(t *testing.T) {
 	config := &types.DomainInstanceConfig{
-		CircuitId: "circuit-id",
+		Circuits: &zetosignerapi.Circuits{
+			"deposit":        &zetosignerapi.Circuit{Name: "circuit-deposit"},
+			"withdraw":       &zetosignerapi.Circuit{Name: "circuit-withdraw"},
+			"transfer":       &zetosignerapi.Circuit{Name: "circuit-transfer"},
+			"transferLocked": &zetosignerapi.Circuit{Name: "circuit-transfer-locked"},
+		},
 		TokenName: "token-name",
 	}
 	configJSON, err := json.Marshal(config)
@@ -133,6 +139,9 @@ func TestInitDomain(t *testing.T) {
 			},
 			{
 				Id: "schema4",
+			},
+			{
+				Id: "schema5",
 			},
 		},
 	}
@@ -168,7 +177,7 @@ func TestPrepareDeploy(t *testing.T) {
 		constructorParamsJson string
 		errorMsg              string
 		tokenName             string
-		circuitId             string
+		circuits              *zetosignerapi.Circuits
 		isNonFungible         bool
 	}{
 		{
@@ -179,28 +188,45 @@ func TestPrepareDeploy(t *testing.T) {
 		{
 			name:                  "Circuit ID Not Found",
 			constructorParamsJson: "{}",
-			circuitId:             "circuit1",
-			tokenName:             "testToken1",
-			errorMsg:              "PD210007: Failed to find circuit ID based on the token name. PD210000: Contract '' not found",
+			circuits: &zetosignerapi.Circuits{
+				"deposit": &zetosignerapi.Circuit{Name: "circuit1"},
+			},
+			tokenName: "testToken1",
+			errorMsg:  "PD210007: Failed to find circuit ID based on the token name. PD210000: Contract '' not found",
 		},
 		{
-			name:                  "Valid fungible token",
-			tokenName:             constants.TOKEN_ANON,
-			circuitId:             constants.CIRCUIT_ANON,
+			name:      "Valid fungible token",
+			tokenName: constants.TOKEN_ANON,
+			circuits: &zetosignerapi.Circuits{
+				"deposit":        &zetosignerapi.Circuit{Name: "circuit-deposit"},
+				"withdraw":       &zetosignerapi.Circuit{Name: "circuit-withdraw"},
+				"transfer":       &zetosignerapi.Circuit{Name: "circuit-transfer"},
+				"transferLocked": &zetosignerapi.Circuit{Name: "circuit-transfer-locked"},
+			},
 			constructorParamsJson: fmt.Sprintf("{\"tokenName\":\"%s\"}", constants.TOKEN_ANON),
 			isNonFungible:         false,
 		},
 		{
-			name:                  "Non-fungible token",
-			tokenName:             constants.TOKEN_NF_ANON,
-			circuitId:             constants.CIRCUIT_NF_ANON,
+			name:      "Non-fungible token",
+			tokenName: constants.TOKEN_NF_ANON,
+			circuits: &zetosignerapi.Circuits{
+				"deposit":        &zetosignerapi.Circuit{Name: "circuit-deposit"},
+				"withdraw":       &zetosignerapi.Circuit{Name: "circuit-withdraw"},
+				"transfer":       &zetosignerapi.Circuit{Name: "circuit-transfer"},
+				"transferLocked": &zetosignerapi.Circuit{Name: "circuit-transfer-locked"},
+			},
 			constructorParamsJson: fmt.Sprintf("{\"tokenName\":\"%s\"}", constants.TOKEN_NF_ANON),
 			isNonFungible:         true,
 		},
 		{
-			name:                  "Non-fungible token with nullifier",
-			tokenName:             constants.TOKEN_NF_ANON_NULLIFIER,
-			circuitId:             constants.CIRCUIT_NF_ANON_NULLIFIER,
+			name:      "Non-fungible token with nullifier",
+			tokenName: constants.TOKEN_NF_ANON_NULLIFIER,
+			circuits: &zetosignerapi.Circuits{
+				"deposit":        &zetosignerapi.Circuit{Name: "circuit-deposit"},
+				"withdraw":       &zetosignerapi.Circuit{Name: "circuit-withdraw"},
+				"transfer":       &zetosignerapi.Circuit{Name: "circuit-transfer"},
+				"transferLocked": &zetosignerapi.Circuit{Name: "circuit-transfer-locked"},
+			},
 			constructorParamsJson: fmt.Sprintf("{\"tokenName\":\"%s\"}", constants.TOKEN_NF_ANON_NULLIFIER),
 			isNonFungible:         true,
 		},
@@ -208,14 +234,14 @@ func TestPrepareDeploy(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			testCallbacks := &testDomainCallbacks{}
+			testCallbacks := &domain.MockDomainCallbacks{}
 			z := New(testCallbacks)
 			z.config = &types.DomainFactoryConfig{
 				DomainContracts: types.DomainConfigContracts{
 					Implementations: []*types.DomainContract{
 						{
-							Name:      tc.tokenName,
-							CircuitId: tc.circuitId,
+							Name:     tc.tokenName,
+							Circuits: tc.circuits,
 						},
 					},
 				},
@@ -257,7 +283,12 @@ func TestInitContract(t *testing.T) {
 	require.False(t, res.Valid)
 
 	conf := types.DomainInstanceConfig{
-		CircuitId: "circuit1",
+		Circuits: &zetosignerapi.Circuits{
+			"deposit":        &zetosignerapi.Circuit{Name: "circuit-deposit"},
+			"withdraw":       &zetosignerapi.Circuit{Name: "circuit-withdraw"},
+			"transfer":       &zetosignerapi.Circuit{Name: "circuit-transfer"},
+			"transferLocked": &zetosignerapi.Circuit{Name: "circuit-transfer-locked"},
+		},
 		TokenName: "testToken1",
 	}
 	configJSON, _ := json.Marshal(conf)
@@ -268,7 +299,12 @@ func TestInitContract(t *testing.T) {
 	assert.NoError(t, err)
 	require.True(t, res.Valid)
 	require.JSONEq(t, `{
-		"circuitId": "circuit1",
+		"circuits": {
+			"deposit": { "name": "circuit-deposit", "type": "", "usesEncryption": false, "usesNullifiers": false },
+			"withdraw": { "name": "circuit-withdraw", "type": "", "usesEncryption": false, "usesNullifiers": false },
+			"transfer": { "name": "circuit-transfer", "type": "", "usesEncryption": false, "usesNullifiers": false },
+			"transferLocked": { "name": "circuit-transfer-locked", "type": "", "usesEncryption": false, "usesNullifiers": false }
+		},
 		"tokenName": "testToken1"
 	}`, res.ContractConfig.ContractConfigJson)
 }
@@ -298,7 +334,9 @@ func TestInitTransaction(t *testing.T) {
 	assert.ErrorContains(t, err, "PD210008")
 
 	conf := types.DomainInstanceConfig{
-		CircuitId: "circuit1",
+		Circuits: &zetosignerapi.Circuits{
+			"deposit": &zetosignerapi.Circuit{Name: "circuit-deposit"},
+		},
 		TokenName: "testToken1",
 	}
 	configJSON, err := json.Marshal(conf)
@@ -375,7 +413,9 @@ func TestAssembleTransaction(t *testing.T) {
 
 	req.Transaction.FunctionSignature = "function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }"
 	conf := types.DomainInstanceConfig{
-		CircuitId: "circuit1",
+		Circuits: &zetosignerapi.Circuits{
+			"deposit": &zetosignerapi.Circuit{Name: "circuit-deposit"},
+		},
 		TokenName: "testToken1",
 	}
 	req.Transaction.ContractInfo.ContractConfigJson = tktypes.JSONString(conf).Pretty()
@@ -401,7 +441,9 @@ func TestEndorseTransaction(t *testing.T) {
 	req.Transaction.FunctionAbiJson = "{\"type\":\"function\",\"name\":\"mint\"}"
 	req.Transaction.FunctionSignature = "function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }"
 	conf := types.DomainInstanceConfig{
-		CircuitId: "circuit1",
+		Circuits: &zetosignerapi.Circuits{
+			"deposit": &zetosignerapi.Circuit{Name: "circuit-deposit"},
+		},
 		TokenName: "testToken1",
 	}
 	req.Transaction.ContractInfo.ContractConfigJson = tktypes.JSONString(conf).Pretty()
@@ -416,8 +458,10 @@ func TestPrepareTransaction(t *testing.T) {
 		DomainContracts: types.DomainConfigContracts{
 			Implementations: []*types.DomainContract{
 				{
-					Name:      "testToken1",
-					CircuitId: "circuit1",
+					Name: "testToken1",
+					Circuits: &zetosignerapi.Circuits{
+						"deposit": &zetosignerapi.Circuit{Name: "circuit-deposit"},
+					},
 				},
 			},
 		},
@@ -442,7 +486,9 @@ func TestPrepareTransaction(t *testing.T) {
 	req.Transaction.FunctionAbiJson = "{\"type\":\"function\",\"name\":\"mint\"}"
 	req.Transaction.FunctionSignature = "function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }"
 	conf := types.DomainInstanceConfig{
-		CircuitId: "circuit1",
+		Circuits: &zetosignerapi.Circuits{
+			"deposit": &zetosignerapi.Circuit{Name: "circuit-deposit"},
+		},
 		TokenName: "testToken1",
 	}
 	req.Transaction.ContractInfo.ContractConfigJson = tktypes.JSONString(conf).Pretty()
@@ -590,10 +636,8 @@ func TestSign(t *testing.T) {
 	_, err = z.Sign(context.Background(), req)
 	assert.ErrorContains(t, err, "PD210023: Failed to sign. PD210088: 'bad algo' does not match supported algorithm")
 
-	_, err = hex.DecodeString("7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
-	assert.NoError(t, err)
-	alice := signer.NewTestKeypair()
-	bob := signer.NewTestKeypair()
+	alice := common.NewTestKeypair()
+	bob := common.NewTestKeypair()
 
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
@@ -618,7 +662,12 @@ func TestSign(t *testing.T) {
 	require.NoError(t, err)
 
 	provingReq := protoz.ProvingRequest{
-		CircuitId: constants.CIRCUIT_ANON,
+		Circuit: &protoz.Circuit{
+			Name:           "anon",
+			Type:           "transfer",
+			UsesNullifiers: false,
+			UsesEncryption: false,
+		},
 		Common: &protoz.ProvingRequestCommon{
 			InputCommitments: inputCommitments,
 			InputSalts:       inputSalts,
@@ -742,7 +791,7 @@ func TestUnimplementedMethods(t *testing.T) {
 }
 
 func TestGetStateSchemas(t *testing.T) {
-	schemas, err := getStateSchemas(context.Background())
+	schemas, err := types.GetStateSchemas()
 	assert.NoError(t, err)
 	assert.Len(t, schemas, 4)
 }
