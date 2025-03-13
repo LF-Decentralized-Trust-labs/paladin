@@ -470,10 +470,10 @@ func guard_Or(guards ...Guard) Guard {
 	}
 }
 
-func (s *State) String() string {
-	switch *s {
+func (s State) String() string {
+	switch s {
 	case State_Initial:
 		return "Initial"
 	}
-	return fmt.Sprintf("Unknown (%d)", *s)
+	return fmt.Sprintf("Unknown (%d)", s)
 }

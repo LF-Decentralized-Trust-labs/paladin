@@ -79,6 +79,12 @@ type TransactionBuilderForTesting struct {
 	fakeClock                 *common.FakeClockForTesting
 	fakeEngineIntegration     *common.FakeEngineIntegrationForTesting
 	emitFunction              func(event common.Event)
+
+	/* Assembling State*/
+	assembleRequestID uuid.UUID
+
+	/* Post Assembling States (e.g. endorsing, reverted, parked)*/
+	latestFulfilledAssembleRequestID uuid.UUID
 }
 
 // Function NewTransactionBuilderForTesting creates a TransactionBuilderForTesting with random values for all fields.
@@ -102,6 +108,10 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 
 func (b *TransactionBuilderForTesting) GetCoordinator() string {
 	return b.currentDelegate
+}
+
+func (b *TransactionBuilderForTesting) GetLatestFulfilledAssembleRequestID() uuid.UUID {
+	return b.latestFulfilledAssembleRequestID
 }
 
 type TransactionDependencyFakes struct {
@@ -136,28 +146,49 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 
 	txn.stateMachine.currentState = b.state
 
+	// Update the private transaction struct to the accumulation that resulted from what ever events that we expect to have happened leading up to the current state
+	// We don't attempt to emulate any other history of those past events but rather assert that the state machine's behavior is determined purely by its current finite state
+	// and the contents of the PrivateTransaction struct
+
 	switch b.state {
 	case State_Delegated:
 		txn.currentDelegate = b.currentDelegate
+	case State_Assembling:
+		txn.currentDelegate = b.currentDelegate
+		b.assembleRequestID = uuid.New()
+		txn.latestAssembleRequest = &assembleRequestFromCoordinator{
+			requestID: b.assembleRequestID,
+		}
+	case State_EndorsementGathering:
+		txn.currentDelegate = b.currentDelegate
+		b.latestFulfilledAssembleRequestID = uuid.New()
+		txn.latestFulfilledAssembleRequestID = b.latestFulfilledAssembleRequestID
+	case State_Reverted:
+		b.latestFulfilledAssembleRequestID = uuid.New()
+		txn.latestFulfilledAssembleRequestID = b.latestFulfilledAssembleRequestID
+
+		txn.PostAssembly = &components.TransactionPostAssembly{
+			AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
+			RevertReason:   ptrTo("test revert reason"),
+		}
+	case State_Parked:
+		b.latestFulfilledAssembleRequestID = uuid.New()
+		txn.latestFulfilledAssembleRequestID = b.latestFulfilledAssembleRequestID
+
+		txn.PostAssembly = &components.TransactionPostAssembly{
+			AssemblyResult: prototk.AssembleTransactionResponse_PARK,
+		}
+	case State_Prepared:
+		txn.currentDelegate = b.currentDelegate
+	case State_Dispatched:
+		txn.currentDelegate = b.currentDelegate
+
 	}
 
 	if err != nil {
 		panic(fmt.Sprintf("Error from NewTransaction: %v", err))
 	}
 	b.txn = txn
-
-	// Update the private transaction struct to the accumulation that resulted from what ever events that we expect to have happened leading up to the current state
-	// We don't attempt to emulate any other history of those past events but rather assert that the state machine's behavior is determined purely by its current finite state
-	// and the contents of the PrivateTransaction struct
-
-	//enter the current state
-	onTransitionFunction := stateDefinitionsMap[b.state].OnTransitionTo
-	if onTransitionFunction != nil {
-		err := onTransitionFunction(ctx, b.txn)
-		if err != nil {
-			panic(fmt.Sprintf("Error from initializeDependencies: %v", err))
-		}
-	}
 
 	b.txn.stateMachine.currentState = b.state
 	return b.txn
