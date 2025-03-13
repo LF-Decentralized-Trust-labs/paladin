@@ -15,7 +15,7 @@
 
 package staticregistry
 
-import "github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+import "github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 
 type Config struct {
 	Entries map[string]*StaticEntry `json:"entries"`

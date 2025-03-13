@@ -5,7 +5,7 @@ plugins {
     id 'application'
 }
 
-group = 'io.kaleido'
+group = 'org.lfdt.labs'
 
 // Set the main class for the JAR
 jar {
@@ -13,7 +13,7 @@ jar {
 
     manifest {
         attributes(
-            'Main-Class': 'io.kaleido.paladin.Main'
+            'Main-Class': 'org.lfdt.labs.paladin.Main'
         )
     }
 
@@ -42,7 +42,7 @@ task wrapper(type: Wrapper){}
 assemble.dependsOn jar
 
 application {
-    mainClass.set('io.kaleido.paladin.Main')
+    mainClass.set('org.lfdt.labs.paladin.Main')
     applicationDefaultJvmArgs = ["-Djna.library.path=" +
         file("${rootDir}/core/go/build/libs").absolutePath + ":" + file("${rootDir}/toolkit/go/build/libs").absolutePath ]
 }

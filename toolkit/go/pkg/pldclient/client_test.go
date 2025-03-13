@@ -22,9 +22,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

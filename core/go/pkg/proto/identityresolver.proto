@@ -15,7 +15,7 @@
 
 syntax = "proto3";
 
-package io.kaleido.paladin.kata.identityresolver;
+package org.lfdt.labs.paladin.kata.identityresolver;
 option go_package = "pkg/proto/identityresolver";
 
 message ResolveVerifierRequest {

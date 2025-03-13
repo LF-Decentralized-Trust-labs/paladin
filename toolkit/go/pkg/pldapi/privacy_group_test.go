@@ -19,7 +19,7 @@ package pldapi
 import (
 	"testing"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/require"
 )
 

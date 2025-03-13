@@ -1,11 +1,11 @@
-module github.com/kaleido-io/paladin/registries/evm
+module github.com/LF-Decentralized-Trust-labs/paladin/registries/evm
 
 go 1.22.5
 
 require (
 	github.com/google/uuid v1.6.0
 	github.com/hyperledger/firefly-signer v1.1.19
-	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/text v0.21.0
 )
@@ -15,7 +15,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/hyperledger/firefly-common v1.4.14 // indirect
-	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000 // indirect
+	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -37,6 +37,6 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/toolkit => ../../toolkit/go
 
-replace github.com/kaleido-io/paladin/config => ../../config
+replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../../config

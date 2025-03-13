@@ -14,7 +14,7 @@
  */
 
 syntax = "proto3";
-package io.kaleido.paladin.transports.grpc;
+package org.lfdt.labs.paladin.transports.grpc;
 option go_package = "pkg/proto";
 
 service PaladinGRPCTransport {

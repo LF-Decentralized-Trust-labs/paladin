@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tkmsgs"
 )
 
 // The locator for private identities is split into two parts separate by an `@` symbol

@@ -19,11 +19,11 @@ package blockindexer
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/query"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func (bi *blockIndexer) RPCModule() *rpcserver.RPCModule {

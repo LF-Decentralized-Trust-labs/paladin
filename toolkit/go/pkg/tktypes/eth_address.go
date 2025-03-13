@@ -22,9 +22,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tkmsgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 // EthAddress is an SQL serializable version of ethtypes.Address0xHex

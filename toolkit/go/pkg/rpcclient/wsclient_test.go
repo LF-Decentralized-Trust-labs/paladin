@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -20,9 +20,9 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 

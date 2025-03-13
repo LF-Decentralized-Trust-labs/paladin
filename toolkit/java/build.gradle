@@ -3,7 +3,7 @@ plugins {
     id 'com.google.protobuf' version '0.9.4'
 }
 
-group = 'io.kaleido'
+group = 'org.lfdt.labs'
 
 repositories {
     mavenCentral()

@@ -18,11 +18,11 @@ package pldclient
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/query"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type PrivacyGroups interface {

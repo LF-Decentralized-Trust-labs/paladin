@@ -19,7 +19,7 @@ package privatetxnmgr
 import (
 	"strconv"
 
-	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/serialx/hashring"
 )
 

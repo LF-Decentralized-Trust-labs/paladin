@@ -15,7 +15,7 @@
 
 syntax = "proto3";
 
-package io.kaleido.paladin.toolkit;
+package org.lfdt.labs.paladin.toolkit;
 
 import "to_domain.proto";
 import "from_domain.proto";

@@ -19,8 +19,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/kaleido-io/paladin/config/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/i18n"
 
 	"sigs.k8s.io/yaml" // because it supports JSON tags, and we embed our structs in the k8s operator
 )

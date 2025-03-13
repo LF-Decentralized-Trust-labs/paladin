@@ -23,10 +23,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 )

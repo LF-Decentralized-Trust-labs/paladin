@@ -34,11 +34,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	corev1alpha1 "github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 	"github.com/Masterminds/sprig/v3"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // TransactionInvokeReconciler reconciles a TransactionInvoke object

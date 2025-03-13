@@ -20,10 +20,10 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tkmsgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 )
 
 // RPCHandler should not be implemented directly - use RPCMethod0 ... RPCMethod5 to implement your function

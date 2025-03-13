@@ -1,4 +1,4 @@
-module github.com/kaleido-io/paladin/domains/zeto
+module github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto
 
 go 1.22.5
 
@@ -11,9 +11,9 @@ require (
 	github.com/iden3/go-rapidsnark/types v0.0.3
 	github.com/iden3/go-rapidsnark/witness/v2 v2.0.0
 	github.com/iden3/go-rapidsnark/witness/wasmer v0.0.0-20240914111027-9588ce2d7e1b
-	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/core v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/core v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/text v0.21.0
 	google.golang.org/protobuf v1.35.1
@@ -112,10 +112,10 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/kaleido-io/paladin/core => ../../core/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/core => ../../core/go
 
-replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/toolkit => ../../toolkit/go
 
-replace github.com/kaleido-io/paladin/config => ../../config
+replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../../config
 
-replace github.com/kaleido-io/paladin/domains/noto => ../noto
+replace github.com/LF-Decentralized-Trust-labs/paladin/domains/noto => ../noto

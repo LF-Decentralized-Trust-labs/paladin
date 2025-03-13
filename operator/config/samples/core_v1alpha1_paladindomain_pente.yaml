@@ -11,6 +11,6 @@ spec:
   plugin:
     type: jar
     library: /app/domains/pente.jar
-    class: io.kaleido.paladin.pente.domain.PenteDomainFactory
+    class: org.lfdt.labs.paladin.pente.domain.PenteDomainFactory
   configJSON: |
     {}

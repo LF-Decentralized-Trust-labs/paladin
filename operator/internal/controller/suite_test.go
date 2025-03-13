@@ -32,7 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
+	corev1alpha1 "github.com/LF-Decentralized-Trust-Labs/paladin/operator/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

@@ -19,11 +19,11 @@ import (
 	"context"
 	_ "embed"
 
-	"github.com/kaleido-io/paladin/core/pkg/testbed"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/testbed"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zeto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/suite"
 )
 

@@ -19,9 +19,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tkmsgs"
 )
 
 type InflightManager[K comparable, T any] struct {

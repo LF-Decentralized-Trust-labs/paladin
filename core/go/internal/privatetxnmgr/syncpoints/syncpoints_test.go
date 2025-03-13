@@ -19,8 +19,8 @@ package syncpoints
 import (
 	"testing"
 
-	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
-	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentmocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence/mockpersistence"
 	"github.com/stretchr/testify/require"
 )
 

@@ -4,7 +4,7 @@ plugins {
     id 'java'
 }
 
-group = 'io.kaleido'
+group = 'org.lfdt.labs'
 
 configurations {
     // Resolvable configurations

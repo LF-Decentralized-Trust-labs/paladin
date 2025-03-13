@@ -21,7 +21,7 @@ import (
 	"runtime/debug"
 	"sync"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/log"
 )
 
 type PluginLibraryEntrypoint struct {

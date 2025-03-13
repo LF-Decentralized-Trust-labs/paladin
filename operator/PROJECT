@@ -9,7 +9,7 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: operator-go
-repo: github.com/kaleido-io/paladin/operator
+repo: github.com/LF-Decentralized-Trust-labs/paladin/operator
 resources:
 - api:
     crdVersion: v1
@@ -18,7 +18,7 @@ resources:
   domain: paladin.io
   group: core
   kind: Paladin
-  path: github.com/kaleido-io/paladin/operator/api/v1alpha1
+  path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -27,7 +27,7 @@ resources:
   domain: paladin.io
   group: core
   kind: SmartContractDeployment
-  path: github.com/kaleido-io/paladin/operator/api/v1alpha1
+  path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -36,7 +36,7 @@ resources:
   domain: paladin.io
   group: core
   kind: Besu
-  path: github.com/kaleido-io/paladin/operator/api/v1alpha1
+  path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -45,7 +45,7 @@ resources:
   domain: paladin.io
   group: core
   kind: BesuGenesis
-  path: github.com/kaleido-io/paladin/operator/api/v1alpha1
+  path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -54,7 +54,7 @@ resources:
   domain: paladin.io
   group: core
   kind: PaladinRegistry
-  path: github.com/kaleido-io/paladin/operator/api/v1alpha1
+  path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -63,7 +63,7 @@ resources:
   domain: paladin.io
   group: core
   kind: PaladinDomain
-  path: github.com/kaleido-io/paladin/operator/api/v1alpha1
+  path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -72,7 +72,7 @@ resources:
   domain: paladin.io
   group: core
   kind: PaladinRegistration
-  path: github.com/kaleido-io/paladin/operator/api/v1alpha1
+  path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -81,6 +81,6 @@ resources:
   domain: paladin.io
   group: core
   kind: TransactionInvoke
-  path: github.com/kaleido-io/paladin/operator/api/v1alpha1
+  path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
 version: "3"

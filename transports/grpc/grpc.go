@@ -18,8 +18,8 @@ import (
 	"C"
 )
 import (
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/transports/grpc/internal/grpctransport"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/transports/grpc/internal/grpctransport"
 )
 
 var ple = plugintk.NewPluginLibraryEntrypoint(func() plugintk.PluginBase {

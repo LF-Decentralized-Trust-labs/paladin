@@ -16,7 +16,7 @@ Run `gradle build` in the `perf` directory to build and install the `pldperf` co
 
 ### Public contract
 
-This test submits transactions which call the `set` method on a [`simplestorage`](https://github.com/kaleido-io/kaleido-js/blob/master/deploy-transact/contracts/simplestorage.sol) contract.
+This test submits transactions which call the `set` method on a [`simplestorage`](https://github.com//kaleido-js/blob/master/deploy-transact/contracts/simplestorage.sol) contract.
 
 1. Create a configuration file for your test. See [`example-quick-start.yaml`](./config/example-quick-start.yaml) for an example and [`conf.go`](./internal/conf/conf.go) for all configuration options.
 1. Deploy the `simplestorage` smart contract. Replace <key> in the following command with the the name of the key you wish to use, e.g. `key@node1`.

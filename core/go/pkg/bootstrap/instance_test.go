@@ -21,7 +21,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentmocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

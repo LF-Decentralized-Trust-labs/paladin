@@ -34,12 +34,12 @@ ext {
     targetCoverage = 94.4
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
-        'github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes/mock_transaction_flow.go',
-        'github.com/kaleido-io/paladin/core/pkg/proto',
-        'github.com/kaleido-io/paladin/core/pkg/proto/transaction',
-        'github.com/kaleido-io/paladin/toolkit/prototk',
-        'github.com/kaleido-io/paladin/core/internal/plugins/loader',
-        'github.com/kaleido-io/paladin/core/pkg/testbed',
+        'github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr/ptmgrtypes/mock_transaction_flow.go',
+        'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto',
+        'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto/transaction',
+        'github.com/LF-Decentralized-Trust-labs/paladin/toolkit/prototk',
+        'github.com/LF-Decentralized-Trust-labs/paladin/core/internal/plugins/loader',
+        'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/testbed',
     ]
 }
 
@@ -165,7 +165,7 @@ task goGet(type:Exec, dependsOn:[protoc, copyContracts, ":toolkit:go:goGet"]) {
 task makeMocks(type: Mockery, dependsOn: [":installMockery", protoc, goGet]) {
     args '--case', 'underscore'
     mock {
-        inputDir "go list -f {{.Dir}} github.com/kaleido-io/paladin/toolkit/pkg/rpcclient".execute().text.trim()
+        inputDir "go list -f {{.Dir}} github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcclient".execute().text.trim()
         includeAll true
         outputPackage 'rpcclientmocks'
         outputDir 'mocks/rpcclientmocks'
@@ -213,13 +213,13 @@ task makeMocks(type: Mockery, dependsOn: [":installMockery", protoc, goGet]) {
         outputDir 'mocks/componentmocks'
     }
     mock {
-        inputDir "go list -f {{.Dir}} github.com/kaleido-io/paladin/toolkit/pkg/rpcserver".execute().text.trim()
+        inputDir "go list -f {{.Dir}} github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver".execute().text.trim()
         includeAll true
         outputPackage 'componentmocks'
         outputDir 'mocks/componentmocks'
     }
     mock {
-        inputDir "go list -f {{.Dir}} github.com/kaleido-io/paladin/toolkit/pkg/signer".execute().text.trim()
+        inputDir "go list -f {{.Dir}} github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signer".execute().text.trim()
         name 'SigningModule'
         outputPackage 'signermocks'
         outputDir 'mocks/signermocks'
@@ -354,7 +354,7 @@ abstract class ComponentTest extends Exec {
         args 'test'
         args './componenttest', './pkg/testbed'
         args '-cover'
-        args "-coverpkg=github.com/kaleido-io/paladin/core/..." // toolkit handled seperately
+        args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..." // toolkit handled seperately
         args '-covermode=atomic'
         args '-timeout=120s'
         if (project.findProperty('verboseTests') == 'true') {

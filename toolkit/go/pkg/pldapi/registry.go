@@ -16,7 +16,7 @@
 
 package pldapi
 
-import "github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+import "github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 
 // An entity within a registry with its current properties
 type RegistryEntry struct {

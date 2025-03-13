@@ -19,9 +19,9 @@ package perf
 import (
 	"fmt"
 
-	"github.com/kaleido-io/paladin/perf/internal/conf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/perf/internal/conf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 )
 
 type publicContract struct {
