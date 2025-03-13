@@ -26,6 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	mock "github.com/stretchr/testify/mock"
 )
 
 // This is the subset of the StateDistributer interface from "github.com/kaleido-io/paladin/core/internal/statedistribution"
@@ -68,7 +69,10 @@ func NewEngineIntegration(ctx context.Context, allComponents components.AllCompo
 
 }
 
+// mockery doesn't really work well when used in code outside of _test.go files and we need these test utils to be usable by other packages so can't put them into _test.go files
+// so we have to define the mock manually
 type FakeEngineIntegrationForTesting struct {
+	mock.Mock
 }
 
 func (f *FakeEngineIntegrationForTesting) WriteLockAndDistributeStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
@@ -76,7 +80,7 @@ func (f *FakeEngineIntegrationForTesting) WriteLockAndDistributeStatesForTransac
 }
 
 func (f *FakeEngineIntegrationForTesting) AssembleAndSign(ctx context.Context, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) (*components.TransactionPostAssembly, error) {
-	return nil, nil
+	return f.Called(ctx, transactionID, preAssembly, stateLocksJSON, blockHeight).Get(0).(*components.TransactionPostAssembly), nil
 }
 
 // interface for existing implementation  in core/go/internal/privatetxnmgr/state_distribution_builder.go

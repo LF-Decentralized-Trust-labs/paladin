@@ -113,7 +113,7 @@ type TransactionBuilderForTesting struct {
 	state                     State
 	sentMessageRecorder       *SentMessageRecorder
 	fakeClock                 *common.FakeClockForTesting
-	fakeStateIntegration      *common.FakeEngineIntegrationForTesting
+	fakeEngineIntegration     *common.FakeEngineIntegrationForTesting
 	grapher                   Grapher
 	txn                       *Transaction
 	requestTimeout            int
@@ -138,7 +138,7 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		state:                     state,
 		sentMessageRecorder:       NewSentMessageRecorder(),
 		fakeClock:                 &common.FakeClockForTesting{},
-		fakeStateIntegration:      &common.FakeEngineIntegrationForTesting{},
+		fakeEngineIntegration:     &common.FakeEngineIntegrationForTesting{},
 		assembleTimeout:           5000,
 		requestTimeout:            100,
 		privateTransactionBuilder: testutil.NewPrivateTransactionBuilderForTesting(),
@@ -231,7 +231,7 @@ func (b *TransactionBuilderForTesting) BuildWithMocks() (*Transaction, *transact
 	mocks := &transactionDependencyFakes{
 		sentMessageRecorder: b.sentMessageRecorder,
 		clock:               b.fakeClock,
-		engineIntegration:   b.fakeStateIntegration,
+		engineIntegration:   b.fakeEngineIntegration,
 	}
 	return b.Build(), mocks
 }
@@ -251,7 +251,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		b.sentMessageRecorder,
 		b.fakeClock,
 		func(_ common.Event) {},
-		b.fakeStateIntegration,
+		b.fakeEngineIntegration,
 		b.fakeClock.Duration(b.requestTimeout),
 		b.fakeClock.Duration(b.assembleTimeout),
 		b.grapher,

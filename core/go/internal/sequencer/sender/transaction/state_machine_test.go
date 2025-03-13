@@ -75,11 +75,8 @@ func TestStateMachine_Pending_ToDelegated_OnDelegated(t *testing.T) {
 
 func TestStateMachine_Delegated_ToAssembling_OnAssembleRequestReceived_OK(t *testing.T) {
 	ctx := context.Background()
-	txn, mocks := NewTransactionForUnitTest(t, ctx, testutil.NewPrivateTransactionBuilderForTesting().Build())
-	//TODO move following complexity into utils e.g. using builder pattern as we do with coordinator.Transaction
-	coordinator := uuid.New().String()
-	txn.currentDelegate = coordinator
-	txn.stateMachine.currentState = State_Delegated
+	builder := NewTransactionBuilderForTesting(t, State_Delegated)
+	txn, mocks := builder.BuildWithMocks()
 
 	mocks.mockForAssembleAndSignRequestOK().Once()
 	requestID := uuid.New()
@@ -89,13 +86,13 @@ func TestStateMachine_Delegated_ToAssembling_OnAssembleRequestReceived_OK(t *tes
 			TransactionID: txn.ID,
 		},
 		RequestID:   requestID,
-		Coordinator: coordinator,
+		Coordinator: builder.GetCoordinator(),
 	})
 	assert.NoError(t, err)
-	assert.True(t, mocks.engineIntegration.AssertExpectations(t))
+	assert.True(t, mocks.EngineIntegration.AssertExpectations(t))
 
-	require.Len(t, mocks.emittedEvents, 1)
-	require.IsType(t, &AssembleAndSignSuccessEvent{}, mocks.emittedEvents[0])
+	require.Len(t, mocks.GetEmittedEvents(), 1)
+	require.IsType(t, &AssembleAndSignSuccessEvent{}, mocks.GetEmittedEvents()[0])
 
 	//We haven't fed that event back into the state machine yet, so the state should still be Assembling
 	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
