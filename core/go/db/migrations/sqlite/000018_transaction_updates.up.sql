@@ -1,0 +1,21 @@
+CREATE TABLE transaction_history (
+  "id"                        UUID            NOT NULL,
+  "tx_id"                     UUID            NOT NULL,
+  "idempotency_key"           VARCHAR,
+  "created"                   BIGINT          NOT NULL,
+  "type"                      VARCHAR         NOT NULL,
+  "abi_ref"                   VARCHAR         NOT NULL,
+  "function"                  VARCHAR,
+  "domain"                    VARCHAR,
+  "from"                      VARCHAR         NOT NULL,
+  "to"                        VARCHAR,
+  "data"                      VARCHAR,
+  "gas"                       BIGINT,
+  "value"                     VARCHAR,
+  "gas_price"                 VARCHAR,
+  "max_fee_per_gas"           VARCHAR,
+  "max_priority_fee_per_gas"  VARCHAR,
+  PRIMARY KEY ("id"),
+  FOREIGN KEY ("abi_ref") REFERENCES abis ("hash") ON DELETE CASCADE,
+  FOREIGN KEY ("tx_id") REFERENCES transactions ("id") ON DELETE CASCADE
+);

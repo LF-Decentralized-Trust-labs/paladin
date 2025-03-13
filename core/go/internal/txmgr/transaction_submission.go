@@ -66,6 +66,29 @@ func (persistedTransaction) TableName() string {
 	return "transactions"
 }
 
+type persistedTransactionHistory struct {
+	ID                   uuid.UUID                            `gorm:"column:id;primaryKey"`
+	TXID                 uuid.UUID                            `gorm:"column:tx_id"`
+	IdempotencyKey       *string                              `gorm:"column:idempotency_key"`
+	Type                 tktypes.Enum[pldapi.TransactionType] `gorm:"column:type"`
+	Created              tktypes.Timestamp                    `gorm:"column:created;autoCreateTime:false"` // set by code before insert
+	ABIReference         *tktypes.Bytes32                     `gorm:"column:abi_ref"`
+	Function             *string                              `gorm:"column:function"`
+	Domain               *string                              `gorm:"column:domain"`
+	From                 string                               `gorm:"column:from"`
+	To                   *tktypes.EthAddress                  `gorm:"column:to"`
+	Data                 tktypes.RawJSON                      `gorm:"column:data"` // we always store in JSON object format
+	Gas                  *tktypes.HexUint64                   `gorm:"column:gas"`
+	Value                *tktypes.HexUint256                  `gorm:"column:value"`
+	GasPrice             *tktypes.HexUint256                  `gorm:"column:gas_price"`
+	MaxFeePerGas         *tktypes.HexUint256                  `gorm:"column:max_fee_per_gas"`
+	MaxPriorityFeePerGas *tktypes.HexUint256                  `gorm:"column:max_priority_fee_per_gas"`
+}
+
+func (persistedTransactionHistory) TableName() string {
+	return "transaction_history"
+}
+
 var defaultConstructor = &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{}}
 var defaultConstructorSignature = func() string {
 	sig, _ := defaultConstructor.Signature()
@@ -616,6 +639,7 @@ func (tm *txManager) getPublicTxData(ctx context.Context, fnDef *abi.Entry, byte
 
 func (tm *txManager) insertTransactions(ctx context.Context, dbTX persistence.DBTX, txis []*components.ValidatedTransaction, ignoreConflicts bool) (int64, error) {
 	ptxs := make([]*persistedTransaction, len(txis))
+	txhs := make([]*persistedTransactionHistory, len(txis))
 	var transactionDeps []*transactionDep
 	for i, txi := range txis {
 		// Resolve the finalized fields on the input object for return
@@ -643,6 +667,24 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX persistence.DB
 				DependsOn:   d,
 			})
 		}
+		txhs[i] = &persistedTransactionHistory{
+			ID:                   uuid.New(),
+			TXID:                 ptxs[i].ID,
+			IdempotencyKey:       ptxs[i].IdempotencyKey,
+			Type:                 ptxs[i].Type,
+			Created:              ptxs[i].Created,
+			ABIReference:         ptxs[i].ABIReference,
+			Function:             ptxs[i].Function,
+			Domain:               ptxs[i].Domain,
+			From:                 ptxs[i].From,
+			To:                   ptxs[i].To,
+			Data:                 ptxs[i].Data,
+			Gas:                  tx.Gas,
+			Value:                tx.Value,
+			GasPrice:             tx.GasPrice,
+			MaxFeePerGas:         tx.MaxFeePerGas,
+			MaxPriorityFeePerGas: tx.MaxPriorityFeePerGas,
+		}
 	}
 
 	insert := dbTX.DB().
@@ -654,6 +696,12 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX persistence.DB
 	}
 	txInsertResult := insert.Create(ptxs)
 	err := txInsertResult.Error
+	if err == nil {
+		err = dbTX.DB().
+			Table("transaction_history").
+			Create(txhs).
+			Error
+	}
 	if err == nil && len(transactionDeps) > 0 {
 		err = dbTX.DB().
 			Table("transaction_deps").
@@ -665,6 +713,7 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX persistence.DB
 		return -1, err
 	}
 	rowsAffected := txInsertResult.RowsAffected
+
 	dbTX.AddPostCommit(func(ctx context.Context) {
 		// Only update the cache if there were no conflicts
 		if rowsAffected == int64(len(txis)) {
@@ -678,4 +727,149 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX persistence.DB
 		}
 	})
 	return rowsAffected, nil
+}
+
+func (tm *txManager) UpdateTransaction(ctx context.Context, id uuid.UUID, tx *pldapi.TransactionInput) (uuid.UUID, error) {
+	oldTX, err := tm.GetTransactionByID(ctx, id)
+	if err != nil {
+		return id, err
+	}
+
+	if oldTX == nil {
+		return id, i18n.NewError(ctx, msgs.MsgTxMgrTransactionNotFound, id)
+	}
+
+	if oldTX.Type.V() != pldapi.TransactionTypePublic {
+		return id, i18n.NewError(ctx, msgs.MsgTxMgrUpdateInvalidType)
+	}
+
+	var pubTXID uint64
+	var publicTxData []byte
+	var validatedTransaction *components.ValidatedTransaction
+	var from *tktypes.EthAddress
+
+	err = tm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		pubTXs, err := tm.publicTxMgr.QueryPublicTxForTransactions(ctx, dbTX, []uuid.UUID{id}, nil)
+		if err != nil {
+			return err
+		}
+		// if this is a public transaction there should be exactly one entry in the map and exactly one entry
+		// in the array but it's still best to avoid any risk of a nil pointer exception
+		if _, ok := pubTXs[id]; !ok || len(pubTXs[id]) == 0 {
+			return i18n.NewError(ctx, msgs.MsgPublicTransactionNotFound, id)
+		}
+		pubTXID = *pubTXs[id][0].LocalID
+
+		validatedTransaction, err = tm.resolveUpdatedTransaction(ctx, dbTX, id, tx, oldTX)
+		if err != nil {
+			return err
+		}
+
+		if validatedTransaction != nil {
+			publicTxData = validatedTransaction.PublicTxData
+		}
+
+		from, err = tktypes.ParseEthAddress(oldTX.From)
+		if err != nil {
+			identifier := strings.Split(oldTX.From, "@")[0]
+			kr := tm.keyManager.KeyResolverForDBTX(dbTX)
+			var resolvedKey *pldapi.KeyMappingAndVerifier
+			resolvedKey, err = kr.ResolveKey(ctx, identifier, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+			if err == nil {
+				// this failure should be impossible if key manager is working correctly
+				from, err = tktypes.ParseEthAddress(resolvedKey.Verifier.Verifier)
+			}
+		}
+		return err
+	})
+
+	if err != nil {
+		return id, err
+	}
+
+	err = tm.publicTxMgr.UpdateTransaction(ctx, id, pubTXID, from, tx, publicTxData, func(dbTX persistence.DBTX) error {
+		return tm.processUpdatedTransaction(ctx, dbTX, oldTX.ID, validatedTransaction)
+	})
+
+	return id, err
+}
+
+func (tm *txManager) processUpdatedTransaction(ctx context.Context, dbTX persistence.DBTX, id *uuid.UUID, validatedTransaction *components.ValidatedTransaction) error {
+	// only update the fields which might have changed with this request
+	err := dbTX.DB().
+		WithContext(ctx).
+		Table("transactions").
+		Where("id = ?", id).
+		Updates(&persistedTransaction{
+			ABIReference: validatedTransaction.Function.ABIReference,
+			Function:     notEmptyOrNull(validatedTransaction.Function.Signature),
+			To:           validatedTransaction.Transaction.To,
+			Data:         validatedTransaction.Transaction.Data,
+		}).
+		Error
+
+	if err == nil {
+		tx := validatedTransaction.Transaction
+		txh := &persistedTransactionHistory{
+			ID:                   uuid.New(),
+			TXID:                 *tx.ID,
+			IdempotencyKey:       notEmptyOrNull(tx.IdempotencyKey),
+			Type:                 tx.Type,
+			Created:              tktypes.TimestampNow(),
+			ABIReference:         validatedTransaction.Function.ABIReference,
+			Function:             notEmptyOrNull(validatedTransaction.Function.Signature),
+			Domain:               notEmptyOrNull(tx.Domain),
+			From:                 tx.From,
+			To:                   tx.To,
+			Data:                 tx.Data,
+			Gas:                  tx.Gas,
+			Value:                tx.Value,
+			GasPrice:             tx.GasPrice,
+			MaxFeePerGas:         tx.MaxFeePerGas,
+			MaxPriorityFeePerGas: tx.MaxPriorityFeePerGas,
+		}
+		err = dbTX.DB().
+			Table("transaction_history").
+			Create(txh).
+			Error
+	}
+	return err
+}
+
+func (tm *txManager) resolveUpdatedTransaction(ctx context.Context, dbTX persistence.DBTX, id uuid.UUID, txi *pldapi.TransactionInput, oldTX *pldapi.Transaction) (*components.ValidatedTransaction, error) {
+	fn, err := tm.resolveFunction(ctx, dbTX, txi.ABI, txi.ABIReference, txi.Function, txi.To)
+	if err != nil {
+		return nil, err
+	}
+
+	var publicTxData []byte
+	cv, normalizedJSON, err := tm.parseInputs(ctx, fn.Definition, pldapi.TransactionTypePublic.Enum(), txi.Data, txi.Bytecode)
+	if err == nil {
+		publicTxData, err = tm.getPublicTxData(ctx, fn.Definition, nil, cv)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	validatedTransaction := &components.ValidatedTransaction{
+		ResolvedTransaction: components.ResolvedTransaction{
+			Transaction: &pldapi.Transaction{
+				TransactionBase: txi.TransactionBase,
+				ID:              &id,
+			},
+			Function: fn,
+		},
+		PublicTxData: publicTxData,
+	}
+
+	tx := validatedTransaction.Transaction
+	// Update to normalized JSON in what we store
+	tx.Data = normalizedJSON
+
+	// copy across immutable fields from old transaction
+	tx.Type = oldTX.Type
+	tx.From = oldTX.From
+	tx.IdempotencyKey = oldTX.IdempotencyKey
+
+	return validatedTransaction, nil
 }

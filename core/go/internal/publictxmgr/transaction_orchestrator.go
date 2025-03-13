@@ -143,19 +143,23 @@ type orchestrator struct {
 
 	lastNonceAlloc time.Time
 	nextNonce      *uint64
+
+	// updates
+	updates   []*transactionUpdate
+	updateMux sync.Mutex
 }
 
 const veryShortMinimum = 50 * time.Millisecond
 
 func NewOrchestrator(
-	ble *pubTxManager,
+	ptm *pubTxManager,
 	signingAddress tktypes.EthAddress,
 	conf *pldconf.PublicTxManagerConfig,
 ) *orchestrator {
-	ctx := ble.ctx
+	ctx := ptm.ctx
 
 	newOrchestrator := &orchestrator{
-		pubTxManager:                ble,
+		pubTxManager:                ptm,
 		orchestratorBirthTime:       time.Now(),
 		orchestratorPollingInterval: confutil.DurationMin(conf.Orchestrator.Interval, veryShortMinimum, *pldconf.PublicTxManagerDefaults.Orchestrator.Interval),
 		maxInFlightTxs:              confutil.IntMin(conf.Orchestrator.MaxInFlight, 1, *pldconf.PublicTxManagerDefaults.Orchestrator.MaxInFlight),
@@ -173,11 +177,11 @@ func NewOrchestrator(
 		// submission retry
 		transactionSubmissionRetry: retry.NewRetryLimited(&conf.Orchestrator.SubmissionRetry),
 		staleTimeout:               confutil.DurationMin(conf.Orchestrator.StaleTimeout, 0, *pldconf.PublicTxManagerDefaults.Orchestrator.StaleTimeout),
-		hasZeroGasPrice:            ble.gasPriceClient.HasZeroGasPrice(ctx),
+		hasZeroGasPrice:            ptm.gasPriceClient.HasZeroGasPrice(ctx),
 		InFlightTxsStale:           make(chan bool, 1),
 		stopProcess:                make(chan bool, 1),
-		ethClient:                  ble.ethClient,
-		bIndexer:                   ble.bIndexer,
+		ethClient:                  ptm.ethClient,
+		bIndexer:                   ptm.bIndexer,
 	}
 
 	log.L(ctx).Debugf("NewOrchestrator for signing address %s created: %+v", newOrchestrator.signingAddress, newOrchestrator)
@@ -213,10 +217,31 @@ func (oc *orchestrator) orchestratorLoop() {
 			oc.MarkInFlightOrchestratorsStale() // trigger engine loop for removal
 			return
 		}
+		oc.handleUpdates(ctx)
 		polled, total := oc.pollAndProcess(ctx)
 		log.L(ctx).Debugf("Orchestrator loop polled %d txs, there are %d txs in total", polled, total)
 	}
 
+}
+
+func (oc *orchestrator) handleUpdates(ctx context.Context) {
+	oc.updateMux.Lock()
+	updates := oc.updates
+	oc.updates = nil
+	oc.updateMux.Unlock()
+
+	oc.inFlightTxsMux.Lock()
+	defer oc.inFlightTxsMux.Unlock()
+
+	for _, update := range updates {
+		for _, inflight := range oc.inFlightTxs {
+			if inflight.stateManager.GetPubTxnID() == update.pubTXID {
+				inflight.UpdateTransaction(ctx, update.newPtx)
+				oc.MarkInFlightTxStale()
+				break
+			}
+		}
+	}
 }
 
 // Used in unit tests

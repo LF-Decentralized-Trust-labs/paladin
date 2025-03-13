@@ -272,6 +272,7 @@ type InMemoryTxStateReadOnly interface {
 	GetGasLimit() uint64
 	IsReadyToExit() bool
 }
+
 type InMemoryTxStateManager interface {
 	InMemoryTxStateReadOnly
 	InMemoryTxStateSetters
@@ -279,6 +280,8 @@ type InMemoryTxStateManager interface {
 
 type InMemoryTxStateSetters interface {
 	ApplyInMemoryUpdates(ctx context.Context, txUpdates *BaseTXUpdates)
+	UpdateTransaction(newPtx *DBPublicTxn)
+	ResetTransactionHash()
 }
 
 type StageOutput struct {
@@ -323,10 +326,10 @@ type PersistenceOutput struct {
 }
 
 type InFlightStageActionTriggers interface {
-	TriggerRetrieveGasPrice(ctx context.Context) error
-	TriggerSignTx(ctx context.Context) error
-	TriggerSubmitTx(ctx context.Context, signedMessage []byte) error
-	TriggerStatusUpdate(ctx context.Context) error
+	TriggerRetrieveGasPrice(ctx context.Context, versionID int) error
+	TriggerSignTx(ctx context.Context, versionID int) error
+	TriggerSubmitTx(ctx context.Context, versionID int, signedMessage []byte, calculatedTxHash *tktypes.Bytes32) error
+	TriggerStatusUpdate(ctx context.Context, versionID int) error
 }
 
 // RunningStageContext is the context for an individual run of the transaction process
@@ -390,20 +393,38 @@ type OrchestratorContext struct {
 // output of some stages doesn't get written into the database
 // so it needs to be carried over to next stages
 type TransientPreviousStageOutputs struct {
-	SignedMessage []byte // NB: if the value is nil when triggering submitTx , node signer will be used to sign the transaction instead, don't use this to judge whether a transaction can be submitted or not.
+	SignedMessage   []byte // NB: if the value is nil when triggering submitTx , node signer will be used to sign the transaction instead, don't use this to judge whether a transaction can be submitted or not.
+	TransactionHash *tktypes.Bytes32
 }
 
 type InFlightTransactionStateManager interface {
 	// tx state management
 	InMemoryTxStateReadOnly
+	InMemoryTxStateSetters
 	CanSubmit(ctx context.Context, cost *big.Int) bool
 	CanBeRemoved(ctx context.Context) bool
 	GetInFlightStatus() InFlightStatus
+	SetOrchestratorContext(ctx context.Context, tec *OrchestratorContext)
+	GetStage(ctx context.Context) InFlightTxStage
+
+	// version management
+	GetVersions(ctx context.Context) []InFlightTransactionStateVersion
+	GetVersion(ctx context.Context, id int) InFlightTransactionStateVersion
+	GetCurrentVersion(ctx context.Context) InFlightTransactionStateVersion
+	GetPreviousVersions(ctx context.Context) []InFlightTransactionStateVersion
+	NewVersion(ctx context.Context)
+}
+
+type InFlightTransactionStateVersion interface {
+	GetID(ctx context.Context) int
+	Cancel(ctx context.Context)
+	IsCancelled(ctx context.Context) bool
+	SetCurrent(ctx context.Context, current bool)
+	IsCurrent(ctx context.Context) bool
 
 	// stage management
-	StartNewStageContext(ctx context.Context, stage InFlightTxStage, substatus BaseTxSubStatus)
+	StartNewStageContext(ctx context.Context, stageType InFlightTxStage, substatus BaseTxSubStatus)
 	GetStage(ctx context.Context) InFlightTxStage
-	SetOrchestratorContext(ctx context.Context, tec *OrchestratorContext)
 	SetTransientPreviousStageOutputs(tpso *TransientPreviousStageOutputs)
 	GetRunningStageContext(ctx context.Context) *RunningStageContext
 	GetStageTriggerError(ctx context.Context) error
