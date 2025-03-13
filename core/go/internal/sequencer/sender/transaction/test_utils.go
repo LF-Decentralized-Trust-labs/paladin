@@ -164,7 +164,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 
 }
 
-func (m *TransactionDependencyFakes) mockForAssembleAndSignRequestOK() *mock.Call {
+func (m *TransactionDependencyFakes) MockForAssembleAndSignRequestOK() *mock.Call {
 
 	return m.EngineIntegration.On(
 		"AssembleAndSign",
@@ -178,7 +178,7 @@ func (m *TransactionDependencyFakes) mockForAssembleAndSignRequestOK() *mock.Cal
 	}, nil)
 }
 
-func (m *TransactionDependencyFakes) mockForAssembleAndSignRequestRevert() *mock.Call {
+func (m *TransactionDependencyFakes) MockForAssembleAndSignRequestRevert() *mock.Call {
 
 	return m.EngineIntegration.On(
 		"AssembleAndSign",
@@ -193,7 +193,7 @@ func (m *TransactionDependencyFakes) mockForAssembleAndSignRequestRevert() *mock
 	}, nil)
 }
 
-func (m *TransactionDependencyFakes) mockForAssembleAndSignRequestPark() *mock.Call {
+func (m *TransactionDependencyFakes) MockForAssembleAndSignRequestPark() *mock.Call {
 
 	return m.EngineIntegration.On(
 		"AssembleAndSign",

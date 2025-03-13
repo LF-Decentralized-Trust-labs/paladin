@@ -47,7 +47,7 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 	switch postAssembly.AssemblyResult {
 	case prototk.AssembleTransactionResponse_OK:
 		txn.emit(&AssembleAndSignSuccessEvent{
-			event: event{
+			BaseEvent: BaseEvent{
 				TransactionID: txn.ID,
 			},
 			RequestID:    requestID,
@@ -55,7 +55,7 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 		})
 	case prototk.AssembleTransactionResponse_REVERT:
 		txn.emit(&AssembleRevertEvent{
-			event: event{
+			BaseEvent: BaseEvent{
 				TransactionID: txn.ID,
 			},
 			RequestID:    requestID,
@@ -63,7 +63,7 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 		})
 	case prototk.AssembleTransactionResponse_PARK:
 		txn.emit(&AssembleParkEvent{
-			event: event{
+			BaseEvent: BaseEvent{
 				TransactionID: txn.ID,
 			},
 			RequestID:    requestID,

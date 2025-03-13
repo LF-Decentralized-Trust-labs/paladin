@@ -35,22 +35,22 @@ type Event interface {
 	ApplyToTransaction(ctx context.Context, txn *Transaction) error
 }
 
-type event struct {
+type BaseEvent struct {
 	TransactionID uuid.UUID
 }
 
 // Default implementation is a no-op
-func (e *event) ApplyToTransaction(ctx context.Context, _ *Transaction) error {
+func (e *BaseEvent) ApplyToTransaction(ctx context.Context, _ *Transaction) error {
 	log.L(ctx).Debugf("nothing to apply for event type %T", e)
 	return nil
 }
 
-func (e *event) GetTransactionID() uuid.UUID {
+func (e *BaseEvent) GetTransactionID() uuid.UUID {
 	return e.TransactionID
 }
 
 type ConfirmedSuccessEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *ConfirmedSuccessEvent) Type() EventType {
@@ -58,7 +58,7 @@ func (_ *ConfirmedSuccessEvent) Type() EventType {
 }
 
 type ConfirmedRevertedEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *ConfirmedRevertedEvent) Type() EventType {
@@ -66,7 +66,7 @@ func (_ *ConfirmedRevertedEvent) Type() EventType {
 }
 
 type CreatedEvent struct {
-	event
+	BaseEvent
 	PrivateTransaction *components.PrivateTransaction
 }
 
@@ -75,7 +75,7 @@ func (_ *CreatedEvent) Type() EventType {
 }
 
 type DelegatedEvent struct {
-	event
+	BaseEvent
 	Coordinator string
 }
 
@@ -89,7 +89,7 @@ func (event *DelegatedEvent) ApplyToTransaction(_ context.Context, txn *Transact
 }
 
 type AssembleRequestReceivedEvent struct {
-	event
+	BaseEvent
 	RequestID               uuid.UUID
 	Coordinator             string
 	CoordinatorsBlockHeight int64
@@ -113,7 +113,7 @@ func (event *AssembleRequestReceivedEvent) ApplyToTransaction(_ context.Context,
 }
 
 type AssembleAndSignSuccessEvent struct {
-	event
+	BaseEvent
 	PostAssembly *components.TransactionPostAssembly
 	RequestID    uuid.UUID
 }
@@ -129,7 +129,7 @@ func (event *AssembleAndSignSuccessEvent) ApplyToTransaction(_ context.Context, 
 }
 
 type AssembleRevertEvent struct {
-	event
+	BaseEvent
 	PostAssembly *components.TransactionPostAssembly
 	RequestID    uuid.UUID
 }
@@ -145,7 +145,7 @@ func (event *AssembleRevertEvent) ApplyToTransaction(_ context.Context, txn *Tra
 }
 
 type AssembleParkEvent struct {
-	event
+	BaseEvent
 	PostAssembly *components.TransactionPostAssembly
 	RequestID    uuid.UUID
 }
@@ -161,7 +161,7 @@ func (event *AssembleParkEvent) ApplyToTransaction(_ context.Context, txn *Trans
 }
 
 type AssembleErrorEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *AssembleErrorEvent) Type() EventType {
@@ -169,7 +169,7 @@ func (_ *AssembleErrorEvent) Type() EventType {
 }
 
 type DispatchConfirmationRequestReceivedEvent struct {
-	event
+	BaseEvent
 	RequestID        uuid.UUID
 	Coordinator      string
 	PostAssemblyHash *tktypes.Bytes32
@@ -180,7 +180,7 @@ func (_ *DispatchConfirmationRequestReceivedEvent) Type() EventType {
 }
 
 type CoordinatorChangedEvent struct {
-	event
+	BaseEvent
 	Coordinator string
 }
 
@@ -194,7 +194,7 @@ func (event *CoordinatorChangedEvent) ApplyToTransaction(_ context.Context, txn 
 }
 
 type DispatchHeartbeatReceivedEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *DispatchHeartbeatReceivedEvent) Type() EventType {
@@ -202,7 +202,7 @@ func (_ *DispatchHeartbeatReceivedEvent) Type() EventType {
 }
 
 type ResumedEvent struct {
-	event
+	BaseEvent
 }
 
 func (_ *ResumedEvent) Type() EventType {

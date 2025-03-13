@@ -90,3 +90,10 @@ func (t *Transaction) Hash(ctx context.Context) (*tktypes.Bytes32, error) {
 func ptrTo[T any](v T) *T {
 	return &v
 }
+
+//TODO the following getter methods are not safe to call on anything other than the sequencer goroutine because they are reading data structures that are being modified by the state machine.
+// We should consider making them safe to call from any goroutine by reading maintaining a copy of the data structures that are updated async from the sequencer thread under a mutex
+
+func (t *Transaction) GetCurrentState() State {
+	return t.stateMachine.currentState
+}

@@ -47,7 +47,7 @@ func TestStateMachine_Initial_ToPending_OnCreated(t *testing.T) {
 	assert.Equal(t, State_Initial, txn.stateMachine.currentState)
 
 	err := txn.HandleEvent(ctx, &CreatedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -64,7 +64,7 @@ func TestStateMachine_Pending_ToDelegated_OnDelegated(t *testing.T) {
 	coordinator := uuid.New().String()
 
 	err := txn.HandleEvent(ctx, &DelegatedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator: coordinator,
@@ -78,11 +78,11 @@ func TestStateMachine_Delegated_ToAssembling_OnAssembleRequestReceived_OK(t *tes
 	builder := NewTransactionBuilderForTesting(t, State_Delegated)
 	txn, mocks := builder.BuildWithMocks()
 
-	mocks.mockForAssembleAndSignRequestOK().Once()
+	mocks.MockForAssembleAndSignRequestOK().Once()
 	requestID := uuid.New()
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID:   requestID,
@@ -95,7 +95,8 @@ func TestStateMachine_Delegated_ToAssembling_OnAssembleRequestReceived_OK(t *tes
 	require.IsType(t, &AssembleAndSignSuccessEvent{}, mocks.GetEmittedEvents()[0])
 
 	//We haven't fed that event back into the state machine yet, so the state should still be Assembling
-	assert.Equal(t, State_Assembling, txn.stateMachine.currentState, "current state is %s", txn.stateMachine.currentState.String())
+	currentState := txn.GetCurrentState()
+	assert.Equal(t, State_Assembling, currentState, "current state is %s", currentState.String())
 }
 
 func TestStateMachine_Delegated_ToAssembling_OnAssembleRequestReceived_REVERT(t *testing.T) {
@@ -110,7 +111,7 @@ func TestStateMachine_Delegated_ToAssembling_OnAssembleRequestReceived_REVERT(t 
 	requestID := uuid.New()
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID:   requestID,
@@ -138,7 +139,7 @@ func TestStateMachine_Delegated_ToAssembling_OnAssembleRequestReceived_PARK(t *t
 	requestID := uuid.New()
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID:   requestID,
@@ -167,7 +168,7 @@ func TestStateMachine_Assembling_ToEndorsementGathering_OnAssembleAndSignSuccess
 	}
 
 	err := txn.HandleEvent(ctx, &AssembleAndSignSuccessEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		PostAssembly: &components.TransactionPostAssembly{
@@ -194,7 +195,7 @@ func TestStateMachine_Assembling_ToReverted_OnAssembleRevert(t *testing.T) {
 	}
 
 	err := txn.HandleEvent(ctx, &AssembleRevertEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		PostAssembly: &components.TransactionPostAssembly{
@@ -221,7 +222,7 @@ func TestStateMachine_Assembling_ToParked_OnAssemblePark(t *testing.T) {
 	}
 
 	err := txn.HandleEvent(ctx, &AssembleParkEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		PostAssembly: &components.TransactionPostAssembly{
@@ -245,7 +246,7 @@ func TestStateMachine_Delegated_ToReverted_OnAssembleRequestReceived_AfterAssemb
 	mocks.mockForAssembleAndSignRequestRevert().Once()
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator: coordinator,
@@ -274,7 +275,7 @@ func TestStateMachine_Delegated_ToParked_OnAssembleRequestReceived_AfterAssemble
 	mocks.mockForAssembleAndSignRequestPark().Once()
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator: coordinator,
@@ -304,7 +305,7 @@ func TestStateMachine_EndorsementGathering_NoTransition_OnAssembleRequest_IfMatc
 	txn.latestFulfilledAssembleRequestID = uuid.New()
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID:   txn.latestFulfilledAssembleRequestID,
@@ -332,7 +333,7 @@ func TestStateMachine_Reverted_DoResendAssembleResponse_OnAssembleRequest_IfMatc
 	}
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID:   txn.latestFulfilledAssembleRequestID,
@@ -359,7 +360,7 @@ func TestStateMachine_Reverted_Ignore_OnAssembleRequest_IfNotMatchesPreviousRequ
 	}
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID:   uuid.New(),
@@ -386,7 +387,7 @@ func TestStateMachine_Parked_DoResendAssembleResponse_OnAssembleRequest_IfMatche
 	}
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID:   txn.latestFulfilledAssembleRequestID,
@@ -413,7 +414,7 @@ func TestStateMachine_Parked_Ignore_OnAssembleRequest_IfNotMatchesPreviousReques
 	}
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID:   uuid.New(),
@@ -439,7 +440,7 @@ func TestStateMachine_EndorsementGathering_ToAssembling_OnAssembleRequest_IfNotM
 	txn.latestFulfilledAssembleRequestID = uuid.New()
 
 	err := txn.HandleEvent(ctx, &AssembleRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID:   uuid.New(),
@@ -468,7 +469,7 @@ func TestStateMachine_EndorsementGathering_ToPrepared_OnDispatchConfirmationRequ
 	require.NoError(t, err)
 
 	err = txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator:      coordinator,
@@ -493,7 +494,7 @@ func TestStateMachine_EndorsementGathering_NoTransition_OnDispatchConfirmationRe
 	require.NoError(t, err)
 
 	err = txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator:      coordinator2,
@@ -517,7 +518,7 @@ func TestStateMachine_EndorsementGathering_NoTransition_OnDispatchConfirmationRe
 	hash := tktypes.Bytes32(tktypes.RandBytes(32))
 
 	err := txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator:      coordinator2,
@@ -539,7 +540,7 @@ func TestStateMachine_EndorsementGathering_ToDelegated_OnCoordinatorChanged(t *t
 	txn.stateMachine.currentState = State_EndorsementGathering
 
 	err := txn.HandleEvent(ctx, &CoordinatorChangedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator: coordinator2,
@@ -556,7 +557,7 @@ func TestStateMachine_Prepared_ToDispatched_OnDispatchHeartbeatReceived(t *testi
 	txn.stateMachine.currentState = State_Prepared
 
 	err := txn.HandleEvent(ctx, &DispatchHeartbeatReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -575,7 +576,7 @@ func TestStateMachine_Prepared_NoTransition_Do_Resend_OnDispatchConfirmationRequ
 	require.NoError(t, err)
 
 	err = txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator:      coordinator,
@@ -600,7 +601,7 @@ func TestStateMachine_Prepared_Ignore_OnDispatchConfirmationRequestReceivedIfNot
 	require.NoError(t, err)
 
 	err = txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator:      coordinator2,
@@ -624,7 +625,7 @@ func TestStateMachine_Prepared_Ignore_OnDispatchConfirmationRequestReceivedIfNot
 	hash := tktypes.Bytes32(tktypes.RandBytes(32))
 
 	err := txn.HandleEvent(ctx, &DispatchConfirmationRequestReceivedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator:      coordinator2,
@@ -646,7 +647,7 @@ func TestStateMachine_Prepared_ToDelegated_OnCoordinatorChanged(t *testing.T) {
 	txn.stateMachine.currentState = State_Prepared
 
 	err := txn.HandleEvent(ctx, &CoordinatorChangedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator: coordinator2,
@@ -663,7 +664,7 @@ func TestStateMachine_Dispatched_ToConfirmed_OnConfirmedSuccess(t *testing.T) {
 	txn.stateMachine.currentState = State_Dispatched
 
 	err := txn.HandleEvent(ctx, &ConfirmedSuccessEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -678,7 +679,7 @@ func TestStateMachine_Dispatched_ToPending_OnConfirmedReverted(t *testing.T) {
 	txn.stateMachine.currentState = State_Dispatched
 
 	err := txn.HandleEvent(ctx, &ConfirmedRevertedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -697,7 +698,7 @@ func TestStateMachine_Dispatched_ToDelegated_OnCoordinatorChanged(t *testing.T) 
 	txn.stateMachine.currentState = State_Dispatched
 
 	err := txn.HandleEvent(ctx, &CoordinatorChangedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 		Coordinator: coordinator2,
@@ -714,7 +715,7 @@ func TestStateMachine_Parked_ToDelegated_OnResumed(t *testing.T) {
 	txn.stateMachine.currentState = State_Parked
 
 	err := txn.HandleEvent(ctx, &ResumedEvent{
-		event: event{
+		BaseEvent: BaseEvent{
 			TransactionID: txn.ID,
 		},
 	})
