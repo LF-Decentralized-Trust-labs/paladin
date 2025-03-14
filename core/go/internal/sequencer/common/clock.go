@@ -79,7 +79,6 @@ type fakeDuration struct {
 }
 
 // On the fake clock, time is just a number
-// TODO would it make more sense for this to take a Duration?
 func (c *FakeClockForTesting) Advance(advance int) {
 	c.currentTime += advance
 }
@@ -97,7 +96,6 @@ func (c *FakeClockForTesting) HasExpired(start Time, duration Duration) bool {
 }
 
 func (c *FakeClockForTesting) ScheduleInterval(context.Context, Duration, func()) (cancel func()) {
-	//TODO - do something useful to allow tests to emulate the passage of time to trigger scheduled events
 	return func() {}
 }
 

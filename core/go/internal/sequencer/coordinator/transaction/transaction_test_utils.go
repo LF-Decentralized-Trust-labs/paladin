@@ -314,8 +314,6 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 	// We don't attempt to emulate any other history of those past events but rather assert that the state machine's behavior is determined purely by its current finite state
 	// and the contents of the PrivateTransaction struct
 
-	//TODO should we do more to assert that no other history is carried across state transitions.  Maybe moving the fine grained state fields off the transaction struct and into the state machine ( or even separate structs for each concrete state a la the State pattern from GoF)
-
 	if b.state == State_Endorsement_Gathering ||
 		b.state == State_Blocked ||
 		b.state == State_Confirming_Dispatch ||

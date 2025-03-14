@@ -337,7 +337,6 @@ func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*E
 // this happens before the state machine is evaluated for transitions that may be triggered by the event
 // so that any guards on the transition rules can take into account the new internal state of the Transaction after this event has been applied
 func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error {
-	//TODO reconsider moving these back into the state machine definition.
 	var err error
 	switch event := event.(type) {
 	case *AssembleSuccessEvent:

@@ -41,7 +41,6 @@ type Hooks interface {
 	GetNodeName() string
 }
 
-// TODO don't like this name
 type EngineIntegration interface {
 	// WriteLockAndDistributeStatesForTransaction is a method that writes a lock to the state and distributes the states for a transaction
 	WriteLockAndDistributeStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error

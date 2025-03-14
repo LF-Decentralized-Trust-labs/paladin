@@ -376,8 +376,6 @@ func (b *PrivateTransactionBuilderForTesting) BuildPostAssembly() *components.Tr
 		}
 	}
 
-	//TODO a bunch of other stuff needs to be populated in the post assembly?
-
 	for i := 0; i < b.numberOfOutputStates; i++ {
 		postAssembly.OutputStates = append(postAssembly.OutputStates, &components.FullState{
 			ID: tktypes.HexBytes(tktypes.RandBytes(32)),

@@ -39,8 +39,7 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 	postAssembly, err := txn.engineIntegration.AssembleAndSign(ctx, txn.ID, txn.PreAssembly, txn.latestAssembleRequest.stateLocksJSON, txn.latestAssembleRequest.coordinatorsBlockHeight)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to assemble and sign transaction: %s", err)
-		//TODO is this right to cause an abend. The other option is to send an error back to the coordinator and let it decide whether to abend itself or not?
-		//Most likely cause of failure is an error in the local domain code so probably right to abend the sender state machine
+		//This should never happen but if it does, the most likely cause of failure is an error in the local domain code or state machine logic so best thing to abend the sender state machine
 		return err
 	}
 

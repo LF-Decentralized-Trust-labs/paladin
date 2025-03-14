@@ -23,7 +23,6 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 )
 
-// TODO would this be more obvious as a state exit/cleanup function?
 func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uuid.UUID) error {
 	t.pendingDispatchConfirmationRequest = nil
 	return nil

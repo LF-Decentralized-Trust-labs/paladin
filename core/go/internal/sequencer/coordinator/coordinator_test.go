@@ -19,8 +19,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -40,31 +38,13 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, committeeMembe
 		messageSender:     NewMockMessageSender(t),
 		clock:             &common.FakeClockForTesting{},
 		engineIntegration: sequencermocks.NewEngineIntegration(t),
-		emit:              func(event common.Event) {}, //TODO do something useful to allow tests to receive events from the state machine
+		emit:              func(event common.Event) {},
 	}
-
-	//TODO: should we use the fake message sender as we do in the transaction tests?
 
 	coordinator, err := NewCoordinator(ctx, mocks.messageSender, committeeMembers, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, tktypes.RandAddress(), 5, 5)
 	require.NoError(t, err)
 
 	return coordinator, mocks
-}
-
-func newPrivateTransactionsForTesting(address *tktypes.EthAddress, num int) []*components.PrivateTransaction {
-	txs := make([]*components.PrivateTransaction, num)
-	if address == nil {
-		address = tktypes.RandAddress()
-	}
-	for i := 0; i < num; i++ {
-		txs[i] = &components.PrivateTransaction{
-			ID:          uuid.New(),
-			Domain:      "testDomain",
-			Address:     *address,
-			PreAssembly: &components.TransactionPreAssembly{},
-		}
-	}
-	return txs
 }
 
 type coordinatorDependencyMocks struct {

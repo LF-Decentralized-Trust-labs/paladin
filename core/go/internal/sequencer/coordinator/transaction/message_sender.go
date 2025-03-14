@@ -24,7 +24,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-// TODO should these methods take a struct instead of a bunch of parameters?
 type MessageSender interface {
 	SendAssembleRequest(
 		ctx context.Context,

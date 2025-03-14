@@ -78,7 +78,6 @@ type StateMachine struct {
 // for a specific transition
 type Action func(ctx context.Context, txn *Transaction) error
 
-// TODO should we pass static config ( e.g. timeouts) to the guards instead of storing them in every transaction struct instance?
 type Guard func(ctx context.Context, txn *Transaction) bool
 
 type Transition struct {

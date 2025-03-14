@@ -34,7 +34,6 @@ func (t *Transaction) isNotReady() bool {
 
 // Function hasDependenciesNotReady checks if the transaction has any dependencies that themselves are not ready for dispatch
 func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
-	//TODO rethink the name of this function
 
 	//We already calculated the dependencies when we got assembled and there is no way we could have picked up new
 	// dependencies without a re-assemble

@@ -213,7 +213,6 @@ func (t *Transaction) incrementAssembleErrors(ctx context.Context) error {
 }
 
 func validator_MatchesPendingAssembleRequest(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
-	//TODO is there some generics magic that would make this more elegant
 	switch event := event.(type) {
 	case *AssembleSuccessEvent:
 		return txn.pendingAssembleRequest != nil && txn.pendingAssembleRequest.IdempotencyKey() == event.RequestID, nil
