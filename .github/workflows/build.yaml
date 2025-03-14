@@ -1,0 +1,40 @@
+name: Build Project
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+on:
+  workflow_call:
+
+jobs:
+  build-core-project:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          
+      - name: Install pre-requisites
+        uses: ./.github/actions/setup
+
+      # Build with Gradle
+      # This does not build any docker images, and does not run any dockerized tests.
+      # It does run Go/Java/Solidity component and integration tests that use PostgreSQL and Besu
+      - name: Build with Gradle
+        run: ./gradlew -PverboseTests=true --no-daemon --parallel --max-workers=5 build
+
+      - name: Upload testbed logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testbed-logs
+          path: '**/testbed.*.log'
+
+      - name: Upload docker compose logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docker-compose-logs
+          path: '**/docker-compose.log'

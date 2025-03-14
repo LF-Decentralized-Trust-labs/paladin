@@ -1,0 +1,34 @@
+name: Build (push)
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+on:
+  push:
+    branches: 
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'operator/charts/**'
+  workflow_dispatch:
+
+# Ensure this workflow only runs for the most recent commit of a pull-request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-project:
+    uses: ./.github/workflows/build.yaml
+   
+  release-image:
+    # run only on pushes to main or manual triggers
+    uses: ./.github/workflows/cross-build-images.yaml
+    with:
+      registry: ghcr.io
+      repository: ${{ github.repository_owner }}
+      image_tags: ${{ github.ref_name }}
+    secrets:
+      username: ${{ github.actor }}
+      password: ${{ secrets.GITHUB_TOKEN }}
