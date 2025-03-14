@@ -281,8 +281,8 @@ func guard_Or(guards ...Guard) Guard {
 	}
 }
 
-func (s *State) String() string {
-	switch *s {
+func (s State) String() string {
+	switch s {
 	case State_Idle:
 		return "Idle"
 	case State_Observing:

@@ -79,6 +79,7 @@ type fakeDuration struct {
 }
 
 // On the fake clock, time is just a number
+// TODO would it make more sense for this to take a Duration?
 func (c *FakeClockForTesting) Advance(advance int) {
 	c.currentTime += advance
 }

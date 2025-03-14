@@ -13,126 +13,91 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package sender
+package spec
 
 import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/sender"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-)
-
-const (
-	TestDefault_HeartbeatThreshold  int = 5
-	TestDefault_HeartbeatIntervalMs int = 100
 )
 
 func TestStateMachine_InitializeOK(t *testing.T) {
 	ctx := context.Background()
-	s, _ := NewSenderForUnitTest(t, ctx, nil)
+	s, _ := sender.NewSenderBuilderForTesting(sender.State_Idle).Build(ctx)
 
-	assert.Equal(t, State_Idle, s.stateMachine.currentState, "current state is %s", s.stateMachine.currentState.String())
+	assert.Equal(t, sender.State_Idle, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 }
 
 func TestStateMachine_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 	ctx := context.Background()
-	s, _ := NewSenderForUnitTest(t, ctx, nil)
-	assert.Equal(t, State_Idle, s.stateMachine.currentState)
+	s, _ := sender.NewSenderBuilderForTesting(sender.State_Idle).Build(ctx)
+	assert.Equal(t, sender.State_Idle, s.GetCurrentState())
 
-	err := s.HandleEvent(ctx, &HeartbeatReceivedEvent{})
+	err := s.HandleEvent(ctx, &sender.HeartbeatReceivedEvent{})
 	assert.NoError(t, err)
-	assert.Equal(t, State_Observing, s.stateMachine.currentState, "current state is %s", s.stateMachine.currentState.String())
+	assert.Equal(t, sender.State_Observing, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 
 }
 
 func TestStateMachine_Idle_ToSending_OnTransactionCreated(t *testing.T) {
 	ctx := context.Background()
-	s, mocks := NewSenderForUnitTest(t, ctx, nil)
-	assert.Equal(t, State_Idle, s.stateMachine.currentState)
+	s, mocks := sender.NewSenderBuilderForTesting(sender.State_Idle).Build(ctx)
+	assert.Equal(t, sender.State_Idle, s.GetCurrentState())
 
-	err := s.HandleEvent(ctx, &TransactionCreatedEvent{})
+	err := s.HandleEvent(ctx, &sender.TransactionCreatedEvent{})
 	assert.NoError(t, err)
-	assert.Equal(t, State_Sending, s.stateMachine.currentState, "current state is %s", s.stateMachine.currentState.String())
+	assert.Equal(t, sender.State_Sending, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 
-	assert.True(t, mocks.messageSender.HasSentDelegationRequest())
+	assert.True(t, mocks.SentMessageRecorder.HasSentDelegationRequest())
 }
 
 func TestStateMachine_Observing_ToSending_OnTransactionCreated(t *testing.T) {
 	ctx := context.Background()
-	s, mocks := NewSenderForUnitTest(t, ctx, nil)
-	s.stateMachine.currentState = State_Observing
+	s, mocks := sender.NewSenderBuilderForTesting(sender.State_Observing).Build(ctx)
 
-	err := s.HandleEvent(ctx, &TransactionCreatedEvent{})
+	err := s.HandleEvent(ctx, &sender.TransactionCreatedEvent{})
 	assert.NoError(t, err)
-	assert.Equal(t, State_Sending, s.stateMachine.currentState, "current state is %s", s.stateMachine.currentState.String())
+	assert.Equal(t, sender.State_Sending, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 
-	assert.True(t, mocks.messageSender.HasSentDelegationRequest())
+	assert.True(t, mocks.SentMessageRecorder.HasSentDelegationRequest())
 }
 
 func TestStateMachine_Sending_ToObserving_OnTransactionConfirmed_IfNoTransactionsInflight(t *testing.T) {
 	ctx := context.Background()
-	s, _ := NewSenderForUnitTest(t, ctx, nil)
-	s.stateMachine.currentState = State_Sending
+	s, _ := sender.NewSenderBuilderForTesting(sender.State_Sending).Build(ctx)
 
-	err := s.HandleEvent(ctx, &TransactionConfirmedEvent{})
+	err := s.HandleEvent(ctx, &sender.TransactionConfirmedEvent{})
 	assert.NoError(t, err)
-	assert.Equal(t, State_Observing, s.stateMachine.currentState, "current state is %s", s.stateMachine.currentState.String())
+	assert.Equal(t, sender.State_Observing, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 }
 
 func TestStateMachine_Observing_ToIdle_OnHeartbeatInterval_IfHeartbeatThresholdExpired(t *testing.T) {
 	ctx := context.Background()
-	s, mocks := NewSenderForUnitTest(t, ctx, nil)
-	s.stateMachine.currentState = State_Observing
-	err := s.HandleEvent(ctx, &HeartbeatReceivedEvent{})
+	builder := sender.NewSenderBuilderForTesting(sender.State_Observing)
+	s, mocks := builder.Build(ctx)
+
+	err := s.HandleEvent(ctx, &sender.HeartbeatReceivedEvent{})
 	assert.NoError(t, err)
 
-	mocks.clock.Advance(TestDefault_HeartbeatThreshold*TestDefault_HeartbeatIntervalMs + 1)
+	mocks.Clock.Advance(builder.GetCoordinatorHeartbeatThresholdMs() + 1)
 
-	err = s.HandleEvent(ctx, &HeartbeatIntervalEvent{})
+	err = s.HandleEvent(ctx, &sender.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
-	assert.Equal(t, State_Idle, s.stateMachine.currentState, "current state is %s", s.stateMachine.currentState.String())
+	assert.Equal(t, sender.State_Idle, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 }
 
 func TestStateMachine_Observing_NoTransition_OnHeartbeatInterval_IfHeartbeatThresholdNotExpired(t *testing.T) {
 	ctx := context.Background()
-	s, mocks := NewSenderForUnitTest(t, ctx, nil)
-	s.stateMachine.currentState = State_Observing
-	err := s.HandleEvent(ctx, &HeartbeatReceivedEvent{})
+	builder := sender.NewSenderBuilderForTesting(sender.State_Observing)
+	s, mocks := builder.Build(ctx)
+	err := s.HandleEvent(ctx, &sender.HeartbeatReceivedEvent{})
 	assert.NoError(t, err)
 
-	mocks.clock.Advance(TestDefault_HeartbeatThreshold*TestDefault_HeartbeatIntervalMs - 1)
+	mocks.Clock.Advance(builder.GetCoordinatorHeartbeatThresholdMs() - 1)
 
-	err = s.HandleEvent(ctx, &HeartbeatIntervalEvent{})
+	err = s.HandleEvent(ctx, &sender.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
-	assert.Equal(t, State_Observing, s.stateMachine.currentState, "current state is %s", s.stateMachine.currentState.String())
-}
-
-// TODO should we move this to common and reuse it in e.g. coordinator tests?
-type senderDependencyMocks struct {
-	messageSender     *SentMessageRecorder
-	clock             *common.FakeClockForTesting
-	engineIntegration *sequencermocks.EngineIntegration
-	emit              common.EmitEvent
-}
-
-func NewSenderForUnitTest(t *testing.T, ctx context.Context, committeeMembers []string) (*sender, *senderDependencyMocks) {
-
-	if committeeMembers == nil {
-		committeeMembers = []string{"member1@node1"}
-	}
-	mocks := &senderDependencyMocks{
-		messageSender:     NewSentMessageRecorder(),
-		clock:             &common.FakeClockForTesting{},
-		engineIntegration: sequencermocks.NewEngineIntegration(t),
-		emit:              func(event common.Event) {}, //TODO do something useful to allow tests to receive events from the state machine
-	}
-
-	coordinator, err := NewSender(ctx, mocks.messageSender, committeeMembers, mocks.clock, mocks.emit, mocks.engineIntegration, 100, tktypes.RandAddress(), TestDefault_HeartbeatIntervalMs, TestDefault_HeartbeatThreshold)
-	require.NoError(t, err)
-
-	return coordinator, mocks
+	assert.Equal(t, sender.State_Observing, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 }

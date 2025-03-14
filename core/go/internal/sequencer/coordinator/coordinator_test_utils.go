@@ -74,8 +74,7 @@ type CoordinatorDependencyMocks struct {
 	SentMessageRecorder *SentMessageRecorder
 	Clock               *common.FakeClockForTesting
 	EngineIntegration   *common.FakeEngineIntegrationForTesting
-
-	emittedEvents []common.Event
+	emittedEvents       []common.Event
 }
 
 func NewCoordinatorBuilderForTesting(state State) *CoordinatorBuilderForTesting {

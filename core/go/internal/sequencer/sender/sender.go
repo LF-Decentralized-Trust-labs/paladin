@@ -139,3 +139,10 @@ func (s *sender) transactionsOrderedByCreatedTime(ctx context.Context) ([]*compo
 func ptrTo[T any](v T) *T {
 	return &v
 }
+
+//TODO the following getter methods are not safe to call on anything other than the sequencer goroutine because they are reading data structures that are being modified by the state machine.
+// We should consider making them safe to call from any goroutine by reading maintaining a copy of the data structures that are updated async from the sequencer thread under a mutex
+
+func (s *sender) GetCurrentState() State {
+	return s.stateMachine.currentState
+}

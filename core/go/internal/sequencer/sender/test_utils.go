@@ -19,7 +19,14 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+)
+
+const (
+	TestDefault_HeartbeatThreshold  int = 5
+	TestDefault_HeartbeatIntervalMs int = 100
 )
 
 type SentMessageRecorder struct {
@@ -38,4 +45,86 @@ func (r *SentMessageRecorder) SendDelegationRequest(ctx context.Context, Transac
 
 func (r *SentMessageRecorder) HasSentDelegationRequest() bool {
 	return r.hasSentDelegationRequest
+}
+
+type SenderBuilderForTesting struct {
+	state            State
+	committeeMembers []string
+	contractAddress  *tktypes.EthAddress
+	emitFunction     func(event common.Event)
+}
+
+type SenderDependencyMocks struct {
+	SentMessageRecorder *SentMessageRecorder
+	Clock               *common.FakeClockForTesting
+	EngineIntegration   *common.FakeEngineIntegrationForTesting
+	emittedEvents       []common.Event
+}
+
+func NewSenderBuilderForTesting(state State) *SenderBuilderForTesting {
+	return &SenderBuilderForTesting{
+		state: state,
+	}
+}
+
+func (b *SenderBuilderForTesting) ContractAddress(contractAddress *tktypes.EthAddress) *SenderBuilderForTesting {
+	b.contractAddress = contractAddress
+	return b
+}
+
+func (b *SenderBuilderForTesting) CommitteeMembers(committeeMembers ...string) *SenderBuilderForTesting {
+	b.committeeMembers = committeeMembers
+	return b
+}
+
+func (b *SenderBuilderForTesting) GetContractAddress() tktypes.EthAddress {
+	return *b.contractAddress
+}
+
+func (b *SenderBuilderForTesting) GetCoordinatorHeartbeatThresholdMs() int {
+	return TestDefault_HeartbeatThreshold * TestDefault_HeartbeatIntervalMs
+}
+
+func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDependencyMocks) {
+
+	if b.committeeMembers == nil {
+		b.committeeMembers = []string{"member1@node1"}
+	}
+
+	if b.contractAddress == nil {
+		b.contractAddress = tktypes.RandAddress()
+	}
+	mocks := &SenderDependencyMocks{
+		SentMessageRecorder: NewSentMessageRecorder(),
+		Clock:               &common.FakeClockForTesting{},
+		EngineIntegration:   &common.FakeEngineIntegrationForTesting{},
+	}
+
+	b.emitFunction = func(event common.Event) {
+		mocks.emittedEvents = append(mocks.emittedEvents, event)
+	}
+
+	sender, err := NewSender(
+		ctx,
+		mocks.SentMessageRecorder,
+		b.committeeMembers,
+		mocks.Clock,
+		b.emitFunction,
+		mocks.EngineIntegration,
+		100, // Block range size
+		b.contractAddress,
+		TestDefault_HeartbeatIntervalMs,
+		TestDefault_HeartbeatThreshold,
+	)
+
+	if err != nil {
+		panic(err)
+	}
+
+	sender.stateMachine.currentState = b.state
+	switch b.state {
+	// Any state specific setup can be done here
+	}
+
+	return sender, mocks
 }
