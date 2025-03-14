@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStateMachine_InitializeOK(t *testing.T) {
+func TestCoordinator_InitializeOK(t *testing.T) {
 	ctx := context.Background()
 
 	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Idle).Build(ctx)
@@ -35,7 +35,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 }
 
-func TestStateMachine_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
+func TestCoordinator_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
 	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Idle).
@@ -54,7 +54,7 @@ func TestStateMachine_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 
 }
 
-func TestStateMachine_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
+func TestCoordinator_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 	ctx := context.Background()
 	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Idle).Build(ctx)
 	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState())
@@ -65,7 +65,7 @@ func TestStateMachine_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 
 }
 
-func TestStateMachine_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
+func TestCoordinator_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
 
@@ -84,7 +84,7 @@ func TestStateMachine_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 	assert.Equal(t, coordinator.State_Standby, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 }
 
-func TestStateMachine_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
+func TestCoordinator_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
 
@@ -105,7 +105,7 @@ func TestStateMachine_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 
 }
 
-func TestStateMachine_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
+func TestCoordinator_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
 	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Standby).
@@ -122,7 +122,7 @@ func TestStateMachine_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 	assert.Equal(t, coordinator.State_Elect, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 }
 
-func TestStateMachine_Standby_NoTransition_OnNewBlock_IfStillBehind(t *testing.T) {
+func TestCoordinator_Standby_NoTransition_OnNewBlock_IfStillBehind(t *testing.T) {
 	ctx := context.Background()
 
 	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Standby).
@@ -139,7 +139,7 @@ func TestStateMachine_Standby_NoTransition_OnNewBlock_IfStillBehind(t *testing.T
 	assert.False(t, mocks.SentMessageRecorder.HasSentHandoverRequest(), "handover request not expected to be sent")
 }
 
-func TestStateMachine_Elect_ToPrepared_OnHandover(t *testing.T) {
+func TestCoordinator_Elect_ToPrepared_OnHandover(t *testing.T) {
 	ctx := context.Background()
 	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Elect).Build(ctx)
 
@@ -149,7 +149,7 @@ func TestStateMachine_Elect_ToPrepared_OnHandover(t *testing.T) {
 	assert.Equal(t, coordinator.State_Prepared, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 }
 
-func TestStateMachine_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(t *testing.T) {
+func TestCoordinator_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(t *testing.T) {
 	ctx := context.Background()
 	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Prepared)
 	c, _ := builder.Build(ctx)
@@ -168,7 +168,7 @@ func TestStateMachine_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(
 
 }
 
-func TestStateMachine_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushCompleted(t *testing.T) {
+func TestCoordinator_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushCompleted(t *testing.T) {
 	ctx := context.Background()
 
 	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Prepared)
@@ -188,7 +188,7 @@ func TestStateMachine_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushComp
 
 }
 
-func TestStateMachine_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFlight(t *testing.T) {
+func TestCoordinator_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFlight(t *testing.T) {
 	ctx := context.Background()
 
 	soleTransaction := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
@@ -207,7 +207,7 @@ func TestStateMachine_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFli
 
 }
 
-func TestStateMachine_ActiveNoTransition_OnTransactionConfirmed_IfNotTransactionsEmpty(t *testing.T) {
+func TestCoordinator_ActiveNoTransition_OnTransactionConfirmed_IfNotTransactionsEmpty(t *testing.T) {
 	ctx := context.Background()
 
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
@@ -227,7 +227,7 @@ func TestStateMachine_ActiveNoTransition_OnTransactionConfirmed_IfNotTransaction
 	assert.Equal(t, coordinator.State_Active, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 }
 
-func TestStateMachine_Active_ToFlush_OnHandoverRequest(t *testing.T) {
+func TestCoordinator_Active_ToFlush_OnHandoverRequest(t *testing.T) {
 	ctx := context.Background()
 
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
@@ -246,7 +246,7 @@ func TestStateMachine_Active_ToFlush_OnHandoverRequest(t *testing.T) {
 
 }
 
-func TestStateMachine_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *testing.T) {
+func TestCoordinator_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *testing.T) {
 	ctx := context.Background()
 
 	//We have 2 transactions in flight but only one of them has passed the point of no return so we
@@ -269,7 +269,7 @@ func TestStateMachine_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *
 
 }
 
-func TestStateMachine_FlushNoTransition_OnTransactionConfirmed_IfNotFlushComplete(t *testing.T) {
+func TestCoordinator_FlushNoTransition_OnTransactionConfirmed_IfNotFlushComplete(t *testing.T) {
 	ctx := context.Background()
 
 	//We have 2 transactions in flight and passed the point of no return but only one of them will be confirmed so we should not
@@ -293,7 +293,7 @@ func TestStateMachine_FlushNoTransition_OnTransactionConfirmed_IfNotFlushComplet
 
 }
 
-func TestStateMachine_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExpired(t *testing.T) {
+func TestCoordinator_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExpired(t *testing.T) {
 	ctx := context.Background()
 
 	d := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
@@ -310,7 +310,7 @@ func TestStateMachine_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExp
 
 }
 
-func TestStateMachine_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGracePeriodExpired(t *testing.T) {
+func TestCoordinator_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGracePeriodExpired(t *testing.T) {
 	ctx := context.Background()
 
 	d := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
