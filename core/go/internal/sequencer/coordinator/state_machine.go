@@ -354,8 +354,8 @@ func action_SelectTransaction(ctx context.Context, c *coordinator) error {
 	return c.selectNextTransaction(ctx, nil)
 }
 
-func (s *State) String() string {
-	switch *s {
+func (s State) String() string {
+	switch s {
 	case State_Idle:
 		return "Idle"
 	case State_Observing:

@@ -13,171 +13,155 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package coordinator
+package spec
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
-	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/kaleido-io/paladin/core/mocks/sequencermocks"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/testutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
-	mock "github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStateMachine_InitializeOK(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
 
-	assert.Equal(t, State_Idle, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Idle).Build(ctx)
+
+	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 }
 
 func TestStateMachine_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
-	c, mocks := NewCoordinatorForUnitTest(t, ctx, []string{sender})
-	mocks.messageSender.On("SendAssembleRequest",
-		mock.Anything, //context
-		mock.Anything, //assemblingNode
-		mock.Anything, //transactionID
-		mock.Anything, //idempotencyID
-		mock.Anything, //transactionPreassembly
-	).Return(nil).Maybe()
-	assert.Equal(t, State_Idle, c.stateMachine.currentState)
+	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Idle).
+		CommitteeMembers(sender)
+	c, _ := builder.Build(ctx)
 
-	err := c.HandleEvent(ctx, &TransactionsDelegatedEvent{
+	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState())
+
+	err := c.HandleEvent(ctx, &coordinator.TransactionsDelegatedEvent{
 		Sender:       sender,
-		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
+		Transactions: testutil.NewPrivateTransactionBuilderListForTesting(1).Address(builder.GetContractAddress()).BuildSparse(),
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Active, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Active, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 
 }
 
 func TestStateMachine_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	assert.Equal(t, State_Idle, c.stateMachine.currentState)
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Idle).Build(ctx)
+	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState())
 
-	err := c.HandleEvent(ctx, &HeartbeatReceivedEvent{})
+	err := c.HandleEvent(ctx, &coordinator.HeartbeatReceivedEvent{})
 	assert.NoError(t, err)
-	assert.Equal(t, State_Observing, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Observing, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 
 }
 
 func TestStateMachine_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
-	c, _ := NewCoordinatorForUnitTest(t, ctx, []string{sender})
-	c.stateMachine.currentState = State_Observing
-	c.currentBlockHeight = 194 // default tolerance is 5 in the test setup so this is behind
-	c.activeCoordinatorBlockHeight = 200
 
-	err := c.HandleEvent(ctx, &TransactionsDelegatedEvent{
+	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Observing).
+		CommitteeMembers(sender).
+		ActiveCoordinatorBlockHeight(200).
+		CurrentBlockHeight(194) // default tolerance is 5 so this is behind
+	c, _ := builder.Build(ctx)
+
+	err := c.HandleEvent(ctx, &coordinator.TransactionsDelegatedEvent{
 		Sender:       sender,
-		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
+		Transactions: testutil.NewPrivateTransactionBuilderListForTesting(1).Address(builder.GetContractAddress()).BuildSparse(),
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Standby, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Standby, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 }
 
 func TestStateMachine_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
-	c, mocks := NewCoordinatorForUnitTest(t, ctx, []string{sender})
-	mocks.messageSender.On("SendHandoverRequest", mock.Anything, "activeCoordinator", c.contractAddress).Return()
-	c.stateMachine.currentState = State_Observing
-	c.activeCoordinator = "activeCoordinator"
-	c.currentBlockHeight = 195 // default tolerance is 5 in the test setup so we are not behind
-	c.activeCoordinatorBlockHeight = 200
 
-	err := c.HandleEvent(ctx, &TransactionsDelegatedEvent{
+	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Observing).
+		CommitteeMembers(sender).
+		ActiveCoordinatorBlockHeight(200).
+		CurrentBlockHeight(195) // default tolerance is 5 so this is not behind
+	c, mocks := builder.Build(ctx)
+
+	err := c.HandleEvent(ctx, &coordinator.TransactionsDelegatedEvent{
 		Sender:       sender,
-		Transactions: newPrivateTransactionsForTesting(c.contractAddress, 1),
+		Transactions: testutil.NewPrivateTransactionBuilderListForTesting(1).Address(builder.GetContractAddress()).BuildSparse(),
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Elect, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
-	mocks.messageSender.AssertExpectations(t)
+	assert.Equal(t, coordinator.State_Elect, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.True(t, mocks.SentMessageRecorder.HasSentHandoverRequest(), "expected handover request to be sent")
+
 }
 
 func TestStateMachine_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
-	c, mocks := NewCoordinatorForUnitTest(t, ctx, nil)
-	mocks.messageSender.On("SendHandoverRequest", mock.Anything, "activeCoordinator", c.contractAddress).Return()
-	c.stateMachine.currentState = State_Standby
-	c.activeCoordinator = "activeCoordinator"
-	c.currentBlockHeight = 194
-	c.activeCoordinatorBlockHeight = 200
+	sender := "sender@senderNode"
+	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Standby).
+		CommitteeMembers(sender).
+		ActiveCoordinatorBlockHeight(200).
+		CurrentBlockHeight(194)
+	c, _ := builder.Build(ctx)
 
-	err := c.HandleEvent(ctx, &NewBlockEvent{
+	err := c.HandleEvent(ctx, &coordinator.NewBlockEvent{
 		BlockHeight: 195, // default tolerance is 5 in the test setup so we are not behind
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Elect, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Elect, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 }
 
-func TestStateMachine_StandbyNot_ToElect_OnNewBlock_IfStillBehind(t *testing.T) {
+func TestStateMachine_Standby_NoTransition_OnNewBlock_IfStillBehind(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	c.stateMachine.currentState = State_Standby
-	c.currentBlockHeight = 193
-	c.activeCoordinatorBlockHeight = 200
 
-	err := c.HandleEvent(ctx, &NewBlockEvent{
+	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Standby).
+		ActiveCoordinatorBlockHeight(200).
+		CurrentBlockHeight(193)
+	c, mocks := builder.Build(ctx)
+
+	err := c.HandleEvent(ctx, &coordinator.NewBlockEvent{
 		BlockHeight: 194, // default tolerance is 5 in the test setup so this is still behind
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Standby, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Standby, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.False(t, mocks.SentMessageRecorder.HasSentHandoverRequest(), "handover request not expected to be sent")
 }
 
 func TestStateMachine_Elect_ToPrepared_OnHandover(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	c.stateMachine.currentState = State_Elect
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Elect).Build(ctx)
 
-	err := c.HandleEvent(ctx, &HandoverReceivedEvent{})
+	err := c.HandleEvent(ctx, &coordinator.HandoverReceivedEvent{})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Prepared, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Prepared, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 }
 
 func TestStateMachine_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	c.stateMachine.currentState = State_Prepared
-	c.activeCoordinator = "activeCoordinator"
-	flushPointTransactionID := uuid.New()
-	flushPointHash := tktypes.Bytes32(tktypes.RandBytes(32))
-	flushPointNonce := uint64(42)
-	flushPointSignerAddress := tktypes.RandAddress()
-	c.activeCoordinatorsFlushPointsBySignerNonce = map[string]*common.FlushPoint{
-		fmt.Sprintf("%s:%d", flushPointSignerAddress.String(), flushPointNonce): {
-			TransactionID: flushPointTransactionID,
-			Hash:          flushPointHash,
-			Nonce:         flushPointNonce,
-			From:          *flushPointSignerAddress,
-		},
-	}
+	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Prepared)
+	c, _ := builder.Build(ctx)
 
-	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
-		From:  flushPointSignerAddress,
-		Nonce: flushPointNonce,
-		Hash:  flushPointHash,
+	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
+		From:  builder.GetFlushPointSignerAddress(),
+		Nonce: builder.GetFlushPointNonce(),
+		Hash:  builder.GetFlushPointHash(),
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Active, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Active, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 
 	//TODO should have other test cases where there are multiple flush points across multiple signers ( and across multiple coordinators?)
 	//TODO test case where the nonce and signer match but hash does not.  This should still trigger the transition because there will never be another confirmed transaction for that nonce and signer
@@ -186,231 +170,159 @@ func TestStateMachine_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(
 
 func TestStateMachine_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushCompleted(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	c.stateMachine.currentState = State_Prepared
-	c.activeCoordinator = "activeCoordinator"
-	flushPointTransactionID := uuid.New()
-	flushPointHash := tktypes.Bytes32(tktypes.RandBytes(32))
-	flushPointNonce := uint64(42)
-	flushPointSignerAddress := tktypes.RandAddress()
+
+	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Prepared)
+	c, _ := builder.Build(ctx)
 
 	otherHash := tktypes.Bytes32(tktypes.RandBytes(32))
-	otherNonce := uint64(41)
+	otherNonce := builder.GetFlushPointNonce() - 1
 
-	c.activeCoordinatorsFlushPointsBySignerNonce = map[string]*common.FlushPoint{
-		fmt.Sprintf("%s:%d", flushPointSignerAddress.String(), flushPointNonce): {
-			TransactionID: flushPointTransactionID,
-			Hash:          flushPointHash,
-			Nonce:         flushPointNonce,
-			From:          *flushPointSignerAddress,
-		},
-	}
-
-	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
-		From:  flushPointSignerAddress,
+	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
+		From:  builder.GetFlushPointSignerAddress(),
 		Nonce: otherNonce,
 		Hash:  otherHash,
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Prepared, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Prepared, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 
 }
 
 func TestStateMachine_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFlight(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	c.stateMachine.currentState = State_Active
 
 	soleTransaction := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
-	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
-		soleTransaction.ID: soleTransaction,
-	}
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Active).
+		Transactions(soleTransaction).
+		Build(ctx)
 
-	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
+	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
 		From:  soleTransaction.GetSignerAddress(),
 		Nonce: *soleTransaction.GetNonce(),
 		Hash:  *soleTransaction.GetLatestSubmissionHash(),
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, State_Idle, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 
 }
 
 func TestStateMachine_ActiveNoTransition_OnTransactionConfirmed_IfNotTransactionsEmpty(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	c.stateMachine.currentState = State_Active
 
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
-	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
-		delegation1.ID: delegation1,
-		delegation2.ID: delegation2,
-	}
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Active).
+		Transactions(delegation1, delegation2).
+		Build(ctx)
 
-	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
+	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
 		From:  delegation1.GetSignerAddress(),
 		Nonce: *delegation1.GetNonce(),
 		Hash:  *delegation1.GetLatestSubmissionHash(),
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Active, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Active, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 }
 
 func TestStateMachine_Active_ToFlush_OnHandoverRequest(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	c.stateMachine.currentState = State_Active
 
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
-	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
-		delegation1.ID: delegation1,
-		delegation2.ID: delegation2,
-	}
 
-	err := c.HandleEvent(ctx, &HandoverRequestEvent{
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Active).
+		Transactions(delegation1, delegation2).
+		Build(ctx)
+
+	err := c.HandleEvent(ctx, &coordinator.HandoverRequestEvent{
 		Requester: "newCoordinator",
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Flush, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Flush, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 
 }
 
 func TestStateMachine_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	c.stateMachine.currentState = State_Flush
 
-	//We have 2 transactions in flight but only of them has passed the point of no return so we
+	//We have 2 transactions in flight but only one of them has passed the point of no return so we
 	// should consider the flush complete when that one is confirmed
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatch).Build()
-	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
-		delegation1.ID: delegation1,
-		delegation2.ID: delegation2,
-	}
 
-	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Flush).
+		Transactions(delegation1, delegation2).
+		Build(ctx)
+
+	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
 		From:  delegation1.GetSignerAddress(),
 		Nonce: *delegation1.GetNonce(),
 		Hash:  *delegation1.GetLatestSubmissionHash(),
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Closing, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Closing, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 
 }
 
 func TestStateMachine_FlushNoTransition_OnTransactionConfirmed_IfNotFlushComplete(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	c.stateMachine.currentState = State_Flush
 
 	//We have 2 transactions in flight and passed the point of no return but only one of them will be confirmed so we should not
 	// consider the flush complete
 
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
-	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
-		delegation1.ID: delegation1,
-		delegation2.ID: delegation2,
-	}
 
-	err := c.HandleEvent(ctx, &TransactionConfirmedEvent{
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Flush).
+		Transactions(delegation1, delegation2).
+		Build(ctx)
+
+	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
 		From:  delegation1.GetSignerAddress(),
 		Nonce: *delegation1.GetNonce(),
 		Hash:  *delegation1.GetLatestSubmissionHash(),
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Flush, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Flush, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 
 }
 
 func TestStateMachine_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExpired(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	c.stateMachine.currentState = State_Closing
 
 	d := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
-	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
-		d.ID: d,
-	}
-	//one heartbeat interval away from the grace period expiring
-	c.heartbeatIntervalsSinceStateChange = 4
+
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Closing).
+		HeartbeatsUntilClosingGracePeriodExpires(1).
+		Transactions(d).
+		Build(ctx)
 
 	err := c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Idle, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 
 }
 
 func TestStateMachine_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGracePeriodExpired(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorForUnitTest(t, ctx, nil)
-	c.stateMachine.currentState = State_Closing
 
 	d := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
-	c.transactionsByID = map[uuid.UUID]*transaction.Transaction{
-		d.ID: d,
-	}
 
-	//two heartbeat intervals away from the grace period expiring
-	c.heartbeatIntervalsSinceStateChange = 3
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Closing).
+		HeartbeatsUntilClosingGracePeriodExpires(2).
+		Transactions(d).
+		Build(ctx)
 
 	err := c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
 
-	assert.Equal(t, State_Closing, c.stateMachine.currentState, "current state is %s", c.stateMachine.currentState.String())
+	assert.Equal(t, coordinator.State_Closing, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
 
-}
-
-func newPrivateTransactionsForTesting(address *tktypes.EthAddress, num int) []*components.PrivateTransaction {
-	txs := make([]*components.PrivateTransaction, num)
-	if address == nil {
-		address = tktypes.RandAddress()
-	}
-	for i := 0; i < num; i++ {
-		txs[i] = &components.PrivateTransaction{
-			ID:          uuid.New(),
-			Domain:      "testDomain",
-			Address:     *address,
-			PreAssembly: &components.TransactionPreAssembly{},
-		}
-	}
-	return txs
-}
-
-type coordinatorDependencyMocks struct {
-	messageSender     *MockMessageSender
-	clock             *common.FakeClockForTesting
-	engineIntegration *sequencermocks.EngineIntegration
-	emit              common.EmitEvent
-}
-
-func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, committeeMembers []string) (*coordinator, *coordinatorDependencyMocks) {
-
-	if committeeMembers == nil {
-		committeeMembers = []string{"member1@node1"}
-	}
-	mocks := &coordinatorDependencyMocks{
-		messageSender:     NewMockMessageSender(t),
-		clock:             &common.FakeClockForTesting{},
-		engineIntegration: sequencermocks.NewEngineIntegration(t),
-		emit:              func(event common.Event) {}, //TODO do something useful to allow tests to receive events from the state machine
-	}
-
-	//TODO: should we use the fake message sender as we do in the transaction tests?
-
-	coordinator, err := NewCoordinator(ctx, mocks.messageSender, committeeMembers, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, tktypes.RandAddress(), 5, 5)
-	require.NoError(t, err)
-
-	return coordinator, mocks
 }

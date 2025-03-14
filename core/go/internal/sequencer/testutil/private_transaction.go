@@ -76,6 +76,14 @@ func (b PrivateTransactionBuilderListForTesting) BuildSparse() []*components.Pri
 	return transactions
 }
 
+func (b PrivateTransactionBuilderListForTesting) Build() []*components.PrivateTransaction {
+	transactions := make([]*components.PrivateTransaction, len(b))
+	for i, builder := range b {
+		transactions[i] = builder.Build()
+	}
+	return transactions
+}
+
 func (b PrivateTransactionBuilderListForTesting) Address(address tktypes.EthAddress) PrivateTransactionBuilderListForTesting {
 	for _, builder := range b {
 		builder.Address(address)
