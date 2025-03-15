@@ -20,9 +20,9 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 

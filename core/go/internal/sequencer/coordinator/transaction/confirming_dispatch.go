@@ -18,9 +18,9 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 )
 
 func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uuid.UUID) error {
