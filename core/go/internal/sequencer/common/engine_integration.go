@@ -33,7 +33,7 @@ import (
 // Here we define the subset that we rely on in this package
 
 type StateDistributer interface {
-	DistributeStates(ctx context.Context, stateDistributions []*components.StateDistribution)
+	DistributeStates(ctx context.Context, stateDistributions []*components.StateDistributionWithData)
 }
 
 type Hooks interface {
@@ -101,7 +101,7 @@ func (s *engineIntegration) WriteLockAndDistributeStatesForTransaction(ctx conte
 
 	//Write output states
 	if txn.PostAssembly.OutputStatesPotential != nil && txn.PostAssembly.OutputStates == nil {
-		readTX := s.components.Persistence().DB() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
+		readTX := s.components.Persistence().NOTX() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
 		err := s.domainSmartContract.WritePotentialStates(s.domainContext, readTX, txn)
 		if err != nil {
 			//Any error from WritePotentialStates is likely to be caused by an invalid init or assemble of the transaction
@@ -116,8 +116,7 @@ func (s *engineIntegration) WriteLockAndDistributeStatesForTransaction(ctx conte
 
 	//Lock input states
 	if len(txn.PostAssembly.InputStates) > 0 {
-		readTX := s.components.Persistence().DB() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
-
+		readTX := s.components.Persistence().NOTX() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
 		err := s.domainSmartContract.LockStates(s.domainContext, readTX, txn)
 		if err != nil {
 			errorMessage := fmt.Sprintf("Failed to lock states: %s", err)
@@ -154,7 +153,7 @@ func (s *engineIntegration) AssembleAndSign(ctx context.Context, transactionID u
 	// if our block height is ahead of the coordinator, there is a small chance that we we assemble a transaction that the coordinator will not be able to
 	// endorse yet but it is better to wait around on the endorsement flow than to wait around on the assemble flow which is single threaded per domain
 
-	err := s.domainContext.ImportStateLocks(stateLocksJSON)
+	err := s.domainContext.ImportSnapshot(stateLocksJSON)
 	if err != nil {
 		log.L(ctx).Errorf("assembleForRemoteCoordinator: Error importing state locks: %s", err)
 		return nil, err
@@ -211,7 +210,7 @@ func (s *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 	/*
 	 * Assemble
 	 */
-	readTX := s.components.Persistence().DB()
+	readTX := s.components.Persistence().NOTX()
 	err = s.domainSmartContract.AssembleTransaction(domainContext, readTX, transaction, localTx)
 	if err != nil {
 		log.L(ctx).Errorf("assembleAndSign: Error assembling transaction: %s", err)
