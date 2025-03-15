@@ -118,7 +118,7 @@ func TestBuildQueryJSONNestedAndOr(t *testing.T) {
 		return db
 	})
 
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag = 'a' AND masked = 1 AND sequence != 999 AND correl_id IS NULL AND sequence > 10 AND ((masked = 1 AND tag IN ('a','b','c') AND tag NOT IN ('x','y') AND tag NOT IN ('z')) OR masked = 0) LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE tag = 'a' AND masked = 1 AND sequence != 999 AND correl_id IS NULL AND sequence > 10 AND ((masked = 1 AND tag IN ('a','b','c') AND tag NOT IN ('x','y') AND tag NOT IN ('z')) OR masked = 0) LIMIT 10", generatedSQL)
 }
 
 func TestBuildQuerySingleNestedOr(t *testing.T) {
@@ -150,7 +150,7 @@ func TestBuildQuerySingleNestedOr(t *testing.T) {
 		require.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag = 'a' LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE tag = 'a' LIMIT 10", generatedSQL)
 }
 
 func TestBuildQuerySingleNestedWithResolverErrorTag(t *testing.T) {
@@ -289,7 +289,7 @@ func TestBuildQueryJSONEqual(t *testing.T) {
 		require.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE created = 981173106000000000 AND tag != 'abc' AND LOWER(tag) = LOWER('ABC') AND LOWER(tag) != LOWER('abc') AND correl_id IS NOT NULL LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE created = 981173106000000000 AND tag != 'abc' AND LOWER(tag) = LOWER('ABC') AND LOWER(tag) != LOWER('abc') AND correl_id IS NOT NULL LIMIT 10", generatedSQL)
 }
 
 func TestBuildQueryJSONLike(t *testing.T) {
@@ -338,7 +338,7 @@ func TestBuildQueryJSONLike(t *testing.T) {
 		return db
 	})
 
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag LIKE '%%stuff%%' AND tag NOT LIKE 'abc' AND tag ILIKE 'ABC' AND tag NOT ILIKE 'abc' LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE tag LIKE '%%stuff%%' AND tag NOT LIKE 'abc' AND tag ILIKE 'ABC' AND tag NOT ILIKE 'abc' LIMIT 10", generatedSQL)
 }
 
 func TestBuildQueryJSONGreaterThan(t *testing.T) {
@@ -366,7 +366,7 @@ func TestBuildQueryJSONGreaterThan(t *testing.T) {
 		require.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence > 0 LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE sequence > 0 LIMIT 10", generatedSQL)
 }
 
 func TestBuildQueryJSONLessThan(t *testing.T) {
@@ -399,7 +399,7 @@ func TestBuildQueryJSONLessThan(t *testing.T) {
 		require.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE amount < '0000000000000000000000000000000000000000000000000000000000003039' AND delta < '0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9c' LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE amount < '0000000000000000000000000000000000000000000000000000000000003039' AND delta < '0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9c' LIMIT 10", generatedSQL)
 }
 
 func TestBuildQueryJSONGreaterThanOrEqual(t *testing.T) {
@@ -432,7 +432,7 @@ func TestBuildQueryJSONGreaterThanOrEqual(t *testing.T) {
 		require.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence >= 0 AND delta >= '10000000000000000000000000000000000000000000000000000000000000064' LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE sequence >= 0 AND delta >= '10000000000000000000000000000000000000000000000000000000000000064' LIMIT 10", generatedSQL)
 }
 
 func TestBuildQueryJSONLessThanOrEqual(t *testing.T) {
@@ -460,7 +460,7 @@ func TestBuildQueryJSONLessThanOrEqual(t *testing.T) {
 		require.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence <= 12345 LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE sequence <= 12345 LIMIT 10", generatedSQL)
 }
 
 func TestBuildQueryJSONIn(t *testing.T) {
@@ -493,7 +493,7 @@ func TestBuildQueryJSONIn(t *testing.T) {
 		require.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag IN ('a','b','c') AND tag NOT IN ('x','y','z') LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE tag IN ('a','b','c') AND tag NOT IN ('x','y','z') LIMIT 10", generatedSQL)
 }
 
 func TestBuildQueryJSONBadModifiers(t *testing.T) {
@@ -599,7 +599,7 @@ func TestBuildQueryJSONContainsShortNames(t *testing.T) {
 		require.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence = 12345", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE sequence = 12345", generatedSQL)
 
 	var qf2 query.QueryJSON
 	err = json.Unmarshal([]byte(`{
@@ -626,5 +626,5 @@ func TestBuildQueryJSONContainsShortNames(t *testing.T) {
 		require.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence <= 12345 AND sequence > 12345", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE sequence <= 12345 AND sequence > 12345", generatedSQL)
 }

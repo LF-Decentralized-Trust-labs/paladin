@@ -19,8 +19,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
 	"sigs.k8s.io/yaml" // because it supports JSON tags, and we embed our structs in the k8s operator
 )
@@ -44,6 +44,7 @@ type PaladinConfig struct {
 	PrivateTxManager       PrivateTxManagerConfig `json:"privateTxManager"`
 	PublicTxManager        PublicTxManagerConfig  `json:"publicTxManager"`
 	IdentityResolver       IdentityResolverConfig `json:"identityResolver"`
+	GroupManager           GroupManagerConfig     `json:"groupManager"`
 }
 
 func ReadAndParseYAMLFile(ctx context.Context, filePath string, config interface{}) error {

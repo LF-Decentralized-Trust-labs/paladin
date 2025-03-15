@@ -14,6 +14,7 @@ require (
 	github.com/hyperledger/firefly-common v1.4.14
 	github.com/hyperledger/firefly-signer v1.1.19
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/pkg/errors v0.9.1
 	github.com/rs/cors v1.11.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
@@ -58,7 +59,6 @@ require (
 	github.com/onsi/gomega v1.33.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.19.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect

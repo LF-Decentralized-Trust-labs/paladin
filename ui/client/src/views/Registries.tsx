@@ -14,26 +14,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Alert, Box, Fade, Typography, useTheme } from "@mui/material";
+import { Alert, Box, Button, Fade, Grid2, MenuItem, TextField, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
-import { t } from "i18next";
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Registry } from "../components/Registry";
 import { ApplicationContext } from "../contexts/ApplicationContext";
 import { fetchRegistries } from "../queries/registry";
-import { getAltModeScrollBarStyle } from "../themes/default";
+import { useTranslation } from "react-i18next";
+import PersonSearchIcon from '@mui/icons-material/PersonSearch';
+import { ResolveVerifierDialog } from "../dialogs/ResolveVerifier";
 
 export const Registries: React.FC = () => {
 
   const { lastBlockWithTransactions, autoRefreshEnabled } = useContext(ApplicationContext);
-  const theme = useTheme();
+  const [resolveVerifierDialogOpen, setResolveVerifierDialogOpen] = useState(false);
+  const [selectedRegistry, setSelectedRegistry] = useState<string>();
+  const { t } = useTranslation();
 
   const { data: registries, error, isFetching } = useQuery({
     queryKey: ["registries", autoRefreshEnabled, lastBlockWithTransactions],
     queryFn: () => fetchRegistries()
   });
 
-  if(isFetching) {
+  useEffect(() => {
+    if (registries?.length === 1) {
+      setSelectedRegistry(registries[0]);
+    }
+  }, [registries]);
+
+  if (isFetching) {
     return <></>;
   }
 
@@ -42,30 +51,59 @@ export const Registries: React.FC = () => {
   }
 
   return (
-    <Fade timeout={600} in={true}>
-      <Box
-        sx={{
-          padding: "30px",
-          maxWidth: "1300px",
-          marginLeft: "auto",
-          marginRight: "auto",
-        }}
-      >
-        <Typography align="center" variant="h5" sx={{ marginBottom: '20px' }}>
-          {t("entries")}
-        </Typography>
+    <>
+      <Fade timeout={600} in={true}>
         <Box
           sx={{
-            paddingRight: '15px',
-            height: "calc(100vh - 170px)",
-            ...getAltModeScrollBarStyle(theme.palette.mode)
+            padding: "20px",
+            maxWidth: "1300px",
+            marginLeft: "auto",
+            marginRight: "auto",
           }}
         >
-          {registries?.map((registry) => (
-            <Registry key={registry} registryName={registry} />
-          ))}
+          <Grid2 container alignItems="center" spacing={2}>
+            <Grid2 sx={{ display: { xs: 'none', sm: 'none', md: 'block' } }} size={{ md: 4 }} >
+              <TextField
+                size="small"
+                color="secondary"
+                slotProps={{ input: { sx: { color: theme => theme.palette.text.secondary, borderRadius: '30px' } } }}
+                select
+                value={selectedRegistry ?? ''}
+                onChange={event => setSelectedRegistry(event.target.value)}
+              >
+                {registries?.map(registry =>
+                  <MenuItem key={registry} value={registry}>{registry}</MenuItem>
+                )}
+              </TextField>
+            </Grid2>
+            <Grid2 size={{ xs: 12, md: 4 }}>
+              <Typography align="center" variant="h5">
+                {t("entries")}
+              </Typography>
+            </Grid2>
+            <Grid2 size={{ xs: 12, md: 4 }} container justifyContent={{ xs: 'center', sm: 'center', md: 'right' }}>
+              <Grid2>
+                <Button
+                  size="large"
+                  variant="outlined"
+                  startIcon={<PersonSearchIcon />}
+                  sx={{ borderRadius: '20px', marginRight: '14px' }}
+                  onClick={() => setResolveVerifierDialogOpen(true)}
+                >
+                  {t('resolveVerifier')}
+                </Button>
+              </Grid2>
+            </Grid2>
+          </Grid2>
+          {selectedRegistry !== undefined &&
+            <Registry registryName={selectedRegistry} />
+          }
         </Box>
-      </Box>
-    </Fade>
+      </Fade>
+      <ResolveVerifierDialog
+        dialogOpen={resolveVerifierDialogOpen}
+        setDialogOpen={setResolveVerifierDialogOpen}
+      />
+    </>
   );
 };

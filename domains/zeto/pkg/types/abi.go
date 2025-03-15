@@ -22,10 +22,15 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-//go:embed abis/IZetoPrivate.json
-var zetoPrivateJSON []byte
+//go:embed abis/IZetoFungible.json
+var zetoFungibleJSON []byte
 
-var ZetoABI = solutils.MustParseBuildABI(zetoPrivateJSON)
+//go:embed abis/IZetoNonFungible.json
+var zetoNonFungibleJSON []byte
+
+var ZetoFungibleABI = solutils.MustParseBuildABI(zetoFungibleJSON)
+
+var ZetoNonFungibleABI = solutils.MustParseBuildABI(zetoNonFungibleJSON)
 
 type InitializerParams struct {
 	TokenName string `json:"tokenName"`
@@ -37,19 +42,33 @@ type DeployParams struct {
 	Data          tktypes.HexBytes `json:"data"`
 	TokenName     string           `json:"tokenName"`
 	InitialOwner  string           `json:"initialOwner"`
+	IsNonFungible bool             `json:"isNonFungible"`
 }
 
-type MintParams struct {
-	Mints []*TransferParamEntry `json:"mints"`
+type NonFungibleMintParams struct {
+	Mints []*NonFungibleTransferParamEntry `json:"mints"`
 }
 
-type TransferParams struct {
-	Transfers []*TransferParamEntry `json:"transfers"`
+type FungibleMintParams struct {
+	Mints []*FungibleTransferParamEntry `json:"mints"`
+}
+type FungibleTransferParams struct {
+	Transfers []*FungibleTransferParamEntry `json:"transfers"`
 }
 
-type TransferParamEntry struct {
+type FungibleTransferParamEntry struct {
 	To     string              `json:"to"`
 	Amount *tktypes.HexUint256 `json:"amount"`
+}
+
+type NonFungibleTransferParams struct {
+	Transfers []*NonFungibleTransferParamEntry `json:"transfers"`
+}
+
+type NonFungibleTransferParamEntry struct {
+	To      string              `json:"to"`
+	URI     string              `json:"uri,omitempty"`
+	TokenID *tktypes.HexUint256 `json:"tokenID"`
 }
 
 type LockParams struct {

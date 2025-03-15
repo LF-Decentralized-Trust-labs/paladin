@@ -17,7 +17,7 @@ package plugintk
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"google.golang.org/grpc"
@@ -41,6 +41,9 @@ type DomainAPI interface {
 	InitCall(context.Context, *prototk.InitCallRequest) (*prototk.InitCallResponse, error)
 	ExecCall(context.Context, *prototk.ExecCallRequest) (*prototk.ExecCallResponse, error)
 	BuildReceipt(context.Context, *prototk.BuildReceiptRequest) (*prototk.BuildReceiptResponse, error)
+	ConfigurePrivacyGroup(context.Context, *prototk.ConfigurePrivacyGroupRequest) (*prototk.ConfigurePrivacyGroupResponse, error)
+	InitPrivacyGroup(context.Context, *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error)
+	WrapPrivacyGroupEVMTX(context.Context, *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error)
 }
 
 type DomainCallbacks interface {
@@ -48,6 +51,9 @@ type DomainCallbacks interface {
 	EncodeData(context.Context, *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error)
 	DecodeData(context.Context, *prototk.DecodeDataRequest) (*prototk.DecodeDataResponse, error)
 	RecoverSigner(ctx context.Context, req *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error)
+	SendTransaction(ctx context.Context, tx *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error)
+	LocalNodeName(context.Context, *prototk.LocalNodeNameRequest) (*prototk.LocalNodeNameResponse, error)
+	GetStatesByID(ctx context.Context, req *prototk.GetStatesByIDRequest) (*prototk.GetStatesByIDResponse, error)
 }
 
 type DomainFactory func(callbacks DomainCallbacks) DomainAPI
@@ -195,6 +201,18 @@ func (dp *domainHandler) RequestToPlugin(ctx context.Context, iReq PluginMessage
 		resMsg := &prototk.DomainMessage_BuildReceiptRes{}
 		resMsg.BuildReceiptRes, err = dp.api.BuildReceipt(ctx, input.BuildReceipt)
 		res.ResponseFromDomain = resMsg
+	case *prototk.DomainMessage_ConfigurePrivacyGroup:
+		resMsg := &prototk.DomainMessage_ConfigurePrivacyGroupRes{}
+		resMsg.ConfigurePrivacyGroupRes, err = dp.api.ConfigurePrivacyGroup(ctx, input.ConfigurePrivacyGroup)
+		res.ResponseFromDomain = resMsg
+	case *prototk.DomainMessage_InitPrivacyGroup:
+		resMsg := &prototk.DomainMessage_InitPrivacyGroupRes{}
+		resMsg.InitPrivacyGroupRes, err = dp.api.InitPrivacyGroup(ctx, input.InitPrivacyGroup)
+		res.ResponseFromDomain = resMsg
+	case *prototk.DomainMessage_WrapPrivacyGroupEvmtx:
+		resMsg := &prototk.DomainMessage_WrapPrivacyGroupEvmtxRes{}
+		resMsg.WrapPrivacyGroupEvmtxRes, err = dp.api.WrapPrivacyGroupEVMTX(ctx, input.WrapPrivacyGroupEvmtx)
+		res.ResponseFromDomain = resMsg
 	default:
 		err = i18n.NewError(ctx, tkmsgs.MsgPluginUnsupportedRequest, input)
 	}
@@ -245,23 +263,59 @@ func (dp *domainHandler) RecoverSigner(ctx context.Context, req *prototk.Recover
 	})
 }
 
+func (dp *domainHandler) SendTransaction(ctx context.Context, req *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error) {
+	res, err := dp.proxy.RequestFromPlugin(ctx, dp.Wrap(&prototk.DomainMessage{
+		RequestFromDomain: &prototk.DomainMessage_SendTransaction{
+			SendTransaction: req,
+		},
+	}))
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_SendTransactionRes) *prototk.SendTransactionResponse {
+		return msg.SendTransactionRes
+	})
+}
+
+func (dp *domainHandler) LocalNodeName(ctx context.Context, req *prototk.LocalNodeNameRequest) (*prototk.LocalNodeNameResponse, error) {
+	res, err := dp.proxy.RequestFromPlugin(ctx, dp.Wrap(&prototk.DomainMessage{
+		RequestFromDomain: &prototk.DomainMessage_LocalNodeName{
+			LocalNodeName: req,
+		},
+	}))
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_LocalNodeNameRes) *prototk.LocalNodeNameResponse {
+		return msg.LocalNodeNameRes
+	})
+}
+
+func (dp *domainHandler) GetStatesByID(ctx context.Context, req *prototk.GetStatesByIDRequest) (*prototk.GetStatesByIDResponse, error) {
+	res, err := dp.proxy.RequestFromPlugin(ctx, dp.Wrap(&prototk.DomainMessage{
+		RequestFromDomain: &prototk.DomainMessage_GetStatesById{
+			GetStatesById: req,
+		},
+	}))
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_GetStatesByIdRes) *prototk.GetStatesByIDResponse {
+		return msg.GetStatesByIdRes
+	})
+}
+
 type DomainAPIFunctions struct {
-	ConfigureDomain     func(context.Context, *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error)
-	InitDomain          func(context.Context, *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error)
-	InitDeploy          func(context.Context, *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error)
-	PrepareDeploy       func(context.Context, *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error)
-	InitContract        func(context.Context, *prototk.InitContractRequest) (*prototk.InitContractResponse, error)
-	InitTransaction     func(context.Context, *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error)
-	AssembleTransaction func(context.Context, *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error)
-	EndorseTransaction  func(context.Context, *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error)
-	PrepareTransaction  func(context.Context, *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error)
-	HandleEventBatch    func(context.Context, *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error)
-	Sign                func(context.Context, *prototk.SignRequest) (*prototk.SignResponse, error)
-	GetVerifier         func(context.Context, *prototk.GetVerifierRequest) (*prototk.GetVerifierResponse, error)
-	ValidateStateHashes func(context.Context, *prototk.ValidateStateHashesRequest) (*prototk.ValidateStateHashesResponse, error)
-	InitCall            func(context.Context, *prototk.InitCallRequest) (*prototk.InitCallResponse, error)
-	ExecCall            func(context.Context, *prototk.ExecCallRequest) (*prototk.ExecCallResponse, error)
-	BuildReceipt        func(context.Context, *prototk.BuildReceiptRequest) (*prototk.BuildReceiptResponse, error)
+	ConfigureDomain       func(context.Context, *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error)
+	InitDomain            func(context.Context, *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error)
+	InitDeploy            func(context.Context, *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error)
+	PrepareDeploy         func(context.Context, *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error)
+	InitContract          func(context.Context, *prototk.InitContractRequest) (*prototk.InitContractResponse, error)
+	InitTransaction       func(context.Context, *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error)
+	AssembleTransaction   func(context.Context, *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error)
+	EndorseTransaction    func(context.Context, *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error)
+	PrepareTransaction    func(context.Context, *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error)
+	HandleEventBatch      func(context.Context, *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error)
+	Sign                  func(context.Context, *prototk.SignRequest) (*prototk.SignResponse, error)
+	GetVerifier           func(context.Context, *prototk.GetVerifierRequest) (*prototk.GetVerifierResponse, error)
+	ValidateStateHashes   func(context.Context, *prototk.ValidateStateHashesRequest) (*prototk.ValidateStateHashesResponse, error)
+	InitCall              func(context.Context, *prototk.InitCallRequest) (*prototk.InitCallResponse, error)
+	ExecCall              func(context.Context, *prototk.ExecCallRequest) (*prototk.ExecCallResponse, error)
+	BuildReceipt          func(context.Context, *prototk.BuildReceiptRequest) (*prototk.BuildReceiptResponse, error)
+	ConfigurePrivacyGroup func(context.Context, *prototk.ConfigurePrivacyGroupRequest) (*prototk.ConfigurePrivacyGroupResponse, error)
+	InitPrivacyGroup      func(context.Context, *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error)
+	WrapPrivacyGroupEVMTX func(context.Context, *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error)
 }
 
 type DomainAPIBase struct {
@@ -330,4 +384,16 @@ func (db *DomainAPIBase) ExecCall(ctx context.Context, req *prototk.ExecCallRequ
 
 func (db *DomainAPIBase) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptRequest) (*prototk.BuildReceiptResponse, error) {
 	return callPluginImpl(ctx, req, db.Functions.BuildReceipt)
+}
+
+func (db *DomainAPIBase) ConfigurePrivacyGroup(ctx context.Context, req *prototk.ConfigurePrivacyGroupRequest) (*prototk.ConfigurePrivacyGroupResponse, error) {
+	return callPluginImpl(ctx, req, db.Functions.ConfigurePrivacyGroup)
+}
+
+func (db *DomainAPIBase) InitPrivacyGroup(ctx context.Context, req *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+	return callPluginImpl(ctx, req, db.Functions.InitPrivacyGroup)
+}
+
+func (db *DomainAPIBase) WrapPrivacyGroupEVMTX(ctx context.Context, req *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error) {
+	return callPluginImpl(ctx, req, db.Functions.WrapPrivacyGroupEVMTX)
 }

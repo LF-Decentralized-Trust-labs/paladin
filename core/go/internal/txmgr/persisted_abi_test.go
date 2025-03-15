@@ -29,48 +29,54 @@ import (
 
 func TestGetABIByHashError(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*abis").WillReturnError(fmt.Errorf("pop"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*abis").WillReturnError(fmt.Errorf("pop"))
+		})
 	defer done()
 
-	_, err := txm.getABIByHash(ctx, txm.p.DB(), tktypes.Bytes32(tktypes.RandBytes(32)))
+	_, err := txm.getABIByHash(ctx, txm.p.NOTX(), tktypes.RandBytes32())
 	assert.Regexp(t, "pop", err)
 
 }
 
 func TestGetABIByHashBadData(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*abis").WillReturnRows(sqlmock.NewRows(
-			[]string{"abi"},
-		).AddRow(
-			`{!!!! bad JSON`,
-		))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*abis").WillReturnRows(sqlmock.NewRows(
+				[]string{"abi"},
+			).AddRow(
+				`{!!!! bad JSON`,
+			))
+		})
 	defer done()
 
-	_, err := txm.getABIByHash(ctx, txm.p.DB(), tktypes.Bytes32(tktypes.RandBytes(32)))
+	_, err := txm.getABIByHash(ctx, txm.p.NOTX(), tktypes.RandBytes32())
 	assert.Regexp(t, "PD012217", err)
 
 }
 
 func TestGetABIByCache(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*abis").WillReturnRows(sqlmock.NewRows(
-			[]string{"abi"},
-		).AddRow(
-			`[]`,
-		))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*abis").WillReturnRows(sqlmock.NewRows(
+				[]string{"abi"},
+			).AddRow(
+				`[]`,
+			))
+		})
 	defer done()
 
-	hash := tktypes.Bytes32(tktypes.RandBytes(32))
+	hash := tktypes.RandBytes32()
 
 	// 2nd time cached (only one DB mock)
 	for i := 0; i < 2; i++ {
-		pa, err := txm.getABIByHash(ctx, txm.p.DB(), hash)
+		pa, err := txm.getABIByHash(ctx, txm.p.NOTX(), hash)
 		assert.NoError(t, err)
 		assert.Equal(t, hash, pa.Hash)
 		assert.Equal(t, abi.ABI{}, pa.ABI)
@@ -80,22 +86,26 @@ func TestGetABIByCache(t *testing.T) {
 
 func TestUpsertABIBadData(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false)
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+	)
 	defer done()
 
-	_, _, err := txm.UpsertABI(ctx, txm.p.DB(), abi.ABI{{Inputs: abi.ParameterArray{{Type: "wrong"}}}})
+	_, err := txm.UpsertABI(ctx, txm.p.NOTX(), abi.ABI{{Inputs: abi.ParameterArray{{Type: "wrong"}}}})
 	assert.Regexp(t, "PD012201", err)
 
 }
 
 func TestUpsertABIFail(t *testing.T) {
 
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectExec("INSERT INTO.*abis").WillReturnError(fmt.Errorf("pop"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectExec("INSERT INTO.*abis").WillReturnError(fmt.Errorf("pop"))
+		})
 	defer done()
 
-	_, _, err := txm.storeABI(ctx, txm.p.DB(), abi.ABI{{Type: abi.Function, Name: "get"}})
+	_, err := txm.storeABI(ctx, txm.p.NOTX(), abi.ABI{{Type: abi.Function, Name: "get"}})
 	assert.Regexp(t, "pop", err)
 
 }

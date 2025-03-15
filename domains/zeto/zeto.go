@@ -18,7 +18,7 @@ import (
 	"C"
 )
 import (
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 

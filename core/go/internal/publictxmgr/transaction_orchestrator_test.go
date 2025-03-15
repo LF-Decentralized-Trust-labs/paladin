@@ -17,7 +17,6 @@ package publictxmgr
 
 import (
 	"context"
-	"database/sql/driver"
 	"fmt"
 	"testing"
 	"time"
@@ -206,7 +205,9 @@ func TestOrchestratorTriggerTopUp(t *testing.T) {
 	}
 
 	// Then insert of the auto-fueling transaction
-	m.db.ExpectExec("INSERT.*public_txns").WillReturnResult(driver.ResultNoRows)
+	m.db.ExpectBegin()
+	m.db.ExpectQuery("INSERT.*public_txns").WillReturnRows(m.db.NewRows([]string{"pub_txn_id"}).AddRow(12345))
+	m.db.ExpectCommit()
 
 	// Mock the insufficient balance on the account that's submitting
 	m.ethClient.On("GetBalance", mock.Anything, o.signingAddress, "latest").Return(tktypes.Uint64ToUint256(0), nil)

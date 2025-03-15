@@ -198,3 +198,38 @@ func TestHandleWithdrawEvent(t *testing.T) {
 	err = z.handleWithdrawEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
 	assert.ErrorContains(t, err, "PD210061: Failed to update merkle tree for the UTXOWithdraw event. PD210056: Failed to create new node index from hash. 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 }
+
+func TestParseStatesFromEvent(t *testing.T) {
+	txID := tktypes.MustParseHexBytes("0x1234")
+	states := parseStatesFromEvent(txID, []tktypes.HexUint256{*tktypes.MustParseHexUint256("0x1234"), *tktypes.MustParseHexUint256("0x0")})
+	assert.Len(t, states, 2)
+	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000001234", states[0].Id)
+	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", states[1].Id)
+}
+func TestHandleLockedEvent(t *testing.T) {
+	z, _ := newTestZeto()
+	ctx := context.Background()
+
+	ev := &prototk.OnChainEvent{
+		DataJson:          "bad json",
+		SoliditySignature: "event Locked(bytes data)",
+	}
+	res := &prototk.HandleEventBatchResponse{}
+
+	// bad data for the locked event - should be logged and move on
+	err := z.handleLockedEvent(ctx, ev, res)
+	assert.NoError(t, err)
+
+	ev.DataJson = "{\"data\":\"0x0001\"}"
+	err = z.handleLockedEvent(ctx, ev, res)
+	assert.NoError(t, err)
+
+	ev.DataJson = "{\"data\":\"0x0001ffff\"}"
+	err = z.handleLockedEvent(ctx, ev, res)
+	assert.NoError(t, err)
+
+	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\"}"
+	err = z.handleLockedEvent(ctx, ev, res)
+	assert.NoError(t, err)
+	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res.TransactionsComplete[0].TransactionId)
+}

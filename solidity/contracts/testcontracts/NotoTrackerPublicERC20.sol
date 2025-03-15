@@ -17,8 +17,9 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
         address sender,
         address to,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external {
+    ) external override {
         _mint(to, amount);
         _executeOperation(prepared);
     }
@@ -28,8 +29,9 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
         address from,
         address to,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external {
+    ) external override {
         _transfer(from, to, amount);
         _executeOperation(prepared);
     }
@@ -38,8 +40,9 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
         address sender,
         address from,
         address delegate,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external {
+    ) external override {
         _executeOperation(prepared);
     }
 
@@ -47,10 +50,60 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
         address sender,
         address from,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
     ) external override {
         _burn(from, amount);
         _executeOperation(prepared);
+    }
+
+    function onLock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        uint256 amount,
+        bytes calldata data,
+        PreparedTransaction calldata prepared
+    ) external override {
+        revert("Lock not supported");
+    }
+
+    function onUnlock(
+        address sender,
+        bytes32 lockId,
+        UnlockRecipient[] calldata recipients,
+        bytes calldata data,
+        PreparedTransaction calldata prepared
+    ) external override {
+        // do nothing
+    }
+
+    function onPrepareUnlock(
+        address sender,
+        bytes32 lockId,
+        UnlockRecipient[] calldata recipients,
+        bytes calldata data,
+        PreparedTransaction calldata prepared
+    ) external override {
+        // do nothing
+    }
+
+    function onDelegateLock(
+        address sender,
+        bytes32 lockId,
+        address delegate,
+        PreparedTransaction calldata prepared
+    ) external override {
+        // do nothing
+    }
+
+    function handleDelegateUnlock(
+        address sender,
+        bytes32 lockId,
+        UnlockRecipient[] calldata recipients,
+        bytes calldata data
+    ) external override {
+        // do nothing
     }
 
     function _executeOperation(PreparedTransaction memory op) internal {

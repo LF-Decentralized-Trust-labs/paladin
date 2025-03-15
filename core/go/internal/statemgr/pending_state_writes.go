@@ -20,9 +20,9 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -58,7 +58,7 @@ func (op *pendingStateWrites) setError(err error) {
 	}
 }
 
-func (op *pendingStateWrites) exec(ctx context.Context, tx *gorm.DB) error {
+func (op *pendingStateWrites) exec(ctx context.Context, dbTX persistence.DBTX) error {
 
 	// Build lists of things to insert (we are insert only)
 	var states []*pldapi.State
@@ -76,11 +76,11 @@ func (op *pendingStateWrites) exec(ctx context.Context, tx *gorm.DB) error {
 	var err error
 
 	if len(states) > 0 {
-		err = op.dc.ss.writeStates(ctx, tx, states)
+		err = op.dc.ss.writeStates(ctx, dbTX, states)
 	}
 
 	if err == nil && len(stateNullifiers) > 0 {
-		err = tx.
+		err = dbTX.DB().
 			Table("state_nullifiers").
 			Clauses(clause.OnConflict{
 				DoNothing: true, // immutable

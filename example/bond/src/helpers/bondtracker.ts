@@ -23,12 +23,12 @@ export const newBondTracker = async (
   from: PaladinVerifier,
   params: BondTrackerConstructorParams
 ) => {
-  const address = await pente.deploy(
-    bondTracker.abi,
-    bondTracker.bytecode,
-    from,
-    params
-  );
+  const address = await pente.deploy({
+      abi: bondTracker.abi,
+      bytecode: bondTracker.bytecode,
+      from: from.lookup,
+      inputs: params
+  });
   return address ? new BondTracker(pente, address) : undefined;
 };
 
@@ -45,11 +45,18 @@ export class BondTracker extends PentePrivateContract<BondTrackerConstructorPara
   }
 
   beginDistribution(from: PaladinVerifier, params: BeginDistributionParams) {
-    return this.invoke(from, "beginDistribution", params);
+    return this.sendTransaction({
+      from: from.lookup,
+      function: "beginDistribution",
+      data: params
+    });
   }
 
   async investorList(from: PaladinVerifier) {
-    const result = await this.call(from, "investorList", []);
+    const result = await this.call({
+        from: from.lookup,
+        function: "investorList"
+    });
     return new InvestorList(this.evm, result[0]);
   }
 }

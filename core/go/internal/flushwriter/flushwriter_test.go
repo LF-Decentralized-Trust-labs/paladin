@@ -27,10 +27,10 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
 type testWritable struct {
@@ -87,12 +87,13 @@ func TestSuccessfulWriteBatch(t *testing.T) {
 	ctx, w, mdb, done := newTestWriter(t, &pldconf.FlushWriterConfig{
 		BatchMaxSize: confutil.P(1000),
 	},
-		func(ctx context.Context, tx *gorm.DB, values []*testWritable) (func(error), []Result[*testResult], error) {
+		func(ctx context.Context, dbTX persistence.DBTX, values []*testWritable) ([]Result[*testResult], error) {
 			results := make([]Result[*testResult], len(values))
 			for i, v := range values {
 				results[i] = Result[*testResult]{R: &testResult{output: v.input}}
 			}
-			return func(err error) { dbTXResult <- err }, results, nil
+			dbTX.AddFinalizer(func(ctx context.Context, err error) { dbTXResult <- err })
+			return results, nil
 		},
 	)
 	defer done()
@@ -117,12 +118,13 @@ func TestBatchTimeout(t *testing.T) {
 		BatchMaxSize: confutil.P(1000),
 		BatchTimeout: confutil.P("10ms"),
 	},
-		func(ctx context.Context, tx *gorm.DB, values []*testWritable) (func(error), []Result[*testResult], error) {
+		func(ctx context.Context, dbTX persistence.DBTX, values []*testWritable) ([]Result[*testResult], error) {
 			results := make([]Result[*testResult], len(values))
 			for i, v := range values {
 				results[i] = Result[*testResult]{R: &testResult{output: v.input}}
 			}
-			return func(err error) { dbTXResult <- err }, results, nil
+			dbTX.AddFinalizer(func(ctx context.Context, err error) { dbTXResult <- err })
+			return results, nil
 		},
 	)
 	defer done()
@@ -154,12 +156,10 @@ func TestBadResult(t *testing.T) {
 	ctx, w, mdb, done := newTestWriter(t, &pldconf.FlushWriterConfig{
 		BatchMaxSize: confutil.P(1000),
 	},
-		func(ctx context.Context, tx *gorm.DB, values []*testWritable) (func(error), []Result[*testResult], error) {
-			return func(err error) { dbTXResult <- err },
-				make([]Result[*testResult], len(values)-1),
-				nil
-		},
-	)
+		func(ctx context.Context, dbTX persistence.DBTX, values []*testWritable) ([]Result[*testResult], error) {
+			dbTX.AddFinalizer(func(ctx context.Context, err error) { dbTXResult <- err })
+			return make([]Result[*testResult], len(values)-1), nil
+		})
 	defer done()
 
 	mdb.ExpectBegin()
@@ -192,12 +192,12 @@ func TestIndividualError(t *testing.T) {
 	ctx, w, mdb, done := newTestWriter(t, &pldconf.FlushWriterConfig{
 		BatchMaxSize: confutil.P(1000),
 	},
-		func(ctx context.Context, tx *gorm.DB, values []*testWritable) (func(error), []Result[*testResult], error) {
-			return func(err error) { dbTXResult <- err },
-				[]Result[*testResult]{
-					{R: &testResult{output: "worked"}},
-					{Err: fmt.Errorf("failed")},
-				}, nil
+		func(ctx context.Context, dbTX persistence.DBTX, values []*testWritable) ([]Result[*testResult], error) {
+			dbTX.AddFinalizer(func(ctx context.Context, err error) { dbTXResult <- err })
+			return []Result[*testResult]{
+				{R: &testResult{output: "worked"}},
+				{Err: fmt.Errorf("failed")},
+			}, nil
 		},
 	)
 	defer done()
@@ -221,8 +221,8 @@ func TestWaitFlushTimeout(t *testing.T) {
 	ctx, w, _, done := newTestWriter(t, &pldconf.FlushWriterConfig{
 		BatchMaxSize: confutil.P(1000),
 	},
-		func(ctx context.Context, tx *gorm.DB, values []*testWritable) (func(error), []Result[*testResult], error) {
-			return nil, nil, fmt.Errorf("should not make it back to call")
+		func(ctx context.Context, dbTX persistence.DBTX, values []*testWritable) ([]Result[*testResult], error) {
+			return nil, fmt.Errorf("should not make it back to call")
 		},
 	)
 	done()
@@ -238,8 +238,8 @@ func TestFailedWriteBatch(t *testing.T) {
 	ctx, w, mdb, done := newTestWriter(t, &pldconf.FlushWriterConfig{
 		BatchMaxSize: confutil.P(1000),
 	},
-		func(ctx context.Context, tx *gorm.DB, values []*testWritable) (func(error), []Result[*testResult], error) {
-			return nil, nil, fmt.Errorf("pop")
+		func(ctx context.Context, dbTX persistence.DBTX, values []*testWritable) ([]Result[*testResult], error) {
+			return nil, fmt.Errorf("pop")
 		},
 	)
 	defer done()

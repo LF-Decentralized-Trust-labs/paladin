@@ -1,4 +1,6 @@
 # run only when workflows are triggered by a push event
+name: Validate workflows
+
 on:
   pull_request:
     paths:

@@ -24,12 +24,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
@@ -125,29 +127,34 @@ func mustParseBuildBytecode(buildJSON []byte) tktypes.HexBytes {
 	return byteCode
 }
 
-func DeploySmartContract(t *testing.T, txm components.TXManager) *tktypes.EthAddress {
+func DeploySmartContract(t *testing.T, p persistence.Persistence, txm components.TXManager, km components.KeyManager) *tktypes.EthAddress {
 	ctx := context.Background()
 
 	simpleDomainABI := mustParseBuildABI(simpleDomainBuild)
 	simpleDomainBytecode := mustParseBuildBytecode(simpleDomainBuild)
 
 	// In this test we deploy the factory in-line
-	txID, err := txm.SendTransaction(ctx, &pldapi.TransactionInput{
-		TransactionBase: pldapi.TransactionBase{
-			Type: pldapi.TransactionTypePublic.Enum(),
-			From: "domain1_admin",
-		},
-		ABI:      simpleDomainABI,
-		Bytecode: simpleDomainBytecode,
+	var txIDs []uuid.UUID
+	err := p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
+		txIDs, err = txm.SendTransactions(ctx, dbTX, &pldapi.TransactionInput{
+			TransactionBase: pldapi.TransactionBase{
+				Type: pldapi.TransactionTypePublic.Enum(),
+				From: "domain1_admin",
+			},
+			ABI:      simpleDomainABI,
+			Bytecode: simpleDomainBytecode,
+		})
+		return err
 	})
 	require.NoError(t, err)
+	txID := txIDs[0]
 
 	var receipt *pldapi.TransactionReceipt
 	ticker := time.NewTicker(100 * time.Millisecond)
 	for {
 		<-ticker.C
 		require.False(t, t.Failed())
-		receipt, err = txm.GetTransactionReceiptByID(ctx, *txID)
+		receipt, err = txm.GetTransactionReceiptByID(ctx, txID)
 		require.NoError(t, err)
 		if receipt != nil {
 			break

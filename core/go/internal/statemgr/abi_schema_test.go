@@ -26,6 +26,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -49,6 +50,10 @@ func mockDomain(t *testing.T, m *mockComponents, name string, customHashFunction
 	return md
 }
 
+func mockStateCallback(m *mockComponents) {
+	m.txManager.On("NotifyStatesDBChanged", mock.Anything).Return()
+}
+
 // This is an E2E test using the actual database, the flush-writer DB storage system, and the schema cache
 func TestStoreRetrieveABISchema(t *testing.T) {
 
@@ -56,6 +61,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	defer done()
 
 	_ = mockDomain(t, m, "domain1", false)
+	mockStateCallback(m)
 
 	as, err := newABISchema(ctx, "domain1", &abi.Parameter{
 		Type:         "tuple",
@@ -116,32 +122,37 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	cacheKey := "domain1/0xcf41493c8bb9652d1483ee6cb5122efbec6fbdf67cc27363ba5b030b59244cad"
 	assert.Equal(t, cacheKey, schemaCacheKey(as.Persisted().DomainName, as.Persisted().ID))
 
-	err = ss.persistSchemas(ctx, ss.p.DB(), []*pldapi.Schema{as.Schema})
+	err = ss.persistSchemas(ctx, ss.p.NOTX(), []*pldapi.Schema{as.Schema})
 	require.NoError(t, err)
 	schemaID := as.Persisted().ID
 	contractAddress := tktypes.RandAddress()
 
 	// Check it handles data
-	states, err := ss.WriteReceivedStates(ctx, ss.p.DB(), "domain1", []*components.StateUpsertOutsideContext{
-		{
-			ID:       nil, // default hashing algo
-			SchemaID: schemaID,
-			Data: tktypes.RawJSON(`{
-				"field1": "0x0123456789012345678901234567890123456789",
-				"field2": "hello world",
-				"field3": 42,
-				"field4": true,
-				"field5": "0x687414C0B8B4182B823Aec5436965cf19b197386",
-				"field6": "-10203040506070809",
-				"field7": "0xfeedbeef",
-				"field8": 12345,
-				"field9": "things and stuff",
-				"cruft": "to remove"
-			}`),
-			ContractAddress: *contractAddress,
-		},
+	var states []*pldapi.State
+	err = ss.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		states, err = ss.WriteReceivedStates(ctx, dbTX, "domain1", []*components.StateUpsertOutsideContext{
+			{
+				ID:       nil, // default hashing algo
+				SchemaID: schemaID,
+				Data: tktypes.RawJSON(`{
+					"field1": "0x0123456789012345678901234567890123456789",
+					"field2": "hello world",
+					"field3": 42,
+					"field4": true,
+					"field5": "0x687414C0B8B4182B823Aec5436965cf19b197386",
+					"field6": "-10203040506070809",
+					"field7": "0xfeedbeef",
+					"field8": 12345,
+					"field9": "things and stuff",
+					"cruft": "to remove"
+				}`),
+				ContractAddress: contractAddress,
+			},
+		})
+		return err
 	})
 	require.NoError(t, err)
+
 	state1 := states[0]
 	assert.Equal(t, []*pldapi.StateLabel{
 		// uint256 written as zero padded string
@@ -180,12 +191,12 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	}`, string(state1.Data))
 
 	// Second should succeed, but not do anything
-	err = ss.persistSchemas(ctx, ss.p.DB(), []*pldapi.Schema{as.Schema})
+	err = ss.persistSchemas(ctx, ss.p.NOTX(), []*pldapi.Schema{as.Schema})
 	require.NoError(t, err)
 	schemaID = as.ID()
 
 	getValidate := func() {
-		as1, err := ss.GetSchema(ctx, ss.p.DB(), as.Persisted().DomainName, schemaID, true)
+		as1, err := ss.getSchemaByID(ctx, ss.p.NOTX(), as.Persisted().DomainName, schemaID, true)
 		require.NoError(t, err)
 		assert.NotNil(t, as1)
 		as1Sig, err := as1.(*abiSchema).FullSignature(ctx)
@@ -204,9 +215,9 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	getValidate()
 
 	// Get the state back too
-	state1a, err := ss.GetState(ctx, ss.p.DB(), as.Persisted().DomainName, *contractAddress, state1.ID, true, true)
+	statesQuery, err := ss.GetStatesByID(ctx, ss.p.NOTX(), as.Persisted().DomainName, contractAddress, []tktypes.HexBytes{state1.ID}, true, true)
 	require.NoError(t, err)
-	assert.Equal(t, state1, state1a)
+	assert.Equal(t, state1, statesQuery[0])
 
 	// Do a query on just one state, based on all the label fields
 	var query *query.QueryJSON
@@ -223,7 +234,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		]
 	}`), &query)
 	require.NoError(t, err)
-	states, err = ss.FindContractStates(ctx, ss.p.DB(), as.Persisted().DomainName, *contractAddress, schemaID, query, "all")
+	states, err = ss.FindContractStates(ctx, ss.p.NOTX(), as.Persisted().DomainName, contractAddress, schemaID, query, "all")
 	require.NoError(t, err)
 	assert.Len(t, states, 1)
 
@@ -234,7 +245,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		]
 	}`), &query)
 	require.NoError(t, err)
-	states, err = ss.FindContractStates(ctx, ss.p.DB(), as.Persisted().DomainName, *contractAddress, schemaID, query, "all")
+	states, err = ss.FindContractStates(ctx, ss.p.NOTX(), as.Persisted().DomainName, contractAddress, schemaID, query, "all")
 	require.NoError(t, err)
 	assert.Len(t, states, 0)
 
@@ -245,7 +256,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		]
 	}`), &query)
 	require.NoError(t, err)
-	states, err = ss.FindContractStates(ctx, ss.p.DB(), as.Persisted().DomainName, *contractAddress, schemaID, query, "all")
+	states, err = ss.FindContractStates(ctx, ss.p.NOTX(), as.Persisted().DomainName, contractAddress, schemaID, query, "all")
 	require.NoError(t, err)
 	assert.Len(t, states, 0)
 }
@@ -278,7 +289,7 @@ func TestGetSchemaInvalidJSON(t *testing.T) {
 		[]string{"type", "content"},
 	).AddRow(pldapi.SchemaTypeABI, "!!! { bad json"))
 
-	_, err := ss.GetSchema(ctx, ss.p.DB(), "domain1", tktypes.Bytes32Keccak(([]byte)("test")), true)
+	_, err := ss.GetSchemaByID(ctx, ss.p.NOTX(), "domain1", tktypes.Bytes32Keccak(([]byte)("test")), true)
 	assert.Regexp(t, "PD010113", err)
 }
 
@@ -453,7 +464,7 @@ func TestABISchemaProcessStateInvalidType(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	require.NoError(t, err)
-	_, err = as.ProcessState(ctx, *tktypes.RandAddress(), tktypes.RawJSON(`{"field1": 12345}`), nil, false)
+	_, err = as.ProcessState(ctx, tktypes.RandAddress(), tktypes.RawJSON(`{"field1": 12345}`), nil, false)
 	assert.Regexp(t, "PD010103", err)
 }
 
@@ -485,7 +496,7 @@ func TestABISchemaProcessStateLabelMissing(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	require.NoError(t, err)
-	_, err = as.ProcessState(ctx, *tktypes.RandAddress(), tktypes.RawJSON(`{"field1": 12345}`), nil, false)
+	_, err = as.ProcessState(ctx, tktypes.RandAddress(), tktypes.RawJSON(`{"field1": 12345}`), nil, false)
 	assert.Regexp(t, "PD010110", err)
 }
 
@@ -521,7 +532,7 @@ func TestABISchemaProcessStateBadValue(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	require.NoError(t, err)
-	_, err = as.ProcessState(ctx, *tktypes.RandAddress(), tktypes.RawJSON(`{!!! wrong`), nil, false)
+	_, err = as.ProcessState(ctx, tktypes.RandAddress(), tktypes.RawJSON(`{!!! wrong`), nil, false)
 	assert.Regexp(t, "PD010116", err)
 }
 
@@ -546,7 +557,7 @@ func TestABISchemaProcessStateMismatchValue(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	require.NoError(t, err)
-	_, err = as.ProcessState(ctx, *tktypes.RandAddress(), tktypes.RawJSON(`{"field1":{}}`), nil, false)
+	_, err = as.ProcessState(ctx, tktypes.RandAddress(), tktypes.RawJSON(`{"field1":{}}`), nil, false)
 	assert.Regexp(t, "FF22030", err)
 }
 
@@ -571,7 +582,7 @@ func TestABISchemaProcessStateEIP712Failure(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	require.NoError(t, err)
-	_, err = as.ProcessState(ctx, *tktypes.RandAddress(), tktypes.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`), nil, false)
+	_, err = as.ProcessState(ctx, tktypes.RandAddress(), tktypes.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`), nil, false)
 	assert.Regexp(t, "FF22073", err)
 }
 
@@ -596,7 +607,7 @@ func TestABISchemaProcessStateDataFailure(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	require.NoError(t, err)
-	_, err = as.ProcessState(ctx, *tktypes.RandAddress(), tktypes.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`), nil, false)
+	_, err = as.ProcessState(ctx, tktypes.RandAddress(), tktypes.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`), nil, false)
 	assert.Regexp(t, "FF22073", err)
 }
 
@@ -631,7 +642,7 @@ func TestABISchemaInsertCustomHashNoID(t *testing.T) {
 	tc, err := as.definition.Components.TypeComponentTree()
 	require.NoError(t, err)
 	as.tc = tc
-	_, err = as.ProcessState(context.Background(), *tktypes.RandAddress(), tktypes.RawJSON(`{}`), nil, true)
+	_, err = as.ProcessState(context.Background(), tktypes.RandAddress(), tktypes.RawJSON(`{}`), nil, true)
 	assert.Regexp(t, "PD010130", err)
 }
 
@@ -643,7 +654,7 @@ func TestABISchemaInsertStandardHashMismatch(t *testing.T) {
 		Components:   abi.ParameterArray{},
 	})
 	require.NoError(t, err)
-	_, err = as.ProcessState(context.Background(), *tktypes.RandAddress(),
+	_, err = as.ProcessState(context.Background(), tktypes.RandAddress(),
 		tktypes.RawJSON(`{}`), tktypes.RandBytes(32), false)
 	assert.Regexp(t, "PD010129", err)
 }
@@ -658,7 +669,7 @@ func TestABISchemaInsertCustomHashBadData(t *testing.T) {
 	tc, err := as.definition.Components.TypeComponentTree()
 	require.NoError(t, err)
 	as.tc = tc
-	_, err = as.ProcessState(context.Background(), *tktypes.RandAddress(), tktypes.RawJSON(`{}`), tktypes.RandBytes(32), false)
+	_, err = as.ProcessState(context.Background(), tktypes.RandAddress(), tktypes.RawJSON(`{}`), tktypes.RandBytes(32), false)
 	assert.Regexp(t, "FF22040", err)
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -14,6 +14,8 @@
  */
 
 package keymanager
+
+import "github.com/kaleido-io/paladin/core/internal/filters"
 
 type DBKeyPath struct {
 	Parent string `gorm:"column:parent;primaryKey"`
@@ -44,4 +46,14 @@ type DBKeyVerifier struct {
 
 func (t DBKeyVerifier) TableName() string {
 	return "key_verifiers"
+}
+
+var KeyEntryFilters filters.FieldSet = filters.FieldMap{
+	"isKey":       filters.BooleanField("key_mappings.identifier IS NOT NULL"),
+	"hasChildren": filters.BooleanField("k.p IS NOT NULL"),
+	"parent":      filters.StringField("parent"),
+	"index":       filters.Int64Field(`"index"`),
+	"path":        filters.StringField("path"),
+	"wallet":      filters.StringField("wallet"),
+	"keyHandle":   filters.StringField("key_handle"),
 }

@@ -24,6 +24,6 @@ import (
 
 func TestRegisterError(t *testing.T) {
 	assert.Panics(t, func() {
-		ffe("notvalid", "")
+		pde("notvalid", "")
 	})
 }

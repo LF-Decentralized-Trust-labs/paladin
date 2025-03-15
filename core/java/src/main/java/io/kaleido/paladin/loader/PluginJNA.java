@@ -16,16 +16,16 @@ package io.kaleido.paladin.loader;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;
-import io.kaleido.paladin.toolkit.Service;
-import org.apache.logging.log4j.LogManager;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Logger;
 
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class PluginJNA extends Plugin {
 
-    private static final Logger LOGGER = LogManager.getLogger(PluginJNA.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(PluginJNA.class);
 
     private final String libName;
 
@@ -57,6 +57,7 @@ public class PluginJNA extends Plugin {
             if (rc != 0) {
                 throw new RuntimeException("Plugin returned RC=%d".formatted(rc));
             }
-        }).whenComplete((voidResult, t) -> onStop.pluginStopped(info.instanceId(), this, t));
+        }, Executors.newSingleThreadExecutor())
+                .whenComplete((voidResult, t) -> onStop.pluginStopped(info.instanceId(), this, t));
     }
 }

@@ -17,10 +17,7 @@ package publictxmgr
 
 import (
 	"context"
-	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
@@ -45,42 +42,31 @@ func (pte *pubTxManager) persistSuspendedFlag(ctx context.Context, from tktypes.
 }
 
 func (pte *pubTxManager) dispatchAction(ctx context.Context, from tktypes.EthAddress, nonce uint64, action AsyncRequestType) error {
-	response := make(chan error, 1)
-	startTime := time.Now()
-	go func() {
-		pte.inFlightOrchestratorMux.Lock()
-		defer pte.inFlightOrchestratorMux.Unlock()
-		inFlightOrchestrator, orchestratorInFlight := pte.inFlightOrchestrators[from]
-		switch action {
-		case ActionCompleted:
-			// Only need to pass this on if there's an orchestrator in flight for this signing address
-			if orchestratorInFlight {
-				inFlightOrchestrator.dispatchAction(ctx, nonce, action, response)
-			}
-		case ActionSuspend, ActionResume:
-			suspended := false
-			if action == ActionSuspend {
-				suspended = true
-			}
-			if !orchestratorInFlight {
-				// no in-flight orchestrator for the signing address, it's OK to update the DB directly
-				response <- pte.persistSuspendedFlag(ctx, from, nonce, suspended)
-			} else {
-				// has to be done in the context of the orchestrator
-				inFlightOrchestrator.dispatchAction(ctx, nonce, action, response)
-			}
+	pte.inFlightOrchestratorMux.Lock()
+	defer pte.inFlightOrchestratorMux.Unlock()
+	inFlightOrchestrator, orchestratorInFlight := pte.inFlightOrchestrators[from]
+	switch action {
+	case ActionCompleted:
+		// Only need to pass this on if there's an orchestrator in flight for this signing address
+		if orchestratorInFlight {
+			return inFlightOrchestrator.dispatchAction(ctx, nonce, action)
 		}
-	}()
-
-	select {
-	case err := <-response:
-		return err
-	case <-ctx.Done():
-		return i18n.NewError(ctx, msgs.MsgTransactionEngineRequestTimeout, time.Since(startTime).Seconds())
+	case ActionSuspend, ActionResume:
+		suspended := false
+		if action == ActionSuspend {
+			suspended = true
+		}
+		if !orchestratorInFlight {
+			// no in-flight orchestrator for the signing address, it's OK to update the DB directly
+			return pte.persistSuspendedFlag(ctx, from, nonce, suspended)
+		}
+		// has to be done in the context of the orchestrator
+		return inFlightOrchestrator.dispatchAction(ctx, nonce, action)
 	}
+	return nil
 }
 
-func (oc *orchestrator) dispatchAction(ctx context.Context, nonce uint64, action AsyncRequestType, response chan<- error) {
+func (oc *orchestrator) dispatchAction(ctx context.Context, nonce uint64, action AsyncRequestType) (err error) {
 	oc.inFlightTxsMux.Lock()
 	defer oc.inFlightTxsMux.Unlock()
 	var pending *inFlightTransactionStageController
@@ -93,21 +79,22 @@ func (oc *orchestrator) dispatchAction(ctx context.Context, nonce uint64, action
 	if pending != nil {
 		switch action {
 		case ActionCompleted:
-			_, err := pending.NotifyStatusUpdate(ctx, InFlightStatusConfirmReceived)
-			response <- err
-		case ActionSuspend, ActionResume:
-			var suspendedFlag bool
+			_, err = pending.NotifyStatusUpdate(ctx, InFlightStatusConfirmReceived)
+		case ActionResume, ActionSuspend:
+			// ActionResume...
+			suspendedFlag := false
+			newStatus := InFlightStatusPending
+			// .. or ActionSuspend
 			if action == ActionSuspend {
 				suspendedFlag = true
-				_, _ = pending.NotifyStatusUpdate(ctx, InFlightStatusSuspending)
-			} else {
-				suspendedFlag = false
-				_, _ = pending.NotifyStatusUpdate(ctx, InFlightStatusPending)
+				newStatus = InFlightStatusSuspending
 			}
+			_, _ = pending.NotifyStatusUpdate(ctx, newStatus)
 			// Ok we've now got the lock that means we can write to the DB
 			// No optimization of this write, as it's a user action from the side of normal processing
-			response <- oc.persistSuspendedFlag(ctx, oc.signingAddress, nonce, suspendedFlag)
+			err = oc.persistSuspendedFlag(ctx, oc.signingAddress, nonce, suspendedFlag)
 		}
 		oc.MarkInFlightTxStale()
 	}
+	return err
 }

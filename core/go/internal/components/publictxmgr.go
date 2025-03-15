@@ -21,10 +21,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 )
 
 var PublicTxFilterFields filters.FieldSet = filters.FieldMap{
@@ -57,17 +57,17 @@ type PublicTxManager interface {
 	ManagerLifecycle
 
 	// Synchronous functions that are executed on the callers thread
-	QueryPublicTxForTransactions(ctx context.Context, dbTX *gorm.DB, boundToTxns []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*pldapi.PublicTx, error)
-	QueryPublicTxWithBindings(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*pldapi.PublicTxWithBinding, error)
-	GetPublicTransactionForHash(ctx context.Context, dbTX *gorm.DB, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error)
+	QueryPublicTxForTransactions(ctx context.Context, dbTX persistence.DBTX, boundToTxns []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*pldapi.PublicTx, error)
+	QueryPublicTxWithBindings(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.PublicTxWithBinding, error)
+	GetPublicTransactionForHash(ctx context.Context, dbTX persistence.DBTX, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error)
 
 	// Perform (potentially expensive) transaction level validation, such as gas estimation. Call before starting a DB transaction
-	ValidateTransaction(ctx context.Context, dbTX *gorm.DB, transaction *PublicTxSubmission) error
+	ValidateTransaction(ctx context.Context, dbTX persistence.DBTX, transaction *PublicTxSubmission) error
 	// Write a set of validated transactions to the public TX mgr database, notifying the relevant orchestrator(s) to wake, assign nonces, and start the submission process
-	WriteNewTransactions(ctx context.Context, dbTX *gorm.DB, transactions []*PublicTxSubmission) (func(), []*pldapi.PublicTx, error)
+	WriteNewTransactions(ctx context.Context, dbTX persistence.DBTX, transactions []*PublicTxSubmission) ([]*pldapi.PublicTx, error)
 	// Convenience function that does ValidateTransaction+WriteNewTransactions for a single Tx
 	SingleTransactionSubmit(ctx context.Context, transaction *PublicTxSubmission) (*pldapi.PublicTx, error)
 
-	MatchUpdateConfirmedTransactions(ctx context.Context, dbTX *gorm.DB, itxs []*blockindexer.IndexedTransactionNotify) ([]*PublicTxMatch, error)
+	MatchUpdateConfirmedTransactions(ctx context.Context, dbTX persistence.DBTX, itxs []*blockindexer.IndexedTransactionNotify) ([]*PublicTxMatch, error)
 	NotifyConfirmPersisted(ctx context.Context, confirms []*PublicTxMatch)
 }

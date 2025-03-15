@@ -120,11 +120,11 @@ func testRPCModule(t *testing.T, getMod func(c PaladinClient) RPCModule) {
 		require.True(t, hasPrefix, "RPC method '%s' does not start with prefix %s", requiredFnName, groupPrefix)
 		requiredFnName = strings.ToUpper(requiredFnName[0:1]) + requiredFnName[1:]
 
-		var method reflect.Method
+		var method *reflect.Method
 		for i := 0; i < apiGroupType.NumMethod(); i++ {
 			m := apiGroupType.Method(i)
 			if m.Name == requiredFnName {
-				method = m
+				method = &m
 			}
 		}
 		require.NotNil(t, method, "Implementation method '%s' for RPC method '%s' does not exist on interface %T", requiredFnName, methodName, mod)

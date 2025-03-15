@@ -20,10 +20,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 )
 
 type ReceiptType int
@@ -73,40 +73,57 @@ type ResolvedFunction struct {
 	Signature    string           `json:"signature"`
 }
 
+type ReceiptReceiver interface {
+	DeliverReceiptBatch(ctx context.Context, batchID uint64, receipts []*pldapi.TransactionReceiptFull) error
+}
+
+type ReceiptReceiverCloser interface {
+	Close()
+}
+
 type TXManager interface {
 	ManagerLifecycle
 
 	// These are the general purpose functions exposed also as JSON/RPC APIs on the TX Manager
 
-	FinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*ReceiptInput) error // requires all transactions to be known
-	CalculateRevertError(ctx context.Context, dbTX *gorm.DB, revertData tktypes.HexBytes) error
-	DecodeRevertError(ctx context.Context, dbTX *gorm.DB, revertData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
-	DecodeCall(ctx context.Context, dbTX *gorm.DB, callData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
-	DecodeEvent(ctx context.Context, dbTX *gorm.DB, topics []tktypes.Bytes32, eventData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
-	SendTransaction(ctx context.Context, tx *pldapi.TransactionInput) (*uuid.UUID, error)
-	SendTransactions(ctx context.Context, txs []*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
-	PrepareTransaction(ctx context.Context, tx *pldapi.TransactionInput) (*uuid.UUID, error)
-	PrepareTransactions(ctx context.Context, txs []*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
+	FinalizeTransactions(ctx context.Context, dbTX persistence.DBTX, info []*ReceiptInput) error // requires all transactions to be known
+	CalculateRevertError(ctx context.Context, dbTX persistence.DBTX, revertData tktypes.HexBytes) error
+	DecodeRevertError(ctx context.Context, dbTX persistence.DBTX, revertData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
+	DecodeCall(ctx context.Context, dbTX persistence.DBTX, callData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
+	DecodeEvent(ctx context.Context, dbTX persistence.DBTX, topics []tktypes.Bytes32, eventData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
+	SendTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
+	ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*ResolvedFunction, *abi.ComponentValue, tktypes.RawJSON, error)
+	PrepareTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (*pldapi.Transaction, error)
 	GetResolvedTransactionByID(ctx context.Context, id uuid.UUID) (*ResolvedTransaction, error) // cache optimized
 	GetTransactionByIDFull(ctx context.Context, id uuid.UUID) (result *pldapi.TransactionFull, err error)
 	GetTransactionDependencies(ctx context.Context, id uuid.UUID) (*pldapi.TransactionDependencies, error)
 	GetPublicTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce tktypes.HexUint64) (*pldapi.PublicTxWithBinding, error)
 	GetPublicTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error)
-	QueryTransactions(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) ([]*pldapi.Transaction, error)
-	QueryTransactionsResolved(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) ([]*ResolvedTransaction, error)
-	QueryTransactionsFull(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) (results []*pldapi.TransactionFull, err error)
-	QueryTransactionsFullTx(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) ([]*pldapi.TransactionFull, error)
+	QueryTransactions(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*pldapi.Transaction, error)
+	QueryTransactionsResolved(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*ResolvedTransaction, error)
+	QueryTransactionsFull(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) (results []*pldapi.TransactionFull, err error)
+	QueryTransactionsFullTx(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*pldapi.TransactionFull, error)
 	QueryTransactionReceipts(ctx context.Context, jq *query.QueryJSON) ([]*pldapi.TransactionReceipt, error)
 	GetTransactionReceiptByID(ctx context.Context, id uuid.UUID) (*pldapi.TransactionReceipt, error)
-	GetPreparedTransactionByID(ctx context.Context, dbTX *gorm.DB, id uuid.UUID) (*pldapi.PreparedTransaction, error)
-	QueryPreparedTransactions(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*pldapi.PreparedTransaction, error)
-	CallTransaction(ctx context.Context, result any, tx *pldapi.TransactionCall) (err error)
-	UpsertABI(ctx context.Context, dbTX *gorm.DB, a abi.ABI) (func(), *pldapi.StoredABI, error)
+	GetPreparedTransactionByID(ctx context.Context, dbTX persistence.DBTX, id uuid.UUID) (*pldapi.PreparedTransaction, error)
+	GetPreparedTransactionWithRefsByID(ctx context.Context, dbTX persistence.DBTX, id uuid.UUID) (*PreparedTransactionWithRefs, error)
+	QueryPreparedTransactions(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.PreparedTransaction, error)
+	QueryPreparedTransactionsWithRefs(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*PreparedTransactionWithRefs, error)
+	CallTransaction(ctx context.Context, dbTX persistence.DBTX, result any, tx *pldapi.TransactionCall) (err error)
+	UpsertABI(ctx context.Context, dbTX persistence.DBTX, a abi.ABI) (*pldapi.StoredABI, error)
+	CreateReceiptListener(ctx context.Context, spec *pldapi.TransactionReceiptListener) error
+	GetReceiptListener(ctx context.Context, name string) *pldapi.TransactionReceiptListener
+	QueryReceiptListeners(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.TransactionReceiptListener, error)
+	StartReceiptListener(ctx context.Context, name string) error
+	StopReceiptListener(ctx context.Context, name string) error
+	DeleteReceiptListener(ctx context.Context, name string) error
+	AddReceiptReceiver(ctx context.Context, name string, r ReceiptReceiver) (ReceiptReceiverCloser, error)
 
-	// These functions for use of the private TX manager for chaining private transactions.
+	// These functions for use of other components
 
-	PrepareInternalPrivateTransaction(ctx context.Context, dbTX *gorm.DB, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (func(), *ValidatedTransaction, error)
-	UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, dbTX *gorm.DB, txis []*ValidatedTransaction) (postCommit func(), err error)
-	WritePreparedTransactions(ctx context.Context, dbTX *gorm.DB, prepared []*PrepareTransactionWithRefs) (postCommit func(), err error)
+	NotifyStatesDBChanged(ctx context.Context) // called by state manager after committing DB TXs writing new states that might fill in gaps
+	PrepareInternalPrivateTransaction(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (*ValidatedTransaction, error)
+	UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, dbTX persistence.DBTX, txis []*ValidatedTransaction) error
+	WritePreparedTransactions(ctx context.Context, dbTX persistence.DBTX, prepared []*PreparedTransactionWithRefs) error
 }

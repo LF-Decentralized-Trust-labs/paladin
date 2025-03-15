@@ -48,6 +48,7 @@ func TestPrivateSmartContractQueryFail(t *testing.T) {
 
 	td, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
 		mc.stateStore.On("EnsureABISchemas", mock.Anything, mock.Anything, "test1", mock.Anything).Return(nil, nil)
+		mc.db.ExpectBegin()
 		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnError(fmt.Errorf("pop"))
 	})
 	defer done()
@@ -61,6 +62,7 @@ func TestPrivateSmartContractQueryNoResult(t *testing.T) {
 
 	td, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
 		mc.stateStore.On("EnsureABISchemas", mock.Anything, mock.Anything, "test1", mock.Anything).Return(nil, nil)
+		mc.db.ExpectBegin()
 		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnRows(sqlmock.NewRows([]string{}))
 	})
 	defer done()
@@ -238,14 +240,14 @@ func TestEncodeDecodeABIData(t *testing.T) {
 		Definition:   funcDef,
 		Body:         `{ "intVal": 42 }`,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	decResult, err := td.d.DecodeData(td.ctx, &prototk.DecodeDataRequest{
 		EncodingType: prototk.EncodingType_FUNCTION_CALL_DATA,
 		Definition:   funcDef,
 		Data:         encResult.Data,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `{"intVal":"42"}`, decResult.Body)
 
 	tupleDef := `{
@@ -259,14 +261,14 @@ func TestEncodeDecodeABIData(t *testing.T) {
 		Definition:   tupleDef,
 		Body:         `{ "intVal": 42 }`,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	decResult, err = td.d.DecodeData(td.ctx, &prototk.DecodeDataRequest{
 		EncodingType: prototk.EncodingType_TUPLE,
 		Definition:   tupleDef,
 		Data:         encResult.Data,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `{"intVal":"42"}`, decResult.Body)
 
 	txEIP1559_a, err := td.d.EncodeData(td.ctx, &prototk.EncodeDataRequest{
@@ -276,7 +278,7 @@ func TestEncodeDecodeABIData(t *testing.T) {
 		  "to": "0x05d936207F04D81a85881b72A0D17854Ee8BE45A"
 		}`,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	txEIP1559_b, err := td.d.EncodeData(td.ctx, &prototk.EncodeDataRequest{
 		EncodingType: prototk.EncodingType_ETH_TRANSACTION,
@@ -285,7 +287,7 @@ func TestEncodeDecodeABIData(t *testing.T) {
 		  "to": "0x05d936207F04D81a85881b72A0D17854Ee8BE45A"
 		}`,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, txEIP1559_a, txEIP1559_b)
 
 	txEIP155, err := td.d.EncodeData(td.ctx, &prototk.EncodeDataRequest{
@@ -295,7 +297,7 @@ func TestEncodeDecodeABIData(t *testing.T) {
 		  "to": "0x05d936207F04D81a85881b72A0D17854Ee8BE45A"
 		}`,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEqual(t, txEIP155, txEIP1559_a)
 
 	original, err := td.d.DecodeData(td.ctx, &prototk.DecodeDataRequest{
@@ -328,7 +330,7 @@ func TestEncodeDecodeABIData(t *testing.T) {
 			ethtypes.MustNewHexBytes0xPrefix("0x000000000000000000000000dbfd76af2157dc15ee4e57f3f942bb45ba84af24"),
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `{"from":"dafce4acc2703a24f29d1321adaadf5768f54642","to":"dbfd76af2157dc15ee4e57f3f942bb45ba84af24","value":"42"}`, decResult.Body)
 
 	eventDef = `{
@@ -353,7 +355,7 @@ func TestEncodeDecodeABIData(t *testing.T) {
 			ethtypes.MustNewHexBytes0xPrefix("0xcac03685d5ba4ab3e1465a8ee1b2bb21094ddbd612a969fd34f93a5be7a0ac4f"),
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `{"contractAddress":"3153e3e67d3d4be35aa5baff60b5a862f55a5431","encodedCall":"60fe47b10000000000000000000000000000000000000000000000000000000000000064"}`, decResult.Body)
 
 }
@@ -430,7 +432,7 @@ func TestEncodeDecodeABIDataWithSigningEIP1559(t *testing.T) {
 		}`,
 		KeyIdentifier: "key1",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	original, err := td.d.DecodeData(td.ctx, &prototk.DecodeDataRequest{
 		EncodingType: prototk.EncodingType_ETH_TRANSACTION_SIGNED,
@@ -466,7 +468,7 @@ func TestEncodeDecodeABIDataWithSigningEIP155(t *testing.T) {
 		}`,
 		KeyIdentifier: "key1",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	original, err := td.d.DecodeData(td.ctx, &prototk.DecodeDataRequest{
 		EncodingType: prototk.EncodingType_ETH_TRANSACTION_SIGNED,
@@ -520,6 +522,57 @@ func TestRecoverSignature(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, kp.Address.String(), res.Verifier)
+}
+
+func TestSendTransaction(t *testing.T) {
+	txID := uuid.New()
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
+		mc.txManager.On("SendTransactions", mock.Anything, mock.Anything, mock.Anything).Return([]uuid.UUID{txID}, nil)
+	})
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	td.c.readOnly = false
+
+	_, err := td.d.SendTransaction(td.ctx, &prototk.SendTransactionRequest{
+		StateQueryContext: td.c.id,
+		Transaction: &prototk.TransactionInput{
+			ContractAddress: "0x05d936207F04D81a85881b72A0D17854Ee8BE45A",
+			FunctionAbiJson: `{}`,
+			ParamsJson:      `{}`,
+		},
+	})
+	require.NoError(t, err)
+}
+
+func TestSendTransactionFail(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
+		mc.txManager.On("SendTransactions", mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
+	})
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	td.c.readOnly = false
+
+	_, err := td.d.SendTransaction(td.ctx, &prototk.SendTransactionRequest{
+		StateQueryContext: td.c.id,
+		Transaction: &prototk.TransactionInput{
+			ContractAddress: "0x05d936207F04D81a85881b72A0D17854Ee8BE45A",
+			FunctionAbiJson: `{}`,
+			ParamsJson:      `{}`,
+		},
+	})
+	require.EqualError(t, err, "pop")
+}
+
+func TestLocalNodeName(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	res, err := td.d.LocalNodeName(td.ctx, &prototk.LocalNodeNameRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, "node1", res.Name)
 }
 
 func TestDomainInitTransactionMissingInput(t *testing.T) {
@@ -606,13 +659,13 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	state4 := storeTestState(t, td, ptx.ID, ethtypes.NewHexInteger64(4444444))
 
 	state5 := &fakeState{
-		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Salt:   tktypes.RandBytes32(),
 		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
 		Amount: ethtypes.NewHexInteger64(5555555),
 	}
 
 	state6 := &fakeState{
-		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Salt:   tktypes.RandBytes32(),
 		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
 		Amount: ethtypes.NewHexInteger64(6666666),
 	}
@@ -957,7 +1010,7 @@ func TestDomainWritePotentialStatesBadSchema(t *testing.T) {
 
 func TestDomainWritePotentialStatesFail(t *testing.T) {
 	schema := componentmocks.NewSchema(t)
-	schemaID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schemaID := tktypes.RandBytes32()
 	schema.On("ID").Return(schemaID)
 	schema.On("Signature").Return("schema1_signature")
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(schema), mockBlockHeight)
@@ -975,7 +1028,7 @@ func TestDomainWritePotentialStatesFail(t *testing.T) {
 
 func TestDomainWritePotentialStatesBadID(t *testing.T) {
 	schema := componentmocks.NewSchema(t)
-	schemaID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schemaID := tktypes.RandBytes32()
 	schema.On("ID").Return(schemaID)
 	schema.On("Signature").Return("schema1_signature")
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(schema), mockBlockHeight)
@@ -1516,4 +1569,206 @@ func TestGetPSCInitError(t *testing.T) {
 	psc, err := td.dm.GetSmartContractByAddress(td.ctx, td.c.dbTX, *addr)
 	require.Regexp(t, "pop", err) // domain no longer configured
 	assert.Nil(t, psc)
+}
+
+func goodWrapPGTxCall(psc *domainContract, salt tktypes.Bytes32) (*pldapi.TransactionInput, error) {
+	tx := &pldapi.PrivacyGroupEVMTX{
+		From:  "from.addr",
+		To:    confutil.P(psc.Address()),
+		Gas:   confutil.P(tktypes.HexUint64(12345)),
+		Value: tktypes.Uint64ToUint256(10000000000),
+		Input: tktypes.JSONString(map[string]any{
+			"who":   tktypes.MustEthAddress("0x09ec006415815b28538d5b9b2d3c0b5d7f43e7f6"),
+			"thing": "stuff",
+		}),
+		Function: &abi.Entry{
+			Type: abi.Function,
+			Name: "doAThing",
+			Inputs: abi.ParameterArray{
+				{Type: "address", Name: "who"},
+				{Type: "string", Name: "thing"},
+			},
+		},
+	}
+	return psc.WrapPrivacyGroupEVMTX(context.Background(), &pldapi.PrivacyGroup{
+		GenesisSalt: salt,
+		Name:        "pg1",
+	}, tx)
+}
+
+func TestWrapPGTxOk(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupEVMTX = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error) {
+		require.Equal(t, "pg1", wpgtr.PrivacyGroup.Name)
+		var fnDef abi.Entry
+		err := json.Unmarshal([]byte(*wpgtr.Transaction.FunctionAbiJson), &fnDef)
+		require.NoError(t, err)
+		paramsJson := tktypes.JSONString(map[string]any{
+			"pgName":            wpgtr.PrivacyGroup.Name,
+			"gas":               wpgtr.Transaction.Gas,
+			"value":             wpgtr.Transaction.Value,
+			"wrappedParamsJSON": tktypes.RawJSON(*wpgtr.Transaction.InputJson),
+		}).Pretty()
+		return &prototk.WrapPrivacyGroupEVMTXResponse{
+			Transaction: &prototk.PreparedTransaction{
+				ContractAddress: confutil.P(psc.Address().String()),
+				Type:            prototk.PreparedTransaction_PRIVATE,
+				RequiredSigner:  confutil.P("pgroup.signer"),
+				FunctionAbiJson: tktypes.JSONString(&abi.Entry{
+					Type: abi.Function,
+					Name: "wrappedDoThing",
+					Inputs: abi.ParameterArray{
+						{Name: "pgName", Type: "string"},
+						{Name: "gas", Type: "uint64"},
+						{Name: "value", Type: "uint256"},
+						{Name: "wrappedParamsJSON", Type: "tuple", Components: fnDef.Inputs},
+					},
+				}).Pretty(),
+				ParamsJson: paramsJson,
+			},
+		}, nil
+	}
+
+	salt := tktypes.RandBytes32()
+	tx, err := goodWrapPGTxCall(psc, salt)
+	require.NoError(t, err)
+
+	require.JSONEq(t, fmt.Sprintf(`{
+		"type":           "private",
+		"domain":         "test1",
+		"function":       "wrappedDoThing",
+		"from":           "pgroup.signer",
+		"to":             "%s",
+		"data": {
+			"pgName": "pg1",
+			"gas": "0x3039",
+			"value": "0x02540be400",
+			"wrappedParamsJSON": {
+			   "who": "0x09ec006415815b28538d5b9b2d3c0b5d7f43e7f6",
+			   "thing": "stuff"
+			}
+		},
+		"abi": [{
+			"type": "function",
+			"name": "wrappedDoThing",
+			"inputs": [
+				{ "name": "pgName", "type": "string" },
+				{ "name": "gas", "type": "uint64" },
+				{ "name": "value", "type": "uint256" },
+				{
+					"components": [
+						{
+							"name": "who",
+							"type": "address"
+						},
+						{
+							"name": "thing",
+							"type": "string"
+						}
+					],
+					"name": "wrappedParamsJSON",
+					"type": "tuple"
+				}
+			],
+			"outputs": null
+		}]
+	}`, psc.Address()), tktypes.JSONString(tx).Pretty())
+}
+
+func TestWrapPGFail(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupEVMTX = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	require.Regexp(t, "pop", err)
+}
+
+func TestWrapPGBadTxType(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupEVMTX = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error) {
+		return &prototk.WrapPrivacyGroupEVMTXResponse{
+			Transaction: &prototk.PreparedTransaction{
+				Type: prototk.PreparedTransaction_PUBLIC,
+			},
+		}, nil
+	}
+
+	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	require.Regexp(t, "PD011665", err)
+}
+
+func TestWrapPGBadToAddr(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupEVMTX = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error) {
+		return &prototk.WrapPrivacyGroupEVMTXResponse{
+			Transaction: &prototk.PreparedTransaction{
+				Type:            prototk.PreparedTransaction_PRIVATE,
+				ContractAddress: confutil.P("wrong"),
+			},
+		}, nil
+	}
+
+	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	require.Regexp(t, "bad address", err)
+}
+
+func TestWrapPGWrongToAddr(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupEVMTX = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error) {
+		return &prototk.WrapPrivacyGroupEVMTXResponse{
+			Transaction: &prototk.PreparedTransaction{
+				Type:            prototk.PreparedTransaction_PRIVATE,
+				ContractAddress: confutil.P(tktypes.RandAddress().String()),
+			},
+		}, nil
+	}
+
+	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	require.Regexp(t, "PD011666", err)
+}
+
+func TestWrapPGBadData(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	psc := goodPSC(t, td)
+
+	td.tp.Functions.WrapPrivacyGroupEVMTX = func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error) {
+		return &prototk.WrapPrivacyGroupEVMTXResponse{
+			Transaction: &prototk.PreparedTransaction{
+				Type: prototk.PreparedTransaction_PRIVATE,
+			},
+		}, nil
+	}
+
+	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	require.Regexp(t, "PD011612", err)
 }

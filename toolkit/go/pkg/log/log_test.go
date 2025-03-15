@@ -42,33 +42,39 @@ func TestLogContextLimited(t *testing.T) {
 func TestSettingErrorLevel(t *testing.T) {
 	SetLevel("eRrOr")
 	assert.Equal(t, logrus.ErrorLevel, logrus.GetLevel())
+	assert.Equal(t, "error", GetLevel())
 }
 
 func TestSettingWarnLevel(t *testing.T) {
 	SetLevel("WARNING")
 	assert.Equal(t, logrus.WarnLevel, logrus.GetLevel())
+	assert.Equal(t, "warn", GetLevel())
 }
 
 func TestSettingDebugLevel(t *testing.T) {
 	SetLevel("DEBUG")
 	assert.True(t, IsDebugEnabled())
 	assert.Equal(t, logrus.DebugLevel, logrus.GetLevel())
+	assert.Equal(t, "debug", GetLevel())
 }
 
 func TestSettingTraceLevel(t *testing.T) {
 	SetLevel("trace")
 	assert.True(t, IsTraceEnabled())
 	assert.Equal(t, logrus.TraceLevel, logrus.GetLevel())
+	assert.Equal(t, "trace", GetLevel())
 }
 
 func TestSettingInfoLevel(t *testing.T) {
 	SetLevel("info")
 	assert.Equal(t, logrus.InfoLevel, logrus.GetLevel())
+	assert.Equal(t, "info", GetLevel())
 }
 
 func TestSettingDefaultLevel(t *testing.T) {
 	SetLevel("something else")
 	assert.Equal(t, logrus.InfoLevel, logrus.GetLevel())
+	assert.Equal(t, "info", GetLevel())
 }
 
 func TestSetFormatting(t *testing.T) {

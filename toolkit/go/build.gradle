@@ -104,17 +104,7 @@ task goGet(type:Exec, dependsOn: protoc) {
     args './pkg/...'
 }
 
-task makeMocks(type: Mockery, dependsOn: [":installMockery", protoc, goGet]) {
-    args '--case', 'underscore'
-    mock {
-        inputDir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
-        includeAll true
-        outputPackage 'rpcbackendmocks'
-        outputDir 'mocks/rpcbackendmocks'
-    }
-}
-
-task lint(type: Exec, dependsOn:[protoc, makeMocks, ":installGolangCILint"]) {
+task lint(type: Exec, dependsOn:[protoc, ":installGolangCILint"]) {
     workingDir '.'
 
     helpers.lockResource(it, "lint.lock")
@@ -144,7 +134,7 @@ task generateDocs(type: Exec) {
     
 }
 
-task test(type: Exec, dependsOn: [goGet, makeMocks]) {
+task test(type: Exec, dependsOn: [goGet]) {
     inputs.files(getProject().goFiles)
     outputs.dir('coverage')
 

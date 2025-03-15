@@ -23,6 +23,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -36,9 +37,12 @@ func newTestDomainContextWithFlush(t *testing.T) (dc *componentmocks.DomainConte
 	}).Maybe()
 
 	flushResult = make(chan error, 1)
-	dc.On("Flush", mock.Anything).Return(func(err error) {
-		flushResult <- err
-	}, nil)
+	dc.On("Flush", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		dbTX := args[0].(persistence.DBTX)
+		dbTX.AddFinalizer(func(ctx context.Context, err error) {
+			flushResult <- err
+		})
+	})
 	return
 }
 
@@ -51,7 +55,6 @@ func TestRunBatchFinalizeOperations(t *testing.T) {
 	testRevertReason := "test error"
 	testTxnID := uuid.New()
 	testContractAddress := tktypes.RandAddress()
-	dbTX := m.persistence.P.DB()
 	testSyncPointOperations := []*syncPointOperation{
 		{
 			domainContext:   dc,
@@ -71,12 +74,16 @@ func TestRunBatchFinalizeOperations(t *testing.T) {
 		},
 	}
 
-	m.txMgr.On("FinalizeTransactions", ctx, dbTX, expectedReceipts).Return(nil)
+	m.txMgr.On("FinalizeTransactions", mock.Anything, mock.Anything, expectedReceipts).Return(nil)
 
-	dbResultCB, res, err := s.runBatch(ctx, dbTX, testSyncPointOperations)
+	m.persistence.Mock.ExpectBegin()
+	m.persistence.Mock.ExpectCommit()
+	err := m.persistence.P.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		res, err := s.runBatch(ctx, dbTX, testSyncPointOperations)
+		require.Len(t, res, 1)
+		return err
+	})
 	assert.NoError(t, err)
-	require.Len(t, res, 1)
-	dbResultCB(nil)
 	require.NoError(t, <-flushResult)
 
 }
@@ -96,7 +103,6 @@ func TestRunBatchFinalizeOperationsMixedContractAddresses(t *testing.T) {
 	testTxnID2b := uuid.New()
 	testContractAddress1 := tktypes.RandAddress()
 	testContractAddress2 := tktypes.RandAddress()
-	dbTX := m.persistence.P.DB()
 	testSyncPointOperations := []*syncPointOperation{
 		{
 			domainContext:   dc,
@@ -151,12 +157,16 @@ func TestRunBatchFinalizeOperationsMixedContractAddresses(t *testing.T) {
 		},
 	}
 
-	m.txMgr.On("FinalizeTransactions", ctx, dbTX, expectedReceipts).Return(nil)
+	m.txMgr.On("FinalizeTransactions", mock.Anything, mock.Anything, expectedReceipts).Return(nil)
+	m.persistence.Mock.ExpectBegin()
+	m.persistence.Mock.ExpectCommit()
 
-	dbResultCB, res, err := s.runBatch(ctx, dbTX, testSyncPointOperations)
+	err := m.persistence.P.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		res, err := s.runBatch(ctx, dbTX, testSyncPointOperations)
+		require.Len(t, res, 4)
+		return err
+	})
 	assert.NoError(t, err)
-	require.Len(t, res, 4)
-	dbResultCB(nil)
 	require.NoError(t, <-flushResult)
 
 }

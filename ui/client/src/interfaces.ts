@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -126,3 +126,66 @@ export interface IABIDecodedEntry {
 }
 
 export type ABIUploadResponse = string
+
+export interface ITransportPeer {
+  name: string
+  stats: {
+    sentMsgs: number
+    receivedMsgs: number
+    sentBytes: number
+    receivedBytes: number
+    lastSend: string
+    lastReceive: string
+    reliableHighestSent: number
+    reliableAckBase: number
+  }
+  activated: string
+  outboundTransport: string
+  outbound: {
+    endpoint: string
+  }
+}
+
+export interface IVerifier {
+  verifier: string
+  type: string
+  algorithm: string
+}
+
+export interface IKeyEntry {
+  isKey: boolean
+  hasChildren: boolean
+  path: string
+  index: number
+  type: string
+  verifiers: IVerifier[] | null
+  wallet: string
+  keyHandle: string
+}
+
+export interface IKeyMappingAndVerifier {
+  identifier: string
+  keyHandle: string
+  path: {
+    index: number
+    name: string
+  }[]
+  verifier: IVerifier
+  wallet: string
+}
+
+export interface IFilterField {
+  label: string
+  name: string
+  type: 'string' | 'number' | 'boolean'
+  isUUID?: boolean
+  isHexValue?: boolean
+  emun?: string[]
+}
+
+export interface IFilter {
+  field: IFilterField,
+  operator: string
+  value: string
+  caseSensitive?: boolean
+}

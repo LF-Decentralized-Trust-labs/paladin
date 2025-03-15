@@ -22,7 +22,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestWriteFinalizeOperations(t *testing.T) {
@@ -37,7 +39,6 @@ func TestWriteFinalizeOperations(t *testing.T) {
 			FailureMessage: testRevertReason,
 		},
 	}
-	dbTX := m.persistence.P.DB()
 
 	expectedReceipts := []*components.ReceiptInput{
 		{
@@ -47,7 +48,12 @@ func TestWriteFinalizeOperations(t *testing.T) {
 		},
 	}
 
-	m.txMgr.On("FinalizeTransactions", ctx, dbTX, expectedReceipts).Return(nil)
-	err := s.writeFailureOperations(ctx, dbTX, finalizeOperations)
+	m.txMgr.On("FinalizeTransactions", mock.Anything, mock.Anything, expectedReceipts).Return(nil)
+	m.persistence.Mock.ExpectBegin()
+	m.persistence.Mock.ExpectCommit()
+
+	err := m.persistence.P.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		return s.writeFailureOperations(ctx, dbTX, finalizeOperations)
+	})
 	assert.NoError(t, err)
 }

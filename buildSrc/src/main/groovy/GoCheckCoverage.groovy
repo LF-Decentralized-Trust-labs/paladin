@@ -33,7 +33,7 @@ class GoCheckCoverage extends DefaultTask {
         } else if (totalCoverage.toFloat() - target > maxGap) {
             throw new GradleException(
                 "ERROR: The target coverage ${target}% is below the current coverage: ${totalCoverage}% by " +
-                "more than ${maxGap}%, please update the target value in ./core/go/build.gradle file"
+                "more than ${maxGap}%; please update the target value in build.gradle."
             )
         } else {
             println "Coverage is above ${target}%, current coverage: ${totalCoverage}%"

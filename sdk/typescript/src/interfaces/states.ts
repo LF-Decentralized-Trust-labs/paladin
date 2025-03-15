@@ -68,3 +68,10 @@ export interface IStateNullifier {
   id: string;
   spent?: IStateSpend;
 }
+
+export type StateStatus =
+  | "available"
+  | "confirmed"
+  | "unconfirmed"
+  | "spent"
+  | "all";

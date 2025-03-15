@@ -5,9 +5,18 @@ on:
       NPM_TOKEN:
         description: 'NPM token'
         required: true
+    inputs:
+      sdk_version:
+        description: 'The version to publish'
+        required: true
+        type: string
   workflow_dispatch:
+    inputs:
+      sdk_version:
+        description: 'The version to publish'
+        required: true
+        type: string
 
-    
 jobs:
   publish:
     permissions:
@@ -28,7 +37,15 @@ jobs:
 
       - name: Install pre-requisites
         uses: ./.github/actions/setup
-       
+
+      # Override package.json version
+      - name: Override SDK version
+        uses: ./.github/actions/update-json
+        with:
+          file: 'sdk/typescript/package.json'
+          key: 'version'
+          value: ${{ inputs.sdk_version }}
+
       - name: Publish to npm
         continue-on-error: true # this can fail if the version is already published
         working-directory: sdk/typescript
@@ -39,4 +56,4 @@ jobs:
           npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
+          

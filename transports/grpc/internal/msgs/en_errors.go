@@ -19,32 +19,33 @@ package msgs
 import (
 	"sync"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"golang.org/x/text/language"
 )
 
 var registered sync.Once
-var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey {
+var pde = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey {
 	registered.Do(func() {
 		i18n.RegisterPrefix("PD03", "Paladin GRPC Transport")
 	})
-	return i18n.FFE(language.AmericanEnglish, key, translation, statusHint...)
+	return i18n.PDE(language.AmericanEnglish, key, translation, statusHint...)
 }
 
 var (
 	// Generic PD0300XX
-	MsgListenerPortAndAddressRequired       = ffe("PD030000", "port and address for listener are required")
-	MsgInvalidTransportConfig               = ffe("PD030001", "Invalid transport configuration")
-	MsgConfIncompatibleWithDirectCertVerify = ffe("PD030002", "When directCertVerification is enabled, TLS and clientAuth must be enabled, with no additional CA configuration or insecureSkipHostVerify")
-	MsgInvalidSubjectRegexp                 = ffe("PD030003", "subjectMatchRegex is invalid")
-	MsgVerifierRequiresOneCert              = ffe("PD030004", "certificate verifier expected exactly one certificate from peer certs=%d")
-	MsgSubjectRegexpMismatch                = ffe("PD030005", "subjectMatchRegex did not match the subject in the certificate")
-	MsgPeerTransportDetailsInvalid          = ffe("PD030006", "published peer transport details for node '%s' are invalid")
-	MsgPeerCertificateIssuerInvalid         = ffe("PD030007", "peer '%s' did not provide a certificate signed an expected issuer received=%s issuers=%v")
-	MsgTLSNegotiationFailed                 = ffe("PD030008", "TLS negotiation did not result in a verified peer node name")
-	MsgAuthContextNotAvailable              = ffe("PD030009", "server failed to retrieve the auth context")
-	MsgInvalidReplyToNode                   = ffe("PD030010", "replyTo node does not match sending node")
-	MsgConnectionToWrongNode                = ffe("PD030011", "the TLS identity of the node '%s' does not match the expected node '%s'")
-	MsgPEMCertificateInvalid                = ffe("PD030012", "invalid PEM encoded x509 certificate")
-	MsgErrorNoTargetNode                    = ffe("PD030013", "request to send message but no target node specified")
+	MsgListenerPortAndAddressRequired       = pde("PD030000", "port and address for listener are required")
+	MsgInvalidTransportConfig               = pde("PD030001", "Invalid transport configuration")
+	MsgConfIncompatibleWithDirectCertVerify = pde("PD030002", "When directCertVerification is enabled, TLS and clientAuth must be enabled, with no additional CA configuration or insecureSkipHostVerify")
+	MsgInvalidSubjectRegexp                 = pde("PD030003", "subjectMatchRegex is invalid")
+	MsgVerifierRequiresOneCert              = pde("PD030004", "certificate verifier expected exactly one certificate from peer certs=%d")
+	MsgSubjectRegexpMismatch                = pde("PD030005", "subjectMatchRegex did not match the subject in the certificate")
+	MsgPeerTransportDetailsInvalid          = pde("PD030006", "published peer transport details for node '%s' are invalid")
+	MsgPeerCertificateIssuerInvalid         = pde("PD030007", "peer '%s' did not provide a certificate signed an expected issuer received=%s issuers=%v")
+	MsgTLSNegotiationFailed                 = pde("PD030008", "TLS negotiation did not result in a verified peer node name")
+	MsgAuthContextNotAvailable              = pde("PD030009", "server failed to retrieve the auth context")
+	MsgConnectionToWrongNode                = pde("PD030011", "the TLS identity of the node '%s' does not match the expected node '%s'")
+	MsgPEMCertificateInvalid                = pde("PD030012", "invalid PEM encoded x509 certificate")
+	MsgInvalidTransportDetails              = pde("PD030014", "Invalid transport details for node '%s'")
+	MsgConnectionFailed                     = pde("PD030015", "GRPC connection failed for endpoint '%s'")
+	MsgNodeNotActive                        = pde("PD030016", "Send for node that is not active '%s'")
 )

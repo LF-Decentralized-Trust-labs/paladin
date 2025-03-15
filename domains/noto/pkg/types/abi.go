@@ -30,18 +30,28 @@ var notoPrivateJSON []byte
 var NotoABI = solutils.MustParseBuildABI(notoPrivateJSON)
 
 type ConstructorParams struct {
-	Notary          string      `json:"notary"`                    // Lookup string for the notary identity
-	Implementation  string      `json:"implementation,omitempty"`  // Use a specific implementation of Noto that was registered to the factory (blank to use default)
-	Hooks           *HookParams `json:"hooks,omitempty"`           // Configure hooks for programmable logic around Noto operations
-	RestrictMinting *bool       `json:"restrictMinting,omitempty"` // Only allow notary to mint (default: true)
-	AllowBurning    *bool       `json:"allowBurning,omitempty"`    // Allow token holders to burn their tokens (default: true)
+	Notary         string      `json:"notary"`                   // Lookup string for the notary identity
+	NotaryMode     NotaryMode  `json:"notaryMode"`               // Notary mode (basic or hooks)
+	Implementation string      `json:"implementation,omitempty"` // Use a specific implementation of Noto that was registered to the factory (blank to use default)
+	Options        NotoOptions `json:"options"`                  // Configure options for the chosen notary mode
 }
 
-// Currently the only supported hooks are provided via a Pente private smart contract
-type HookParams struct {
-	PrivateGroup   *PentePrivateGroup  `json:"privateGroup,omitempty"`   // Details on a Pente privacy group
-	PublicAddress  *tktypes.EthAddress `json:"publicAddress,omitempty"`  // Public address of the Pente privacy group
-	PrivateAddress *tktypes.EthAddress `json:"privateAddress,omitempty"` // Private address of the hook contract deployed within the privacy group
+type NotaryMode string
+
+const (
+	NotaryModeBasic NotaryMode = "basic"
+	NotaryModeHooks NotaryMode = "hooks"
+)
+
+func (tt NotaryMode) Enum() tktypes.Enum[NotaryMode] {
+	return tktypes.Enum[NotaryMode](tt)
+}
+
+func (tt NotaryMode) Options() []string {
+	return []string{
+		string(NotaryModeBasic),
+		string(NotaryModeHooks),
+	}
 }
 
 type MintParams struct {
@@ -66,6 +76,38 @@ type ApproveParams struct {
 	Outputs  []*pldapi.StateEncoded `json:"outputs"`
 	Data     tktypes.HexBytes       `json:"data"`
 	Delegate *tktypes.EthAddress    `json:"delegate"`
+}
+
+type LockParams struct {
+	Amount *tktypes.HexUint256 `json:"amount"`
+	Data   tktypes.HexBytes    `json:"data"`
+}
+
+type UnlockParams struct {
+	LockID     tktypes.Bytes32    `json:"lockId"`
+	From       string             `json:"from"`
+	Recipients []*UnlockRecipient `json:"recipients"`
+	Data       tktypes.HexBytes   `json:"data"`
+}
+
+type DelegateLockParams struct {
+	LockID   tktypes.Bytes32     `json:"lockId"`
+	Unlock   *UnlockPublicParams `json:"unlock"`
+	Delegate *tktypes.EthAddress `json:"delegate"`
+	Data     tktypes.HexBytes    `json:"data"`
+}
+
+type UnlockRecipient struct {
+	To     string              `json:"to"`
+	Amount *tktypes.HexUint256 `json:"amount"`
+}
+
+type UnlockPublicParams struct {
+	LockedInputs  []string         `json:"lockedInputs"`
+	LockedOutputs []string         `json:"lockedOutputs"`
+	Outputs       []string         `json:"outputs"`
+	Signature     tktypes.HexBytes `json:"signature"`
+	Data          tktypes.HexBytes `json:"data"`
 }
 
 type ApproveExtraParams struct {

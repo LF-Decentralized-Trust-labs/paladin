@@ -23,11 +23,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
@@ -130,7 +130,7 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 		}
 		if bl.newHeadsSub == nil {
 			// Once subscribed the backend will keep us subscribed over reconnect
-			sub, rpcErr := bl.wsConn.Subscribe(bl.ctx, "newHeads")
+			sub, rpcErr := bl.wsConn.Subscribe(bl.ctx, rpcclient.EthSubscribeConfig(), "newHeads")
 			if rpcErr != nil {
 				return true, rpcErr
 			}

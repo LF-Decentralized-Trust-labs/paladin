@@ -84,7 +84,6 @@ export const TimestampDialog: React.FC<Props> = ({
       </DialogContent>
       <DialogActions sx={{ justifyContent: 'center', marginBottom: '15px' }}>
         <Button
-          sx={{ textTransform: 'none' }}
           onClick={() => setDialogOpen(false)}
           variant="contained"
           disableElevation>

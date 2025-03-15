@@ -16,6 +16,17 @@
             "cwd": "${workspaceFolder}/example/bond"
         },
         {
+            "name": "Lock example: run",
+            "request": "launch",
+            "runtimeArgs": [
+                "run",
+                "start"
+            ],
+            "runtimeExecutable": "npm",
+            "type": "node",
+            "cwd": "${workspaceFolder}/example/lock"
+        },
+        {
             "name": "Run Controller",
             "type": "go",
             "preLaunchTask": "check-running-on-kind",
@@ -30,6 +41,14 @@
             "presentation": {
                 "hidden": false
             }
+        },
+        {
+            "name": "Run perf test against quick start",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceRoot}/perf/pldperf/main.go",
+            "args": ["run", "-c", "../config/example-quick-start.yaml", "-i", "0"],
         }
     ]
 }

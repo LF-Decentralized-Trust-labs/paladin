@@ -20,8 +20,9 @@ import (
 )
 
 type TxManagerConfig struct {
-	ABI          ABIConfig          `json:"abi"`
-	Transactions TransactionsConfig `json:"transactions"`
+	ABI              ABIConfig          `json:"abi"`
+	Transactions     TransactionsConfig `json:"transactions"`
+	ReceiptListeners ReceiptListeners   `json:"receiptListeners"`
 }
 
 type ABIConfig struct {
@@ -30,6 +31,12 @@ type ABIConfig struct {
 
 type TransactionsConfig struct {
 	Cache CacheConfig `json:"cache"`
+}
+
+type ReceiptListeners struct {
+	Retry                 RetryConfig `json:"retry"`
+	ReadPageSize          *int        `json:"readPageSize"`
+	StateGapCheckInterval *string     `json:"stateGapCheckInterval"`
 }
 
 var TxManagerDefaults = &TxManagerConfig{
@@ -42,5 +49,10 @@ var TxManagerDefaults = &TxManagerConfig{
 		Cache: CacheConfig{
 			Capacity: confutil.P(100),
 		},
+	},
+	ReceiptListeners: ReceiptListeners{
+		Retry:                 GenericRetryDefaults.RetryConfig,
+		ReadPageSize:          confutil.P(100),
+		StateGapCheckInterval: confutil.P("1s"),
 	},
 }

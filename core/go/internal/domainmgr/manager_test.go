@@ -106,6 +106,7 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManager
 	}
 
 	dm := NewDomainManager(ctx, conf)
+
 	_, err = dm.PreInit(componentMocks)
 	require.NoError(t, err)
 	err = dm.PostInit(componentMocks)

@@ -13,31 +13,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.paladin.toolkit;
+ package io.kaleido.paladin.toolkit;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import java.util.HashMap;
-import java.util.Map;
-
-abstract class PluginBase<MSG> {
-
-    private static final Logger LOGGER = LogManager.getLogger(PluginBase.class);
-
-    abstract PluginInstance<MSG> newPluginInstance(String grpcTarget, String instanceId);
-
-    private final Map<String, PluginInstance<MSG>> instances = new HashMap<>();
-
-    public synchronized void startInstance(String grpcTarget, String instanceId) {
-        instances.put(instanceId, newPluginInstance(grpcTarget, instanceId));
-    }
-
-    public synchronized void stopInstance(String instanceId) {
-        PluginInstance<MSG> instance = instances.remove(instanceId);
-        if (instance != null) {
-            instance.shutdown();
-        }
-    }
-
-}
+ import io.kaleido.paladin.logging.PaladinLogging;
+ import org.apache.logging.log4j.Logger;
+ 
+ import java.util.HashMap;
+ import java.util.Map;
+ 
+ abstract class PluginBase<MSG> {
+ 
+     private static final Logger LOGGER = PaladinLogging.getLogger(PluginBase.class);
+ 
+     abstract PluginInstance<MSG> newPluginInstance(String grpcTarget, String instanceId);
+ 
+     private final Map<String, PluginInstance<MSG>> instances = new HashMap<>();
+ 
+     public synchronized void startInstance(String grpcTarget, String instanceId) {
+         LOGGER.info("starting plugin instance {}", instanceId);
+         instances.put(instanceId, newPluginInstance(grpcTarget, instanceId));
+     }
+ 
+     public synchronized void stopInstance(String instanceId) {
+         PluginInstance<MSG> instance = instances.remove(instanceId);
+         if (instance != null) {
+             instance.shutdown();
+         }
+     }
+ 
+ }
+ 

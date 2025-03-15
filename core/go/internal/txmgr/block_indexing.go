@@ -20,24 +20,24 @@ import (
 
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 )
 
 func (tm *txManager) blockIndexerPreCommit(
 	ctx context.Context,
-	dbTX *gorm.DB,
+	dbTX persistence.DBTX,
 	blocks []*pldapi.IndexedBlock,
 	transactions []*blockindexer.IndexedTransactionNotify,
-) (blockindexer.PostCommit, error) {
+) error {
 
 	// Pass the list of transactions to the public transaction manager, who will pass us back an
 	// ORDERED list of matches to transaction IDs based on the bindings.
 	txMatches, err := tm.publicTxMgr.MatchUpdateConfirmedTransactions(ctx, dbTX, transactions)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Ok now we have an ordered list of completions that match Paladin transactions
@@ -66,25 +66,28 @@ func (tm *txManager) blockIndexerPreCommit(
 
 	// Write the receipts themselves - only way of duplicates should be a rewind of
 	// the block explorer, so we simply OnConflict ignore
-	if err := tm.FinalizeTransactions(ctx, dbTX, finalizeInfo); err != nil {
-		return nil, err
+	err = tm.FinalizeTransactions(ctx, dbTX, finalizeInfo)
+	if err != nil {
+		return err
 	}
 
 	// Deliver the failures to the private transaction manager
 	if len(failedForPrivateTx) > 0 {
-		if err := tm.privateTxMgr.NotifyFailedPublicTx(ctx, dbTX, failedForPrivateTx); err != nil {
-			return nil, err
+		err = tm.privateTxMgr.NotifyFailedPublicTx(ctx, dbTX, failedForPrivateTx)
+		if err != nil {
+			return err
 		}
 	}
 
-	return func() {
+	dbTX.AddPostCommit(func(ctx context.Context) {
 		// We need to notify the public TX manager when the DB transaction for these has completed,
 		// so it can remove any in-memory processing (this is regardless of they were matched to
 		// a public or private transaction)
 		if len(txMatches) > 0 {
 			tm.publicTxMgr.NotifyConfirmPersisted(ctx, txMatches)
 		}
-	}, nil
+	})
+	return nil
 }
 
 func (tm *txManager) mapBlockchainReceipt(pubTx *components.PublicTxMatch) *components.ReceiptInput {

@@ -24,6 +24,8 @@ import "from_transport.proto";
 import "to_registry.proto";
 import "from_registry.proto";
 
+option java_multiple_files = true;
+
 message Header {
   enum MessageType {
     REGISTER = 0;
@@ -44,41 +46,47 @@ message DomainMessage {
   Header header = 1;
   // Request/reply exchanges initiated by the paladin node, to the domain
   oneof request_to_domain {
-    ConfigureDomainRequest      configure_domain =          1010;
-    InitDomainRequest           init_domain =               1020;
-    InitDeployRequest           init_deploy =               1030;
-    PrepareDeployRequest        prepare_deploy =            1040;
-    InitContractRequest         init_contract =             1050;
-    InitTransactionRequest      init_transaction =          1060;
-    AssembleTransactionRequest  assemble_transaction =      1070;
-    EndorseTransactionRequest   endorse_transaction =       1080;
-    PrepareTransactionRequest   prepare_transaction =       1090;
-    HandleEventBatchRequest     handle_event_batch =        1100;
-    InitCallRequest             init_call =                 1110;
-    ExecCallRequest             exec_call =                 1120;
-    SignRequest                 sign =                      1130;
-    GetVerifierRequest          get_verifier =              1140;
-    ValidateStateHashesRequest  validate_state_hashes =     1150;
-    BuildReceiptRequest         build_receipt =             1160;
+    ConfigureDomainRequest        configure_domain =             1010;
+    InitDomainRequest             init_domain =                  1020;
+    InitDeployRequest             init_deploy =                  1030;
+    PrepareDeployRequest          prepare_deploy =               1040;
+    InitContractRequest           init_contract =                1050;
+    InitTransactionRequest        init_transaction =             1060;
+    AssembleTransactionRequest    assemble_transaction =         1070;
+    EndorseTransactionRequest     endorse_transaction =          1080;
+    PrepareTransactionRequest     prepare_transaction =          1090;
+    HandleEventBatchRequest       handle_event_batch =           1100;
+    InitCallRequest               init_call =                    1110;
+    ExecCallRequest               exec_call =                    1120;
+    SignRequest                   sign =                         1130;
+    GetVerifierRequest            get_verifier =                 1140;
+    ValidateStateHashesRequest    validate_state_hashes =        1150;
+    BuildReceiptRequest           build_receipt =                1160;
+    ConfigurePrivacyGroupRequest  configure_privacy_group =      1170;
+    InitPrivacyGroupRequest       init_privacy_group =           1180;
+    WrapPrivacyGroupEVMTXRequest  wrap_privacy_group_evmtx =     1190;
   }
 
   oneof response_from_domain {
-    ConfigureDomainResponse     configure_domain_res =      1011;
-    InitDomainResponse          init_domain_res =           1021;
-    InitDeployResponse          init_deploy_res =           1031;
-    PrepareDeployResponse       prepare_deploy_res =        1041;
-    InitContractResponse        init_contract_res =         1051;
-    InitTransactionResponse     init_transaction_res =      1061;
-    AssembleTransactionResponse assemble_transaction_res =  1071;
-    EndorseTransactionResponse  endorse_transaction_res =   1081;
-    PrepareTransactionResponse  prepare_transaction_res =   1091;
-    HandleEventBatchResponse    handle_event_batch_res =    1101;
-    InitCallResponse            init_call_res =             1111;
-    ExecCallResponse            exec_call_res =             1121;
-    SignResponse                sign_res =                  1131;
-    GetVerifierResponse         get_verifier_res =          1141;
-    ValidateStateHashesResponse validate_state_hashes_res = 1151;
-    BuildReceiptResponse        build_receipt_res =         1161;
+    ConfigureDomainResponse       configure_domain_res =         1011;
+    InitDomainResponse            init_domain_res =              1021;
+    InitDeployResponse            init_deploy_res =              1031;
+    PrepareDeployResponse         prepare_deploy_res =           1041;
+    InitContractResponse          init_contract_res =            1051;
+    InitTransactionResponse       init_transaction_res =         1061;
+    AssembleTransactionResponse   assemble_transaction_res =     1071;
+    EndorseTransactionResponse    endorse_transaction_res =      1081;
+    PrepareTransactionResponse    prepare_transaction_res =      1091;
+    HandleEventBatchResponse      handle_event_batch_res =       1101;
+    InitCallResponse              init_call_res =                1111;
+    ExecCallResponse              exec_call_res =                1121;
+    SignResponse                  sign_res =                     1131;
+    GetVerifierResponse           get_verifier_res =             1141;
+    ValidateStateHashesResponse   validate_state_hashes_res =    1151;
+    BuildReceiptResponse          build_receipt_res =            1161;
+    ConfigurePrivacyGroupResponse configure_privacy_group_res =  1171;
+    InitPrivacyGroupResponse      init_privacy_group_res =       1181;
+    WrapPrivacyGroupEVMTXResponse wrap_privacy_group_evmtx_res = 1191;
   }
 
   // Request/reply exchanges initiated by the domain, to the paladin node
@@ -87,6 +95,9 @@ message DomainMessage {
     EncodeDataRequest           encode_data =               2020;
     DecodeDataRequest           decode_data =               2030;
     RecoverSignerRequest        recover_signer =            2040;
+    SendTransactionRequest      send_transaction =          2050;
+    LocalNodeNameRequest        local_node_name =           2060;
+    GetStatesByIDRequest        get_states_by_id =          2070;
   }
 
   oneof response_to_domain {
@@ -94,6 +105,9 @@ message DomainMessage {
     EncodeDataResponse          encode_data_res =           2021;
     DecodeDataResponse          decode_data_res =           2031;
     RecoverSignerResponse       recover_signer_res =        2041;
+    SendTransactionResponse     send_transaction_res =      2051;
+    LocalNodeNameResponse       local_node_name_res =       2061;
+    GetStatesByIDResponse       get_states_by_id_res =      2071;
   }
     
 }
@@ -105,12 +119,16 @@ message TransportMessage {
     ConfigureTransportRequest configure_transport =         1010;
     SendMessageRequest send_message =                       1020;
     GetLocalDetailsRequest get_local_details =              1030;
+    ActivatePeerRequest activate_peer =                     1040;
+    DeactivatePeerRequest deactivate_peer =                 1050;
   }
 
   oneof response_from_transport {
     ConfigureTransportResponse configure_transport_res =    1011;
     SendMessageResponse send_message_res =                  1021;
     GetLocalDetailsResponse get_local_details_res =         1031;
+    ActivatePeerResponse activate_peer_res =                1041;
+    DeactivatePeerResponse deactivate_peer_res =            1051;
   }
 
   // Request/reply exchanges initiated by the transport, to the paladin node
@@ -123,6 +141,7 @@ message TransportMessage {
     GetTransportDetailsResponse get_transport_details_res = 2011;
     ReceiveMessageResponse receive_message_res =            2021;
   }
+
 }
 
 message RegistryMessage {

@@ -20,14 +20,13 @@ import (
 	"encoding/json"
 	"math/big"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
@@ -47,25 +46,24 @@ func (h *burnHandler) ValidateParams(ctx context.Context, config *types.NotoPars
 	return &BurnParams, nil
 }
 
+func (h *burnHandler) checkAllowed(ctx context.Context, tx *types.ParsedTransaction) error {
+	if tx.DomainConfig.NotaryMode != types.NotaryModeBasic.Enum() {
+		return nil
+	}
+	if *tx.DomainConfig.Options.Basic.AllowBurn {
+		return nil
+	}
+	return i18n.NewError(ctx, msgs.MsgBurnNotAllowed)
+}
+
 func (h *burnHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 	notary := tx.DomainConfig.NotaryLookup
-
-	if !tx.DomainConfig.AllowBurning {
-		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
+	if err := h.checkAllowed(ctx, tx); err != nil {
+		return nil, err
 	}
+
 	return &prototk.InitTransactionResponse{
-		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
-			{
-				Lookup:       notary,
-				Algorithm:    algorithms.ECDSA_SECP256K1,
-				VerifierType: verifiers.ETH_ADDRESS,
-			},
-			{
-				Lookup:       tx.Transaction.From,
-				Algorithm:    algorithms.ECDSA_SECP256K1,
-				VerifierType: verifiers.ETH_ADDRESS,
-			},
-		},
+		RequiredVerifiers: h.noto.ethAddressVerifiers(notary, tx.Transaction.From),
 	}, nil
 }
 
@@ -73,17 +71,20 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	params := tx.Params.(*types.BurnParams)
 	notary := tx.DomainConfig.NotaryLookup
 
-	_, err := h.noto.findEthAddressVerifier(ctx, "notary", notary, req.ResolvedVerifiers)
-	if err != nil {
-		return nil, err
-	}
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
 	if err != nil {
 		return nil, err
 	}
 
-	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, req.StateQueryContext, fromAddress, params.Amount)
+	inputStates, revert, err := h.noto.prepareInputs(ctx, req.StateQueryContext, fromAddress, params.Amount)
 	if err != nil {
+		if revert {
+			message := err.Error()
+			return &prototk.AssembleTransactionResponse{
+				AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
+				RevertReason:   &message,
+			}, nil
+		}
 		return nil, err
 	}
 	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, tx.Transaction.From})
@@ -93,17 +94,17 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 
 	var outputCoins []*types.NotoCoin
 	var outputStates []*prototk.NewState
-	if total.Cmp(params.Amount.Int()) == 1 {
-		remainder := big.NewInt(0).Sub(total, params.Amount.Int())
-		returnedCoins, returnedStates, err := h.noto.prepareOutputs(fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
+	if inputStates.total.Cmp(params.Amount.Int()) == 1 {
+		remainder := big.NewInt(0).Sub(inputStates.total, params.Amount.Int())
+		returnedStates, err := h.noto.prepareOutputs(fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
 		if err != nil {
 			return nil, err
 		}
-		outputCoins = append(outputCoins, returnedCoins...)
-		outputStates = append(outputStates, returnedStates...)
+		outputCoins = append(outputCoins, returnedStates.coins...)
+		outputStates = append(outputStates, returnedStates.states...)
 	}
 
-	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, inputCoins, outputCoins)
+	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, inputStates.coins, outputCoins)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +112,7 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	return &prototk.AssembleTransactionResponse{
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
 		AssembledTransaction: &prototk.AssembledTransaction{
-			InputStates:  inputStates,
+			InputStates:  inputStates.states,
 			OutputStates: outputStates,
 			InfoStates:   infoStates,
 		},
@@ -140,19 +141,33 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 
 func (h *burnHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.BurnParams)
-	coins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
+	if err := h.checkAllowed(ctx, tx); err != nil {
+		return nil, err
+	}
+
+	inputs, err := h.noto.parseCoinList(ctx, "input", req.Inputs)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateBurnAmounts(ctx, params, coins); err != nil {
+	outputs, err := h.noto.parseCoinList(ctx, "output", req.Outputs)
+	if err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx, req, coins); err != nil {
+
+	// Validate the amounts, and sender's ownership of the inputs
+	if err := h.noto.validateBurnAmounts(ctx, params, inputs, outputs); err != nil {
+		return nil, err
+	}
+	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, inputs.coins, inputs.states); err != nil {
 		return nil, err
 	}
 
 	// Notary checks the signature from the sender, then submits the transaction
-	if err := h.noto.validateTransferSignature(ctx, tx, req, coins); err != nil {
+	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, inputs.coins, outputs.coins)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.noto.validateSignature(ctx, "sender", req.Signatures, encodedTransfer); err != nil {
 		return nil, err
 	}
 	return &prototk.EndorseTransactionResponse{
@@ -160,16 +175,7 @@ func (h *burnHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *burnHandler) baseLedgerBurn(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
-	inputs := make([]string, len(req.InputStates))
-	for i, state := range req.InputStates {
-		inputs[i] = state.Id
-	}
-	outputs := make([]string, len(req.OutputStates))
-	for i, state := range req.OutputStates {
-		outputs[i] = state.Id
-	}
-
+func (h *burnHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	// Include the signature from the sender/notary
 	// This is not verified on the base ledger, but can be verified by anyone with the unmasked state data
 	sender := domain.FindAttestation("sender", req.AttestationResult)
@@ -181,9 +187,9 @@ func (h *burnHandler) baseLedgerBurn(ctx context.Context, req *prototk.PrepareTr
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoTransferParams{
-		Inputs:    inputs,
-		Outputs:   outputs,
+	params := &NotoBurnParams{
+		Inputs:    endorsableStateIDs(req.InputStates),
+		Outputs:   endorsableStateIDs(req.OutputStates),
 		Signature: sender.Payload,
 		Data:      data,
 	}
@@ -193,12 +199,12 @@ func (h *burnHandler) baseLedgerBurn(ctx context.Context, req *prototk.PrepareTr
 	}
 	return &TransactionWrapper{
 		transactionType: prototk.PreparedTransaction_PUBLIC,
-		functionABI:     h.noto.contractABI.Functions()["transfer"],
+		functionABI:     interfaceBuild.ABI.Functions()["transfer"],
 		paramsJSON:      paramsJSON,
 	}, nil
 }
 
-func (h *burnHandler) hookBurn(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+func (h *burnHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.BurnParams)
 
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
@@ -214,49 +220,42 @@ func (h *burnHandler) hookBurn(ctx context.Context, tx *types.ParsedTransaction,
 		Sender: fromAddress,
 		From:   fromAddress,
 		Amount: inParams.Amount,
+		Data:   inParams.Data,
 		Prepared: PreparedTransaction{
 			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
 		},
 	}
 
-	transactionType := prototk.PreparedTransaction_PUBLIC
-	functionABI := solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onBurn"]
-	var paramsJSON []byte
-
-	if tx.DomainConfig.PrivateAddress != nil {
-		transactionType = prototk.PreparedTransaction_PRIVATE
-		functionABI = penteInvokeABI("onBurn", functionABI.Inputs)
-		penteParams := &PenteInvokeParams{
-			Group:  tx.DomainConfig.PrivateGroup,
-			To:     tx.DomainConfig.PrivateAddress,
-			Inputs: params,
-		}
-		paramsJSON, err = json.Marshal(penteParams)
-	} else {
-		// Note: public hooks aren't really useful except in testing, as they disclose everything
-		// TODO: remove this?
-		paramsJSON, err = json.Marshal(params)
-	}
+	transactionType, functionABI, paramsJSON, err := h.noto.wrapHookTransaction(
+		tx.DomainConfig,
+		hooksBuild.ABI.Functions()["onBurn"],
+		params,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &TransactionWrapper{
-		transactionType: transactionType,
+		transactionType: mapPrepareTransactionType(transactionType),
 		functionABI:     functionABI,
 		paramsJSON:      paramsJSON,
-		contractAddress: &tx.DomainConfig.NotaryAddress,
+		contractAddress: tx.DomainConfig.Options.Hooks.PublicAddress,
 	}, nil
 }
 
 func (h *burnHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	baseTransaction, err := h.baseLedgerBurn(ctx, req)
+	endorsement := domain.FindAttestation("notary", req.AttestationResult)
+	if endorsement == nil || endorsement.Verifier.Lookup != tx.DomainConfig.NotaryLookup {
+		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "notary")
+	}
+
+	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
-		hookTransaction, err := h.hookBurn(ctx, tx, req, baseTransaction)
+	if tx.DomainConfig.NotaryMode == types.NotaryModeHooks.Enum() {
+		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err
 		}

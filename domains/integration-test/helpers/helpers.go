@@ -23,11 +23,11 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldclient"
+	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,7 +43,7 @@ type TransactionHelper struct {
 type DomainTransactionHelper struct {
 	ctx context.Context
 	t   *testing.T
-	rpc rpcbackend.Backend
+	rpc rpcclient.Client
 	tx  *pldapi.TransactionInput
 }
 
@@ -94,7 +94,7 @@ func (th *TransactionHelper) FindEvent(txHash *tktypes.Bytes32, abi abi.ABI, eve
 	return nil
 }
 
-func NewDomainTransactionHelper(ctx context.Context, t *testing.T, rpc rpcbackend.Backend, to *tktypes.EthAddress, fn *abi.Entry, inputs tktypes.RawJSON) *DomainTransactionHelper {
+func NewDomainTransactionHelper(ctx context.Context, t *testing.T, rpc rpcclient.Client, to *tktypes.EthAddress, fn *abi.Entry, inputs tktypes.RawJSON) *DomainTransactionHelper {
 	return &DomainTransactionHelper{
 		ctx: ctx,
 		t:   t,
@@ -122,7 +122,7 @@ func (dth *DomainTransactionHelper) SignAndSend(signer string, confirm ...bool) 
 	go func() {
 		var result any
 		rpcerr := dth.rpc.CallRPC(dth.ctx, &result, "testbed_invoke", dth.tx, confirmEvents)
-		if rpcerr != nil && rpcerr.Error() != nil {
+		if rpcerr != nil {
 			tx.result <- rpcerr.Error()
 		}
 		tx.result <- result
@@ -135,18 +135,21 @@ func (dth *DomainTransactionHelper) Prepare(signer string) *testbed.TransactionR
 	dth.tx.From = signer
 	rpcerr := dth.rpc.CallRPC(dth.ctx, &result, "testbed_prepare", dth.tx)
 	if rpcerr != nil {
-		require.NoError(dth.t, rpcerr.Error())
+		require.NoError(dth.t, rpcerr)
 	}
 	return &result
 }
 
-func (st *SentDomainTransaction) Wait() {
+func (st *SentDomainTransaction) Wait() map[string]any {
 	result := <-st.result
 	switch r := result.(type) {
 	case error:
 		require.NoError(st.t, r)
+	case map[string]any:
+		return r
 	default:
 	}
+	return nil
 }
 
 func toJSON(t *testing.T, v any) []byte {

@@ -26,13 +26,28 @@ message ProvingRequest {
 
 message ProvingRequestCommon {
   repeated string inputCommitments = 1;
-  repeated uint64 inputValues = 2;
+  TokenType tokenType  = 2;
   repeated string inputSalts = 3;
   string inputOwner = 4;
   repeated string outputCommitments = 5;
-  repeated uint64 outputValues = 6;
-  repeated string outputSalts = 7;
-  repeated string outputOwners = 8;
+  repeated string outputSalts = 6;
+  repeated string outputOwners = 7;
+  bytes tokenSecrets = 8;
+}
+
+enum TokenType {
+  fungible = 0;
+  nunFungible = 1;
+}
+
+message TokenSecrets_Fungible {
+  repeated uint64 inputValues = 1;
+  repeated uint64 outputValues = 2;
+}
+
+message TokenSecrets_NonFungible {
+  repeated string tokenIds = 1;
+  repeated string tokenUris = 2;
 }
 
 message ProvingRequestExtras_Encryption {

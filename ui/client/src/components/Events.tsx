@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -16,7 +16,6 @@
 
 import { Alert, Box, LinearProgress, Typography, useTheme } from "@mui/material";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { t } from "i18next";
 import { fetchEvents } from "../queries/events";
 import { Event } from "./Event";
 import { useContext } from "react";
@@ -24,6 +23,7 @@ import { ApplicationContext } from "../contexts/ApplicationContext";
 import { getAltModeScrollBarStyle } from "../themes/default";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { IEvent } from "../interfaces";
+import { useTranslation } from "react-i18next";
 
 export const Events: React.FC = () => {
 
@@ -37,7 +37,8 @@ export const Events: React.FC = () => {
   });
 
   const theme = useTheme();
-  
+  const { t } = useTranslation();
+
   if (error) {
     return <Alert sx={{ margin: '30px' }} severity="error" variant="filled">{error.message}</Alert>
   }

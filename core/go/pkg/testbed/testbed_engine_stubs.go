@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/statedistribution"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -33,15 +33,20 @@ import (
 
 func (tb *testbed) ExecTransactionSync(ctx context.Context, tx *pldapi.TransactionInput) (receipt *pldapi.TransactionReceipt, err error) {
 	txm := tb.c.TxManager()
-	txID, err := tb.c.TxManager().SendTransaction(ctx, tx)
+	var txIDs []uuid.UUID
+	err = tb.Components().Persistence().Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		txIDs, err = tb.c.TxManager().SendTransactions(ctx, dbTX, tx)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
+	txID := txIDs[0]
 
 	ticker := time.NewTicker(100 * time.Millisecond)
 	for {
 		<-ticker.C
-		receipt, err = txm.GetTransactionReceiptByID(ctx, *txID)
+		receipt, err = txm.GetTransactionReceiptByID(ctx, txID)
 		if err != nil {
 			return nil, fmt.Errorf("error checking for transaction receipt: %s", err)
 		}
@@ -97,7 +102,7 @@ func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, signer string,
 }
 
 func (tb *testbed) ExecBaseLedgerCall(ctx context.Context, result any, tx *pldapi.TransactionCall) error {
-	return tb.Components().TxManager().CallTransaction(ctx, result, tx)
+	return tb.Components().TxManager().CallTransaction(ctx, tb.c.Persistence().NOTX(), result, tx)
 }
 
 func (tb *testbed) ResolveKey(ctx context.Context, fqLookup, algorithm, verifierType string) (resolvedKey *pldapi.KeyMappingAndVerifier, err error) {
@@ -152,16 +157,7 @@ func (tb *testbed) writeNullifiersToContext(dCtx components.DomainContext, tx *c
 		return fmt.Errorf("testbed does not support states for remote nodes")
 	}
 
-	// We construct a state distributor each time, but DO NOT START IT.
-	// TODO: State distributor needs to become a first class component with significant lifecycle activities
-	sd := statedistribution.NewStateDistributer(tb.ctx,
-		tb.c.TransportManager(),
-		tb.c.StateManager(),
-		tb.c.KeyManager(),
-		tb.c.Persistence(),
-		&pldconf.DistributerConfig{},
-	)
-	nullifiers, err := sd.BuildNullifiers(tb.ctx, distributions.Local)
+	nullifiers, err := tb.c.PrivateTxManager().BuildNullifiers(tb.ctx, distributions.Local)
 	if err != nil {
 		return err
 	}
@@ -195,7 +191,7 @@ func (tb *testbed) gatherEndorsements(dCtx components.DomainContext, tx *testbed
 					return fmt.Errorf("failed to resolve (local in testbed case) endorser for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
 				}
 				// Invoke the domain
-				endorseRes, err := tx.psc.EndorseTransaction(dCtx, tb.c.Persistence().DB(), &components.PrivateTransactionEndorseRequest{
+				endorseRes, err := tx.psc.EndorseTransaction(dCtx, tb.c.Persistence().NOTX(), &components.PrivateTransactionEndorseRequest{
 					TransactionSpecification: tx.ptx.PreAssembly.TransactionSpecification,
 					Verifiers:                tx.ptx.PreAssembly.Verifiers,
 					Signatures:               tx.ptx.PostAssembly.Signatures,

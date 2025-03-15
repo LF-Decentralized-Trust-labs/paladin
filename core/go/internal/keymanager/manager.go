@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -19,17 +19,19 @@ import (
 	"context"
 	"sync"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -104,48 +106,47 @@ func (km *keyManager) Sign(ctx context.Context, mapping *pldapi.KeyMappingAndVer
 	return w.sign(ctx, mapping, payloadType, payload)
 }
 
-func (km *keyManager) lockAllocationOrGetOwner(krc *keyResolver) *keyResolver {
+func (km *keyManager) lockAllocationOrGetOwner(kr *keyResolver) *keyResolver {
 	km.allocLock.Lock()
 	defer km.allocLock.Unlock()
 	if km.allocLockHolder != nil {
 		return km.allocLockHolder
 	}
-	km.allocLockHolder = krc
+	km.allocLockHolder = kr
 	return nil
 }
 
-func (km *keyManager) takeAllocationLock(krc *keyResolver) error {
-	ctx := krc.ctx
+func (km *keyManager) takeAllocationLock(ctx context.Context, kr *keyResolver) error {
 	for {
-		lockingKRC := km.lockAllocationOrGetOwner(krc)
+		lockingKRC := km.lockAllocationOrGetOwner(kr)
 		if lockingKRC == nil {
-			log.L(ctx).Debugf("key resolution context %s locked allocation", krc.id)
+			log.L(ctx).Debugf("key resolution context %s locked allocation", kr.id)
 			return nil
 		}
 		// There is contention on this path - wait until the lock is released, and try to get it again
 		select {
 		case <-lockingKRC.done:
 		case <-ctx.Done():
-			log.L(ctx).Debugf("key resolution context %s cancelled while waiting for allocation unlocked by %s", krc.id, lockingKRC.id)
+			log.L(ctx).Debugf("key resolution context %s cancelled while waiting for allocation unlocked by %s", kr.id, lockingKRC.id)
 			return i18n.NewError(ctx, msgs.MsgContextCanceled)
 		}
 	}
 }
 
-func (km *keyManager) unlockAllocation(krc *keyResolver) {
+func (km *keyManager) unlockAllocation(ctx context.Context, kr *keyResolver) {
 	km.allocLock.Lock()
 	defer km.allocLock.Unlock()
 
 	// We will have locks on all the parent paths
-	if km.allocLockHolder == krc {
-		log.L(krc.ctx).Debugf("key resolution context %s unlocked allocation", krc.id)
+	if km.allocLockHolder == kr {
+		log.L(ctx).Debugf("key resolution context %s unlocked allocation", kr.id)
 		km.allocLockHolder = nil
 	} else {
 		existingID := "null"
 		if km.allocLockHolder != nil {
 			existingID = km.allocLockHolder.id
 		}
-		log.L(krc.ctx).Errorf("key resolution context %s attempted to unlock allocation lock held by %s", krc.id, existingID)
+		log.L(ctx).Errorf("key resolution context %s attempted to unlock allocation lock held by %s", kr.id, existingID)
 	}
 }
 
@@ -190,33 +191,29 @@ func (km *keyManager) ResolveEthAddressBatchNewDatabaseTX(ctx context.Context, i
 // Convenience function
 func (km *keyManager) ResolveBatchNewDatabaseTX(ctx context.Context, algorithm, verifierType string, identifiers []string) (resolvedKeys []*pldapi.KeyMappingAndVerifier, err error) {
 	resolvedKeys = make([]*pldapi.KeyMappingAndVerifier, len(identifiers))
-	krc := km.NewKeyResolutionContextLazyDB(ctx)
-	defer func() {
-		if err != nil {
-			krc.Rollback()
-		} else {
-			err = krc.Commit()
+	err = km.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		kr := km.KeyResolverForDBTX(dbTX)
+		for i, identifier := range identifiers {
+			if err == nil {
+				resolvedKeys[i], err = kr.ResolveKey(ctx, identifier, algorithm, verifierType)
+			}
 		}
-	}()
-	for i, identifier := range identifiers {
-		if err == nil {
-			resolvedKeys[i], err = krc.KeyResolverLazyDB().ResolveKey(identifier, algorithm, verifierType)
-		}
-	}
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
 	return resolvedKeys, nil
 }
 
-func (km *keyManager) ReverseKeyLookup(ctx context.Context, dbTX *gorm.DB, algorithm, verifierType, verifier string) (*pldapi.KeyMappingAndVerifier, error) {
+func (km *keyManager) ReverseKeyLookup(ctx context.Context, dbTX persistence.DBTX, algorithm, verifierType, verifier string) (*pldapi.KeyMappingAndVerifier, error) {
 	vKey := verifierReverseCacheKey(algorithm, verifierType, verifier)
 	mapping, _ := km.verifierReverseCache.Get(vKey)
 	if mapping != nil {
 		return mapping, nil
 	}
 	var dbVerifiers []*DBKeyVerifier
-	err := dbTX.WithContext(ctx).
+	err := dbTX.DB().WithContext(ctx).
 		Where(`"algorithm" = ?`, algorithm).
 		Where(`"type" = ?`, verifierType).
 		Where(`"verifier" = ?`, verifier).
@@ -231,14 +228,65 @@ func (km *keyManager) ReverseKeyLookup(ctx context.Context, dbTX *gorm.DB, algor
 	}
 
 	// Now we need to look up the associated mapping and rebuild it
-	// NOTE: this is an internal-only use mode of a KRC that does not follow the external convention
-	krc := km.NewKeyResolutionContext(ctx)
-	defer krc.Close(false) // no changes to commit
-	mapping, err = krc.KeyResolver(dbTX).(*keyResolver).
-		resolveKey(dbVerifiers[0].Identifier, algorithm, verifierType, true /* existing only */)
+	// NOTE: this is an internal-only use mode of a KRC that does not follow the external convention. Which means
+	kr := km.newKeyResolver(dbTX, false /* allowing use with NOTX() */).(*keyResolver)
+	mapping, err = kr.resolveKey(ctx, dbVerifiers[0].Identifier, algorithm, verifierType, true /* existing only */)
 	if err != nil {
 		return nil, err
 	}
 	km.verifierReverseCache.Set(vKey, mapping)
 	return mapping, nil
+}
+
+func (km *keyManager) QueryKeys(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) (keyList []*pldapi.KeyQueryEntry, err error) {
+
+	q := filters.BuildGORM(ctx, jq,
+		dbTX.WithContext(ctx).
+			Table("key_paths"), KeyEntryFilters)
+
+	q.Select(`DISTINCT key_mappings.identifier IS NOT NULL AS "is_key",` +
+		`k.p IS NOT NULL AS "has_children",` +
+		`key_paths.parent AS "parent",` +
+		`key_paths."index" AS "index",` +
+		`key_paths.path AS "path",` +
+		`key_mappings.wallet AS "wallet",` +
+		`key_mappings.key_handle AS "key_handle"`,
+	)
+
+	q.Joins("LEFT OUTER JOIN key_mappings ON key_paths.path = key_mappings.identifier")
+	q.Joins(`LEFT OUTER JOIN (SELECT parent AS "p" from key_paths AS p) AS k ON key_paths.path = k.p`)
+	q.Where("key_paths.path != ''")
+
+	err = q.Find(&keyList).Error
+	if err != nil {
+		return nil, err
+	}
+
+	var ids []string
+	for _, k := range keyList {
+		ids = append(ids, k.Path)
+	}
+
+	var verifiers []*DBKeyVerifier
+
+	err = dbTX.Table("key_verifiers").
+		Where("identifier IN ?", ids).
+		Scan(&verifiers).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, k := range keyList {
+		for _, v := range verifiers {
+			if k.Path == v.Identifier {
+				k.Verifiers = append(k.Verifiers, &pldapi.KeyVerifier{
+					Verifier:  v.Verifier,
+					Type:      v.Type,
+					Algorithm: v.Algorithm,
+				})
+			}
+		}
+	}
+
+	return keyList, nil
 }

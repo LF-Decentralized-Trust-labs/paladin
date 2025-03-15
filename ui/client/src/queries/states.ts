@@ -36,3 +36,19 @@ export const fetchStateReceipt = async (
     )
   );
 };
+
+export const resolveVerifier = async (keyIdentifier: string, algorithm: string, verifierType: string): Promise<string> => {
+  const requestPayload = {
+    jsonrpc: "2.0",
+    id: Date.now(),
+    method: RpcMethods.ptx_resolveVerifier,
+    params: [keyIdentifier, algorithm, verifierType]
+  };
+
+  return <Promise<string>>(
+    returnResponse(
+      () => fetch(RpcEndpoint, generatePostReq(JSON.stringify(requestPayload))),
+      i18next.t("errorFetchingResolveVerifier"), []
+    )
+  );
+};

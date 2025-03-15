@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -16,13 +16,13 @@
 
 import { Box, Button, Grid2, Typography } from "@mui/material";
 import { IEvent } from "../interfaces";
-import { t } from "i18next";
 import { Hash } from "./Hash";
 import { EllapsedTime } from "./EllapsedTime";
 import VisibilityIcon from '@mui/icons-material/VisibilityOutlined';
 import { useState } from "react";
 import { ViewDetailsDialog } from "../dialogs/ViewDetails";
 import { HashIcon, Radio } from 'lucide-react';
+import { useTranslation } from "react-i18next";
 
 type Props = {
   event: IEvent
@@ -31,6 +31,7 @@ type Props = {
 export const Event: React.FC<Props> = ({ event }) => {
 
   const [viewDetailsDialogOpen, setViewDetailsDialogOpen] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <>
@@ -68,7 +69,7 @@ export const Event: React.FC<Props> = ({ event }) => {
         </Box>
         <Box sx={{ display: 'flex', padding: '10px', justifyContent: 'end' }}>
           <EllapsedTime timestamp={event.block.timestamp} />
-          <Button sx={{ marginLeft: '20px', textTransform: 'none', fontWeight: '400' }} size="small" startIcon={<VisibilityIcon />}
+          <Button sx={{ marginLeft: '20px', fontWeight: '400' }} size="small" startIcon={<VisibilityIcon />}
             onClick={() => setViewDetailsDialogOpen(true)}>{t('viewDetails')}</Button>
         </Box>
       </Box>

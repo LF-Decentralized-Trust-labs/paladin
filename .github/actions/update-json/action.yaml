@@ -1,0 +1,31 @@
+name: 'Update JSON File'
+description: 'Update values in a JSON file'
+inputs:
+  file:
+    description: 'The path to the JSON file to update'
+    required: true
+  key:
+    description: 'The JSON key to update'
+    required: true
+  value:
+    description: 'The new value to set for the key'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Install jq
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq
+
+    - name: Update JSON file
+      shell: bash
+      run: |
+        set -e
+        echo "Updating ${{ inputs.file }}"
+        
+        jq --arg key "${{ inputs.key }}" --arg value "${{ inputs.value }}" '.[$key] = $value' "${{ inputs.file }}" > temp.json && mv temp.json "${{ inputs.file }}"
+
+        echo "Updated ${{ inputs.file }}:"
+        cat "${{ inputs.file }}"

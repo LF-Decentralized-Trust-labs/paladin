@@ -17,8 +17,8 @@ package plugins
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
@@ -123,6 +123,36 @@ func (br *TransportBridge) GetLocalDetails(ctx context.Context, req *prototk.Get
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) bool {
 			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_GetLocalDetailsRes); ok {
 				res = r.GetLocalDetailsRes
+			}
+			return res != nil
+		},
+	)
+	return
+}
+
+func (br *TransportBridge) ActivatePeer(ctx context.Context, req *prototk.ActivatePeerRequest) (res *prototk.ActivatePeerResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
+			dm.Message().RequestToTransport = &prototk.TransportMessage_ActivatePeer{ActivatePeer: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) bool {
+			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_ActivatePeerRes); ok {
+				res = r.ActivatePeerRes
+			}
+			return res != nil
+		},
+	)
+	return
+}
+
+func (br *TransportBridge) DeactivatePeer(ctx context.Context, req *prototk.DeactivatePeerRequest) (res *prototk.DeactivatePeerResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
+			dm.Message().RequestToTransport = &prototk.TransportMessage_DeactivatePeer{DeactivatePeer: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) bool {
+			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_DeactivatePeerRes); ok {
+				res = r.DeactivatePeerRes
 			}
 			return res != nil
 		},

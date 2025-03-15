@@ -17,6 +17,9 @@ package pldclient
 
 import (
 	"context"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 )
 
 type Transport interface {
@@ -24,6 +27,11 @@ type Transport interface {
 
 	NodeName(ctx context.Context) (nodeName string, err error)
 	LocalTransports(ctx context.Context) (transportNames []string, err error)
+	LocalTransportDetails(ctx context.Context, transportName string) (transportDetailsStr string, err error)
+	Peers(ctx context.Context) (peers []*pldapi.PeerInfo, err error)
+	PeerInfo(ctx context.Context, nodeName string) (peer *pldapi.PeerInfo, err error)
+	QueryReliableMessages(ctx context.Context, query *query.QueryJSON) (reliableMessages []*pldapi.ReliableMessage, err error)
+	QueryReliableMessageAcks(ctx context.Context, query *query.QueryJSON) (reliableMessageAcks []*pldapi.ReliableMessageAck, err error)
 }
 
 // This is necessary because there's no way to introspect function parameter names via reflection
@@ -42,8 +50,26 @@ var transportInfo = &rpcModuleInfo{
 			Inputs: []string{"transportName"},
 			Output: "transportDetailsStr",
 		},
+		"transport_peers": {
+			Inputs: []string{},
+			Output: "peers",
+		},
+		"transport_peerInfo": {
+			Inputs: []string{"nodeName"},
+			Output: "peer",
+		},
+		"transport_queryReliableMessages": {
+			Inputs: []string{"query"},
+			Output: "reliableMessages",
+		},
+		"transport_queryReliableMessageAcks": {
+			Inputs: []string{"query"},
+			Output: "reliableMessageAcks",
+		},
 	},
 }
+
+var _ Transport = &transport{}
 
 type transport struct {
 	*rpcModuleInfo
@@ -66,5 +92,25 @@ func (t *transport) LocalTransports(ctx context.Context) (transportNames []strin
 
 func (t *transport) LocalTransportDetails(ctx context.Context, transportName string) (transportDetailsStr string, err error) {
 	err = t.c.CallRPC(ctx, &transportDetailsStr, "transport_localTransportDetails", transportName)
+	return
+}
+
+func (t *transport) Peers(ctx context.Context) (peers []*pldapi.PeerInfo, err error) {
+	err = t.c.CallRPC(ctx, &peers, "transport_peers")
+	return
+}
+
+func (t *transport) PeerInfo(ctx context.Context, nodeName string) (peer *pldapi.PeerInfo, err error) {
+	err = t.c.CallRPC(ctx, &peer, "transport_peerInfo", nodeName)
+	return
+}
+
+func (t *transport) QueryReliableMessages(ctx context.Context, query *query.QueryJSON) (reliableMessages []*pldapi.ReliableMessage, err error) {
+	err = t.c.CallRPC(ctx, &reliableMessages, "transport_queryReliableMessages", query)
+	return
+}
+
+func (t *transport) QueryReliableMessageAcks(ctx context.Context, query *query.QueryJSON) (reliableMessageAcks []*pldapi.ReliableMessageAck, err error) {
+	err = t.c.CallRPC(ctx, &reliableMessageAcks, "transport_queryReliableMessageAcks", query)
 	return
 }

@@ -23,7 +23,6 @@ import (
 
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -39,8 +38,8 @@ func newSubmissionWriter(bgCtx context.Context, p persistence.Persistence, conf 
 	return sw
 }
 
-func (sw *submissionWriter) runBatch(ctx context.Context, tx *gorm.DB, values []*DBPubTxnSubmission) (func(error), []flushwriter.Result[*noResult], error) {
-	err := tx.
+func (sw *submissionWriter) runBatch(ctx context.Context, tx persistence.DBTX, values []*DBPubTxnSubmission) ([]flushwriter.Result[*noResult], error) {
+	err := tx.DB().
 		Table("public_submissions").
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "tx_hash"}},
@@ -49,8 +48,8 @@ func (sw *submissionWriter) runBatch(ctx context.Context, tx *gorm.DB, values []
 		Create(values).
 		Error
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	// We don't actually provide any result, so just build an array of nil results
-	return nil, make([]flushwriter.Result[*noResult], len(values)), err
+	return make([]flushwriter.Result[*noResult], len(values)), err
 }

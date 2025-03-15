@@ -24,7 +24,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 // Timestamp stores a Unix timestamp with nanoseconds.
@@ -65,9 +66,17 @@ func ParseTimeString(str string) (Timestamp, error) {
 		}
 	}
 	if err != nil {
-		return 0, i18n.NewError(context.Background(), i18n.MsgTimeParseFail, str)
+		return 0, i18n.NewError(context.Background(), tkmsgs.MsgTypesTimeParseFail, str)
 	}
 	return Timestamp(t.UnixNano()), nil
+}
+
+func MustParseTimeString(str string) Timestamp {
+	t, err := ParseTimeString(str)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }
 
 func (ts Timestamp) Time() time.Time {
@@ -112,7 +121,7 @@ func (ts *Timestamp) Scan(src interface{}) error {
 		*ts = TimestampFromUnix(src)
 		return nil
 	default:
-		return i18n.NewError(context.Background(), i18n.MsgTypeRestoreFailed, src, ts)
+		return i18n.NewError(context.Background(), tkmsgs.MsgTypesRestoreFailed, src, ts)
 	}
 
 }

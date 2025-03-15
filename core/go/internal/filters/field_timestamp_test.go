@@ -33,7 +33,7 @@ func TestTimestampField(t *testing.T) {
 	assert.Error(t, err)
 
 	_, err = TimestampField("test").SQLValue(ctx, (tktypes.RawJSON)(`"not a valid timestamp"`))
-	assert.Regexp(t, "FF00136", err)
+	assert.Regexp(t, "PD020019", err)
 
 	nv, err := TimestampField("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
 	require.NoError(t, err)

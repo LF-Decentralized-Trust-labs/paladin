@@ -89,7 +89,6 @@ export const PaladinTransactionsReceiptDetailsDialog: React.FC<Props> = ({
       <DialogActions sx={{ justifyContent: 'center', marginBottom: '15px' }}>
         <Button
           onClick={() => setDialogOpen(false)}
-          sx={{ textTransform: 'none' }}
           variant="contained"
           disableElevation>
           {t('close')}

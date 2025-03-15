@@ -32,9 +32,11 @@ import (
 )
 
 func TestGetTransactionByIDFullFail(t *testing.T) {
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*transactions").WillReturnError(fmt.Errorf("pop"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*transactions").WillReturnError(fmt.Errorf("pop"))
+		})
 	defer done()
 
 	_, err := txm.GetTransactionByIDFull(ctx, uuid.New())
@@ -42,12 +44,14 @@ func TestGetTransactionByIDFullFail(t *testing.T) {
 }
 
 func TestGetTransactionByIDFullPublicFail(t *testing.T) {
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*transactions").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.New()))
-		mc.db.ExpectQuery("SELECT.*transaction_deps").WillReturnRows(sqlmock.NewRows([]string{}))
-	}, mockQueryPublicTxForTransactions(func(ids []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*pldapi.PublicTx, error) {
-		return nil, fmt.Errorf("pop")
-	}))
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*transactions").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.New()))
+			mc.db.ExpectQuery("SELECT.*transaction_deps").WillReturnRows(sqlmock.NewRows([]string{}))
+		}, mockQueryPublicTxForTransactions(func(ids []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*pldapi.PublicTx, error) {
+			return nil, fmt.Errorf("pop")
+		}))
 	defer done()
 
 	_, err := txm.GetTransactionByIDFull(ctx, uuid.New())
@@ -55,9 +59,11 @@ func TestGetTransactionByIDFullPublicFail(t *testing.T) {
 }
 
 func TestGetTransactionByIDFail(t *testing.T) {
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*transactions").WillReturnError(fmt.Errorf("pop"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*transactions").WillReturnError(fmt.Errorf("pop"))
+		})
 	defer done()
 
 	_, err := txm.GetTransactionByID(ctx, uuid.New())
@@ -65,9 +71,11 @@ func TestGetTransactionByIDFail(t *testing.T) {
 }
 
 func TestGetTransactionDependenciesFail(t *testing.T) {
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*transaction_deps").WillReturnError(fmt.Errorf("pop"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*transaction_deps").WillReturnError(fmt.Errorf("pop"))
+		})
 	defer done()
 
 	_, err := txm.GetTransactionDependencies(ctx, uuid.New())
@@ -75,9 +83,11 @@ func TestGetTransactionDependenciesFail(t *testing.T) {
 }
 
 func TestGetResolvedTransactionByIDFail(t *testing.T) {
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*transactions").WillReturnError(fmt.Errorf("pop"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*transactions").WillReturnError(fmt.Errorf("pop"))
+		})
 	defer done()
 
 	_, err := txm.GetResolvedTransactionByID(ctx, uuid.New())
@@ -85,12 +95,14 @@ func TestGetResolvedTransactionByIDFail(t *testing.T) {
 }
 
 func TestResolveABIReferencesAndCacheFail(t *testing.T) {
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*abis").WillReturnError(fmt.Errorf("pop"))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*abis").WillReturnError(fmt.Errorf("pop"))
+		})
 	defer done()
 
-	_, err := txm.resolveABIReferencesAndCache(ctx, txm.p.DB(), []*components.ResolvedTransaction{
+	_, err := txm.resolveABIReferencesAndCache(ctx, txm.p.NOTX(), []*components.ResolvedTransaction{
 		{Transaction: &pldapi.Transaction{
 			TransactionBase: pldapi.TransactionBase{
 				ABIReference: confutil.P((tktypes.Bytes32)(tktypes.RandBytes(32))),
@@ -102,14 +114,16 @@ func TestResolveABIReferencesAndCacheFail(t *testing.T) {
 
 func TestResolveABIReferencesAndCacheBadFunc(t *testing.T) {
 	var abiHash = (tktypes.Bytes32)(tktypes.RandBytes(32))
-	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*abis").WillReturnRows(mc.db.NewRows([]string{"hash", "abi"}).AddRow(
-			abiHash.String(), `[]`,
-		))
-	})
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*abis").WillReturnRows(mc.db.NewRows([]string{"hash", "abi"}).AddRow(
+				abiHash.String(), `[]`,
+			))
+		})
 	defer done()
 
-	_, err := txm.resolveABIReferencesAndCache(ctx, txm.p.DB(), []*components.ResolvedTransaction{
+	_, err := txm.resolveABIReferencesAndCache(ctx, txm.p.NOTX(), []*components.ResolvedTransaction{
 		{Transaction: &pldapi.Transaction{
 			ID: confutil.P(uuid.New()),
 			TransactionBase: pldapi.TransactionBase{

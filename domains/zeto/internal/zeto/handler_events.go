@@ -7,10 +7,11 @@ import (
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/node"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -172,7 +173,7 @@ func parseStatesFromEvent(txID tktypes.HexBytes, states []tktypes.HexUint256) []
 	refs := make([]*prototk.StateUpdate, len(states))
 	for i, state := range states {
 		refs[i] = &prototk.StateUpdate{
-			Id:            state.String(),
+			Id:            common.HexUint256To32ByteHexString(&state),
 			TransactionId: txID.String(),
 		}
 	}
@@ -185,4 +186,14 @@ func formatErrors(errors []string) string {
 		msg = fmt.Sprintf("%s. [%d]%s", msg, i, err)
 	}
 	return msg
+}
+func decodeTransactionData(data tktypes.HexBytes) (txID tktypes.HexBytes) {
+	if len(data) < 4 {
+		return nil
+	}
+	dataPrefix := data[0:4]
+	if dataPrefix.String() != types.ZetoTransactionData_V0.String() {
+		return nil
+	}
+	return data[4:]
 }

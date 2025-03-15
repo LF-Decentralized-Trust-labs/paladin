@@ -3,11 +3,12 @@
     "go.lintTool": "golangci-lint",
     "go.lintFlags": ["--fast", "--allow-parallel-runners"],
     "cSpell.words": [
+      "Finalizers",
       "idempotency",
       "remoting",
       "Upsert"
     ],
-    "go.testTimeout": "60s",
+    "go.testTimeout": "30s",
     "java.configuration.updateBuildConfiguration": "disabled",
     "go.testTags": "testdbpostgres",
     "go.buildTags": "testdbpostgres"

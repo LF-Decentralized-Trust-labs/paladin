@@ -20,11 +20,11 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
@@ -75,9 +75,10 @@ type BalanceManagerWithInMemoryTracking struct {
 	// When the mutex is not set, balance manager will query transaction persistence to fetch the in-flight
 	// fueling transactions by search for the latest transfer type transaction to the destination address. (this involves
 	//  read from database and is necessary to recover balance manager from crashes)
-	destinationAddressesFuelingTracked    map[tktypes.EthAddress]*sync.Mutex
-	trackedFuelingTransactions            map[tktypes.EthAddress]*pldapi.PublicTx
 	destinationAddressesFuelingTrackedMux sync.Mutex
+	destinationAddressesFuelingTracked    map[tktypes.EthAddress]*sync.Mutex // use a map of mutex to achieve concurrent balance tracking for different destination addresses but single threaded tracking for the same address
+	trackedFuelingTransactionsMux         sync.RWMutex                       // a mutex to avoid concurrent writes to the trackedFuelingTransactions map
+	trackedFuelingTransactions            map[tktypes.EthAddress]*pldapi.PublicTx
 
 	// a map of signing addresses and a boolean to indicate whether balance manager should fetch
 	// the balance of the signing address from the chain
@@ -210,7 +211,7 @@ func (af *BalanceManagerWithInMemoryTracking) TransferGasFromAutoFuelingSource(c
 	log.L(ctx).Tracef("TransferGasFromAutoFuelingSource entry, source address: %s, destination address: %s, amount: %s", af.sourceAddress, destAddress, value.String())
 
 	af.destinationAddressesFuelingTrackedMux.Lock()
-	perAddressMux, ok := af.destinationAddressesFuelingTracked[destAddress] // there is no lock here as the map of tracked transactions is the one that is critical to get right
+	perAddressMux, ok := af.destinationAddressesFuelingTracked[destAddress]
 	if !ok {
 		perAddressMux = &sync.Mutex{}
 		af.destinationAddressesFuelingTracked[destAddress] = perAddressMux
@@ -218,7 +219,11 @@ func (af *BalanceManagerWithInMemoryTracking) TransferGasFromAutoFuelingSource(c
 	perAddressMux.Lock()
 	defer perAddressMux.Unlock()
 	af.destinationAddressesFuelingTrackedMux.Unlock()
+
+	af.trackedFuelingTransactionsMux.RLock()
 	fuelingTx = af.trackedFuelingTransactions[destAddress]
+	af.trackedFuelingTransactionsMux.RUnlock()
+
 	if fuelingTx == nil {
 		log.L(ctx).Debugf("TransferGasFromAutoFuelingSource no existing tracking fueling request for  destination address: %s", destAddress)
 		// there is no tracked fueling transaction for this address, do a lookup in the db in case we've restarted or couldn't record the last one submitted
@@ -230,7 +235,9 @@ func (af *BalanceManagerWithInMemoryTracking) TransferGasFromAutoFuelingSource(c
 			return nil, err
 		}
 		if fuelingTx != nil {
+			af.trackedFuelingTransactionsMux.Lock()
 			af.trackedFuelingTransactions[destAddress] = fuelingTx
+			af.trackedFuelingTransactionsMux.Unlock()
 		}
 	}
 	if fuelingTx != nil {
@@ -248,7 +255,9 @@ func (af *BalanceManagerWithInMemoryTracking) TransferGasFromAutoFuelingSource(c
 	// otherwise, new fueling tx is required
 
 	// clean up the existing tracked transaction
+	af.trackedFuelingTransactionsMux.Lock()
 	delete(af.trackedFuelingTransactions, destAddress)
+	af.trackedFuelingTransactionsMux.Unlock()
 
 	// 1) Check balance of source address to ensure we have enough to transfer
 	sourceAccount, err := af.GetAddressBalance(ctx, *af.sourceAddress)
@@ -292,7 +301,9 @@ func (af *BalanceManagerWithInMemoryTracking) TransferGasFromAutoFuelingSource(c
 	}
 	log.L(ctx).Debugf("TransferGasFromAutoFuelingSource tracking fueling tx with from=%s nonce=%d, for destination address: %s ", fuelingTx.From, fuelingTx.Nonce, destAddress)
 	// start tracking the new transactions
+	af.trackedFuelingTransactionsMux.Lock()
 	af.trackedFuelingTransactions[destAddress] = fuelingTx
+	af.trackedFuelingTransactionsMux.Unlock()
 	return fuelingTx, nil
 }
 

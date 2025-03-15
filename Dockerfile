@@ -41,7 +41,7 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     xz-utils \
     && apt-get clean
-
+  
 # Install JDK
 RUN JAVA_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "aarch64"; else echo -n "x64"; fi ) && \
     curl -sLo - https://api.adoptium.net/v3/binary/version/jdk-${JAVA_VERSION}/${TARGETOS}/${JAVA_ARCH}/jdk/${JVM_TYPE}/${JVM_HEAP}/eclipse | \
@@ -131,9 +131,10 @@ COPY registries/static registries/static
 COPY registries/evm registries/evm
 COPY transports/grpc transports/grpc
 COPY ui/client ui/client
-# No build of these two, but we need to go.mod to make the go.work valid
+# No build of these three, but we need to go.mod to make the go.work valid
 COPY testinfra/go.mod testinfra/go.mod
 COPY operator/go.mod operator/go.mod
+COPY perf/go.mod perf/go.mod
 RUN gradle --no-daemon --parallel assemble
 
 # Stage 3: Pull together runtime
@@ -150,6 +151,7 @@ ARG GO_MIGRATE_VERSION
 RUN apt-get update && apt-get install -y \
     libgomp1 \
     curl \
+    postgresql-client \
     && apt-get clean
 
 # Set environment variables
@@ -170,6 +172,7 @@ RUN GO_MIRGATE_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "arm64"; els
     curl -sLo - https://github.com/golang-migrate/migrate/releases/download/v$GO_MIGRATE_VERSION/migrate.${TARGETOS}-${GO_MIRGATE_ARCH}.tar.gz | \
     tar -C /usr/local/bin -xzf - migrate
 
+
 # Copy Wasmer shared libraries to the runtime container
 COPY --from=full-builder /usr/local/wasmer/lib/libwasmer.so /usr/local/wasmer/lib/libwasmer.so
 
@@ -185,8 +188,11 @@ ENV PATH=$PATH:/usr/local/java/bin
 # Define the entry point for running the application
 ENTRYPOINT [                         \
     "java",                          \
+    "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED", \
+    "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED", \
+    "--add-opens", "java.base/java.nio=ALL-UNNAMED", \
+    "-Dio.netty.tryReflectionSetAccessible=true", \
     "-Djna.library.path=/app/libs",  \
     "-jar",                          \
     "/app/libs/paladin.jar"          \
 ]
- 

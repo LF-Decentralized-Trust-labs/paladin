@@ -7,7 +7,7 @@ import {
   fakeTXO,
   newTransferHash,
   randomBytes32,
-} from "../../domains/noto/Noto";
+} from "../../domains/noto/util";
 
 describe("Atom", function () {
   it("atomic operation with 2 encoded calls", async function () {
@@ -77,14 +77,14 @@ describe("Atom", function () {
     // Do the delegation/approval transactions
     const f1tx = await noto
       .connect(notary1)
-      .approveTransfer(mcAddr, multiTXF1Part.hash, "0x", "0x");
+      .approveTransfer(mcAddr, multiTXF1Part, "0x", "0x");
     const delegateResult1: ContractTransactionReceipt | null =
       await f1tx.wait();
     const delegateEvent1 = noto.interface.parseLog(
       delegateResult1?.logs[0] as any
     )!.args;
     expect(delegateEvent1.delegate).to.equal(mcAddr);
-    expect(delegateEvent1.txhash).to.equal(multiTXF1Part.hash);
+    expect(delegateEvent1.txhash).to.equal(multiTXF1Part);
     await erc20.approve(mcAddr, 1000);
 
     // Run the atomic op (anyone can initiate)
@@ -151,6 +151,6 @@ describe("Atom", function () {
     const atom = Atom.connect(anybody2).attach(mcAddr) as Atom;
     await expect(atom.execute())
       .to.be.revertedWithCustomError(Noto, "NotoInvalidDelegate")
-      .withArgs(multiTXF1Part.hash, ZeroAddress, mcAddr);
+      .withArgs(multiTXF1Part, ZeroAddress, mcAddr);
   });
 });

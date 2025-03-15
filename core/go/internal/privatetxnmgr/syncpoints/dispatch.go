@@ -21,20 +21,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/preparedtxdistribution"
-	"github.com/kaleido-io/paladin/core/internal/statedistribution"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type dispatchOperation struct {
-	publicDispatches         []*PublicDispatch
-	privateDispatches        []*components.ValidatedTransaction
-	preparedTransactions     []*components.PrepareTransactionWithRefs
-	preparedTxnDistributions []*preparedtxdistribution.PreparedTxnDistributionPersisted
-	stateDistributions       []*statedistribution.StateDistributionPersisted
+	publicDispatches     []*PublicDispatch
+	privateDispatches    []*components.ValidatedTransaction
+	localPreparedTxns    []*components.PreparedTransactionWithRefs
+	preparedReliableMsgs []*pldapi.ReliableMessage
 }
 
 type DispatchPersisted struct {
@@ -55,32 +53,36 @@ type PublicDispatch struct {
 type DispatchBatch struct {
 	PublicDispatches     []*PublicDispatch
 	PrivateDispatches    []*components.ValidatedTransaction
-	PreparedTransactions []*components.PrepareTransactionWithRefs
+	PreparedTransactions []*components.PreparedTransactionWithRefs
 }
 
 // PersistDispatches persists the dispatches to the database and coordinates with the public transaction manager
 // to submit public transactions.
-func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*components.StateDistribution, preparedTxnDistributions []*preparedtxdistribution.PreparedTxnDistribution) error {
+func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*components.StateDistribution, preparedTxnDistributions []*components.PreparedTransactionWithRefs) error {
 
-	stateDistributionsPersisted := make([]*statedistribution.StateDistributionPersisted, 0, len(stateDistributions))
-	for _, stateDistribution := range stateDistributions {
-		stateDistributionsPersisted = append(stateDistributionsPersisted, &statedistribution.StateDistributionPersisted{
-			ID:              stateDistribution.ID,
-			StateID:         tktypes.MustParseHexBytes(stateDistribution.StateID),
-			IdentityLocator: stateDistribution.IdentityLocator,
-			DomainName:      stateDistribution.Domain,
-			ContractAddress: *tktypes.MustEthAddress(stateDistribution.ContractAddress),
-		})
+	preparedReliableMsgs := make([]*pldapi.ReliableMessage, 0,
+		len(dispatchBatch.PreparedTransactions)+len(stateDistributions))
+
+	var localPreparedTxns []*components.PreparedTransactionWithRefs
+	for _, preparedTxnDistribution := range preparedTxnDistributions {
+		node, _ := tktypes.PrivateIdentityLocator(preparedTxnDistribution.Transaction.From).Node(dCtx.Ctx(), false)
+		if node != s.transportMgr.LocalNodeName() {
+			preparedReliableMsgs = append(preparedReliableMsgs, &pldapi.ReliableMessage{
+				Node:        node,
+				MessageType: pldapi.RMTPreparedTransaction.Enum(),
+				Metadata:    tktypes.JSONString(preparedTxnDistribution),
+			})
+		} else {
+			localPreparedTxns = append(localPreparedTxns, preparedTxnDistribution)
+		}
 	}
 
-	preparedTxnDistributionsPersisted := make([]*preparedtxdistribution.PreparedTxnDistributionPersisted, 0, len(dispatchBatch.PreparedTransactions))
-	for _, preparedTxnDistribution := range preparedTxnDistributions {
-		preparedTxnDistributionsPersisted = append(preparedTxnDistributionsPersisted, &preparedtxdistribution.PreparedTxnDistributionPersisted{
-			ID:              preparedTxnDistribution.ID,
-			PreparedTxnID:   preparedTxnDistribution.PreparedTxnID,
-			IdentityLocator: preparedTxnDistribution.IdentityLocator,
-			DomainName:      preparedTxnDistribution.Domain,
-			ContractAddress: preparedTxnDistribution.ContractAddress,
+	for _, stateDistribution := range stateDistributions {
+		node, _ := tktypes.PrivateIdentityLocator(stateDistribution.IdentityLocator).Node(dCtx.Ctx(), false)
+		preparedReliableMsgs = append(preparedReliableMsgs, &pldapi.ReliableMessage{
+			Node:        node,
+			MessageType: pldapi.RMTState.Enum(),
+			Metadata:    tktypes.JSONString(stateDistribution),
 		})
 	}
 
@@ -89,11 +91,10 @@ func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contrac
 		domainContext:   dCtx,
 		contractAddress: contractAddress,
 		dispatchOperation: &dispatchOperation{
-			publicDispatches:         dispatchBatch.PublicDispatches,
-			privateDispatches:        dispatchBatch.PrivateDispatches,
-			preparedTransactions:     dispatchBatch.PreparedTransactions,
-			preparedTxnDistributions: preparedTxnDistributionsPersisted,
-			stateDistributions:       stateDistributionsPersisted,
+			publicDispatches:     dispatchBatch.PublicDispatches,
+			privateDispatches:    dispatchBatch.PrivateDispatches,
+			localPreparedTxns:    localPreparedTxns,
+			preparedReliableMsgs: preparedReliableMsgs,
 		},
 	})
 
@@ -116,7 +117,7 @@ func (s *syncPoints) PersistDeployDispatchBatch(ctx context.Context, dispatchBat
 	return err
 }
 
-func (s *syncPoints) writeDispatchOperations(ctx context.Context, dbTX *gorm.DB, dispatchOperations []*dispatchOperation) (postCommits []func(), err error) {
+func (s *syncPoints) writeDispatchOperations(ctx context.Context, dbTX persistence.DBTX, dispatchOperations []*dispatchOperation) (err error) {
 
 	// For each operation in the batch, we need to call the baseledger transaction manager to allocate its nonce
 	// which it can only guaranteed to be gapless and unique if it is done during the database transaction that inserts the dispatch record.
@@ -132,12 +133,11 @@ func (s *syncPoints) writeDispatchOperations(ctx context.Context, dbTX *gorm.DB,
 			}
 
 			// Call the public transaction manager persist to the database under the current transaction
-			pubTXCb, publicTxns, err := s.pubTxMgr.WriteNewTransactions(ctx, dbTX, dispatchSequenceOp.PublicTxs)
+			publicTxns, err := s.pubTxMgr.WriteNewTransactions(ctx, dbTX, dispatchSequenceOp.PublicTxs)
 			if err != nil {
 				log.L(ctx).Errorf("Error submitting public transactions: %s", err)
-				return nil, err
+				return err
 			}
-			postCommits = append(postCommits, pubTXCb)
 
 			//TODO this results in an `INSERT` for each dispatchSequence
 			//Would it be more efficient to pass an array for the whole flush?
@@ -153,7 +153,7 @@ func (s *syncPoints) writeDispatchOperations(ctx context.Context, dbTX *gorm.DB,
 
 			log.L(ctx).Debugf("Writing dispatch batch %d", len(dispatchSequenceOp.PrivateTransactionDispatches))
 
-			err = dbTX.
+			err = dbTX.DB().
 				Table("dispatches").
 				Clauses(clause.OnConflict{
 					Columns: []clause.Column{
@@ -168,76 +168,41 @@ func (s *syncPoints) writeDispatchOperations(ctx context.Context, dbTX *gorm.DB,
 
 			if err != nil {
 				log.L(ctx).Errorf("Error persisting dispatches: %s", err)
-				return nil, err
+				return err
 			}
 
 		}
 
 		if len(op.privateDispatches) > 0 {
-			txPostCommit, err := s.txMgr.UpsertInternalPrivateTxsFinalizeIDs(ctx, dbTX, op.privateDispatches)
+			err := s.txMgr.UpsertInternalPrivateTxsFinalizeIDs(ctx, dbTX, op.privateDispatches)
 			if err != nil {
 				log.L(ctx).Errorf("Error persisting private dispatches: %s", err)
-				return nil, err
+				return err
 			}
-			postCommits = append(postCommits, txPostCommit)
 		}
 
-		if len(op.preparedTransactions) > 0 {
-			log.L(ctx).Debugf("Writing prepared transactions locally  %d", len(op.preparedTransactions))
+		if len(op.localPreparedTxns) > 0 {
+			log.L(ctx).Debugf("Writing prepared transactions locally  %d", len(op.localPreparedTxns))
 
-			txPostCommit, err := s.txMgr.WritePreparedTransactions(ctx, dbTX, op.preparedTransactions)
+			err := s.txMgr.WritePreparedTransactions(ctx, dbTX, op.localPreparedTxns)
 			if err != nil {
 				log.L(ctx).Errorf("Error persisting prepared transactions: %s", err)
-				return nil, err
-			}
-			postCommits = append(postCommits, txPostCommit)
-		}
-
-		if len(op.preparedTxnDistributions) == 0 {
-			log.L(ctx).Debug("No prepared transaction distributions to persist")
-		} else {
-
-			log.L(ctx).Debugf("Writing distribution record to send prepared transaction to remote node %d", len(op.preparedTxnDistributions))
-			err := dbTX.
-				Table("prepared_txn_distributions").
-				Clauses(clause.OnConflict{
-					Columns: []clause.Column{
-						{Name: "prepared_txn_id"},
-						{Name: "identity_locator"},
-					},
-					DoNothing: true, // immutable
-				}).
-				Create(op.preparedTxnDistributions).
-				Error
-
-			if err != nil {
-				log.L(ctx).Errorf("Error persisting prepared transaction distributions: %s", err)
-				return nil, err
+				return err
 			}
 		}
 
-		if len(op.stateDistributions) == 0 {
-			log.L(ctx).Debug("No state distributions to persist")
+		if len(op.preparedReliableMsgs) == 0 {
+			log.L(ctx).Debug("No prepared reliable messages to persist to persist")
 		} else {
-			log.L(ctx).Debugf("Writing state distributions %d", len(op.stateDistributions))
-			err := dbTX.
-				Table("state_distributions").
-				Clauses(clause.OnConflict{
-					Columns: []clause.Column{
-						{Name: "state_id"},
-						{Name: "identity_locator"},
-					},
-					DoNothing: true, // immutable
-				}).
-				Create(op.stateDistributions).
-				Error
 
+			log.L(ctx).Debugf("Writing %d reliable messages", len(op.preparedReliableMsgs))
+			err := s.transportMgr.SendReliable(ctx, dbTX, op.preparedReliableMsgs...)
 			if err != nil {
-				log.L(ctx).Errorf("Error persisting state distributions: %s", err)
-				return nil, err
+				log.L(ctx).Errorf("Error persisting prepared reliable messages: %s", err)
+				return err
 			}
 		}
 
 	}
-	return postCommits, nil
+	return nil
 }

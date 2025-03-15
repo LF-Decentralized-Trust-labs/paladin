@@ -1,7 +1,7 @@
 import { TransactionType } from "../interfaces";
 import PaladinClient from "../paladin";
 import { PaladinVerifier } from "../verifier";
-import * as zetoPrivateJSON from "./abis/IZetoPrivate.json";
+import * as zetoPrivateJSON from "./abis/IZetoFungible.json";
 
 const POLL_TIMEOUT_MS = 10000;
 
@@ -135,6 +135,19 @@ export class ZetoInstance {
       },
     });
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
+  }
+
+  prepareTransfer(from: PaladinVerifier, data: ZetoTransferParams) {
+    return this.paladin.prepareTransaction({
+      type: TransactionType.PRIVATE,
+      abi: zetoAbi,
+      function: "transfer",
+      to: this.address,
+      from: from.lookup,
+      data: {
+        transfers: data.transfers.map((t) => ({ ...t, to: t.to.lookup })),
+      },
+    });
   }
 
   async lock(from: PaladinVerifier, data: ZetoLockParams) {

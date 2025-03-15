@@ -21,6 +21,7 @@ package persistence
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -42,4 +43,15 @@ func TestMigrateUpDown(t *testing.T) {
 	err = p.(*provider).runMigration(ctx, func(m *migrate.Migrate) error { return m.Down() })
 	require.NoError(t, err)
 
+}
+func TestRequireNoError(t *testing.T) {
+	// Test case where error is nil
+	assert.NotPanics(t, func() {
+		requireNoError(nil)
+	})
+
+	// Test case where error is not nil
+	assert.Panics(t, func() {
+		requireNoError(fmt.Errorf("this is an error"))
+	})
 }

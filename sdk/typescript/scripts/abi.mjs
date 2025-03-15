@@ -6,11 +6,16 @@ await copyFile(
 );
 
 await copyFile(
+  "../../solidity/artifacts/contracts/domains/interfaces/INoto.sol/INoto.json",
+  "src/domains/abis/INoto.json"
+);
+
+await copyFile(
   "../../solidity/artifacts/contracts/domains/interfaces/INotoPrivate.sol/INotoPrivate.json",
   "src/domains/abis/INotoPrivate.json"
 );
 
 await copyFile(
-  "../../solidity/artifacts/contracts/domains/interfaces/IZetoPrivate.sol/IZetoPrivate.json",
-  "src/domains/abis/IZetoPrivate.json"
+  "../../solidity/artifacts/contracts/domains/interfaces/IZetoFungible.sol/IZetoFungible.json",
+  "src/domains/abis/IZetoFungible.json"
 );

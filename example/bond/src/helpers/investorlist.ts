@@ -22,6 +22,10 @@ export class InvestorList extends PentePrivateContract<{}> {
   }
 
   addInvestor(from: PaladinVerifier, params: AddInvestorParams) {
-    return this.invoke(from, "addInvestor", params);
+    return this.sendTransaction({
+      from: from.lookup,
+      function: "addInvestor",
+      data: params
+    });
   }
 }

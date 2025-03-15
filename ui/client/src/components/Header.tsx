@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -35,12 +35,16 @@ export const Header: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const getTabFromPath = (path: string) => {
-    if (path.startsWith(AppRoutes.Indexer)) {
+    if (path.startsWith(AppRoutes.Activity)) {
       return 0;
     } else if (path.startsWith(AppRoutes.Submissions)) {
       return 1;
-    } else if (path.startsWith(AppRoutes.Registry)) {
-      return 2;
+    } else if (path.startsWith(AppRoutes.Peers)) {
+      return 2;  
+    } else if (path.startsWith(AppRoutes.Keys)) {
+      return 3;
+    }else if (path.startsWith(AppRoutes.Registry)) {
+      return 4;
     }
     return 0;
   };
@@ -50,9 +54,11 @@ export const Header: React.FC = () => {
   const handleNavigation = (tab: number) => {
     setTab(tab);
     switch (tab) {
-      case 0: navigate(AppRoutes.Indexer); break;
+      case 0: navigate(AppRoutes.Activity); break;
       case 1: navigate(AppRoutes.Submissions); break;
-      case 2: navigate(AppRoutes.Registry); break;
+      case 2: navigate(AppRoutes.Peers); break;
+      case 3: navigate(AppRoutes.Keys); break;
+      case 4: navigate(AppRoutes.Registry); break;
     }
   };
 
@@ -62,26 +68,28 @@ export const Header: React.FC = () => {
         <Toolbar sx={{ backgroundColor: theme => theme.palette.background.paper }}>
           <Box sx={{ width: '100%', maxWidth: '1270px', marginLeft: 'auto', marginRight: 'auto' }}>
             <Grid2 container alignItems="center">
-              <Grid2 size={{ xs: 12, sm: 12, md: 4 }} textAlign={lessThanMedium ? 'center' : 'left'}>
+              <Grid2 size={{ xs: 12, sm: 12, md: 3 }} textAlign={lessThanMedium ? 'center' : 'left'}>
                 <img src={theme.palette.mode === 'dark' ?
                   '/ui/paladin-title-dark.svg' : '/ui/paladin-title-light.svg'
                 } style={{ marginTop: '7px' }} />
               </Grid2>
-              <Grid2 size={{ xs: 12, sm: 12, md: 4 }} alignContent="center">
+              <Grid2 size={{ xs: 12, sm: 12, md: 6 }} alignContent="center">
                 <Tabs
                   TabIndicatorProps={{ style: { height: '4px' } }}
                   value={tab} onChange={(_event, value) => handleNavigation(value)} centered>
-                  <Tab sx={{ textTransform: 'none' }} label={t('indexer')} />
-                  <Tab sx={{ textTransform: 'none' }} label={t('submissions')} />
-                  <Tab sx={{ textTransform: 'none' }} label={t('registry')} />
+                  <Tab label={t('activity')} />
+                  <Tab label={t('submissions')} />
+                  <Tab label={t('peers')} />
+                  <Tab label={t('keys')} />
+                  <Tab label={t('registry')} />
                 </Tabs>
               </Grid2>
-              <Grid2 size={{ xs: 12, sm: 12, md: 4 }}>
+              <Grid2 size={{ xs: 12, sm: 12, md: 3 }}>
                 <Grid2 container justifyContent={lessThanMedium ? 'center' : 'right'} spacing={1} alignItems="center"
                   sx={{ padding: lessThanMedium ? '20px' : undefined }}>
                   {refreshRequired &&
                     <Grid2>
-                      <Button size="small" startIcon={<RefreshIcon />} variant="outlined" sx={{ textTransform: 'none', borderRadius: '20px' }}
+                      <Button size="small" startIcon={<RefreshIcon />} variant="outlined" sx={{ borderRadius: '20px' }}
                         onClick={() => refresh()}>
                         {t('newData')}
                       </Button>

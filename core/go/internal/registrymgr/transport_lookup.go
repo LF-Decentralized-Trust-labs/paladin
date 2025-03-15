@@ -20,16 +20,16 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 )
 
 type transportLookup struct {
@@ -62,7 +62,7 @@ func newTransportLookup(ctx context.Context, regName string, conf *pldconf.Regis
 	return tl, nil
 }
 
-func (tl *transportLookup) getNodeTransports(ctx context.Context, dbTX *gorm.DB, r *registry, fullLookup string) ([]*components.RegistryNodeTransportEntry, error) {
+func (tl *transportLookup) getNodeTransports(ctx context.Context, dbTX persistence.DBTX, r *registry, fullLookup string) ([]*components.RegistryNodeTransportEntry, error) {
 
 	lookup := fullLookup
 	if tl.requiredPrefix != "" {

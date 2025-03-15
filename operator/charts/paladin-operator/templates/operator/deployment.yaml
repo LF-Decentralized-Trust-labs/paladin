@@ -1,3 +1,4 @@
+{{- $checksums := fromYaml (include "checksums" .) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -21,10 +22,14 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: {{ .Values.operator.name }}
-      {{- with .Values.operator.annotations }}
-      annotations:
+        {{- with .Values.operator.labels }}
         {{ toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
+      annotations:
+        {{- with .Values.operator.annotations }}
+        checksum/operator-config: {{ $checksums.operatorConfig }} # Add a checksum annotation to trigger a rolling update when the config changes
+        {{ toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: {{ .Values.operator.name }}
       securityContext:

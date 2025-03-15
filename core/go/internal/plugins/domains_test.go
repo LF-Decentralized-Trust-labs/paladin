@@ -44,6 +44,9 @@ type testDomainManager struct {
 	encodeData          func(context.Context, *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error)
 	decodeData          func(context.Context, *prototk.DecodeDataRequest) (*prototk.DecodeDataResponse, error)
 	recoverSigner       func(context.Context, *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error)
+	sendTransaction     func(context.Context, *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error)
+	localNodeName       func(context.Context, *prototk.LocalNodeNameRequest) (*prototk.LocalNodeNameResponse, error)
+	getStates           func(context.Context, *prototk.GetStatesByIDRequest) (*prototk.GetStatesByIDResponse, error)
 }
 
 func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
@@ -60,6 +63,18 @@ func (tp *testDomainManager) DecodeData(ctx context.Context, req *prototk.Decode
 
 func (tp *testDomainManager) RecoverSigner(ctx context.Context, req *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error) {
 	return tp.recoverSigner(ctx, req)
+}
+
+func (tp *testDomainManager) SendTransaction(ctx context.Context, req *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error) {
+	return tp.sendTransaction(ctx, req)
+}
+
+func (tp *testDomainManager) LocalNodeName(ctx context.Context, req *prototk.LocalNodeNameRequest) (*prototk.LocalNodeNameResponse, error) {
+	return tp.localNodeName(ctx, req)
+}
+
+func (tp *testDomainManager) GetStatesByID(ctx context.Context, req *prototk.GetStatesByIDRequest) (*prototk.GetStatesByIDResponse, error) {
+	return tp.getStates(ctx, req)
 }
 
 func domainConnectFactory(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.DomainMessage, prototk.DomainMessage], error) {
@@ -229,6 +244,28 @@ func TestDomainRequestsOK(t *testing.T) {
 				ReceiptJson: `{"receipt":"data"}`,
 			}, nil
 		},
+		ConfigurePrivacyGroup: func(ctx context.Context, cpgr *prototk.ConfigurePrivacyGroupRequest) (*prototk.ConfigurePrivacyGroupResponse, error) {
+			assert.Equal(t, map[string]string{"input": "props"}, cpgr.InputConfiguration)
+			return &prototk.ConfigurePrivacyGroupResponse{
+				Configuration: map[string]string{"finalized": "props"},
+			}, nil
+		},
+		InitPrivacyGroup: func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+			assert.Equal(t, `pg1`, ipgr.PrivacyGroup.Name)
+			return &prototk.InitPrivacyGroupResponse{
+				Transaction: &prototk.PreparedTransaction{
+					ParamsJson: `{"some":"params"}`,
+				},
+			}, nil
+		},
+		WrapPrivacyGroupEVMTX: func(ctx context.Context, wpgtr *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error) {
+			assert.Equal(t, `{"orig":"params"}`, *wpgtr.Transaction.InputJson)
+			return &prototk.WrapPrivacyGroupEVMTXResponse{
+				Transaction: &prototk.PreparedTransaction{
+					ParamsJson: `{"wrapped":"params"}`,
+				},
+			}, nil
+		},
 	}
 
 	tdm := &testDomainManager{
@@ -272,6 +309,26 @@ func TestDomainRequestsOK(t *testing.T) {
 		assert.Equal(t, edr.Algorithm, "some algo")
 		return &prototk.RecoverSignerResponse{
 			Verifier: "some verifier",
+		}, nil
+	}
+
+	tdm.sendTransaction = func(ctx context.Context, str *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error) {
+		assert.Equal(t, str.Transaction.From, "user1")
+		return &prototk.SendTransactionResponse{
+			Id: "tx1",
+		}, nil
+	}
+
+	tdm.localNodeName = func(ctx context.Context, lnr *prototk.LocalNodeNameRequest) (*prototk.LocalNodeNameResponse, error) {
+		return &prototk.LocalNodeNameResponse{
+			Name: "node1",
+		}, nil
+	}
+
+	tdm.getStates = func(ctx context.Context, gsr *prototk.GetStatesByIDRequest) (*prototk.GetStatesByIDResponse, error) {
+		assert.Equal(t, "schema1", gsr.SchemaId)
+		return &prototk.GetStatesByIDResponse{
+			States: []*prototk.StoredState{{}},
 		}, nil
 	}
 
@@ -392,6 +449,28 @@ func TestDomainRequestsOK(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, `{"receipt":"data"}`, brr.ReceiptJson)
 
+	cpgr, err := domainAPI.ConfigurePrivacyGroup(ctx, &prototk.ConfigurePrivacyGroupRequest{
+		InputConfiguration: map[string]string{"input": "props"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"finalized": "props"}, cpgr.Configuration)
+
+	ipgr, err := domainAPI.InitPrivacyGroup(ctx, &prototk.InitPrivacyGroupRequest{
+		PrivacyGroup: &prototk.PrivacyGroup{
+			Name: "pg1",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, `{"some":"params"}`, ipgr.Transaction.ParamsJson)
+
+	wpgtr, err := domainAPI.WrapPrivacyGroupEVMTX(ctx, &prototk.WrapPrivacyGroupEVMTXRequest{
+		Transaction: &prototk.PrivacyGroupEVMTX{
+			InputJson: confutil.P(`{"orig":"params"}`),
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, `{"wrapped":"params"}`, wpgtr.Transaction.ParamsJson)
+
 	callbacks := <-waitForCallbacks
 
 	fas, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
@@ -417,18 +496,37 @@ func TestDomainRequestsOK(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "some verifier", string(rsr.Verifier))
+
+	str, err := callbacks.SendTransaction(ctx, &prototk.SendTransactionRequest{
+		Transaction: &prototk.TransactionInput{
+			From: "user1",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "tx1", str.Id)
+
+	lnr, err := callbacks.LocalNodeName(ctx, &prototk.LocalNodeNameRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, "node1", lnr.Name)
+
+	gsr, err := callbacks.GetStatesByID(ctx, &prototk.GetStatesByIDRequest{
+		SchemaId: "schema1",
+	})
+	require.NoError(t, err)
+	assert.Len(t, gsr.States, 1)
 }
 
 func TestDomainRegisterFail(t *testing.T) {
 
-	waitForError := make(chan error, 1)
+	waitForError := make(chan struct{})
 
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
-				t:              t,
-				connectFactory: domainConnectFactory,
-				headerAccessor: domainHeaderAccessor,
+				t:                   t,
+				allowRegisterErrors: true,
+				connectFactory:      domainConnectFactory,
+				headerAccessor:      domainHeaderAccessor,
 				preRegister: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
 						Header: &prototk.Header{
@@ -438,13 +536,11 @@ func TestDomainRegisterFail(t *testing.T) {
 						},
 					}
 				},
-				expectClose: func(err error) {
-					waitForError <- err
-				},
 			},
 		},
 	}
 	tdm.domainRegistered = func(name string, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+		close(waitForError)
 		return nil, fmt.Errorf("pop")
 	}
 
@@ -453,7 +549,7 @@ func TestDomainRegisterFail(t *testing.T) {
 	})
 	defer done()
 
-	assert.Regexp(t, "pop", <-waitForError)
+	<-waitForError
 }
 
 func TestFromDomainRequestBadReq(t *testing.T) {

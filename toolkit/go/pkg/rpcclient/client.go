@@ -18,16 +18,19 @@ package rpcclient
 
 import (
 	"context"
-	"sync"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"sync/atomic"
+	"time"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/wsclient"
-	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/sirupsen/logrus"
 )
 
 type RPCCode int64
@@ -38,11 +41,37 @@ const (
 	RPCCodeInternalError  RPCCode = -32603
 )
 
-type RPCRequest = rpcbackend.RPCRequest
+// NewRPCClient Constructor
+func NewHTTPClient(ctx context.Context, conf *pldconf.HTTPClientConfig) (Client, error) {
+	rc, err := ParseHTTPConfig(ctx, conf)
+	if err != nil {
+		return nil, err
+	}
+	return WrapRestyClient(rc), nil
+}
 
-type RPCResponse = rpcbackend.RPCResponse
+func WrapRestyClient(rc *resty.Client) Client {
+	return &rpcClient{client: rc}
+}
 
-type RPCError = rpcbackend.RPCError
+type Byteable interface {
+	Bytes() []byte
+}
+
+func NewRPCErrorResponse(err error, id Byteable, code RPCCode) *RPCResponse {
+	var byteID []byte
+	if id != nil {
+		byteID = id.Bytes()
+	}
+	return &RPCResponse{
+		JSONRpc: "2.0",
+		ID:      tktypes.RawJSON(byteID),
+		Error: &RPCError{
+			Code:    int64(code),
+			Message: err.Error(),
+		},
+	}
+}
 
 type ErrorRPC interface {
 	error
@@ -53,176 +82,197 @@ type Client interface {
 	CallRPC(ctx context.Context, result interface{}, method string, params ...interface{}) ErrorRPC
 }
 
+type SubscriptionConfig struct {
+	SubscribeMethod    string
+	UnsubscribeMethod  string
+	NotificationMethod string
+	AckMethod          string
+	NackMethod         string
+}
+
+func EthSubscribeConfig() SubscriptionConfig {
+	return SubscriptionConfig{
+		SubscribeMethod:    "eth_subscribe",
+		UnsubscribeMethod:  "eth_unsubscribe",
+		NotificationMethod: "eth_subscription",
+	}
+}
+
 type WSClient interface {
 	Client
-	Subscribe(ctx context.Context, params ...interface{}) (Subscription, ErrorRPC)
+	Subscribe(ctx context.Context, conf SubscriptionConfig, params ...interface{}) (Subscription, ErrorRPC)
 	Subscriptions() []Subscription
 	UnsubscribeAll(ctx context.Context) ErrorRPC
 	Connect(ctx context.Context) error
 	Close()
 }
 
-type Subscription interface {
-	LocalID() uuid.UUID // does not change through reconnects
-	Notifications() chan *RPCSubscriptionNotification
-	Unsubscribe(ctx context.Context) ErrorRPC
+type rpcClient struct {
+	client         *resty.Client
+	requestCounter int64
 }
 
-type Byteable interface {
-	Bytes() []byte
+type RPCClientOptions struct {
+	MaxConcurrentRequest int64
 }
 
-type RPCSubscriptionNotification struct {
-	CurrentSubID string // will change on each reconnect
-	Result       tktypes.RawJSON
+type RPCRequest struct {
+	JSONRpc string            `json:"jsonrpc"`
+	ID      tktypes.RawJSON   `json:"id"`
+	Method  string            `json:"method"`
+	Params  []tktypes.RawJSON `json:"params,omitempty"`
 }
 
-// Note this is (currently) a very thin wrapper around rpcbackend in firefly-signer, which has a lot of very
-// helpful code/utility, but a couple of weirdnesses in the interface that this package addresses.
-// The biggest being the fact that the errors, are not errors (the Error() function returns the error, not a string).
-func NewHTTPClient(ctx context.Context, conf *pldconf.HTTPClientConfig) (Client, error) {
-	rc, err := ParseHTTPConfig(ctx, conf)
+type RPCError struct {
+	Code    int64           `json:"code"`
+	Message string          `json:"message"`
+	Data    tktypes.RawJSON `json:"data,omitempty"`
+}
+
+func (e *RPCError) Error() string {
+	return e.Message
+}
+
+func (e *RPCError) RPCError() *RPCError {
+	return e
+}
+
+type RPCResponse struct {
+	JSONRpc string          `json:"jsonrpc"`
+	ID      tktypes.RawJSON `json:"id"`
+	Result  tktypes.RawJSON `json:"result,omitempty"`
+	Error   *RPCError       `json:"error,omitempty"`
+	// Only for subscription notifications
+	Method string          `json:"method,omitempty"`
+	Params tktypes.RawJSON `json:"params,omitempty"`
+}
+
+func (r *RPCResponse) Message() string {
+	if r.Error != nil {
+		return r.Error.Error()
+	}
+	return ""
+}
+
+func (rc *rpcClient) allocateRequestID(req *RPCRequest) string {
+	reqID := fmt.Sprintf(`%.9d`, atomic.AddInt64(&rc.requestCounter, 1))
+	req.ID = tktypes.RawJSON(`"` + reqID + `"`)
+	return reqID
+}
+
+func (rc *rpcClient) CallRPC(ctx context.Context, result interface{}, method string, params ...interface{}) ErrorRPC {
+	rpcReq, rpcErr := buildRequest(ctx, method, params)
+	if rpcErr != nil {
+		return rpcErr
+	}
+	res, err := rc.SyncRequest(ctx, rpcReq)
 	if err != nil {
-		return nil, err
+		if res != nil && res.Error != nil && res.Error.RPCError().Code != 0 {
+			return res.Error
+		}
+		return &RPCError{Code: int64(RPCCodeInternalError), Message: err.Error()}
 	}
-	return WrapRestyClient(rc), nil
-}
-
-func WrapRestyClient(rc *resty.Client) Client {
-	return &httpWrap{c: rpcbackend.NewRPCClient(rc)}
-}
-
-func NewWSClient(ctx context.Context, conf *pldconf.WSClientConfig) (WSClient, error) {
-	wsc, err := ParseWSConfig(ctx, conf)
+	err = json.Unmarshal(res.Result.Bytes(), &result)
 	if err != nil {
-		return nil, err
+		err = i18n.NewError(ctx, tkmsgs.MsgRPCClientResultParseFailed, result, err)
+		return &RPCError{Code: int64(RPCCodeParseError), Message: err.Error()}
 	}
-	return WrapWSConfig(wsc), nil
+	return nil
 }
 
-func WrapWSConfig(wsc *wsclient.WSConfig) WSClient {
-	return &wsWrap{c: rpcbackend.NewWSRPCClient(wsc)}
+// SyncRequest sends an individual RPC request to the backend (always over HTTP currently),
+// and waits synchronously for the response, or an error.
+//
+// In all return paths *including error paths* the RPCResponse is populated
+// so the caller has an RPC structure to send back to the front-end caller.
+func (rc *rpcClient) SyncRequest(ctx context.Context, rpcReq *RPCRequest) (rpcRes *RPCResponse, err error) {
+
+	// We always set the back-end request ID - as we need to support requests coming in from
+	// multiple concurrent clients on our front-end that might use clashing IDs.
+	var beReq = *rpcReq
+	beReq.JSONRpc = "2.0"
+	rpcTraceID := rc.allocateRequestID(&beReq)
+	if rpcReq.ID != nil {
+		// We're proxying a request with front-end RPC ID - log that as well
+		rpcTraceID = fmt.Sprintf("%s->%s", rpcReq.ID, rpcTraceID)
+	}
+
+	rpcRes = new(RPCResponse)
+
+	log.L(ctx).Debugf("RPC[%s] --> %s", rpcTraceID, rpcReq.Method)
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		jsonInput, _ := json.Marshal(rpcReq)
+		log.L(ctx).Tracef("RPC[%s] INPUT: %s", rpcTraceID, jsonInput)
+	}
+	rpcStartTime := time.Now()
+	res, err := rc.client.R().
+		SetContext(ctx).
+		SetBody(beReq).
+		SetResult(&rpcRes).
+		SetError(rpcRes).
+		Post("")
+
+	// Restore the original ID
+	rpcRes.ID = rpcReq.ID
+	if err != nil {
+		err := i18n.NewError(ctx, tkmsgs.MsgRPCClientRequestFailed, err)
+		log.L(ctx).Errorf("RPC[%s] <-- ERROR: %s", rpcTraceID, err)
+		rpcRes = RPCErrorResponse(err, rpcReq.ID, RPCCodeInternalError)
+		return rpcRes, err
+	}
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		jsonOutput, _ := json.Marshal(rpcRes)
+		log.L(ctx).Tracef("RPC[%s] OUTPUT: %s", rpcTraceID, jsonOutput)
+	}
+	// JSON/RPC allows errors to be returned with a 200 status code, as well as other status codes
+	if res.IsError() || rpcRes.Error != nil && rpcRes.Error.RPCError().Code != 0 {
+		rpcMsg := rpcRes.Message()
+		errLog := rpcMsg
+		if rpcMsg == "" {
+			// Log the raw result in the case of JSON parse error etc. (note that Resty no longer
+			// returns this as an error - rather the body comes back raw)
+			errLog = string(res.Body())
+			rpcMsg = i18n.NewError(ctx, tkmsgs.MsgRPCClientRequestFailed, res.Status()).Error()
+		}
+		log.L(ctx).Errorf("RPC[%s] <-- [%d]: %s", rpcTraceID, res.StatusCode(), errLog)
+		err := errors.New(rpcMsg)
+		return rpcRes, err
+	}
+	log.L(ctx).Infof("RPC[%s] <-- %s [%d] OK (%.2fms)", rpcTraceID, rpcReq.Method, res.StatusCode(), float64(time.Since(rpcStartTime))/float64(time.Millisecond))
+	return rpcRes, nil
 }
 
-func NewRPCErrorResponse(err error, id Byteable, code RPCCode) *RPCResponse {
-	var byteID []byte
-	if id != nil {
-		byteID = id.Bytes()
-	}
-	return &rpcbackend.RPCResponse{
+func RPCErrorResponse(err error, id tktypes.RawJSON, code RPCCode) *RPCResponse {
+	return &RPCResponse{
 		JSONRpc: "2.0",
-		ID:      fftypes.JSONAnyPtrBytes(byteID),
-		Error: &rpcbackend.RPCError{
+		ID:      id,
+		Error: &RPCError{
 			Code:    int64(code),
 			Message: err.Error(),
 		},
 	}
 }
 
+func buildRequest(ctx context.Context, method string, params []interface{}) (*RPCRequest, ErrorRPC) {
+	req := &RPCRequest{
+		JSONRpc: "2.0",
+		Method:  method,
+		Params:  make([]tktypes.RawJSON, len(params)),
+	}
+	for i, param := range params {
+		b, err := json.Marshal(param)
+		if err != nil {
+			return nil, NewRPCError(ctx, RPCCodeInvalidRequest, tkmsgs.MsgRPCClientInvalidParam, i, method, err)
+		}
+		req.Params[i] = tktypes.RawJSON(b)
+	}
+	return req, nil
+}
+
 func NewRPCError(ctx context.Context, code RPCCode, msg i18n.ErrorMessageKey, inserts ...interface{}) *RPCError {
 	return &RPCError{Code: int64(code), Message: i18n.NewError(ctx, msg, inserts...).Error()}
 }
 
-func WrapErrorRPC(code RPCCode, err error) ErrorRPC {
-	return &errWrap{&RPCError{Code: int64(code), Message: err.Error()}}
-}
-
-type httpWrap struct {
-	c rpcbackend.Backend
-}
-
-type errWrap struct {
-	e *RPCError
-}
-
-func (w *errWrap) Error() string {
-	return w.e.Error().Error()
-}
-
-func (w *errWrap) RPCError() *RPCError {
-	return w.e
-}
-
-func wrapIfErr(rpcErr *RPCError) ErrorRPC {
-	if rpcErr != nil {
-		return &errWrap{rpcErr}
-	}
-	return nil
-}
-
-func (w *httpWrap) CallRPC(ctx context.Context, result interface{}, method string, params ...interface{}) ErrorRPC {
-	rpcErr := w.c.CallRPC(ctx, result, method, params...)
-	return wrapIfErr(rpcErr)
-}
-
-type wsWrap struct {
-	c rpcbackend.WebSocketRPCClient
-}
-
-func (w *wsWrap) CallRPC(ctx context.Context, result interface{}, method string, params ...interface{}) ErrorRPC {
-	rpcErr := w.c.CallRPC(ctx, result, method, params...)
-	return wrapIfErr(rpcErr)
-}
-
-func (w *wsWrap) Subscribe(ctx context.Context, params ...interface{}) (Subscription, ErrorRPC) {
-	s, rpcErr := w.c.Subscribe(ctx, params...)
-	if rpcErr != nil {
-		return nil, &errWrap{rpcErr}
-	}
-	return &sWrap{s: s}, nil
-}
-
-func (w *wsWrap) Subscriptions() []Subscription {
-	subs := w.c.Subscriptions()
-	wSubs := make([]Subscription, len(subs))
-	for i, s := range subs {
-		wSubs[i] = &sWrap{s: s}
-	}
-	return wSubs
-}
-
-func (w *wsWrap) UnsubscribeAll(ctx context.Context) ErrorRPC {
-	rpcErr := w.c.UnsubscribeAll(ctx)
-	return wrapIfErr(rpcErr)
-}
-
-func (w *wsWrap) Connect(ctx context.Context) error {
-	return w.c.Connect(ctx)
-}
-
-func (w *wsWrap) Close() {
-	w.c.Close()
-}
-
-type sWrap struct {
-	s    rpcbackend.Subscription
-	lock sync.Mutex
-	ch   chan *RPCSubscriptionNotification
-}
-
-func (w *sWrap) LocalID() uuid.UUID {
-	u := w.s.LocalID()
-	return uuid.UUID(*u)
-}
-
-func (w *sWrap) Notifications() chan *RPCSubscriptionNotification {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-	if w.ch == nil {
-		w.ch = make(chan *RPCSubscriptionNotification)
-		go func() {
-			for n := range w.s.Notifications() {
-				w.ch <- &RPCSubscriptionNotification{
-					CurrentSubID: n.CurrentSubID,
-					Result:       n.Result.Bytes(),
-				}
-			}
-		}()
-	}
-	return w.ch
-}
-
-func (w *sWrap) Unsubscribe(ctx context.Context) ErrorRPC {
-	rpcErr := w.s.Unsubscribe(ctx)
-	return wrapIfErr(rpcErr)
+func WrapRPCError(code RPCCode, err error) *RPCError {
+	return &RPCError{Code: int64(code), Message: err.Error()}
 }

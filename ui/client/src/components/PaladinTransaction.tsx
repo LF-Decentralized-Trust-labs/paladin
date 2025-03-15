@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -15,7 +15,6 @@
 // limitations under the License.
 
 import { Box, Button, Collapse, Grid2, TextField, Typography, useTheme } from "@mui/material";
-import { t } from "i18next";
 import { useState } from "react";
 import { IPaladinTransaction } from "../interfaces";
 import { Hash } from "./Hash";
@@ -28,6 +27,7 @@ import VisibilityIcon from '@mui/icons-material/VisibilityOutlined';
 import { PaladinTransactionsDetailsDialog } from "../dialogs/TransactionDetails";
 import { Captions, Tag } from 'lucide-react';
 import { formatJSONWhenApplicable } from "../utils";
+import { useTranslation } from "react-i18next";
 
 daysjs.extend(relativeTime);
 
@@ -40,6 +40,7 @@ export const PaladinTransaction: React.FC<Props> = ({ paladinTransaction }) => {
   const [viewDetailsDialogOpen, setViewDetailsDialogOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const theme = useTheme();
+  const { t } = useTranslation();
 
   if (paladinTransaction === undefined) {
     return <></>;
@@ -90,12 +91,12 @@ export const PaladinTransaction: React.FC<Props> = ({ paladinTransaction }) => {
             </Grid2>
             <Grid2 container spacing={3} size="grow" justifyContent="end">
               <Grid2>
-                <Button size="small" startIcon={<VisibilityIcon />} sx={{ minWidth: '120px', textTransform: 'none', fontWeight: '400' }}
+                <Button size="small" startIcon={<VisibilityIcon />} sx={{ minWidth: '120px', fontWeight: '400' }}
                   onClick={() => setViewDetailsDialogOpen(true)}>{t('viewDetails')}</Button>
               </Grid2>
               <Grid2>
                 <Button size="small" endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                  onClick={() => setIsExpanded(!isExpanded)} sx={{ minWidth: '140px', textTransform: 'none', fontWeight: '400' }}>
+                  onClick={() => setIsExpanded(!isExpanded)} sx={{ minWidth: '140px', fontWeight: '400' }}>
                   {t(isExpanded ? 'hideProperties' : 'showProperties')}
                 </Button>
               </Grid2>

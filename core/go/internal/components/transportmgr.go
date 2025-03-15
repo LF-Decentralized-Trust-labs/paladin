@@ -21,15 +21,26 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 )
 
-type TransportMessage struct {
+type FireAndForgetMessageSend struct {
+	Node          string
+	Component     prototk.PaladinMsg_Component
+	MessageID     *uuid.UUID // optionally supplied by caller for request/reply correlation
+	CorrelationID *uuid.UUID
+	MessageType   string
+	Payload       []byte
+}
+
+type ReceivedMessage struct {
+	FromNode      string
 	MessageID     uuid.UUID
 	CorrelationID *uuid.UUID
-	Component     string // The name of the component to route the message to once it arrives at the destination node
-	Node          string // The node id to send the message to
-	ReplyTo       string // The node id to send replies to
 	MessageType   string
 	Payload       []byte
 }
@@ -41,8 +52,6 @@ type TransportManagerToTransport interface {
 
 // TransportClient is the interface for a component that can receive messages from the transport manager
 type TransportClient interface {
-	// Destination returns a string that should be matched with the Destination field of incomming messages to be routed to this client
-	Destination() string
 	// This function is used by the transport manager to deliver messages to the engine.
 	//
 	// The implementation of this function:
@@ -70,7 +79,7 @@ type TransportClient interface {
 	// It delivers messages to this function:
 	// - in whatever order they are received from the transport plugin(s), which is dependent on the _sender_ usually
 	// - with whatever concurrency is performed by the transport plugin(s), which is commonly one per remote node, but that's not assured
-	ReceiveTransportMessage(context.Context, *TransportMessage)
+	HandlePaladinMsg(ctx context.Context, msg *ReceivedMessage)
 }
 
 type TransportManager interface {
@@ -88,10 +97,19 @@ type TransportManager interface {
 	// on delivery, and the target failing to process the message should be considered a possible
 	// situation to recover from (although not critical path).
 	//
-	// e.g. at-most-once delivery semantics
-	Send(ctx context.Context, message *TransportMessage) error
+	// at-most-once delivery semantics
+	Send(ctx context.Context, send *FireAndForgetMessageSend) error
 
-	// RegisterClient registers a client to receive messages from the transport manager
-	// messages are routed to the client based on the Destination field of the message matching the value returned from Destination() function of the TransportClient
-	RegisterClient(ctx context.Context, client TransportClient) error
+	// Sends a message with at-least-once delivery semantics
+	//
+	// Each reliable message type has special building code in the transport manager, which assembles the full
+	// message by combining the metadata in the ReliableMessage with data looked up from other components.
+	// This avoids the performance and storage cost of writing the big data (states, receipts) multiple times.
+	//
+	// The message is persisted to the DB in the supplied transaction, then sent on the wire with indefinite retry
+	// including over node restart, until an ack is returned from the remote node.
+	SendReliable(ctx context.Context, dbTX persistence.DBTX, msg ...*pldapi.ReliableMessage) (err error)
+
+	QueryReliableMessages(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.ReliableMessage, error)
+	QueryReliableMessageAcks(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.ReliableMessageAck, error)
 }

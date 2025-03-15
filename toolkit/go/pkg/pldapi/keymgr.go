@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -51,4 +51,16 @@ type KeyVerifier struct {
 type KeyPathSegment struct {
 	Name  string `docstruct:"KeyPathSegment" json:"name"`
 	Index int64  `docstruct:"KeyPathSegment" json:"index"`
+}
+
+type KeyQueryEntry struct {
+	IsKey       bool           `docstruct:"KeyListEntry" json:"isKey"`
+	HasChildren bool           `docstruct:"KeyListEntry" json:"hasChildren"`
+	Parent      string         `docstruct:"KeyListEntry" json:"parent"`
+	Path        string         `docstruct:"KeyListEntry" json:"path"`
+	Name        string         `docstruct:"KeyListEntry" json:"name"`
+	Index       int64          `docstruct:"KeyListEntry" json:"index"`
+	Wallet      string         `docstruct:"KeyListEntry" json:"wallet"`
+	KeyHandle   string         `docstruct:"KeyListEntry" json:"keyHandle"`
+	Verifiers   []*KeyVerifier `docstruct:"KeyListEntry" json:"verifiers" gorm:"-"`
 }

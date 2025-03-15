@@ -21,15 +21,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -91,7 +91,7 @@ func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
 	return nil
 }
 
-func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *InternalEventStream) (*eventStream, error) {
+func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX persistence.DBTX, ies *InternalEventStream) (*eventStream, error) {
 
 	// Defensive coding against panics
 	def := ies.Definition
@@ -109,7 +109,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 
 	// Find if one exists - as we need to check it matches, and get its uuid
 	var existing []*EventStream
-	err := bi.persistence.DB().
+	err := dbTX.DB().
 		Table("event_streams").
 		Where("type = ?", def.Type).
 		Where("name = ?", def.Name).
@@ -140,7 +140,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 		// Update in the DB so we store the latest config
 		// only the config can be updated. In particular the
 		// "Source" is immutable after creation
-		err := bi.persistence.DB().
+		err := dbTX.DB().
 			Table("event_streams").
 			Where("type = ?", def.Type).
 			Where("name = ?", def.Name).
@@ -153,7 +153,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 	} else {
 		// Otherwise we're just creating
 		def.ID = uuid.New()
-		err := bi.persistence.DB().
+		err := dbTX.DB().
 			Table("event_streams").
 			WithContext(ctx).
 			Create(def).
@@ -272,25 +272,28 @@ func (es *eventStream) stop() {
 	}
 }
 
-func (es *eventStream) processCheckpoint() (int64, error) {
+func (es *eventStream) readDBCheckpoint() (int64, error) {
 	var checkpoints []*EventStreamCheckpoint
-	err := es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
-		return true, es.bi.persistence.DB().
-			Table("event_stream_checkpoints").
-			Where("stream = ?", es.definition.ID).
-			WithContext(es.ctx).
-			Find(&checkpoints).
-			Error
-	})
-	if err != nil {
+	err := es.bi.persistence.DB().
+		Table("event_stream_checkpoints").
+		Where("stream = ?", es.definition.ID).
+		WithContext(es.ctx).
+		Find(&checkpoints).
+		Error
+	if err != nil || len(checkpoints) < 1 {
 		return -1, err
 	}
-	baseBlock := int64(-1)
-	if len(checkpoints) > 0 {
-		baseBlock = checkpoints[0].BlockNumber
-		log.L(es.ctx).Infof("starting from checkpoint block %d", baseBlock)
-	}
+	baseBlock := checkpoints[0].BlockNumber
+	log.L(es.ctx).Infof("read persisted checkpoint block %d", baseBlock)
 	return baseBlock, nil
+}
+
+func (es *eventStream) processCheckpoint() (baseBlock int64, err error) {
+	err = es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
+		baseBlock, err = es.readDBCheckpoint()
+		return true, err
+	})
+	return baseBlock, err
 }
 
 func (bi *blockIndexer) getHighestIndexedBlock(ctx context.Context) (*int64, error) {
@@ -487,14 +490,14 @@ func (es *eventStream) runBatch(batch *eventBatch) error {
 
 	// We start a database transaction, run the callback function
 	return es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
-		var postCommit PostCommit
-		err = es.bi.persistence.DB().Transaction(func(tx *gorm.DB) (err error) {
-			postCommit, err = es.handler(es.ctx, tx, &batch.EventDeliveryBatch)
+		err = es.bi.persistence.Transaction(es.ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
+			err = es.handler(ctx, dbTX, &batch.EventDeliveryBatch)
 			if err != nil {
 				return err
 			}
 			// commit the checkpoint
-			return tx.
+			return dbTX.DB().
+				WithContext(ctx).
 				Table("event_stream_checkpoints").
 				Clauses(clause.OnConflict{
 					Columns: []clause.Column{{Name: "stream"}},
@@ -506,12 +509,8 @@ func (es *eventStream) runBatch(batch *eventBatch) error {
 					Stream:      es.definition.ID,
 					BlockNumber: int64(batch.checkpointAfterBatch),
 				}).
-				WithContext(es.ctx).
 				Error
 		})
-		if err == nil && postCommit != nil {
-			postCommit()
-		}
 		return true, err
 	})
 

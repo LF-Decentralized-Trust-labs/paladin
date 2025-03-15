@@ -19,32 +19,39 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRPCLocalDetails(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t)
+	ctx, tm, tp, done := newTestTransport(t, false)
 	defer done()
 
-	rpc, rpcDone := newTestRPCServer(t, ctx, tm)
+	client, rpcDone := newTestRPCServer(t, ctx, tm)
 	defer rpcDone()
 
-	var nodeName string
-	err := rpc.CallRPC(ctx, &nodeName, "transport_nodeName")
-	require.NoError(t, err)
+	transportRPC := pldclient.Wrap(client).Transport()
+
+	nodeName, rpcErr := transportRPC.NodeName(ctx)
+	require.NoError(t, rpcErr)
 	assert.Equal(t, "node1", nodeName)
 
-	var localTransports []string
-	err = rpc.CallRPC(ctx, &localTransports, "transport_localTransports")
-	require.NoError(t, err)
+	localTransports, rpcErr := transportRPC.LocalTransports(ctx)
+	require.NoError(t, rpcErr)
 	assert.Equal(t, []string{tp.t.name}, localTransports)
 
 	tp.Functions.GetLocalDetails = func(ctx context.Context, gldr *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error) {
@@ -53,10 +60,24 @@ func TestRPCLocalDetails(t *testing.T) {
 		}, nil
 	}
 
-	var localTransportDetails string
-	err = rpc.CallRPC(ctx, &localTransportDetails, "transport_localTransportDetails", localTransports[0])
-	require.NoError(t, err)
+	localTransportDetails, rpcErr := transportRPC.LocalTransportDetails(ctx, localTransports[0])
+	require.NoError(t, rpcErr)
 	assert.Equal(t, "some details", localTransportDetails)
+
+	_, err := tm.getPeer(ctx, "node2", false)
+	require.NoError(t, err)
+
+	peers, rpcErr := transportRPC.Peers(ctx)
+	require.NoError(t, rpcErr)
+	require.Len(t, peers, 1)
+	require.Equal(t, "node2", peers[0].Name)
+
+	peer, rpcErr := transportRPC.PeerInfo(ctx, "node2")
+	require.NoError(t, rpcErr)
+	require.Equal(t, "node2", peer.Name)
+	peer, rpcErr = transportRPC.PeerInfo(ctx, "node3")
+	require.NoError(t, rpcErr)
+	require.Nil(t, peer)
 
 }
 
@@ -77,5 +98,55 @@ func newTestRPCServer(t *testing.T, ctx context.Context, tm *transportManager) (
 	c := rpcclient.WrapRestyClient(resty.New().SetBaseURL(fmt.Sprintf("http://%s", s.HTTPAddr())))
 
 	return c, s.Stop
+
+}
+
+func TestRPCReliableMessages(t *testing.T) {
+	ctx, tm, tp, done := newTestTransport(t, true, mockGoodTransport)
+	defer done()
+
+	tp.Functions.ActivatePeer = func(ctx context.Context, apr *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error) {
+		return &prototk.ActivatePeerResponse{}, nil
+	}
+
+	client, rpcDone := newTestRPCServer(t, ctx, tm)
+	defer rpcDone()
+
+	var msgID uuid.UUID
+	err := tm.persistence.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		msg := &pldapi.ReliableMessage{
+			MessageType: pldapi.RMTPrivacyGroup.Enum(),
+			Node:        "node2",
+			Metadata:    tktypes.RawJSON(`{}`),
+		}
+		err := tm.SendReliable(ctx, dbTX, msg)
+		msgID = msg.ID
+		return err
+	})
+	require.NoError(t, err)
+
+	transportRPC := pldclient.Wrap(client).Transport()
+
+	// Wait for the message to get nack'd
+	for {
+		rmsgs, err := transportRPC.QueryReliableMessages(ctx, query.NewQueryBuilder().Equal("node", "node2").Limit(100).Query())
+		require.NoError(t, err)
+		if len(rmsgs) > 0 {
+			require.Len(t, rmsgs, 1)
+			require.Equal(t, msgID, rmsgs[0].ID)
+			if rmsgs[0].Ack == nil {
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
+			require.Regexp(t, "PD012016", rmsgs[0].Ack.Error)
+			break
+		}
+	}
+
+	// Get the ack directly
+	acks, err := transportRPC.QueryReliableMessageAcks(ctx, query.NewQueryBuilder().Equal("messageId", msgID).Limit(100).Query())
+	require.NoError(t, err)
+	require.Len(t, acks, 1)
+	require.Regexp(t, "PD012016", acks[0].Error)
 
 }

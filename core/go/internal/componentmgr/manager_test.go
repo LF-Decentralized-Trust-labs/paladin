@@ -32,6 +32,7 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/mocks/ethclientmocks"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
@@ -40,7 +41,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
 func TestInitOK(t *testing.T) {
@@ -127,6 +127,7 @@ func TestInitOK(t *testing.T) {
 	assert.NotNil(t, cm.PrivateTxManager())
 	assert.NotNil(t, cm.PublicTxManager())
 	assert.NotNil(t, cm.TxManager())
+	assert.NotNil(t, cm.GroupManager())
 	assert.NotNil(t, cm.IdentityResolver())
 
 	// Check we can send a request for a javadump - even just after init (not start)
@@ -201,6 +202,10 @@ func TestStartOK(t *testing.T) {
 	mockTxManager.On("Start").Return(nil)
 	mockTxManager.On("Stop").Return()
 
+	mockGroupManager := componentmocks.NewGroupManager(t)
+	mockGroupManager.On("Start").Return(nil)
+	mockGroupManager.On("Stop").Return()
+
 	mockStateManager := componentmocks.NewStateManager(t)
 	mockStateManager.On("Start").Return(nil)
 	mockStateManager.On("Stop").Return()
@@ -237,6 +242,7 @@ func TestStartOK(t *testing.T) {
 	cm.publicTxManager = mockPublicTxManager
 	cm.privateTxManager = mockPrivateTxManager
 	cm.txManager = mockTxManager
+	cm.groupManager = mockGroupManager
 	cm.additionalManagers = append(cm.additionalManagers, mockExtraManager)
 
 	err := cm.StartManagers()
@@ -250,8 +256,8 @@ func TestStartOK(t *testing.T) {
 
 func TestBuildInternalEventStreamsPreCommitPostCommit(t *testing.T) {
 	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), &pldconf.PaladinConfig{}, nil).(*componentManager)
-	handler := func(ctx context.Context, dbTX *gorm.DB, blocks []*pldapi.IndexedBlock, transactions []*blockindexer.IndexedTransactionNotify) (blockindexer.PostCommit, error) {
-		return nil, nil
+	handler := func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*blockindexer.IndexedTransactionNotify) error {
+		return nil
 	}
 	cm.initResults = map[string]*components.ManagerInitResult{
 		"utengine": {

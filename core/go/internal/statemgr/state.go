@@ -21,10 +21,11 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -46,7 +47,7 @@ func (transactionStateRecord) TableName() string {
 	return "states"
 }
 
-func (ss *stateManager) WritePreVerifiedStates(ctx context.Context, dbTX *gorm.DB, domainName string, states []*components.StateUpsertOutsideContext) ([]*pldapi.State, error) {
+func (ss *stateManager) WritePreVerifiedStates(ctx context.Context, dbTX persistence.DBTX, domainName string, states []*components.StateUpsertOutsideContext) ([]*pldapi.State, error) {
 
 	d, err := ss.domainManager.GetDomainByName(ctx, domainName)
 	if err != nil {
@@ -56,7 +57,7 @@ func (ss *stateManager) WritePreVerifiedStates(ctx context.Context, dbTX *gorm.D
 	return ss.processInsertStates(ctx, dbTX, d, states)
 }
 
-func (ss *stateManager) WriteReceivedStates(ctx context.Context, dbTX *gorm.DB, domainName string, states []*components.StateUpsertOutsideContext) ([]*pldapi.State, error) {
+func (ss *stateManager) WriteReceivedStates(ctx context.Context, dbTX persistence.DBTX, domainName string, states []*components.StateUpsertOutsideContext) ([]*pldapi.State, error) {
 
 	d, err := ss.domainManager.GetDomainByName(ctx, domainName)
 	if err != nil {
@@ -86,7 +87,7 @@ func (ss *stateManager) WriteReceivedStates(ctx context.Context, dbTX *gorm.DB, 
 	return ss.processInsertStates(ctx, dbTX, d, states)
 }
 
-func (ss *stateManager) WriteNullifiersForReceivedStates(ctx context.Context, dbTX *gorm.DB, domainName string, upserts []*components.NullifierUpsert) (err error) {
+func (ss *stateManager) WriteNullifiersForReceivedStates(ctx context.Context, dbTX persistence.DBTX, domainName string, upserts []*components.NullifierUpsert) (err error) {
 	d, err := ss.domainManager.GetDomainByName(ctx, domainName)
 	if err != nil {
 		return err
@@ -102,7 +103,7 @@ func (ss *stateManager) WriteNullifiersForReceivedStates(ctx context.Context, db
 	}
 
 	if len(stateNullifiers) > 0 {
-		err = dbTX.
+		err = dbTX.DB().
 			Table("state_nullifiers").
 			Clauses(clause.OnConflict{
 				DoNothing: true, // immutable
@@ -114,11 +115,11 @@ func (ss *stateManager) WriteNullifiersForReceivedStates(ctx context.Context, db
 	return err
 }
 
-func (ss *stateManager) processInsertStates(ctx context.Context, dbTX *gorm.DB, d components.Domain, inStates []*components.StateUpsertOutsideContext) (processedStates []*pldapi.State, err error) {
+func (ss *stateManager) processInsertStates(ctx context.Context, dbTX persistence.DBTX, d components.Domain, inStates []*components.StateUpsertOutsideContext) (processedStates []*pldapi.State, err error) {
 
 	processedStates = make([]*pldapi.State, len(inStates))
 	for i, inState := range inStates {
-		schema, err := ss.GetSchema(ctx, dbTX, d.Name(), inState.SchemaID, true)
+		schema, err := ss.getSchemaByID(ctx, dbTX, d.Name(), inState.SchemaID, true)
 		if err != nil {
 			return nil, err
 		}
@@ -135,10 +136,11 @@ func (ss *stateManager) processInsertStates(ctx context.Context, dbTX *gorm.DB, 
 		return nil, err
 	}
 
+	dbTX.AddPostCommit(ss.txManager.NotifyStatesDBChanged)
 	return processedStates, nil
 }
 
-func (ss *stateManager) writeStates(ctx context.Context, dbTX *gorm.DB, states []*pldapi.State) (err error) {
+func (ss *stateManager) writeStates(ctx context.Context, dbTX persistence.DBTX, states []*pldapi.State) (err error) {
 	var labels []*pldapi.StateLabel
 	var int64Labels []*pldapi.StateInt64Label
 	for _, s := range states {
@@ -147,7 +149,7 @@ func (ss *stateManager) writeStates(ctx context.Context, dbTX *gorm.DB, states [
 	}
 
 	if len(states) > 0 {
-		err = dbTX.
+		err = dbTX.DB().
 			Table("states").
 			WithContext(ctx).
 			Clauses(clause.OnConflict{
@@ -159,7 +161,7 @@ func (ss *stateManager) writeStates(ctx context.Context, dbTX *gorm.DB, states [
 			Error
 	}
 	if err == nil && len(labels) > 0 {
-		err = dbTX.
+		err = dbTX.DB().
 			Table("state_labels").
 			Clauses(clause.OnConflict{
 				Columns:   []clause.Column{{Name: "domain_name"}, {Name: "state"}, {Name: "label"}},
@@ -169,7 +171,7 @@ func (ss *stateManager) writeStates(ctx context.Context, dbTX *gorm.DB, states [
 			Error
 	}
 	if err == nil && len(int64Labels) > 0 {
-		err = dbTX.
+		err = dbTX.DB().
 			Table("state_int64_labels").
 			Clauses(clause.OnConflict{
 				Columns:   []clause.Column{{Name: "domain_name"}, {Name: "state"}, {Name: "label"}},
@@ -181,23 +183,25 @@ func (ss *stateManager) writeStates(ctx context.Context, dbTX *gorm.DB, states [
 	return err
 }
 
-func (ss *stateManager) GetState(ctx context.Context, dbTX *gorm.DB, domainName string, contractAddress tktypes.EthAddress, stateID tktypes.HexBytes, failNotFound, withLabels bool) (*pldapi.State, error) {
-	q := dbTX.Table("states")
+func (ss *stateManager) GetStatesByID(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress *tktypes.EthAddress, stateIDs []tktypes.HexBytes, failNotFound, withLabels bool) ([]*pldapi.State, error) {
+	q := dbTX.DB().Table("states")
 	if withLabels {
 		q = q.Preload("Labels").Preload("Int64Labels")
 	}
 	var states []*pldapi.State
-	err := q.
+	q = q.
 		Where("domain_name = ?", domainName).
-		Where("contract_address = ?", contractAddress).
-		Where("id = ?", stateID).
-		Limit(1).
+		Where("id IN ?", stateIDs)
+	if contractAddress != nil {
+		q = q.Where("contract_address = ?", contractAddress)
+	}
+	err := q.
 		Find(&states).
 		Error
-	if err == nil && len(states) == 0 && failNotFound {
-		return nil, i18n.NewError(ctx, msgs.MsgStateNotFound, stateID)
+	if err == nil && len(states) != len(stateIDs) && failNotFound {
+		return nil, i18n.NewError(ctx, msgs.MsgStateNotFound, stateIDs)
 	}
-	return states[0], err
+	return states, err
 }
 
 // Built in fields all start with "." as that prevents them
@@ -239,55 +243,64 @@ func (ss *stateManager) labelSetFor(schema components.Schema) *trackingLabelSet 
 	return &tls
 }
 
-func (ss *stateManager) FindContractStates(ctx context.Context, dbTX *gorm.DB, domainName string, contractAddress tktypes.EthAddress, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
-	_, s, err = ss.findStates(ctx, dbTX, domainName, &contractAddress, schemaID, query, status)
+func (ss *stateManager) FindContractStates(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress *tktypes.EthAddress, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
+	_, s, err = ss.findStates(ctx, dbTX, domainName, contractAddress, schemaID, query, &components.StateQueryOptions{StatusQualifier: status})
 	return s, err
 }
 
-func (ss *stateManager) FindStates(ctx context.Context, dbTX *gorm.DB, domainName string, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
-	_, s, err = ss.findStates(ctx, dbTX, domainName, nil, schemaID, query, status)
+func (ss *stateManager) FindStates(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, query *query.QueryJSON, options *components.StateQueryOptions) (s []*pldapi.State, err error) {
+	_, s, err = ss.findStates(ctx, dbTX, domainName, nil, schemaID, query, options)
 	return s, err
 }
 
-func (ss *stateManager) FindContractNullifiers(ctx context.Context, dbTX *gorm.DB, domainName string, contractAddress tktypes.EthAddress, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
+func (ss *stateManager) FindContractNullifiers(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress tktypes.EthAddress, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
 	_, s, err = ss.findNullifiers(ctx, dbTX, domainName, &contractAddress, schemaID, query, status, nil, nil)
 	return s, err
 }
 
-func (ss *stateManager) FindNullifiers(ctx context.Context, dbTX *gorm.DB, domainName string, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
+func (ss *stateManager) FindNullifiers(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
 	_, s, err = ss.findNullifiers(ctx, dbTX, domainName, nil, schemaID, query, status, nil, nil)
 	return s, err
 }
 
 func (ss *stateManager) findStates(
 	ctx context.Context,
-	dbTX *gorm.DB,
+	dbTX persistence.DBTX,
 	domainName string,
 	contractAddress *tktypes.EthAddress,
 	schemaID tktypes.Bytes32,
 	jq *query.QueryJSON,
-	status pldapi.StateStatusQualifier,
-	excluded ...tktypes.HexBytes,
+	options *components.StateQueryOptions,
 ) (schema components.Schema, s []*pldapi.State, err error) {
-	whereClause, isPlainDB := whereClauseForQual(dbTX, status, "Spent")
+	if options == nil {
+		options = &components.StateQueryOptions{}
+	}
+	if options.StatusQualifier == "" {
+		options.StatusQualifier = pldapi.StateStatusAll
+	}
+	whereClause, isPlainDB := whereClauseForQual(dbTX.DB(), options.StatusQualifier, "Spent")
 	if isPlainDB {
-		return ss.findStatesCommon(ctx, dbTX, domainName, contractAddress, schemaID, jq, func(q *gorm.DB) *gorm.DB {
-			q = q.Joins("Confirmed", dbTX.Select("transaction")).
-				Joins("Spent", dbTX.Select("transaction"))
+		return ss.findStatesCommon(ctx, dbTX, domainName, contractAddress, schemaID, jq, func(dbTX persistence.DBTX, q *gorm.DB) *gorm.DB {
+			q = q.Joins("Confirmed", dbTX.DB().Select("transaction")).
+				Joins("Spent", dbTX.DB().Select("transaction"))
 
-			if len(excluded) > 0 {
-				q = q.Not(`"states"."id" IN(?)`, excluded)
+			if len(options.ExcludedIDs) > 0 {
+				q = q.Not(`"states"."id" IN(?)`, options.ExcludedIDs)
 			}
 
 			// Scope the query based on the status qualifier
 			q = q.Where(whereClause)
+
+			if options.QueryModifier != nil {
+				q = options.QueryModifier(dbTX, q)
+			}
 			return q
 		})
 	}
 
 	// Otherwise, we need to run it against the specified domain context
 	var dc components.DomainContext
-	dcID, err := uuid.Parse(string(status))
+	dcID, err := uuid.Parse(string(options.StatusQualifier))
 	if err == nil {
 		if dc = ss.GetDomainContext(ctx, dcID); dc == nil {
 			err = i18n.NewError(ctx, msgs.MsgStateDomainContextNotActive, dcID)
@@ -301,7 +314,7 @@ func (ss *stateManager) findStates(
 
 func (ss *stateManager) findNullifiers(
 	ctx context.Context,
-	dbTX *gorm.DB,
+	dbTX persistence.DBTX,
 	domainName string,
 	contractAddress *tktypes.EthAddress,
 	schemaID tktypes.Bytes32,
@@ -310,14 +323,14 @@ func (ss *stateManager) findNullifiers(
 	spendingStates []tktypes.HexBytes,
 	spendingNullifiers []tktypes.HexBytes,
 ) (schema components.Schema, s []*pldapi.State, err error) {
-	whereClause, isPlainDB := whereClauseForQual(dbTX, status, "Nullifier__Spent")
+	whereClause, isPlainDB := whereClauseForQual(dbTX.DB(), status, "Nullifier__Spent")
 	if isPlainDB {
-		return ss.findStatesCommon(ctx, dbTX, domainName, contractAddress, schemaID, jq, func(q *gorm.DB) *gorm.DB {
-			hasNullifier := dbTX.Where(`"Nullifier"."id" IS NOT NULL`)
+		return ss.findStatesCommon(ctx, dbTX, domainName, contractAddress, schemaID, jq, func(dbTX persistence.DBTX, q *gorm.DB) *gorm.DB {
+			hasNullifier := dbTX.DB().Where(`"Nullifier"."id" IS NOT NULL`)
 
-			q = q.Joins("Confirmed", dbTX.Select("transaction")).
-				Joins("Nullifier", dbTX.Select(`"Nullifier"."id"`)).
-				Joins("Nullifier.Spent", dbTX.Select("transaction")).
+			q = q.Joins("Confirmed", dbTX.DB().Select("transaction")).
+				Joins("Nullifier", dbTX.DB().Select(`"Nullifier"."id"`)).
+				Joins("Nullifier.Spent", dbTX.DB().Select("transaction")).
 				Where(hasNullifier)
 
 			if len(spendingStates) > 0 {
@@ -349,18 +362,18 @@ func (ss *stateManager) findNullifiers(
 
 func (ss *stateManager) findStatesCommon(
 	ctx context.Context,
-	dbTX *gorm.DB,
+	dbTX persistence.DBTX,
 	domainName string,
 	contractAddress *tktypes.EthAddress,
 	schemaID tktypes.Bytes32,
 	jq *query.QueryJSON,
-	addQuery func(q *gorm.DB) *gorm.DB,
+	modifyQuery func(dbTX persistence.DBTX, q *gorm.DB) *gorm.DB,
 ) (schema components.Schema, s []*pldapi.State, err error) {
 	if len(jq.Sort) == 0 {
 		jq.Sort = []string{".created"}
 	}
 
-	schema, err = ss.GetSchema(ctx, dbTX, domainName, schemaID, true)
+	schema, err = ss.getSchemaByID(ctx, dbTX, domainName, schemaID, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -368,7 +381,7 @@ func (ss *stateManager) findStatesCommon(
 	tracker := ss.labelSetFor(schema)
 
 	// Build the query
-	q := filters.BuildGORM(ctx, jq, dbTX.Table("states"), tracker)
+	q := filters.BuildGORM(ctx, jq, dbTX.DB().Table("states"), tracker)
 	if q.Error != nil {
 		return nil, nil, q.Error
 	}
@@ -387,7 +400,7 @@ func (ss *stateManager) findStatesCommon(
 	if contractAddress != nil {
 		q = q.Where("states.contract_address = ?", contractAddress)
 	}
-	q = addQuery(q)
+	q = modifyQuery(dbTX, q)
 
 	var states []*pldapi.State
 	q = q.Find(&states)

@@ -31,6 +31,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
@@ -38,6 +39,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
+	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
@@ -52,6 +54,10 @@ var NotoTrackerERC20BuildJSON []byte
 const node1HttpURL = "http://127.0.0.1:31548"
 const node2HttpURL = "http://127.0.0.1:31648"
 const node3HttpURL = "http://127.0.0.1:31748"
+
+const node1WebSocketURL = "ws://127.0.0.1:31549"
+const node2WebSocketURL = "ws://127.0.0.1:31649"
+const node3WebSocketURL = "ws://127.0.0.1:31749"
 
 func withTimeout[T any](do func(ctx context.Context) T) T {
 	ctx, cancelCtx := context.WithTimeout(context.Background(), 2*time.Second)
@@ -79,17 +85,17 @@ func with10Decimals(x int64) *tktypes.HexUint256 {
 	return (*tktypes.HexUint256)(bx)
 }
 
-func getJSONPropertyAs(jsonData tktypes.RawJSON, name string, toValue any) {
-	var mapProp map[string]tktypes.RawJSON
-	err := json.Unmarshal(jsonData, &mapProp)
-	if err != nil {
-		panic(fmt.Errorf("Unable to unmarshal %s", jsonData))
-	}
-	err = json.Unmarshal(mapProp[name], toValue)
-	if err != nil {
-		panic(fmt.Errorf("Unable to map %s to %T: %s", mapProp[name], toValue, err))
-	}
-}
+// func getJSONPropertyAs(jsonData tktypes.RawJSON, name string, toValue any) {
+// 	var mapProp map[string]tktypes.RawJSON
+// 	err := json.Unmarshal(jsonData, &mapProp)
+// 	if err != nil {
+// 		panic(fmt.Errorf("Unable to unmarshal %s", jsonData))
+// 	}
+// 	err = json.Unmarshal(mapProp[name], toValue)
+// 	if err != nil {
+// 		panic(fmt.Errorf("Unable to map %s to %T: %s", mapProp[name], toValue, err))
+// 	}
+// }
 
 var pentePrivGroupComps = abi.ParameterArray{
 	{Name: "salt", Type: "bytes32"},
@@ -189,11 +195,21 @@ type penteReceipt struct {
 }
 
 var _ = Describe("noto/pente - simple", Ordered, func() {
+	var listenerName = "e2e_" + uuid.NewString()
+	var wsRPC = map[string]pldclient.PaladinWSClient{}
+
 	BeforeAll(func() {
 		// Skip("for now")
 	})
 
 	AfterAll(func() {
+		wsc := wsRPC["node1"]
+		if wsc != nil {
+			_, _ = wsc.PTX().DeleteReceiptListener(context.Background(), listenerName)
+		}
+		for _, wsc := range wsRPC {
+			wsc.Close()
+		}
 	})
 
 	Context("Noto domain verification", func() {
@@ -201,7 +217,7 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 		ctx := context.Background()
 		rpc := map[string]pldclient.PaladinClient{}
 
-		connectNode := func(url, name string) {
+		connectNode := func(url, wsURL, name string) {
 			Eventually(func() bool {
 				return withTimeout(func(ctx context.Context) bool {
 					pld, err := pldclient.New().HTTP(ctx, &pldconf.HTTPClientConfig{URL: url})
@@ -214,12 +230,20 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 					return err == nil
 				})
 			}).Should(BeTrue())
+
+			wsRPCClient, wsErr := pldclient.New().WebSocket(ctx, &pldconf.WSClientConfig{HTTPClientConfig: pldconf.HTTPClientConfig{URL: wsURL}})
+			if wsErr == nil {
+				queriedName, err := wsRPCClient.Transport().NodeName(ctx)
+				Expect(err).To(BeNil())
+				Expect(queriedName).To(Equal(name))
+				wsRPC[name] = wsRPCClient
+			}
 		}
 
 		It("waits to connect to all three nodes", func() {
-			connectNode(node1HttpURL, "node1")
-			connectNode(node2HttpURL, "node2")
-			connectNode(node3HttpURL, "node3")
+			connectNode(node1HttpURL, node1WebSocketURL, "node1")
+			connectNode(node2HttpURL, node2WebSocketURL, "node2")
+			connectNode(node3HttpURL, node3WebSocketURL, "node3")
 		})
 
 		It("checks nodes can talk to each other", func() {
@@ -243,11 +267,13 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 
 		const notary = "notary.on@node1"
 		var notoContract *tktypes.EthAddress
+		var deploySequenceNode1 uint64
 
 		It("deploys a noto", func() {
 			deploy := rpc["node1"].ForABI(ctx, abi.ABI{
 				{Type: abi.Constructor, Inputs: abi.ParameterArray{
 					{Name: "notary", Type: "string"},
+					{Name: "notaryMode", Type: "string"},
 				}},
 			}).
 				Private().
@@ -255,14 +281,38 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 				Constructor().
 				From(notary).
 				Inputs(&nototypes.ConstructorParams{
-					Notary: notary,
+					Notary:     notary,
+					NotaryMode: nototypes.NotaryModeBasic,
 				}).
 				Send().
 				Wait(5 * time.Second)
 			Expect(deploy.Error()).To(BeNil())
 			Expect(deploy.Receipt().ContractAddress).ToNot(BeNil())
 			notoContract = deploy.Receipt().ContractAddress
+			deploySequenceNode1 = deploy.Receipt().Sequence
 			testLog("Noto (plain) contract %s deployed by TX %s", notoContract, deploy.ID())
+		})
+
+		It("creates a receipt listener", func() {
+			_, err := rpc["node1" /* must match deploySequenceNode1 */].PTX().CreateReceiptListener(ctx, &pldapi.TransactionReceiptListener{
+				Name: listenerName,
+				Filters: pldapi.TransactionReceiptFilters{
+					// Just listen to receipts from this point on
+					SequenceAbove: confutil.P(deploySequenceNode1),
+				},
+				Options: pldapi.TransactionReceiptListenerOptions{
+					// We just want to check we get all receipts
+					IncompleteStateReceiptBehavior: pldapi.IncompleteStateReceiptBehaviorProcess.Enum(),
+				},
+			})
+			Expect(err).To(BeNil())
+		})
+
+		var receiptsSub rpcclient.Subscription
+		It("starts a receipt listener", func() {
+			sub, err := wsRPC["node1"].PTX().SubscribeReceipts(ctx, listenerName)
+			Expect(err).To(BeNil())
+			receiptsSub = sub
 		})
 
 		var notoCoinSchemaID *tktypes.Bytes32
@@ -366,8 +416,8 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 		})
 
 		penteGroupNodes1and2 := nototypes.PentePrivateGroup{
-			Salt:    tktypes.Bytes32(tktypes.RandBytes(32)), // unique salt must be shared privately to retain anonymity
-			Members: []string{"bob@node1", "sally@node2"},   // these will be salted to establish the endorsement key identifiers
+			Salt:    tktypes.RandBytes32(),                // unique salt must be shared privately to retain anonymity
+			Members: []string{"bob@node1", "sally@node2"}, // these will be salted to establish the endorsement key identifiers
 		}
 
 		var penteContract *tktypes.EthAddress
@@ -609,10 +659,13 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 			deploy := rpc["node1"].ForABI(ctx, abi.ABI{
 				{Type: abi.Constructor, Inputs: abi.ParameterArray{
 					{Name: "notary", Type: "string"},
-					{Name: "hooks", Type: "tuple", Components: abi.ParameterArray{
-						{Name: "publicAddress", Type: "string"},
-						{Name: "privateAddress", Type: "string"},
-						{Name: "privateGroup", Type: "tuple", Components: pentePrivGroupComps},
+					{Name: "notaryMode", Type: "string"},
+					{Name: "options", Type: "tuple", Components: abi.ParameterArray{
+						{Name: "hooks", Type: "tuple", Components: abi.ParameterArray{
+							{Name: "publicAddress", Type: "string"},
+							{Name: "privateAddress", Type: "string"},
+							{Name: "privateGroup", Type: "tuple", Components: pentePrivGroupComps},
+						}},
 					}},
 				}},
 			}).
@@ -621,11 +674,14 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 				Constructor().
 				From(notary).
 				Inputs(&nototypes.ConstructorParams{
-					Notary: notary,
-					Hooks: &nototypes.HookParams{
-						PublicAddress:  penteContract,
-						PrivateAddress: notoTrackerAddr,
-						PrivateGroup:   &penteGroupNodes1and2,
+					Notary:     notary,
+					NotaryMode: nototypes.NotaryModeHooks,
+					Options: nototypes.NotoOptions{
+						Hooks: &nototypes.NotoHooksOptions{
+							PublicAddress:  penteContract,
+							PrivateAddress: notoTrackerAddr,
+							PrivateGroup:   &penteGroupNodes1and2,
+						},
 					},
 				}).
 				Send().
@@ -636,6 +692,7 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 			testLog("Combined Noto<->Pente contract %s deployed by TX %s", notoPenteContractAddr, deploy.ID())
 		})
 
+		var mintTxID uuid.UUID
 		It("mints some noto-pentes to bob on node1", func() {
 			txn := rpc["node1"].ForABI(ctx, nototypes.NotoABI).
 				Private().
@@ -650,6 +707,7 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 				Send().
 				Wait(5 * time.Second)
 			Expect(txn.Error()).To(BeNil())
+			mintTxID = txn.ID()
 			testLog("Noto<->Pente mint transaction %s", txn.ID())
 			logWallet("bob", "node1")
 		})
@@ -669,6 +727,30 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 				Wait(5 * time.Second)
 			Expect(prepared.Error()).To(BeNil())
 			testLog("Noto<->Pente prepared transaction original TX id=%s prepared TX idempotencyKey=%v", prepared.ID(), prepared.PreparedTransaction().Transaction.IdempotencyKey)
+		})
+
+		It("streams down receipts until it finds the mint", func() {
+			mintMatched := false
+			for !mintMatched {
+				var receiptBatch pldapi.TransactionReceiptBatch
+				var notification rpcclient.RPCSubscriptionNotification
+				select {
+				case notification = <-receiptsSub.Notifications():
+					err := json.Unmarshal(notification.GetResult(), &receiptBatch)
+					Expect(err).To(BeNil())
+				case <-time.After(5 * time.Second):
+					Fail("Timed out waiting for ereceipt")
+				}
+				for _, receipt := range receiptBatch.Receipts {
+					testLog("streamed receipt %s", receipt.ID)
+					if receipt.ID == mintTxID {
+						testLog("matched mint receipt %s", receipt.ID)
+						mintMatched = true
+					}
+				}
+				err := notification.Ack(ctx)
+				Expect(err).To(BeNil())
+			}
 		})
 	})
 })

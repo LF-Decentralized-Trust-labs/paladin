@@ -17,7 +17,7 @@ package plugintk
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"google.golang.org/protobuf/encoding/protojson"

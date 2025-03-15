@@ -1,16 +1,14 @@
 import PaladinClient, {
-  Algorithms,
   encodeStates,
   newGroupSalt,
   newTransactionId,
   NotoFactory,
   PenteFactory,
   TransactionType,
-  Verifiers,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
-import bondTrackerPublicJson from "./abis/BondTrackerPublic.json";
-import atomFactoryJson from "./abis/AtomFactory.json";
 import atomJson from "./abis/Atom.json";
+import atomFactoryJson from "./abis/AtomFactory.json";
+import bondTrackerPublicJson from "./abis/BondTrackerPublic.json";
 import { newBondSubscription } from "./helpers/bondsubscription";
 import { newBondTracker } from "./helpers/bondtracker";
 import { checkDeploy, checkReceipt } from "./util";
@@ -40,7 +38,7 @@ async function main(): Promise<boolean> {
   const notoFactory = new NotoFactory(paladin1, "noto");
   const notoCash = await notoFactory.newNoto(cashIssuer, {
     notary: cashIssuer,
-    restrictMinting: true,
+    notaryMode: "basic",
   });
   if (!checkDeploy(notoCash)) return false;
 
@@ -56,13 +54,9 @@ async function main(): Promise<boolean> {
   // Create a Pente privacy group between the bond issuer and bond custodian
   logger.log("Creating issuer+custodian privacy group...");
   const penteFactory = new PenteFactory(paladin1, "pente");
-  const issuerCustodianGroup = await penteFactory.newPrivacyGroup(bondIssuer, {
-    group: {
-      salt: newGroupSalt(),
-      members: [bondIssuer, bondCustodian],
-    },
+  const issuerCustodianGroup = await penteFactory.newPrivacyGroup({
+    members: [bondIssuer, bondCustodian],
     evmVersion: "shanghai",
-    endorsementType: "group_scoped_identities",
     externalCallsEnabled: true,
   });
   if (!checkDeploy(issuerCustodianGroup)) return false;
@@ -107,12 +101,14 @@ async function main(): Promise<boolean> {
   logger.log("Deploying Noto bond token...");
   const notoBond = await notoFactory.newNoto(bondIssuer, {
     notary: bondCustodian,
-    hooks: {
-      privateGroup: issuerCustodianGroup.group,
-      publicAddress: issuerCustodianGroup.address,
-      privateAddress: bondTracker.address,
+    notaryMode: "hooks",
+    options: {
+      hooks: {
+        privateGroup: issuerCustodianGroup,
+        publicAddress: issuerCustodianGroup.address,
+        privateAddress: bondTracker.address,
+      },
     },
-    restrictMinting: false,
   });
   if (!checkDeploy(notoBond)) return false;
 
@@ -161,13 +157,9 @@ async function main(): Promise<boolean> {
   logger.log("Creating investor+custodian privacy group...");
   const investorCustodianGroup = await penteFactory
     .using(paladin3)
-    .newPrivacyGroup(investor, {
-      group: {
-        salt: newGroupSalt(),
-        members: [investor, bondCustodian],
-      },
+    .newPrivacyGroup({
+      members: [investor, bondCustodian],
       evmVersion: "shanghai",
-      endorsementType: "group_scoped_identities",
       externalCallsEnabled: true,
     });
   if (investorCustodianGroup === undefined) {
@@ -192,18 +184,16 @@ async function main(): Promise<boolean> {
 
   // Prepare the payment transfer (investor -> custodian)
   logger.log("Preparing payment transfer...");
-  const paymentTransfer = await notoCash
-    .using(paladin3)
-    .prepareTransfer(investor, {
-      to: bondCustodian,
-      amount: 100,
-      data: "0x",
-    });
-  if (paymentTransfer === undefined) {
-    logger.error("Failed!");
-    return false;
-  }
-  logger.log("Success!");
+  txID = await notoCash.using(paladin3).prepareTransfer(investor, {
+    to: bondCustodian,
+    amount: 100,
+    data: "0x",
+  });
+  const paymentTransfer = await paladin1.pollForPreparedTransaction(
+    txID,
+    10000
+  );
+  if (!paymentTransfer) return false;
 
   if (paymentTransfer.transaction.to === undefined) {
     logger.error("Prepared payment transfer had no 'to' address");
@@ -213,13 +203,12 @@ async function main(): Promise<boolean> {
   // Prepare the bond transfer (custodian -> investor)
   // Requires 2 calls to prepare, as the Noto transaction spawns a Pente transaction to wrap it
   logger.log("Preparing bond transfer (step 1/2)...");
-  const bondTransfer1 = await notoBond
-    .using(paladin2)
-    .prepareTransfer(bondCustodian, {
-      to: investor,
-      amount: 100,
-      data: "0x",
-    });
+  txID = await notoBond.using(paladin2).prepareTransfer(bondCustodian, {
+    to: investor,
+    amount: 100,
+    data: "0x",
+  });
+  const bondTransfer1 = await paladin2.pollForPreparedTransaction(txID, 10000);
   if (bondTransfer1 === undefined) {
     logger.error("Failed!");
     return false;
@@ -246,7 +235,7 @@ async function main(): Promise<boolean> {
     logger.error("Prepared bond transfer had no 'to' address");
     return false;
   }
-  if (!bondTransfer2.transaction.function.startsWith("transition(")) {
+  if (!bondTransfer2.transaction.function?.startsWith("transition(")) {
     logger.error(
       `Prepared bond transfer did not seem to be a Pente transition: ${bondTransfer2.transaction}`
     );

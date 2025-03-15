@@ -30,6 +30,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/mocks/rpcclientmocks"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
@@ -37,7 +38,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
 func mockBlockListenerNil(mRPC *rpcclientmocks.WSClient) {
@@ -72,7 +72,7 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 	var esID string
 	calledPostCommit := false
 	err := bi.Start(&InternalEventStream{
-		Handler: func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error) {
+		Handler: func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error {
 			if esID == "" {
 				esID = batch.StreamID.String()
 			} else {
@@ -87,7 +87,8 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 				case <-ctx.Done():
 				}
 			}
-			return func() { calledPostCommit = true }, nil
+			dbTX.AddPostCommit(func(ctx context.Context) { calledPostCommit = true })
+			return nil
 		},
 		Definition: &EventStream{
 			Name: "unit_test",
@@ -164,7 +165,7 @@ func TestInternalEventStreamDeliveryAtHeadWithSourceAddress(t *testing.T) {
 	var esID string
 	calledPostCommit := false
 	err := bi.Start(&InternalEventStream{
-		Handler: func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error) {
+		Handler: func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error {
 			if esID == "" {
 				esID = batch.StreamID.String()
 			} else {
@@ -179,7 +180,8 @@ func TestInternalEventStreamDeliveryAtHeadWithSourceAddress(t *testing.T) {
 				case <-ctx.Done():
 				}
 			}
-			return func() { calledPostCommit = true }, nil
+			dbTX.AddPostCommit(func(ctx context.Context) { calledPostCommit = true })
+			return nil
 		},
 		Definition: definition,
 	})
@@ -213,7 +215,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 	// Set up our handler, even though it won't be driven with anything yet
 	eventCollector := make(chan *pldapi.EventWithData)
 	var esID string
-	handler := func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error) {
+	handler := func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error {
 		if esID == "" {
 			esID = batch.StreamID.String()
 		} else {
@@ -228,7 +230,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 			case <-ctx.Done():
 			}
 		}
-		return nil, nil
+		return nil
 	}
 
 	// Do a full start now without a block listener, and wait for the ut notification of all the blocks
@@ -236,15 +238,16 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 	preCommitCount := 0
 	err := bi.Start(&InternalEventStream{
 		Type: IESTypePreCommitHandler,
-		PreCommitHandler: func(ctx context.Context, dbTX *gorm.DB, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) (PostCommit, error) {
+		PreCommitHandler: func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) error {
 			// Return an error once to drive a retry
 			preCommitCount++
 			if preCommitCount == 0 {
-				return nil, fmt.Errorf("pop")
+				return fmt.Errorf("pop")
 			}
-			return func() {
+			dbTX.AddPostCommit(func(ctx context.Context) {
 				utBatchNotify <- blocks
-			}, nil
+			})
+			return nil
 		},
 	})
 	require.NoError(t, err)
@@ -269,7 +272,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 			},
 		}},
 	}
-	_, err = bi.AddEventStream(ctx, &InternalEventStream{
+	_, err = bi.AddEventStream(ctx, bi.persistence.NOTX(), &InternalEventStream{
 		Definition: internalESConfig,
 		Handler:    handler,
 	})
@@ -293,6 +296,18 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 				}`, 1000+blockNumber, 2000+blockNumber, 3000+blockNumber, 4000+blockNumber, 5000+blockNumber,
 				blockNumber), string(e.Data))
 		}
+	}
+
+	// Wait for checkpoint
+	for {
+		es := bi.eventStreams[uuid.MustParse(esID)]
+		baseBlock, err := es.readDBCheckpoint()
+		require.NoError(t, err)
+		if baseBlock >= 14 {
+			break
+		}
+		require.False(t, t.Failed())
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	// Stop and restart
@@ -342,15 +357,16 @@ func TestNoMatchingEvents(t *testing.T) {
 	utBatchNotify := make(chan []*pldapi.IndexedBlock)
 	err := bi.Start(&InternalEventStream{
 		Type: IESTypePreCommitHandler,
-		PreCommitHandler: func(ctx context.Context, dbTX *gorm.DB, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) (PostCommit, error) {
-			return func() {
+		PreCommitHandler: func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) error {
+			dbTX.AddPostCommit(func(ctx context.Context) {
 				utBatchNotify <- blocks
-			}, nil
+			})
+			return nil
 		},
 	}, &InternalEventStream{
-		Handler: func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error) {
+		Handler: func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error {
 			require.Fail(t, "should not be called")
-			return nil, nil
+			return nil
 		},
 		Definition: &EventStream{
 			Name: "unit_test",
@@ -729,9 +745,9 @@ func TestDispatcherDispatchClosed(t *testing.T) {
 		batchTimeout:   1 * time.Microsecond, // but not going to wait
 		dispatch:       make(chan *eventDispatch),
 		dispatcherDone: make(chan struct{}),
-		handler: func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error) {
+		handler: func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error {
 			called = true
-			return nil, fmt.Errorf("pop")
+			return fmt.Errorf("pop")
 		},
 	}
 	go func() {
@@ -757,7 +773,7 @@ func TestProcessCatchupEventPageFailRPC(t *testing.T) {
 
 	bi.retry.UTSetMaxAttempts(2)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", ethtypes.MustNewHexBytes0xPrefix(txHash.String())).
-		Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("pop"))).Once()
+		Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("pop"))).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", ethtypes.MustNewHexBytes0xPrefix(txHash.String())).
 		Return(nil) // but still not found
 
@@ -792,13 +808,13 @@ func TestProcessCatchupEventMultiPageRealDB(t *testing.T) {
 	allTransactions := []*pldapi.IndexedTransaction{}
 	allEvents := []*pldapi.IndexedEvent{}
 	for b := 1; b < 14; b++ {
-		blockHash := tktypes.Bytes32(tktypes.RandBytes(32))
+		blockHash := tktypes.RandBytes32()
 		allBlocks = append(allBlocks, &pldapi.IndexedBlock{
 			Number: int64(b),
 			Hash:   blockHash,
 		})
 		for tx := 0; tx < 8; tx++ {
-			txHash := tktypes.Bytes32(tktypes.RandBytes(32))
+			txHash := tktypes.RandBytes32()
 			allTransactions = append(allTransactions, &pldapi.IndexedTransaction{
 				Hash:             txHash,
 				BlockNumber:      int64(b),

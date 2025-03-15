@@ -24,7 +24,7 @@ import (
 
 var ple = plugintk.NewPluginLibraryEntrypoint(func() plugintk.PluginBase {
 	return plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
-		return noto.NewNoto(callbacks)
+		return &noto.Noto{Callbacks: callbacks}
 	})
 })
 

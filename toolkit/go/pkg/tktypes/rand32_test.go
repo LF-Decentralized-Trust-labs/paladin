@@ -38,3 +38,8 @@ func TestRandHex(t *testing.T) {
 	})
 
 }
+
+func TestRandBytes32(t *testing.T) {
+	r1 := RandBytes32()
+	assert.Len(t, r1, 32)
+}

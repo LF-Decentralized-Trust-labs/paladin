@@ -22,12 +22,12 @@ import (
 	"testing"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/stretchr/testify/assert"
+	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
@@ -81,21 +81,21 @@ func DeployZetoContracts(t *testing.T, hdWalletSeed *testbed.UTInitFunction, con
 
 	tb := testbed.NewTestBed()
 	url, _, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{}, hdWalletSeed)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer done()
-	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
+	rpc := rpcclient.WrapRestyClient(resty.New().SetBaseURL(url))
 
 	var config domainConfig
 	testZetoConfigYaml, err := os.ReadFile(configFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = yaml.Unmarshal(testZetoConfigYaml, &config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	deployedContracts, err := deployDomainContracts(ctx, rpc, controller, &config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = configureFactoryContract(ctx, tb, controller, deployedContracts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return deployedContracts
 }

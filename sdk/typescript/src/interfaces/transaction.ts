@@ -1,5 +1,6 @@
+import { BigNumberish, ethers } from "ethers";
+import { NotoUnlockPublicParams } from "../domains/noto";
 import { IStateBase } from "./states";
-import { ethers } from "ethers";
 
 export interface IBlock {
   number: number;
@@ -12,10 +13,18 @@ export enum TransactionType {
   PRIVATE = "private",
 }
 
+export interface PublicTxOptions {
+  gas?: BigNumberish;
+  value?: BigNumberish;
+  maxPriorityFeePerGas?: BigNumberish;
+  maxFeePerGas?: BigNumberish;
+  gasPrice?: BigNumberish;
+}
+
 export interface ITransactionBase {
   type: TransactionType;
   domain?: string;
-  function: string;
+  function?: string;
   from: string;
   to?: string;
   data: {
@@ -56,12 +65,14 @@ export interface ITransactionCall extends ITransactionInput {}
 export interface ITransactionReceipt {
   blockNumber: number;
   id: string;
+  sequence: number;
   success: boolean;
   transactionHash: string;
   source: string;
+  domain?: string;
   contractAddress?: string;
   states?: ITransactionStates;
-  domainReceipt?: IPenteDomainReceipt;
+  domainReceipt?: IPenteDomainReceipt | INotoDomainReceipt;
   failureMessage?: string;
 }
 
@@ -78,6 +89,50 @@ export interface IPenteLog {
   address: string;
   topics: string[];
   data: string;
+}
+
+export interface INotoDomainReceipt {
+  states: {
+    inputs?: IReceiptState<INotoCoin>[];
+    outputs?: IReceiptState<INotoCoin>[];
+    readInputs?: IReceiptState<INotoCoin>[];
+    preparedOutputs?: IReceiptState<INotoCoin>[];
+
+    lockedInputs?: IReceiptState<INotoLockedCoin>[];
+    lockedOutputs?: IReceiptState<INotoLockedCoin>[];
+    readLockedInputs?: IReceiptState<INotoLockedCoin>[];
+    preparedLockedOutputs?: IReceiptState<INotoLockedCoin>[];
+  };
+  transfers?: {
+    from?: string;
+    to?: string;
+    amount: string;
+  }[];
+  lockInfo?: {
+    lockId: string;
+    delegate?: string;
+    unlockParams?: NotoUnlockPublicParams;
+    unlockCall?: string;
+  };
+  data?: string;
+}
+
+export interface IReceiptState<T> {
+  id: string;
+  data: T;
+}
+
+export interface INotoCoin {
+  salt: string;
+  owner: string;
+  amount: string;
+}
+
+export interface INotoLockedCoin {
+  lockId: string;
+  salt: string;
+  owner: string;
+  amount: string;
 }
 
 export interface ITransactionStates {
@@ -115,4 +170,22 @@ export interface IEventWithData {
   soliditySignature: string;
   address: string;
   data: any;
+}
+
+export interface IStoredABI {
+  hash: string;
+  abi: ethers.InterfaceAbi;
+}
+
+export interface ITransactionReceiptListener {
+  name: string;
+  filters?: {
+    sequenceAbove?: number;
+    type?: TransactionType;
+    domain?: string;
+  };
+  options?: {
+    domainReceipts?: boolean;
+    incompleteStateReceiptBehavior?: "block_contract" | "process";
+  };
 }

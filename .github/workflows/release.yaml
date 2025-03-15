@@ -14,7 +14,7 @@ on:
         required: true
         type: string
         description: 'Release tag (chart and images)'
-        
+
 jobs:
   set-variables:
     runs-on: ubuntu-latest
@@ -47,7 +47,6 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "latest=$LATEST" >> $GITHUB_OUTPUT
 
-
   release-images:
     needs: set-variables
     uses: ./.github/workflows/release-images.yaml
@@ -64,13 +63,52 @@ jobs:
     with:
       chart_tag: ${{ needs.set-variables.outputs.tag }}
       images_tag: ${{ needs.set-variables.outputs.tag }}
-      latest: '${{ fromJSON(needs.set-variables.outputs.latest) }}'
       registry: docker.io
     secrets:
       CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  release-solidity-contracts:
+    uses: ./.github/workflows/release-solidity-contracts.yaml
+
+  release:
+    needs: [set-variables, release-charts, release-solidity-contracts]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Helm artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: helm-artifacts
+          path: helm-artifacts/
+
+      - name: Download Solidity artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: contracts
+          path: contracts/
+
+      - name: List downloaded artifacts
+        run: |
+          ls -R
+
+      - name: Create release with all artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.set-variables.outputs.tag }}
+          body: "Release ${{ needs.set-variables.outputs.tag }}"
+          generate_release_notes: true
+          make_latest: '${{ fromJSON(needs.set-variables.outputs.latest) }}'
+          files: |
+            helm-artifacts/basenet.yaml
+            helm-artifacts/devnet.yaml
+            helm-artifacts/artifacts.tar.gz
+            contracts/abis.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   release-typescript-sdk:
-    needs: release-charts
+    needs: [set-variables, release]
     uses: ./.github/workflows/release-typescript-sdk.yaml
+    with:
+      sdk_version: ${{ needs.set-variables.outputs.tag }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

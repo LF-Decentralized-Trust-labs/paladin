@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -16,7 +16,6 @@
 
 import { Alert, Box, LinearProgress, Typography, useTheme } from "@mui/material";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { t } from "i18next";
 import { useContext } from "react";
 import { ApplicationContext } from "../contexts/ApplicationContext";
 import {
@@ -26,12 +25,14 @@ import { Transaction } from "./Transaction";
 import { getAltModeScrollBarStyle } from "../themes/default";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { ITransaction } from "../interfaces";
+import { useTranslation } from "react-i18next";
 
 
 export const Transactions: React.FC = () => {
   const { lastBlockWithTransactions } = useContext(ApplicationContext);
 
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const { data: transactions, fetchNextPage, hasNextPage, error } = useInfiniteQuery({
     queryKey: ["transactions", lastBlockWithTransactions],
@@ -51,7 +52,7 @@ export const Transactions: React.FC = () => {
   return (
     <>
       <Typography align="center" variant="h5" sx={{ marginBottom: '20px' }}>
-        {t("transactions")}
+        {t("receipts")}
       </Typography>
       <Box
         id="scrollableDivEventsTransactions"
@@ -68,7 +69,7 @@ export const Transactions: React.FC = () => {
           hasMore={hasNextPage}
           loader={<LinearProgress />}
         >
-          {transactions.pages.map(transactionArrat => transactionArrat?.map((transaction) => (
+          {transactions.pages.map(transactionArray => transactionArray.map((transaction) => (
             <Transaction
               key={transaction.hash}
               transaction={transaction}

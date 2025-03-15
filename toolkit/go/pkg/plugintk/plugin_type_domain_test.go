@@ -114,6 +114,45 @@ func TestDomainCallback_RecoverSigner(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDomainCallback_SendTransaction(t *testing.T) {
+	ctx, _, _, callbacks, inOutMap, done := setupDomainTests(t)
+	defer done()
+
+	inOutMap[fmt.Sprintf("%T", &prototk.DomainMessage_SendTransaction{})] = func(dm *prototk.DomainMessage) {
+		dm.ResponseToDomain = &prototk.DomainMessage_SendTransactionRes{
+			SendTransactionRes: &prototk.SendTransactionResponse{},
+		}
+	}
+	_, err := callbacks.SendTransaction(ctx, &prototk.SendTransactionRequest{})
+	require.NoError(t, err)
+}
+
+func TestDomainCallback_LocalNodeName(t *testing.T) {
+	ctx, _, _, callbacks, inOutMap, done := setupDomainTests(t)
+	defer done()
+
+	inOutMap[fmt.Sprintf("%T", &prototk.DomainMessage_LocalNodeName{})] = func(dm *prototk.DomainMessage) {
+		dm.ResponseToDomain = &prototk.DomainMessage_LocalNodeNameRes{
+			LocalNodeNameRes: &prototk.LocalNodeNameResponse{},
+		}
+	}
+	_, err := callbacks.LocalNodeName(ctx, &prototk.LocalNodeNameRequest{})
+	require.NoError(t, err)
+}
+
+func TestDomainCallback_GetStates(t *testing.T) {
+	ctx, _, _, callbacks, inOutMap, done := setupDomainTests(t)
+	defer done()
+
+	inOutMap[fmt.Sprintf("%T", &prototk.DomainMessage_GetStatesById{})] = func(dm *prototk.DomainMessage) {
+		dm.ResponseToDomain = &prototk.DomainMessage_GetStatesByIdRes{
+			GetStatesByIdRes: &prototk.GetStatesByIDResponse{},
+		}
+	}
+	_, err := callbacks.GetStatesByID(ctx, &prototk.GetStatesByIDRequest{})
+	require.NoError(t, err)
+}
+
 func TestDomainFunction_ConfigureDomain(t *testing.T) {
 	_, exerciser, funcs, _, _, done := setupDomainTests(t)
 	defer done()
@@ -383,6 +422,57 @@ func TestDomainFunction_BuildReceipt(t *testing.T) {
 		}
 	}, func(res *prototk.DomainMessage) {
 		assert.IsType(t, &prototk.DomainMessage_BuildReceiptRes{}, res.ResponseFromDomain)
+	})
+}
+
+func TestDomainFunction_ConfigurePrivacyGroup(t *testing.T) {
+	_, exerciser, funcs, _, _, done := setupDomainTests(t)
+	defer done()
+
+	// ConfigurePrivacyGroup - paladin to domain
+	funcs.ConfigurePrivacyGroup = func(ctx context.Context, cdr *prototk.ConfigurePrivacyGroupRequest) (*prototk.ConfigurePrivacyGroupResponse, error) {
+		return &prototk.ConfigurePrivacyGroupResponse{}, nil
+	}
+	exerciser.doExchangeToPlugin(func(req *prototk.DomainMessage) {
+		req.RequestToDomain = &prototk.DomainMessage_ConfigurePrivacyGroup{
+			ConfigurePrivacyGroup: &prototk.ConfigurePrivacyGroupRequest{},
+		}
+	}, func(res *prototk.DomainMessage) {
+		assert.IsType(t, &prototk.DomainMessage_ConfigurePrivacyGroupRes{}, res.ResponseFromDomain)
+	})
+}
+
+func TestDomainFunction_InitPrivacyGroup(t *testing.T) {
+	_, exerciser, funcs, _, _, done := setupDomainTests(t)
+	defer done()
+
+	// InitPrivacyGroup - paladin to domain
+	funcs.InitPrivacyGroup = func(ctx context.Context, cdr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+		return &prototk.InitPrivacyGroupResponse{}, nil
+	}
+	exerciser.doExchangeToPlugin(func(req *prototk.DomainMessage) {
+		req.RequestToDomain = &prototk.DomainMessage_InitPrivacyGroup{
+			InitPrivacyGroup: &prototk.InitPrivacyGroupRequest{},
+		}
+	}, func(res *prototk.DomainMessage) {
+		assert.IsType(t, &prototk.DomainMessage_InitPrivacyGroupRes{}, res.ResponseFromDomain)
+	})
+}
+
+func TestDomainFunction_WrapPrivacyGroupEVMTX(t *testing.T) {
+	_, exerciser, funcs, _, _, done := setupDomainTests(t)
+	defer done()
+
+	// WrapPrivacyGroupEVMTX - paladin to domain
+	funcs.WrapPrivacyGroupEVMTX = func(ctx context.Context, cdr *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error) {
+		return &prototk.WrapPrivacyGroupEVMTXResponse{}, nil
+	}
+	exerciser.doExchangeToPlugin(func(req *prototk.DomainMessage) {
+		req.RequestToDomain = &prototk.DomainMessage_WrapPrivacyGroupEvmtx{
+			WrapPrivacyGroupEvmtx: &prototk.WrapPrivacyGroupEVMTXRequest{},
+		}
+	}, func(res *prototk.DomainMessage) {
+		assert.IsType(t, &prototk.DomainMessage_WrapPrivacyGroupEvmtxRes{}, res.ResponseFromDomain)
 	})
 }
 

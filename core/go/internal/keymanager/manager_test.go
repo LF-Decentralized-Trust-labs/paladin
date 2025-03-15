@@ -35,7 +35,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -163,12 +162,11 @@ func TestE2ESigningHDWalletRealDB(t *testing.T) {
 			km.verifierByIdentityCache.Clear()
 		}
 
-		krc := km.NewKeyResolutionContext(ctx)
-		err := km.p.DB().Transaction(func(dbTX *gorm.DB) error {
-			kr := krc.KeyResolver(dbTX)
+		err := km.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+			kr := km.KeyResolverForDBTX(dbTX)
 
 			// one key out of the blue
-			resolved1, err := kr.ResolveKey("bob.keys.blue.42", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+			resolved1, err := kr.ResolveKey(ctx, "bob.keys.blue.42", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 			require.NoError(t, err)
 			assert.Equal(t, algorithms.ECDSA_SECP256K1, resolved1.Verifier.Algorithm)
 			assert.Equal(t, verifiers.ETH_ADDRESS, resolved1.Verifier.Type)
@@ -185,7 +183,7 @@ func TestE2ESigningHDWalletRealDB(t *testing.T) {
 			assert.Equal(t, addr.String(), resolved1.Verifier.Verifier)
 
 			// a root key, after we've already allocated a key under it
-			resolved2, err := kr.ResolveKey("bob", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+			resolved2, err := kr.ResolveKey(ctx, "bob", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 			require.NoError(t, err)
 			assert.Equal(t, algorithms.ECDSA_SECP256K1, resolved2.Verifier.Algorithm)
 			assert.Equal(t, verifiers.ETH_ADDRESS, resolved2.Verifier.Type)
@@ -193,7 +191,7 @@ func TestE2ESigningHDWalletRealDB(t *testing.T) {
 
 			// keys at a nested layer
 			for i := 0; i < 10; i++ {
-				resolved, err := kr.ResolveKey(fmt.Sprintf("bob.keys.red.%d", i), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				resolved, err := kr.ResolveKey(ctx, fmt.Sprintf("bob.keys.red.%d", i), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
 				assert.Equal(t, algorithms.ECDSA_SECP256K1, resolved.Verifier.Algorithm)
 				assert.Equal(t, verifiers.ETH_ADDRESS, resolved.Verifier.Type)
@@ -202,7 +200,7 @@ func TestE2ESigningHDWalletRealDB(t *testing.T) {
 
 			// same keys backwards
 			for i := 9; i >= 0; i-- {
-				resolved, err := kr.ResolveKey(fmt.Sprintf("bob.keys.red.%d", i), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				resolved, err := kr.ResolveKey(ctx, fmt.Sprintf("bob.keys.red.%d", i), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
 				assert.Equal(t, algorithms.ECDSA_SECP256K1, resolved.Verifier.Algorithm)
 				assert.Equal(t, verifiers.ETH_ADDRESS, resolved.Verifier.Type)
@@ -211,17 +209,16 @@ func TestE2ESigningHDWalletRealDB(t *testing.T) {
 
 			// keys under a different root
 			for i := 0; i < 10; i++ {
-				resolved, err := kr.ResolveKey(fmt.Sprintf("sally.%d", i), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				resolved, err := kr.ResolveKey(ctx, fmt.Sprintf("sally.%d", i), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
 				assert.Equal(t, algorithms.ECDSA_SECP256K1, resolved.Verifier.Algorithm)
 				assert.Equal(t, verifiers.ETH_ADDRESS, resolved.Verifier.Type)
 				assert.Equal(t, fmt.Sprintf("m/44'/60'/2'/%d", i), resolved.KeyHandle)
 			}
 
-			return krc.PreCommit()
+			return nil
 		})
 		require.NoError(t, err)
-		krc.Close(true) // note a cheat in this unit test to not have a defer on this in a sub-function
 	}
 
 	// Sub-test two - concurrent resolution with a consistent outcome
@@ -260,23 +257,19 @@ func TestE2ESigningHDWalletRealDB(t *testing.T) {
 			require.True(t, found)
 			require.Equal(t, reference[u], result)
 			// Check the reverse lookup too
-			resolved, err := km.ReverseKeyLookup(ctx, km.p.DB(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, result)
+			resolved, err := km.ReverseKeyLookup(ctx, km.p.NOTX(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, result)
 			require.NoError(t, err)
 			require.Equal(t, fmt.Sprintf("sally.rand.%s", u), resolved.Identifier)
 		}
 	}
 
 	testResolveMulti := func(doResolve func(kr components.KeyResolver)) {
-		krc := km.NewKeyResolutionContext(ctx)
-		committed := false
-		defer func() { krc.Close(committed) }()
 		// DB TX for each UUID to hammer things a little
-		err := km.p.DB().Transaction(func(dbTX *gorm.DB) error {
-			doResolve(krc.KeyResolver(dbTX))
-			return krc.PreCommit()
+		err := km.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+			doResolve(km.KeyResolverForDBTX(dbTX))
+			return nil
 		})
 		require.NoError(t, err)
-		committed = true
 	}
 
 	// Now this last one is really hard.
@@ -287,33 +280,33 @@ func TestE2ESigningHDWalletRealDB(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			testResolveMulti(func(kr components.KeyResolver) {
-				_, err := kr.ResolveKey(fmt.Sprintf("path.to.A.%d", i+1000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				_, err := kr.ResolveKey(ctx, fmt.Sprintf("path.to.A.%d", i+1000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
-				_, err = kr.ResolveKey(fmt.Sprintf("path.to.B.%d", i+1000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				_, err = kr.ResolveKey(ctx, fmt.Sprintf("path.to.B.%d", i+1000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
-				_, err = kr.ResolveKey(fmt.Sprintf("path.to.C.%d", i+1000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				_, err = kr.ResolveKey(ctx, fmt.Sprintf("path.to.C.%d", i+1000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
 			})
 		}()
 		go func() {
 			defer wg.Done()
 			testResolveMulti(func(kr components.KeyResolver) {
-				_, err := kr.ResolveKey(fmt.Sprintf("path.to.B.%d", i+2000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				_, err := kr.ResolveKey(ctx, fmt.Sprintf("path.to.B.%d", i+2000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
-				_, err = kr.ResolveKey(fmt.Sprintf("path.to.C.%d", i+2000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				_, err = kr.ResolveKey(ctx, fmt.Sprintf("path.to.C.%d", i+2000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
-				_, err = kr.ResolveKey(fmt.Sprintf("path.to.A.%d", i+2000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				_, err = kr.ResolveKey(ctx, fmt.Sprintf("path.to.A.%d", i+2000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
 			})
 		}()
 		go func() {
 			defer wg.Done()
 			testResolveMulti(func(lr components.KeyResolver) {
-				_, err := lr.ResolveKey(fmt.Sprintf("path.to.C.%d", i+3000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				_, err := lr.ResolveKey(ctx, fmt.Sprintf("path.to.C.%d", i+3000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
-				_, err = lr.ResolveKey(fmt.Sprintf("path.to.B.%d", i+3000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				_, err = lr.ResolveKey(ctx, fmt.Sprintf("path.to.B.%d", i+3000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
-				_, err = lr.ResolveKey(fmt.Sprintf("path.to.A.%d", i+3000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+				_, err = lr.ResolveKey(ctx, fmt.Sprintf("path.to.A.%d", i+3000), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 				require.NoError(t, err)
 			})
 		}()
@@ -331,29 +324,37 @@ func TestE2EMixedKeyResolution(t *testing.T) {
 	)
 	defer done()
 
-	krc := km.NewKeyResolutionContextLazyDB(ctx)
-	_, err := krc.KeyResolverLazyDB().ResolveKey("static.key3", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	err := km.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		kr := km.KeyResolverForDBTX(dbTX)
+		_, err := kr.ResolveKey(ctx, "static.key3", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+		return err
+	})
 	assert.Regexp(t, "PD020818", err)
-	krc.Rollback()
 
-	krc = km.NewKeyResolutionContextLazyDB(ctx)
-	mappingStaticKey1, err := krc.KeyResolverLazyDB().ResolveKey("static.key1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	var mappingStaticKey1, mappingStaticKey2 *pldapi.KeyMappingAndVerifier
+	err = km.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		kr := km.KeyResolverForDBTX(dbTX)
+		mappingStaticKey1, err = kr.ResolveKey(ctx, "static.key1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+		require.NoError(t, err)
+		mappingStaticKey2, err = kr.ResolveKey(ctx, "static.key2", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+		require.NoError(t, err)
+		return nil
+	})
 	require.NoError(t, err)
-	mappingStaticKey2, err := krc.KeyResolverLazyDB().ResolveKey("static.key2", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
-	require.NoError(t, err)
-	err = krc.Commit()
-	require.NoError(t, err)
 
-	key1 := secp256k1.KeyPairFromBytes(tktypes.MustParseHexBytes(staticKeys.Signer.KeyStore.Static.Keys["static.key1"].Inline))
-	require.Equal(t, key1.Address.String(), mappingStaticKey1.Verifier.Verifier)
+	err = km.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		kr := km.KeyResolverForDBTX(dbTX)
 
-	key2 := secp256k1.KeyPairFromBytes(tktypes.MustParseHexBytes(staticKeys.Signer.KeyStore.Static.Keys["static.key2"].Inline))
-	require.Equal(t, key2.Address.String(), mappingStaticKey2.Verifier.Verifier)
+		key1 := secp256k1.KeyPairFromBytes(tktypes.MustParseHexBytes(staticKeys.Signer.KeyStore.Static.Keys["static.key1"].Inline))
+		require.Equal(t, key1.Address.String(), mappingStaticKey1.Verifier.Verifier)
 
-	krc = km.NewKeyResolutionContextLazyDB(ctx)
-	_, err = krc.KeyResolverLazyDB().ResolveKey("anything.at.any.level", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
-	assert.NoError(t, err)
-	err = krc.Commit()
+		key2 := secp256k1.KeyPairFromBytes(tktypes.MustParseHexBytes(staticKeys.Signer.KeyStore.Static.Keys["static.key2"].Inline))
+		require.Equal(t, key2.Address.String(), mappingStaticKey2.Verifier.Verifier)
+
+		_, err = kr.ResolveKey(ctx, "anything.at.any.level", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+		assert.NoError(t, err)
+		return nil
+	})
 	require.NoError(t, err)
 
 }
@@ -400,48 +401,6 @@ func TestSignUnknownWallet(t *testing.T) {
 
 }
 
-func TestTimeoutWaitingForLock(t *testing.T) {
-
-	ctx, km, _, done := newTestDBKeyManagerWithWallets(t, hdWalletConfig("wallet1", ""))
-	defer done()
-
-	readyToTry := make(chan struct{})
-	waitDone := make(chan struct{})
-	krc1 := km.NewKeyResolutionContext(ctx)
-	go func() {
-
-		committed := false
-		defer func() {
-			krc1.Close(committed)
-		}()
-		err := km.p.DB().Transaction(func(tx *gorm.DB) error {
-			mapping1, err := krc1.KeyResolver(tx).ResolveKey("key1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
-			require.NoError(t, err)
-			require.NotEmpty(t, mapping1.Verifier.Verifier)
-			close(readyToTry)
-			<-waitDone
-			return nil
-		})
-		require.NoError(t, err)
-		committed = true
-	}()
-
-	// Wait until we know we are blocked
-	<-readyToTry
-	cancelled, cancelCtx := context.WithCancel(ctx)
-	cancelCtx()
-	krc2 := km.NewKeyResolutionContext(cancelled)
-	kr2 := krc2.KeyResolver(km.p.DB()).(*keyResolver)
-	err := km.takeAllocationLock(kr2)
-	assert.Regexp(t, "PD010301", err)
-
-	close(waitDone)
-
-	// Double unlock is a warned no-op
-	km.unlockAllocation(kr2)
-
-}
-
 type testSigner struct {
 	getMinimumKeyLen func(ctx context.Context, algorithm string) (int, error)
 	getVerifier      func(ctx context.Context, algorithm string, verifierType string, privateKey []byte) (string, error)
@@ -472,14 +431,17 @@ func TestAddInMemorySignerAndSign(t *testing.T) {
 	}
 	km.AddInMemorySigner("test", s)
 
-	krc := km.NewKeyResolutionContextLazyDB(ctx)
-	defer krc.Rollback()
+	err := km.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 
-	mapping, err := krc.KeyResolverLazyDB().ResolveKey("my-custom-thing", "test:blue", "thingies")
+		mapping, err := km.KeyResolverForDBTX(dbTX).ResolveKey(ctx, "my-custom-thing", "test:blue", "thingies")
+		require.NoError(t, err)
+		require.Equal(t, "test:blue", mapping.Verifier.Algorithm)
+		require.Equal(t, "thingies", mapping.Verifier.Type)
+		require.Equal(t, "custom-thing", mapping.Verifier.Verifier)
+
+		return nil
+	})
 	require.NoError(t, err)
-	require.Equal(t, "test:blue", mapping.Verifier.Algorithm)
-	require.Equal(t, "thingies", mapping.Verifier.Type)
-	require.Equal(t, "custom-thing", mapping.Verifier.Verifier)
 
 }
 
@@ -530,7 +492,7 @@ func TestReverseKeyLookupFail(t *testing.T) {
 
 	mc.db.ExpectQuery("SELECT.*key_verifiers").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := km.ReverseKeyLookup(ctx, mc.c.Persistence().DB(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, tktypes.RandAddress().String())
+	_, err := km.ReverseKeyLookup(ctx, mc.c.Persistence().NOTX(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, tktypes.RandAddress().String())
 	assert.Regexp(t, "pop", err)
 }
 
@@ -540,7 +502,7 @@ func TestReverseKeyLookupNotFound(t *testing.T) {
 	})
 	defer done()
 
-	_, err := km.ReverseKeyLookup(ctx, mc.c.Persistence().DB(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, tktypes.RandAddress().String())
+	_, err := km.ReverseKeyLookup(ctx, mc.c.Persistence().NOTX(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, tktypes.RandAddress().String())
 	assert.Regexp(t, "PD010511", err)
 }
 
@@ -556,6 +518,6 @@ func TestReverseKeyLookupFailMapping(t *testing.T) {
 			AddRow(algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, verifier, "!!!!! wrong"),
 	)
 
-	_, err := km.ReverseKeyLookup(ctx, mc.c.Persistence().DB(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, verifier)
+	_, err := km.ReverseKeyLookup(ctx, mc.c.Persistence().NOTX(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, verifier)
 	assert.Regexp(t, "PD010500", err)
 }

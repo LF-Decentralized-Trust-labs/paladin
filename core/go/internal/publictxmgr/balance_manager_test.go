@@ -17,10 +17,10 @@ package publictxmgr
 
 import (
 	"context"
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -272,7 +272,9 @@ func expectFuelingEqual(t *testing.T, fuelingTx *pldapi.PublicTx, amountToTransf
 
 func mockAutoFuelTransactionSubmit(m *mocksAndTestControl, bm *BalanceManagerWithInMemoryTracking, uncachedBalance bool) {
 	// Then insert of the auto-fueling transaction
-	m.db.ExpectExec("INSERT.*public_txns").WillReturnResult(driver.ResultNoRows)
+	m.db.ExpectBegin()
+	m.db.ExpectQuery("INSERT.*public_txns").WillReturnRows(m.db.NewRows([]string{"pub_txn_id"}).AddRow(12345))
+	m.db.ExpectCommit()
 
 	if uncachedBalance {
 		// Mock the sufficient balance on the auto-fueling source address, and the nonce assignment
@@ -334,7 +336,7 @@ func TestTopUpWithNoAmountModificationWithMultipleFuelingTxs(t *testing.T) {
 	// current transaction completed, replace with new transaction
 	expectedTopUpAmount2 := big.NewInt(50)
 	m.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{"from", `Completed__tx_hash`}).
-		AddRow(*bm.sourceAddress, tktypes.Bytes32(tktypes.RandBytes(32))))
+		AddRow(*bm.sourceAddress, tktypes.RandBytes32()))
 
 	mockAutoFuelTransactionSubmit(m, bm, false)
 
@@ -357,7 +359,8 @@ func TestTopUpWithNoAmountModificationWithMultipleFuelingTxs(t *testing.T) {
 	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(tktypes.Uint64ToUint256(50), nil).Once()
 
 	m.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{"from", `Completed__tx_hash`}).
-		AddRow(*bm.sourceAddress, tktypes.Bytes32(tktypes.RandBytes(32))))
+		AddRow(*bm.sourceAddress, tktypes.RandBytes32()))
+	m.db.ExpectBegin()
 
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
 		Return(ethclient.EstimateGasResult{}, fmt.Errorf("pop")).Once()
@@ -647,6 +650,43 @@ func TestTopUpFailedDueToSourceBalanceBelowRequestedAmount(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, fuelingTx)
 	assert.Regexp(t, fmt.Sprintf("PD011900: Balance 400 of fueling source address %s is below the required amount 1900", bm.sourceAddress), err.Error())
+}
+
+func TestTopUpFailedDueToSourceBalanceBelowRequestedAmountConcurrencyTest(t *testing.T) {
+	testConcurrency := 5000
+	ctx, bm, _, m, done := newTestBalanceManager(t, true, func(m *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+		m.disableManagerStart = true
+	})
+	defer done()
+
+	// Mock no auto-fueling TX in flight
+	for i := 0; i < testConcurrency; i++ {
+		m.db.ExpectQuery(`SELECT.*public_txns.*data IS NULL`).
+			WillReturnRows(sqlmock.NewRows([]string{}))
+	}
+
+	// Mock the sufficient balance on the auto-fueling source address, and the nonce assignment
+	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(tktypes.Uint64ToUint256(400), nil).Once() // called once and then cached
+
+	var wg sync.WaitGroup
+	for i := 0; i < testConcurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			fuelingTx, err := bm.TopUpAccount(ctx, &AddressAccount{
+				Balance:               big.NewInt(100),
+				Spent:                 big.NewInt(2000),
+				Address:               *tktypes.RandAddress(),
+				SpentTransactionCount: 2,
+				MinCost:               big.NewInt(500),
+				MaxCost:               big.NewInt(1500),
+			})
+			assert.Error(t, err)
+			assert.Nil(t, fuelingTx)
+			assert.Regexp(t, fmt.Sprintf("PD011900: Balance 400 of fueling source address %s is below the required amount 1900", bm.sourceAddress), err.Error())
+		}()
+	}
+	wg.Wait()
 }
 
 func TestTopUpFailedDueToUnableToGetPendingFuelingTransaction(t *testing.T) {

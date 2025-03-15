@@ -21,7 +21,7 @@ title: keymgr_*
 
 ### Returns
 
-0. `mapping`: `KeyMappingAndVerifier`
+0. `mapping`: [`KeyMappingAndVerifier`](../types/keymappingandverifier.md#keymappingandverifier)
 
 ## `keymgr_reverseKeyLookup`
 
@@ -33,7 +33,7 @@ title: keymgr_*
 
 ### Returns
 
-0. `mapping`: `KeyMappingAndVerifier`
+0. `mapping`: [`KeyMappingAndVerifier`](../types/keymappingandverifier.md#keymappingandverifier)
 
 ## `keymgr_wallets`
 

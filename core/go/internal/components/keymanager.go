@@ -18,25 +18,14 @@ package components
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 )
 
-type KeyResolutionContext interface {
-	KeyResolver(dbTX *gorm.DB) KeyResolver // Defers passing the DB TX in until it's begun
-	PreCommit() error                      // MUST be called for successful TX inside the DB TX
-	Close(committed bool)                  // MUST be called outside the DB TX
-}
-type KeyResolutionContextLazyDB interface {
-	KeyResolverLazyDB() KeyResolver // Defers starting the DB TX in until it's begun
-	Commit() error
-	Rollback()
-}
-
 type KeyResolver interface {
-	ResolveKey(identifier, algorithm, verifierType string) (mapping *pldapi.KeyMappingAndVerifier, err error)
+	ResolveKey(ctx context.Context, identifier, algorithm, verifierType string) (mapping *pldapi.KeyMappingAndVerifier, err error)
 }
 
 type KeyManager interface {
@@ -45,10 +34,9 @@ type KeyManager interface {
 	// Note resolving a key is a persistent activity that requires a database transaction to be managed by the caller.
 	// To avoid deadlock when resolving multiple keys in the same DB transaction, the caller is responsible for using the same
 	// resolution context for all calls that occur within the same DB tx.
-	NewKeyResolutionContext(ctx context.Context) KeyResolutionContext
-
-	// Key resolution context where we sort the database transaction for you
-	NewKeyResolutionContextLazyDB(ctx context.Context) KeyResolutionContextLazyDB
+	//
+	// IMPORTANT: An attempt to use a NOTX() pseudo transaction with this call will panic
+	KeyResolverForDBTX(dbTX persistence.DBTX) KeyResolver
 
 	// Convenience function in code where there isn't already a database transaction, and we're happy to create a
 	// new one just to scope the lookup (cannot be called safely within a containing DB transaction)
@@ -66,7 +54,7 @@ type KeyManager interface {
 	// Domains register their signers during PostCommit
 	AddInMemorySigner(prefix string, signer signerapi.InMemorySigner)
 
-	ReverseKeyLookup(ctx context.Context, dbTX *gorm.DB, algorithm, verifierType, verifier string) (mapping *pldapi.KeyMappingAndVerifier, err error)
+	ReverseKeyLookup(ctx context.Context, dbTX persistence.DBTX, algorithm, verifierType, verifier string) (mapping *pldapi.KeyMappingAndVerifier, err error)
 
 	Sign(ctx context.Context, mapping *pldapi.KeyMappingAndVerifier, payloadType string, payload []byte) ([]byte, error)
 }

@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -20,7 +20,6 @@ import VisibilityIcon from '@mui/icons-material/VisibilityOutlined';
 import { Box, Button, Grid2, Typography } from "@mui/material";
 import daysjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { t } from "i18next";
 import { useState } from "react";
 import { PaladinTransactionsReceiptDetailsDialog } from "../dialogs/TransactionReceiptDetails";
 import { ViewDetailsDialog } from "../dialogs/ViewDetails";
@@ -28,6 +27,7 @@ import { IPaladinTransaction, ITransaction, ITransactionReceipt } from "../inter
 import { EllapsedTime } from "./EllapsedTime";
 import { Hash } from "./Hash";
 import { Captions, HashIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   transaction: ITransaction
@@ -50,6 +50,7 @@ export const Transaction: React.FC<Props> = ({
     receiptCount > 1 ? 'atomicNumber' :
       receiptIsPrivate ? 'private' :
         'public';
+  const { t } = useTranslation();
 
   return (
     <>
@@ -123,7 +124,7 @@ export const Transaction: React.FC<Props> = ({
         </Box>
         <Box sx={{ display: 'flex', padding: '10px', justifyContent: 'end' }}>
           <EllapsedTime timestamp={transaction.block.timestamp} />
-          <Button sx={{ marginLeft: '20px', textTransform: 'none', fontWeight: '400' }} size="small" startIcon={<VisibilityIcon />}
+          <Button sx={{ marginLeft: '20px', fontWeight: '400' }} size="small" startIcon={<VisibilityIcon />}
             onClick={() => setViewDetailsDialogOpen(true)}>{t('viewDetails')}</Button>
         </Box>
       </Box>

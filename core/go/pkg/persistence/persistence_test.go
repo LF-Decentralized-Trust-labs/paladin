@@ -22,6 +22,7 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPersistenceTypes(t *testing.T) {
@@ -40,4 +41,9 @@ func TestPersistenceTypes(t *testing.T) {
 	_, err = NewPersistence(ctx, &pldconf.DBConfig{Type: "wrong"})
 	assert.Regexp(t, "PD010200.*wrong", err)
 
+}
+
+func TestHashCodeAlwaysPositive(t *testing.T) {
+	require.Equal(t, int64(1793351735952061022), hashCode("aaa"))
+	require.Equal(t, int64(18883120392660901), hashCode("bbb"))
 }

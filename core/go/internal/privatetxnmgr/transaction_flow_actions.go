@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -74,6 +74,8 @@ func (tf *transactionFlow) Action(ctx context.Context) {
 		//we know we need to finalize but we are not currently waiting for a finalize to complete
 		// most likely a previous attempt to finalize has failed
 		tf.finalize(ctx)
+		tf.logActionInfo(ctx, "finalize initiated")
+		return
 	}
 
 	if tf.dispatched {
@@ -284,6 +286,8 @@ func (tf *transactionFlow) finalize(ctx context.Context) {
 			go tf.publisher.PublishTransactionFinalizeError(ctx, tf.transaction.ID.String(), tf.finalizeRevertReason, rollbackErr)
 		},
 	)
+
+	tf.finalizePending = true
 }
 
 func (tf *transactionFlow) delegateIfRequired(ctx context.Context) (doContinue bool) {
@@ -370,11 +374,12 @@ func (tf *transactionFlow) writeAndLockStates(ctx context.Context) {
 	// we are accessing the transactionFlow's PrivateTransaction object which is only safe to do on the sequencer thread
 	// but we need to make sure that these writes/locks are complete before the assemble requester thread can proceed to assemble
 	// the next transaction
-	if tf.transaction.PostAssembly.OutputStatesPotential != nil && tf.transaction.PostAssembly.OutputStates == nil {
+	if (tf.transaction.PostAssembly.OutputStatesPotential != nil && tf.transaction.PostAssembly.OutputStates == nil) ||
+		(tf.transaction.PostAssembly.InfoStatesPotential != nil && tf.transaction.PostAssembly.InfoStates == nil) {
 		// We need to write the potential states to the domain before we can sign or endorse the transaction
 		// but there is no point in doing that until we are sure that the transaction is going to be coordinated locally
 		// so this is the earliest, and latest, point in the flow that we can do this
-		readTX := tf.components.Persistence().DB() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
+		readTX := tf.components.Persistence().NOTX() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
 		err := tf.domainAPI.WritePotentialStates(tf.domainContext, readTX, tf.transaction)
 		if err != nil {
 			//Any error from WritePotentialStates is likely to be caused by an invalid init or assemble of the transaction
@@ -389,8 +394,8 @@ func (tf *transactionFlow) writeAndLockStates(ctx context.Context) {
 			tf.logActionDebugf(ctx, "Potential states written %s", tf.domainContext.Info().ID)
 		}
 	}
-	if len(tf.transaction.PostAssembly.InputStates) > 0 {
-		readTX := tf.components.Persistence().DB() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
+	if len(tf.transaction.PostAssembly.InputStates) > 0 && tf.transaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION {
+		readTX := tf.components.Persistence().NOTX() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
 
 		err := tf.domainAPI.LockStates(tf.domainContext, readTX, tf.transaction)
 		if err != nil {

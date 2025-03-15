@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
@@ -36,6 +35,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
@@ -44,13 +44,12 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 )
 
 type BlockIndexer interface {
 	Start(...*InternalEventStream) error
 	Stop()
-	AddEventStream(ctx context.Context, stream *InternalEventStream) (*EventStream, error)
+	AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error)
 	GetIndexedBlockByNumber(ctx context.Context, number uint64) (*pldapi.IndexedBlock, error)
 	GetIndexedTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*pldapi.IndexedTransaction, error)
 	GetIndexedTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce uint64) (*pldapi.IndexedTransaction, error)
@@ -151,7 +150,7 @@ func (bi *blockIndexer) Start(internalStreams ...*InternalEventStream) error {
 	for _, ies := range internalStreams {
 		switch ies.Type {
 		case IESTypeEventStream:
-			if _, err := bi.upsertInternalEventStream(bi.parentCtxForReset, ies); err != nil {
+			if _, err := bi.upsertInternalEventStream(bi.parentCtxForReset, bi.persistence.NOTX(), ies); err != nil {
 				return err
 			}
 		case IESTypePreCommitHandler:
@@ -164,8 +163,8 @@ func (bi *blockIndexer) Start(internalStreams ...*InternalEventStream) error {
 	return nil
 }
 
-func (bi *blockIndexer) AddEventStream(ctx context.Context, stream *InternalEventStream) (*EventStream, error) {
-	es, err := bi.upsertInternalEventStream(ctx, stream)
+func (bi *blockIndexer) AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error) {
+	es, err := bi.upsertInternalEventStream(ctx, dbTX, stream)
 	if err != nil {
 		return nil, err
 	}
@@ -599,33 +598,29 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		}
 	}
 
-	var postCommits []PostCommit
 	err := bi.retry.Do(ctx, func(attempt int) (retryable bool, err error) {
-		postCommits = nil
-		err = bi.persistence.DB().Transaction(func(dbTX *gorm.DB) (err error) {
+		err = bi.persistence.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
 			for _, preCommitHandler := range bi.preCommitHandlers {
-				var postCommit PostCommit
-				postCommit, err = preCommitHandler(ctx, dbTX, blocks, notifyTransactions)
 				if err == nil {
-					postCommits = append(postCommits, postCommit)
+					err = preCommitHandler(ctx, dbTX, blocks, notifyTransactions)
 				}
 			}
 			if err == nil && len(blocks) > 0 {
-				err = dbTX.
+				err = dbTX.DB().
 					WithContext(ctx).
 					Table("indexed_blocks").
 					Create(blocks).
 					Error
 			}
 			if err == nil && len(transactions) > 0 {
-				err = dbTX.
+				err = dbTX.DB().
 					WithContext(ctx).
 					Table("indexed_transactions").
 					Create(transactions).
 					Error
 			}
 			if err == nil && len(events) > 0 {
-				err = dbTX.
+				err = dbTX.DB().
 					WithContext(ctx).
 					Table("indexed_events").
 					Omit("Transaction").
@@ -645,9 +640,6 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		bi.highestConfirmedBlock.Store(newHighestBlock)
 	}
 	if err == nil {
-		for _, postCommitHandler := range postCommits {
-			postCommitHandler()
-		}
 		for _, t := range transactions {
 			if inflight := bi.txWaiters.GetInflight(t.Hash); inflight != nil {
 				inflight.Complete(t)

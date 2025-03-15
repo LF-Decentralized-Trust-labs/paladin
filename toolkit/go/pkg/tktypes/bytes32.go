@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"golang.org/x/crypto/sha3"
 )

@@ -23,20 +23,20 @@ import (
 	"sync/atomic"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -88,7 +88,7 @@ func (r *registry) init() {
 		})
 		if err == nil {
 			r.config = res.RegistryConfig
-			err = r.configureEventStream(r.ctx)
+			err = r.configureEventStream(r.ctx, r.rm.p.NOTX())
 		}
 		return true, err
 	})
@@ -103,7 +103,7 @@ func (r *registry) init() {
 	}
 }
 
-func (r *registry) configureEventStream(ctx context.Context) (err error) {
+func (r *registry) configureEventStream(ctx context.Context, dbTX persistence.DBTX) (err error) {
 
 	if len(r.config.EventSources) == 0 {
 		return nil
@@ -141,7 +141,7 @@ func (r *registry) configureEventStream(ctx context.Context) (err error) {
 	}
 	stream.Name = fmt.Sprintf("registry_%s_%s", r.name, streamHash)
 
-	r.eventStream, err = r.rm.blockIndexer.AddEventStream(ctx, &blockindexer.InternalEventStream{
+	r.eventStream, err = r.rm.blockIndexer.AddEventStream(ctx, dbTX, &blockindexer.InternalEventStream{
 		Definition: stream,
 		Handler:    r.handleEventBatch,
 	})
@@ -149,19 +149,17 @@ func (r *registry) configureEventStream(ctx context.Context) (err error) {
 }
 
 func (r *registry) UpsertRegistryRecords(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest) (*prototk.UpsertRegistryRecordsResponse, error) {
-	var postCommit func()
-	err := r.rm.p.DB().Transaction(func(dbTX *gorm.DB) (err error) {
-		postCommit, err = r.upsertRegistryRecords(ctx, dbTX, req.Entries, req.Properties)
+	err := r.rm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
+		err = r.upsertRegistryRecords(ctx, dbTX, req.Entries, req.Properties)
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	postCommit()
 	return &prototk.UpsertRegistryRecordsResponse{}, nil
 }
 
-func (r *registry) handleEventBatch(ctx context.Context, dbTX *gorm.DB, batch *blockindexer.EventDeliveryBatch) (blockindexer.PostCommit, error) {
+func (r *registry) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, batch *blockindexer.EventDeliveryBatch) error {
 
 	// Build the proto version of these events
 	events := make([]*prototk.OnChainEvent, len(batch.Events))
@@ -185,7 +183,7 @@ func (r *registry) handleEventBatch(ctx context.Context, dbTX *gorm.DB, batch *b
 		Events:  events,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Upsert any transport details that are detected by the registry
@@ -193,7 +191,7 @@ func (r *registry) handleEventBatch(ctx context.Context, dbTX *gorm.DB, batch *b
 
 }
 
-func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX *gorm.DB, protoEntries []*prototk.RegistryEntry, protoProps []*prototk.RegistryProperty) (func(), error) {
+func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX persistence.DBTX, protoEntries []*prototk.RegistryEntry, protoProps []*prototk.RegistryProperty) error {
 
 	dbEntries := make([]*DBEntry, len(protoEntries))
 	for i, protoEntry := range protoEntries {
@@ -210,14 +208,14 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX *gorm.DB, pro
 		// it is unique within the whole registry scope.
 		entryID, err := tktypes.ParseHexBytes(ctx, protoEntry.Id)
 		if err != nil || len(entryID) == 0 {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryID, protoEntry.Id)
+			return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryID, protoEntry.Id)
 		}
 
 		var parentID tktypes.HexBytes
 		if protoEntry.ParentId != "" {
 			parentID, err = tktypes.ParseHexBytes(ctx, protoEntry.ParentId)
 			if err != nil || len(parentID) == 0 {
-				return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidParentID, protoEntry.ParentId)
+				return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidParentID, protoEntry.ParentId)
 			}
 		}
 
@@ -225,7 +223,7 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX *gorm.DB, pro
 		// as a node name. That is not to say this is the only use of entries, but applying this
 		// common rule to all entry names ensures we meet the criteria of node names.
 		if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, protoEntry.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryName, protoEntry.Name)
+			return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryName, protoEntry.Name)
 		}
 
 		dbe := &DBEntry{
@@ -251,14 +249,14 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX *gorm.DB, pro
 		// DB will check for relationship to entry, but we need to parse the ID consistently into bytes
 		entryID, err := tktypes.ParseHexBytes(ctx, protoProp.EntryId)
 		if err != nil || len(entryID) == 0 {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryID, protoProp.EntryId)
+			return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryID, protoProp.EntryId)
 		}
 
 		// Plugin reserved property names must start with $, which is not valid in the name so we
 		// cut it before checking the rest of the string.
 		nameToCheck, hasReservedPrefix := strings.CutPrefix(protoProp.Name, "$")
 		if protoProp.PluginReserved != hasReservedPrefix {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryDollarPrefixReserved, protoProp.Name, protoProp.PluginReserved)
+			return i18n.WrapError(ctx, err, msgs.MsgRegistryDollarPrefixReserved, protoProp.Name, protoProp.PluginReserved)
 		}
 
 		// We require the names of properties to conform to rules, so that we can distinguish
@@ -266,7 +264,7 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX *gorm.DB, pro
 		// Note as above it is the registry plugin's responsibility to handle cases where a
 		// value that does not conform is published to it (by logging and discarding it etc.)
 		if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, nameToCheck, tktypes.DefaultNameMaxLen, "name"); err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidPropertyName, protoProp.Name)
+			return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidPropertyName, protoProp.Name)
 		}
 
 		dbp := &DBProperty{
@@ -289,7 +287,7 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX *gorm.DB, pro
 	var err error
 
 	if len(dbEntries) > 0 {
-		err = dbTX.
+		err = dbTX.DB().
 			WithContext(ctx).
 			Table("reg_entries").
 			Clauses(clause.OnConflict{
@@ -311,7 +309,7 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX *gorm.DB, pro
 	}
 
 	if len(dbProps) > 0 {
-		err = dbTX.
+		err = dbTX.DB().
 			WithContext(ctx).
 			Table("reg_props").
 			Clauses(clause.OnConflict{
@@ -335,17 +333,18 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX *gorm.DB, pro
 	}
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return func() {
+	dbTX.AddPostCommit(func(ctx context.Context) {
 		// It's a lot of work to determine which parts of the node transport cache are affected,
 		// as the upserts above happen simply by storing properties that might/might-not match
 		// queries that resolve node transports to names.
 		//
 		// So instead we just zap the whole cache when we have an update.
 		r.rm.transportDetailsCache.Clear()
-	}, nil
+	})
+	return nil
 }
 
 type dynamicFieldSet struct {
@@ -377,7 +376,7 @@ func (dfs *dynamicFieldSet) ResolverFor(propName string) filters.FieldResolver {
 	return filters.StringField(fmt.Sprintf("p%d.value", idx))
 }
 
-func (r *registry) QueryEntries(ctx context.Context, dbTX *gorm.DB, fActive pldapi.ActiveFilter, jq *query.QueryJSON) ([]*pldapi.RegistryEntry, error) {
+func (r *registry) QueryEntries(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, jq *query.QueryJSON) ([]*pldapi.RegistryEntry, error) {
 
 	if jq.Limit == nil || *jq.Limit == 0 {
 		return nil, i18n.NewError(ctx, msgs.MsgRegistryQueryLimitRequired)
@@ -386,7 +385,7 @@ func (r *registry) QueryEntries(ctx context.Context, dbTX *gorm.DB, fActive plda
 	dfs := &dynamicFieldSet{propIndexes: make(map[string]int)}
 
 	q := filters.BuildGORM(ctx, jq,
-		dbTX.WithContext(ctx).
+		dbTX.DB().WithContext(ctx).
 			Table("reg_entries").
 			Where(`"reg_entries"."registry" = ?`, r.name),
 		dfs)
@@ -452,10 +451,10 @@ func (r *registry) QueryEntries(ctx context.Context, dbTX *gorm.DB, fActive plda
 
 }
 
-func (r *registry) GetEntryProperties(ctx context.Context, dbTX *gorm.DB, fActive pldapi.ActiveFilter, entryIDs ...tktypes.HexBytes) ([]*pldapi.RegistryProperty, error) {
+func (r *registry) GetEntryProperties(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, entryIDs ...tktypes.HexBytes) ([]*pldapi.RegistryProperty, error) {
 
 	var dbProps []*DBProperty
-	q := dbTX.WithContext(ctx).
+	q := dbTX.DB().WithContext(ctx).
 		Table("reg_props").
 		Where("registry = ?", r.name).
 		Where("entry_id IN (?)", entryIDs)
@@ -512,7 +511,7 @@ func filteredPropsMap(entryProps []*pldapi.RegistryProperty, entryID tktypes.Hex
 	return props
 }
 
-func (r *registry) QueryEntriesWithProps(ctx context.Context, dbTX *gorm.DB, fActive pldapi.ActiveFilter, jq *query.QueryJSON) ([]*pldapi.RegistryEntryWithProperties, error) {
+func (r *registry) QueryEntriesWithProps(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, jq *query.QueryJSON) ([]*pldapi.RegistryEntryWithProperties, error) {
 
 	entries, err := r.QueryEntries(ctx, dbTX, fActive, jq)
 	if err != nil {

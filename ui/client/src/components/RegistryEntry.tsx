@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -17,7 +17,6 @@
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import { Box, Button, Collapse, Grid2, TextField, Typography, useTheme } from "@mui/material";
-import { t } from "i18next";
 import { Hash } from "./Hash";
 import { useState } from "react";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -26,6 +25,7 @@ import { IRegistryEntry } from "../interfaces";
 import VisibilityIcon from '@mui/icons-material/VisibilityOutlined';
 import { ViewDetailsDialog } from "../dialogs/ViewDetails";
 import { Captions, Tag } from 'lucide-react';
+import { useTranslation } from "react-i18next";
 
 type Props = {
   registryEntry: IRegistryEntry;
@@ -36,6 +36,7 @@ export const RegistryEntry: React.FC<Props> = ({ registryEntry }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [viewDetailsDialogOpen, setViewDetailsDialogOpen] = useState(false);
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const processValue = (value: string) => {
     try {
@@ -59,10 +60,10 @@ export const RegistryEntry: React.FC<Props> = ({ registryEntry }) => {
         <Box sx={{ padding: '10px', paddingLeft: '20px', paddingRight: '20px', borderBottom: theme => `solid 1px ${theme.palette.divider}` }}>
 
           <Grid2 container justifyContent="space-between" alignItems="center" spacing={2}>
-            <Grid2 size={{ xs: 3 }}>
+            <Grid2 size={{ xs: 4 }}>
               <Hash Icon={<Tag size="18px" />} title={t("id")} hash={registryEntry.id} />
             </Grid2>
-            <Grid2 size={{ xs: 3 }}>
+            <Grid2 size={{ xs: 4 }}>
               <Hash
                 Icon={<Captions size="18px" />}
                 title={t("owner")}
@@ -81,20 +82,8 @@ export const RegistryEntry: React.FC<Props> = ({ registryEntry }) => {
                 {t("name")}
               </Typography>
             </Grid2>
-            <Grid2 size={{ xs: 2 }}>
-              <Typography align="center" variant="h6" color="textPrimary">
-                {registryEntry.registry}
-              </Typography>
-              <Typography
-                align="center"
-                variant="body2"
-                color="textSecondary"
-              >
-                {t("registry")}
-              </Typography>
-            </Grid2>
             <Grid2 sx={{ textAlign: "center" }} alignContent="center" size={{ xs: 2 }}>
-              {registryEntry.active ? (
+              {registryEntry.active !== false ? (
                 <CheckCircleOutlineIcon color="primary" />
               ) : (
                 <ErrorOutlineIcon color="error" />
@@ -111,9 +100,9 @@ export const RegistryEntry: React.FC<Props> = ({ registryEntry }) => {
         </Box>
         <Box sx={{ padding: '10px'}}>
         <Box sx={{ display: 'flex', justifyContent: 'right' }}>
-          <Button size="small" startIcon={<VisibilityIcon />} sx={{ marginRight: '40px', textTransform: 'none', fontWeight: '400' }}
+          <Button size="small" startIcon={<VisibilityIcon />} sx={{ marginRight: '40px', fontWeight: '400' }}
             onClick={() => setViewDetailsDialogOpen(true)}>{t('viewDetails')}</Button>
-          <Button sx={{ textTransform: 'none', fontWeight: '400', minWidth: '140px' }} size="small" endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          <Button sx={{ fontWeight: '400', minWidth: '140px' }} size="small" endIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             onClick={() => setIsExpanded(!isExpanded)}>
             {t(isExpanded ? 'hideProperties' : 'showProperties')}
           </Button>

@@ -61,7 +61,7 @@ func (rm *registryManager) rpcQueryEntries() rpcserver.RPCHandler {
 	) ([]*pldapi.RegistryEntry, error) {
 		return withRegistry(ctx, rm, registryName,
 			func(r components.Registry) ([]*pldapi.RegistryEntry, error) {
-				return r.QueryEntries(ctx, rm.p.DB(), activeFilter.V(), &jq)
+				return r.QueryEntries(ctx, rm.p.NOTX(), activeFilter.V(), &jq)
 			},
 		)
 	})
@@ -75,7 +75,7 @@ func (rm *registryManager) rpcQueryEntriesWithProps() rpcserver.RPCHandler {
 	) ([]*pldapi.RegistryEntryWithProperties, error) {
 		return withRegistry(ctx, rm, registryName,
 			func(r components.Registry) ([]*pldapi.RegistryEntryWithProperties, error) {
-				return r.QueryEntriesWithProps(ctx, rm.p.DB(), activeFilter.V(), &jq)
+				return r.QueryEntriesWithProps(ctx, rm.p.NOTX(), activeFilter.V(), &jq)
 			},
 		)
 	})
@@ -89,7 +89,7 @@ func (rm *registryManager) rpcGetEntryProperties() rpcserver.RPCHandler {
 	) ([]*pldapi.RegistryProperty, error) {
 		return withRegistry(ctx, rm, registryName,
 			func(r components.Registry) ([]*pldapi.RegistryProperty, error) {
-				return r.GetEntryProperties(ctx, rm.p.DB(), activeFilter.V(), entryID)
+				return r.GetEntryProperties(ctx, rm.p.NOTX(), activeFilter.V(), entryID)
 			},
 		)
 	})

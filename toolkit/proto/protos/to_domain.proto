@@ -19,6 +19,9 @@ package io.kaleido.paladin.toolkit;
 
 import "on_chain_events.proto";
 
+// This is necessary to avoid ToDomain.java being >2.5MB in size
+option java_multiple_files = true;
+
 // **CONFIGURE** happens once when the domain is loaded into Paladin
 message ConfigureDomainRequest {
   string name = 1; // The name
@@ -228,6 +231,31 @@ message ValidateStateHashesResponse {
   repeated string state_ids = 1; // the validates ids in the same order as the states supplied (if any states were invalid, return an error instead)
 }
 
+message ConfigurePrivacyGroupRequest {
+  map<string, string> input_configuration = 1; // User supplied options to inform the configuration of the domain
+}
+
+message ConfigurePrivacyGroupResponse {
+  map<string, string> configuration = 1; // The calculated final set of configuration for the domain to store in the state (informed by any user-supplied options)
+}
+
+message InitPrivacyGroupRequest {
+  PrivacyGroup privacy_group = 1; // the configured privacy group
+}
+
+message InitPrivacyGroupResponse {
+  PreparedTransaction transaction = 1; // The transaction that will result from this against the domain
+}
+
+message WrapPrivacyGroupEVMTXRequest {
+  PrivacyGroup privacy_group = 1; // the configured privacy group
+  PrivacyGroupEVMTX transaction = 2; // the transaction to wrap
+}
+
+message WrapPrivacyGroupEVMTXResponse {
+  PreparedTransaction transaction = 1; // The transaction that will result from this against the domain
+}
+
 message DomainConfig {
   bool custom_hash_function = 1; // If true then the ValidateStateHashes function must be implemeted, and all states must come with a pre-caclculated ID
   repeated string abi_state_schemas_json = 2; // A list of Schema definitions (in ABI parameter format) the domain requires for all state types it interacts with
@@ -241,7 +269,7 @@ message ContractInfo {
 }
 
 message ContractConfig {
-  string contract_config_json = 1; // Arbitray JSON configuration parsed by the domain itself - opaque to Paladin beyond being valid JSON. Passed back on all transaction calls
+  string contract_config_json = 1; // Arbitrary JSON configuration parsed by the domain itself - opaque to Paladin beyond being valid JSON. Passed back on all transaction calls
   
   enum CoordinatorSelection {
       COORDINATOR_STATIC = 0; // The coordinator is fixed for the smart contract by the configuration
@@ -284,6 +312,17 @@ message TransactionSpecification {
   string function_params_json = 6; // The parameters supplied in the invocation in normalized JSON format, after validation against the ABI the caller supplied
   int64 base_block = 7; // The block number on the base ledger, upon which this transaction is being assembled
   Intent intent = 8; // The sender's intended outcome (a submitted transaction or only a call)
+}
+
+message PrivacyGroupEVMTX {
+  ContractInfo contract_info = 1; // Details of the privacy group smart contract
+  string from = 2; // The unresolved sender identity
+  optional string to = 3; // The ethereum identifier specified in the to of the transaction. Null for deployment
+  optional string gas = 4; // Gas limit for the transaction (hex encoded unsigned integer)
+  optional string value = 5; // Value of base token to transfer (hex encoded 256bit unsigned integer)
+  optional string input_json = 6; // Could be a hex byte string pre-encoded, or a JSON object
+  optional string function_abi_json = 7; // If supplied, then it implies the input will be a JSON object to decode
+  optional bytes bytecode = 9; // For deployment transactions only 
 }
 
 message AssembledTransaction {
@@ -401,4 +440,13 @@ message DomainAPIError {
 message CompletedTransaction {
   string transaction_id = 1; // The ID of the transaction that has completed (opaque 32 byte identifier)
   OnChainEventLocation location = 2; // the locator information on the blockchain to point at as the source of the confirmation
+}
+
+message PrivacyGroup {
+  string id = 1;
+  string genesis_salt = 2;
+  string name = 3;
+  repeated string members = 4;
+  map<string, string> properties = 5;
+  map<string, string> configuration = 6;
 }

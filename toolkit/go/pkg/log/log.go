@@ -95,7 +95,7 @@ func IsTraceEnabled() bool {
 	return logrus.IsLevelEnabled(logrus.TraceLevel)
 }
 
-func ensureInit() {
+func EnsureInit() {
 	// Called at a couple of strategic points to check we get log initialize in things like unit tests
 	// However NOT guaranteed to be called because we can't afford to do atomic load on every log line
 	if !initAtLeastOnce.Load() {
@@ -105,13 +105,13 @@ func ensureInit() {
 
 // WithLogger adds the specified logger to the context
 func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
-	ensureInit()
+	EnsureInit()
 	return context.WithValue(ctx, ctxLogKey{}, logger)
 }
 
 // WithLogField adds the specified field to the logger in the context
 func WithLogField(ctx context.Context, key, value string) context.Context {
-	ensureInit()
+	EnsureInit()
 	if len(value) > 61 {
 		value = value[0:61] + "..."
 	}
@@ -125,6 +125,21 @@ func loggerFromContext(ctx context.Context) *logrus.Entry {
 		return rootLogger
 	}
 	return logger.(*logrus.Entry)
+}
+
+func GetLevel() string {
+	switch logrus.GetLevel() {
+	case logrus.ErrorLevel:
+		return "error"
+	case logrus.WarnLevel:
+		return "warn"
+	case logrus.DebugLevel:
+		return "debug"
+	case logrus.TraceLevel:
+		return "trace"
+	default:
+		return "info"
+	}
 }
 
 func SetLevel(level string) {

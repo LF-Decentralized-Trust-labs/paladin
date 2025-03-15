@@ -18,6 +18,8 @@ ext {
         include 'internal/**/*.go'
         include 'pkg/**/*.go'
     }
+    targetCoverage = 62
+    maxCoverageBarGap = 1
 }
 
 configurations {
@@ -58,9 +60,9 @@ task copyInternalSolidity(type: Copy) {
     into 'internal/noto/abis'
     from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/domains/interfaces/INoto.sol/INoto.json'
+        include 'contracts/domains/interfaces/INotoErrors.sol/INotoErrors.json'
         include 'contracts/domains/noto/NotoFactory.sol/NotoFactory.json'
         include 'contracts/domains/noto/Noto.sol/Noto.json'
-        include 'contracts/domains/noto/NotoSelfSubmit.sol/NotoSelfSubmit.json'
         include 'contracts/private/interfaces/INotoHooks.sol/INotoHooks.json'
     }
 
@@ -90,6 +92,7 @@ task test(type: Exec, dependsOn: [':core:go:makeMocks', copySolidity]) {
     inputs.files(configurations.coreGo)
     inputs.files(goFiles)
     outputs.dir('coverage')
+    outputs.file('coverage.txt')
 
     workingDir '.'
     executable 'go'
@@ -103,6 +106,7 @@ task test(type: Exec, dependsOn: [':core:go:makeMocks', copySolidity]) {
         args '-v'
     }
     args "-test.gocoverdir=${projectDir}/coverage"
+    args '-coverprofile=coverage.txt'
 
     dependsOn ':testinfra:startTestInfra'
     helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
@@ -116,13 +120,20 @@ task buildGo(type: GoLib, dependsOn: [':toolkit:go:protoc', copySolidity]) {
     mainFile 'noto.go'
 }
 
+task checkCoverage(type: GoCheckCoverage, dependsOn: test) {
+    coverageFile('coverage.txt')
+    target = targetCoverage
+    maxGap = maxCoverageBarGap
+}
+
 task build {
-    dependsOn test
+    dependsOn test, checkCoverage
 }
 
 task clean(type: Delete) {
     delete "${buildDir}"
     delete 'coverage'
+    delete 'coverage.txt'
     delete 'internal/noto/abis'
 }
 

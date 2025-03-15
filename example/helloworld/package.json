@@ -1,0 +1,23 @@
+{
+  "name": "paladin-example-helloworld",
+  "version": "0.0.1",
+  "description": "",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node ./src/index.ts",
+    "start:prod": "node ./build/index.js",
+    "abi": "node scripts/abi.mjs"
+  },
+  "author": "",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^22.8.7",
+    "copy-file": "^11.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@lfdecentralizedtrust-labs/paladin-sdk": "file:../../sdk/typescript"
+  }
+}

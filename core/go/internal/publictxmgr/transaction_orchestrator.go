@@ -24,7 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"gorm.io/gorm"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -294,7 +294,7 @@ func (oc *orchestrator) allocateNonces(ctx context.Context, txns []*DBPublicTxn)
 	}
 
 	// Run the DB TXN using a VALUES temp table to update multiple rows in a single operation
-	err := oc.p.DB().Transaction(func(dbTX *gorm.DB) error {
+	err := oc.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		sqlQuery := `WITH nonce_updates ("pub_txn_id", "nonce") AS ( VALUES `
 		values := make([]any, 0, len(toAlloc)*2)
 		for i, tx := range toAlloc {
@@ -308,7 +308,7 @@ func (oc *orchestrator) allocateNonces(ctx context.Context, txns []*DBPublicTxn)
 		}
 		sqlQuery += ` ) UPDATE "public_txns" SET "nonce" = nu."nonce" FROM ( SELECT "pub_txn_id", "nonce" FROM nonce_updates ) AS nu ` +
 			`WHERE "public_txns"."pub_txn_id" = nu."pub_txn_id";`
-		return dbTX.WithContext(ctx).Exec(sqlQuery, values...).Error
+		return dbTX.DB().WithContext(ctx).Exec(sqlQuery, values...).Error
 	})
 	if err != nil {
 		return err
@@ -392,7 +392,7 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 			// as we are the only thread that writes to the submissions table, for
 			// inflight transactions we have in memory that would not be overwritten
 			// by this query.
-			additional, err = oc.runTransactionQuery(ctx, oc.p.DB(), false /* just the individual transactions - no duplication for bindings */, nil, q)
+			additional, err = oc.runTransactionQuery(ctx, oc.p.NOTX(), false /* just the individual transactions - no duplication for bindings */, nil, q)
 			return true, err
 		})
 		if err != nil {

@@ -27,11 +27,11 @@ guide.
 ### Building locally
 
 Install the following pre-requisites:
-- JDK - https://adoptium.net/download/
-- Protoc - https://grpc.io/docs/protoc-installation/
-- Docker - https://docs.docker.com/compose/install/
-- npm/NodeJS - https://nodejs.org/en/download/package-manager
 
+- JDK - <https://adoptium.net/download/>, requires version 17 or above
+- Protoc - <https://grpc.io/docs/protoc-installation/>
+- Docker - <https://docs.docker.com/compose/install/>
+- npm/NodeJS - <https://nodejs.org/en/download/package-manager>
 
 Then run the following command to build Paladin via [Gradle](https://gradle.org/):
 

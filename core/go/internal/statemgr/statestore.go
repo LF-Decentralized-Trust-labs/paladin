@@ -28,7 +28,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -38,6 +37,7 @@ type stateManager struct {
 	cancelCtx         context.CancelFunc
 	conf              *pldconf.StateStoreConfig
 	domainManager     components.DomainManager
+	txManager         components.TXManager
 	abiSchemaCache    cache.Cache[string, components.Schema]
 	rpcModule         *rpcserver.RPCModule
 	domainContextLock sync.Mutex
@@ -68,6 +68,7 @@ func (ss *stateManager) PreInit(c components.PreInitComponents) (*components.Man
 
 func (ss *stateManager) PostInit(c components.AllComponents) error {
 	ss.domainManager = c.DomainManager()
+	ss.txManager = c.TxManager()
 	return nil
 }
 
@@ -92,9 +93,9 @@ func (ss *stateManager) Stop() {
 // be happening concurrently against the database, and after commit of these changes
 // might find new states become available and/or states marked locked for spending
 // become fully unavailable.
-func (ss *stateManager) WriteStateFinalizations(ctx context.Context, dbTX *gorm.DB, spends []*pldapi.StateSpendRecord, reads []*pldapi.StateReadRecord, confirms []*pldapi.StateConfirmRecord, infoRecords []*pldapi.StateInfoRecord) (err error) {
+func (ss *stateManager) WriteStateFinalizations(ctx context.Context, dbTX persistence.DBTX, spends []*pldapi.StateSpendRecord, reads []*pldapi.StateReadRecord, confirms []*pldapi.StateConfirmRecord, infoRecords []*pldapi.StateInfoRecord) (err error) {
 	if len(spends) > 0 {
-		err = dbTX.
+		err = dbTX.DB().
 			WithContext(ctx).
 			Table("state_spend_records").
 			Clauses(clause.OnConflict{DoNothing: true}).
@@ -102,7 +103,7 @@ func (ss *stateManager) WriteStateFinalizations(ctx context.Context, dbTX *gorm.
 			Error
 	}
 	if err == nil && len(reads) > 0 {
-		err = dbTX.
+		err = dbTX.DB().
 			WithContext(ctx).
 			Table("state_read_records").
 			Clauses(clause.OnConflict{DoNothing: true}).
@@ -110,7 +111,7 @@ func (ss *stateManager) WriteStateFinalizations(ctx context.Context, dbTX *gorm.
 			Error
 	}
 	if err == nil && len(confirms) > 0 {
-		err = dbTX.
+		err = dbTX.DB().
 			WithContext(ctx).
 			Table("state_confirm_records").
 			Clauses(clause.OnConflict{DoNothing: true}).
@@ -118,7 +119,7 @@ func (ss *stateManager) WriteStateFinalizations(ctx context.Context, dbTX *gorm.
 			Error
 	}
 	if err == nil && len(infoRecords) > 0 {
-		err = dbTX.
+		err = dbTX.DB().
 			WithContext(ctx).
 			Table("state_info_records").
 			Clauses(clause.OnConflict{DoNothing: true}).
@@ -128,11 +129,11 @@ func (ss *stateManager) WriteStateFinalizations(ctx context.Context, dbTX *gorm.
 	return err
 }
 
-func (ss *stateManager) GetTransactionStates(ctx context.Context, dbTX *gorm.DB, txID uuid.UUID) (*pldapi.TransactionStates, error) {
+func (ss *stateManager) GetTransactionStates(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID) (*pldapi.TransactionStates, error) {
 
 	// We query from the records table, joining in the other fields
 	var records []*transactionStateRecord
-	err := dbTX.
+	err := dbTX.DB().
 		WithContext(ctx).
 		// This query joins across three tables in a single query - pushing the complexity to the DB.
 		// The reason we have three tables is to make the queries for available states simpler.

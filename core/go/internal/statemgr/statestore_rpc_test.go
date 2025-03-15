@@ -68,13 +68,14 @@ func TestRPC(t *testing.T) {
 	defer done()
 
 	_ = mockDomain(t, m, "domain1", false)
+	mockStateCallback(m)
 
 	var abiParam abi.Parameter
 	err := json.Unmarshal([]byte(widgetABI), &abiParam)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	schema, err := newABISchema(ctx, "domain1", &abiParam)
 	assert.NoError(t, err)
-	err = ss.persistSchemas(ctx, ss.p.DB(), []*pldapi.Schema{schema.Schema})
+	err = ss.persistSchemas(ctx, ss.p.NOTX(), []*pldapi.Schema{schema.Schema})
 	assert.NoError(t, err)
 
 	var schemas []*pldapi.Schema
@@ -84,6 +85,11 @@ func TestRPC(t *testing.T) {
 	assert.Len(t, schemas, 1)
 	assert.Equal(t, pldapi.SchemaTypeABI, schemas[0].Type.V())
 	assert.Equal(t, "0x3612029bf239cbed1e27548e9211ecfe72496dfec4183fd3ea79a3a54eb126be", schemas[0].ID.String())
+
+	var rpcSchema *pldapi.Schema
+	rpcErr = c.CallRPC(ctx, &rpcSchema, "pstate_getSchemaById", "domain1", schemas[0].ID)
+	require.NoError(t, rpcErr)
+	require.NotNil(t, rpcSchema)
 
 	contractAddress := tktypes.RandAddress()
 	var state *pldapi.State
@@ -96,7 +102,7 @@ func TestRPC(t *testing.T) {
 	jsonTestLog(t, "pstate_storeState", state)
 	assert.Nil(t, rpcErr)
 	if rpcErr != nil {
-		assert.NoError(t, rpcErr.RPCError().Error())
+		assert.NoError(t, rpcErr)
 	}
 	assert.Equal(t, schemas[0].ID, state.Schema)
 	assert.Equal(t, "domain1", state.DomainName)
@@ -127,7 +133,7 @@ func TestRPC(t *testing.T) {
 
 	// Write some nullifiers and query them back
 	nullifier1 := tktypes.HexBytes(tktypes.RandHex(32))
-	err = ss.WriteNullifiersForReceivedStates(ctx, ss.p.DB(), "domain1", []*components.NullifierUpsert{
+	err = ss.WriteNullifiersForReceivedStates(ctx, ss.p.NOTX(), "domain1", []*components.NullifierUpsert{
 		{
 			ID:    nullifier1,
 			State: state.ID,

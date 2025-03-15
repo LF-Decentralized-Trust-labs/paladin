@@ -20,7 +20,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"gorm.io/gorm"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type PrivateTxEventSubscriber func(event PrivateTxEvent)
@@ -51,29 +52,28 @@ type PrivateTxStatus struct {
 	FailureMessage string                       `json:"failureMessage,omitempty"`
 }
 
-// If we had lots of these we would probably want to centralize the assignment of the constants to avoid duplication
-// but currently there is only 2 ( the other being IDENTITY_RESOLVER_DESTINATION )
-const PRIVATE_TX_MANAGER_DESTINATION = "private-tx-manager"
-
 type StateDistributionSet struct {
 	LocalNode  string
 	SenderNode string
-	Remote     []*StateDistribution
-	Local      []*StateDistribution
+	Remote     []*StateDistributionWithData
+	Local      []*StateDistributionWithData
 }
 
-// A StateDistribution is an intent to send private data for a given state to a remote party
 type StateDistribution struct {
-	ID                    string
-	StateID               string
-	IdentityLocator       string
-	Domain                string
-	ContractAddress       string
-	SchemaID              string
-	StateDataJson         string
-	NullifierAlgorithm    *string
-	NullifierVerifierType *string
-	NullifierPayloadType  *string
+	StateID               string  `json:"stateId"`
+	IdentityLocator       string  `json:"identityLocator"`
+	Domain                string  `json:"domain"`
+	ContractAddress       string  `json:"contractAddress"`
+	SchemaID              string  `json:"schemaId"`
+	NullifierAlgorithm    *string `json:"nullifierAlgorithm,omitempty"`
+	NullifierVerifierType *string `json:"nullifierVerifierType,omitempty"`
+	NullifierPayloadType  *string `json:"nullifierPayloadType,omitempty"`
+}
+
+// A StateDistributionWithData is an intent to send private data for a given state to a remote party
+type StateDistributionWithData struct {
+	StateDistribution
+	StateData tktypes.RawJSON `json:"stateData"`
 }
 
 type PrivateTxManager interface {
@@ -81,7 +81,7 @@ type PrivateTxManager interface {
 	TransportClient
 
 	//Synchronous functions to submit a new private transaction
-	HandleNewTx(ctx context.Context, dbTX *gorm.DB, tx *ValidatedTransaction) error
+	HandleNewTx(ctx context.Context, dbTX persistence.DBTX, tx *ValidatedTransaction) error
 	GetTxStatus(ctx context.Context, domainAddress string, txID uuid.UUID) (status PrivateTxStatus, err error)
 
 	// Synchronous function to call an existing deployed smart contract
@@ -91,9 +91,11 @@ type PrivateTxManager interface {
 	// in the meantime, this is handy for some blackish box testing
 	Subscribe(ctx context.Context, subscriber PrivateTxEventSubscriber)
 
-	NotifyFailedPublicTx(ctx context.Context, dbTX *gorm.DB, confirms []*PublicTxMatch) error
+	NotifyFailedPublicTx(ctx context.Context, dbTX persistence.DBTX, confirms []*PublicTxMatch) error
 
 	PrivateTransactionConfirmed(ctx context.Context, receipt *TxCompletion)
 
 	BuildStateDistributions(ctx context.Context, tx *PrivateTransaction) (*StateDistributionSet, error)
+	BuildNullifier(ctx context.Context, kr KeyResolver, s *StateDistributionWithData) (*NullifierUpsert, error)
+	BuildNullifiers(ctx context.Context, distributions []*StateDistributionWithData) (nullifiers []*NullifierUpsert, err error)
 }

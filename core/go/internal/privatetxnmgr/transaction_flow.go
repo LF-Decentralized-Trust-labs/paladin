@@ -21,11 +21,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -153,7 +153,7 @@ func (tf *transactionFlow) PrepareTransaction(ctx context.Context, defaultSigner
 		tf.transaction.Signer = defaultSigner
 	}
 
-	readTX := tf.components.Persistence().DB() // no DB transaction required here
+	readTX := tf.components.Persistence().NOTX() // no DB transaction required here
 	prepError := tf.domainAPI.PrepareTransaction(tf.domainContext, readTX, tf.transaction)
 	if prepError != nil {
 		log.L(ctx).Errorf("Error preparing transaction: %s", prepError)

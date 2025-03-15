@@ -23,7 +23,6 @@ import (
 	"sync/atomic"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
@@ -33,8 +32,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"golang.org/x/crypto/sha3"
-	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -74,18 +74,19 @@ type domain struct {
 }
 
 type inFlightDomainRequest struct {
-	d    *domain
-	id   string                   // each request gets a unique ID
-	dbTX *gorm.DB                 // only if there's a DB transactions such as when called by block indexer
-	dCtx components.DomainContext // might be short lived, or managed externally (by private TX manager)
+	d        *domain
+	id       string                   // each request gets a unique ID
+	dbTX     persistence.DBTX         // only if there's a DB transactions such as when called by block indexer
+	dCtx     components.DomainContext // might be short lived, or managed externally (by private TX manager)
+	readOnly bool
 }
 
 func (dm *domainManager) newDomain(name string, conf *pldconf.DomainConfig, toDomain components.DomainManagerToDomain) *domain {
 	d := &domain{
 		dm:              dm,
 		conf:            conf,
-		defaultGasLimit: pldconf.DefaultDefaultGasLimit, // can be set by config below
-		initRetry:       retry.NewRetryIndefinite(&conf.Init.Retry),
+		defaultGasLimit: pldconf.DefaultDefaultGasLimit,             // can be set by config below
+		initRetry:       retry.NewRetryIndefinite(&conf.Init.Retry), // indefinite retry
 		name:            name,
 		api:             toDomain,
 		initDone:        make(chan struct{}),
@@ -104,7 +105,7 @@ func (dm *domainManager) newDomain(name string, conf *pldconf.DomainConfig, toDo
 	return d
 }
 
-func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (*prototk.InitDomainRequest, error) {
+func (d *domain) processDomainConfig(dbTX persistence.DBTX, confRes *prototk.ConfigureDomainResponse) (*prototk.InitDomainRequest, error) {
 	d.stateLock.Lock()
 	defer d.stateLock.Unlock()
 
@@ -121,7 +122,7 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 	var schemas []components.Schema
 	if len(abiSchemas) > 0 {
 		var err error
-		schemas, err = d.dm.stateStore.EnsureABISchemas(d.ctx, d.dm.persistence.DB(), d.name, abiSchemas)
+		schemas, err = d.dm.stateStore.EnsureABISchemas(d.ctx, dbTX, d.name, abiSchemas)
 		if err != nil {
 			return nil, err
 		}
@@ -154,11 +155,10 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 		}
 		stream.Sources = append(stream.Sources, blockindexer.EventStreamSource{ABI: eventsABI})
 
-		postCommit, _, err := d.dm.txManager.UpsertABI(d.ctx, d.dm.persistence.DB(), eventsABI)
+		_, err := d.dm.txManager.UpsertABI(d.ctx, dbTX, eventsABI)
 		if err != nil {
 			return nil, err
 		}
-		postCommit() // we didn't actually use a coordinated TX to call immediately
 	}
 
 	// We build a stream name in a way assured to result in a new stream if the ABI changes
@@ -170,7 +170,7 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 	stream.Name = fmt.Sprintf("domain_%s_%s", d.name, streamHash)
 
 	// Create the event stream
-	d.eventStream, err = d.dm.blockIndexer.AddEventStream(d.ctx, &blockindexer.InternalEventStream{
+	d.eventStream, err = d.dm.blockIndexer.AddEventStream(d.ctx, dbTX, &blockindexer.InternalEventStream{
 		Definition: stream,
 		Handler:    d.handleEventBatch,
 	})
@@ -202,7 +202,11 @@ func (d *domain) init() {
 		}
 
 		// Process the configuration, so we can move onto init
-		initReq, err := d.processDomainConfig(confRes)
+		var initReq *prototk.InitDomainRequest
+		err = d.dm.persistence.Transaction(d.ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+			initReq, err = d.processDomainConfig(dbTX, confRes)
+			return err
+		})
 		if err != nil {
 			return true, err
 		}
@@ -224,12 +228,13 @@ func (d *domain) init() {
 	}
 }
 
-func (d *domain) newInFlightDomainRequest(dbTX *gorm.DB, dc components.DomainContext) *inFlightDomainRequest {
+func (d *domain) newInFlightDomainRequest(dbTX persistence.DBTX, dc components.DomainContext, readOnly bool) *inFlightDomainRequest {
 	c := &inFlightDomainRequest{
-		d:    d,
-		dCtx: dc,
-		id:   tktypes.ShortID(),
-		dbTX: dbTX,
+		d:        d,
+		dCtx:     dc,
+		id:       tktypes.ShortID(),
+		dbTX:     dbTX,
+		readOnly: readOnly,
 	}
 	d.inFlightLock.Lock()
 	defer d.inFlightLock.Unlock()
@@ -243,7 +248,7 @@ func (i *inFlightDomainRequest) close() {
 	delete(i.d.inFlight, i.id)
 }
 
-func (d *domain) checkInFlight(ctx context.Context, stateQueryContext string) (*inFlightDomainRequest, error) {
+func (d *domain) checkInFlight(ctx context.Context, stateQueryContext string, needWrite bool) (*inFlightDomainRequest, error) {
 	if err := d.checkInit(ctx); err != nil {
 		return nil, err
 	}
@@ -252,6 +257,9 @@ func (d *domain) checkInFlight(ctx context.Context, stateQueryContext string) (*
 	c := d.inFlight[stateQueryContext]
 	if c == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgDomainRequestNotInFlight, stateQueryContext)
+	}
+	if needWrite && c.readOnly {
+		return nil, i18n.NewError(ctx, msgs.MsgDomainWriteActionNotPossibleInContext)
 	}
 	return c, nil
 }
@@ -279,9 +287,29 @@ func (d *domain) Configuration() *prototk.DomainConfig {
 	return d.config
 }
 
+func toProtoStates(states []*pldapi.State) []*prototk.StoredState {
+	pbStates := make([]*prototk.StoredState, len(states))
+	for i, s := range states {
+		pbStates[i] = &prototk.StoredState{
+			Id:        s.ID.String(),
+			SchemaId:  s.Schema.String(),
+			CreatedAt: s.Created.UnixNano(),
+			DataJson:  string(s.Data),
+			Locks:     []*prototk.StateLock{},
+		}
+		for _, l := range s.Locks {
+			pbStates[i].Locks = append(pbStates[i].Locks, &prototk.StateLock{
+				Type:        mapStateLockType(l.Type.V()),
+				Transaction: l.Transaction.String(),
+			})
+		}
+	}
+	return pbStates
+}
+
 // Domain callback to query the state store
 func (d *domain) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
-	c, err := d.checkInFlight(ctx, req.StateQueryContext)
+	c, err := d.checkInFlight(ctx, req.StateQueryContext, false)
 	if err != nil {
 		return nil, err
 	}
@@ -306,24 +334,8 @@ func (d *domain) FindAvailableStates(ctx context.Context, req *prototk.FindAvail
 		return nil, err
 	}
 
-	pbStates := make([]*prototk.StoredState, len(states))
-	for i, s := range states {
-		pbStates[i] = &prototk.StoredState{
-			Id:        s.ID.String(),
-			SchemaId:  s.Schema.String(),
-			CreatedAt: s.Created.UnixNano(),
-			DataJson:  string(s.Data),
-			Locks:     []*prototk.StateLock{},
-		}
-		for _, l := range s.Locks {
-			pbStates[i].Locks = append(pbStates[i].Locks, &prototk.StateLock{
-				Type:        mapStateLockType(l.Type.V()),
-				Transaction: l.Transaction.String(),
-			})
-		}
-	}
 	return &prototk.FindAvailableStatesResponse{
-		States: pbStates,
+		States: toProtoStates(states),
 	}, nil
 
 }
@@ -735,7 +747,7 @@ func (d *domain) ValidateStateHashes(ctx context.Context, states []*components.F
 	return hexIDs, nil
 }
 
-func (d *domain) GetDomainReceipt(ctx context.Context, dbTX *gorm.DB, txID uuid.UUID) (tktypes.RawJSON, error) {
+func (d *domain) GetDomainReceipt(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID) (tktypes.RawJSON, error) {
 
 	// Load up the currently available set of states
 	txStates, err := d.dm.stateStore.GetTransactionStates(ctx, dbTX, txID)
@@ -746,7 +758,7 @@ func (d *domain) GetDomainReceipt(ctx context.Context, dbTX *gorm.DB, txID uuid.
 	return d.BuildDomainReceipt(ctx, dbTX, txID, txStates)
 }
 
-func (d *domain) BuildDomainReceipt(ctx context.Context, dbTX *gorm.DB, txID uuid.UUID, txStates *pldapi.TransactionStates) (tktypes.RawJSON, error) {
+func (d *domain) BuildDomainReceipt(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID, txStates *pldapi.TransactionStates) (tktypes.RawJSON, error) {
 	if txStates.None {
 		// We know nothing about this transaction yet
 		return nil, i18n.NewError(ctx, msgs.MsgDomainDomainReceiptNotAvailable, txID)
@@ -770,4 +782,116 @@ func (d *domain) BuildDomainReceipt(ctx context.Context, dbTX *gorm.DB, txID uui
 		return nil, err
 	}
 	return tktypes.RawJSON(res.ReceiptJson), nil
+}
+
+func (d *domain) SendTransaction(ctx context.Context, req *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error) {
+	c, err := d.checkInFlight(ctx, req.StateQueryContext, true /* need write */)
+	if err != nil {
+		return nil, err
+	}
+
+	txType := pldapi.TransactionTypePrivate
+	if req.Transaction.Type == prototk.TransactionInput_PUBLIC {
+		txType = pldapi.TransactionTypePublic
+	}
+	contractAddress, err := tktypes.ParseEthAddress(req.Transaction.ContractAddress)
+	if err != nil {
+		return nil, err
+	}
+	var functionABI abi.Entry
+	if err = json.Unmarshal([]byte(req.Transaction.FunctionAbiJson), &functionABI); err != nil {
+		return nil, err
+	}
+
+	txIDs, err := d.dm.txManager.SendTransactions(ctx, c.dbTX, &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			Type: txType.Enum(),
+			From: req.Transaction.From,
+			To:   contractAddress,
+			Data: tktypes.RawJSON(req.Transaction.ParamsJson),
+		},
+		ABI: abi.ABI{&functionABI},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &prototk.SendTransactionResponse{Id: txIDs[0].String()}, nil
+}
+
+func (d *domain) LocalNodeName(ctx context.Context, req *prototk.LocalNodeNameRequest) (*prototk.LocalNodeNameResponse, error) {
+	return &prototk.LocalNodeNameResponse{
+		Name: d.dm.transportMgr.LocalNodeName(),
+	}, nil
+}
+
+func (d *domain) GetStatesByID(ctx context.Context, req *prototk.GetStatesByIDRequest) (*prototk.GetStatesByIDResponse, error) {
+	c, err := d.checkInFlight(ctx, req.StateQueryContext, false)
+	if err != nil {
+		return nil, err
+	}
+
+	schemaID, err := tktypes.ParseBytes32(req.SchemaId)
+	if err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgDomainInvalidSchemaID, req.SchemaId)
+	}
+
+	_, states, err := c.dCtx.GetStatesByID(c.dbTX, schemaID, req.StateIds)
+	return &prototk.GetStatesByIDResponse{
+		States: toProtoStates(states),
+	}, err
+}
+
+func (d *domain) ConfigurePrivacyGroup(ctx context.Context, inputConfiguration map[string]string) (configuration map[string]string, err error) {
+	res, err := d.api.ConfigurePrivacyGroup(ctx, &prototk.ConfigurePrivacyGroupRequest{
+		InputConfiguration: inputConfiguration,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res.Configuration, nil
+}
+
+func (d *domain) InitPrivacyGroup(ctx context.Context, id tktypes.HexBytes, genesis *pldapi.PrivacyGroupGenesisState) (tx *pldapi.TransactionInput, err error) {
+
+	// This one is a straight forward pass-through to the domain - the Privacy Group manager does the
+	// hard work in validating the data returned against the genesis ABI spec returned.
+	res, err := d.api.InitPrivacyGroup(ctx, &prototk.InitPrivacyGroupRequest{
+		PrivacyGroup: mapPrivacyGroupToProto(id, genesis),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	signer := ""
+	if res.Transaction.RequiredSigner != nil {
+		signer = *res.Transaction.RequiredSigner
+	}
+	txType := pldapi.TransactionTypePrivate.Enum()
+	if res.Transaction.Type == prototk.PreparedTransaction_PUBLIC {
+		txType = pldapi.TransactionTypePublic.Enum()
+	}
+
+	var functionABI abi.Entry
+	if err := json.Unmarshal(([]byte)(res.Transaction.FunctionAbiJson), &functionABI); err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
+	}
+	var optionalContractAddr *tktypes.EthAddress
+	if res.Transaction.ContractAddress != nil {
+		optionalContractAddr, err = tktypes.ParseEthAddress(*res.Transaction.ContractAddress)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:   signer,
+			To:     optionalContractAddr,
+			Type:   txType,
+			Data:   tktypes.RawJSON(res.Transaction.ParamsJson),
+			Domain: d.name,
+		},
+		ABI: abi.ABI{&functionABI},
+	}, nil
+
 }

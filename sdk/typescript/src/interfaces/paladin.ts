@@ -3,7 +3,6 @@ import { Logger } from "./logger";
 
 export interface PaladinConfig {
   url: string;
-  wsUrl?: string;
   requestConfig?: AxiosRequestConfig;
   logger?: Logger;
   onError?: PaladinErrorHandler;

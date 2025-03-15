@@ -21,7 +21,7 @@ import (
 	"database/sql/driver"
 	"strings"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 

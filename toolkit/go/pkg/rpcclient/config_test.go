@@ -27,9 +27,9 @@ import (
 
 func TestWSConfigOK(t *testing.T) {
 	ctx := context.Background()
-	wsc, err := ParseWSConfig(ctx, &pldconf.WSClientConfig{HTTPClientConfig: pldconf.HTTPClientConfig{URL: "ws://localhost:8545"}})
+	wsc, err := NewWSClient(ctx, &pldconf.WSClientConfig{HTTPClientConfig: pldconf.HTTPClientConfig{URL: "ws://localhost:8545"}})
 	require.NoError(t, err)
-	assert.Equal(t, "ws://localhost:8545", wsc.WebSocketURL)
+	assert.Equal(t, "ws://localhost:8545", wsc.(*wsRPCClient).wsConf.WebSocketURL)
 }
 
 func TestWSConfigTLSOK(t *testing.T) {

@@ -10,74 +10,57 @@ title: QueryJSON
     "eq": [
         {
             "field": "field1",
-            "value": {
-                "value": 12345
-            }
+            "value": "abcde"
         },
         {
             "not": true,
             "caseInsensitive": true,
             "field": "field12",
-            "value": {
-                "value": 12345
-            }
+            "value": "abcde"
         }
     ],
     "neq": [
         {
             "field": "field2",
-            "value": {
-                "value": 12345
-            }
+            "value": "abcde"
         }
     ],
     "like": [
         {
             "field": "field3",
-            "value": {
-                "value": 12345
-            }
+            "value": "abcde"
         }
     ],
     "lt": [
         {
             "field": "field4",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         }
     ],
     "lte": [
         {
             "field": "field5",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         }
     ],
     "gt": [
         {
             "field": "field6",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         }
     ],
     "gte": [
         {
             "field": "field7",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         }
     ],
     "in": [
         {
             "field": "field8",
             "values": [
-                {
-                    "value": 12345
-                }
+                "abcde",
+                "fghij"
             ]
         }
     ],
@@ -85,19 +68,18 @@ title: QueryJSON
         {
             "field": "field9",
             "values": [
-                {
-                    "value": 12345
-                }
+                "abcde",
+                "fghij"
             ]
         }
     ],
     "null": [
         {
             "not": true,
-            "field": "field10"
+            "field": "field1"
         },
         {
-            "field": "field11"
+            "field": "field2"
         }
     ],
     "limit": 10,

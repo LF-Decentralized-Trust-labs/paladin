@@ -21,11 +21,11 @@ import (
 	"os"
 	"path"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/iden3/go-rapidsnark/witness/v2"
 	"github.com/iden3/go-rapidsnark/witness/wasmer"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 )
 
 func loadCircuit(ctx context.Context, circuitName string, config *zetosignerapi.SnarkProverConfig) (witness.Calculator, []byte, error) {

@@ -20,13 +20,13 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -182,7 +182,7 @@ func (rm *registryManager) GetNodeTransports(ctx context.Context, node string) (
 		tl := rm.registryTransportLookups[regName]
 		if tl != nil {
 			regLookupsChecked++
-			regTransports, err := tl.getNodeTransports(ctx, rm.p.DB() /* no TX needed */, r, node)
+			regTransports, err := tl.getNodeTransports(ctx, rm.p.NOTX() /* no TX needed */, r, node)
 			if err != nil {
 				return nil, err
 			}

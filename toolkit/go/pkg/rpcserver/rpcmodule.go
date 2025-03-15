@@ -18,18 +18,43 @@ package rpcserver
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
 type RPCModule struct {
 	group   string
-	methods map[string]RPCHandler
+	methods map[string]*rpcMethodEntry
+}
+
+type rpcMethodType int
+
+const (
+	rpcMethodTypeMethod = iota
+	rpcMethodTypeAsyncStart
+	rpcMethodTypeAsyncLifecycle
+)
+
+type rpcMethodEntry struct {
+	methodType rpcMethodType
+	handler    RPCHandler
+	async      RPCAsyncHandler
 }
 
 func NewRPCModule(prefix string) *RPCModule {
 	return &RPCModule{
 		group:   strings.SplitN(prefix, "_", 2)[0],
-		methods: map[string]RPCHandler{},
+		methods: map[string]*rpcMethodEntry{},
+	}
+}
+
+func (m *RPCModule) validateMethod(method string) {
+	prefix := m.group + "_"
+	if !strings.HasPrefix(method, prefix) {
+		panic(fmt.Sprintf("invalid prefix %s (expected=%s)", method, prefix))
+	}
+	if m.methods[method] != nil {
+		panic(fmt.Sprintf("duplicate method: %s", method))
 	}
 }
 
@@ -40,13 +65,33 @@ func NewRPCModule(prefix string) *RPCModule {
 // This is inspired by strong adoption of this convention in the Ethereum ecosystem, although
 // it is not part of the JSON/RPC 2.0 standard.
 func (m *RPCModule) Add(method string, handler RPCHandler) *RPCModule {
-	prefix := m.group + "_"
-	if !strings.HasPrefix(method, prefix) {
-		panic(fmt.Sprintf("invalid prefix %s (expected=%s)", method, prefix))
-	}
-	if m.methods[method] != nil {
-		panic(fmt.Sprintf("duplicate method: %s", method))
-	}
-	m.methods[method] = handler
+	m.validateMethod(method)
+	m.methods[method] = &rpcMethodEntry{methodType: rpcMethodTypeMethod, handler: handler}
 	return m
+}
+
+func (m *RPCModule) AddAsync(handler RPCAsyncHandler) *RPCModule {
+	startMethod := handler.StartMethod()
+	m.validateMethod(startMethod)
+	m.methods[startMethod] = &rpcMethodEntry{
+		methodType: rpcMethodTypeAsyncStart,
+		async:      handler,
+	}
+	for _, lifecycleMethod := range handler.LifecycleMethods() {
+		m.validateMethod(lifecycleMethod)
+		m.methods[lifecycleMethod] = &rpcMethodEntry{
+			methodType: rpcMethodTypeAsyncLifecycle,
+			async:      handler,
+		}
+	}
+	return m
+}
+
+func (m *RPCModule) MethodNames() []string {
+	names := make([]string, 0, len(m.methods))
+	for n := range m.methods {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return names
 }

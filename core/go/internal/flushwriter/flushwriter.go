@@ -25,13 +25,12 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
@@ -62,7 +61,7 @@ type Operation[T Writeable[R], R any] interface {
 //
 // Note: If you perform a failed DB operation, then the whole DB transaction
 // will rollback even if you don't return an error.
-type BatchHandler[T Writeable[R], R any] func(ctx context.Context, tx *gorm.DB, values []T) (func(error), []Result[R], error)
+type BatchHandler[T Writeable[R], R any] func(ctx context.Context, dbTX persistence.DBTX, values []T) ([]Result[R], error)
 
 type Writer[T Writeable[R], R any] interface {
 	Start()                                                      // the routines do not run until this is called
@@ -272,16 +271,10 @@ func (w *writer[T, R]) runBatch(ctx context.Context, b *batch[T, R]) {
 
 	// We promise to call any registered result callback with the DB Transaction result on all paths.
 	var txErr error
-	var dbResultCallback func(error)
-	defer func() {
-		if dbResultCallback != nil {
-			dbResultCallback(txErr)
-		}
-	}()
 
 	var results []Result[R]
-	txErr = w.p.DB().Transaction(func(tx *gorm.DB) (err error) {
-		dbResultCallback, results, err = w.handler(ctx, tx.WithContext(ctx), values)
+	txErr = w.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
+		results, err = w.handler(ctx, dbTX, values)
 		return err
 	})
 	err := txErr

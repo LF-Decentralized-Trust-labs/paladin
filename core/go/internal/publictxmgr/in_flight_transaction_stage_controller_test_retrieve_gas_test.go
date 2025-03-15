@@ -143,6 +143,38 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	assert.NotEqual(t, rsc, it.stateManager.GetRunningStageContext(ctx))
 }
 
+func TestProduceLatestInFlightStageContextRetrieveGasFixedGasPricing(t *testing.T) {
+	ctx, o, _, done := newTestOrchestrator(t)
+	defer done()
+	it, mTS := newInflightTransaction(o, 1, func(tx *DBPublicTxn) {
+		tx.FixedGasPricing = tktypes.JSONString(pldapi.PublicTxGasPricing{
+			GasPrice: tktypes.Int64ToInt256(10),
+		})
+	})
+	it.testOnlyNoActionMode = true
+	mTS.statusUpdater = &mockStatusUpdater{
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+			return nil
+		},
+	}
+
+	// trigger retrieve gas price
+	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
+		AvailableToSpend:         nil,
+		PreviousNonceCostUnknown: true,
+	})
+	if assert.NotNil(t, tOut.Cost) {
+		assert.Equal(t, int64(20000), tOut.Cost.Int64())
+	}
+
+	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetRunningStageContext(ctx)
+
+	// skip the retrieve gas price stage
+	assert.Equal(t, InFlightTxStageSigning, rsc.Stage)
+}
+
 func TestProduceLatestInFlightStageContextRetrieveGasIncrements(t *testing.T) {
 	ctx, o, _, done := newTestOrchestrator(t)
 	defer done()

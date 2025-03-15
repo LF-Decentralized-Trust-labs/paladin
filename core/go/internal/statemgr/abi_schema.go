@@ -24,13 +24,13 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -326,7 +326,7 @@ func (as *abiSchema) parseStateData(ctx context.Context, data tktypes.RawJSON) (
 
 // Take the state, parse the value into the type tree of this schema, and from that
 // build the label values to store in the DB for comparison appropriate to the type.
-func (as *abiSchema) ProcessState(ctx context.Context, contractAddress tktypes.EthAddress, data tktypes.RawJSON, id tktypes.HexBytes, customHashFunction bool) (*components.StateWithLabels, error) {
+func (as *abiSchema) ProcessState(ctx context.Context, contractAddress *tktypes.EthAddress, data tktypes.RawJSON, id tktypes.HexBytes, customHashFunction bool) (*components.StateWithLabels, error) {
 
 	// We need to re-serialize the data according to the ABI to:
 	// - Ensure it's valid

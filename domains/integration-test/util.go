@@ -20,15 +20,16 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
+
 	"github.com/go-resty/resty/v2"
-	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/noto"
 	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
@@ -42,11 +43,12 @@ func mapConfig(t *testing.T, config any) (m map[string]any) {
 	return m
 }
 
-func newTestbed(t *testing.T, hdWalletSeed *testbed.UTInitFunction, domains map[string]*testbed.TestbedDomain) (context.CancelFunc, *pldconf.PaladinConfig, testbed.Testbed, rpcbackend.Backend) {
+func newTestbed(t *testing.T, hdWalletSeed *testbed.UTInitFunction, domains map[string]*testbed.TestbedDomain) (context.CancelFunc, *pldconf.PaladinConfig, testbed.Testbed, rpcclient.Client) {
 	tb := testbed.NewTestBed()
 	url, conf, done, err := tb.StartForTest("./testbed.config.yaml", domains, hdWalletSeed)
 	assert.NoError(t, err)
-	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
+	rc := resty.New().SetBaseURL(url)
+	rpc := rpcclient.WrapRestyClient(rc)
 	return done, conf, tb, rpc
 }
 
@@ -55,7 +57,7 @@ func deployContracts(ctx context.Context, t *testing.T, hdWalletSeed *testbed.UT
 	url, _, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{}, hdWalletSeed)
 	assert.NoError(t, err)
 	defer done()
-	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
+	rpc := rpcclient.WrapRestyClient(resty.New().SetBaseURL(url))
 
 	deployed := make(map[string]string, len(contracts))
 	for name, contract := range contracts {
@@ -64,7 +66,7 @@ func deployContracts(ctx context.Context, t *testing.T, hdWalletSeed *testbed.UT
 		rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
 			deployer, build.ABI, build.Bytecode.String(), tktypes.RawJSON(`{}`))
 		if rpcerr != nil {
-			assert.NoError(t, rpcerr.Error())
+			assert.NoError(t, rpcerr)
 		}
 		deployed[name] = addr
 	}

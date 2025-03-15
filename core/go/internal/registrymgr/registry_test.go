@@ -29,6 +29,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -172,7 +173,6 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 
 	r, err := rm.GetRegistry(ctx, "test1")
 	require.NoError(t, err)
-	db := rm.p.DB()
 
 	// Insert a root entry
 	rootEntry1 := &prototk.RegistryEntry{Id: randID(), Name: "entry1", Location: randChainInfo(), Active: true}
@@ -192,7 +192,7 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 	assert.NotNil(t, res)
 
 	// Test getting all the entries with props
-	entries, err := r.QueryEntriesWithProps(ctx, db, "active", query.NewQueryBuilder().Limit(100).Query())
+	entries, err := r.QueryEntriesWithProps(ctx, rm.p.NOTX(), "active", query.NewQueryBuilder().Limit(100).Query())
 	require.NoError(t, err)
 	require.Len(t, entries, 2)
 	assert.Equal(t, rootEntry1.Id, entries[0].ID.HexString())
@@ -205,7 +205,7 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 	require.Equal(t, rootEntry2Props2.Value, entries[1].Properties[rootEntry2Props2.Name])
 
 	// Test on a non-null field
-	entries, err = r.QueryEntriesWithProps(ctx, db, "active",
+	entries, err = r.QueryEntriesWithProps(ctx, rm.p.NOTX(), "active",
 		query.NewQueryBuilder().NotNull(rootEntry2Props2.Name).Limit(100).Query(),
 	)
 	require.NoError(t, err)
@@ -216,7 +216,7 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 	require.Equal(t, rootEntry2Props2.Value, entries[0].Properties[rootEntry2Props2.Name])
 
 	// Test on an equal field
-	entries, err = r.QueryEntriesWithProps(ctx, db, "active",
+	entries, err = r.QueryEntriesWithProps(ctx, rm.p.NOTX(), "active",
 		query.NewQueryBuilder().Equal(rootEntry1Props1.Name, rootEntry1Props1.Value).Limit(100).Query(),
 	)
 	require.NoError(t, err)
@@ -227,7 +227,7 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 	require.Equal(t, rootEntry1Props1.Value, entries[0].Properties[rootEntry1Props1.Name])
 
 	// Search on the system prop
-	entries, err = r.QueryEntriesWithProps(ctx, db, "active",
+	entries, err = r.QueryEntriesWithProps(ctx, rm.p.NOTX(), "active",
 		query.NewQueryBuilder().Equal("$owner", rootEntry1SysProp.Value).Limit(100).Query(),
 	)
 	require.NoError(t, err)
@@ -242,7 +242,7 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 	assert.NotNil(t, res)
 
 	// Find children and check sorting fields
-	children, err := r.QueryEntries(ctx, db, "active", query.NewQueryBuilder().Equal(
+	children, err := r.QueryEntries(ctx, rm.p.NOTX(), "active", query.NewQueryBuilder().Equal(
 		".parentId", rootEntry1.Id,
 	).Sort("-.created", "-.updated").Limit(100).Query())
 	require.NoError(t, err)
@@ -262,14 +262,14 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 	assert.NotNil(t, res)
 
 	// Check not returned from normal query
-	entries, err = r.QueryEntriesWithProps(ctx, db, "active",
+	entries, err = r.QueryEntriesWithProps(ctx, rm.p.NOTX(), "active",
 		query.NewQueryBuilder().Null(".parentId").Limit(100).Query())
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
 	assert.Equal(t, rootEntry1.Id, entries[0].ID.HexString())
 
 	// Check returned from cherry pick with any
-	entries, err = r.QueryEntriesWithProps(ctx, db, "any",
+	entries, err = r.QueryEntriesWithProps(ctx, rm.p.NOTX(), "any",
 		query.NewQueryBuilder().Equal(".name", rootEntry2.Name).Limit(100).Query())
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
@@ -281,14 +281,14 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 	require.Equal(t, rootEntry2Props3.Value, entries[0].Properties[rootEntry2Props3.Name])
 
 	// Check returned from cherry pick with inactive
-	entries, err = r.QueryEntriesWithProps(ctx, db, "inactive",
+	entries, err = r.QueryEntriesWithProps(ctx, rm.p.NOTX(), "inactive",
 		query.NewQueryBuilder().Equal(".id", rootEntry2.Id).Limit(100).Query())
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
 	assert.Equal(t, rootEntry2.Id, entries[0].ID.HexString())
 
 	// Can get the complete prop set
-	allProps, err := r.GetEntryProperties(ctx, db, "any", tktypes.MustParseHexBytes(rootEntry2.Id))
+	allProps, err := r.GetEntryProperties(ctx, rm.p.NOTX(), "any", tktypes.MustParseHexBytes(rootEntry2.Id))
 	require.NoError(t, err)
 	propsMap := filteredPropsMap(allProps, tktypes.MustParseHexBytes(rootEntry2.Id))
 	require.Len(t, propsMap, 3)
@@ -297,7 +297,7 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 	require.Equal(t, rootEntry2Props3.Value, propsMap[rootEntry2Props3.Name])
 
 	// Can get just the inactive props set
-	allProps, err = r.GetEntryProperties(ctx, db, "inactive", tktypes.MustParseHexBytes(rootEntry2.Id))
+	allProps, err = r.GetEntryProperties(ctx, rm.p.NOTX(), "inactive", tktypes.MustParseHexBytes(rootEntry2.Id))
 	require.NoError(t, err)
 	propsMap = filteredPropsMap(allProps, tktypes.MustParseHexBytes(rootEntry2.Id))
 	require.Len(t, propsMap, 1)
@@ -416,7 +416,7 @@ func TestQueryEntriesQueryNoLimit(t *testing.T) {
 	ctx, _, tp, _, done := newTestRegistry(t, false)
 	defer done()
 
-	_, err := tp.r.QueryEntriesWithProps(ctx, tp.r.rm.p.DB(), "active", query.NewQueryBuilder().Query())
+	_, err := tp.r.QueryEntriesWithProps(ctx, tp.r.rm.p.NOTX(), "active", query.NewQueryBuilder().Query())
 	assert.Regexp(t, "PD012107", err)
 }
 
@@ -426,7 +426,7 @@ func TestQueryEntriesQueryFail(t *testing.T) {
 
 	m.db.ExpectQuery("SELECT.*reg_entries").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := tp.r.QueryEntries(ctx, tp.r.rm.p.DB(), "active", query.NewQueryBuilder().Limit(100).Query())
+	_, err := tp.r.QueryEntries(ctx, tp.r.rm.p.NOTX(), "active", query.NewQueryBuilder().Limit(100).Query())
 	assert.Regexp(t, "pop", err)
 }
 
@@ -439,7 +439,7 @@ func TestGetEntryPropertiesQueryFail(t *testing.T) {
 		AddRow(tktypes.HexBytes(tktypes.RandBytes(32))))
 	m.db.ExpectQuery("SELECT.*reg_props").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := tp.r.QueryEntriesWithProps(ctx, tp.r.rm.p.DB(), "active", query.NewQueryBuilder().Limit(100).Query())
+	_, err := tp.r.QueryEntriesWithProps(ctx, tp.r.rm.p.NOTX(), "active", query.NewQueryBuilder().Limit(100).Query())
 	assert.Regexp(t, "pop", err)
 }
 
@@ -459,7 +459,7 @@ func TestRegistryWithEventStreams(t *testing.T) {
 		}
 		addr := tktypes.RandAddress()
 
-		mc.blockIndexer.On("AddEventStream", mock.Anything, mock.MatchedBy(func(ies *blockindexer.InternalEventStream) bool {
+		mc.blockIndexer.On("AddEventStream", mock.Anything, mock.Anything, mock.MatchedBy(func(ies *blockindexer.InternalEventStream) bool {
 			require.Len(t, ies.Definition.Sources, 1)
 			assert.JSONEq(t, tktypes.JSONString(a).String(), tktypes.JSONString(ies.Definition.Sources[0].ABI).String())
 			assert.Equal(t, addr, ies.Definition.Sources[0].Address)
@@ -490,7 +490,7 @@ func TestConfigureEventStreamBadEventABI(t *testing.T) {
 			},
 		},
 	}
-	err := tp.r.configureEventStream(ctx)
+	err := tp.r.configureEventStream(ctx, tp.r.rm.p.NOTX())
 	assert.Regexp(t, "PD012102", err)
 
 }
@@ -506,7 +506,7 @@ func TestConfigureEventStreamBadEventContractAddr(t *testing.T) {
 			},
 		},
 	}
-	err := tp.r.configureEventStream(ctx)
+	err := tp.r.configureEventStream(ctx, tp.r.rm.p.NOTX())
 	assert.Regexp(t, "PD012102", err)
 
 }
@@ -522,7 +522,7 @@ func TestConfigureEventStreamBadEventABITypes(t *testing.T) {
 			},
 		},
 	}
-	err := tp.r.configureEventStream(ctx)
+	err := tp.r.configureEventStream(ctx, tp.r.rm.p.NOTX())
 	assert.Regexp(t, "FF22025", err)
 
 }
@@ -530,7 +530,9 @@ func TestConfigureEventStreamBadEventABITypes(t *testing.T) {
 func TestHandleEventBatchOk(t *testing.T) {
 
 	ctx, _, tp, _, done := newTestRegistry(t, false, func(mc *mockComponents, conf *pldconf.RegistryManagerConfig, regConf *prototk.RegistryConfig) {
+		mc.db.ExpectBegin()
 		mc.db.ExpectExec("INSERT.*reg_entries").WillReturnResult(driver.ResultNoRows)
+		mc.db.ExpectCommit()
 	})
 	defer done()
 
@@ -544,8 +546,8 @@ func TestHandleEventBatchOk(t *testing.T) {
 					BlockNumber:      12345,
 					TransactionIndex: 10,
 					LogIndex:         20,
-					TransactionHash:  tktypes.Bytes32(tktypes.RandBytes(32)),
-					Signature:        tktypes.Bytes32(tktypes.RandBytes(32)),
+					TransactionHash:  tktypes.RandBytes32(),
+					Signature:        tktypes.RandBytes32(),
 				},
 				SoliditySignature: "event1()",
 				Address:           *tktypes.RandAddress(),
@@ -567,15 +569,18 @@ func TestHandleEventBatchOk(t *testing.T) {
 		}, nil
 	}
 
-	res, err := tp.r.handleEventBatch(ctx, tp.r.rm.p.DB(), batch)
+	err := tp.r.rm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		return tp.r.handleEventBatch(ctx, dbTX, batch)
+	})
 	require.NoError(t, err)
-	assert.NotNil(t, res)
 
 }
 
 func TestHandleEventBatchError(t *testing.T) {
 
-	ctx, _, tp, _, done := newTestRegistry(t, false)
+	ctx, _, tp, _, done := newTestRegistry(t, false, func(mc *mockComponents, conf *pldconf.RegistryManagerConfig, regConf *prototk.RegistryConfig) {
+		mc.db.ExpectBegin()
+	})
 	defer done()
 
 	batch := &blockindexer.EventDeliveryBatch{
@@ -585,8 +590,8 @@ func TestHandleEventBatchError(t *testing.T) {
 				BlockNumber:      12345,
 				TransactionIndex: 10,
 				LogIndex:         20,
-				TransactionHash:  tktypes.Bytes32(tktypes.RandBytes(32)),
-				Signature:        tktypes.Bytes32(tktypes.RandBytes(32)),
+				TransactionHash:  tktypes.RandBytes32(),
+				Signature:        tktypes.RandBytes32(),
 			},
 			SoliditySignature: "event1()",
 			Address:           *tktypes.RandAddress(),
@@ -598,7 +603,9 @@ func TestHandleEventBatchError(t *testing.T) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	_, err := tp.r.handleEventBatch(ctx, tp.r.rm.p.DB(), batch)
+	err := tp.r.rm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		return tp.r.handleEventBatch(ctx, dbTX, batch)
+	})
 	require.Regexp(t, "pop", err)
 
 }

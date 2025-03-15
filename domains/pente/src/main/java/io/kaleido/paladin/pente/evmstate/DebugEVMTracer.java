@@ -13,78 +13,79 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.paladin.pente.evmstate;
+ package io.kaleido.paladin.pente.evmstate;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.apache.tuweni.bytes.Bytes;
-import org.hyperledger.besu.datatypes.Transaction;
-import org.hyperledger.besu.evm.frame.ExceptionalHaltReason;
-import org.hyperledger.besu.evm.frame.MessageFrame;
-import org.hyperledger.besu.evm.log.Log;
-import org.hyperledger.besu.evm.operation.Operation;
-import org.hyperledger.besu.evm.tracing.OperationTracer;
-import org.hyperledger.besu.evm.worldstate.WorldView;
-
-import java.util.List;
-import java.util.Optional;
-
-public class DebugEVMTracer implements OperationTracer {
-
-    private static final Logger logger = LogManager.getLogger(DebugEVMTracer.class);
-
-    @Override
-    public void tracePreExecution(MessageFrame frame) {
-        logger.trace("tracePreExecution: op={}", frame.getCurrentOperation().getName());
-    }
-
-    @Override
-    public void tracePostExecution(MessageFrame frame, Operation.OperationResult operationResult) {
-        logger.trace("tracePostExecution: op={} cost={}", frame.getCurrentOperation().getName(), operationResult.getGasCost());
-    }
-
-    @Override
-    public void tracePrecompileCall(MessageFrame frame, long gasRequirement, Bytes output) {
-        logger.trace("tracePrecompileCall: frame={} gasRequirement={} output={}", frame, gasRequirement, output);
-    }
-
-    @Override
-    public void traceAccountCreationResult(MessageFrame frame, Optional<ExceptionalHaltReason> haltReason) {
-        logger.trace("traceAccountCreationResult: frame={} haltReason={}", frame, haltReason);
-    }
-
-    @Override
-    public void tracePrepareTransaction(WorldView worldView, Transaction transaction) {
-        logger.trace("tracePrepareTransaction: worldView={} transaction={}", worldView, transaction);
-    }
-
-    @Override
-    public void traceStartTransaction(WorldView worldView, Transaction transaction) {
-        logger.trace("traceStartTransaction: worldView={} transaction={}", worldView, transaction);
-    }
-
-    @Override
-    public void traceEndTransaction(WorldView worldView, Transaction transaction, boolean status, Bytes output, List<Log> logs, long gasUsed, long timeNs) {
-        logger.trace("traceEndTransaction: worldView={} transaction={} status={} output={} logs={} gasUsed={} timens={}", worldView, transaction, status, output, logs, gasUsed, timeNs);
-    }
-
-    @Override
-    public void traceContextEnter(MessageFrame frame) {
-        logger.trace("traceContextEnter: frame={}", frame);
-    }
-
-    @Override
-    public void traceContextReEnter(MessageFrame frame) {
-        logger.trace("traceContextReEnter: frame={}", frame);
-    }
-
-    @Override
-    public void traceContextExit(MessageFrame frame) {
-        logger.trace("traceContextExit: frame={}", frame);
-    }
-
-    @Override
-    public boolean isExtendedTracing() {
-        return true;
-    }
-}
+ import io.kaleido.paladin.logging.PaladinLogging;
+ import org.apache.logging.log4j.Logger;
+ import org.apache.tuweni.bytes.Bytes;
+ import org.hyperledger.besu.datatypes.Transaction;
+ import org.hyperledger.besu.evm.frame.ExceptionalHaltReason;
+ import org.hyperledger.besu.evm.frame.MessageFrame;
+ import org.hyperledger.besu.evm.log.Log;
+ import org.hyperledger.besu.evm.operation.Operation;
+ import org.hyperledger.besu.evm.tracing.OperationTracer;
+ import org.hyperledger.besu.evm.worldstate.WorldView;
+ 
+ import java.util.List;
+ import java.util.Optional;
+ 
+ public class DebugEVMTracer implements OperationTracer {
+ 
+     private static final Logger logger = PaladinLogging.getLogger(DebugEVMTracer.class);
+ 
+     @Override
+     public void tracePreExecution(MessageFrame frame) {
+         logger.trace("tracePreExecution: op={}", frame.getCurrentOperation().getName());
+     }
+ 
+     @Override
+     public void tracePostExecution(MessageFrame frame, Operation.OperationResult operationResult) {
+         logger.trace("tracePostExecution: op={} cost={}", frame.getCurrentOperation().getName(), operationResult.getGasCost());
+     }
+ 
+     @Override
+     public void tracePrecompileCall(MessageFrame frame, long gasRequirement, Bytes output) {
+         logger.trace("tracePrecompileCall: frame={} gasRequirement={} output={}", frame, gasRequirement, output);
+     }
+ 
+     @Override
+     public void traceAccountCreationResult(MessageFrame frame, Optional<ExceptionalHaltReason> haltReason) {
+         logger.trace("traceAccountCreationResult: frame={} haltReason={}", frame, haltReason);
+     }
+ 
+     @Override
+     public void tracePrepareTransaction(WorldView worldView, Transaction transaction) {
+         logger.trace("tracePrepareTransaction: worldView={} transaction={}", worldView, transaction);
+     }
+ 
+     @Override
+     public void traceStartTransaction(WorldView worldView, Transaction transaction) {
+         logger.trace("traceStartTransaction: worldView={} transaction={}", worldView, transaction);
+     }
+ 
+     @Override
+     public void traceEndTransaction(WorldView worldView, Transaction transaction, boolean status, Bytes output, List<Log> logs, long gasUsed, long timeNs) {
+         logger.trace("traceEndTransaction: worldView={} transaction={} status={} output={} logs={} gasUsed={} timens={}", worldView, transaction, status, output, logs, gasUsed, timeNs);
+     }
+ 
+     @Override
+     public void traceContextEnter(MessageFrame frame) {
+         logger.trace("traceContextEnter: frame={}", frame);
+     }
+ 
+     @Override
+     public void traceContextReEnter(MessageFrame frame) {
+         logger.trace("traceContextReEnter: frame={}", frame);
+     }
+ 
+     @Override
+     public void traceContextExit(MessageFrame frame) {
+         logger.trace("traceContextExit: frame={}", frame);
+     }
+ 
+     @Override
+     public boolean isExtendedTracing() {
+         return true;
+     }
+ }
+ 

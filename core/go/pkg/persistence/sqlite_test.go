@@ -17,11 +17,13 @@
 package persistence
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSQLiteProvider(t *testing.T) {
@@ -31,4 +33,6 @@ func TestSQLiteProvider(t *testing.T) {
 	db, _, _ := sqlmock.New()
 	_, err := p.GetMigrationDriver(db)
 	assert.Error(t, err)
+
+	require.NoError(t, p.TakeNamedLock(context.Background(), nil, "")) // no-op, so doesn't matter the values are junk
 }

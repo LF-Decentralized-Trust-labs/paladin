@@ -51,15 +51,25 @@ func NewInMemoryTxStateManager(ctx context.Context, ptx *DBPublicTxn) InMemoryTx
 	imtxs := &inMemoryTxState{
 		mtx: &managedTx{ptx: ptx, InFlightStatus: InFlightStatusPending},
 	}
+
+	if ptx.FixedGasPricing != nil && ptx.FixedGasPricing.String() != "{}" {
+		// If the transaction has fixed gas pricing, recover this from the persisted transaction so that
+		// the gas price does not get recalculated later on
+		gasPricing := recoverGasPriceOptions(ptx.FixedGasPricing)
+		imtxs.mtx.GasPricing = &gasPricing
+	}
+
 	// Initialize the ephemeral state from the most recent persisted submission if one exists
 	if len(ptx.Submissions) > 0 {
 		lastSub := ptx.Submissions[0]
-		lastGasPricing := recoverGasPriceOptions(lastSub.GasPricing)
-		imtxs.mtx.GasPricing = &lastGasPricing
 		imtxs.mtx.TransactionHash = &lastSub.TransactionHash
 		imtxs.mtx.LastSubmit = &lastSub.Created
 		firstSub := ptx.Submissions[len(ptx.Submissions)-1]
 		imtxs.mtx.FirstSubmit = &firstSub.Created
+		if imtxs.mtx.GasPricing == nil {
+			lastGasPricing := recoverGasPriceOptions(lastSub.GasPricing)
+			imtxs.mtx.GasPricing = &lastGasPricing
+		}
 	}
 	return imtxs
 }

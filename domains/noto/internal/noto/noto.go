@@ -23,13 +23,14 @@ import (
 	"math/big"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
@@ -43,25 +44,59 @@ var notoFactoryJSON []byte
 //go:embed abis/INoto.json
 var notoInterfaceJSON []byte
 
+//go:embed abis/INotoErrors.json
+var notoErrorsJSON []byte
+
 //go:embed abis/INotoHooks.json
 var notoHooksJSON []byte
 
-func NewNoto(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
-	return &Noto{Callbacks: callbacks}
+var (
+	factoryBuild   = solutils.MustLoadBuild(notoFactoryJSON)
+	interfaceBuild = solutils.MustLoadBuild(notoInterfaceJSON)
+	errorsBuild    = solutils.MustLoadBuild(notoErrorsJSON)
+	hooksBuild     = solutils.MustLoadBuild(notoHooksJSON)
+)
+
+var (
+	NotoTransfer       = "NotoTransfer"
+	NotoApproved       = "NotoApproved"
+	NotoLock           = "NotoLock"
+	NotoUnlock         = "NotoUnlock"
+	NotoUnlockPrepared = "NotoUnlockPrepared"
+	NotoLockDelegated  = "NotoLockDelegated"
+)
+
+var allEvents = []string{
+	NotoTransfer,
+	NotoApproved,
+	NotoLock,
+	NotoUnlock,
+	NotoUnlockPrepared,
+	NotoLockDelegated,
 }
+
+var eventsJSON = mustBuildEventsJSON(interfaceBuild.ABI, errorsBuild.ABI)
+var eventSignatures = mustLoadEventSignatures(interfaceBuild.ABI, allEvents)
+
+var allSchemas = []*abi.Parameter{
+	types.NotoCoinABI,
+	types.NotoLockInfoABI,
+	types.NotoLockedCoinABI,
+	types.TransactionDataABI,
+}
+
+var schemasJSON = mustParseSchemas(allSchemas)
 
 type Noto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	name              string
-	config            types.DomainConfig
-	chainID           int64
-	coinSchema        *prototk.StateSchema
-	dataSchema        *prototk.StateSchema
-	factoryABI        abi.ABI
-	contractABI       abi.ABI
-	transferSignature string
-	approvedSignature string
+	name             string
+	config           types.DomainConfig
+	chainID          int64
+	coinSchema       *prototk.StateSchema
+	lockedCoinSchema *prototk.StateSchema
+	dataSchema       *prototk.StateSchema
+	lockInfoSchema   *prototk.StateSchema
 }
 
 type NotoDeployParams struct {
@@ -84,11 +119,40 @@ type NotoTransferParams struct {
 	Data      tktypes.HexBytes `json:"data"`
 }
 
+type NotoBurnParams struct {
+	Inputs    []string         `json:"inputs"`
+	Outputs   []string         `json:"outputs"`
+	Signature tktypes.HexBytes `json:"signature"`
+	Data      tktypes.HexBytes `json:"data"`
+}
+
 type NotoApproveTransferParams struct {
 	Delegate  *tktypes.EthAddress `json:"delegate"`
-	TXHash    tktypes.HexBytes    `json:"txhash"`
+	TXHash    tktypes.Bytes32     `json:"txhash"`
 	Signature tktypes.HexBytes    `json:"signature"`
 	Data      tktypes.HexBytes    `json:"data"`
+}
+
+type NotoLockParams struct {
+	Inputs        []string         `json:"inputs"`
+	Outputs       []string         `json:"outputs"`
+	LockedOutputs []string         `json:"lockedOutputs"`
+	Signature     tktypes.HexBytes `json:"signature"`
+	Data          tktypes.HexBytes `json:"data"`
+}
+
+type NotoPrepareUnlockParams struct {
+	LockedInputs []string         `json:"lockedInputs"`
+	UnlockHash   tktypes.Bytes32  `json:"unlockHash"`
+	Signature    tktypes.HexBytes `json:"signature"`
+	Data         tktypes.HexBytes `json:"data"`
+}
+
+type NotoDelegateLockParams struct {
+	UnlockHash tktypes.Bytes32     `json:"unlockHash"`
+	Delegate   *tktypes.EthAddress `json:"delegate"`
+	Signature  tktypes.HexBytes    `json:"signature"`
+	Data       tktypes.HexBytes    `json:"data"`
 }
 
 type NotoTransfer_Event struct {
@@ -105,21 +169,86 @@ type NotoApproved_Event struct {
 	Data      tktypes.HexBytes   `json:"data"`
 }
 
-type gatheredCoins struct {
-	inCoins   []*types.NotoCoin
-	inStates  []*prototk.StateRef
-	inTotal   *big.Int
-	outCoins  []*types.NotoCoin
-	outStates []*prototk.StateRef
-	outTotal  *big.Int
+type NotoLock_Event struct {
+	Inputs        []tktypes.Bytes32 `json:"inputs"`
+	Outputs       []tktypes.Bytes32 `json:"outputs"`
+	LockedOutputs []tktypes.Bytes32 `json:"lockedOutputs"`
+	Signature     tktypes.HexBytes  `json:"signature"`
+	Data          tktypes.HexBytes  `json:"data"`
 }
 
-func getEventSignature(ctx context.Context, abi abi.ABI, eventName string) (string, error) {
-	event := abi.Events()[eventName]
-	if event == nil {
-		return "", i18n.NewError(ctx, msgs.MsgUnknownEvent, eventName)
+type NotoUnlock_Event struct {
+	Sender        *tktypes.EthAddress `json:"sender"`
+	LockedInputs  []tktypes.Bytes32   `json:"lockedInputs"`
+	LockedOutputs []tktypes.Bytes32   `json:"lockedOutputs"`
+	Outputs       []tktypes.Bytes32   `json:"outputs"`
+	Signature     tktypes.HexBytes    `json:"signature"`
+	Data          tktypes.HexBytes    `json:"data"`
+}
+
+type NotoUnlockPrepared_Event struct {
+	LockedInputs []tktypes.Bytes32 `json:"lockedInputs"`
+	UnlockHash   tktypes.Bytes32   `json:"unlockHash"`
+	Signature    tktypes.HexBytes  `json:"signature"`
+	Data         tktypes.HexBytes  `json:"data"`
+}
+
+type NotoLockDelegated_Event struct {
+	UnlockHash tktypes.Bytes32     `json:"unlockHash"`
+	Delegate   *tktypes.EthAddress `json:"delegate"`
+	Signature  tktypes.HexBytes    `json:"signature"`
+	Data       tktypes.HexBytes    `json:"data"`
+}
+
+type parsedCoins struct {
+	coins        []*types.NotoCoin
+	states       []*prototk.StateRef
+	total        *big.Int
+	lockedCoins  []*types.NotoLockedCoin
+	lockedStates []*prototk.StateRef
+	lockedTotal  *big.Int
+}
+
+func mustLoadEventSignatures(contractABI abi.ABI, allEvents []string) map[string]string {
+	events := contractABI.Events()
+	signatures := make(map[string]string, len(allEvents))
+	for _, eventName := range allEvents {
+		event := events[eventName]
+		if event == nil {
+			panic(fmt.Errorf("unknown event: %s", eventName))
+		}
+		signatures[eventName] = event.SolString()
 	}
-	return event.SolString(), nil
+	return signatures
+}
+
+func mustParseJSON[T any](obj T) string {
+	parsed, err := json.Marshal(obj)
+	if err != nil {
+		panic(err)
+	}
+	return string(parsed)
+}
+
+func mustBuildEventsJSON(abis ...abi.ABI) string {
+	var events abi.ABI
+	for _, a := range abis {
+		for _, entry := range a {
+			// We include errors as well as events, so that Paladin will decode domain errors
+			if entry.Type == abi.Event || entry.Type == abi.Error {
+				events = append(events, entry)
+			}
+		}
+	}
+	return mustParseJSON(events)
+}
+
+func mustParseSchemas(allSchemas []*abi.Parameter) []string {
+	schemas := make([]string, len(allSchemas))
+	for i, schema := range allSchemas {
+		schemas[i] = mustParseJSON(schema)
+	}
+	return schemas
 }
 
 func (n *Noto) Name() string {
@@ -130,60 +259,48 @@ func (n *Noto) CoinSchemaID() string {
 	return n.coinSchema.Id
 }
 
+func (n *Noto) LockedCoinSchemaID() string {
+	return n.lockedCoinSchema.Id
+}
+
+func (n *Noto) LockInfoSchemaID() string {
+	return n.lockInfoSchema.Id
+}
+
+func (n *Noto) DataSchemaID() string {
+	return n.dataSchema.Id
+}
+
 func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
 	err := json.Unmarshal([]byte(req.ConfigJson), &n.config)
 	if err != nil {
 		return nil, err
 	}
 
-	factory := solutils.MustLoadBuild(notoFactoryJSON)
-	contract := solutils.MustLoadBuild(notoInterfaceJSON)
-
 	n.name = req.Name
 	n.chainID = req.ChainId
-	n.factoryABI = factory.ABI
-	n.contractABI = contract.ABI
-
-	n.transferSignature, err = getEventSignature(ctx, contract.ABI, "NotoTransfer")
-	if err != nil {
-		return nil, err
-	}
-	n.approvedSignature, err = getEventSignature(ctx, contract.ABI, "NotoApproved")
-	if err != nil {
-		return nil, err
-	}
-
-	coinSchemaJSON, err := json.Marshal(types.NotoCoinABI)
-	if err != nil {
-		return nil, err
-	}
-	infoSchemaJSON, err := json.Marshal(types.TransactionDataABI)
-	if err != nil {
-		return nil, err
-	}
-
-	var events abi.ABI
-	for _, entry := range contract.ABI {
-		if entry.Type == abi.Event {
-			events = append(events, entry)
-		}
-	}
-	eventsJSON, err := json.Marshal(events)
-	if err != nil {
-		return nil, err
-	}
 
 	return &prototk.ConfigureDomainResponse{
 		DomainConfig: &prototk.DomainConfig{
-			AbiStateSchemasJson: []string{string(coinSchemaJSON), string(infoSchemaJSON)},
-			AbiEventsJson:       string(eventsJSON),
+			AbiStateSchemasJson: schemasJSON,
+			AbiEventsJson:       eventsJSON,
 		},
 	}, nil
 }
 
 func (n *Noto) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
-	n.coinSchema = req.AbiStateSchemas[0]
-	n.dataSchema = req.AbiStateSchemas[1]
+	for i, schema := range allSchemas {
+		switch schema.Name {
+		case types.NotoCoinABI.Name:
+			n.coinSchema = req.AbiStateSchemas[i]
+		case types.NotoLockedCoinABI.Name:
+			n.lockedCoinSchema = req.AbiStateSchemas[i]
+		case types.TransactionDataABI.Name:
+			n.dataSchema = req.AbiStateSchemas[i]
+		case types.NotoLockInfoABI.Name:
+			n.lockInfoSchema = req.AbiStateSchemas[i]
+		}
+	}
 	return &prototk.InitDomainResponse{}, nil
 }
 
@@ -192,6 +309,29 @@ func (n *Noto) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (
 	if err != nil {
 		return nil, err
 	}
+
+	switch params.NotaryMode {
+	case types.NotaryModeBasic:
+		// no required params
+	case types.NotaryModeHooks:
+		if params.Options.Hooks == nil {
+			return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "options.hooks")
+		}
+		if params.Options.Hooks.PublicAddress == nil {
+			return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "options.hooks.publicAddress")
+		}
+		if !params.Options.Hooks.DevUsePublicHooks {
+			if params.Options.Hooks.PrivateAddress == nil {
+				return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "options.hooks.privateAddress")
+			}
+			if params.Options.Hooks.PrivateGroup == nil {
+				return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "options.hooks.privateGroup")
+			}
+		}
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "notaryMode")
+	}
+
 	return &prototk.InitDeployResponse{
 		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 			{
@@ -208,99 +348,123 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 	if err != nil {
 		return nil, err
 	}
+	localNodeName, _ := n.Callbacks.LocalNodeName(ctx, &prototk.LocalNodeNameRequest{})
+	notaryQualified, err := tktypes.PrivateIdentityLocator(params.Notary).FullyQualified(ctx, localNodeName.Name)
+	if err != nil {
+		return nil, err
+	}
 	notaryAddress, err := n.findEthAddressVerifier(ctx, "notary", params.Notary, req.ResolvedVerifiers)
 	if err != nil {
 		return nil, err
 	}
 
 	deployData := &types.NotoConfigData_V0{
-		NotaryLookup:    params.Notary,
-		NotaryType:      types.NotaryTypeSigner,
-		RestrictMinting: true,
-		AllowBurning:    true,
+		NotaryLookup: notaryQualified.String(),
 	}
-	if params.RestrictMinting != nil {
-		deployData.RestrictMinting = *params.RestrictMinting
-	}
-	if params.AllowBurning != nil {
-		deployData.AllowBurning = *params.AllowBurning
+	switch params.NotaryMode {
+	case types.NotaryModeBasic:
+		deployData.NotaryMode = types.NotaryModeIntBasic
+		deployData.RestrictMint = true
+		deployData.AllowBurn = true
+		deployData.AllowLock = true
+		if params.Options.Basic != nil {
+			if params.Options.Basic.RestrictMint != nil {
+				deployData.RestrictMint = *params.Options.Basic.RestrictMint
+			}
+			if params.Options.Basic.AllowBurn != nil {
+				deployData.AllowBurn = *params.Options.Basic.AllowBurn
+			}
+			if params.Options.Basic.AllowLock != nil {
+				deployData.AllowLock = *params.Options.Basic.AllowLock
+			}
+		}
+	case types.NotaryModeHooks:
+		deployData.NotaryMode = types.NotaryModeIntHooks
+		deployData.PrivateAddress = params.Options.Hooks.PrivateAddress
+		deployData.PrivateGroup = params.Options.Hooks.PrivateGroup
+		notaryAddress = params.Options.Hooks.PublicAddress
 	}
 
-	if params.Hooks != nil && !params.Hooks.PublicAddress.IsZero() {
-		notaryAddress = params.Hooks.PublicAddress
-		deployData.NotaryType = types.NotaryTypePente
-		deployData.PrivateAddress = params.Hooks.PrivateAddress
-		deployData.PrivateGroup = params.Hooks.PrivateGroup
-	}
-
-	deployDataJSON, err := json.Marshal(deployData)
-	if err != nil {
-		return nil, err
-	}
-	deployParams := &NotoDeployParams{
-		Name:          params.Implementation,
-		TransactionID: req.Transaction.TransactionId,
-		NotaryAddress: *notaryAddress,
-		Data:          deployDataJSON,
-	}
-	paramsJSON, err := json.Marshal(deployParams)
-	if err != nil {
-		return nil, err
-	}
-	functionName := "deploy"
-	if deployParams.Name != "" {
-		functionName = "deployImplementation"
-	}
-	functionJSON, err := json.Marshal(n.factoryABI.Functions()[functionName])
-	if err != nil {
-		return nil, err
-	}
+	var functionJSON []byte
+	var paramsJSON []byte
+	var deployDataJSON []byte
 
 	// Use a random key to deploy
+	// TODO: shouldn't it be possible to omit this and let Paladin choose?
 	signer := fmt.Sprintf("%s.deploy.%s", n.name, uuid.New())
+
+	functionName := "deploy"
+	if params.Implementation != "" {
+		functionName = "deployImplementation"
+	}
+	functionJSON, err = json.Marshal(factoryBuild.ABI.Functions()[functionName])
+	if err == nil {
+		deployDataJSON, err = json.Marshal(deployData)
+	}
+	if err == nil {
+		paramsJSON, err = json.Marshal(&NotoDeployParams{
+			Name:          params.Implementation,
+			TransactionID: req.Transaction.TransactionId,
+			NotaryAddress: *notaryAddress,
+			Data:          deployDataJSON,
+		})
+	}
 	return &prototk.PrepareDeployResponse{
 		Transaction: &prototk.PreparedTransaction{
 			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},
 		Signer: &signer,
-	}, nil
+	}, err
 }
 
 func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractRequest) (*prototk.InitContractResponse, error) {
 	var notoContractConfigJSON []byte
-	var staticCoordinator string
-	domainConfig, err := n.decodeConfig(ctx, req.ContractConfig)
-	if err == nil {
-		parsedConfig := &types.NotoParsedConfig{
-			NotaryType:      domainConfig.DecodedData.NotaryType,
-			NotaryAddress:   domainConfig.NotaryAddress,
-			Variant:         domainConfig.Variant,
-			NotaryLookup:    domainConfig.DecodedData.NotaryLookup,
-			PrivateAddress:  domainConfig.DecodedData.PrivateAddress,
-			PrivateGroup:    domainConfig.DecodedData.PrivateGroup,
-			RestrictMinting: domainConfig.DecodedData.RestrictMinting,
-			AllowBurning:    domainConfig.DecodedData.AllowBurning,
-		}
-		notoContractConfigJSON, err = json.Marshal(parsedConfig)
-	}
-	if err == nil {
-		staticCoordinator = domainConfig.DecodedData.NotaryLookup
-	}
+
+	domainConfig, decodedData, err := n.decodeConfig(ctx, req.ContractConfig)
 	if err != nil {
 		// This on-chain contract has invalid configuration - not an error in our process
 		return &prototk.InitContractResponse{Valid: false}, nil
 	}
 
+	localNodeName, _ := n.Callbacks.LocalNodeName(ctx, &prototk.LocalNodeNameRequest{})
+	_, notaryNodeName, err := tktypes.PrivateIdentityLocator(decodedData.NotaryLookup).Validate(ctx, localNodeName.Name, true)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedConfig := &types.NotoParsedConfig{
+		NotaryMode:   types.NotaryModeBasic.Enum(),
+		Variant:      domainConfig.Variant,
+		NotaryLookup: decodedData.NotaryLookup,
+		IsNotary:     notaryNodeName == localNodeName.Name,
+	}
+	if decodedData.NotaryMode == types.NotaryModeIntHooks {
+		parsedConfig.NotaryMode = types.NotaryModeHooks.Enum()
+		parsedConfig.Options.Hooks = &types.NotoHooksOptions{
+			PublicAddress:     &domainConfig.NotaryAddress,
+			PrivateAddress:    decodedData.PrivateAddress,
+			PrivateGroup:      decodedData.PrivateGroup,
+			DevUsePublicHooks: decodedData.PrivateAddress == nil,
+		}
+	} else {
+		parsedConfig.Options.Basic = &types.NotoBasicOptions{
+			RestrictMint: &decodedData.RestrictMint,
+			AllowBurn:    &decodedData.AllowBurn,
+			AllowLock:    &decodedData.AllowLock,
+		}
+	}
+
+	notoContractConfigJSON, err = json.Marshal(parsedConfig)
 	return &prototk.InitContractResponse{
 		Valid: true,
 		ContractConfig: &prototk.ContractConfig{
 			ContractConfigJson:   string(notoContractConfigJSON),
 			CoordinatorSelection: prototk.ContractConfig_COORDINATOR_STATIC,
-			StaticCoordinator:    &staticCoordinator,
+			StaticCoordinator:    &decodedData.NotaryLookup,
 			SubmitterSelection:   prototk.ContractConfig_SUBMITTER_COORDINATOR,
 		},
-	}, nil
+	}, err
 }
 
 func (n *Noto) InitTransaction(ctx context.Context, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
@@ -335,31 +499,36 @@ func (n *Noto) PrepareTransaction(ctx context.Context, req *prototk.PrepareTrans
 	return handler.Prepare(ctx, tx, req)
 }
 
-func (n *Noto) decodeConfig(ctx context.Context, domainConfig []byte) (*types.NotoConfig_V0, error) {
-	configSelector := ethtypes.HexBytes0xPrefix(domainConfig[0:4])
+func (n *Noto) decodeConfig(ctx context.Context, domainConfig []byte) (*types.NotoConfig_V0, *types.NotoConfigData_V0, error) {
+	var configSelector ethtypes.HexBytes0xPrefix
+	if len(domainConfig) >= 4 {
+		configSelector = ethtypes.HexBytes0xPrefix(domainConfig[0:4])
+	}
 	if configSelector.String() != types.NotoConfigID_V0.String() {
-		return nil, i18n.NewError(ctx, msgs.MsgUnexpectedConfigType, configSelector)
+		return nil, nil, i18n.NewError(ctx, msgs.MsgUnexpectedConfigType, configSelector)
 	}
 	configValues, err := types.NotoConfigABI_V0.DecodeABIDataCtx(ctx, domainConfig[4:], 0)
 	if err != nil {
-		return nil, err
-	}
-	configJSON, err := tktypes.StandardABISerializer().SerializeJSON(configValues)
-	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var config types.NotoConfig_V0
-	err = json.Unmarshal(configJSON, &config)
-	if err != nil {
-		return nil, err
+	var decodedData types.NotoConfigData_V0
+	configJSON, err := tktypes.StandardABISerializer().SerializeJSON(configValues)
+	if err == nil {
+		err = json.Unmarshal(configJSON, &config)
 	}
-	err = json.Unmarshal(config.Data, &config.DecodedData)
-	return &config, err
+	if err == nil {
+		err = json.Unmarshal(config.Data, &decodedData)
+	}
+	return &config, &decodedData, err
 }
 
 func (n *Noto) validateDeploy(tx *prototk.DeployTransactionSpecification) (*types.ConstructorParams, error) {
 	var params types.ConstructorParams
 	err := json.Unmarshal([]byte(tx.ConstructorParamsJson), &params)
+	if err == nil && params.Notary == "" {
+		err = i18n.NewError(context.Background(), msgs.MsgParameterRequired, "notary")
+	}
 	return &params, err
 }
 
@@ -370,7 +539,7 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *prototk.TransactionS
 		return nil, nil, err
 	}
 
-	var domainConfig *types.NotoParsedConfig
+	var domainConfig types.NotoParsedConfig
 	err = json.Unmarshal([]byte(tx.ContractInfo.ContractConfigJson), &domainConfig)
 	if err != nil {
 		return nil, nil, err
@@ -381,20 +550,21 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *prototk.TransactionS
 	if abi == nil || handler == nil {
 		return nil, nil, i18n.NewError(ctx, msgs.MsgUnknownFunction, functionABI.Name)
 	}
-	params, err := handler.ValidateParams(ctx, domainConfig, tx.FunctionParamsJson)
+
+	contractAddress, err := ethtypes.NewAddress(tx.ContractInfo.ContractAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	params, err := handler.ValidateParams(ctx, &domainConfig, tx.FunctionParamsJson)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	signature, err := abi.SolidityStringCtx(ctx)
-	if err != nil {
-		return nil, nil, err
+	if err == nil && tx.FunctionSignature != signature {
+		err = i18n.NewError(ctx, msgs.MsgUnexpectedFunctionSignature, functionABI.Name, signature, tx.FunctionSignature)
 	}
-	if tx.FunctionSignature != signature {
-		return nil, nil, i18n.NewError(ctx, msgs.MsgUnexpectedFunctionSignature, functionABI.Name, signature, tx.FunctionSignature)
-	}
-
-	contractAddress, err := ethtypes.NewAddress(tx.ContractInfo.ContractAddress)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -403,9 +573,29 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *prototk.TransactionS
 		Transaction:     tx,
 		FunctionABI:     &functionABI,
 		ContractAddress: contractAddress,
-		DomainConfig:    domainConfig,
+		DomainConfig:    &domainConfig,
 		Params:          params,
 	}, handler, nil
+}
+
+func (n *Noto) ethAddressVerifiers(lookups ...string) []*prototk.ResolveVerifierRequest {
+	verifierMap := make(map[string]bool, len(lookups))
+	verifierList := make([]string, 0, len(lookups))
+	for _, lookup := range lookups {
+		if _, ok := verifierMap[lookup]; !ok {
+			verifierMap[lookup] = true
+			verifierList = append(verifierList, lookup)
+		}
+	}
+	request := make([]*prototk.ResolveVerifierRequest, len(verifierList))
+	for i, lookup := range verifierList {
+		request[i] = &prototk.ResolveVerifierRequest{
+			Lookup:       lookup,
+			Algorithm:    algorithms.ECDSA_SECP256K1,
+			VerifierType: verifiers.ETH_ADDRESS,
+		}
+	}
+	return request
 }
 
 func (n *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0xPrefix, signature []byte) (*ethtypes.Address0xHex, error) {
@@ -416,49 +606,50 @@ func (n *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0x
 	return sig.RecoverDirect(payload, n.chainID)
 }
 
-func (n *Noto) parseCoinList(ctx context.Context, label string, states []*prototk.EndorsableState) ([]*types.NotoCoin, []*prototk.StateRef, *big.Int, error) {
-	var err error
+func (n *Noto) parseCoinList(ctx context.Context, label string, states []*prototk.EndorsableState) (*parsedCoins, error) {
 	statesUsed := make(map[string]bool)
-	coins := make([]*types.NotoCoin, len(states))
-	refs := make([]*prototk.StateRef, len(states))
-	total := big.NewInt(0)
+	result := &parsedCoins{
+		total:       new(big.Int),
+		lockedTotal: new(big.Int),
+	}
 	for i, state := range states {
-		if state.SchemaId != n.coinSchema.Id {
-			return nil, nil, nil, i18n.NewError(ctx, msgs.MsgUnknownSchema, state.SchemaId)
-		}
 		if statesUsed[state.Id] {
-			return nil, nil, nil, i18n.NewError(ctx, msgs.MsgDuplicateStateInList, label, i, state.Id)
+			return nil, i18n.NewError(ctx, msgs.MsgDuplicateStateInList, label, i, state.Id)
 		}
 		statesUsed[state.Id] = true
-		if coins[i], err = n.unmarshalCoin(state.StateDataJson); err != nil {
-			return nil, nil, nil, i18n.NewError(ctx, msgs.MsgInvalidListInput, label, i, state.Id, err)
-		}
-		refs[i] = &prototk.StateRef{
-			SchemaId: state.SchemaId,
-			Id:       state.Id,
-		}
-		total = total.Add(total, coins[i].Amount.Int())
-	}
-	return coins, refs, total, nil
-}
 
-func (n *Noto) gatherCoins(ctx context.Context, inputs, outputs []*prototk.EndorsableState) (*gatheredCoins, error) {
-	inCoins, inStates, inTotal, err := n.parseCoinList(ctx, "input", inputs)
-	if err != nil {
-		return nil, err
+		switch state.SchemaId {
+		case n.coinSchema.Id:
+			coin, err := n.unmarshalCoin(state.StateDataJson)
+			if err != nil {
+				return nil, i18n.NewError(ctx, msgs.MsgInvalidListInput, label, i, state.Id, err)
+			}
+			result.coins = append(result.coins, coin)
+			result.total = result.total.Add(result.total, coin.Amount.Int())
+			result.states = append(result.states, &prototk.StateRef{
+				SchemaId: state.SchemaId,
+				Id:       state.Id,
+			})
+			break
+
+		case n.lockedCoinSchema.Id:
+			coin, err := n.unmarshalLockedCoin(state.StateDataJson)
+			if err != nil {
+				return nil, i18n.NewError(ctx, msgs.MsgInvalidListInput, label, i, state.Id, err)
+			}
+			result.lockedCoins = append(result.lockedCoins, coin)
+			result.lockedTotal = result.lockedTotal.Add(result.lockedTotal, coin.Amount.Int())
+			result.lockedStates = append(result.lockedStates, &prototk.StateRef{
+				SchemaId: state.SchemaId,
+				Id:       state.Id,
+			})
+			break
+
+		default:
+			return nil, i18n.NewError(ctx, msgs.MsgUnexpectedSchema, state.SchemaId)
+		}
 	}
-	outCoins, outStates, outTotal, err := n.parseCoinList(ctx, "output", outputs)
-	if err != nil {
-		return nil, err
-	}
-	return &gatheredCoins{
-		inCoins:   inCoins,
-		inStates:  inStates,
-		inTotal:   inTotal,
-		outCoins:  outCoins,
-		outStates: outStates,
-		outTotal:  outTotal,
-	}, nil
+	return result, nil
 }
 
 func (n *Noto) encodeTransactionData(ctx context.Context, transaction *prototk.TransactionSpecification, infoStates []*prototk.EndorsableState) (tktypes.HexBytes, error) {
@@ -495,83 +686,58 @@ func (n *Noto) encodeTransactionData(ctx context.Context, transaction *prototk.T
 }
 
 func (n *Noto) decodeTransactionData(ctx context.Context, data tktypes.HexBytes) (*types.NotoTransactionData_V0, error) {
-	if len(data) < 4 {
-		return nil, nil
-	}
-	dataPrefix := data[0:4]
-	if dataPrefix.String() != types.NotoTransactionDataID_V0.String() {
-		return nil, nil
-	}
-	dataDecoded, err := types.NotoTransactionDataABI_V0.DecodeABIDataCtx(ctx, data, 4)
-	if err != nil {
-		return nil, err
-	}
-	dataJSON, err := dataDecoded.JSON()
-	if err != nil {
-		return nil, err
-	}
 	var dataValues types.NotoTransactionData_V0
-	err = json.Unmarshal(dataJSON, &dataValues)
-	return &dataValues, err
-}
-
-func (n *Noto) parseStatesFromEvent(txID tktypes.Bytes32, states []tktypes.Bytes32) []*prototk.StateUpdate {
-	refs := make([]*prototk.StateUpdate, len(states))
-	for i, state := range states {
-		refs[i] = &prototk.StateUpdate{
-			Id:            state.String(),
-			TransactionId: txID.String(),
-		}
-	}
-	return refs
-}
-
-func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error) {
-	var res prototk.HandleEventBatchResponse
-	for _, ev := range req.Events {
-		switch ev.SoliditySignature {
-		case n.transferSignature:
-			var transfer NotoTransfer_Event
-			if err := json.Unmarshal([]byte(ev.DataJson), &transfer); err == nil {
-				txData, err := n.decodeTransactionData(ctx, transfer.Data)
-				if err != nil {
-					return nil, err
-				}
-				res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
-					TransactionId: txData.TransactionID.String(),
-					Location:      ev.Location,
-				})
-				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, transfer.Inputs)...)
-				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, transfer.Outputs)...)
-				for _, state := range txData.InfoStates {
-					res.InfoStates = append(res.InfoStates, &prototk.StateUpdate{
-						Id:            state.String(),
-						TransactionId: txData.TransactionID.String(),
-					})
+	if len(data) >= 4 {
+		dataPrefix := data[0:4]
+		if dataPrefix.String() == types.NotoTransactionDataID_V0.String() {
+			dataDecoded, err := types.NotoTransactionDataABI_V0.DecodeABIDataCtx(ctx, data, 4)
+			if err == nil {
+				var dataJSON []byte
+				dataJSON, err = dataDecoded.JSON()
+				if err == nil {
+					err = json.Unmarshal(dataJSON, &dataValues)
 				}
 			}
-
-		case n.approvedSignature:
-			var approved NotoApproved_Event
-			if err := json.Unmarshal([]byte(ev.DataJson), &approved); err == nil {
-				txData, err := n.decodeTransactionData(ctx, approved.Data)
-				if err != nil {
-					return nil, err
-				}
-				res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
-					TransactionId: txData.TransactionID.String(),
-					Location:      ev.Location,
-				})
-				for _, state := range txData.InfoStates {
-					res.InfoStates = append(res.InfoStates, &prototk.StateUpdate{
-						Id:            state.String(),
-						TransactionId: txData.TransactionID.String(),
-					})
-				}
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
-	return &res, nil
+	if dataValues.TransactionID.IsZero() {
+		// If no transaction ID could be decoded, assign a random one
+		dataValues.TransactionID = tktypes.RandBytes32()
+	}
+	return &dataValues, nil
+}
+
+func (n *Noto) wrapHookTransaction(domainConfig *types.NotoParsedConfig, functionABI *abi.Entry, params any) (pldapi.TransactionType, *abi.Entry, tktypes.HexBytes, error) {
+	if domainConfig.Options.Hooks.DevUsePublicHooks {
+		paramsJSON, err := json.Marshal(params)
+		return pldapi.TransactionTypePublic, functionABI, paramsJSON, err
+	}
+
+	functionABI = penteInvokeABI(functionABI.Name, functionABI.Inputs)
+	penteParams := &PenteInvokeParams{
+		Group:  domainConfig.Options.Hooks.PrivateGroup,
+		To:     domainConfig.Options.Hooks.PrivateAddress,
+		Inputs: params,
+	}
+	paramsJSON, err := json.Marshal(penteParams)
+	return pldapi.TransactionTypePrivate, functionABI, paramsJSON, err
+}
+
+func mapSendTransactionType(transactionType pldapi.TransactionType) prototk.TransactionInput_TransactionType {
+	if transactionType == pldapi.TransactionTypePrivate {
+		return prototk.TransactionInput_PRIVATE
+	}
+	return prototk.TransactionInput_PUBLIC
+}
+
+func mapPrepareTransactionType(transactionType pldapi.TransactionType) prototk.PreparedTransaction_TransactionType {
+	if transactionType == pldapi.TransactionTypePrivate {
+		return prototk.PreparedTransaction_PRIVATE
+	}
+	return prototk.PreparedTransaction_PUBLIC
 }
 
 func (n *Noto) Sign(ctx context.Context, req *prototk.SignRequest) (*prototk.SignResponse, error) {
@@ -594,7 +760,14 @@ func (n *Noto) ExecCall(ctx context.Context, req *prototk.ExecCallRequest) (*pro
 	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
 }
 
-func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptRequest) (*prototk.BuildReceiptResponse, error) {
-	// TODO: Event logs for transfers would be great for Noto
-	return nil, i18n.NewError(ctx, msgs.MsgNoDomainReceipt)
+func (n *Noto) ConfigurePrivacyGroup(ctx context.Context, req *prototk.ConfigurePrivacyGroupRequest) (*prototk.ConfigurePrivacyGroupResponse, error) {
+	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+}
+
+func (n *Noto) InitPrivacyGroup(ctx context.Context, req *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+}
+
+func (n *Noto) WrapPrivacyGroupEVMTX(ctx context.Context, req *prototk.WrapPrivacyGroupEVMTXRequest) (*prototk.WrapPrivacyGroupEVMTXResponse, error) {
+	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
 }

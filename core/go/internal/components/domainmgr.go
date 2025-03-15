@@ -20,9 +20,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -41,7 +41,7 @@ type DomainManager interface {
 	ConfiguredDomains() map[string]*pldconf.PluginConfig
 	DomainRegistered(name string, toDomain DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
 	GetDomainByName(ctx context.Context, name string) (Domain, error)
-	GetSmartContractByAddress(ctx context.Context, dbTX *gorm.DB, addr tktypes.EthAddress) (DomainSmartContract, error)
+	GetSmartContractByAddress(ctx context.Context, dbTX persistence.DBTX, addr tktypes.EthAddress) (DomainSmartContract, error)
 	ExecDeployAndWait(ctx context.Context, txID uuid.UUID, call func() error) (dc DomainSmartContract, err error)
 	ExecAndWaitTransaction(ctx context.Context, txID uuid.UUID, call func() error) error
 	GetSigner() signerapi.InMemorySigner
@@ -55,6 +55,11 @@ type Domain interface {
 	Configuration() *prototk.DomainConfig
 	CustomHashFunction() bool
 
+	// Specific to domains that support privacy groups (domain should return error if it does not).
+	// Validates the input properties, and turns it into the full genesis configuration for a group
+	ConfigurePrivacyGroup(ctx context.Context, inputConfiguration map[string]string) (configuration map[string]string, err error)
+	InitPrivacyGroup(ctx context.Context, id tktypes.HexBytes, genesis *pldapi.PrivacyGroupGenesisState) (tx *pldapi.TransactionInput, err error)
+
 	InitDeploy(ctx context.Context, tx *PrivateContractDeploy) error
 	PrepareDeploy(ctx context.Context, tx *PrivateContractDeploy) error
 
@@ -62,8 +67,8 @@ type Domain interface {
 	// Any nil IDs should be filled in, and any mis-matched IDs should result in an error
 	ValidateStateHashes(ctx context.Context, states []*FullState) ([]tktypes.HexBytes, error)
 
-	GetDomainReceipt(ctx context.Context, dbTX *gorm.DB, txID uuid.UUID) (tktypes.RawJSON, error)
-	BuildDomainReceipt(ctx context.Context, dbTX *gorm.DB, txID uuid.UUID, txStates *pldapi.TransactionStates) (tktypes.RawJSON, error)
+	GetDomainReceipt(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID) (tktypes.RawJSON, error)
+	BuildDomainReceipt(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID, txStates *pldapi.TransactionStates) (tktypes.RawJSON, error)
 }
 
 // External interface for other components to call against a private smart contract
@@ -73,14 +78,20 @@ type DomainSmartContract interface {
 	ContractConfig() *prototk.ContractConfig
 
 	InitTransaction(ctx context.Context, ptx *PrivateTransaction, localTx *ResolvedTransaction) error
-	AssembleTransaction(dCtx DomainContext, readTX *gorm.DB, ptx *PrivateTransaction, localTx *ResolvedTransaction) error
-	WritePotentialStates(dCtx DomainContext, readTX *gorm.DB, tx *PrivateTransaction) error
-	LockStates(dCtx DomainContext, readTX *gorm.DB, tx *PrivateTransaction) error
-	EndorseTransaction(dCtx DomainContext, readTX *gorm.DB, req *PrivateTransactionEndorseRequest) (*EndorsementResult, error)
-	PrepareTransaction(dCtx DomainContext, readTX *gorm.DB, tx *PrivateTransaction) error
+	AssembleTransaction(dCtx DomainContext, readTX persistence.DBTX, ptx *PrivateTransaction, localTx *ResolvedTransaction) error
+	WritePotentialStates(dCtx DomainContext, readTX persistence.DBTX, tx *PrivateTransaction) error
+	LockStates(dCtx DomainContext, readTX persistence.DBTX, tx *PrivateTransaction) error
+	EndorseTransaction(dCtx DomainContext, readTX persistence.DBTX, req *PrivateTransactionEndorseRequest) (*EndorsementResult, error)
+	PrepareTransaction(dCtx DomainContext, readTX persistence.DBTX, tx *PrivateTransaction) error
 
 	InitCall(ctx context.Context, tx *ResolvedTransaction) ([]*prototk.ResolveVerifierRequest, error)
-	ExecCall(dCtx DomainContext, readTX *gorm.DB, tx *ResolvedTransaction, verifiers []*prototk.ResolvedVerifier) (*abi.ComponentValue, error)
+	ExecCall(dCtx DomainContext, readTX persistence.DBTX, tx *ResolvedTransaction, verifiers []*prototk.ResolvedVerifier) (*abi.ComponentValue, error)
+
+	WrapPrivacyGroupEVMTX(context.Context, *pldapi.PrivacyGroup, *pldapi.PrivacyGroupEVMTX) (*pldapi.TransactionInput, error)
+}
+
+type DomainPrivacyGroupConfig struct {
+	DefaultSchemaABI *abi.Parameter
 }
 
 type EndorsementResult struct {

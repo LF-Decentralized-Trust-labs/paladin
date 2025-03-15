@@ -41,7 +41,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
 var testEventABIJSON = ([]byte)(`[
@@ -227,7 +226,7 @@ func mockBlocksRPCCallsDynamic(mRPC *rpcclientmocks.WSClient, dynamic func(args 
 		blockReturn := args[1].(**BlockInfoJSONRPC)
 		blockNumber := int(args[3].(ethtypes.HexUint64))
 		if blockNumber >= len(blocks) {
-			byBlock.Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("not found")))
+			byBlock.Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("not found")))
 		} else {
 			*blockReturn = blocks[blockNumber]
 			byBlock.Return(nil)
@@ -241,7 +240,7 @@ func mockBlocksRPCCallsDynamic(mRPC *rpcclientmocks.WSClient, dynamic func(args 
 		blockHash := args[3].(ethtypes.HexBytes0xPrefix)
 		*blockReturn = receipts[blockHash.String()]
 		if *blockReturn == nil {
-			blockReceipts.Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("not found")))
+			blockReceipts.Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("not found")))
 		} else {
 			blockReceipts.Return(nil)
 		}
@@ -261,7 +260,7 @@ func mockBlocksRPCCallsDynamic(mRPC *rpcclientmocks.WSClient, dynamic func(args 
 			}
 		}
 		if *blockReturn == nil {
-			txReceipt.Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("not found")))
+			txReceipt.Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("not found")))
 		} else {
 			txReceipt.Return(nil)
 		}
@@ -307,8 +306,9 @@ func checkIndexedBlockEqual(t *testing.T, expected *BlockInfoJSONRPC, indexed *p
 }
 
 func addBlockPostCommit(bi *blockIndexer, postCommit func([]*pldapi.IndexedBlock)) {
-	bi.preCommitHandlers = append(bi.preCommitHandlers, func(ctx context.Context, dbTX *gorm.DB, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) (PostCommit, error) {
-		return func() { postCommit(blocks) }, nil
+	bi.preCommitHandlers = append(bi.preCommitHandlers, func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) error {
+		dbTX.AddPostCommit(func(txCtx context.Context) { postCommit(blocks) })
+		return nil
 	})
 }
 
@@ -516,8 +516,12 @@ func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
 		checkIndexedBlockEqual(t, blocks[i], notifiedBlocks[0])
 	}
 
-	ch, err := bi.GetConfirmedBlockHeight(ctx)
-	require.NoError(t, err)
+	var ch tktypes.HexUint64
+	for ch < 9 {
+		time.Sleep(10 * time.Millisecond)
+		ch, err = bi.GetConfirmedBlockHeight(ctx)
+		require.NoError(t, err)
+	}
 	assert.Equal(t, tktypes.HexUint64(9), ch)
 }
 
@@ -901,13 +905,13 @@ func TestGetIndexedTransactionByHashErrors(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnRows(sqlmock.NewRows([]string{}))
 
-	res, err := bi.GetIndexedTransactionByHash(ctx, tktypes.Bytes32(tktypes.RandBytes(32)))
+	res, err := bi.GetIndexedTransactionByHash(ctx, tktypes.RandBytes32())
 	require.NoError(t, err)
 	assert.Nil(t, res)
 
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnError(fmt.Errorf("pop"))
 
-	_, err = bi.GetIndexedTransactionByHash(ctx, tktypes.Bytes32(tktypes.RandBytes(32)))
+	_, err = bi.GetIndexedTransactionByHash(ctx, tktypes.RandBytes32())
 	assert.Regexp(t, "pop", err)
 
 }
@@ -1011,7 +1015,7 @@ func TestWaitForTransactionErrorCases(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := bi.WaitForTransactionSuccess(ctx, tktypes.Bytes32(tktypes.RandBytes(32)), nil)
+	_, err := bi.WaitForTransactionSuccess(ctx, tktypes.RandBytes32(), nil)
 	assert.Regexp(t, "pop", err)
 
 }
@@ -1023,7 +1027,7 @@ func TestDecodeTransactionEventsFail(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*indexed_events").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := bi.DecodeTransactionEvents(ctx, tktypes.Bytes32(tktypes.RandBytes(32)), testABI, "")
+	_, err := bi.DecodeTransactionEvents(ctx, tktypes.RandBytes32(), testABI, "")
 	assert.Regexp(t, "pop", err)
 
 }
@@ -1034,10 +1038,10 @@ func TestWaitForTransactionSuccessGetReceiptFail(t *testing.T) {
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).Return(
-		rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("pop")),
+		rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("pop")),
 	)
 
-	err := bi.getReceiptRevertError(ctx, tktypes.Bytes32(tktypes.RandBytes(32)), nil)
+	err := bi.getReceiptRevertError(ctx, tktypes.RandBytes32(), nil)
 	assert.Regexp(t, "pop", err)
 
 }
@@ -1053,7 +1057,7 @@ func TestWaitForTransactionSuccessGetReceiptFallback(t *testing.T) {
 		},
 	).Return(nil)
 
-	err := bi.getReceiptRevertError(ctx, tktypes.Bytes32(tktypes.RandBytes(32)), nil)
+	err := bi.getReceiptRevertError(ctx, tktypes.RandBytes32(), nil)
 	assert.Regexp(t, "PD011309", err)
 
 }
@@ -1077,7 +1081,7 @@ func TestHydrateBlockErrorCase(t *testing.T) {
 	bi.retry.UTSetMaxAttempts(1)
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockReceipts", mock.Anything).Return(
-		rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("pop")),
+		rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("pop")),
 	)
 
 	batch := &blockWriterBatch{
@@ -1152,9 +1156,9 @@ func TestQueryNoLimit(t *testing.T) {
 }
 
 func TestAddEventStreamBadName(t *testing.T) {
-	ctx, bi, _, _, done := newMockBlockIndexer(t, &pldconf.BlockIndexerConfig{})
+	ctx, bi, _, mp, done := newMockBlockIndexer(t, &pldconf.BlockIndexerConfig{})
 	defer done()
 
-	_, err := bi.AddEventStream(ctx, &InternalEventStream{})
+	_, err := bi.AddEventStream(ctx, mp.P.NOTX(), &InternalEventStream{})
 	assert.Regexp(t, "PD020005", err)
 }

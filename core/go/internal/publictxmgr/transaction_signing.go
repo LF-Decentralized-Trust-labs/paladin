@@ -34,7 +34,7 @@ func (it *inFlightTransactionStageController) signTx(ctx context.Context, from t
 	signStart := time.Now()
 
 	// Reverse resolve the key - to get to this point it will be in the key management system
-	resolvedKey, err := it.keymgr.ReverseKeyLookup(ctx, it.pubTxManager.p.DB(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, from.String())
+	resolvedKey, err := it.keymgr.ReverseKeyLookup(ctx, it.pubTxManager.p.NOTX(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, from.String())
 	if err != nil {
 		log.L(ctx).Errorf("signing failed to resolve key %s for signing: %s", from.String(), err)
 		it.thMetrics.RecordOperationMetrics(ctx, string(InFlightTxOperationSign), string(GenericStatusFail), time.Since(signStart).Seconds())

@@ -18,17 +18,26 @@ package persistence
 
 import (
 	"context"
+	"hash/fnv"
 
 	// Import pq driver
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"gorm.io/gorm"
 )
 
 type Persistence interface {
 	DB() *gorm.DB
 	Close()
+
+	// We provide our own transaction wrapper with extra functions over gORM
+	Transaction(ctx context.Context, fn func(ctx context.Context, dbTX DBTX) error) (err error)
+	// Wrapper that provides a pseudo-transaction that will fail if any pre-commit/post-commit handlers are used
+	NOTX() DBTX
+
+	// DB specific implementation function
+	TakeNamedLock(ctx context.Context, dbTX DBTX, lockName string) error
 }
 
 const (
@@ -45,4 +54,14 @@ func NewPersistence(ctx context.Context, conf *pldconf.DBConfig) (Persistence, e
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgPersistenceInvalidType, conf.Type)
 	}
+}
+
+func hashCode(s string) int64 {
+	h := fnv.New64a()
+	h.Write([]byte(s))
+	v := int64(h.Sum64())
+	if v < 0 {
+		return -v
+	}
+	return v
 }

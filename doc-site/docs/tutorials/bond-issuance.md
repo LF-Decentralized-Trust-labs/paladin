@@ -8,7 +8,7 @@ This shows how to leverage the [Noto](../../architecture/noto/) and [Pente](../.
 
 ## Running the example
 
-Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paldin environment, and
+Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paladin environment, and
 then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/bond/README.md)
 to run the code.
 
@@ -24,7 +24,7 @@ Below is a walkthrough of each step in the example, with an explanation of what 
 const notoFactory = new NotoFactory(paladin1, "noto");
 const notoCash = await notoFactory.newNoto(cashIssuer, {
   notary: cashIssuer,
-  restrictMinting: true,
+  notaryMode: "basic",
 });
 ```
 
@@ -57,13 +57,9 @@ allowed to do this.
 
 ```typescript
 const penteFactory = new PenteFactory(paladin1, "pente");
-const issuerCustodianGroup = await penteFactory.newPrivacyGroup(bondIssuer, {
-  group: {
-    salt: newGroupSalt(),
-    members: [bondIssuer, bondCustodian],
-  },
+const issuerCustodianGroup = await penteFactory.newPrivacyGroup({
+  members: [bondIssuer, bondCustodian],
   evmVersion: "shanghai",
-  endorsementType: "group_scoped_identities",
   externalCallsEnabled: true,
 });
 ```
@@ -127,19 +123,21 @@ visible to the bond issuer and custodian, but will be atomically linked to the N
 ```typescript
 const notoBond = await notoFactory.newNoto(bondIssuer, {
   notary: bondCustodian,
-  hooks: {
-    privateGroup: issuerCustodianGroup.group,
-    publicAddress: issuerCustodianGroup.address,
-    privateAddress: bondTracker.address,
+  notaryMode: "hooks",
+  options: {
+    hooks: {
+      privateGroup: issuerCustodianGroup.group,
+      publicAddress: issuerCustodianGroup.address,
+      privateAddress: bondTracker.address,
+    },
   },
-  restrictMinting: false,
 });
 ```
 
 Now that the public and private tracking contracts have been deployed, the actual Noto token for the bond can be created.
 The "hooks" configuration points it to the private hooks contract that was deployed in the previous step.
 
-For this token, "restrictMinting" is disabled, because the hooks can enforce more flexible rules on both mint and transfer.
+For this token, "restrictMint" is disabled, because the hooks can enforce more flexible rules on both mint and transfer.
 
 #### Create factory for atomic transactions
 
@@ -205,13 +203,9 @@ between the issuer and custodian.
 ```typescript
 const investorCustodianGroup = await penteFactory
   .using(paladin3)
-  .newPrivacyGroup(investor, {
-    group: {
-      salt: newGroupSalt(),
-      members: [investor, bondCustodian],
-    },
+  .newPrivacyGroup({
+    members: [investor, bondCustodian],
     evmVersion: "shanghai",
-    endorsementType: "group_scoped_identities",
     externalCallsEnabled: true,
   });
 ```

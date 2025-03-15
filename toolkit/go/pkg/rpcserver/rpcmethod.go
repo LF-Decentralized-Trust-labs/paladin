@@ -20,16 +20,33 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // RPCHandler should not be implemented directly - use RPCMethod0 ... RPCMethod5 to implement your function
 // These use generics to avoid you needing to do any messy type mapping in your functions.
 type RPCHandler interface {
 	Handle(ctx context.Context, req *rpcclient.RPCRequest) *rpcclient.RPCResponse
+}
+
+type RPCAsyncControl interface {
+	ID() string
+	Closed() // must be called to clean up resources
+	Send(method string, params any)
+}
+
+type RPCAsyncInstance interface {
+	ConnectionClosed() // called if the underlying connection is closed
+}
+
+type RPCAsyncHandler interface {
+	StartMethod() string
+	LifecycleMethods() []string
+	HandleStart(ctx context.Context, req *rpcclient.RPCRequest, ctrl RPCAsyncControl) (RPCAsyncInstance, *rpcclient.RPCResponse)
+	HandleLifecycle(ctx context.Context, req *rpcclient.RPCRequest) *rpcclient.RPCResponse
 }
 
 func HandlerFunc(fn func(ctx context.Context, req *rpcclient.RPCRequest) *rpcclient.RPCResponse) RPCHandler {
@@ -131,9 +148,6 @@ func parseParams(ctx context.Context, req *rpcclient.RPCRequest, params ...inter
 	}
 	for i := range params {
 		b := req.Params[i].Bytes()
-		if b == nil {
-			b = ([]byte)(`null`)
-		}
 		if err := json.Unmarshal(b, &params[i]); err != nil {
 			return rpcclient.RPCCodeInvalidRequest, i18n.NewError(ctx, tkmsgs.MsgJSONRPCInvalidParam, req.Method, i, err)
 		}
@@ -150,7 +164,7 @@ func mapResponse(ctx context.Context, req *rpcclient.RPCRequest, result interfac
 			return &rpcclient.RPCResponse{
 				JSONRpc: "2.0",
 				ID:      req.ID,
-				Result:  fftypes.JSONAnyPtrBytes(b),
+				Result:  tktypes.RawJSON(b),
 			}
 		}
 	}

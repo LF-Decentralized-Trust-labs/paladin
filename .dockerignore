@@ -13,10 +13,19 @@
 **/*.pb.go
 .git
 **/.gradle
+
 # Doc site is 100s of MB
 doc-site/
+
 # Zeto ZKP is 1GB
 domains/zeto/zkp
+# perf is not needed
+perf/
+!perf/go.mod
+
+# Other folders not needed for the Docker build
+example/
+sdk/
 
 # The operator has its own docker build (with its own .dockerignore), so we don't want to rebuild the whole
 # Paladin docker every time you're re-running the operator/test.

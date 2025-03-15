@@ -22,7 +22,7 @@ import (
 )
 
 func TestWitnessCalculator(t *testing.T) {
-	calc := &testWitnessCalculator{}
+	calc := &testWitnessMock{}
 	res1, err := calc.CalculateBinWitness(nil, false)
 	assert.NoError(t, err)
 	assert.Empty(t, res1)

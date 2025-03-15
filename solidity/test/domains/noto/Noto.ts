@@ -1,63 +1,18 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
-import { randomBytes } from "crypto";
+import { ethers } from "hardhat";
+import { Noto } from "../../../typechain-types";
 import {
-  AbiCoder,
-  ContractTransactionReceipt,
-  Signer,
-  TypedDataEncoder,
-} from "ethers";
-import hre, { ethers } from "hardhat";
-import { NotoFactory, Noto } from "../../../typechain-types";
-
-export async function newTransferHash(
-  noto: Noto,
-  inputs: string[],
-  outputs: string[],
-  data: string
-) {
-  const domain = {
-    name: "noto",
-    version: "0.0.1",
-    chainId: hre.network.config.chainId,
-    verifyingContract: await noto.getAddress(),
-  };
-  const types = {
-    Transfer: [
-      { name: "inputs", type: "bytes32[]" },
-      { name: "outputs", type: "bytes32[]" },
-      { name: "data", type: "bytes" },
-    ],
-  };
-  const value = { inputs, outputs, data };
-  return {
-    hash: TypedDataEncoder.hash(domain, types, value),
-  };
-}
-
-export function randomBytes32() {
-  return "0x" + Buffer.from(randomBytes(32)).toString("hex");
-}
-
-export function fakeTXO() {
-  return randomBytes32();
-}
-
-export async function deployNotoInstance(
-  notoFactory: NotoFactory,
-  notary: string
-) {
-  const abi = AbiCoder.defaultAbiCoder();
-  const deployTx = await notoFactory.deploy(randomBytes32(), notary, "0x");
-  const deployReceipt = await deployTx.wait();
-  const deployEvent = deployReceipt?.logs.find(
-    (l) =>
-      notoFactory.interface.parseLog(l)?.name ===
-      "PaladinRegisterSmartContract_V0"
-  );
-  expect(deployEvent).to.exist;
-  return deployEvent && "args" in deployEvent ? deployEvent.args.instance : "";
-}
+  deployNotoInstance,
+  doDelegateLock,
+  doLock,
+  doPrepareUnlock,
+  doTransfer,
+  doUnlock,
+  fakeTXO,
+  newUnlockHash,
+  randomBytes32,
+} from "./util";
 
 describe("Noto", function () {
   async function deployNotoFixture() {
@@ -71,30 +26,6 @@ describe("Noto", function () {
     );
 
     return { noto: noto as Noto, notary, other };
-  }
-
-  async function doTransfer(
-    notary: Signer,
-    noto: Noto,
-    inputs: string[],
-    outputs: string[],
-    data: string
-  ) {
-    const tx = await noto.connect(notary).transfer(inputs, outputs, "0x", data);
-    const results: ContractTransactionReceipt | null = await tx.wait();
-
-    for (const log of results?.logs || []) {
-      const event = noto.interface.parseLog(log as any);
-      expect(event?.args.inputs).to.deep.equal(inputs);
-      expect(event?.args.outputs).to.deep.equal(outputs);
-      expect(event?.args.data).to.deep.equal(data);
-    }
-    for (const input of inputs) {
-      expect(await noto.isUnspent(input)).to.equal(false);
-    }
-    for (const output of outputs) {
-      expect(await noto.isUnspent(output)).to.equal(true);
-    }
   }
 
   it("UTXO lifecycle and double-spend protections", async function () {
@@ -130,5 +61,85 @@ describe("Noto", function () {
 
     // Spend the last one
     await doTransfer(notary, noto, [txo3], [], randomBytes32());
+  });
+
+  it("lock and unlock", async function () {
+    const { noto, notary } = await loadFixture(deployNotoFixture);
+    const [_, delegate, other] = await ethers.getSigners();
+    expect(notary.address).to.not.equal(delegate.address);
+
+    const txo1 = fakeTXO();
+    const txo2 = fakeTXO();
+    const txo3 = fakeTXO();
+    const txo4 = fakeTXO();
+    const txo5 = fakeTXO();
+
+    const locked1 = fakeTXO();
+    const locked2 = fakeTXO();
+
+    // Make two UTXOs
+    await doTransfer(notary, noto, [], [txo1, txo2], randomBytes32());
+
+    // Lock both of them
+    await doLock(
+      notary,
+      noto,
+      [txo1, txo2],
+      [txo3],
+      [locked1],
+      randomBytes32()
+    );
+
+    // Check that the same state cannot be locked again with the same lock
+    await expect(
+      doLock(notary, noto, [], [], [locked1], randomBytes32())
+    ).to.be.rejectedWith("NotoInvalidOutput");
+
+    // Check that locked value cannot be spent
+    await expect(
+      doTransfer(notary, noto, [locked1], [], randomBytes32())
+    ).to.be.rejectedWith("NotoInvalidInput");
+
+    // Unlock the UTXO
+    await doUnlock(notary, noto, [locked1], [locked2], [txo4], randomBytes32());
+
+    // Check that the same state cannot be unlocked again
+    await expect(
+      doUnlock(notary, noto, [locked1], [], [], randomBytes32())
+    ).to.be.rejectedWith("NotoInvalidInput");
+
+    // Prepare an unlock operation
+    const unlockData = randomBytes32();
+    const unlockHash = await newUnlockHash(
+      noto,
+      [locked2],
+      [],
+      [txo5],
+      unlockData
+    );
+    await doPrepareUnlock(notary, noto, [locked2], unlockHash, unlockData);
+
+    // Delegate the unlock
+    await doDelegateLock(
+      notary,
+      noto,
+      unlockHash,
+      delegate.address,
+      randomBytes32()
+    );
+
+    // Attempt to perform an incorrect unlock
+    await expect(
+      doUnlock(delegate, noto, [locked1, locked2], [], [txo5], unlockData) // mismatched input states
+    ).to.be.rejectedWith("NotoInvalidInput");
+    await expect(
+      doUnlock(delegate, noto, [locked2], [], [txo5], randomBytes32()) // wrong data
+    ).to.be.rejectedWith("NotoInvalidUnlockHash");
+    await expect(
+      doUnlock(other, noto, [locked2], [], [txo5], unlockData) // wrong delegate
+    ).to.be.rejectedWith("NotoInvalidDelegate");
+
+    // Perform the prepared unlock
+    await doUnlock(delegate, noto, [locked2], [], [txo5], unlockData);
   });
 });

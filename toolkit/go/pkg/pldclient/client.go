@@ -20,9 +20,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
@@ -59,6 +59,9 @@ type PaladinClient interface {
 
 	// Paladin block index
 	BlockIndex() BlockIndex
+
+	// Paladin pgroup RPC interface
+	PrivacyGroups() PrivacyGroups
 }
 
 type RPCModule interface {
@@ -72,9 +75,16 @@ type RPCMethodInfo struct {
 	Output string
 }
 
+type RPCSubscriptionInfo struct {
+	rpcclient.SubscriptionConfig
+	FixedInputs []string
+	Inputs      []string
+}
+
 type rpcModuleInfo struct {
-	group      string
-	methodInfo map[string]RPCMethodInfo
+	group         string
+	methodInfo    map[string]RPCMethodInfo
+	subscriptions []RPCSubscriptionInfo
 }
 
 func (fg *rpcModuleInfo) Group() string {
@@ -123,6 +133,14 @@ func New() PaladinClient {
 	return Wrap(&unconnectedRPC{})
 }
 
+func (c *paladinClient) WSClient(ctx context.Context) (rpcclient.WSClient, error) {
+	wsc, ok := c.Client.(rpcclient.WSClient)
+	if !ok {
+		return nil, i18n.NewError(ctx, tkmsgs.MsgPaladinClientWebSocketRequired)
+	}
+	return wsc, nil
+}
+
 func (c *paladinClient) HTTP(ctx context.Context, conf *pldconf.HTTPClientConfig) (PaladinClient, error) {
 	rpc, err := rpcclient.NewHTTPClient(ctx, conf)
 	if err != nil {
@@ -147,7 +165,7 @@ func (c *paladinClient) WebSocket(ctx context.Context, conf *pldconf.WSClientCon
 type unconnectedRPC struct{}
 
 func (u *unconnectedRPC) CallRPC(ctx context.Context, result interface{}, method string, params ...interface{}) rpcclient.ErrorRPC {
-	return rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, i18n.NewError(ctx, tkmsgs.MsgPaladinClientNoConnection))
+	return rpcclient.NewRPCError(ctx, rpcclient.RPCCodeInternalError, tkmsgs.MsgPaladinClientNoConnection)
 }
 
 func (c *paladinClient) ReceiptPollingInterval(t time.Duration) PaladinClient {

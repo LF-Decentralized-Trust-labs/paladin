@@ -29,11 +29,22 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func setTraceForTest(t *testing.T) {
+	log.EnsureInit()
+	l := log.GetLevel()
+	log.SetLevel("trace")
+	t.Cleanup(func() {
+		log.SetLevel(l)
+	})
+}
+
 func newTestServerHTTP(t *testing.T, conf *pldconf.RPCServerConfig) (string, *rpcServer, func()) {
+	setTraceForTest(t)
 
 	conf.HTTP.Address = confutil.P("127.0.0.1")
 	conf.HTTP.Port = confutil.P(0)

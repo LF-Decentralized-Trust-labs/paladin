@@ -18,7 +18,6 @@ package publictxmgr
 import (
 	"context"
 	"crypto/rand"
-	"database/sql/driver"
 	"fmt"
 	"math/big"
 	"testing"
@@ -123,7 +122,7 @@ func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...fu
 								Keys: map[string]pldconf.StaticKeyEntryConfig{
 									"seed": {
 										Encoding: "hex",
-										Inline:   tktypes.Bytes32(tktypes.RandBytes(32)).String(),
+										Inline:   tktypes.RandBytes32().String(),
 									},
 								},
 							},
@@ -259,19 +258,22 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 
 	// The rest we submit as as batch
 	for _, tx := range txs[1:] {
-		err := ble.ValidateTransaction(ctx, ble.p.DB(), tx)
+		err := ble.ValidateTransaction(ctx, ble.p.NOTX(), tx)
 		require.NoError(t, err)
 	}
-	postCommit, batch, err := ble.WriteNewTransactions(ctx, ble.p.DB(), txs[1:])
+	var batch []*pldapi.PublicTx
+	err = ble.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		batch, err = ble.WriteNewTransactions(ctx, dbTX, txs[1:])
+		return err
+	})
 	require.NoError(t, err)
 	require.Len(t, batch, len(txs[1:]))
 	for _, tx := range batch {
 		require.Greater(t, *tx.LocalID, uint64(0))
 	}
-	postCommit()
 
 	// Get one back again by ID
-	txRead, err := ble.QueryPublicTxWithBindings(ctx, ble.p.DB(), query.NewQueryBuilder().Equal("localId", *batch[1].LocalID).Limit(1).Query())
+	txRead, err := ble.QueryPublicTxWithBindings(ctx, ble.p.NOTX(), query.NewQueryBuilder().Equal("localId", *batch[1].LocalID).Limit(1).Query())
 	require.NoError(t, err)
 	require.Len(t, txRead, 1)
 	require.Equal(t, batch[1].Data, txRead[0].Data)
@@ -282,7 +284,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	}
 
 	// Query to check we now have all of these
-	queryTxs, err := ble.QueryPublicTxWithBindings(ctx, ble.p.DB(),
+	queryTxs, err := ble.QueryPublicTxWithBindings(ctx, ble.p.NOTX(),
 		query.NewQueryBuilder().Sort("localId").Query())
 	require.NoError(t, err)
 	assert.Len(t, queryTxs, len(txs))
@@ -294,7 +296,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	}
 
 	// Query scoped to one TX
-	byTxn, err := ble.QueryPublicTxForTransactions(ctx, ble.p.DB(), txIDs, nil)
+	byTxn, err := ble.QueryPublicTxForTransactions(ctx, ble.p.NOTX(), txIDs, nil)
 	require.NoError(t, err)
 	for _, tx := range txs {
 		queryTxs := byTxn[tx.Bindings[0].TransactionID]
@@ -302,7 +304,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	}
 
 	// Check we can select to just see confirmed (which this isn't yet)
-	byTxn, err = ble.QueryPublicTxForTransactions(ctx, ble.p.DB(), txIDs,
+	byTxn, err = ble.QueryPublicTxForTransactions(ctx, ble.p.NOTX(), txIDs,
 		query.NewQueryBuilder().NotNull("transactionHash").Query())
 	require.NoError(t, err)
 	for _, tx := range txs {
@@ -348,7 +350,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 			gatheredConfirmations = append(gatheredConfirmations, confirmation)
 
 			// Check we can query the public txn by this submission (even before the confirm)
-			ptxQuery, err := ble.GetPublicTransactionForHash(ctx, ble.p.DB(), confirmation.Hash)
+			ptxQuery, err := ble.GetPublicTransactionForHash(ctx, ble.p.NOTX(), confirmation.Hash)
 			require.NoError(t, err)
 			require.NotNil(t, ptxQuery)
 			require.Len(t, ptxQuery.Submissions, 1)
@@ -364,7 +366,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	var allMatches []*components.PublicTxMatch
 	confirmationsMatched := make(map[uuid.UUID]*components.PublicTxMatch)
 	for _, confirmation := range gatheredConfirmations {
-		matches, err := ble.MatchUpdateConfirmedTransactions(ctx, ble.p.DB(), []*blockindexer.IndexedTransactionNotify{confirmation})
+		matches, err := ble.MatchUpdateConfirmedTransactions(ctx, ble.p.NOTX(), []*blockindexer.IndexedTransactionNotify{confirmation})
 		require.NoError(t, err)
 		// NOTE: This is a good test that we definitely persist _before_ we submit as
 		// otherwise we could miss notifying users of their transactions completing.
@@ -379,7 +381,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	}
 
 	// Check we can select to just see just unconfirmed
-	byTxn, err = ble.QueryPublicTxForTransactions(ctx, ble.p.DB(), txIDs,
+	byTxn, err = ble.QueryPublicTxForTransactions(ctx, ble.p.NOTX(), txIDs,
 		query.NewQueryBuilder().Null("transactionHash").Query())
 	require.NoError(t, err)
 	for _, tx := range txs {
@@ -406,7 +408,7 @@ func fakeTxManagerInsert(t *testing.T, db *gorm.DB, txID uuid.UUID, fromStr stri
 	// Yes, there is a slight smell of un-partitioned DB responsibilities between components
 	// here. But the saving is critical path avoidance of one extra DB query for every block
 	// that is mined. So it's currently considered worth this limited quirk.
-	fakeABI := tktypes.Bytes32(tktypes.RandBytes(32))
+	fakeABI := tktypes.RandBytes32()
 	err := db.Exec(`INSERT INTO "abis" ("hash","abi","created") VALUES (?, ?, ?)`,
 		fakeABI, `[]`, tktypes.TimestampNow()).
 		Error
@@ -422,6 +424,7 @@ func TestSubmitFailures(t *testing.T) {
 	defer done()
 
 	// estimation failure - for non-revert
+	m.db.ExpectBegin()
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
 		Return(ethclient.EstimateGasResult{}, fmt.Errorf("GasEstimate error")).Once()
 	_, err := ble.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
@@ -432,6 +435,7 @@ func TestSubmitFailures(t *testing.T) {
 	assert.Regexp(t, "GasEstimate error", err)
 
 	// estimation failure - for revert
+	m.db.ExpectBegin()
 	sampleRevertData := tktypes.HexBytes("some data")
 	m.txManager.On("CalculateRevertError", mock.Anything, mock.Anything, sampleRevertData).Return(fmt.Errorf("mapped revert error"))
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
@@ -477,8 +481,10 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 	ctx := context.Background()
 	_, ble, _, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		mocks.db.MatchExpectationsInOrder(false)
+		mocks.db.ExpectBegin()
 		mocks.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{}))
-		mocks.db.ExpectExec("INSERT.*public_txns").WillReturnResult(driver.ResultNoRows)
+		mocks.db.ExpectQuery("INSERT.*public_txns").WillReturnRows(mocks.db.NewRows([]string{"pub_txn_id"}).AddRow(12345))
+		mocks.db.ExpectCommit()
 	})
 	defer done()
 
@@ -577,4 +583,25 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 	newNonce := getIFT().stateManager.GetNonce()
 	assert.Equal(t, txNonce, newNonce)
 
+}
+
+func TestGasEstimateFactor(t *testing.T) {
+	ctx := context.Background()
+	_, ble, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+		conf.GasLimit.GasEstimateFactor = confutil.P(2.0)
+	})
+	defer done()
+
+	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
+		Return(ethclient.EstimateGasResult{GasLimit: tktypes.MustParseHexUint64("0x62f8")}, nil)
+
+	tx := &components.PublicTxSubmission{
+		PublicTxInput: pldapi.PublicTxInput{
+			From: tktypes.MustEthAddress("0x14655a513c68280d16f72304ebfd1ae1a2262d2d"),
+			Data: []byte("[2]"),
+		},
+	}
+
+	require.NoError(t, ble.ValidateTransaction(ctx, ble.p.NOTX(), tx))
+	assert.Equal(t, tktypes.MustParseHexUint64("0xc5f0"), *tx.Gas)
 }

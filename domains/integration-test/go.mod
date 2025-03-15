@@ -4,7 +4,6 @@ go 1.22.5
 
 require (
 	github.com/go-resty/resty/v2 v2.14.0
-	github.com/hyperledger/firefly-common v1.4.14
 	github.com/hyperledger/firefly-signer v1.1.19
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/core v0.0.0-00010101000000-000000000000
@@ -40,6 +39,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20241004174307-aa3c1fdf0966 // indirect
+	github.com/hyperledger/firefly-common v1.4.14 // indirect
 	github.com/iden3/go-iden3-crypto v0.0.17 // indirect
 	github.com/iden3/go-rapidsnark/prover v0.0.12 // indirect
 	github.com/iden3/go-rapidsnark/types v0.0.3 // indirect

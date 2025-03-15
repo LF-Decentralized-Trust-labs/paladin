@@ -17,6 +17,7 @@ package signer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"sync"
@@ -70,16 +71,22 @@ func TestSnarkProve(t *testing.T) {
 	alicePubKey := EncodeBabyJubJubPublicKey(alice.PublicKey)
 	bobPubKey := EncodeBabyJubJubPublicKey(bob.PublicKey)
 
+	tokenSecrets, err := json.Marshal(&pb.TokenSecrets_Fungible{
+		InputValues:  inputValueInts,
+		OutputValues: outputValueInts,
+	})
+	require.NoError(t, err)
+
 	req := pb.ProvingRequest{
 		CircuitId: constants.CIRCUIT_ANON,
 		Common: &pb.ProvingRequestCommon{
 			InputCommitments: inputCommitments,
-			InputValues:      inputValueInts,
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
-			OutputValues:     outputValueInts,
 			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
+			TokenSecrets:     tokenSecrets,
+			TokenType:        pb.TokenType_fungible,
 		},
 	}
 	payload, err := proto.Marshal(&req)
@@ -157,16 +164,22 @@ func TestConcurrentSnarkProofGeneration(t *testing.T) {
 	alicePubKey := EncodeBabyJubJubPublicKey(alice.PublicKey)
 	bobPubKey := EncodeBabyJubJubPublicKey(bob.PublicKey)
 
+	tokenSecrets, err := json.Marshal(&pb.TokenSecrets_Fungible{
+		InputValues:  inputValueInts,
+		OutputValues: outputValueInts,
+	})
+	require.NoError(t, err)
+
 	req := pb.ProvingRequest{
 		CircuitId: constants.CIRCUIT_ANON,
 		Common: &pb.ProvingRequestCommon{
 			InputCommitments: inputCommitments,
-			InputValues:      inputValueInts,
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
-			OutputValues:     outputValueInts,
 			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
+			TokenSecrets:     tokenSecrets,
+			TokenType:        pb.TokenType_fungible,
 		},
 	}
 	payload, err := proto.Marshal(&req)
@@ -194,32 +207,6 @@ func TestConcurrentSnarkProofGeneration(t *testing.T) {
 	}
 }
 
-func TestSnarkProveError(t *testing.T) {
-	config := &zetosignerapi.SnarkProverConfig{
-		CircuitsDir:    "test",
-		ProvingKeysDir: "test",
-	}
-	prover, err := newSnarkProver(config)
-	require.NoError(t, err)
-
-	alice := NewTestKeypair()
-
-	// construct a bad payload by using the inner object
-	req := pb.ProvingRequestCommon{
-		InputCommitments: []string{"input1", "input2"},
-		InputValues:      []uint64{30, 40},
-		InputSalts:       []string{"salt1", "salt2"},
-		InputOwner:       "alice/key0",
-		OutputValues:     []uint64{32, 38},
-		OutputOwners:     []string{"bob", "alice"},
-	}
-	payload, err := proto.Marshal(&req)
-	require.NoError(t, err)
-
-	_, err = prover.Sign(context.Background(), zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
-	assert.ErrorContains(t, err, "cannot parse invalid wire-format data")
-}
-
 func TestSnarkProveErrorCircuit(t *testing.T) {
 	config := &zetosignerapi.SnarkProverConfig{
 		CircuitsDir:    "test",
@@ -230,16 +217,22 @@ func TestSnarkProveErrorCircuit(t *testing.T) {
 
 	alice := NewTestKeypair()
 
+	tokenSecrets, err := json.Marshal(&pb.TokenSecrets_Fungible{
+		InputValues:  []uint64{30, 40},
+		OutputValues: []uint64{32, 38},
+	})
+	require.NoError(t, err)
+
 	// leave the circuit ID empty
 	req := pb.ProvingRequest{
 		Common: &pb.ProvingRequestCommon{
 			InputCommitments: []string{"input1", "input2"},
-			InputValues:      []uint64{30, 40},
 			InputSalts:       []string{"salt1", "salt2"},
 			InputOwner:       "alice/key0",
-			OutputValues:     []uint64{32, 38},
 			OutputSalts:      []string{"salt1", "salt2"},
 			OutputOwners:     []string{"bob", "alice"},
+			TokenSecrets:     tokenSecrets,
+			TokenType:        pb.TokenType_fungible,
 		},
 	}
 	payload, err := proto.Marshal(&req)
@@ -259,14 +252,20 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 
 	alice := NewTestKeypair()
 
+	tokenSecrets, err := json.Marshal(&pb.TokenSecrets_Fungible{
+		InputValues:  []uint64{30, 40},
+		OutputValues: []uint64{32, 38},
+	})
+	require.NoError(t, err)
+
 	req := pb.ProvingRequest{
 		CircuitId: constants.CIRCUIT_ANON,
 		Common: &pb.ProvingRequestCommon{
 			InputCommitments: []string{"input1", "input2"},
-			InputValues:      []uint64{30, 40},
 			InputSalts:       []string{"salt1", "salt2"},
-			OutputValues:     []uint64{32, 38},
 			OutputOwners:     []string{"bob", "alice"},
+			TokenSecrets:     tokenSecrets,
+			TokenType:        pb.TokenType_fungible,
 		},
 	}
 	payload, err := proto.Marshal(&req)
@@ -307,15 +306,21 @@ func TestSnarkProveErrorLoadcircuits(t *testing.T) {
 	alicePubKey := EncodeBabyJubJubPublicKey(alice.PublicKey)
 	bobPubKey := EncodeBabyJubJubPublicKey(bob.PublicKey)
 
+	tokenSecrets, err := json.Marshal(&pb.TokenSecrets_Fungible{
+		InputValues:  inputValueInts,
+		OutputValues: outputValueInts,
+	})
+	require.NoError(t, err)
+
 	req := pb.ProvingRequest{
 		CircuitId: constants.CIRCUIT_ANON,
 		Common: &pb.ProvingRequestCommon{
 			InputCommitments: inputCommitments,
-			InputValues:      inputValueInts,
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
-			OutputValues:     outputValueInts,
 			OutputOwners:     []string{bobPubKey, alicePubKey},
+			TokenSecrets:     tokenSecrets,
+			TokenType:        pb.TokenType_fungible,
 		},
 	}
 	payload, err := proto.Marshal(&req)
@@ -353,15 +358,21 @@ func TestSnarkProveErrorGenerateProof(t *testing.T) {
 	inputSalts := []string{salt1.Text(16), salt2.Text(16)}
 	outputValueInts := []uint64{outputValues[0].Uint64(), outputValues[1].Uint64()}
 
+	tokenSecrets, err := json.Marshal(&pb.TokenSecrets_Fungible{
+		InputValues:  inputValueInts,
+		OutputValues: outputValueInts,
+	})
+	require.NoError(t, err)
+
 	req := pb.ProvingRequest{
 		CircuitId: constants.CIRCUIT_ANON,
 		Common: &pb.ProvingRequestCommon{
 			InputCommitments: inputCommitments,
-			InputValues:      inputValueInts,
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
-			OutputValues:     outputValueInts,
 			OutputOwners:     []string{"badKey1", "badKey2"},
+			TokenSecrets:     tokenSecrets,
+			TokenType:        pb.TokenType_fungible,
 		},
 	}
 	payload, err := proto.Marshal(&req)
@@ -403,16 +414,22 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 	alicePubKey := EncodeBabyJubJubPublicKey(alice.PublicKey)
 	bobPubKey := EncodeBabyJubJubPublicKey(bob.PublicKey)
 
+	tokenSecrets, err := json.Marshal(&pb.TokenSecrets_Fungible{
+		InputValues:  inputValueInts,
+		OutputValues: outputValueInts,
+	})
+	require.NoError(t, err)
+
 	req := pb.ProvingRequest{
 		CircuitId: constants.CIRCUIT_ANON,
 		Common: &pb.ProvingRequestCommon{
 			InputCommitments: []string{"input1", "input2"},
-			InputValues:      inputValueInts,
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
-			OutputValues:     outputValueInts,
 			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
+			TokenSecrets:     tokenSecrets,
+			TokenType:        pb.TokenType_fungible,
 		},
 	}
 	payload, err := proto.Marshal(&req)
@@ -424,47 +441,18 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 		CircuitId: constants.CIRCUIT_ANON,
 		Common: &pb.ProvingRequestCommon{
 			InputCommitments: inputCommitments,
-			InputValues:      inputValueInts,
 			InputSalts:       []string{"salt1", "salt2"},
 			InputOwner:       "alice/key0",
-			OutputValues:     outputValueInts,
 			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
+			TokenSecrets:     tokenSecrets,
+			TokenType:        pb.TokenType_fungible,
 		},
 	}
 	payload, err = proto.Marshal(&req)
 	require.NoError(t, err)
 	_, err = prover.Sign(context.Background(), zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "PD210082: Failed to parse input salt")
-}
-
-func TestValidateInputs(t *testing.T) {
-	ctx := context.Background()
-	inputs1 := &pb.ProvingRequestCommon{
-		InputCommitments: []string{"input1", "input2"},
-		InputValues:      []uint64{30},
-		InputSalts:       []string{"salt1", "salt2"},
-	}
-	err := validateInputs(ctx, inputs1)
-	assert.ErrorContains(t, err, "input commitments, values, and salts must have the same length")
-
-	inputs2 := &pb.ProvingRequestCommon{
-		InputCommitments: []string{"input1", "input2"},
-		InputValues:      []uint64{30, 40},
-		InputSalts:       []string{"salt1"},
-	}
-	err = validateInputs(ctx, inputs2)
-	assert.ErrorContains(t, err, "input commitments, values, and salts must have the same length")
-
-	inputs3 := &pb.ProvingRequestCommon{
-		InputCommitments: []string{"input1", "input2"},
-		InputValues:      []uint64{30, 40},
-		InputSalts:       []string{"salt1", "salt2"},
-		OutputValues:     []uint64{32, 38},
-		OutputOwners:     []string{"bob"},
-	}
-	err = validateInputs(ctx, inputs3)
-	assert.ErrorContains(t, err, "output values and owner keys must have the same length")
 }
 
 func TestSerializeProofResponse(t *testing.T) {
@@ -562,64 +550,338 @@ func TestGetCircuitId(t *testing.T) {
 	assert.Equal(t, constants.CIRCUIT_ANON_ENC_BATCH, circuitId)
 }
 
-func TestCalculateWitness(t *testing.T) {
-	extras1 := &pb.ProvingRequestExtras_Encryption{
-		EncryptionNonce: "bad number",
-	}
-	inputs := &pb.ProvingRequestCommon{
-		InputCommitments: []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
-		InputValues:      []uint64{10, 20},
-		InputSalts:       []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
-		InputOwner:       "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025",
-		OutputValues:     []uint64{30, 0},
-		OutputSalts:      []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
-		OutputOwners:     []string{"7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025", "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025"},
-	}
+func TestGenerateProof(t *testing.T) {
 	ctx := context.Background()
-	_, err := calculateWitness(ctx, constants.CIRCUIT_ANON_ENC, inputs, extras1, nil, nil)
-	assert.EqualError(t, err, "PD210099: failed to assemble private inputs for witness calculation. PD210077: Failed to parse encryption nonce")
 
-	extras2 := &pb.ProvingRequestExtras_Nullifiers{
-		Root: "123456",
-		MerkleProofs: []*pb.MerkleProof{
-			{
-				Nodes: []string{"1", "2", "3"},
-			},
-			{
-				Nodes: []string{"0", "0", "0"},
-			},
+	t.Run("Error in proof generation", func(t *testing.T) {
+		wtns := []byte("invalid witness")
+		provingKey := []byte("invalid proving key")
+
+		_, err := generateProof(ctx, wtns, provingKey)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "PD210101")
+	})
+}
+
+func TestNewWitnessInputs(t *testing.T) {
+	tests := []struct {
+		name        string
+		circuitId   string
+		extras      interface{}
+		expectType  interface{}
+		expectErr   bool
+		errContains string
+	}{
+		{
+			name:       "Valid non-fungible witness inputs",
+			circuitId:  constants.CIRCUIT_NF_ANON,
+			extras:     nil,
+			expectType: &nonFungibleWitnessInputs{},
+			expectErr:  false,
 		},
-		Enabled: []bool{true, false},
+		{
+			name:       "Valid non-fungible nullifier witness inputs",
+			circuitId:  constants.CIRCUIT_NF_ANON_NULLIFIER,
+			extras:     nil,
+			expectType: &nonFungibleWitnessInputs{},
+			expectErr:  false,
+		},
+		{
+			name:       "Valid fungible encryption witness inputs",
+			circuitId:  constants.CIRCUIT_ANON_ENC,
+			extras:     &pb.ProvingRequestExtras_Encryption{},
+			expectType: &fungibleEncWitnessInputs{},
+			expectErr:  false,
+		},
+		{
+			name:       "Valid fungible encryption batch witness inputs",
+			circuitId:  constants.CIRCUIT_ANON_ENC_BATCH,
+			extras:     &pb.ProvingRequestExtras_Encryption{},
+			expectType: &fungibleEncWitnessInputs{},
+			expectErr:  false,
+		},
+		{
+			name:       "Valid fungible nullifier witness inputs",
+			circuitId:  constants.CIRCUIT_ANON_NULLIFIER,
+			extras:     &pb.ProvingRequestExtras_Nullifiers{},
+			expectType: &fungibleNullifierWitnessInputs{},
+			expectErr:  false,
+		},
+		{
+			name:       "Valid fungible nullifier batch witness inputs",
+			circuitId:  constants.CIRCUIT_ANON_NULLIFIER_BATCH,
+			extras:     &pb.ProvingRequestExtras_Nullifiers{},
+			expectType: &fungibleNullifierWitnessInputs{},
+			expectErr:  false,
+		},
+		{
+			name:       "Valid withdraw nullifier witness inputs",
+			circuitId:  constants.CIRCUIT_WITHDRAW_NULLIFIER,
+			extras:     &pb.ProvingRequestExtras_Nullifiers{},
+			expectType: &fungibleNullifierWitnessInputs{},
+			expectErr:  false,
+		},
+		{
+			name:       "Valid withdraw nullifier batch witness inputs",
+			circuitId:  constants.CIRCUIT_WITHDRAW_NULLIFIER_BATCH,
+			extras:     &pb.ProvingRequestExtras_Nullifiers{},
+			expectType: &fungibleNullifierWitnessInputs{},
+			expectErr:  false,
+		},
+		{
+			name:       "Valid withdraw deposit witness inputs",
+			circuitId:  constants.CIRCUIT_DEPOSIT,
+			expectType: &depositWitnessInputs{},
+			expectErr:  false,
+		},
+		{
+			name:        "Invalid extras type for encryption circuit",
+			circuitId:   constants.CIRCUIT_ANON_ENC,
+			extras:      &pb.ProvingRequestExtras_Nullifiers{},
+			expectType:  nil,
+			expectErr:   true,
+			errContains: "unexpected extras type for encryption circuit",
+		},
+		{
+			name:        "Invalid extras type for nullifier circuit",
+			circuitId:   constants.CIRCUIT_ANON_NULLIFIER,
+			extras:      &pb.ProvingRequestExtras_Encryption{},
+			expectType:  nil,
+			expectErr:   true,
+			errContains: "unexpected extras type for anon nullifier circuit",
+		},
+		{
+			name:       "Default fungible witness inputs",
+			circuitId:  "unknown_circuit",
+			extras:     nil,
+			expectType: &fungibleWitnessInputs{},
+			expectErr:  false,
+		},
 	}
-	privKey, ok := new(big.Int).SetString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
-	require.True(t, ok)
-	keyEntry := &core.KeyEntry{
-		PrivateKeyForZkp: privKey,
-	}
-	_, err = calculateWitness(ctx, constants.CIRCUIT_ANON_NULLIFIER, inputs, extras2, keyEntry, nil)
-	assert.EqualError(t, err, "PD210099: failed to assemble private inputs for witness calculation. PD210079: Failed to calculate nullifier. inputs values not inside Finite Field")
 
-	inputs = &pb.ProvingRequestCommon{
-		OutputValues: []uint64{30, 0},
-		OutputSalts:  []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
-		OutputOwners: []string{"7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025", "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025"},
-	}
-	circuit, _ := loadTestCircuit(t)
-	_, err = calculateWitness(ctx, constants.CIRCUIT_DEPOSIT, inputs, nil, keyEntry, circuit)
-	assert.ErrorContains(t, err, "PD210100: failed to calculate the witness")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			inputs, err := newWitnessInputs(tc.circuitId, tc.extras)
 
-	inputs = &pb.ProvingRequestCommon{
-		InputCommitments: []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
-		InputValues:      []uint64{10, 20},
-		InputSalts:       []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
-		InputOwner:       "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025",
-		OutputValues:     []uint64{30, 0},
-		OutputSalts:      []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
-		OutputOwners:     []string{"7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025", "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025"},
+			if tc.expectErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errContains)
+			} else {
+				require.NoError(t, err)
+				assert.IsType(t, tc.expectType, inputs)
+			}
+		})
 	}
-	_, err = calculateWitness(ctx, constants.CIRCUIT_WITHDRAW, inputs, nil, keyEntry, circuit)
-	assert.ErrorContains(t, err, "PD210100: failed to calculate the witness")
+}
+func TestCalculateWitness(t *testing.T) {
+	ctx := context.Background()
 
-	_, err = calculateWitness(ctx, constants.CIRCUIT_WITHDRAW_NULLIFIER, inputs, extras2, keyEntry, circuit)
-	assert.EqualError(t, err, "PD210099: failed to assemble private inputs for witness calculation. PD210079: Failed to calculate nullifier. inputs values not inside Finite Field")
+	tests := []struct {
+		name          string
+		circuitId     string
+		commonInputs  *pb.ProvingRequestCommon
+		extras        interface{}
+		keyEntry      *core.KeyEntry
+		circuit       *testWitnessMock
+		expectedError string
+	}{
+		{
+			name:      "Successful witness calculation",
+			circuitId: constants.CIRCUIT_ANON_ENC,
+			commonInputs: &pb.ProvingRequestCommon{
+				InputCommitments: []string{"1", "2"},
+				InputSalts:       []string{"3", "4"},
+				OutputSalts:      []string{"5", "0"},
+				OutputOwners:     []string{"3", "3"},
+				TokenType:        pb.TokenType_fungible,
+				TokenSecrets:     []byte(`{"inputValues":[10,20],"outputValues":[30,0]}`),
+			},
+			extras:   &pb.ProvingRequestExtras_Encryption{},
+			keyEntry: &core.KeyEntry{},
+			circuit:  &testWitnessMock{},
+		},
+		{
+			name:          "Error in newWitnessInputs",
+			circuitId:     constants.CIRCUIT_ANON_ENC,
+			commonInputs:  &pb.ProvingRequestCommon{},
+			extras:        &pb.ProvingRequestExtras_Nullifiers{},
+			keyEntry:      &core.KeyEntry{},
+			circuit:       &testWitnessMock{},
+			expectedError: "unexpected extras type for encryption circuit",
+		},
+		{
+			name:      "Error in validate inputs",
+			circuitId: constants.CIRCUIT_ANON_ENC,
+			commonInputs: &pb.ProvingRequestCommon{
+				InputCommitments: []string{"input1"},
+				InputSalts:       []string{"salt1", "salt2"},
+			},
+			extras:        &pb.ProvingRequestExtras_Encryption{},
+			keyEntry:      &core.KeyEntry{},
+			circuit:       &testWitnessMock{validateError: true},
+			expectedError: "validate error",
+		},
+		{
+			name:      "Error in build inputs",
+			circuitId: constants.CIRCUIT_ANON_ENC,
+			commonInputs: &pb.ProvingRequestCommon{
+				InputCommitments: []string{"input1", "input2"},
+				InputSalts:       []string{"salt1", "salt2"},
+			},
+			extras:        &pb.ProvingRequestExtras_Encryption{},
+			keyEntry:      &core.KeyEntry{},
+			circuit:       &testWitnessMock{buildError: true},
+			expectedError: "build error",
+		},
+		{
+			name:      "Error in assemble inputs",
+			circuitId: constants.CIRCUIT_ANON_ENC,
+			commonInputs: &pb.ProvingRequestCommon{
+				InputCommitments: []string{"input1", "input2"},
+				InputSalts:       []string{"salt1", "salt2"},
+			},
+			extras:        &pb.ProvingRequestExtras_Encryption{},
+			keyEntry:      &core.KeyEntry{},
+			circuit:       &testWitnessMock{assembleError: true},
+			expectedError: "assemble error",
+		},
+		{
+			name:      "Error in CalculateWTNSBin",
+			circuitId: constants.CIRCUIT_ANON_ENC,
+			commonInputs: &pb.ProvingRequestCommon{
+				InputCommitments: []string{"input1", "input2"},
+				InputSalts:       []string{"salt1", "salt2"},
+			},
+			extras:        &pb.ProvingRequestExtras_Encryption{},
+			keyEntry:      &core.KeyEntry{},
+			circuit:       &testWitnessMock{calculateWTNSError: true},
+			expectedError: "calculate WTNSBin error",
+		},
+	}
+
+	tmpGetWitnessInputs := getWitnessInputs
+	defer func() { getWitnessInputs = tmpGetWitnessInputs }()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			getWitnessInputs = func(_ string, _ interface{}) (witnessInputs, error) {
+				if tt.name == "Error in newWitnessInputs" {
+					return nil, fmt.Errorf("unexpected extras type for encryption circuit")
+				}
+				return tt.circuit, nil
+			}
+
+			wtns, err := calculateWitness(ctx, tt.circuitId, tt.commonInputs, tt.extras, tt.keyEntry, tt.circuit)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, wtns)
+			}
+		})
+	}
+}
+
+func TestNewSnarkProver(t *testing.T) {
+	config := &zetosignerapi.SnarkProverConfig{
+		CircuitsDir:    "test",
+		ProvingKeysDir: "test",
+	}
+	prover, err := NewSnarkProver(config)
+	require.NoError(t, err)
+	assert.NotNil(t, prover)
+}
+
+func TestSnarkProverSign(t *testing.T) {
+	ctx := context.Background()
+	config := &zetosignerapi.SnarkProverConfig{
+		CircuitsDir:    "test",
+		ProvingKeysDir: "test",
+	}
+	prover, err := newSnarkProver(config)
+	require.NoError(t, err)
+
+	t.Run("Invalid algorithm", func(t *testing.T) {
+		_, err := prover.Sign(ctx, "invalid_algorithm", zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, nil, nil)
+		assert.ErrorContains(t, err, "PD210088")
+	})
+
+	t.Run("Invalid payload type", func(t *testing.T) {
+		_, err := prover.Sign(ctx, zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), "invalid_payload_type", nil, nil)
+		assert.ErrorContains(t, err, "PD210090")
+	})
+
+	t.Run("Missing circuit ID", func(t *testing.T) {
+		payload, err := proto.Marshal(&pb.ProvingRequest{})
+		require.NoError(t, err)
+		_, err = prover.Sign(ctx, zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, nil, payload)
+		assert.ErrorContains(t, err, "PD210124")
+	})
+
+	t.Run("Context cancelled", func(t *testing.T) {
+		circuitId := constants.CIRCUIT_ANON_ENC
+		payload, err := proto.Marshal(&pb.ProvingRequest{CircuitId: circuitId})
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		_, err = prover.Sign(ctx, zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, nil, payload)
+		assert.ErrorContains(t, err, "PD210124")
+	})
+}
+
+var _ witness.Calculator = &testWitnessMock{}
+var _ witnessInputs = &testWitnessMock{}
+
+type testWitnessMock struct {
+	buildError               bool
+	validateError            bool
+	assembleError            bool
+	calculateWTNSError       bool
+	calculateWitnessError    bool
+	calculateBinWitnessError bool
+}
+
+func (twc *testWitnessMock) CalculateWitness(inputs map[string]interface{}, sanityCheck bool) ([]*big.Int, error) {
+	if twc.calculateWitnessError {
+		return nil, fmt.Errorf("calculate witness error")
+	}
+	return []*big.Int{}, nil
+}
+
+func (twc *testWitnessMock) CalculateBinWitness(inputs map[string]interface{}, sanityCheck bool) ([]byte, error) {
+	if twc.calculateBinWitnessError {
+		return nil, fmt.Errorf("calculate BinWitness error")
+	}
+	return []byte{}, nil
+}
+func (twc *testWitnessMock) CalculateWTNSBin(inputs map[string]interface{}, sanityCheck bool) ([]byte, error) {
+	if twc.calculateWTNSError {
+		return nil, fmt.Errorf("calculate WTNSBin error")
+	}
+	return []byte("witness"), nil
+}
+
+func (twc *testWitnessMock) validate(ctx context.Context, commonInputs *pb.ProvingRequestCommon) error {
+	if twc.validateError {
+		return fmt.Errorf("validate error")
+	}
+	return nil
+}
+
+func (twc *testWitnessMock) build(ctx context.Context, commonInputs *pb.ProvingRequestCommon) error {
+	if twc.buildError {
+		return fmt.Errorf("build error")
+	}
+	return nil
+}
+
+func (twc *testWitnessMock) assemble(ctx context.Context, keyEntry *core.KeyEntry) (map[string]interface{}, error) {
+	if twc.assembleError {
+		return nil, fmt.Errorf("assemble error")
+	}
+	return map[string]interface{}{"key": "value"}, nil
 }

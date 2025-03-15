@@ -1,6 +1,6 @@
 {
   "name": "@lfdecentralizedtrust-labs/paladin-sdk",
-  "version": "0.0.6-alpha.2",
+  "version": "0.0.0",
   "description": "",
   "main": "build/index.js",
   "scripts": {
@@ -11,13 +11,15 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@types/node": "^22.9.0",
+    "@types/ws": "^8.18.0",
     "copy-file": "^11.0.0",
     "typescript": "^5.6.3"
   },
   "dependencies": {
     "axios": "^1.7.7",
     "ethers": "^6.13.4",
-    "uuid": "^11.0.2"
+    "uuid": "^11.0.2",
+    "ws": "^8.18.1"
   },
   "repository": {
     "url": "https://github.com/LF-Decentralized-Trust-labs/paladin"

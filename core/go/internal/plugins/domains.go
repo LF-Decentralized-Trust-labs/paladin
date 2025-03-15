@@ -17,8 +17,8 @@ package plugins
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
@@ -95,6 +95,33 @@ func (br *domainBridge) RequestReply(ctx context.Context, reqMsg plugintk.Plugin
 			func(resMsg *prototk.DomainMessage, res *prototk.RecoverSignerResponse) {
 				resMsg.ResponseToDomain = &prototk.DomainMessage_RecoverSignerRes{
 					RecoverSignerRes: res,
+				}
+			},
+		)
+	case *prototk.DomainMessage_SendTransaction:
+		return callManagerImpl(ctx, req.SendTransaction,
+			br.manager.SendTransaction,
+			func(resMsg *prototk.DomainMessage, res *prototk.SendTransactionResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_SendTransactionRes{
+					SendTransactionRes: res,
+				}
+			},
+		)
+	case *prototk.DomainMessage_LocalNodeName:
+		return callManagerImpl(ctx, req.LocalNodeName,
+			br.manager.LocalNodeName,
+			func(resMsg *prototk.DomainMessage, res *prototk.LocalNodeNameResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_LocalNodeNameRes{
+					LocalNodeNameRes: res,
+				}
+			},
+		)
+	case *prototk.DomainMessage_GetStatesById:
+		return callManagerImpl(ctx, req.GetStatesById,
+			br.manager.GetStatesByID,
+			func(resMsg *prototk.DomainMessage, res *prototk.GetStatesByIDResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_GetStatesByIdRes{
+					GetStatesByIdRes: res,
 				}
 			},
 		)
@@ -336,6 +363,51 @@ func (br *domainBridge) BuildReceipt(ctx context.Context, req *prototk.BuildRece
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
 			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_BuildReceiptRes); ok {
 				res = r.BuildReceiptRes
+			}
+			return res != nil
+		},
+	)
+	return
+}
+
+func (br *domainBridge) ConfigurePrivacyGroup(ctx context.Context, req *prototk.ConfigurePrivacyGroupRequest) (res *prototk.ConfigurePrivacyGroupResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_ConfigurePrivacyGroup{ConfigurePrivacyGroup: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_ConfigurePrivacyGroupRes); ok {
+				res = r.ConfigurePrivacyGroupRes
+			}
+			return res != nil
+		},
+	)
+	return
+}
+
+func (br *domainBridge) InitPrivacyGroup(ctx context.Context, req *prototk.InitPrivacyGroupRequest) (res *prototk.InitPrivacyGroupResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_InitPrivacyGroup{InitPrivacyGroup: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_InitPrivacyGroupRes); ok {
+				res = r.InitPrivacyGroupRes
+			}
+			return res != nil
+		},
+	)
+	return
+}
+
+func (br *domainBridge) WrapPrivacyGroupEVMTX(ctx context.Context, req *prototk.WrapPrivacyGroupEVMTXRequest) (res *prototk.WrapPrivacyGroupEVMTXResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_WrapPrivacyGroupEvmtx{WrapPrivacyGroupEvmtx: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_WrapPrivacyGroupEvmtxRes); ok {
+				res = r.WrapPrivacyGroupEvmtxRes
 			}
 			return res != nil
 		},

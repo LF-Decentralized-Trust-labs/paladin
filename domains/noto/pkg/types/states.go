@@ -20,6 +20,42 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
+type NotoDomainReceipt struct {
+	States    ReceiptStates      `json:"states"`
+	Transfers []*ReceiptTransfer `json:"transfers,omitempty"`
+	LockInfo  *ReceiptLockInfo   `json:"lockInfo,omitempty"`
+	Data      tktypes.HexBytes   `json:"data,omitempty"`
+}
+
+type ReceiptStates struct {
+	Inputs                []*ReceiptState `json:"inputs,omitempty"`
+	LockedInputs          []*ReceiptState `json:"lockedInputs,omitempty"`
+	Outputs               []*ReceiptState `json:"outputs,omitempty"`
+	LockedOutputs         []*ReceiptState `json:"lockedOutputs,omitempty"`
+	ReadInputs            []*ReceiptState `json:"readInputs,omitempty"`
+	ReadLockedInputs      []*ReceiptState `json:"readLockedInputs,omitempty"`
+	PreparedOutputs       []*ReceiptState `json:"preparedOutputs,omitempty"`
+	PreparedLockedOutputs []*ReceiptState `json:"preparedLockedOutputs,omitempty"`
+}
+
+type ReceiptLockInfo struct {
+	LockID       tktypes.Bytes32     `json:"lockId"`
+	Delegate     *tktypes.EthAddress `json:"delegate,omitempty"`     // only set for delegateLock
+	UnlockParams *UnlockPublicParams `json:"unlockParams,omitempty"` // only set for prepareUnlock
+	UnlockCall   tktypes.HexBytes    `json:"unlockCall,omitempty"`   // only set for prepareUnlock
+}
+
+type ReceiptState struct {
+	ID   tktypes.HexBytes `json:"id"`
+	Data tktypes.RawJSON  `json:"data"`
+}
+
+type ReceiptTransfer struct {
+	From   *tktypes.EthAddress `json:"from,omitempty"`
+	To     *tktypes.EthAddress `json:"to,omitempty"`
+	Amount *tktypes.HexUint256 `json:"amount"`
+}
+
 type NotoCoinState struct {
 	ID              tktypes.Bytes32    `json:"id"`
 	Created         tktypes.Timestamp  `json:"created"`
@@ -28,12 +64,13 @@ type NotoCoinState struct {
 }
 
 type NotoCoin struct {
-	Salt   string              `json:"salt"`
+	Salt   tktypes.Bytes32     `json:"salt"`
 	Owner  *tktypes.EthAddress `json:"owner"`
 	Amount *tktypes.HexUint256 `json:"amount"`
 }
 
 var NotoCoinABI = &abi.Parameter{
+	Name:         "NotoCoin",
 	Type:         "tuple",
 	InternalType: "struct NotoCoin",
 	Components: abi.ParameterArray{
@@ -43,12 +80,58 @@ var NotoCoinABI = &abi.Parameter{
 	},
 }
 
+type NotoLockedCoinState struct {
+	ID              tktypes.Bytes32    `json:"id"`
+	Created         tktypes.Timestamp  `json:"created"`
+	ContractAddress tktypes.EthAddress `json:"contractAddress"`
+	Data            NotoLockedCoin     `json:"data"`
+}
+
+type NotoLockedCoin struct {
+	Salt   tktypes.Bytes32     `json:"salt"`
+	LockID tktypes.Bytes32     `json:"lockId"`
+	Owner  *tktypes.EthAddress `json:"owner"`
+	Amount *tktypes.HexUint256 `json:"amount"`
+}
+
+var NotoLockedCoinABI = &abi.Parameter{
+	Name:         "NotoLockedCoin",
+	Type:         "tuple",
+	InternalType: "struct NotoLockedCoin",
+	Components: abi.ParameterArray{
+		{Name: "salt", Type: "bytes32"},
+		{Name: "lockId", Type: "bytes32", Indexed: true},
+		{Name: "owner", Type: "string", Indexed: true},
+		{Name: "amount", Type: "uint256"},
+	},
+}
+
+type NotoLockInfo struct {
+	Salt     tktypes.Bytes32     `json:"salt"`
+	LockID   tktypes.Bytes32     `json:"lockId"`
+	Owner    *tktypes.EthAddress `json:"owner"`
+	Delegate *tktypes.EthAddress `json:"delegate"`
+}
+
+var NotoLockInfoABI = &abi.Parameter{
+	Name:         "NotoLockInfo",
+	Type:         "tuple",
+	InternalType: "struct NotoLockInfo",
+	Components: abi.ParameterArray{
+		{Name: "salt", Type: "bytes32"},
+		{Name: "lockId", Type: "bytes32"},
+		{Name: "owner", Type: "address"},
+		{Name: "delegate", Type: "address"},
+	},
+}
+
 type TransactionData struct {
 	Salt string           `json:"salt"`
 	Data tktypes.HexBytes `json:"data"`
 }
 
 var TransactionDataABI = &abi.Parameter{
+	Name:         "TransactionData",
 	Type:         "tuple",
 	InternalType: "struct TransactionData",
 	Components: abi.ParameterArray{

@@ -80,11 +80,11 @@ func TestEthAddress(t *testing.T) {
 
 	a5 := &EthAddress{}
 	err = a5.Scan([]byte{0x01})
-	assert.Regexp(t, "FF00105", err)
+	assert.Regexp(t, "PD020018", err)
 
 	a6 := &EthAddress{}
 	err = a6.Scan(false)
-	assert.Regexp(t, "FF00105", err)
+	assert.Regexp(t, "PD020018", err)
 
 	a7 := &EthAddress{}
 	err = a7.Scan(([]byte)("!!aca6d8ba6bff0fa5c8a06a58368cb6097285d5"))

@@ -17,8 +17,26 @@ package pldclient
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestPTXModule(t *testing.T) {
 	testRPCModule(t, func(c PaladinClient) RPCModule { return c.PTX() })
+}
+
+func TestPTXSubscribe(t *testing.T) {
+	ctx, c, _, done := newTestClientAndServerWebSockets(t)
+	defer done()
+
+	_, err := c.PTX().SubscribeReceipts(ctx, "listener1")
+	require.Regexp(t, "PD020702", err)
+}
+
+func TestPTXSubscribeNotWS(t *testing.T) {
+	ctx, c, _, done := newTestClientAndServerHTTP(t)
+	defer done()
+
+	_, err := c.PTX().SubscribeReceipts(ctx, "listener1")
+	require.Regexp(t, "PD020217", err)
 }

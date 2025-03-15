@@ -18,12 +18,14 @@ import i18next from "i18next";
 import { constants } from "../components/config";
 import {
   IEnrichedTransaction,
+  IFilter,
   IPaladinTransaction,
   ITransaction,
   ITransactionReceipt,
 } from "../interfaces";
 import { generatePostReq, returnResponse } from "./common";
 import { RpcEndpoint, RpcMethods } from "./rpcMethods";
+import { translateFilters } from "../utils";
 
 export const fetchIndexedTransactions = async (pageParam?: ITransaction): Promise<IEnrichedTransaction[]> => {
   let requestPayload: any = {
@@ -90,22 +92,28 @@ export const fetchIndexedTransactions = async (pageParam?: ITransaction): Promis
 
 export const fetchSubmissions = async (
   type: "all" | "pending",
+  filters: IFilter[],
   pageParam?: IPaladinTransaction
 ): Promise<IPaladinTransaction[]> => {
+
+  let translatedFilters = translateFilters(filters);
+
   let allParams: any = [
     {
+      ...translatedFilters,
       limit: constants.SUBMISSIONS_QUERY_LIMIT,
       sort: ["created DESC"],
     },
   ];
 
-  if(pageParam !== undefined) {
-    allParams[0].lessThan = [
-      {
-        "field": "created",
-        "value": pageParam.created
-      }
-    ];
+  if (pageParam !== undefined) {
+    if (allParams[0].lessThan === undefined) {
+      allParams[0].lessThan = [];
+    }
+    allParams[0].lessThan.push({
+      "field": "created",
+      "value": pageParam.created
+    });
   }
 
   const pendingParams = [...allParams, true];

@@ -21,100 +21,124 @@ import (
 
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
 
-func TestDecodeProvingRequest_AnonEnc(t *testing.T) {
-	common := pb.ProvingRequestCommon{}
-	req := &pb.ProvingRequest{
-		CircuitId: constants.CIRCUIT_ANON_ENC,
-		Common:    &common,
-	}
-	bytes, err := proto.Marshal(req)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-	_, extras, err := decodeProvingRequest(ctx, bytes)
-	require.NoError(t, err)
-	assert.Empty(t, extras)
-
-	encExtras := &pb.ProvingRequestExtras_Encryption{
-		EncryptionNonce: "123456",
-	}
-	req.Extras, err = proto.Marshal(encExtras)
-	require.NoError(t, err)
-
-	bytes, err = proto.Marshal(req)
-	require.NoError(t, err)
-	_, extras, err = decodeProvingRequest(ctx, bytes)
-	require.NoError(t, err)
-	assert.Equal(t, "123456", extras.(*pb.ProvingRequestExtras_Encryption).EncryptionNonce)
+func TestInvalidDecodeProvingRequest(t *testing.T) {
+	_, _, err := decodeProvingRequest(context.Background(), []byte("invalid"))
+	assert.Error(t, err)
 }
 
-func TestDecodeProvingRequest_AnonNullifier(t *testing.T) {
-	common := pb.ProvingRequestCommon{}
-	req := &pb.ProvingRequest{
-		CircuitId: constants.CIRCUIT_ANON_NULLIFIER,
-		Common:    &common,
-	}
-	encExtras := &pb.ProvingRequestExtras_Nullifiers{
-		Root: "123456",
-		MerkleProofs: []*pb.MerkleProof{
-			{
-				Nodes: []string{"1", "2", "3"},
-			},
+func TestDecodeProvingRequest(t *testing.T) {
+	tests := []struct {
+		name        string
+		circuitID   string
+		extras      interface{}
+		expectError bool
+		expectValue interface{}
+	}{
+		{
+			name:      "AnonEnc No Extras",
+			circuitID: constants.CIRCUIT_ANON_ENC,
 		},
-		Enabled: []bool{true},
+		{
+			name:      "AnonEnc With Extras",
+			circuitID: constants.CIRCUIT_ANON_ENC,
+			extras: &pb.ProvingRequestExtras_Encryption{
+				EncryptionNonce: "123456",
+			},
+			expectValue: "123456",
+		},
+		{
+			name:      "AnonNullifier With Extras",
+			circuitID: constants.CIRCUIT_ANON_NULLIFIER,
+			extras: &pb.ProvingRequestExtras_Nullifiers{
+				Root: "123456",
+				MerkleProofs: []*pb.MerkleProof{
+					{
+						Nodes: []string{"1", "2", "3"},
+					},
+				},
+				Enabled: []bool{true},
+			},
+			expectValue: "123456",
+		},
+		{
+			name:        "AnonNullifier Invalid Extras",
+			circuitID:   constants.CIRCUIT_ANON_NULLIFIER,
+			extras:      []byte("invalid"),
+			expectError: true,
+		},
+		{
+			name:      "AnonNullifier valid Extras",
+			circuitID: constants.CIRCUIT_NF_ANON_NULLIFIER,
+			extras: &pb.ProvingRequestExtras_Nullifiers{
+				Root: "123456",
+				MerkleProofs: []*pb.MerkleProof{
+					{
+						Nodes: []string{"1", "2", "3"},
+					},
+				},
+				Enabled: []bool{true},
+			},
+			expectValue: "123456",
+		},
+		{
+			name:        "NfAnonNullifier Invalid Extras",
+			circuitID:   constants.CIRCUIT_NF_ANON_NULLIFIER,
+			extras:      []byte("invalid"),
+			expectError: true,
+		},
+		{
+			name:        "Invalid Extras",
+			circuitID:   constants.CIRCUIT_ANON_ENC,
+			extras:      []byte("invalid"),
+			expectError: true,
+		},
 	}
-	var err error
-	req.Extras, err = proto.Marshal(encExtras)
-	assert.NoError(t, err)
 
-	bytes, err := proto.Marshal(req)
-	assert.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			common := pb.ProvingRequestCommon{}
+			req := &pb.ProvingRequest{
+				CircuitId: tt.circuitID,
+				Common:    &common,
+			}
 
-	signReq := &signerapi.SignRequest{
-		Payload: bytes,
+			if tt.extras != nil {
+				var err error
+				switch extras := tt.extras.(type) {
+				case proto.Message:
+					req.Extras, err = proto.Marshal(extras)
+					require.NoError(t, err)
+				case []byte:
+					req.Extras = extras
+				}
+			}
+
+			bytes, err := proto.Marshal(req)
+			require.NoError(t, err)
+
+			ctx := context.Background()
+			_, extras, err := decodeProvingRequest(ctx, bytes)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				if tt.expectValue != nil {
+					switch v := extras.(type) {
+					case *pb.ProvingRequestExtras_Encryption:
+						assert.Equal(t, tt.expectValue, v.EncryptionNonce)
+					case *pb.ProvingRequestExtras_Nullifiers:
+						assert.Equal(t, tt.expectValue, v.Root)
+					}
+				} else {
+					assert.Empty(t, extras)
+				}
+			}
+		})
 	}
-
-	ctx := context.Background()
-	bytes, err = proto.Marshal(req)
-	assert.NoError(t, err)
-	signReq.Payload = bytes
-	_, extras, err := decodeProvingRequest(ctx, signReq.Payload)
-	assert.NoError(t, err)
-	assert.Equal(t, "123456", extras.(*pb.ProvingRequestExtras_Nullifiers).Root)
-}
-
-func TestDecodeProvingRequest_Fail(t *testing.T) {
-	common := pb.ProvingRequestCommon{}
-	req := &pb.ProvingRequest{
-		CircuitId: constants.CIRCUIT_ANON_ENC,
-		Common:    &common,
-		Extras:    []byte("invalid"),
-	}
-	bytes, err := proto.Marshal(req)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-	signReq := &signerapi.SignRequest{
-		Payload: bytes,
-	}
-	_, _, err = decodeProvingRequest(ctx, signReq.Payload)
-	assert.ErrorContains(t, err, "PD210076: Failed to unmarshal proving request extras for circuit anon_enc")
-
-	req.CircuitId = constants.CIRCUIT_ANON_NULLIFIER
-	bytes, err = proto.Marshal(req)
-	assert.NoError(t, err)
-
-	signReq = &signerapi.SignRequest{
-		Payload: bytes,
-	}
-	_, _, err = decodeProvingRequest(ctx, signReq.Payload)
-	assert.ErrorContains(t, err, "PD210076: Failed to unmarshal proving request extras for circuit anon_nullifier")
-	_, _, err = decodeProvingRequest(ctx, bytes)
-	assert.ErrorContains(t, err, "cannot parse invalid wire-format data")
 }

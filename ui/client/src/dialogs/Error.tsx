@@ -28,7 +28,7 @@ type Props = {
 
 export const ErrorDialog: React.FC<Props> = ({
   message,
-  dialogOpen,
+  dialogOpen
 }) => {
 
   const { t } = useTranslation();

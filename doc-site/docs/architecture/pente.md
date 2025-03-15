@@ -44,7 +44,7 @@ However, the model has not fundamentally changed in this time.
 
 Read here about the [Private transaction lifecycle](https://docs.goquorum.consensys.io/concepts/privacy/private-transaction-lifecycle) for Quorum and Besu when used with the Tessera private transaction manager.
 
-### Problems with the existing model
+### Problems with the previous models
 
 There are two closely related problems with the EVM Private Smart Contract model as implemented in these generations of the technology.
 
@@ -99,97 +99,59 @@ The guiding principals are:
     - This is the single most important enhancement. Because Pente is just another privacy preserving smart contract in Paladin, it can atomically interoperate with Token smart contracts. 
     - See the [Atomic Interop](./atomic_interop.md) section for how this enables sophisticated DvP scenarios to be programmed via Private EVM
 
-## Private ABI
+## Implementation
 
-The private ABI of Pente is implemented in [Java](https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/domains/pente),
-and can be accessed by calling `ptx_sendTransaction` with `"type": "private"`.
+The Pente private domain is implemented [in Java](https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/domains/pente/src)
+using the [Besu EVM](https://github.com/hyperledger/besu) as a code module to start and run ephemeral in-memory EVMs.
 
-### constructor
+## Submitting transactions
 
-Creates a new Pente private EVM group, with a new address on the base ledger.
+The recommended way to submit transactions is to:
 
-```json
-{
-    "name": "",
-    "type": "constructor",
-    "inputs": [
-        {"name": "group", "type": "tuple", "components": [
-            {"name": "salt", "type": "bytes32"},
-            {"name": "members", "type": "string[]"}
-        ]},
-        {"name": "evmVersion", "type": "string"},
-        {"name": "endorsementType", "type": "string"},
-        {"name": "externalCallsEnabled", "type": "boolean"},
-    ]
-}
-```
+1. Create a privacy group using the [pgroup_createGroup](../../reference/apis/pgroup/#pgroup_creategroup) JSON/RPC API
+    - This distributes information about the privacy group off-chain to all members
+    - You can add properties to your privacy group to allow all members to find it (a business transaction identifier for example)
+2. Wait for a receipt to the transaction returned in the [PrivacyGroup](../../reference/types/privacygroup/)
+    - This means that the blockchain has confirmed creation of the privacy group
+3. Submit transactions using the [pgroup_sendTransaction](../../reference/apis/pgroup/#pgroup_sendtransaction) JSON/RPC API
+    - The [PrivacyGroupEVMTXInput](../../reference/types/privacygroupevmtxinput/#privacygroupevmtxinput) payload is as similar to a normal `eth_sendTransaction` payload as possible
+    - Deployment of smart contracts is performed by omitting the `to` address, and supplying `bytecode`
+4. Use WebSockets combined with [TransactionReceiptListener](../../reference/types/transactionreceiptlistener/) to detect transaction completion
+    - This is a reliable ordered delivery system
+    - Use `incompleteStateReceiptBehavior: "block_contract` to ensure you receive receipts in order for each privacy group
+5. Decode the receipts using [ptx_getDomainReceipt](../../reference/apis/ptx/#ptx_getdomainreceipt)
+    - Decodes the full EVM receipt format with `logs` (EVM emitted events) from the private states of the transaction
+6. Make calls to query data using [pgroup_call](../../reference/apis/pgroup/#pgroup_call) JSON/RPC API
+    - The [PrivacyGroupEVMCall](../../rreference/types/privacygroupevmcall/#privacygroupevmcall) payload is as similar to a normal `eth_call` payload as possible
+    - The result is decoded for you against the ABI you supply
 
-Inputs:
+## Private messaging
 
-* **group** - group details, including member lookup strings and a randomly-chosen group salt
-* **evmVersion** - EVM version to run (such as "shanghai", "paris", "london")
-* **endorsementType** - only supported type is "group_scoped_identities" (100% endorsement on each transaction from all group members)
-* **externalCallsEnabled** - true to allow this privacy group to trigger external calls to other contracts on the base ledger
+Privacy groups also allow you to send private messages that are completely off-chain, to distribute information
+without the latency (and gas) overhead of mining a blockchain transaction.
 
-### deploy
+> There are no ordering or non-repudiation guarantees when doing this, as the shared ordering context
+> and transaction signature (+execution) verification of a full EVM blockchain transaction are bypassed.
 
-Deploys a new contract into the private EVM group.
+See [pgroup_sendMessage](../../reference/apis/pgroup/#pgroup_sendmessage) for more details of sending messages.
 
-```json
-{
-    "name": "deploy",
-    "type": "function",
-    "inputs": [
-        {"name": "group", "type": "tuple", "components": [
-            {"name": "salt", "type": "bytes32"},
-            {"name": "members", "type": "string[]"}
-        ]},
-        {"name": "bytecode", "type": "bytes"},
-        {"name": "inputs", "type": "tuple", "components": [
-            // variable - see below
-        ]}
-    ]
-}
-```
+Use WebSockets combined with [PrivacyGroupMessageListener](../../reference/types/privacygroupmessagelistener/) to
+listen for messages.
 
-Inputs:
+> The lifecycle JSON/RPC APIs over the websocket are the same as [TransactionReceiptListener](../../reference/types/transactionreceiptlistener/)
 
-* **group** - group details, including member lookup strings and a randomly-chosen group salt (must exactly match what was passed at group creation)
-* **bytecode** - the compiled contract bytecode
-* **inputs** - ABI constructor parameters for the contract (must be filled in to match the contract being deployed)
+## Raw Private ABI
 
-### invoke
+When you look at the resulting private transactions submitted through the privacy group, you will see that
+the original inputs are wrapped to instruct the Pente privacy group what to do inside of the Private EVM.
 
-Send an encoded transaction to a private smart contract.
+The `to` and `inputs` (as well as `gas`,`value` and `bytecode` if supplied) are nested inside of this
+containing ABI, as they will not be the same as the public transaction that is submitted to the containing
+(public/permissioned) EVM blockchain that backs the privacy group.
 
 ```json
 {
-    "name": "invoke",
-    "type": "function",
-    "inputs": [
-        {"name": "group", "type": "tuple", "components": [
-            {"name": "salt", "type": "bytes32"},
-            {"name": "members", "type": "string[]"}
-        ]},
-        {"name": "to", "type": "address"},
-        {"name": "data", "type": "bytes"}
-    ]
-}
-```
-
-Inputs:
-
-* **group** - group details, including member lookup strings and a randomly-chosen group salt (must exactly match what was passed at group creation)
-* **to** - the address of the private contract
-* **data** - an encoded transation (like the `data` of `eth_sendTransaction`)
-
-### &lt;custom function&gt;
-
-Perform an invoke or call to any function in a private smart contract.
-
-```json
-{
-    "name": "<variable - see below>"
+    "name": "<variable - see below>",
     "type": "function",
     "inputs": [
         {"name": "group", "type": "tuple", "components": [
@@ -209,13 +171,13 @@ Perform an invoke or call to any function in a private smart contract.
 
 Inputs:
 
-* **group** - group details, including member lookup strings and a randomly-chosen group salt (must exactly match what was passed at group creation)
+* **group** - group details, including member lookup strings and a randomly-chosen group salt (must exactly match what was passed at group creation, as stored inside of the genesis state of the [PrivacyGroup](../../reference/types/privacygroup/))
 * **to** - the address of the private contract
 * **inputs** - ABI method inputs for the contract (must be filled in to match the contract)
 
 Other fields:
 
-* **name** - name of the method to invoke on the contract.
+* **name** - name of the method to invoke on the contract, or the special `deploy` function for performing a deploy with `bytecode`
 * **outputs** - ABI method outputs for the contract (only valid for `ptx_call`, must be filled in to match the contract).
 
 ## Public ABI
@@ -231,7 +193,7 @@ Generally should not be called directly.
 
 ```json
 {
-    "name": "mint",
+    "name": "transition",
     "type": "function",
     "inputs": [
         {"name": "txId", "type": "bytes32"},

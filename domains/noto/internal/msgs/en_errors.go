@@ -21,47 +21,52 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"golang.org/x/text/language"
 )
 
 const notoPrefix = "PD20"
 
 var registered sync.Once
-var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey {
+var pde = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey {
 	registered.Do(func() {
 		i18n.RegisterPrefix(notoPrefix, "Noto Domain")
 	})
 	if !strings.HasPrefix(key, notoPrefix) {
 		panic(fmt.Errorf("must have prefix '%s': %s", notoPrefix, key))
 	}
-	return i18n.FFE(language.AmericanEnglish, key, translation, statusHint...)
+	return i18n.PDE(language.AmericanEnglish, key, translation, statusHint...)
 }
 
 var (
-	MsgUnexpectedConfigType        = ffe("PD200000", "Unexpected config type: %s")
-	MsgUnknownFunction             = ffe("PD200001", "Unknown function: %s")
-	MsgUnexpectedFunctionSignature = ffe("PD200002", "Unexpected signature for function '%s': expected=%s actual=%s")
-	MsgUnknownSchema               = ffe("PD200003", "Unknown schema: %s")
-	MsgInvalidListInput            = ffe("PD200004", "Invalid item in list %s[%d] (%s): %s")
-	MsgInsufficientFunds           = ffe("PD200005", "Insufficient funds (available=%s)")
-	MsgInvalidStateData            = ffe("PD200006", "State data %s is invalid: %s")
-	MsgParameterRequired           = ffe("PD200007", "Parameter '%s' is required")
-	MsgParameterGreaterThanZero    = ffe("PD200008", "Parameter '%s' must be greater than 0")
-	MsgMintOnlyNotary              = ffe("PD200009", "Mint can only be initiated by notary: expected=%s actual=%s")
-	MsgErrorVerifyingAddress       = ffe("PD200011", "Error verifying '%s' address")
-	MsgInvalidInputs               = ffe("PD200012", "Invalid inputs to '%s': %v")
-	MsgInvalidAmount               = ffe("PD200013", "Invalid amount for '%s': expected=%s actual=%s")
-	MsgUnknownDomainVariant        = ffe("PD200014", "Unknown domain variant: %s")
-	MsgAttestationNotFound         = ffe("PD200015", "Did not find '%s' attestation")
-	MsgAttestationUnexpected       = ffe("PD200016", "Attestation for '%s' did not match expected lookup: expected=%s actual=%s")
-	MsgSignatureDoesNotMatch       = ffe("PD200017", "Signature for '%s' did not match: expected=%s actual=%s")
-	MsgStateWrongOwner             = ffe("PD200018", "State '%s' is not owned by '%s'")
-	MsgUnrecognizedEndorsement     = ffe("PD200019", "Unrecognized endorsement request: %s")
-	MsgDuplicateStateInList        = ffe("PD200020", "Duplicate state in list %s[%d] (%s)")
-	MsgUnknownEvent                = ffe("PD200021", "Unknown event: %s")
-	MsgNotImplemented              = ffe("PD200022", "Not implemented")
-	MsgInvalidDelegate             = ffe("PD200023", "Invalid delegate: %s")
-	MsgNoDomainReceipt             = ffe("PD200024", "Not implemented. See state receipt for coin transfers")
-	MsgNoBurning                   = ffe("PD200025", "Burn is not enabled")
+	MsgUnexpectedConfigType        = pde("PD200000", "Unexpected config type: %s")
+	MsgUnknownFunction             = pde("PD200001", "Unknown function: %s")
+	MsgUnexpectedFunctionSignature = pde("PD200002", "Unexpected signature for function '%s': expected=%s actual=%s")
+	MsgUnexpectedSchema            = pde("PD200003", "Unexpected schema: %s")
+	MsgInvalidListInput            = pde("PD200004", "Invalid item in list %s[%d] (%s): %s")
+	MsgInsufficientFunds           = pde("PD200005", "Insufficient funds (available=%s)")
+	MsgInvalidStateData            = pde("PD200006", "State data %s is invalid: %s")
+	MsgParameterRequired           = pde("PD200007", "Parameter '%s' is required")
+	MsgParameterGreaterThanZero    = pde("PD200008", "Parameter '%s' must be greater than 0")
+	MsgMintOnlyNotary              = pde("PD200009", "Mint can only be initiated by notary: expected=%s actual=%s")
+	MsgErrorVerifyingAddress       = pde("PD200011", "Error verifying '%s' address")
+	MsgInvalidInputs               = pde("PD200012", "Invalid inputs to '%s': %v")
+	MsgInvalidAmount               = pde("PD200013", "Invalid amount for '%s': expected=%s actual=%s")
+	MsgUnknownDomainVariant        = pde("PD200014", "Unknown domain variant: %s")
+	MsgAttestationNotFound         = pde("PD200015", "Did not find '%s' attestation")
+	MsgAttestationUnexpected       = pde("PD200016", "Attestation for '%s' did not match expected lookup: expected=%s actual=%s")
+	MsgSignatureDoesNotMatch       = pde("PD200017", "Signature for '%s' did not match: expected=%s actual=%s")
+	MsgStateWrongOwner             = pde("PD200018", "State '%s' is not owned by '%s'")
+	MsgUnrecognizedEndorsement     = pde("PD200019", "Unrecognized endorsement request: %s")
+	MsgDuplicateStateInList        = pde("PD200020", "Duplicate state in list %s[%d] (%s)")
+	MsgNotImplemented              = pde("PD200022", "Not implemented")
+	MsgInvalidDelegate             = pde("PD200023", "Invalid delegate: %s")
+	MsgNoDomainReceipt             = pde("PD200024", "Not implemented. See state receipt for coin transfers")
+	MsgBurnNotAllowed              = pde("PD200025", "Burn is not enabled")
+	MsgNoStatesSpecified           = pde("PD200026", "No states were specified")
+	MsgUnlockNotAllowed            = pde("PD200027", "Cannot unlock states owned by '%s'")
+	MsgLockIDNotFound              = pde("PD200028", "Lock ID not found")
+	MsgMissingStateData            = pde("PD200029", "Missing state data for one or more states: %s")
+	MsgLockNotAllowed              = pde("PD200030", "Lock is not enabled")
+	MsgUnlockOnlyCreator           = pde("PD200031", "Only the lock creator can perform unlock: expected=%s actual=%s")
 )

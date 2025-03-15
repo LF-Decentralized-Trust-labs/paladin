@@ -25,19 +25,22 @@ import (
 )
 
 type dependencyMocks struct {
-	persistence *mockpersistence.SQLMockProvider
-	txMgr       *componentmocks.TXManager
+	persistence  *mockpersistence.SQLMockProvider
+	txMgr        *componentmocks.TXManager
+	transportMgr *componentmocks.TransportManager
 }
 
 func newSyncPointsForTesting(t *testing.T) (*syncPoints, *dependencyMocks) {
 	p, err := mockpersistence.NewSQLMockProvider()
 	require.NoError(t, err)
 	mocks := &dependencyMocks{
-		persistence: p,
-		txMgr:       componentmocks.NewTXManager(t),
+		persistence:  p,
+		txMgr:        componentmocks.NewTXManager(t),
+		transportMgr: componentmocks.NewTransportManager(t),
 	}
 
 	return &syncPoints{
-		txMgr: mocks.txMgr,
+		txMgr:        mocks.txMgr,
+		transportMgr: mocks.transportMgr,
 	}, mocks
 }

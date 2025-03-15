@@ -14,13 +14,44 @@
  */
 package pldconf
 
+import "github.com/kaleido-io/paladin/config/pkg/confutil"
+
 type TransportManagerConfig struct {
-	NodeName   string                      `json:"nodeName"`
-	Transports map[string]*TransportConfig `json:"transports"`
+	NodeName              string                      `json:"nodeName"`
+	SendQueueLen          *int                        `json:"sendQueueLen"`
+	PeerInactivityTimeout *string                     `json:"peerInactivityTimeout"`
+	PeerReaperInterval    *string                     `json:"peerReaperInterval"`
+	SendRetry             RetryConfigWithMax          `json:"sendRetry"`
+	ReliableScanRetry     RetryConfig                 `json:"reliableScanRetry"`
+	ReliableMessageResend *string                     `json:"reliableMessageResend"`
+	ReliableMessageWriter FlushWriterConfig           `json:"reliableMessageWriter"`
+	Transports            map[string]*TransportConfig `json:"transports"`
 }
 
 type TransportInitConfig struct {
 	Retry RetryConfig `json:"retry"`
+}
+
+var TransportManagerDefaults = &TransportManagerConfig{
+	SendQueueLen:          confutil.P(10),
+	ReliableMessageResend: confutil.P("30s"),
+	PeerInactivityTimeout: confutil.P("1m"),
+	PeerReaperInterval:    confutil.P("30s"),
+	ReliableScanRetry:     GenericRetryDefaults.RetryConfig,
+	// SendRetry defaults are deliberately short
+	SendRetry: RetryConfigWithMax{
+		RetryConfig: RetryConfig{
+			InitialDelay: confutil.P("50ms"),
+			MaxDelay:     confutil.P("1s"),
+			Factor:       confutil.P(2.0),
+		},
+		MaxAttempts: confutil.P(3),
+	},
+	ReliableMessageWriter: FlushWriterConfig{
+		WorkerCount:  confutil.P(1),
+		BatchTimeout: confutil.P("250ms"),
+		BatchMaxSize: confutil.P(50),
+	},
 }
 
 type TransportConfig struct {

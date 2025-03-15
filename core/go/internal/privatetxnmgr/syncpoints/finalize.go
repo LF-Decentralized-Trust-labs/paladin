@@ -21,8 +21,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 )
 
 // a transaction finalization operation is an update to the transaction managers tables
@@ -56,7 +56,7 @@ func (s *syncPoints) QueueTransactionFinalize(ctx context.Context, domain string
 
 }
 
-func (s *syncPoints) writeFailureOperations(ctx context.Context, dbTX *gorm.DB, finalizeOperations []*finalizeOperation) error {
+func (s *syncPoints) writeFailureOperations(ctx context.Context, dbTX persistence.DBTX, finalizeOperations []*finalizeOperation) error {
 
 	// We are only responsible for failures. Success receipts are written on the DB transaction of the event handler,
 	// so they are guaranteed to be written in sequence for each confirmed domain private transaction.

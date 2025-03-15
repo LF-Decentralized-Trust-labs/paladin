@@ -20,11 +20,11 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/domainmgr"
+	"github.com/kaleido-io/paladin/core/internal/groupmgr"
 	"github.com/kaleido-io/paladin/core/internal/identityresolver"
 	"github.com/kaleido-io/paladin/core/internal/keymanager"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -36,6 +36,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/transportmgr"
 	"github.com/kaleido-io/paladin/core/internal/txmgr"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -79,6 +80,7 @@ type componentManager struct {
 	privateTxManager components.PrivateTxManager
 	txManager        components.TXManager
 	identityResolver components.IdentityResolver
+	groupManager     components.GroupManager
 	// managers that are not a core part of the engine, but allow Paladin to operate in an extended mode - the testbed is an example.
 	// these cannot be queried by other components (no AdditionalManagers() function on AllComponents)
 	additionalManagers []components.AdditionalManager
@@ -214,6 +216,12 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	if err == nil {
+		cm.groupManager = groupmgr.NewGroupManager(cm.bgCtx, &cm.conf.GroupManager)
+		cm.initResults["group_manager"], err = cm.groupManager.PreInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentGroupManagerInitError)
+	}
+
+	if err == nil {
 		cm.identityResolver = identityresolver.NewIdentityResolver(cm.bgCtx, &cm.conf.IdentityResolver)
 		cm.initResults["identity_resolver"], err = cm.identityResolver.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentIdentityResolverInitError)
@@ -271,6 +279,11 @@ func (cm *componentManager) Init() (err error) {
 	if err == nil {
 		err = cm.txManager.PostInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentTxManagerInitError)
+	}
+
+	if err == nil {
+		err = cm.groupManager.PostInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentGroupManagerInitError)
 	}
 
 	if err == nil {
@@ -362,6 +375,11 @@ func (cm *componentManager) StartManagers() (err error) {
 	if err == nil {
 		err = cm.txManager.Start()
 		err = cm.addIfStarted("tx_manager", cm.txManager, err, msgs.MsgComponentTxManagerStartError)
+	}
+
+	if err == nil {
+		err = cm.groupManager.Start()
+		err = cm.addIfStarted("group_manager", cm.groupManager, err, msgs.MsgComponentGroupManagerStartError)
 	}
 
 	for _, am := range cm.additionalManagers {
@@ -522,6 +540,10 @@ func (cm *componentManager) PrivateTxManager() components.PrivateTxManager {
 
 func (cm *componentManager) TxManager() components.TXManager {
 	return cm.txManager
+}
+
+func (cm *componentManager) GroupManager() components.GroupManager {
+	return cm.groupManager
 }
 
 func (cm *componentManager) IdentityResolver() components.IdentityResolver {

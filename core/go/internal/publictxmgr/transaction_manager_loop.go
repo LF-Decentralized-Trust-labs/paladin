@@ -76,17 +76,15 @@ func (pte *pubTxManager) getOrchestratorForAddress(signer tktypes.EthAddress) *o
 	return pte.inFlightOrchestrators[signer]
 }
 
-func (ble *pubTxManager) poll(ctx context.Context) (polled int, total int) {
-	pollStart := time.Now()
+func (ble *pubTxManager) flushStaleOrchestratorsGetCount(ctx context.Context) (inFlightSigningAddresses []tktypes.EthAddress, stateCounts map[string]int, totalAfterFlush int) {
 	ble.inFlightOrchestratorMux.Lock()
 	defer ble.inFlightOrchestratorMux.Unlock()
 
 	oldInFlight := ble.inFlightOrchestrators
 	ble.inFlightOrchestrators = make(map[tktypes.EthAddress]*orchestrator)
+	inFlightSigningAddresses = make([]tktypes.EthAddress, 0, len(oldInFlight))
 
-	inFlightSigningAddresses := make([]tktypes.EthAddress, 0, len(oldInFlight))
-
-	stateCounts := make(map[string]int)
+	stateCounts = make(map[string]int)
 	for _, sName := range AllOrchestratorStates {
 		// map for saving number of in flight transaction per stage
 		stateCounts[sName] = 0
@@ -111,12 +109,22 @@ func (ble *pubTxManager) poll(ctx context.Context) (polled int, total int) {
 		}
 	}
 
-	totalBeforePoll := len(ble.inFlightOrchestrators)
+	totalAfterFlush = len(ble.inFlightOrchestrators)
+	return inFlightSigningAddresses, stateCounts, totalAfterFlush
+}
+
+func (ble *pubTxManager) poll(ctx context.Context) (polled int, total int) {
+	pollStart := time.Now()
+
+	// Perform locked processing to determine if there are spaces to fill
+	inFlightSigningAddresses, stateCounts, totalBeforePoll := ble.flushStaleOrchestratorsGetCount(ctx)
+
 	// check and poll new signers from the persistence if there are more transaction orchestrators slots
 	spaces := ble.maxInflight - totalBeforePoll
 	if spaces > 0 {
 
 		// Run through the paused orchestrators for fairness control
+		// Note not controlled by mutex, as only modified on this routine.
 		for signingAddress, pausedUntil := range ble.signingAddressesPausedUntil {
 			if time.Now().Before(pausedUntil) {
 				log.L(ctx).Debugf("Engine excluded orchestrator for signing address %s from polling as it's paused util %s", signingAddress, pausedUntil.String())
@@ -143,10 +151,14 @@ func (ble *pubTxManager) poll(ctx context.Context) (polled int, total int) {
 		})
 		if err != nil {
 			log.L(ctx).Infof("Engine polling context cancelled while retrying")
-			return -1, len(ble.inFlightOrchestrators)
+			return -1, totalBeforePoll
 		}
 
 		log.L(ctx).Debugf("Engine polled %d items to fill in %d empty slots.", len(additionalNonInFlightSigners), spaces)
+
+		// (Re)obtain the lock to add the additional ones
+		ble.inFlightOrchestratorMux.Lock()
+		defer ble.inFlightOrchestratorMux.Unlock()
 
 		for _, r := range additionalNonInFlightSigners {
 			if _, exist := ble.inFlightOrchestrators[r.From]; !exist {
@@ -162,6 +174,11 @@ func (ble *pubTxManager) poll(ctx context.Context) (polled int, total int) {
 			polled = total - totalBeforePoll
 		}
 	} else {
+
+		// (Re)obtain the lock to do fairness control
+		ble.inFlightOrchestratorMux.Lock()
+		defer ble.inFlightOrchestratorMux.Unlock()
+
 		// the in-flight orchestrator pool is full, do the fairness control
 
 		// TODO: don't stop more than required number of slots

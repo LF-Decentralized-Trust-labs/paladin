@@ -13,43 +13,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.paladin.loader;
+ package io.kaleido.paladin.loader;
 
-import io.kaleido.paladin.toolkit.PluginControllerGrpc;
-import io.kaleido.paladin.toolkit.Service;
-import io.kaleido.paladin.toolkit.Service.PluginLoad;
-import io.grpc.ManagedChannel;
-import io.grpc.netty.NettyChannelBuilder;
-import io.grpc.stub.StreamObserver;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioDomainSocketChannel;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.message.FormattedMessage;
-
-import java.util.UUID;
-
-public class LoggingObserver<T> implements StreamObserver<T> {
-
-    private static final Logger LOGGER = LogManager.getLogger(LoggingObserver.class);
-
-    private final String desc;
-
-    public LoggingObserver(String desc) {
-        this.desc = desc;
-        LOGGER.info("--> {}", desc);
-    }
-
-    @Override
-    public void onNext(T value) {
-        LOGGER.info("<-- {} {}", desc, value);
-    }
-
-    @Override
-    public void onError(Throwable t) {
-        LOGGER.error(new FormattedMessage("<-- {} ERROR", desc), t);
-    }
-
-    @Override
-    public void onCompleted() {}
-}
+ import io.grpc.stub.StreamObserver;
+ import io.kaleido.paladin.logging.PaladinLogging;
+ import org.apache.logging.log4j.Logger;
+ import org.apache.logging.log4j.message.FormattedMessage;
+ 
+ public class LoggingObserver<T> implements StreamObserver<T> {
+ 
+     private static final Logger LOGGER = PaladinLogging.getLogger(LoggingObserver.class);
+ 
+     private final String desc;
+ 
+     public LoggingObserver(String desc) {
+         this.desc = desc;
+         LOGGER.info("--> {}", desc);
+     }
+ 
+     @Override
+     public void onNext(T value) {
+         LOGGER.info("<-- {} {}", desc, value);
+     }
+ 
+     @Override
+     public void onError(Throwable t) {
+         LOGGER.error(new FormattedMessage("<-- {} ERROR", desc), t);
+     }
+ 
+     @Override
+     public void onCompleted() {}
+ }
+ 

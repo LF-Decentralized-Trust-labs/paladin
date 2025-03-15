@@ -13,23 +13,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.paladin.toolkit;
+ package io.kaleido.paladin.toolkit;
 
-import io.kaleido.paladin.toolkit.Service;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import java.util.HashMap;
-import java.util.Map;
-
-public abstract class DomainBase extends PluginBase<Service.DomainMessage> {
-    private static final Logger LOGGER = LogManager.getLogger(DomainBase.class);
-
-    protected abstract DomainInstance newDomainInstance(String grpcTarget, String instanceId);
-
-    @Override
-    final PluginInstance<Service.DomainMessage> newPluginInstance(String grpcTarget, String instanceId) {
-        LOGGER.info("Starting new domain instance {} connecting to {}", instanceId, grpcTarget);
-        return newDomainInstance(grpcTarget, instanceId);
-    }
-}
+ import io.kaleido.paladin.logging.PaladinLogging;
+ import org.apache.logging.log4j.Logger;
+ 
+ public abstract class DomainBase extends PluginBase<DomainMessage> {
+     private static final Logger LOGGER = PaladinLogging.getLogger(DomainBase.class);
+ 
+     protected abstract DomainInstance newDomainInstance(String grpcTarget, String instanceId);
+ 
+     @Override
+     final PluginInstance<DomainMessage> newPluginInstance(String grpcTarget, String instanceId) {
+         LOGGER.info("Starting new domain instance {} connecting to {}", instanceId, grpcTarget);
+         return newDomainInstance(grpcTarget, instanceId);
+     }
+ }
+ 

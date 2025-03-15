@@ -22,6 +22,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
+	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -56,6 +57,23 @@ type PTX interface {
 	QueryStoredABIs(ctx context.Context, jq *query.QueryJSON) (storedABIs []*pldapi.StoredABI, err error)
 
 	ResolveVerifier(ctx context.Context, keyIdentifier string, algorithm string, verifierType string) (verifier string, err error)
+
+	CreateReceiptListener(ctx context.Context, listener *pldapi.TransactionReceiptListener) (success bool, err error)
+	QueryReceiptListeners(ctx context.Context, jq *query.QueryJSON) (listeners []*pldapi.TransactionReceiptListener, err error)
+	GetReceiptListener(ctx context.Context, listenerName string) (listener *pldapi.TransactionReceiptListener, err error)
+	StartReceiptListener(ctx context.Context, listenerName string) (success bool, err error)
+	StopReceiptListener(ctx context.Context, listenerName string) (success bool, err error)
+	DeleteReceiptListener(ctx context.Context, listenerName string) (success bool, err error)
+
+	SubscribeReceipts(ctx context.Context, listenerName string) (sub rpcclient.Subscription, err error)
+}
+
+var ptxReceiptsSubscriptionConfig = rpcclient.SubscriptionConfig{
+	SubscribeMethod:    "ptx_subscribe",
+	UnsubscribeMethod:  "ptx_unsubscribe",
+	NotificationMethod: "ptx_subscription",
+	AckMethod:          "ptx_ack",
+	NackMethod:         "ptx_nack",
 }
 
 // This is necessary because there's no way to introspect function parameter names via reflection
@@ -157,6 +175,37 @@ var ptxInfo = &rpcModuleInfo{
 		"ptx_resolveVerifier": {
 			Inputs: []string{"keyIdentifier", "algorithm", "verifierType"},
 			Output: "verifier",
+		},
+		"ptx_createReceiptListener": {
+			Inputs: []string{"listener"},
+			Output: "success",
+		},
+		"ptx_queryReceiptListeners": {
+			Inputs: []string{"query"},
+			Output: "listeners",
+		},
+		"ptx_getReceiptListener": {
+			Inputs: []string{"listenerName"},
+			Output: "listener",
+		},
+		"ptx_startReceiptListener": {
+			Inputs: []string{"listenerName"},
+			Output: "success",
+		},
+		"ptx_stopReceiptListener": {
+			Inputs: []string{"listenerName"},
+			Output: "success",
+		},
+		"ptx_deleteReceiptListener": {
+			Inputs: []string{"listenerName"},
+			Output: "success",
+		},
+	},
+	subscriptions: []RPCSubscriptionInfo{
+		{
+			SubscriptionConfig: ptxReceiptsSubscriptionConfig,
+			FixedInputs:        []string{"receipts"},
+			Inputs:             []string{"listenerName"},
 		},
 	},
 }
@@ -288,4 +337,42 @@ func (p *ptx) DecodeEvent(ctx context.Context, topics []tktypes.Bytes32, data tk
 func (p *ptx) ResolveVerifier(ctx context.Context, keyIdentifier string, algorithm string, verifierType string) (verifier string, err error) {
 	err = p.c.CallRPC(ctx, &verifier, "ptx_resolveVerifier", keyIdentifier, algorithm, verifierType)
 	return
+}
+
+func (p *ptx) CreateReceiptListener(ctx context.Context, listener *pldapi.TransactionReceiptListener) (success bool, err error) {
+	err = p.c.CallRPC(ctx, &success, "ptx_createReceiptListener", listener)
+	return
+}
+
+func (p *ptx) QueryReceiptListeners(ctx context.Context, jq *query.QueryJSON) (listeners []*pldapi.TransactionReceiptListener, err error) {
+	err = p.c.CallRPC(ctx, &listeners, "ptx_queryReceiptListeners", jq)
+	return
+}
+
+func (p *ptx) GetReceiptListener(ctx context.Context, listenerName string) (listener *pldapi.TransactionReceiptListener, err error) {
+	err = p.c.CallRPC(ctx, &listener, "ptx_getReceiptListener", listenerName)
+	return
+}
+
+func (p *ptx) StartReceiptListener(ctx context.Context, listenerName string) (success bool, err error) {
+	err = p.c.CallRPC(ctx, &success, "ptx_startReceiptListener", listenerName)
+	return
+}
+
+func (p *ptx) StopReceiptListener(ctx context.Context, listenerName string) (success bool, err error) {
+	err = p.c.CallRPC(ctx, &success, "ptx_stopReceiptListener", listenerName)
+	return
+}
+
+func (p *ptx) DeleteReceiptListener(ctx context.Context, listenerName string) (success bool, err error) {
+	err = p.c.CallRPC(ctx, &success, "ptx_deleteReceiptListener", listenerName)
+	return
+}
+
+func (p *ptx) SubscribeReceipts(ctx context.Context, listenerName string) (sub rpcclient.Subscription, err error) {
+	ws, err := p.c.WSClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return ws.Subscribe(ctx, ptxReceiptsSubscriptionConfig, "receipts", listenerName)
 }

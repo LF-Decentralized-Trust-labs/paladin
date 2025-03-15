@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -16,8 +16,8 @@
 
 import { Box, Typography, Tooltip, IconButton } from "@mui/material";
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { t } from "i18next";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type Props = {
   label: string
@@ -27,6 +27,7 @@ type Props = {
 export const SingleValue: React.FC<Props> = ({ label, value }) => {
 
   const [copyLabel, setCopyLabel] = useState('copyToClipboard');
+  const { t } = useTranslation();
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', border: theme => `solid 1px ${theme.palette.divider}`, borderRadius: '4px' }}>

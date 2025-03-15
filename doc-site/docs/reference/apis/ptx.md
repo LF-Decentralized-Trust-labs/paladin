@@ -11,6 +11,16 @@ title: ptx_*
 
 0. `result`: [`RawJSON`](../types/simpletypes.md#rawjson)
 
+## `ptx_createReceiptListener`
+
+### Parameters
+
+0. `listener`: [`TransactionReceiptListener`](../types/transactionreceiptlistener.md#transactionreceiptlistener)
+
+### Returns
+
+0. `success`: `bool`
+
 ## `ptx_decodeCall`
 
 ### Parameters
@@ -45,6 +55,16 @@ title: ptx_*
 
 0. `decodedEvent`: [`ABIDecodedData`](../types/abidecodeddata.md#abidecodeddata)
 
+## `ptx_deleteReceiptListener`
+
+### Parameters
+
+0. `listenerName`: `string`
+
+### Returns
+
+0. `success`: `bool`
+
 ## `ptx_getDomainReceipt`
 
 ### Parameters
@@ -65,6 +85,16 @@ title: ptx_*
 ### Returns
 
 0. `preparedTransaction`: [`PreparedTransaction`](../types/preparedtransaction.md#preparedtransaction)
+
+## `ptx_getReceiptListener`
+
+### Parameters
+
+0. `listenerName`: `string`
+
+### Returns
+
+0. `listener`: [`TransactionReceiptListener`](../types/transactionreceiptlistener.md#transactionreceiptlistener)
 
 ## `ptx_getStateReceipt`
 
@@ -166,6 +196,16 @@ title: ptx_*
 
 0. `preparedTransactions`: [`PreparedTransaction[]`](../types/preparedtransaction.md#preparedtransaction)
 
+## `ptx_queryReceiptListeners`
+
+### Parameters
+
+0. `query`: [`QueryJSON`](../types/queryjson.md#queryjson)
+
+### Returns
+
+0. `listeners`: [`TransactionReceiptListener[]`](../types/transactionreceiptlistener.md#transactionreceiptlistener)
+
 ## `ptx_queryStoredABIs`
 
 ### Parameters
@@ -237,6 +277,26 @@ title: ptx_*
 ### Returns
 
 0. `transactionIds`: [`UUID[]`](../types/simpletypes.md#uuid)
+
+## `ptx_startReceiptListener`
+
+### Parameters
+
+0. `listenerName`: `string`
+
+### Returns
+
+0. `success`: `bool`
+
+## `ptx_stopReceiptListener`
+
+### Parameters
+
+0. `listenerName`: `string`
+
+### Returns
+
+0. `success`: `bool`
 
 ## `ptx_storeABI`
 

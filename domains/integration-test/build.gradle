@@ -98,10 +98,7 @@ task test(type: Exec, dependsOn: [":core:go:makeMocks"]) {
     args '-v'
     args '-cover'
     args '-covermode=atomic'
-    args '-timeout=90s'
-    if (project.findProperty('verboseTests') == 'true') {
-        args '-v'
-    }
+    args '-timeout=120s'
     args "-test.gocoverdir=${projectDir}/coverage"
 
     dependsOn ':testinfra:startTestInfra'

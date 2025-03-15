@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -31,15 +32,45 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
 
+type testDomainCallbacks struct {
+	returnFunc func() (*pb.FindAvailableStatesResponse, error)
+}
+
+func (dc *testDomainCallbacks) FindAvailableStates(ctx context.Context, req *pb.FindAvailableStatesRequest) (*pb.FindAvailableStatesResponse, error) {
+	return dc.returnFunc()
+}
+
+func (dc *testDomainCallbacks) EncodeData(ctx context.Context, req *pb.EncodeDataRequest) (*pb.EncodeDataResponse, error) {
+	return nil, nil
+}
+func (dc *testDomainCallbacks) RecoverSigner(ctx context.Context, req *pb.RecoverSignerRequest) (*pb.RecoverSignerResponse, error) {
+	return nil, nil
+}
+
+func (dc *testDomainCallbacks) DecodeData(context.Context, *pb.DecodeDataRequest) (*pb.DecodeDataResponse, error) {
+	return nil, nil
+}
+func (dc *testDomainCallbacks) GetStatesByID(ctx context.Context, req *pb.GetStatesByIDRequest) (*pb.GetStatesByIDResponse, error) {
+	return nil, nil
+}
+func (dc *testDomainCallbacks) LocalNodeName(context.Context, *pb.LocalNodeNameRequest) (*pb.LocalNodeNameResponse, error) {
+	return nil, nil
+}
+
+func (dc *testDomainCallbacks) SendTransaction(ctx context.Context, tx *pb.SendTransactionRequest) (*pb.SendTransactionResponse, error) {
+	return nil, nil
+}
+
 func TestNew(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	assert.NotNil(t, z)
 }
@@ -53,7 +84,7 @@ func TestConfigureDomain(t *testing.T) {
 	}
 	configBytes, err := json.Marshal(dfConfig)
 	assert.NoError(t, err)
-	req := &prototk.ConfigureDomainRequest{
+	req := &pb.ConfigureDomainRequest{
 		Name:       "z1",
 		ConfigJson: "bad json",
 	}
@@ -87,10 +118,10 @@ func TestDecodeDomainConfig(t *testing.T) {
 }
 
 func TestInitDomain(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
-	req := &prototk.InitDomainRequest{
-		AbiStateSchemas: []*prototk.StateSchema{
+	req := &pb.InitDomainRequest{
+		AbiStateSchemas: []*pb.StateSchema{
 			{
 				Id: "schema1",
 			},
@@ -100,21 +131,25 @@ func TestInitDomain(t *testing.T) {
 			{
 				Id: "schema3",
 			},
+			{
+				Id: "schema4",
+			},
 		},
 	}
 	res, err := z.InitDomain(context.Background(), req)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, "schema1", z.coinSchema.Id)
-	assert.Equal(t, "schema2", z.merkleTreeRootSchema.Id)
-	assert.Equal(t, "schema3", z.merkleTreeNodeSchema.Id)
+	assert.Equal(t, "schema2", z.nftSchema.Id)
+	assert.Equal(t, "schema3", z.merkleTreeRootSchema.Id)
+	assert.Equal(t, "schema4", z.merkleTreeNodeSchema.Id)
 }
 
 func TestInitDeploy(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
-	req := &prototk.InitDeployRequest{
-		Transaction: &prototk.DeployTransactionSpecification{
+	req := &pb.InitDeployRequest{
+		Transaction: &pb.DeployTransactionSpecification{
 			TransactionId:         "0x1234",
 			ConstructorParamsJson: "bad json",
 		},
@@ -128,45 +163,93 @@ func TestInitDeploy(t *testing.T) {
 }
 
 func TestPrepareDeploy(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
-	z := New(testCallbacks)
-	z.config = &types.DomainFactoryConfig{
-		DomainContracts: types.DomainConfigContracts{
-			Implementations: []*types.DomainContract{
-				{
-					Name:      "testToken1",
-					CircuitId: "circuit1",
+	testCases := []struct {
+		name                  string
+		constructorParamsJson string
+		errorMsg              string
+		tokenName             string
+		circuitId             string
+		isNonFungible         bool
+	}{
+		{
+			name:                  "Invalid JSON in ConstructorParamsJson",
+			constructorParamsJson: "bad json",
+			errorMsg:              "PD210006: Failed to validate prepare deploy parameters. invalid character 'b' looking for beginning of value",
+		},
+		{
+			name:                  "Circuit ID Not Found",
+			constructorParamsJson: "{}",
+			circuitId:             "circuit1",
+			tokenName:             "testToken1",
+			errorMsg:              "PD210007: Failed to find circuit ID based on the token name. PD210000: Contract '' not found",
+		},
+		{
+			name:                  "Valid fungible token",
+			tokenName:             constants.TOKEN_ANON,
+			circuitId:             constants.CIRCUIT_ANON,
+			constructorParamsJson: fmt.Sprintf("{\"tokenName\":\"%s\"}", constants.TOKEN_ANON),
+			isNonFungible:         false,
+		},
+		{
+			name:                  "Non-fungible token",
+			tokenName:             constants.TOKEN_NF_ANON,
+			circuitId:             constants.CIRCUIT_NF_ANON,
+			constructorParamsJson: fmt.Sprintf("{\"tokenName\":\"%s\"}", constants.TOKEN_NF_ANON),
+			isNonFungible:         true,
+		},
+		{
+			name:                  "Non-fungible token with nullifier",
+			tokenName:             constants.TOKEN_NF_ANON_NULLIFIER,
+			circuitId:             constants.CIRCUIT_NF_ANON_NULLIFIER,
+			constructorParamsJson: fmt.Sprintf("{\"tokenName\":\"%s\"}", constants.TOKEN_NF_ANON_NULLIFIER),
+			isNonFungible:         true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testCallbacks := &testDomainCallbacks{}
+			z := New(testCallbacks)
+			z.config = &types.DomainFactoryConfig{
+				DomainContracts: types.DomainConfigContracts{
+					Implementations: []*types.DomainContract{
+						{
+							Name:      tc.tokenName,
+							CircuitId: tc.circuitId,
+						},
+					},
 				},
-			},
-		},
-	}
-	req := &prototk.PrepareDeployRequest{
-		Transaction: &prototk.DeployTransactionSpecification{
-			TransactionId:         "0x1234",
-			ConstructorParamsJson: "bad json",
-		},
-		ResolvedVerifiers: []*prototk.ResolvedVerifier{
-			{
-				Verifier: "Alice",
-			},
-		},
-	}
-	_, err := z.PrepareDeploy(context.Background(), req)
-	assert.EqualError(t, err, "PD210006: Failed to validate prepare deploy parameters. invalid character 'b' looking for beginning of value")
+			}
 
-	req.Transaction.ConstructorParamsJson = "{}"
-	_, err = z.PrepareDeploy(context.Background(), req)
-	assert.EqualError(t, err, "PD210007: Failed to find circuit ID based on the token name. PD210000: Contract '' not found")
+			req := &pb.PrepareDeployRequest{
+				Transaction: &pb.DeployTransactionSpecification{
+					TransactionId:         "0x1234",
+					ConstructorParamsJson: tc.constructorParamsJson,
+				},
+				ResolvedVerifiers: []*pb.ResolvedVerifier{
+					{
+						Verifier: "Alice",
+					},
+				},
+			}
 
-	req.Transaction.ConstructorParamsJson = "{\"tokenName\":\"testToken1\"}"
-	_, err = z.PrepareDeploy(context.Background(), req)
-	assert.NoError(t, err)
+			res, err := z.PrepareDeploy(context.Background(), req)
+
+			if tc.errorMsg == "" {
+				require.NoError(t, err)
+				assert.Contains(t, res.Transaction.ParamsJson, fmt.Sprintf("\"tokenName\":\"%s\"", tc.tokenName))
+				assert.Contains(t, res.Transaction.ParamsJson, fmt.Sprintf("\"isNonFungible\":%t", tc.isNonFungible))
+			} else {
+				assert.EqualError(t, err, tc.errorMsg)
+			}
+		})
+	}
 }
 
 func TestInitContract(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
-	req := &prototk.InitContractRequest{
+	req := &pb.InitContractRequest{
 		ContractConfig: []byte("bad config"),
 	}
 	res, err := z.InitContract(context.Background(), req)
@@ -191,14 +274,14 @@ func TestInitContract(t *testing.T) {
 }
 
 func TestInitTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
-	req := &prototk.InitTransactionRequest{
-		Transaction: &prototk.TransactionSpecification{
+	req := &pb.InitTransactionRequest{
+		Transaction: &pb.TransactionSpecification{
 			TransactionId:      "0x1234",
 			FunctionAbiJson:    "bad json",
 			FunctionParamsJson: "bad json",
-			ContractInfo: &prototk.ContractInfo{
+			ContractInfo: &pb.ContractInfo{
 				ContractConfigJson: `{!!! bad`,
 			},
 		},
@@ -259,26 +342,26 @@ func TestInitTransaction(t *testing.T) {
 }
 
 func TestAssembleTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.name = "z1"
-	z.coinSchema = &prototk.StateSchema{
+	z.coinSchema = &pb.StateSchema{
 		Id: "coin",
 	}
 
 	assert.Equal(t, "z1", z.Name())
 	assert.Equal(t, "coin", z.CoinSchemaID())
 
-	req := &prototk.AssembleTransactionRequest{
-		Transaction: &prototk.TransactionSpecification{
+	req := &pb.AssembleTransactionRequest{
+		Transaction: &pb.TransactionSpecification{
 			TransactionId:      "0x1234",
 			FunctionAbiJson:    "{\"type\":\"function\",\"name\":\"mint\"}",
 			FunctionParamsJson: "{\"mints\":[{\"to\":\"Alice\",\"amount\":\"10\"}]}",
-			ContractInfo: &prototk.ContractInfo{
+			ContractInfo: &pb.ContractInfo{
 				ContractAddress: "0x1234567890123456789012345678901234567890",
 			},
 		},
-		ResolvedVerifiers: []*prototk.ResolvedVerifier{
+		ResolvedVerifiers: []*pb.ResolvedVerifier{
 			{
 				Lookup:       "Alice",
 				Verifier:     "0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025",
@@ -301,13 +384,13 @@ func TestAssembleTransaction(t *testing.T) {
 }
 
 func TestEndorseTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
-	req := &prototk.EndorseTransactionRequest{
-		Transaction: &prototk.TransactionSpecification{
+	req := &pb.EndorseTransactionRequest{
+		Transaction: &pb.TransactionSpecification{
 			TransactionId:      "0x1234",
 			FunctionParamsJson: "{\"mints\":[{\"to\":\"Alice\",\"amount\":\"10\"}]}",
-			ContractInfo: &prototk.ContractInfo{
+			ContractInfo: &pb.ContractInfo{
 				ContractAddress: "0x1234567890123456789012345678901234567890",
 			},
 		},
@@ -327,7 +410,7 @@ func TestEndorseTransaction(t *testing.T) {
 }
 
 func TestPrepareTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.config = &types.DomainFactoryConfig{
 		DomainContracts: types.DomainConfigContracts{
@@ -339,15 +422,15 @@ func TestPrepareTransaction(t *testing.T) {
 			},
 		},
 	}
-	req := &prototk.PrepareTransactionRequest{
-		Transaction: &prototk.TransactionSpecification{
+	req := &pb.PrepareTransactionRequest{
+		Transaction: &pb.TransactionSpecification{
 			TransactionId:      "0x1234",
 			FunctionParamsJson: "{\"mints\":[{\"to\":\"Alice\",\"amount\":\"10\"}]}",
-			ContractInfo: &prototk.ContractInfo{
+			ContractInfo: &pb.ContractInfo{
 				ContractAddress: "0x1234567890123456789012345678901234567890",
 			},
 		},
-		OutputStates: []*prototk.EndorsableState{
+		OutputStates: []*pb.EndorsableState{
 			{
 				StateDataJson: "{\"salt\":\"0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec\",\"owner\":\"0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025\",\"amount\":\"0x0f\",\"hash\":\"0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f\"}",
 			},
@@ -367,51 +450,21 @@ func TestPrepareTransaction(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestFindCoins(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{
-		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
-			return nil, errors.New("find coins error")
+func newTestZeto() (*Zeto, *domain.MockDomainCallbacks) {
+	testCallbacks := &domain.MockDomainCallbacks{
+		MockFindAvailableStates: func() (*pb.FindAvailableStatesResponse, error) {
+			return &pb.FindAvailableStatesResponse{}, nil
 		},
 	}
 	z := New(testCallbacks)
 	z.name = "z1"
-	z.coinSchema = &prototk.StateSchema{
+	z.coinSchema = &pb.StateSchema{
 		Id: "coin",
 	}
-	useNullifiers := false
-	addr, _ := tktypes.ParseEthAddress("0x1234567890123456789012345678901234567890")
-	_, err := findCoins(context.Background(), z, useNullifiers, addr, "{}")
-	assert.EqualError(t, err, "find coins error")
-
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
-		return &prototk.FindAvailableStatesResponse{
-			States: []*prototk.StoredState{
-				{
-					DataJson: "{\"salt\":\"0x13de02d64a5736a56b2d35d2a83dd60397ba70aae6f8347629f0960d4fee5d58\",\"owner\":\"0xc1d218cf8993f940e75eabd3fee23dadc4e89cd1de479f03a61e91727959281b\",\"amount\":\"0x0a\"}",
-				},
-			},
-		}, nil
-	}
-	res, err := findCoins(context.Background(), z, useNullifiers, addr, "{}")
-	assert.NoError(t, err)
-	assert.NotNil(t, res)
-}
-
-func newTestZeto() (*Zeto, *testDomainCallbacks) {
-	testCallbacks := &testDomainCallbacks{
-		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
-			return &prototk.FindAvailableStatesResponse{}, nil
-		},
-	}
-	z := New(testCallbacks)
-	z.name = "z1"
-	z.coinSchema = &prototk.StateSchema{
-		Id: "coin",
-	}
-	z.merkleTreeRootSchema = &prototk.StateSchema{
+	z.merkleTreeRootSchema = &pb.StateSchema{
 		Id: "merkle_tree_root",
 	}
-	z.merkleTreeNodeSchema = &prototk.StateSchema{
+	z.merkleTreeNodeSchema = &pb.StateSchema{
 		Id: "merkle_tree_node",
 	}
 	z.mintSignature = "event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)"
@@ -422,18 +475,18 @@ func newTestZeto() (*Zeto, *testDomainCallbacks) {
 
 func TestHandleEventBatch(t *testing.T) {
 	z, testCallbacks := newTestZeto()
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*pb.FindAvailableStatesResponse, error) {
 		return nil, errors.New("find merkle tree root error")
 	}
 	ctx := context.Background()
-	req := &prototk.HandleEventBatchRequest{
-		Events: []*prototk.OnChainEvent{
+	req := &pb.HandleEventBatchRequest{
+		Events: []*pb.OnChainEvent{
 			{
 				DataJson:          "bad data",
 				SoliditySignature: "event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)",
 			},
 		},
-		ContractInfo: &prototk.ContractInfo{
+		ContractInfo: &pb.ContractInfo{
 			ContractConfigJson: `{!!! bad config`,
 		},
 	}
@@ -452,8 +505,8 @@ func TestHandleEventBatch(t *testing.T) {
 	_, err = z.HandleEventBatch(ctx, req)
 	assert.EqualError(t, err, "PD210019: Failed to create Merkle tree for smt_Zeto_AnonNullifier_0x1234567890123456789012345678901234567890: PD210065: Failed to find available states for the merkle tree. find merkle tree root error")
 
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
-		return &prototk.FindAvailableStatesResponse{}, nil
+	testCallbacks.MockFindAvailableStates = func() (*pb.FindAvailableStatesResponse, error) {
+		return &pb.FindAvailableStatesResponse{}, nil
 	}
 	res1, err := z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
@@ -487,16 +540,16 @@ func TestHandleEventBatch(t *testing.T) {
 }
 
 func TestGetVerifier(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.name = "z1"
-	z.coinSchema = &prototk.StateSchema{
+	z.coinSchema = &pb.StateSchema{
 		Id: "coin",
 	}
 	snarkProver, err := zetosigner.NewSnarkProver(&zetosignerapi.SnarkProverConfig{})
 	assert.NoError(t, err)
 	z.snarkProver = snarkProver
-	req := &prototk.GetVerifierRequest{
+	req := &pb.GetVerifierRequest{
 		Algorithm: "bad algo",
 	}
 	_, err = z.GetVerifier(context.Background(), req)
@@ -504,7 +557,7 @@ func TestGetVerifier(t *testing.T) {
 
 	bytes, err := hex.DecodeString("7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
 	assert.NoError(t, err)
-	req = &prototk.GetVerifierRequest{
+	req = &pb.GetVerifierRequest{
 		Algorithm:    z.getAlgoZetoSnarkBJJ(),
 		VerifierType: zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X,
 		PrivateKey:   bytes,
@@ -515,29 +568,29 @@ func TestGetVerifier(t *testing.T) {
 }
 
 func TestSign(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.name = "z1"
-	z.coinSchema = &prototk.StateSchema{
+	z.coinSchema = &pb.StateSchema{
 		Id: "coin",
 	}
 	snarkProver := signer.NewTestProver(t)
 	z.snarkProver = snarkProver
 
-	req := &prototk.SignRequest{
+	req := &pb.SignRequest{
 		PayloadType: "bad payload",
 	}
 	_, err := z.Sign(context.Background(), req)
 	assert.ErrorContains(t, err, "PD210103: Sign payload type 'bad payload' not recognized")
 
-	req = &prototk.SignRequest{
+	req = &pb.SignRequest{
 		PayloadType: "domain:zeto:snark",
 		Algorithm:   "bad algo",
 	}
 	_, err = z.Sign(context.Background(), req)
 	assert.ErrorContains(t, err, "PD210023: Failed to sign. PD210088: 'bad algo' does not match supported algorithm")
 
-	bytes, err := hex.DecodeString("7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
+	_, err = hex.DecodeString("7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
 	assert.NoError(t, err)
 	alice := signer.NewTestKeypair()
 	bob := signer.NewTestKeypair()
@@ -557,29 +610,35 @@ func TestSign(t *testing.T) {
 
 	alicePubKey := zetosigner.EncodeBabyJubJubPublicKey(alice.PublicKey)
 	bobPubKey := zetosigner.EncodeBabyJubJubPublicKey(bob.PublicKey)
+	s := protoz.TokenSecrets_Fungible{
+		InputValues:  inputValueInts,
+		OutputValues: outputValueInts,
+	}
+	bytes, err := json.Marshal(&s)
+	require.NoError(t, err)
 
 	provingReq := protoz.ProvingRequest{
 		CircuitId: constants.CIRCUIT_ANON,
 		Common: &protoz.ProvingRequestCommon{
 			InputCommitments: inputCommitments,
-			InputValues:      inputValueInts,
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
-			OutputValues:     outputValueInts,
 			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
+			TokenType:        protoz.TokenType_fungible,
+			TokenSecrets:     bytes,
 		},
 	}
 	payload, err := proto.Marshal(&provingReq)
 	require.NoError(t, err)
-	req = &prototk.SignRequest{
+	req = &pb.SignRequest{
 		Algorithm:   z.getAlgoZetoSnarkBJJ(),
 		PayloadType: "domain:zeto:snark",
 		PrivateKey:  bytes,
 		Payload:     payload,
 	}
 	res, err := z.Sign(context.Background(), req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, res.Payload, 36)
 
 	// Test with nullifiers
@@ -589,7 +648,7 @@ func TestSign(t *testing.T) {
 		Owner:  tktypes.MustParseHexBytes(alicePubKey),
 		Amount: tktypes.Int64ToInt256(12345),
 	}
-	req = &prototk.SignRequest{
+	req = &pb.SignRequest{
 		Algorithm:   z.getAlgoZetoSnarkBJJ(),
 		PayloadType: "domain:zeto:nullifier",
 		PrivateKey:  bytes,
@@ -603,8 +662,8 @@ func TestSign(t *testing.T) {
 func TestValidateStateHashes(t *testing.T) {
 	z, _ := newTestZeto()
 	ctx := context.Background()
-	req := &prototk.ValidateStateHashesRequest{
-		States: []*prototk.EndorsableState{
+	req := &pb.ValidateStateHashesRequest{
+		States: []*pb.EndorsableState{
 			{
 				SchemaId:      "coin",
 				StateDataJson: "bad json",
@@ -633,31 +692,41 @@ func TestValidateStateHashes(t *testing.T) {
 	assert.Len(t, res.StateIds, 1)
 }
 
-func findCoins(ctx context.Context, z *Zeto, useNullifiers bool, contractAddress *tktypes.EthAddress, query string) ([]*types.ZetoCoin, error) {
-	states, err := z.findAvailableStates(ctx, useNullifiers, contractAddress.String(), query)
-	if err != nil {
-		return nil, err
-	}
-
-	coins := make([]*types.ZetoCoin, len(states))
-	for i, state := range states {
-		if coins[i], err = z.makeCoin(state.DataJson); err != nil {
-			return nil, err
-		}
-	}
-	return coins, err
-}
-
 func TestGetHandler(t *testing.T) {
 	z := &Zeto{
 		name: "test1",
 	}
-	assert.NotNil(t, z.GetHandler("mint"))
-	assert.NotNil(t, z.GetHandler("transfer"))
-	assert.NotNil(t, z.GetHandler("lock"))
-	assert.NotNil(t, z.GetHandler("deposit"))
-	assert.NotNil(t, z.GetHandler("withdraw"))
-	assert.Nil(t, z.GetHandler("bad"))
+
+	tests := []struct {
+		name        string
+		action      string
+		tokenName   string
+		expectedNil bool
+	}{
+		// Tests for TOKEN_ANON
+		{"Valid mint handler for TOKEN_ANON", "mint", constants.TOKEN_ANON, false},
+		{"Valid transfer handler for TOKEN_ANON", "transfer", constants.TOKEN_ANON, false},
+		{"Valid lock handler for TOKEN_ANON", "lock", constants.TOKEN_ANON, false},
+		{"Valid deposit handler for TOKEN_ANON", "deposit", constants.TOKEN_ANON, false},
+		{"Valid withdraw handler for TOKEN_ANON", "withdraw", constants.TOKEN_ANON, false},
+		{"Invalid handler for TOKEN_ANON", "bad", constants.TOKEN_ANON, true},
+
+		// Tests for TOKEN_NF_ANON
+		{"Valid mint handler for TOKEN_NF_ANON", "mint", constants.TOKEN_NF_ANON, false},
+		{"Valid transfer handler for TOKEN_NF_ANON", "transfer", constants.TOKEN_NF_ANON, false},
+		{"Invalid handler for TOKEN_NF_ANON", "bad", constants.TOKEN_NF_ANON, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := z.GetHandler(tt.action, tt.tokenName)
+			if tt.expectedNil {
+				assert.Nil(t, handler)
+			} else {
+				assert.NotNil(t, handler)
+			}
+		})
+	}
 }
 
 func TestUnimplementedMethods(t *testing.T) {
@@ -670,4 +739,10 @@ func TestUnimplementedMethods(t *testing.T) {
 
 	_, err = z.BuildReceipt(context.Background(), nil)
 	assert.ErrorContains(t, err, "PD210102: Not implemented")
+}
+
+func TestGetStateSchemas(t *testing.T) {
+	schemas, err := getStateSchemas(context.Background())
+	assert.NoError(t, err)
+	assert.Len(t, schemas, 4)
 }

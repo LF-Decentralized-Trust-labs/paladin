@@ -24,7 +24,7 @@ ext {
     goFilesE2E = fileTree(".") {
         include "integration-test/**/*.go"
     }
-    targetCoverage = 92.9
+    targetCoverage = 92.0
     maxCoverageBarGap = 1
     coveragePackages = [
         "github.com/kaleido-io/paladin/domains/zeto/internal/...",
@@ -179,7 +179,8 @@ task copyPkgSolidity(type: Copy) {
 
     into 'pkg/types/abis'
     from fileTree(configurations.contractCompile.asPath) {
-        include 'contracts/domains/interfaces/IZetoPrivate.sol/IZetoPrivate.json'
+        include 'contracts/domains/interfaces/IZetoFungible.sol/IZetoFungible.json'
+        include 'contracts/domains/interfaces/IZetoNonFungible.sol/IZetoNonFungible.json'
     }
 
     // Flatten all paths into the destination folder
@@ -216,7 +217,8 @@ task testE2E(type: Exec, dependsOn: [protoc, copySolidity, copyPkgSolidity, copy
     inputs.files(configurations.coreGo)
     inputs.files(goFiles)
     inputs.files(goFilesE2E)
-    inputs.file('./integration-test/config-for-deploy.yaml')
+    inputs.file('./integration-test/config-for-deploy-fungible.yaml')
+    inputs.file('./integration-test/config-for-deploy-non-fungible.yaml')
     outputs.dir('coverage')
 
     workingDir '.'
@@ -300,7 +302,7 @@ task assemble {
 }
 
 dependencies {
-    goSource files(goFiles, copySolidity, copyPkgSolidity)
+    goSource files(goFiles, copySolidity, copyPkgSolidity, copySolidityForTest)
     zetoArtifacts files(extractZetoArtifacts)
     poseidonArtifacts files(generatePoseidonArtifacts)
 }

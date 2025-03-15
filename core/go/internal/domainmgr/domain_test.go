@@ -193,11 +193,12 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 				Config:          map[string]any{"some": "conf"},
 				RegistryAddress: tktypes.RandHex(20),
 				DefaultGasLimit: confutil.P(uint64(100000)),
+				Init:            pldconf.DomainInitConfig{},
 			},
 		},
 	}, extraSetup...)
 
-	mc.blockIndexer.On("AddEventStream", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
+	mc.blockIndexer.On("AddEventStream", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
 	tp := newTestPlugin(nil)
 	tp.Functions = &plugintk.DomainAPIFunctions{
@@ -221,13 +222,13 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 	addr := *tktypes.RandAddress()
 	if realDB {
 		dCtx := dm.stateStore.NewDomainContext(ctx, tp.d, addr)
-		c = tp.d.newInFlightDomainRequest(dm.persistence.DB(), dCtx)
+		c = tp.d.newInFlightDomainRequest(dm.persistence.NOTX(), dCtx, true /* readonly unless modified by test */)
 	} else {
 		mdc = componentmocks.NewDomainContext(t)
 		mdc.On("Ctx").Return(ctx).Maybe()
 		mdc.On("Info").Return(components.DomainContextInfo{ID: uuid.New()}).Maybe()
 		mdc.On("Close").Return()
-		c = tp.d.newInFlightDomainRequest(dm.persistence.DB(), mdc)
+		c = tp.d.newInFlightDomainRequest(dm.persistence.NOTX(), mdc, true /* readonly unless modified by test */)
 		mc.stateStore.On("NewDomainContext", mock.Anything, tp.d, mock.Anything, mock.Anything).Return(mdc).Maybe()
 	}
 
@@ -242,18 +243,26 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 		}, func() {
 			c.close()
 			c.dCtx.Close()
+			if mdc != nil {
+				mdc.Close()
+			}
 			dmDone()
 		}
 }
 
 func registerTestDomain(t *testing.T, dm *domainManager, tp *testPlugin) {
-	_, err := dm.DomainRegistered("test1", tp)
+	d, err := dm.registerDomain("test1", tp)
 	require.NoError(t, err)
+
+	// For unit tests, we want any errors to pop out - rather than the actual runtime behavior of infinite retry
+	d.initRetry.UTSetMaxAttempts(1)
+
+	// Kick off the init (as would happen in DomainRegistered callback otherwise)
+	go d.init()
 
 	da, err := dm.getDomainByName(context.Background(), "test1")
 	require.NoError(t, err)
 	tp.d = da
-	tp.d.initRetry.UTSetMaxAttempts(1)
 	<-tp.d.initDone
 }
 
@@ -267,7 +276,9 @@ func goodDomainConf() *prototk.DomainConfig {
 
 func mockSchemas(schemas ...components.Schema) func(mc *mockComponents) {
 	return func(mc *mockComponents) {
+		mc.db.ExpectBegin()
 		mc.stateStore.On("EnsureABISchemas", mock.Anything, mock.Anything, "test1", mock.Anything).Return(schemas, nil)
+		mc.db.ExpectCommit()
 	}
 }
 
@@ -285,9 +296,10 @@ func TestDomainInitStates(t *testing.T) {
 	assert.True(t, td.d.Initialized())
 
 }
+
 func mockUpsertABIOk(mc *mockComponents) {
-	mc.txManager.On("UpsertABI", mock.Anything, mock.Anything, mock.Anything).Return(func() {}, &pldapi.StoredABI{
-		Hash: tktypes.Bytes32(tktypes.RandBytes(32)),
+	mc.txManager.On("UpsertABI", mock.Anything, mock.Anything, mock.Anything).Return(&pldapi.StoredABI{
+		Hash: tktypes.RandBytes32(),
 	}, nil)
 }
 
@@ -332,12 +344,16 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 
 }
 
+func mockBegin(mc *mockComponents) {
+	mc.db.ExpectBegin()
+}
+
 func TestDomainInitBadSchemas(t *testing.T) {
 	td, done := newTestDomain(t, false, &prototk.DomainConfig{
 		AbiStateSchemasJson: []string{
 			`!!! Wrong`,
 		},
-	})
+	}, mockBegin)
 	defer done()
 	assert.Regexp(t, "PD011602", *td.d.initError.Load())
 	assert.False(t, td.tp.initialized.Load())
@@ -347,7 +363,7 @@ func TestDomainInitBadEventsJSON(t *testing.T) {
 	td, done := newTestDomain(t, false, &prototk.DomainConfig{
 		AbiStateSchemasJson: []string{},
 		AbiEventsJson:       `!!! Wrong`,
-	})
+	}, mockBegin)
 	defer done()
 	assert.Regexp(t, "PD011642", *td.d.initError.Load())
 	assert.False(t, td.tp.initialized.Load())
@@ -363,7 +379,7 @@ func TestDomainInitBadEventsABI(t *testing.T) {
 				"inputs": [{"type": "verywrong"}]
 			}
 		]`,
-	}, mockUpsertABIOk)
+	}, mockBegin, mockUpsertABIOk)
 	defer done()
 	assert.Regexp(t, "FF22025", *td.d.initError.Load())
 	assert.False(t, td.tp.initialized.Load())
@@ -379,8 +395,8 @@ func TestDomainInitUpsertEventsABIFail(t *testing.T) {
 				"inputs": [{"type": "verywrong"}]
 			}
 		]`,
-	}, func(mc *mockComponents) {
-		mc.txManager.On("UpsertABI", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil, fmt.Errorf("pop"))
+	}, mockBegin, func(mc *mockComponents) {
+		mc.txManager.On("UpsertABI", mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
 	})
 	defer done()
 	assert.Regexp(t, "pop", *td.d.initError.Load())
@@ -391,8 +407,8 @@ func TestDomainInitStreamFail(t *testing.T) {
 	td, done := newTestDomain(t, false, &prototk.DomainConfig{
 		AbiStateSchemasJson: []string{},
 		AbiEventsJson:       fakeCoinEventsABI,
-	}, mockUpsertABIOk, func(mc *mockComponents) {
-		mc.blockIndexer.On("AddEventStream", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
+	}, mockBegin, mockUpsertABIOk, func(mc *mockComponents) {
+		mc.blockIndexer.On("AddEventStream", mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
 	})
 	defer done()
 	assert.EqualError(t, *td.d.initError.Load(), "pop")
@@ -404,7 +420,7 @@ func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
-	}, func(mc *mockComponents) {
+	}, mockBegin, func(mc *mockComponents) {
 		mc.stateStore.On("EnsureABISchemas", mock.Anything, mock.Anything, "test1", mock.Anything).Return(nil, fmt.Errorf("pop"))
 	})
 	defer done()
@@ -491,12 +507,10 @@ func TestDomainFindAvailableStatesBadQStateQueryContext(t *testing.T) {
 }
 
 func TestDomainFindAvailableStatesFail(t *testing.T) {
-	td, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
-		mc.stateStore.On("EnsureABISchemas", mock.Anything, mock.Anything, "test1", mock.Anything).Return([]components.Schema{}, nil)
-	})
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
 
-	schemaID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schemaID := tktypes.RandBytes32()
 	td.mdc.On("FindAvailableStates", mock.Anything, schemaID, mock.Anything).Return(nil, nil, fmt.Errorf("pop"))
 
 	assert.Nil(t, td.d.initError.Load())
@@ -510,7 +524,7 @@ func TestDomainFindAvailableStatesFail(t *testing.T) {
 
 func storeTestState(t *testing.T, td *testDomainContext, txID uuid.UUID, amount *ethtypes.HexInteger) *fakeState {
 	state := &fakeState{
-		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Salt:   tktypes.RandBytes32(),
 		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
 		Amount: amount,
 	}
@@ -519,7 +533,7 @@ func storeTestState(t *testing.T, td *testDomainContext, txID uuid.UUID, amount 
 
 	// Call the real statestore
 	_, err = td.c.dCtx.UpsertStates(td.c.dbTX, &components.StateUpsert{
-		SchemaID:  tktypes.MustParseBytes32(td.tp.stateSchemas[0].Id),
+		Schema:    tktypes.MustParseBytes32(td.tp.stateSchemas[0].Id),
 		Data:      stateJSON,
 		CreatedBy: &txID,
 	})
@@ -1022,6 +1036,64 @@ func TestRecoverSignerFailCases(t *testing.T) {
 	assert.Regexp(t, "PD011638", err)
 }
 
+func TestSendTransactionFailCases(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+
+	_, err := td.d.SendTransaction(td.ctx, &prototk.SendTransactionRequest{
+		StateQueryContext: td.c.id,
+	})
+	require.ErrorContains(t, err, "PD011663")
+
+	td.c.readOnly = false
+
+	_, err = td.d.SendTransaction(td.ctx, &prototk.SendTransactionRequest{
+		StateQueryContext: td.c.id,
+		Transaction: &prototk.TransactionInput{
+			ContractAddress: "badnotgood",
+			FunctionAbiJson: `{}`,
+			ParamsJson:      `{}`,
+		},
+	})
+	require.ErrorContains(t, err, "bad address")
+
+	_, err = td.d.SendTransaction(td.ctx, &prototk.SendTransactionRequest{
+		StateQueryContext: td.c.id,
+		Transaction: &prototk.TransactionInput{
+			ContractAddress: "0x05d936207F04D81a85881b72A0D17854Ee8BE45A",
+			FunctionAbiJson: `bad`,
+			ParamsJson:      `{}`,
+		},
+	})
+	require.ErrorContains(t, err, "invalid character")
+}
+
+func TestGetStatesFailCases(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+
+	_, err := td.d.GetStatesByID(td.ctx, &prototk.GetStatesByIDRequest{
+		StateQueryContext: "bad",
+	})
+	require.ErrorContains(t, err, "PD011649")
+
+	_, err = td.d.GetStatesByID(td.ctx, &prototk.GetStatesByIDRequest{
+		StateQueryContext: td.c.id,
+		SchemaId:          "bad",
+	})
+	require.ErrorContains(t, err, "PD011641")
+
+	schemaID := tktypes.Bytes32(tktypes.RandBytes(32))
+	td.mdc.On("GetStatesByID", mock.Anything, schemaID, []string{"id1"}).Return(nil, nil, fmt.Errorf("pop"))
+
+	_, err = td.d.GetStatesByID(td.ctx, &prototk.GetStatesByIDRequest{
+		StateQueryContext: td.c.id,
+		SchemaId:          schemaID.String(),
+		StateIds:          []string{"id1"},
+	})
+	require.EqualError(t, err, "pop")
+}
+
 func TestMapStateLockType(t *testing.T) {
 	for _, pldType := range pldapi.StateLockType("").Options() {
 		assert.NotNil(t, mapStateLockType(pldapi.StateLockType(pldType)))
@@ -1267,5 +1339,148 @@ func TestGetDomainReceiptLookupError(t *testing.T) {
 
 	_, err := td.d.GetDomainReceipt(td.ctx, td.c.dbTX, txID)
 	assert.Regexp(t, "pop", err)
+
+}
+
+func TestDomainConfigurePrivacyGroupOk(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	td.tp.Functions.ConfigurePrivacyGroup = func(ctx context.Context, cpgr *prototk.ConfigurePrivacyGroupRequest) (*prototk.ConfigurePrivacyGroupResponse, error) {
+		require.Equal(t, map[string]string{"prop1": "value1"}, cpgr.InputConfiguration)
+		return &prototk.ConfigurePrivacyGroupResponse{
+			Configuration: map[string]string{
+				"prop1": "value1",
+				"prop2": "value2",
+			},
+		}, nil
+	}
+
+	domain := td.d
+	props, err := domain.ConfigurePrivacyGroup(td.ctx, map[string]string{"prop1": "value1"})
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{
+		"prop1": "value1",
+		"prop2": "value2",
+	}, props)
+
+}
+
+func TestDomainConfigurePrivacyGroupFail(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	td.tp.Functions.ConfigurePrivacyGroup = func(ctx context.Context, cpgr *prototk.ConfigurePrivacyGroupRequest) (*prototk.ConfigurePrivacyGroupResponse, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	domain := td.d
+	_, err := domain.ConfigurePrivacyGroup(td.ctx, map[string]string{"prop1": "value1"})
+	require.Regexp(t, "pop", err)
+}
+
+func TestDomainInitPrivacyGroupOk(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	pgID := tktypes.RandBytes(32)
+	pgGenesis := &pldapi.PrivacyGroupGenesisState{
+		Name:        "pg1",
+		GenesisSalt: tktypes.RandBytes32(),
+		Members:     []string{"me@node1", "you@node2"},
+		Properties: pldapi.KeyValueStringProperties{
+			{Key: "prop1", Value: "value1"},
+		},
+		Configuration: pldapi.KeyValueStringProperties{
+			{Key: "confA", Value: "valueA"},
+		},
+	}
+
+	functionABI := &abi.Entry{Type: abi.Function, Name: "initPrivacyGroup"}
+	addr := tktypes.RandAddress()
+	td.tp.Functions.InitPrivacyGroup = func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+		require.Equal(t, "pg1", ipgr.PrivacyGroup.Name)
+		require.Equal(t, pgGenesis.GenesisSalt.String(), ipgr.PrivacyGroup.GenesisSalt)
+		require.Equal(t, pgGenesis.Members, ipgr.PrivacyGroup.Members)
+		require.Equal(t, pgGenesis.Properties.Map(), ipgr.PrivacyGroup.Properties)
+		require.Equal(t, pgGenesis.Configuration.Map(), ipgr.PrivacyGroup.Configuration)
+		return &prototk.InitPrivacyGroupResponse{
+			Transaction: &prototk.PreparedTransaction{
+				Type:            prototk.PreparedTransaction_PUBLIC, // less likely than private
+				ContractAddress: confutil.P(addr.String()),          // less likely than deploy
+				RequiredSigner:  confutil.P("some.signer"),          // less likely than rndom assignment
+				ParamsJson:      `{"tx": "input"}`,
+				FunctionAbiJson: tktypes.JSONString(functionABI).Pretty(),
+			},
+		}, nil
+	}
+
+	domain := td.d
+	tx, err := domain.InitPrivacyGroup(td.ctx, pgID, pgGenesis)
+	require.NoError(t, err)
+	require.Equal(t, &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:   "some.signer",
+			To:     addr,
+			Type:   pldapi.TransactionTypePublic.Enum(),
+			Data:   tktypes.RawJSON(`{"tx": "input"}`),
+			Domain: "test1",
+		},
+		ABI: abi.ABI{functionABI},
+	}, tx)
+}
+
+func TestDomainInitPrivacyGroupError(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	td.tp.Functions.InitPrivacyGroup = func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	domain := td.d
+	_, err := domain.InitPrivacyGroup(td.ctx, tktypes.RandBytes(32), &pldapi.PrivacyGroupGenesisState{})
+	assert.Regexp(t, "pop", err)
+
+}
+
+func TestDomainInitPrivacyGroupBadResFunctionABI(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	td.tp.Functions.InitPrivacyGroup = func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+		return &prototk.InitPrivacyGroupResponse{
+			Transaction: &prototk.PreparedTransaction{},
+		}, nil
+	}
+
+	domain := td.d
+	_, err := domain.InitPrivacyGroup(td.ctx, tktypes.RandBytes(32), &pldapi.PrivacyGroupGenesisState{})
+	assert.Regexp(t, "PD011607", err)
+
+}
+
+func TestDomainInitPrivacyGroupBadResFromAddr(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, td.d.initError.Load())
+
+	td.tp.Functions.InitPrivacyGroup = func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
+		return &prototk.InitPrivacyGroupResponse{
+			Transaction: &prototk.PreparedTransaction{
+				FunctionAbiJson: tktypes.JSONString(&abi.Entry{Type: abi.Function, Name: "initPrivacyGroup"}).Pretty(),
+				ContractAddress: confutil.P("wrong"),
+			},
+		}, nil
+	}
+
+	domain := td.d
+	_, err := domain.InitPrivacyGroup(td.ctx, tktypes.RandBytes(32), &pldapi.PrivacyGroupGenesisState{})
+	assert.Regexp(t, "bad address", err)
 
 }

@@ -8,6 +8,6 @@ import (
 
 func TestFfeError(t *testing.T) {
 	assert.Panics(t, func() {
-		ffe("notvalid", "")
+		pde("notvalid", "")
 	})
 }

@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -16,8 +16,43 @@
 
 import { PaletteMode, ThemeOptions } from '@mui/material';
 
-export const darkThemeOptions: ThemeOptions = {
+const commonThemeOptions: ThemeOptions = {
+  components: {
+    MuiTextField: {
+      defaultProps: {
+        slotProps: {
+          inputLabel: {
+            shrink: true
+          }
+        }
+      }
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none'
+        }
+      }
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none'
+        }
+      }
+    },
+    MuiToggleButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none'
+        }
+      }
+    }
+  }
+};
 
+export const darkThemeOptions: ThemeOptions = {
+  ...commonThemeOptions,
   palette: {
     mode: 'dark',
     primary: {
@@ -25,16 +60,30 @@ export const darkThemeOptions: ThemeOptions = {
       dark: '#6D6D6D'
     },
     secondary: {
-      main: '#20dfdf',
+      main: '#bbbbbb',
     },
     background: {
       default: 'black',
       paper: '#1E242B',
     }
   },
+  components: {
+    ...commonThemeOptions.components,
+    MuiAlert: {
+      styleOverrides: {
+        filledSuccess: {
+          color: 'white'
+        },
+        filledError: {
+          color: 'white'
+        }
+      }
+    }
+  }
 };
 
 export const lightThemeOptions: ThemeOptions = {
+  ...commonThemeOptions,
   palette: {
     mode: 'light',
     primary: {

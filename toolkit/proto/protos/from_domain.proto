@@ -17,6 +17,8 @@ syntax = "proto3";
 
 package io.kaleido.paladin.toolkit;
 
+option java_multiple_files = true;
+
 message FindAvailableStatesRequest {
   string state_query_context = 1; // Must hold a valid state query context to perform a query
   string schema_id = 2; // The ID of the schema
@@ -70,6 +72,31 @@ message RecoverSignerResponse {
   string verifier = 1;
 }
 
+message SendTransactionRequest {
+  string state_query_context = 1; // Must hold a valid state query context to perform a submit
+  TransactionInput transaction = 2;
+}
+
+message SendTransactionResponse {
+  string id = 1;
+}
+
+message LocalNodeNameRequest {
+}
+
+message LocalNodeNameResponse {
+  string name = 1;
+}
+
+message GetStatesByIDRequest {
+  string state_query_context = 1; // Must hold a valid state query context to perform a query
+  string schema_id = 2; // The ID of the schema
+  repeated string state_ids = 3; // The state IDs
+}
+
+message GetStatesByIDResponse {
+  repeated StoredState states = 1;
+}
 
 message StoredState {
   string id = 1;
@@ -87,4 +114,16 @@ message StateLock {
   }
   StateLockType type = 1;
   string transaction = 2;
+}
+
+message TransactionInput {
+  enum TransactionType {
+    PUBLIC = 0;
+    PRIVATE = 1;
+  }
+  TransactionType type = 1;
+  string from = 2;
+  string contract_address = 3;
+  string function_abi_json = 4;
+  string params_json = 5;
 }

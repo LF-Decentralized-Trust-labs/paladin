@@ -20,37 +20,44 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type transactionReceipt struct {
-	TransactionID    uuid.UUID           `gorm:"column:transaction"`
-	Indexed          tktypes.Timestamp   `gorm:"column:indexed"`
-	Domain           string              `gorm:"column:domain"`
-	Success          bool                `gorm:"column:success"`
-	TransactionHash  *tktypes.Bytes32    `gorm:"column:tx_hash"`
-	BlockNumber      *int64              `gorm:"column:block_number"`
-	TransactionIndex *int64              `gorm:"column:tx_index"`
-	LogIndex         *int64              `gorm:"column:log_index"`
-	Source           *tktypes.EthAddress `gorm:"column:source"`
-	FailureMessage   *string             `gorm:"column:failure_message"`
-	RevertData       tktypes.HexBytes    `gorm:"column:revert_data"`
-	ContractAddress  *tktypes.EthAddress `gorm:"column:contract_address"`
+	TransactionID    uuid.UUID            `gorm:"column:transaction"`
+	Sequence         uint64               `gorm:"column:sequence;autoIncrement"`
+	Indexed          tktypes.Timestamp    `gorm:"column:indexed"`
+	Domain           string               `gorm:"column:domain"`
+	Success          bool                 `gorm:"column:success"`
+	TransactionHash  *tktypes.Bytes32     `gorm:"column:tx_hash"`
+	BlockNumber      *int64               `gorm:"column:block_number"`
+	TransactionIndex *int64               `gorm:"column:tx_index"`
+	LogIndex         *int64               `gorm:"column:log_index"`
+	Source           *tktypes.EthAddress  `gorm:"column:source"`
+	FailureMessage   *string              `gorm:"column:failure_message"`
+	RevertData       tktypes.HexBytes     `gorm:"column:revert_data"`
+	ContractAddress  *tktypes.EthAddress  `gorm:"column:contract_address"`
+	Gap              *persistedReceiptGap `gorm:"foreignKey:Source;references:Source;"`
+}
+
+func (transactionReceipt) TableName() string {
+	return "transaction_receipts"
 }
 
 func mapPersistedReceipt(receipt *transactionReceipt) *pldapi.TransactionReceiptData {
 	r := &pldapi.TransactionReceiptData{
+		Sequence:        receipt.Sequence,
 		Domain:          receipt.Domain,
 		Success:         receipt.Success,
 		FailureMessage:  stringOrEmpty(receipt.FailureMessage),
@@ -76,15 +83,19 @@ func mapPersistedReceipt(receipt *transactionReceipt) *pldapi.TransactionReceipt
 
 var transactionReceiptFilters = filters.FieldMap{
 	"id":              filters.UUIDField(`"transaction"`),
+	"sequence":        filters.Int64Field("sequence"),
 	"indexed":         filters.TimestampField("indexed"),
 	"success":         filters.BooleanField("success"),
+	"domain":          filters.StringField("domain"),
+	"contractAddress": filters.HexBytesField("contract_address"),
+	"source":          filters.StringField("source"),
 	"transactionHash": filters.HexBytesField("tx_hash"),
 	"blockNumber":     filters.Int64Field("block_number"),
 }
 
 // FinalizeTransactions is called by the block indexing routine, but also can be called
 // by the private transaction manager if transactions fail without making it to the blockchain
-func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*components.ReceiptInput) error {
+func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.DBTX, info []*components.ReceiptInput) error {
 
 	if len(info) == 0 {
 		return nil
@@ -137,25 +148,35 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX *gorm.DB, in
 	}
 
 	if len(receiptsToInsert) > 0 {
-		err := dbTX.Table("transaction_receipts").
-			Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "transaction"}},
-				DoNothing: true, // once inserted, the receipt is immutable
-			}).
-			Create(receiptsToInsert).
-			Error
+		// It is very important that the sequence number for receipts increases in the commit order of the transactions.
+		// Otherwise receipt listeners might miss receipts that appear behind it's polling checkpoint.
+		// So we use an advisory lock on the DB to ensure the allocation of sequence numbers occurs under a lock.
+		// This means if transaction A commits before transaction B, it is guaranteed that the sequence number(s) allocated
+		// in transaction A will be lower than transaction B (not guaranteed otherwise).
+		err := tm.p.TakeNamedLock(ctx, dbTX, "transaction_receipts")
+		if err == nil {
+			err = dbTX.DB().Table("transaction_receipts").
+				Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "transaction"}},
+					DoNothing: true, // once inserted, the receipt is immutable
+				}).
+				Create(receiptsToInsert).
+				Error
+		}
 		if err != nil {
 			return err
 		}
 	}
 
-	// TODO: Need to create an guaranteed increasing event table for these receipts, as applications
-	//       must be able to efficiently and reliably listen for them as they are written (good or bad)
-
+	dbTX.AddPostCommit(func(ctx context.Context) {
+		if len(receiptsToInsert) > 0 {
+			tm.notifyNewReceipts(receiptsToInsert)
+		}
+	})
 	return nil
 }
 
-func (tm *txManager) CalculateRevertError(ctx context.Context, dbTX *gorm.DB, revertData tktypes.HexBytes) error {
+func (tm *txManager) CalculateRevertError(ctx context.Context, dbTX persistence.DBTX, revertData tktypes.HexBytes) error {
 	de, err := tm.DecodeRevertError(ctx, dbTX, revertData, "")
 	if err != nil {
 		return err
@@ -163,7 +184,7 @@ func (tm *txManager) CalculateRevertError(ctx context.Context, dbTX *gorm.DB, re
 	return i18n.NewError(ctx, msgs.MsgTxMgrRevertedDecodedData, de.Summary)
 }
 
-func (tm *txManager) DecodeRevertError(ctx context.Context, dbTX *gorm.DB, revertData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
+func (tm *txManager) DecodeRevertError(ctx context.Context, dbTX persistence.DBTX, revertData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
 
 	if len(revertData) < 4 {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrRevertedNoData)
@@ -172,7 +193,7 @@ func (tm *txManager) DecodeRevertError(ctx context.Context, dbTX *gorm.DB, rever
 
 	// There is potential with a 4 byte selector for clashes, so we do a distinct on the full hash
 	var errorDefs []*PersistedABIEntry
-	err := dbTX.Table("abi_entries").
+	err := dbTX.DB().Table("abi_entries").
 		Where("selector = ?", selector).
 		Where("type = ?", abi.Error).
 		Distinct("full_hash", "definition").
@@ -211,7 +232,7 @@ func (tm *txManager) DecodeRevertError(ctx context.Context, dbTX *gorm.DB, rever
 	return de, nil
 }
 
-func (tm *txManager) DecodeCall(ctx context.Context, dbTX *gorm.DB, callData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
+func (tm *txManager) DecodeCall(ctx context.Context, dbTX persistence.DBTX, callData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
 
 	if len(callData) < 4 {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrDecodeCallNoData)
@@ -220,7 +241,7 @@ func (tm *txManager) DecodeCall(ctx context.Context, dbTX *gorm.DB, callData tkt
 
 	// There is potential with a 4 byte selector for clashes, so we do a distinct on the full hash
 	var functionDefs []*PersistedABIEntry
-	err := dbTX.Table("abi_entries").
+	err := dbTX.DB().Table("abi_entries").
 		Where("selector = ?", selector).
 		Where("type = ?", abi.Function).
 		Distinct("full_hash", "definition").
@@ -255,7 +276,7 @@ func (tm *txManager) DecodeCall(ctx context.Context, dbTX *gorm.DB, callData tkt
 	return de, err
 }
 
-func (tm *txManager) DecodeEvent(ctx context.Context, dbTX *gorm.DB, topics []tktypes.Bytes32, eventData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
+func (tm *txManager) DecodeEvent(ctx context.Context, dbTX persistence.DBTX, topics []tktypes.Bytes32, eventData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
 
 	if len(topics) < 1 {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrDecodeCallNoData)
@@ -266,7 +287,7 @@ func (tm *txManager) DecodeEvent(ctx context.Context, dbTX *gorm.DB, topics []tk
 	}
 
 	var eventDefs []*PersistedABIEntry
-	err := dbTX.Table("abi_entries").
+	err := dbTX.DB().Table("abi_entries").
 		Where("full_hash = ?", topics[0]).
 		Where("type = ?", abi.Event).
 		Find(&eventDefs).
@@ -301,20 +322,20 @@ func (tm *txManager) DecodeEvent(ctx context.Context, dbTX *gorm.DB, topics []tk
 }
 
 func (tm *txManager) QueryTransactionReceipts(ctx context.Context, jq *query.QueryJSON) ([]*pldapi.TransactionReceipt, error) {
-	qw := &queryWrapper[transactionReceipt, pldapi.TransactionReceipt]{
-		p:           tm.p,
-		table:       "transaction_receipts",
-		defaultSort: "-indexed",
-		filters:     transactionReceiptFilters,
-		query:       jq,
-		mapResult: func(pt *transactionReceipt) (*pldapi.TransactionReceipt, error) {
+	qw := &filters.QueryWrapper[transactionReceipt, pldapi.TransactionReceipt]{
+		P:           tm.p,
+		Table:       "transaction_receipts",
+		DefaultSort: "-sequence",
+		Filters:     transactionReceiptFilters,
+		Query:       jq,
+		MapResult: func(pt *transactionReceipt) (*pldapi.TransactionReceipt, error) {
 			return &pldapi.TransactionReceipt{
 				ID:                     pt.TransactionID,
 				TransactionReceiptData: *mapPersistedReceipt(pt),
 			}, nil
 		},
 	}
-	return qw.run(ctx, nil)
+	return qw.Run(ctx, nil)
 }
 
 func (tm *txManager) GetTransactionReceiptByID(ctx context.Context, id uuid.UUID) (*pldapi.TransactionReceipt, error) {
@@ -325,18 +346,17 @@ func (tm *txManager) GetTransactionReceiptByID(ctx context.Context, id uuid.UUID
 	return prs[0], nil
 }
 
-func (tm *txManager) GetTransactionReceiptByIDFull(ctx context.Context, id uuid.UUID) (*pldapi.TransactionReceiptFull, error) {
-	receipt, err := tm.GetTransactionReceiptByID(ctx, id)
-	if err != nil || receipt == nil {
-		return nil, err
-	}
-	fullReceipt := &pldapi.TransactionReceiptFull{TransactionReceipt: receipt}
+func (tm *txManager) buildFullReceipt(ctx context.Context, receipt *pldapi.TransactionReceipt, domainReceipt bool) (fullReceipt *pldapi.TransactionReceiptFull, err error) {
+	fullReceipt = &pldapi.TransactionReceiptFull{TransactionReceipt: receipt}
 	if receipt.Domain != "" {
-		fullReceipt.States, err = tm.stateMgr.GetTransactionStates(ctx, tm.p.DB(), id)
-		if err == nil {
+		fullReceipt.States, err = tm.stateMgr.GetTransactionStates(ctx, tm.p.NOTX(), fullReceipt.ID)
+		if err != nil {
+			return nil, err
+		}
+		if domainReceipt {
 			d, domainErr := tm.domainMgr.GetDomainByName(ctx, receipt.Domain)
 			if domainErr == nil {
-				fullReceipt.DomainReceipt, domainErr = d.BuildDomainReceipt(ctx, tm.p.DB(), id, fullReceipt.States)
+				fullReceipt.DomainReceipt, domainErr = d.BuildDomainReceipt(ctx, tm.p.NOTX(), fullReceipt.ID, fullReceipt.States)
 			}
 			if domainErr != nil {
 				fullReceipt.DomainReceiptError = domainErr.Error()
@@ -346,14 +366,22 @@ func (tm *txManager) GetTransactionReceiptByIDFull(ctx context.Context, id uuid.
 	return fullReceipt, nil
 }
 
+func (tm *txManager) GetTransactionReceiptByIDFull(ctx context.Context, id uuid.UUID) (*pldapi.TransactionReceiptFull, error) {
+	receipt, err := tm.GetTransactionReceiptByID(ctx, id)
+	if err != nil || receipt == nil {
+		return nil, err
+	}
+	return tm.buildFullReceipt(ctx, receipt, true)
+}
+
 func (tm *txManager) GetDomainReceiptByID(ctx context.Context, domain string, id uuid.UUID) (tktypes.RawJSON, error) {
 	d, err := tm.domainMgr.GetDomainByName(ctx, domain)
 	if err != nil {
 		return nil, err
 	}
-	return d.GetDomainReceipt(ctx, tm.p.DB(), id)
+	return d.GetDomainReceipt(ctx, tm.p.NOTX(), id)
 }
 
 func (tm *txManager) GetStateReceiptByID(ctx context.Context, id uuid.UUID) (*pldapi.TransactionStates, error) {
-	return tm.stateMgr.GetTransactionStates(ctx, tm.p.DB(), id)
+	return tm.stateMgr.GetTransactionStates(ctx, tm.p.NOTX(), id)
 }

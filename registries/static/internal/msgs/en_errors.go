@@ -19,20 +19,20 @@ package msgs
 import (
 	"sync"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"golang.org/x/text/language"
 )
 
 var registered sync.Once
-var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey {
+var pde = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey {
 	registered.Do(func() {
 		i18n.RegisterPrefix("PD04", "Paladin Static Registry")
 	})
-	return i18n.FFE(language.AmericanEnglish, key, translation, statusHint...)
+	return i18n.PDE(language.AmericanEnglish, key, translation, statusHint...)
 }
 
 var (
 	// Generic PD0400XX
-	MsgInvalidRegistryConfig = ffe("PD040001", "Invalid registry configuration")
-	MsgFunctionUnsupported   = ffe("PD040002", "Function not supported")
+	MsgInvalidRegistryConfig = pde("PD040001", "Invalid registry configuration")
+	MsgFunctionUnsupported   = pde("PD040002", "Function not supported")
 )

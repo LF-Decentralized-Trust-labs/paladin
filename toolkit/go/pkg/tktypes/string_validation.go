@@ -20,7 +20,7 @@ import (
 	"context"
 	"unicode"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
@@ -43,4 +43,11 @@ func ValidateSafeCharsStartEndAlphaNum(ctx context.Context, val string, maxLen i
 		return i18n.NewError(ctx, tkmsgs.MsgTypesInvalidNameSafeCharAlphaBoxed, fieldName, maxLen, val)
 	}
 	return nil
+}
+
+func StrOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

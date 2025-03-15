@@ -95,8 +95,8 @@ configurations {
     }
 }
 
-def grpcVersion = '1.65+'
-def protobufVersion = '3.25+'
+def grpcVersion = '1.69+'
+def protobufVersion = '4.29+'
 
 dependencies {
 

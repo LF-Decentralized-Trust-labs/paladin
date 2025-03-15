@@ -15,9 +15,7 @@
 
 package io.kaleido.paladin;
 
-import io.kaleido.paladin.toolkit.ToDomain;
-import io.kaleido.paladin.toolkit.DomainBase;
-import io.kaleido.paladin.toolkit.DomainInstance;
+import io.kaleido.paladin.toolkit.*;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -28,87 +26,102 @@ public class TestDomain extends DomainInstance {
     }
 
     @Override
-    protected CompletableFuture<ToDomain.ConfigureDomainResponse> configureDomain(ToDomain.ConfigureDomainRequest request) {
-        ToDomain.DomainConfig domainConfig = ToDomain.DomainConfig.newBuilder()
+    protected CompletableFuture<ConfigureDomainResponse> configureDomain(ConfigureDomainRequest request) {
+        DomainConfig domainConfig = DomainConfig.newBuilder()
                 .build();
-        return CompletableFuture.completedFuture(ToDomain.ConfigureDomainResponse.newBuilder()
+        return CompletableFuture.completedFuture(ConfigureDomainResponse.newBuilder()
                 .setDomainConfig(domainConfig)
                 .build()
         );
     }
 
     @Override
-    protected CompletableFuture<ToDomain.InitDomainResponse> initDomain(ToDomain.InitDomainRequest request) {
-        return CompletableFuture.completedFuture(ToDomain.InitDomainResponse.getDefaultInstance());
+    protected CompletableFuture<InitDomainResponse> initDomain(InitDomainRequest request) {
+        return CompletableFuture.completedFuture(InitDomainResponse.getDefaultInstance());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.InitDeployResponse> initDeploy(ToDomain.InitDeployRequest request) {
+    protected CompletableFuture<InitDeployResponse> initDeploy(InitDeployRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.PrepareDeployResponse> prepareDeploy(ToDomain.PrepareDeployRequest request) {
+    protected CompletableFuture<PrepareDeployResponse> prepareDeploy(PrepareDeployRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.InitContractResponse> initContract(ToDomain.InitContractRequest request) {
+    protected CompletableFuture<InitContractResponse> initContract(InitContractRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.InitTransactionResponse> initTransaction(ToDomain.InitTransactionRequest request) {
+    protected CompletableFuture<InitTransactionResponse> initTransaction(InitTransactionRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.AssembleTransactionResponse> assembleTransaction(ToDomain.AssembleTransactionRequest request) {
+    protected CompletableFuture<AssembleTransactionResponse> assembleTransaction(AssembleTransactionRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.EndorseTransactionResponse> endorseTransaction(ToDomain.EndorseTransactionRequest request) {
+    protected CompletableFuture<EndorseTransactionResponse> endorseTransaction(EndorseTransactionRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.PrepareTransactionResponse> prepareTransaction(ToDomain.PrepareTransactionRequest request) {
+    protected CompletableFuture<PrepareTransactionResponse> prepareTransaction(PrepareTransactionRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.HandleEventBatchResponse> handleEventBatch(ToDomain.HandleEventBatchRequest request) {
+    protected CompletableFuture<HandleEventBatchResponse> handleEventBatch(HandleEventBatchRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.SignResponse> sign(ToDomain.SignRequest request) {
+    protected CompletableFuture<SignResponse> sign(SignRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.GetVerifierResponse> getVerifier(ToDomain.GetVerifierRequest request) {
+    protected CompletableFuture<GetVerifierResponse> getVerifier(GetVerifierRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.ValidateStateHashesResponse> validateStateHashes(ToDomain.ValidateStateHashesRequest request) {
+    protected CompletableFuture<ValidateStateHashesResponse> validateStateHashes(ValidateStateHashesRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.InitCallResponse> initCall(ToDomain.InitCallRequest request) {
+    protected CompletableFuture<InitCallResponse> initCall(InitCallRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.ExecCallResponse> execCall(ToDomain.ExecCallRequest request) {
+    protected CompletableFuture<ExecCallResponse> execCall(ExecCallRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected CompletableFuture<ToDomain.BuildReceiptResponse> buildReceipt(ToDomain.BuildReceiptRequest request) {
+    protected CompletableFuture<BuildReceiptResponse> buildReceipt(BuildReceiptRequest request) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException());
+    }
+
+    @Override
+    protected CompletableFuture<ConfigurePrivacyGroupResponse> configurePrivacyGroup(ConfigurePrivacyGroupRequest request) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException());
+    }
+
+    @Override
+    protected CompletableFuture<InitPrivacyGroupResponse> initPrivacyGroup(InitPrivacyGroupRequest request) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException());
+    }
+
+    @Override
+    protected CompletableFuture<WrapPrivacyGroupEVMTXResponse> wrapPrivacyGroupTransaction(WrapPrivacyGroupEVMTXRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 }

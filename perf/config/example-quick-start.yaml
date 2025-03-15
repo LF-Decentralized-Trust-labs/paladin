@@ -1,0 +1,22 @@
+# Run a short performance test against the paladin quick start running in kind
+# Note that this is for demonstration purposes only. The quick start system is
+# not optimised for performance.
+nodes:
+  - name: paladin-node1
+    httpEndpoint: http://127.0.0.1:31548
+    wsEndpoint: ws://127.0.0.1:31549
+instances:
+  - name: test
+    manualNodeIndex: 0
+    tests:
+      - name: public_contract
+        workers: 30
+        actionsPerLoop: 10
+    contractOptions: # deploy simple storage before running this test
+      address: '0xf795dca501ad06660f961e59497bc75500577ecf'
+    maxTimePerAction: 60s
+    noWaitSubmission: false
+    delinquentAction: log
+    length: 1m
+    rampLength: 30s
+logLevel: debug    

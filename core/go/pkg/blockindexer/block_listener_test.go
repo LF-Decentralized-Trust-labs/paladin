@@ -55,12 +55,12 @@ func newTestBlockListenerConf(t *testing.T, ctx context.Context, config *pldconf
 
 	mRPC := rpcclientmocks.NewWSClient(t)
 
-	subsChan := make(chan *rpcclient.RPCSubscriptionNotification)
+	subsChan := make(chan rpcclient.RPCSubscriptionNotification)
 	mSub := rpcclientmocks.NewSubscription(t)
 	mSub.On("Notifications").Return(subsChan).Maybe()
 
 	mRPC.On("Connect", mock.Anything).Return(nil).Maybe()
-	mRPC.On("Subscribe", mock.Anything, "newHeads").Return(
+	mRPC.On("Subscribe", mock.Anything, mock.Anything, "newHeads").Return(
 		mSub, nil,
 	).Maybe()
 	mRPC.On("UnsubscribeAll", mock.Anything).Return(nil).Maybe()
@@ -85,7 +85,7 @@ func TestBlockListenerStartGettingHighestBlockRetry(t *testing.T) {
 		Return(nil).Once()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").
-		Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("pop"))).Once()
+		Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("pop"))).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexUint64)
 		*hbh = ethtypes.HexUint64(12345)
@@ -239,9 +239,9 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 				}
 				switch rpcReq.Method {
 				case "eth_blockNumber":
-					rpcRes.Result = fftypes.JSONAnyPtr(`"0x12345"`)
+					rpcRes.Result = tktypes.RawJSON(`"0x12345"`)
 				case "eth_subscribe":
-					assert.Equal(t, "newHeads", rpcReq.Params[0].AsString())
+					assert.Equal(t, "newHeads", rpcReq.Params[0].StringValue())
 					if !failedSubOnce {
 						failedSubOnce = true
 						rpcRes.Error = &rpcclient.RPCError{
@@ -249,23 +249,20 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 							Message: "pop",
 						}
 					} else {
-						rpcRes.Result = fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, uuid.New()))
+						rpcRes.Result = tktypes.RawJSON(fmt.Sprintf(`"%s"`, uuid.New()))
 						// Spam with notifications
 						go func() {
 							defer close(pingerDone)
 							for !complete {
 								time.Sleep(100 * time.Microsecond)
 								if bl.newHeadsSub != nil {
-									bl.newHeadsSub.Notifications() <- &rpcclient.RPCSubscriptionNotification{
-										CurrentSubID: bl.newHeadsSub.LocalID().String(),
-										Result:       tktypes.JSONString("anything"),
-									}
+									bl.newHeadsSub.Notifications() <- rpcclientmocks.NewRPCSubscriptionNotification(t)
 								}
 							}
 						}()
 					}
 				case "eth_newBlockFilter":
-					rpcRes.Result = fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, uuid.New()))
+					rpcRes.Result = tktypes.RawJSON(fmt.Sprintf(`"%s"`, uuid.New()))
 				case "eth_getFilterChanges":
 					// ok we can close - the shoulder tap worked
 					complete = true
@@ -405,7 +402,7 @@ func TestBlockListenerBlockNotAvailableAfterNotify(t *testing.T) {
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == block1000Hash.String()
-	}), true).Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("not found")))
+	}), true).Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("not found")))
 
 	bl.start()
 
@@ -1070,7 +1067,7 @@ func TestBlockListenerRebuildToHead(t *testing.T) {
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn ethtypes.HexUint64) bool {
 		return bn == 1003
-	}), true).Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("not found")))
+	}), true).Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("not found")))
 
 	bl.start()
 
@@ -1333,7 +1330,7 @@ func TestBlockListenerBlockHashFailed(t *testing.T) {
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == block1003Hash.String()
-	}), true).Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("pop")))
+	}), true).Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("pop")))
 
 	bl.start()
 
@@ -1358,7 +1355,7 @@ func TestBlockListenerReestablishBlockFilter(t *testing.T) {
 		hbh := args[1].(*string)
 		*hbh = testBlockFilterID2
 	}).Once()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("filter not found"))).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("filter not found"))).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		go done() // Close after we've processed the log
 	})
@@ -1377,7 +1374,7 @@ func TestBlockListenerReestablishBlockFilterFail(t *testing.T) {
 		hbh := args[1].(*ethtypes.HexUint64)
 		*hbh = ethtypes.HexUint64(1000)
 	}).Once()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("pop"))).Run(func(args mock.Arguments) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("pop"))).Run(func(args mock.Arguments) {
 		go done()
 	})
 
@@ -1415,7 +1412,7 @@ func TestBlockListenerRebuildCanonicalFailTerminate(t *testing.T) {
 	})
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, true).
-		Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("pop"))).
+		Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("pop"))).
 		Run(func(args mock.Arguments) {
 			done()
 		})
@@ -1431,7 +1428,7 @@ func TestBlockListenerClosedBeforeEstablishingBlockHeight(t *testing.T) {
 	done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").
-		Return(rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("pop"))).Once()
+		Return(rpcclient.WrapRPCError(rpcclient.RPCCodeInternalError, fmt.Errorf("pop"))).Once()
 
 	bl.listenLoopDone = make(chan struct{})
 	listenerInitiated := make(chan struct{})

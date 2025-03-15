@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
@@ -36,19 +36,30 @@ var NotoInterfaceJSON []byte
 
 type NotoHelper struct {
 	t       *testing.T
-	rpc     rpcbackend.Backend
+	rpc     rpcclient.Client
 	Address *tktypes.EthAddress
 	ABI     abi.ABI
 }
 
-func DeployNoto(ctx context.Context, t *testing.T, rpc rpcbackend.Backend, domainName, notary string, hooks *tktypes.EthAddress) *NotoHelper {
+func DeployNoto(ctx context.Context, t *testing.T, rpc rpcclient.Client, domainName, notary string, hooks *tktypes.EthAddress) *NotoHelper {
+	notaryMode := types.NotaryModeBasic
+	if hooks != nil {
+		notaryMode = types.NotaryModeHooks
+	}
+
 	var addr tktypes.EthAddress
 	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deploy", domainName, "notary", &types.ConstructorParams{
-		Notary: notary + "@node1",
-		Hooks:  &types.HookParams{PublicAddress: hooks},
+		Notary:     notary + "@node1",
+		NotaryMode: notaryMode,
+		Options: types.NotoOptions{
+			Hooks: &types.NotoHooksOptions{
+				PublicAddress:     hooks,
+				DevUsePublicHooks: true,
+			},
+		},
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		assert.NoError(t, rpcerr)
 	}
 	return &NotoHelper{
 		t:       t,
@@ -76,5 +87,25 @@ func (n *NotoHelper) Transfer(ctx context.Context, to string, amount int64) *Dom
 
 func (n *NotoHelper) ApproveTransfer(ctx context.Context, params *types.ApproveParams) *DomainTransactionHelper {
 	fn := types.NotoABI.Functions()["approveTransfer"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
+}
+
+func (n *NotoHelper) Lock(ctx context.Context, params *types.LockParams) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["lock"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
+}
+
+func (n *NotoHelper) Unlock(ctx context.Context, params *types.UnlockParams) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["unlock"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
+}
+
+func (n *NotoHelper) PrepareUnlock(ctx context.Context, params *types.UnlockParams) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["prepareUnlock"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
+}
+
+func (n *NotoHelper) DelegateLock(ctx context.Context, params *types.DelegateLockParams) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["delegateLock"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
 }

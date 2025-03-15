@@ -20,17 +20,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -39,11 +35,12 @@ func (s *rpcServer) newWSConnection(conn *websocket.Conn) {
 	defer s.wsMux.Unlock()
 
 	c := &webSocketConnection{
-		id:      tktypes.ShortID(),
-		server:  s,
-		conn:    conn,
-		send:    make(chan []byte),
-		closing: make(chan struct{}),
+		id:             tktypes.ShortID(),
+		server:         s,
+		conn:           conn,
+		asyncInstances: make(map[uuid.UUID]*asyncWrapper),
+		send:           make(chan []byte),
+		closing:        make(chan struct{}),
 	}
 	c.ctx, c.cancelCtx = context.WithCancel(log.WithLogField(s.bgCtx, "wsconn", c.id))
 
@@ -59,146 +56,79 @@ func (s *rpcServer) wsClosed(id string) {
 	delete(s.wsConnections, id)
 }
 
-func (s *rpcServer) ethSubList() []*ethSubscription {
-	s.wsMux.Lock()
-	defer s.wsMux.Unlock()
-
-	subs := make([]*ethSubscription, 0)
-	for _, wsc := range s.wsConnections {
-		subs = append(subs, wsc.subscriptions...)
-	}
-	return subs
-}
-
-func (s *rpcServer) processSubscribe(ctx context.Context, rpcReq *rpcclient.RPCRequest, wsc *webSocketConnection) (*rpcclient.RPCResponse, bool) {
-	s.wsMux.Lock()
-	defer s.wsMux.Unlock()
-
-	var eventType string
-	if len(rpcReq.Params) > 0 {
-		eventType = rpcReq.Params[0].AsString()
-	}
-	if eventType == "" {
-		return rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, tkmsgs.MsgJSONRPCInvalidParam, rpcReq.Method, 0, ""),
-			rpcReq.ID, rpcclient.RPCCodeInvalidRequest), false
-	}
-	var params1 tktypes.RawJSON
-	if len(rpcReq.Params) > 1 {
-		params1 = rpcReq.Params[1].Bytes()
-	}
-	sub := &ethSubscription{
-		c:         wsc,
-		id:        uuid.New().String(),
-		eventType: eventType,
-		params:    params1,
-	}
-	wsc.subscriptions = append(wsc.subscriptions, sub)
-
-	return &rpcclient.RPCResponse{
-		ID:      rpcReq.ID,
-		JSONRpc: "2.0",
-		Result:  fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, sub.id)),
-	}, true
-}
-
-func (s *rpcServer) processUnsubscribe(ctx context.Context, rpcReq *rpcclient.RPCRequest, wsc *webSocketConnection) (*rpcclient.RPCResponse, bool) {
-	s.wsMux.Lock()
-	defer s.wsMux.Unlock()
-
-	var subID string
-	if len(rpcReq.Params) > 0 {
-		subID = rpcReq.Params[0].AsString()
-	}
-	if subID == "" {
-		return rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, tkmsgs.MsgJSONRPCInvalidParam, rpcReq.Method, 0, ""),
-			rpcReq.ID, rpcclient.RPCCodeInvalidRequest), false
-	}
-
-	// Trim the sub
-	found := false
-	var newSubs []*ethSubscription
-	for _, s := range wsc.subscriptions {
-		if s.id == subID {
-			found = true
-		} else {
-			newSubs = append(newSubs, s)
-		}
-	}
-	wsc.subscriptions = newSubs
-
-	return &rpcclient.RPCResponse{
-		ID:      rpcReq.ID,
-		JSONRpc: "2.0",
-		Result:  fftypes.JSONAnyPtr(fmt.Sprintf("%t", found)),
-	}, true
-}
-
-func (s *rpcServer) EthPublish(eventType string, result interface{}) {
-	subs := s.ethSubList()
-	for _, s := range subs {
-		if s.eventType == eventType {
-			b, _ := json.Marshal(&ethPublication{
-				JSONRPC: "2.0",
-				Method:  "eth_subscription",
-				Params: ethPublicationParams{
-					Subscription: s.id,
-					Result:       result,
-				},
-			})
-			select {
-			case s.c.send <- b:
-			case <-s.c.closing:
-			}
-		}
-	}
-}
-
-func (s *rpcServer) WSSubscriptionCount(eventType string) (count int) {
-	allSubs := s.ethSubList()
-
-	if eventType == "" {
-		return len(allSubs)
-	}
-
-	count = 0
-	for _, s := range allSubs {
-		if s.eventType == eventType {
-			count++
-		}
-	}
-
-	return count
-}
-
-type ethSubscription struct {
-	c         *webSocketConnection
-	id        string
-	eventType string
-	params    tktypes.RawJSON
-}
-
 type webSocketConnection struct {
-	ctx           context.Context
-	cancelCtx     context.CancelFunc
-	server        *rpcServer
-	id            string
-	closeMux      sync.Mutex
-	closed        bool
-	conn          *websocket.Conn
-	subscriptions []*ethSubscription // TODO: Decide JSON/RPC sub model
-	send          chan ([]byte)
-	closing       chan (struct{})
+	ctx            context.Context
+	cancelCtx      context.CancelFunc
+	server         *rpcServer
+	id             string
+	closeMux       sync.Mutex
+	closed         bool
+	conn           *websocket.Conn
+	asyncMux       sync.Mutex
+	asyncInstances map[uuid.UUID]*asyncWrapper
+	send           chan ([]byte)
+	closing        chan (struct{})
 }
 
-type ethPublicationParams struct {
-	Subscription string      `json:"subscription"`
-	Result       interface{} `json:"result"`
+type asyncWrapper struct {
+	id       uuid.UUID
+	wsc      *webSocketConnection
+	instance RPCAsyncInstance
 }
 
-type ethPublication struct {
-	JSONRPC string               `json:"jsonrpc"`
-	Method  string               `json:"method"`
-	Params  ethPublicationParams `json:"params"`
+func (aw *asyncWrapper) Send(method string, params any) {
+	aw.wsc.sendMessage(&rpcclient.RPCResponse{
+		JSONRpc: "2.0",
+		Method:  method,
+		Params:  tktypes.JSONString(params),
+	})
+}
+
+func (aw *asyncWrapper) Closed() {
+	aw.wsc.handleCloseAsync(aw)
+}
+
+func (aw *asyncWrapper) ID() string {
+	return aw.id.String()
+}
+
+func (c *webSocketConnection) asyncHandlerList() []RPCAsyncInstance {
+	c.asyncMux.Lock()
+	defer c.asyncMux.Unlock()
+
+	handlers := make([]RPCAsyncInstance, 0, len(c.asyncInstances))
+	for _, aw := range c.asyncInstances {
+		handlers = append(handlers, aw.instance)
+	}
+	return handlers
+}
+
+func (c *webSocketConnection) handleCloseAsync(aw *asyncWrapper) {
+	c.asyncMux.Lock()
+	defer c.asyncMux.Unlock()
+
+	delete(c.asyncInstances, aw.id)
+}
+
+func (c *webSocketConnection) handleNewAsync(ctx context.Context, rpcReq *rpcclient.RPCRequest, ash RPCAsyncHandler) (res *rpcclient.RPCResponse) {
+
+	aw := &asyncWrapper{wsc: c, id: uuid.New()}
+	aw.instance, res = ash.HandleStart(ctx, rpcReq, aw)
+
+	c.asyncMux.Lock()
+	defer c.asyncMux.Unlock()
+
+	isOK := res.Error == nil
+	if isOK && aw.instance != nil {
+		c.asyncInstances[aw.id] = aw
+	}
+	return res
+}
+
+func (c *webSocketConnection) handleLifecycle(ctx context.Context, rpcReq *rpcclient.RPCRequest, ash RPCAsyncHandler) *rpcclient.RPCResponse {
+	// Just passed for on-way handling by the async handler
+	return ash.HandleLifecycle(ctx, rpcReq)
+
 }
 
 func (c *webSocketConnection) close() {
@@ -210,6 +140,11 @@ func (c *webSocketConnection) close() {
 		c.cancelCtx()
 	}
 	c.closeMux.Unlock()
+
+	// Let all the aysnc handlers know to cleanup
+	for _, ah := range c.asyncHandlerList() {
+		ah.ConnectionClosed()
+	}
 
 	c.server.wsClosed(c.id)
 	log.L(c.ctx).Infof("WS disconnected")
@@ -233,8 +168,10 @@ func (c *webSocketConnection) sender() {
 }
 
 func (c *webSocketConnection) handleMessage(payload []byte) {
-	res, _ := c.server.rpcHandler(c.ctx, bytes.NewBuffer(payload), c)
-	c.sendMessage(res)
+	r := c.server.rpcHandler(c.ctx, bytes.NewBuffer(payload), c)
+	if r.sendRes {
+		c.sendMessage(r.res)
+	}
 }
 
 func (c *webSocketConnection) sendMessage(res interface{}) {

@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
@@ -91,21 +91,21 @@ type Schema struct {
 }
 
 type StateBase struct {
-	ID              tktypes.HexBytes   `docstruct:"State" json:"id"                  gorm:"primaryKey"`
-	Created         tktypes.Timestamp  `docstruct:"State" json:"created"             gorm:"autoCreateTime:nano"`
-	DomainName      string             `docstruct:"State" json:"domain"              gorm:"primaryKey"`
-	Schema          tktypes.Bytes32    `docstruct:"State" json:"schema"`
-	ContractAddress tktypes.EthAddress `docstruct:"State" json:"contractAddress"`
-	Data            tktypes.RawJSON    `docstruct:"State" json:"data"`
+	ID              tktypes.HexBytes    `docstruct:"State" json:"id"                  gorm:"primaryKey"`
+	Created         tktypes.Timestamp   `docstruct:"State" json:"created"             gorm:"autoCreateTime:nano"`
+	DomainName      string              `docstruct:"State" json:"domain"              gorm:"primaryKey"`
+	Schema          tktypes.Bytes32     `docstruct:"State" json:"schema"`
+	ContractAddress *tktypes.EthAddress `docstruct:"State" json:"contractAddress"` // nil used for states like privacy group genesis that exists before state creation
+	Data            tktypes.RawJSON     `docstruct:"State" json:"data"`
 }
 
 // Like StateBase, but encodes Data as HexBytes
 type StateEncoded struct {
-	ID              tktypes.HexBytes   `json:"id"`
-	DomainName      string             `json:"domain"`
-	Schema          tktypes.Bytes32    `json:"schema"`
-	ContractAddress tktypes.EthAddress `json:"contractAddress"`
-	Data            tktypes.HexBytes   `json:"data"`
+	ID              tktypes.HexBytes    `json:"id"`
+	DomainName      string              `json:"domain"`
+	Schema          tktypes.Bytes32     `json:"schema"`
+	ContractAddress *tktypes.EthAddress `json:"contractAddress"` // nil used for states like privacy group genesis that exists before state creation
+	Data            tktypes.HexBytes    `json:"data"`
 }
 
 type State struct {
@@ -145,6 +145,23 @@ type TransactionStates struct {
 	Confirmed   []*StateBase       `docstruct:"TransactionStates" json:"confirmed,omitempty"`
 	Info        []*StateBase       `docstruct:"TransactionStates" json:"info,omitempty"`
 	Unavailable *UnavailableStates `docstruct:"TransactionStates" json:"unavailable,omitempty"` // nil if we have the data for all states
+}
+
+func (ts *TransactionStates) FirstUnavailable() tktypes.HexBytes {
+	switch {
+	case ts.Unavailable == nil:
+		return nil
+	case len(ts.Unavailable.Confirmed) > 0:
+		return ts.Unavailable.Confirmed[0]
+	case len(ts.Unavailable.Spent) > 0:
+		return ts.Unavailable.Spent[0]
+	case len(ts.Unavailable.Read) > 0:
+		return ts.Unavailable.Read[0]
+	case len(ts.Unavailable.Info) > 0:
+		return ts.Unavailable.Info[0]
+	default:
+		return nil
+	}
 }
 
 type UnavailableStates struct {
@@ -233,7 +250,7 @@ func (tt StateLockType) Options() []string {
 // (and maybe later spending) a state that is yet to be confirmed.
 type StateLock struct {
 	DomainName  string                      `json:"-"`
-	State       tktypes.HexBytes            `json:"-"`
+	StateID     tktypes.HexBytes            `json:"-"`
 	Transaction uuid.UUID                   `docstruct:"StateLock" json:"transaction"`
 	Type        tktypes.Enum[StateLockType] `docstruct:"StateLock" json:"type"`
 }

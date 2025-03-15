@@ -26,6 +26,8 @@ type Noto interface {
 	GetHandler(method string) types.DomainHandler
 	Name() string
 	CoinSchemaID() string
+	LockedCoinSchemaID() string
+	LockInfoSchemaID() string
 }
 
 func New(callbacks plugintk.DomainCallbacks) Noto {

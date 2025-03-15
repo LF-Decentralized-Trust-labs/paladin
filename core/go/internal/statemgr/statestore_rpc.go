@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
@@ -33,6 +34,7 @@ func (ss *stateManager) RPCModule() *rpcserver.RPCModule {
 func (ss *stateManager) initRPC() {
 	ss.rpcModule = rpcserver.NewRPCModule("pstate").
 		Add("pstate_listSchemas", ss.rpcListSchema()).
+		Add("pstate_getSchemaById", ss.rpcGetSchemaByID()).
 		Add("pstate_storeState", ss.rpcStoreState()).
 		Add("pstate_queryStates", ss.rpcQueryStates()).
 		Add("pstate_queryContractStates", ss.rpcQueryContractStates()).
@@ -44,28 +46,31 @@ func (ss *stateManager) rpcListSchema() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		domain string,
 	) ([]*pldapi.Schema, error) {
-		return ss.ListSchemasForJSON(ctx, ss.p.DB(), domain)
+		return ss.ListSchemasForJSON(ctx, ss.p.NOTX(), domain)
 	})
 }
 
 func (ss *stateManager) rpcStoreState() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod4(func(ctx context.Context,
 		domain string,
-		contractAddress tktypes.EthAddress,
+		contractAddress *tktypes.EthAddress,
 		schema tktypes.Bytes32,
 		data tktypes.RawJSON,
 	) (*pldapi.State, error) {
 		var state *pldapi.State
-		newStates, err := ss.WriteReceivedStates(ctx, ss.p.DB(), domain, []*components.StateUpsertOutsideContext{
-			{
-				ContractAddress: contractAddress,
-				SchemaID:        schema,
-				Data:            data,
-			},
+		err := ss.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+			newStates, err := ss.WriteReceivedStates(ctx, dbTX, domain, []*components.StateUpsertOutsideContext{
+				{
+					ContractAddress: contractAddress,
+					SchemaID:        schema,
+					Data:            data,
+				},
+			})
+			if err == nil {
+				state = newStates[0]
+			}
+			return err
 		})
-		if err == nil {
-			state = newStates[0]
-		}
 		return state, err
 	})
 }
@@ -77,19 +82,19 @@ func (ss *stateManager) rpcQueryStates() rpcserver.RPCHandler {
 		query query.QueryJSON,
 		status pldapi.StateStatusQualifier,
 	) ([]*pldapi.State, error) {
-		return ss.FindStates(ctx, ss.p.DB(), domain, schema, &query, status)
+		return ss.FindStates(ctx, ss.p.NOTX(), domain, schema, &query, &components.StateQueryOptions{StatusQualifier: status})
 	})
 }
 
 func (ss *stateManager) rpcQueryContractStates() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod5(func(ctx context.Context,
 		domain string,
-		contractAddress tktypes.EthAddress,
+		contractAddress *tktypes.EthAddress,
 		schema tktypes.Bytes32,
 		query query.QueryJSON,
 		status pldapi.StateStatusQualifier,
 	) ([]*pldapi.State, error) {
-		return ss.FindContractStates(ctx, ss.p.DB(), domain, contractAddress, schema, &query, status)
+		return ss.FindContractStates(ctx, ss.p.NOTX(), domain, contractAddress, schema, &query, status)
 	})
 }
 
@@ -100,7 +105,7 @@ func (ss *stateManager) rpcQueryNullifiers() rpcserver.RPCHandler {
 		query query.QueryJSON,
 		status pldapi.StateStatusQualifier,
 	) ([]*pldapi.State, error) {
-		return ss.FindNullifiers(ctx, ss.p.DB(), domain, schema, &query, status)
+		return ss.FindNullifiers(ctx, ss.p.NOTX(), domain, schema, &query, status)
 	})
 }
 
@@ -112,6 +117,15 @@ func (ss *stateManager) rpcQueryContractNullifiers() rpcserver.RPCHandler {
 		query query.QueryJSON,
 		status pldapi.StateStatusQualifier,
 	) ([]*pldapi.State, error) {
-		return ss.FindContractNullifiers(ctx, ss.p.DB(), domain, contractAddress, schema, &query, status)
+		return ss.FindContractNullifiers(ctx, ss.p.NOTX(), domain, contractAddress, schema, &query, status)
+	})
+}
+
+func (ss *stateManager) rpcGetSchemaByID() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod2(func(ctx context.Context,
+		domain string,
+		schemaID tktypes.Bytes32,
+	) (*pldapi.Schema, error) {
+		return ss.GetSchemaByID(ctx, ss.p.NOTX(), domain, schemaID, false /* null on not found */)
 	})
 }

@@ -14,20 +14,18 @@
  */
 package io.kaleido.paladin.loader;
 
-import org.apache.logging.log4j.LogManager;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Logger;
 
 import java.io.File;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
 
 public class PluginJAR extends Plugin {
 
-    private static final Logger LOGGER = LogManager.getLogger(PluginJAR.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(PluginJAR.class);
 
     private final String libName;
     private final String className;
@@ -42,6 +40,7 @@ public class PluginJAR extends Plugin {
 
     @Override
     public synchronized void loadAndStart() throws Exception {
+        LOGGER.info("loading JAR plugin {} libName={}", className, libName);
         ClassLoader classLoader = this.getClass().getClassLoader();
         if (libName != null && !libName.isBlank()) {
             URI fileURI = new File(libName).toURI();
@@ -51,7 +50,9 @@ public class PluginJAR extends Plugin {
         pluginImpl = clazz.getDeclaredConstructor().newInstance();
         Method startInstanceMethod = clazz.getMethod("startInstance", String.class, String.class);
         stopInstanceMethod = clazz.getMethod("stopInstance", String.class);
+        LOGGER.info("loaded JAR plugin {} pluginId={}", pluginImpl.getClass().getName(), info.instanceId());
         startInstanceMethod.invoke(pluginImpl, grpcTarget, info.instanceId());
+        LOGGER.info("started JAR plugin {} pluginId={}", pluginImpl.getClass().getName(), info.instanceId());
     }
 
     @Override

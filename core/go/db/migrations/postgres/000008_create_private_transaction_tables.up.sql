@@ -36,3 +36,4 @@ CREATE TABLE state_distribution_acknowledgments (
 
 CREATE UNIQUE INDEX state_distribution_acknowledgments_state_distribution ON state_distribution_acknowledgments("state_distribution");
 
+COMMIT;

@@ -23,12 +23,12 @@ import (
 	_ "embed"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -154,6 +154,16 @@ func (dm *domainManager) ConfiguredDomains() map[string]*pldconf.PluginConfig {
 }
 
 func (dm *domainManager) DomainRegistered(name string, toDomain components.DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error) {
+	d, err := dm.registerDomain(name, toDomain)
+	if err != nil {
+		return nil, err
+	}
+	// Now the domain is registered, perform the initialization
+	go d.init()
+	return d, nil
+}
+
+func (dm *domainManager) registerDomain(name string, toDomain components.DomainManagerToDomain) (d *domain, err error) {
 	dm.mux.Lock()
 	defer dm.mux.Unlock()
 
@@ -175,12 +185,10 @@ func (dm *domainManager) DomainRegistered(name string, toDomain components.Domai
 	}
 
 	// Initialize
-	d := dm.newDomain(name, conf, toDomain)
+	d = dm.newDomain(name, conf, toDomain)
 	dm.domainsByName[name] = d
 
 	log.L(dm.bgCtx).Infof("Domain plugin registered name=%s address=%s", d.name, d.RegistryAddress())
-
-	go d.init()
 	return d, nil
 }
 
@@ -236,7 +244,7 @@ func (dm *domainManager) waitForDeploy(ctx context.Context, req *inflight.Inflig
 		return nil, i18n.NewError(ctx, msgs.MsgDomainTransactionWasNotADeployment, receipt.TransactionID)
 	}
 
-	return dm.GetSmartContractByAddress(ctx, dm.persistence.DB(), *receipt.ContractAddress)
+	return dm.GetSmartContractByAddress(ctx, dm.persistence.NOTX(), *receipt.ContractAddress)
 }
 
 func (dm *domainManager) ExecAndWaitTransaction(ctx context.Context, txID uuid.UUID, call func() error) error {
@@ -277,7 +285,7 @@ func (dm *domainManager) getDomainByAddressOrNil(addr *tktypes.EthAddress) *doma
 	return dm.domainsByAddress[*addr]
 }
 
-func (dm *domainManager) GetSmartContractByAddress(ctx context.Context, dbTX *gorm.DB, addr tktypes.EthAddress) (components.DomainSmartContract, error) {
+func (dm *domainManager) GetSmartContractByAddress(ctx context.Context, dbTX persistence.DBTX, addr tktypes.EthAddress) (components.DomainSmartContract, error) {
 	loadResult, dc, err := dm.getSmartContractCached(ctx, dbTX, addr)
 	if dc != nil || err != nil {
 		return dc, err
@@ -292,18 +300,18 @@ func (dm *domainManager) GetSmartContractByAddress(ctx context.Context, dbTX *go
 	}
 }
 
-func (dm *domainManager) getSmartContractCached(ctx context.Context, tx *gorm.DB, addr tktypes.EthAddress) (pscLoadResult, *domainContract, error) {
+func (dm *domainManager) getSmartContractCached(ctx context.Context, dbTX persistence.DBTX, addr tktypes.EthAddress) (pscLoadResult, *domainContract, error) {
 	dc, isCached := dm.contractCache.Get(addr)
 	if isCached {
 		return pscValid, dc, nil
 	}
 	// Updating the cache deferred down to initSmartContract (under enrichContractWithDomain)
-	return dm.dbGetSmartContract(ctx, tx, func(db *gorm.DB) *gorm.DB { return db.Where("address = ?", addr) })
+	return dm.dbGetSmartContract(ctx, dbTX, func(db *gorm.DB) *gorm.DB { return db.Where("address = ?", addr) })
 }
 
-func (dm *domainManager) dbGetSmartContract(ctx context.Context, tx *gorm.DB, setWhere func(db *gorm.DB) *gorm.DB) (pscLoadResult, *domainContract, error) {
+func (dm *domainManager) dbGetSmartContract(ctx context.Context, dbTX persistence.DBTX, setWhere func(db *gorm.DB) *gorm.DB) (pscLoadResult, *domainContract, error) {
 	var contracts []*PrivateSmartContract
-	query := tx.Table("private_smart_contracts")
+	query := dbTX.DB().Table("private_smart_contracts")
 	query = setWhere(query)
 	err := query.
 		WithContext(ctx).

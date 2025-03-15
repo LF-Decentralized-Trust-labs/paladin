@@ -21,18 +21,16 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/preparedtxdistribution"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
-	"github.com/kaleido-io/paladin/core/internal/statedistribution"
-	"gorm.io/gorm"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
@@ -47,32 +45,31 @@ import (
 )
 
 type privateTxManager struct {
-	ctx                            context.Context
-	ctxCancel                      func()
-	config                         *pldconf.PrivateTxManagerConfig
-	sequencers                     map[string]*Sequencer
-	sequencersLock                 sync.RWMutex
-	endorsementGatherers           map[string]ptmgrtypes.EndorsementGatherer
-	components                     components.AllComponents
-	nodeName                       string
-	subscribers                    []components.PrivateTxEventSubscriber
-	subscribersLock                sync.Mutex
-	syncPoints                     syncpoints.SyncPoints
-	stateDistributer               statedistribution.StateDistributer
-	preparedTransactionDistributer preparedtxdistribution.PreparedTransactionDistributer
-	blockHeight                    int64
+	ctx                  context.Context
+	ctxCancel            func()
+	config               *pldconf.PrivateTxManagerConfig
+	sequencers           map[string]*Sequencer
+	sequencersLock       sync.RWMutex
+	endorsementGatherers map[string]ptmgrtypes.EndorsementGatherer
+	components           components.AllComponents
+	nodeName             string
+	subscribers          []components.PrivateTxEventSubscriber
+	subscribersLock      sync.Mutex
+	syncPoints           syncpoints.SyncPoints
+	blockHeight          int64
 }
 
 // Init implements Engine.
 func (p *privateTxManager) PreInit(c components.PreInitComponents) (*components.ManagerInitResult, error) {
 	return &components.ManagerInitResult{
-		PreCommitHandler: func(ctx context.Context, _ *gorm.DB, blocks []*pldapi.IndexedBlock, transactions []*blockindexer.IndexedTransactionNotify) (blockindexer.PostCommit, error) {
+		PreCommitHandler: func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*blockindexer.IndexedTransactionNotify) error {
 			log.L(ctx).Debug("PrivateTxManager PreCommitHandler")
 			latestBlockNumber := blocks[len(blocks)-1].Number
-			return func() {
+			dbTX.AddPostCommit(func(ctx context.Context) {
 				log.L(ctx).Debugf("PrivateTxManager PostCommitHandler: %d", latestBlockNumber)
 				p.OnNewBlockHeight(ctx, latestBlockNumber)
-			}, nil
+			})
+			return nil
 		},
 	}, nil
 }
@@ -80,31 +77,8 @@ func (p *privateTxManager) PreInit(c components.PreInitComponents) (*components.
 func (p *privateTxManager) PostInit(c components.AllComponents) error {
 	p.components = c
 	p.nodeName = p.components.TransportManager().LocalNodeName()
-	p.syncPoints = syncpoints.NewSyncPoints(p.ctx, &p.config.Writer, c.Persistence(), c.TxManager(), c.PublicTxManager())
-	p.stateDistributer = statedistribution.NewStateDistributer(
-		p.ctx,
-		p.components.TransportManager(),
-		p.components.StateManager(),
-		p.components.KeyManager(),
-		p.components.Persistence(),
-		&p.config.StateDistributer)
-	p.preparedTransactionDistributer = preparedtxdistribution.NewPreparedTransactionDistributer(
-		p.ctx,
-		p.nodeName,
-		p.components.TransportManager(),
-		p.components.TxManager(),
-		p.components.Persistence(),
-		&p.config.PreparedTransactionDistributer)
-
-	err := p.stateDistributer.Start(p.ctx)
-	if err != nil {
-		return err
-	}
-	err = p.preparedTransactionDistributer.Start(p.ctx)
-	if err != nil {
-		return err
-	}
-	return p.components.TransportManager().RegisterClient(p.ctx, p)
+	p.syncPoints = syncpoints.NewSyncPoints(p.ctx, &p.config.Writer, c.Persistence(), c.TxManager(), c.PublicTxManager(), c.TransportManager())
+	return nil
 }
 
 func (p *privateTxManager) Start() error {
@@ -113,8 +87,6 @@ func (p *privateTxManager) Start() error {
 }
 
 func (p *privateTxManager) Stop() {
-	p.stateDistributer.Stop(p.ctx)
-
 }
 
 func NewPrivateTransactionMgr(ctx context.Context, config *pldconf.PrivateTxManagerConfig) components.PrivateTxManager {
@@ -138,7 +110,7 @@ func (p *privateTxManager) OnNewBlockHeight(ctx context.Context, blockHeight int
 	}
 }
 
-func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX *gorm.DB, contractAddr tktypes.EthAddress, domainAPI components.DomainSmartContract) (oc *Sequencer, err error) {
+func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr tktypes.EthAddress, domainAPI components.DomainSmartContract) (oc *Sequencer, err error) {
 
 	if domainAPI == nil {
 		domainAPI, err = p.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
@@ -184,8 +156,6 @@ func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX *go
 				publisher,
 				p.syncPoints,
 				p.components.IdentityResolver(),
-				p.stateDistributer,
-				p.preparedTransactionDistributer,
 				transportWriter,
 				confutil.DurationMin(p.config.RequestTimeout, 0, *pldconf.PrivateTxManagerDefaults.RequestTimeout),
 				p.blockHeight,
@@ -215,7 +185,7 @@ func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX *go
 	return p.sequencers[contractAddr.String()], nil
 }
 
-func (p *privateTxManager) getEndorsementGathererForContract(ctx context.Context, dbTX *gorm.DB, contractAddr tktypes.EthAddress) (ptmgrtypes.EndorsementGatherer, error) {
+func (p *privateTxManager) getEndorsementGathererForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr tktypes.EthAddress) (ptmgrtypes.EndorsementGatherer, error) {
 	// We need to have this as a function of the PrivateTransactionManager rather than a function of the sequencer because the endorsement gatherer is needed
 	// even if we don't have a sequencer.  e.g. maybe the transaction is being coordinated by another node and this node has just been asked to endorse it
 	// in that case, we need to make sure that we are using the domainContext provided by the endorsement request
@@ -232,7 +202,7 @@ func (p *privateTxManager) getEndorsementGathererForContract(ctx context.Context
 	return p.endorsementGatherers[contractAddr.String()], nil
 }
 
-func (p *privateTxManager) HandleNewTx(ctx context.Context, dbTX *gorm.DB, txi *components.ValidatedTransaction) error {
+func (p *privateTxManager) HandleNewTx(ctx context.Context, dbTX persistence.DBTX, txi *components.ValidatedTransaction) error {
 	tx := txi.Transaction
 	if tx.To == nil {
 		if txi.Transaction.SubmitMode.V() != pldapi.SubmitModeAuto {
@@ -268,7 +238,7 @@ func (p *privateTxManager) HandleNewTx(ctx context.Context, dbTX *gorm.DB, txi *
 //
 // We are currently proving out this pattern on the boundary of the private transaction manager and the public transaction manager and once that has settled, we will implement the same pattern here.
 // In the meantime, we a single function to submit a transaction and there is currently no persistence of the submission record.  It is all held in memory only
-func (p *privateTxManager) handleNewTx(ctx context.Context, dbTX *gorm.DB, tx *components.PrivateTransaction, localTx *components.ResolvedTransaction) error {
+func (p *privateTxManager) handleNewTx(ctx context.Context, dbTX persistence.DBTX, tx *components.PrivateTransaction, localTx *components.ResolvedTransaction) error {
 	log.L(ctx).Debugf("Handling new transaction: %v", tx)
 
 	contractAddr := *localTx.Transaction.To
@@ -326,7 +296,7 @@ func (p *privateTxManager) validateDelegatedTransaction(ctx context.Context, tx 
 
 }
 
-func (p *privateTxManager) handleDelegatedTransaction(ctx context.Context, dbTX *gorm.DB, delegationBlockHeight int64, delegatingNodeName string, delegationId string, tx *components.PrivateTransaction) error {
+func (p *privateTxManager) handleDelegatedTransaction(ctx context.Context, dbTX persistence.DBTX, delegationBlockHeight int64, delegatingNodeName string, delegationId string, tx *components.PrivateTransaction) error {
 	log.L(ctx).Debugf("Handling delegated transaction: %v", tx)
 
 	domainAPI, err := p.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, tx.Address)
@@ -484,7 +454,7 @@ func (p *privateTxManager) evaluateDeployment(ctx context.Context, domain compon
 	}
 
 	for _, pubTx := range publicTXs {
-		err := publicTransactionEngine.ValidateTransaction(ctx, p.components.Persistence().DB(), pubTx)
+		err := publicTransactionEngine.ValidateTransaction(ctx, p.components.Persistence().NOTX(), pubTx)
 		if err != nil {
 			return p.revertDeploy(ctx, tx, i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerInternalError, "PrepareSubmissionBatch failed"))
 		}
@@ -565,7 +535,7 @@ func (p *privateTxManager) handleEndorsementRequest(ctx context.Context, message
 		return
 	}
 
-	endorsementGatherer, err := p.getEndorsementGathererForContract(ctx, p.components.Persistence().DB(), *contractAddress)
+	endorsementGatherer, err := p.getEndorsementGathererForContract(ctx, p.components.Persistence().NOTX(), *contractAddress)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to get endorsement gatherer for contract address %s: %s", contractAddressString, err)
 		return
@@ -688,12 +658,11 @@ func (p *privateTxManager) handleEndorsementRequest(ctx context.Context, message
 		return
 	}
 
-	err = p.components.TransportManager().Send(ctx, &components.TransportMessage{
+	err = p.components.TransportManager().Send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: "EndorsementResponse",
-		ReplyTo:     p.nodeName,
 		Payload:     endorsementResponseBytes,
 		Node:        replyTo,
-		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 	})
 	if err != nil {
 		log.L(ctx).Errorf("Failed to send endorsement response: %s", err)
@@ -726,7 +695,7 @@ func (p *privateTxManager) handleDelegationRequest(ctx context.Context, messageP
 	// in the domain context of the sender.  In some cases, it will be using committed states so that will be ok.
 	// for now, in the interest of simplicity, we just trash the PostAssembly and start again
 	transaction.PostAssembly = nil
-	err = p.handleDelegatedTransaction(ctx, p.components.Persistence().DB(), delegationRequest.BlockHeight, replyTo, delegationRequest.DelegationId, transaction)
+	err = p.handleDelegatedTransaction(ctx, p.components.Persistence().NOTX(), delegationRequest.BlockHeight, replyTo, delegationRequest.DelegationId, transaction)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to handle delegated transaction: %s", err)
 		// do not send an ack and let the sender retry
@@ -804,12 +773,11 @@ func (p *privateTxManager) sendAssembleError(ctx context.Context, node string, a
 
 	log.L(ctx).Infof("Sending Assemble Error: ContractAddress: %s, TransactionId: %s, AssembleRequestId %s, Error: %s", contractAddress, transactionID, assembleRequestId, assembleError.ErrorMessage)
 
-	err = p.components.TransportManager().Send(ctx, &components.TransportMessage{
+	err = p.components.TransportManager().Send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: "AssembleError",
-		ReplyTo:     p.nodeName,
 		Payload:     assembleErrorBytes,
 		Node:        node,
-		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 	})
 	if err != nil {
 		log.L(ctx).Errorf("Failed to send  assemble error: %s", err)
@@ -852,7 +820,7 @@ func (p *privateTxManager) handleAssembleRequest(ctx context.Context, messagePay
 		return
 	}
 
-	sequencer, err := p.getSequencerForContract(ctx, p.components.Persistence().DB(), *contractAddress, nil) // this is just to make sure the sequencer is running
+	sequencer, err := p.getSequencerForContract(ctx, p.components.Persistence().NOTX(), *contractAddress, nil) // this is just to make sure the sequencer is running
 	if err != nil {
 		log.L(ctx).Errorf("Failed to get sequencer for contract address %s: %s", contractAddressString, err)
 		p.sendAssembleError(ctx, replyTo, assembleRequest.AssembleRequestId, assembleRequest.ContractAddress, assembleRequest.TransactionId, err)
@@ -888,12 +856,11 @@ func (p *privateTxManager) handleAssembleRequest(ctx context.Context, messagePay
 		return
 	}
 
-	err = p.components.TransportManager().Send(ctx, &components.TransportMessage{
+	err = p.components.TransportManager().Send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: "AssembleResponse",
-		ReplyTo:     p.nodeName,
 		Payload:     assembleResponseBytes,
 		Node:        replyTo,
-		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 	})
 	if err != nil {
 		log.L(ctx).Errorf("Failed to send assemble response: %s", err)
@@ -988,7 +955,7 @@ func (p *privateTxManager) publishToSubscribers(ctx context.Context, event compo
 	}
 }
 
-func (p *privateTxManager) NotifyFailedPublicTx(ctx context.Context, dbTX *gorm.DB, failures []*components.PublicTxMatch) error {
+func (p *privateTxManager) NotifyFailedPublicTx(ctx context.Context, dbTX persistence.DBTX, failures []*components.PublicTxMatch) error {
 	// TODO: We have processing we need to do here to resubmit
 	// For now, we directly raise a failure receipt for them back with the main transaction manager
 	privateFailureReceipts := make([]*components.ReceiptInput, len(failures))
@@ -1015,7 +982,7 @@ func (p *privateTxManager) PrivateTransactionConfirmed(ctx context.Context, rece
 	log.L(ctx).Infof("private TX manager notified of transaction confirmation %s deploy=%t",
 		receipt.TransactionID, receipt.PSC == nil)
 	if receipt.PSC != nil {
-		seq, err := p.getSequencerForContract(ctx, p.components.Persistence().DB(), receipt.PSC.Address(), receipt.PSC)
+		seq, err := p.getSequencerForContract(ctx, p.components.Persistence().NOTX(), receipt.PSC.Address(), receipt.PSC)
 		if err != nil {
 			log.L(ctx).Errorf("failed to obtain sequence to process receipts on contract %s: %s", receipt.PSC.Address(), err)
 			return
@@ -1024,35 +991,10 @@ func (p *privateTxManager) PrivateTransactionConfirmed(ctx context.Context, rece
 	}
 }
 
-func (p *privateTxManager) handleStateProducedEvent(ctx context.Context, messagePayload []byte, replyToDestination string) {
-
-	//in the meantime, we share with the sequencer in memory in case that state is needed to assemble in flight transactions
-	stateProducedEvent := &pbEngine.StateProducedEvent{}
-	err := proto.Unmarshal(messagePayload, stateProducedEvent)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to unmarshal StateProducedEvent: %s", err)
-		return
-	}
-
-	//State distributer deals with the reliable delivery e.g. sending acks etc
-	go p.stateDistributer.HandleStateProducedEvent(ctx, stateProducedEvent, replyToDestination)
-
-	contractAddressString := stateProducedEvent.ContractAddress
-	contractAddress := tktypes.MustEthAddress(contractAddressString)
-
-	sequencer, err := p.getSequencerForContract(ctx, p.components.Persistence().DB(), *contractAddress, nil)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to get sequencer for contract address %s: %s", contractAddress, err)
-		return
-	}
-	sequencer.HandleStateProducedEvent(ctx, stateProducedEvent)
-
-}
-
 func (p *privateTxManager) CallPrivateSmartContract(ctx context.Context, call *components.ResolvedTransaction) (*abi.ComponentValue, error) {
 
 	callTx := call.Transaction
-	psc, err := p.components.DomainManager().GetSmartContractByAddress(ctx, p.components.Persistence().DB(), *callTx.To)
+	psc, err := p.components.DomainManager().GetSmartContractByAddress(ctx, p.components.Persistence().NOTX(), *callTx.To)
 	if err != nil {
 		return nil, err
 	}
@@ -1090,7 +1032,7 @@ func (p *privateTxManager) CallPrivateSmartContract(ctx context.Context, call *c
 	defer dCtx.Close()
 
 	// Do the actual call
-	return psc.ExecCall(dCtx, p.components.Persistence().DB(), call, verifiers)
+	return psc.ExecCall(dCtx, p.components.Persistence().NOTX(), call, verifiers)
 }
 
 func (p *privateTxManager) BuildStateDistributions(ctx context.Context, tx *components.PrivateTransaction) (*components.StateDistributionSet, error) {

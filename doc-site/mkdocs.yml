@@ -1,6 +1,6 @@
 site_name: Paladin
-repo_name: kaleido-io/paladin
-repo_url: https://github.com/kaleido-io/paladin
+repo_name: LF-Decentralized-Trust-labs/paladin
+repo_url: https://github.com/LF-Decentralized-Trust-labs/paladin
 theme:
   name: material
   custom_dir: overrides
@@ -116,6 +116,10 @@ nav:
     - User Interface: getting-started/user-interface.md
   - Tutorials:
     - Introduction: tutorials/index.md
+    - Hello World: tutorials/hello-world.md
+    - Public Smart Contract: tutorials/public-storage.md
+    - Private Smart Contract: tutorials/private-storage.md
+    - Notarized Tokens: tutorials/notarized-tokens.md
     - Bond Issuance: tutorials/bond-issuance.md
     - Wholesale CBDC: tutorials/zkp-cbdc.md
   - Reference:

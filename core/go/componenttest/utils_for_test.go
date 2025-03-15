@@ -137,7 +137,7 @@ func deployDomainRegistry(t *testing.T) *tktypes.EthAddress {
 	require.NoError(t, err)
 	err = cmTmp.CompleteStart()
 	require.NoError(t, err)
-	domainRegistryAddress := domains.DeploySmartContract(t, cmTmp.TxManager())
+	domainRegistryAddress := domains.DeploySmartContract(t, cmTmp.Persistence(), cmTmp.TxManager(), cmTmp.KeyManager())
 
 	cmTmp.Stop()
 	return domainRegistryAddress
@@ -380,6 +380,8 @@ func testConfig(t *testing.T) pldconf.PaladinConfig {
 	conf.RPCServer.WS.ShutdownTimeout = confutil.P("0s")
 	conf.RPCServer.WS.Disabled = true
 	conf.Log.Level = confutil.P("info")
+
+	conf.TransportManagerConfig.ReliableMessageWriter.BatchMaxSize = confutil.P(1)
 
 	conf.Wallets[0].Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
 		Encoding: "hex",

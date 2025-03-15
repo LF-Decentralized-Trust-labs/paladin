@@ -39,9 +39,16 @@ public class NotoHelper {
             @JsonProperty
             String notary,
             @JsonProperty
-            HookParams hooks,
+            String notaryMode,
             @JsonProperty
-            boolean restrictMinting
+            OptionsParams options
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record OptionsParams(
+            @JsonProperty
+            HookParams hooks
     ) {
     }
 

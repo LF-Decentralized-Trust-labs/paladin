@@ -72,7 +72,7 @@ func TestTimestampJSONSerialization(t *testing.T) {
 func TestTimestampJSONUnmarshalFail(t *testing.T) {
 	var utTimeTest UTTimeTest
 	err := json.Unmarshal([]byte(`{"t1": "!Badness"}`), &utTimeTest)
-	assert.Regexp(t, "FF00136", err)
+	assert.Regexp(t, "PD020019", err)
 }
 
 func TestTimestampJSONUnmarshalNumber(t *testing.T) {
@@ -163,7 +163,7 @@ func TestTimestampParseValue(t *testing.T) {
 
 	// A bad string
 	err = ts.Scan("!a supported time format")
-	assert.Regexp(t, "FF00136", err)
+	assert.Regexp(t, "PD020019", err)
 
 	// Nil
 	err = ts.Scan(nil)
@@ -182,6 +182,13 @@ func TestTimestampParseValue(t *testing.T) {
 
 	// A bad type
 	err = ts.Scan(false)
-	assert.Regexp(t, "FF00105", err)
+	assert.Regexp(t, "PD020018", err)
 
+}
+
+func TestParseTimeString(t *testing.T) {
+	require.Equal(t, int64(1621108144123000000), MustParseTimeString("2021-05-15T19:49:04.123Z").UnixNano())
+	assert.Panics(t, func() {
+		_ = MustParseTimeString(".... wrong")
+	})
 }

@@ -18,10 +18,10 @@ package signer
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -32,6 +32,11 @@ func decodeProvingRequest(ctx context.Context, payload []byte) (*pb.ProvingReque
 	if err != nil {
 		return nil, nil, err
 	}
+
+	if inputs.Common == nil {
+		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorProvingReqCommonNil)
+	}
+
 	if common.IsEncryptionCircuit(inputs.CircuitId) {
 		encExtras := pb.ProvingRequestExtras_Encryption{
 			EncryptionNonce: "",
@@ -43,7 +48,15 @@ func decodeProvingRequest(ctx context.Context, payload []byte) (*pb.ProvingReque
 			}
 		}
 		return &inputs, &encExtras, nil
-	} else if common.IsNullifiersCircuit(inputs.CircuitId) {
+	} else if common.IsNonFungibleNullifiersCircuit(inputs.CircuitId) {
+		nullifierExtras := pb.ProvingRequestExtras_Nullifiers{}
+		err := proto.Unmarshal(inputs.Extras, &nullifierExtras)
+		if err != nil {
+			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalProvingReqExtras, inputs.CircuitId, err)
+		}
+		return &inputs, &nullifierExtras, nil
+
+	} else if common.IsFungibleNullifiersCircuit(inputs.CircuitId) { // check if it is a nullifier circuit only after checking non-fungible circuit (to avoid parsing non-fungible + nullifier circuit)
 		var nullifierExtras pb.ProvingRequestExtras_Nullifiers
 		err := proto.Unmarshal(inputs.Extras, &nullifierExtras)
 		if err != nil {

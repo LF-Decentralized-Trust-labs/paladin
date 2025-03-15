@@ -56,7 +56,7 @@ task build(type: Exec, dependsOn: [install, copyContracts]) {
 }
 
 task e2e(type: Exec, dependsOn: [build]) {
-    dependsOn ':operator:deploy'
+    dependsOn ':operator:e2e'
 
     executable 'npm'
     args 'run'

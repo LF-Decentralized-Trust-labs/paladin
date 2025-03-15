@@ -1,0 +1,38 @@
+name: Publish Solidity Contracts
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Install pre-requisites
+      uses: ./.github/actions/setup
+
+    - name: Build
+      working-directory: solidity
+      run: ../gradlew build 
+
+    - name: Copy Solidity artifacts to contracts directory
+      run: |
+        mkdir -p contracts
+        find solidity/artifacts/contracts -type f -name "*.json" ! -name "*.dbg.json" -exec cp {} contracts/ \;
+
+    - name: Archive ABI directory
+      run: |
+        tar -czvf abis.tar.gz -C contracts .
+
+    - name: Upload artifacts for inspection (optional)
+      uses: actions/upload-artifact@v4
+      with:
+        name: contracts
+        path: abis.tar.gz

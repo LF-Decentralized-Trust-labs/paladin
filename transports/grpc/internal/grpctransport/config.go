@@ -54,3 +54,7 @@ type PublishedTransportDetails struct {
 	// - must be the direct parent (not the root of a chain - for that use normal CA verification)
 	Issuers string `json:"issuers,omitempty"`
 }
+
+type PeerInfo struct {
+	Endpoint string `json:"endpoint"`
+}

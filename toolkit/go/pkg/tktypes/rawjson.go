@@ -21,7 +21,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -129,6 +129,14 @@ func (m RawJSON) Value() driver.Value {
 		return nil
 	}
 	return (string)(m)
+}
+
+func (m RawJSON) ToMap() (jm map[string]any) {
+	_ = json.Unmarshal(m, &jm)
+	if jm == nil {
+		jm = map[string]any{}
+	}
+	return jm
 }
 
 func (m *RawJSON) Scan(src interface{}) error {

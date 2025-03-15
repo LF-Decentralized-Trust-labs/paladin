@@ -20,23 +20,32 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"time"
 	"unicode"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader, wsc *webSocketConnection) (interface{}, bool) {
+type handlerResult struct {
+	sendRes bool
+	isOK    bool
+	res     any
+}
+
+func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader, wsc *webSocketConnection) handlerResult {
 
 	b, err := io.ReadAll(r)
 	if err != nil {
 		return s.replyRPCParseError(ctx, b, err)
 	}
 
-	log.L(ctx).Infof("RPC[Server] --> %s", b)
+	if log.IsTraceEnabled() {
+		log.L(ctx).Tracef("RPC[Server] --> %s", b)
+	}
 
 	if s.sniffFirstByte(b) == '[' {
 		var rpcArray []*rpcclient.RPCRequest
@@ -45,7 +54,8 @@ func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader, wsc *webSocketC
 			log.L(ctx).Errorf("Bad RPC array received %s", b)
 			return s.replyRPCParseError(ctx, b, err)
 		}
-		return s.handleRPCBatch(ctx, rpcArray)
+		batchRes, isOK := s.handleRPCBatch(ctx, rpcArray, wsc)
+		return handlerResult{isOK: isOK, sendRes: true, res: batchRes}
 	}
 
 	var rpcRequest rpcclient.RPCRequest
@@ -53,24 +63,33 @@ func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader, wsc *webSocketC
 	if err != nil {
 		return s.replyRPCParseError(ctx, b, err)
 	}
-	if wsc != nil {
-		if rpcRequest.Method == "eth_subscribe" {
-			return s.processSubscribe(ctx, &rpcRequest, wsc)
-		} else if rpcRequest.Method == "eth_unsubscribe" {
-			return s.processUnsubscribe(ctx, &rpcRequest, wsc)
-		}
+	startTime := time.Now()
+	log.L(ctx).Debugf("RPC-server[%s] --> %s", rpcRequest.ID, rpcRequest.Method)
+	res, isOK := s.processRPC(ctx, &rpcRequest, wsc)
+	durationMS := float64(time.Since(startTime)) / float64(time.Millisecond)
+	if res != nil && res.Error != nil {
+		log.L(ctx).Errorf("RPC-server[%s] <-- %s [%.2fms]: %s", rpcRequest.ID.StringValue(), rpcRequest.Method, durationMS, res.Error.Message)
+	} else {
+		log.L(ctx).Debugf("RPC-server[%s] <-- %s [%.2fms]", rpcRequest.ID.StringValue(), rpcRequest.Method, durationMS)
 	}
-	return s.processRPC(ctx, &rpcRequest)
+	if log.IsTraceEnabled() {
+		log.L(ctx).Tracef("RPC-server[%s] <-- %s", rpcRequest.ID.StringValue(), tktypes.JSONString(res))
+	}
+	return handlerResult{isOK: isOK, sendRes: res != nil, res: res}
 
 }
 
-func (s *rpcServer) replyRPCParseError(ctx context.Context, b []byte, err error) (*rpcclient.RPCResponse, bool) {
+func (s *rpcServer) replyRPCParseError(ctx context.Context, b []byte, err error) handlerResult {
 	log.L(ctx).Errorf("Request could not be parsed (err=%v): %s", err, b)
-	return rpcclient.NewRPCErrorResponse(
-		i18n.NewError(ctx, tkmsgs.MsgJSONRPCInvalidRequest),
-		tktypes.RawJSON(`"1"`),
-		rpcclient.RPCCodeInvalidRequest,
-	), false
+	return handlerResult{
+		isOK:    false,
+		sendRes: true,
+		res: rpcclient.NewRPCErrorResponse(
+			i18n.NewError(ctx, tkmsgs.MsgJSONRPCInvalidRequest),
+			tktypes.RawJSON(`"1"`),
+			rpcclient.RPCCodeInvalidRequest,
+		),
+	}
 }
 
 func (s *rpcServer) sniffFirstByte(data []byte) byte {
@@ -86,17 +105,29 @@ func (s *rpcServer) sniffFirstByte(data []byte) byte {
 	return 0x00
 }
 
-func (s *rpcServer) handleRPCBatch(ctx context.Context, rpcArray []*rpcclient.RPCRequest) ([]*rpcclient.RPCResponse, bool) {
+func (s *rpcServer) handleRPCBatch(ctx context.Context, rpcArray []*rpcclient.RPCRequest, wsc *webSocketConnection) ([]*rpcclient.RPCResponse, bool) {
 
 	// Kick off a routine to fill in each
 	rpcResponses := make([]*rpcclient.RPCResponse, len(rpcArray))
 	results := make(chan bool)
 	for i, r := range rpcArray {
 		responseNumber := i
-		rpcReq := r
+		rpcRequest := r
 		go func() {
 			var ok bool
-			rpcResponses[responseNumber], ok = s.processRPC(ctx, rpcReq)
+			startTime := time.Now()
+			log.L(ctx).Debugf("RPC-server[%v] (b=%d) --> %s", rpcRequest.ID.StringValue(), i, rpcRequest.Method)
+			res, ok := s.processRPC(ctx, rpcRequest, wsc)
+			durationMS := float64(time.Since(startTime)) / float64(time.Millisecond)
+			if res != nil && res.Error != nil {
+				log.L(ctx).Errorf("RPC-server[%s] (b=%d) <-- %s [%.2fms]: %s", rpcRequest.ID.StringValue(), i, rpcRequest.Method, durationMS, res.Error.Message)
+			} else {
+				log.L(ctx).Debugf("RPC-server[%s] (b=%d) <-- %s [%.2fms]", rpcRequest.ID.StringValue(), i, rpcRequest.Method, durationMS)
+			}
+			if log.IsTraceEnabled() {
+				log.L(ctx).Tracef("RPC-server[%s] (b=%d) <-- %s", rpcRequest.ID.StringValue(), i, tktypes.JSONString(res))
+			}
+			rpcResponses[responseNumber] = res
 			results <- ok
 		}()
 	}

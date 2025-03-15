@@ -19,21 +19,21 @@ package msgs
 import (
 	"sync"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"golang.org/x/text/language"
 )
 
 var registered sync.Once
-var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey {
+var pde = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey {
 	registered.Do(func() {
 		i18n.RegisterPrefix("PD06", "Paladin EVM Registry")
 	})
-	return i18n.FFE(language.AmericanEnglish, key, translation, statusHint...)
+	return i18n.PDE(language.AmericanEnglish, key, translation, statusHint...)
 }
 
 var (
 	// Generic PD0600XX
-	MsgInvalidRegistryConfig  = ffe("PD060001", "Invalid registry configuration")
-	MsgInvalidRegistryEvent   = ffe("PD060002", "Invalid registry event %+v")
-	MsgMissingContractAddress = ffe("PD060003", "contractAddress is required in registry config")
+	MsgInvalidRegistryConfig  = pde("PD060001", "Invalid registry configuration")
+	MsgInvalidRegistryEvent   = pde("PD060002", "Invalid registry event %+v")
+	MsgMissingContractAddress = pde("PD060003", "contractAddress is required in registry config")
 )
