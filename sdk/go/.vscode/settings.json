@@ -1,0 +1,6 @@
+{
+    "window.title": "${activeEditorShort}${separator}Paladin SDK (${rootName})${separator}${profileName}",
+    "cSpell.words": [
+        "pubkey"
+    ]
+}

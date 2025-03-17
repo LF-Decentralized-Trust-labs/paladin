@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/kaleido-io/paladin/perf/internal/conf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 type publicContract struct {

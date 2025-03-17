@@ -22,7 +22,7 @@ import (
 	"math/big"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 type Uint256Field string

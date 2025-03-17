@@ -21,7 +21,7 @@ import (
 	"database/sql/driver"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 type Int256Field string

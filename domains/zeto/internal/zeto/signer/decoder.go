@@ -20,7 +20,7 @@ import (
 
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/i18n"
 	"google.golang.org/protobuf/proto"
 )
 

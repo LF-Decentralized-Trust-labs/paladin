@@ -34,9 +34,9 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 // SmartContractDeploymentReconciler reconciles a SmartContractDeployment object

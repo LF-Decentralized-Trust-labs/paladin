@@ -19,7 +19,7 @@ package msgs
 import (
 	"sync"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/config/internal/i18n"
 	"golang.org/x/text/language"
 )
 
