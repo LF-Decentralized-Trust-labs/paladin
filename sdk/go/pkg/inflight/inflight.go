@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 )
 
@@ -85,7 +85,7 @@ func (ifm *InflightManager[K, T]) GetInflight(id K) *InflightRequest[K, T] {
 func (ifm *InflightManager[K, T]) waitInFlight(req *InflightRequest[K, T]) (T, error) {
 	select {
 	case <-req.ctx.Done():
-		return *new(T), i18n.NewError(req.ctx, tkmsgs.MsgInflightRequestCancelled, req.Age())
+		return *new(T), i18n.NewError(req.ctx, msgs.MsgInflightRequestCancelled, req.Age())
 	case reply := <-req.done:
 		return reply, nil
 	}

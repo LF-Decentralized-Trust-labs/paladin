@@ -27,7 +27,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/keystorev3"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
@@ -58,7 +58,7 @@ func (fsf *filesystemStoreFactory[C]) NewKeyStore(ctx context.Context, eConf C) 
 		pathInfo, err = os.Stat(path)
 	}
 	if err != nil || !pathInfo.IsDir() {
-		return nil, i18n.WrapError(ctx, err, tkmsgs.MsgSigningModuleBadPathError, *pldconf.FileSystemDefaults.Path)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgSigningModuleBadPathError, *pldconf.FileSystemDefaults.Path)
 	}
 	return &filesystemStore{
 		cache:    cache.NewCache[string, keystorev3.WalletFile](&conf.Cache, &pldconf.FileSystemDefaults.Cache),
@@ -94,7 +94,7 @@ func (fss *filesystemStore) validateFilePathKeyHandle(ctx context.Context, keyHa
 				}
 			} else {
 				if (!isDir && fsInfo.IsDir()) || (isDir && !fsInfo.IsDir()) {
-					err = i18n.NewError(ctx, tkmsgs.MsgSigningModuleKeyHandleClash)
+					err = i18n.NewError(ctx, msgs.MsgSigningModuleKeyHandleClash)
 				}
 			}
 			if err != nil {
@@ -130,7 +130,7 @@ func (fss *filesystemStore) createWalletFile(ctx context.Context, keyFilePath, p
 		err = os.WriteFile(keyFilePath, wf.JSON(), fss.fileMode)
 	}
 	if err != nil {
-		return nil, i18n.WrapError(ctx, err, tkmsgs.MsgSigningModuleFSError)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgSigningModuleFSError)
 	}
 	return wf, nil
 }
@@ -159,7 +159,7 @@ func (fss *filesystemStore) getOrCreateWalletFile(ctx context.Context, keyHandle
 			}
 			return wf, err
 		} else {
-			return nil, i18n.NewError(ctx, tkmsgs.MsgSigningModuleKeyNotExist, keyHandle)
+			return nil, i18n.NewError(ctx, msgs.MsgSigningModuleKeyNotExist, keyHandle)
 		}
 	}
 	// we need to read it
@@ -174,12 +174,12 @@ func (fss *filesystemStore) readWalletFile(ctx context.Context, keyFilePath, pas
 
 	keyData, err := os.ReadFile(keyFilePath)
 	if err != nil {
-		return nil, i18n.WrapError(ctx, err, tkmsgs.MsgSigningModuleBadKeyFile, keyFilePath)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgSigningModuleBadKeyFile, keyFilePath)
 	}
 
 	passData, err := os.ReadFile(passwordFilePath)
 	if err != nil {
-		return nil, i18n.WrapError(ctx, err, tkmsgs.MsgSigningModuleBadPassFile, passwordFilePath)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgSigningModuleBadPassFile, passwordFilePath)
 	}
 
 	return keystorev3.ReadWalletFile(keyData, passData)
@@ -188,13 +188,13 @@ func (fss *filesystemStore) readWalletFile(ctx context.Context, keyFilePath, pas
 func (fss *filesystemStore) FindOrCreateLoadableKey(ctx context.Context, req *signerapi.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error) {
 	for _, segment := range req.Path {
 		if len(segment.Name) == 0 {
-			return nil, "", i18n.NewError(ctx, tkmsgs.MsgSigningModuleBadKeyHandle)
+			return nil, "", i18n.NewError(ctx, msgs.MsgSigningModuleBadKeyHandle)
 		}
 		keyHandle += url.PathEscape(segment.Name)
 		keyHandle += "/"
 	}
 	if len(req.Name) == 0 {
-		return nil, "", i18n.NewError(ctx, tkmsgs.MsgSigningModuleBadKeyHandle)
+		return nil, "", i18n.NewError(ctx, msgs.MsgSigningModuleBadKeyHandle)
 	}
 	keyHandle += url.PathEscape(req.Name)
 	wf, err := fss.getOrCreateWalletFile(ctx, keyHandle, newKeyMaterial)

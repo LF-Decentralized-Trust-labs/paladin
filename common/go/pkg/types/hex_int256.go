@@ -27,7 +27,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 )
 
 // HexInt256 is any integer (signed or unsigned) up to 256 bits in size, serialized to the DB using a 65 sortable string (a 0/1 sign character, followed by 32 hex bytes)
@@ -41,7 +41,7 @@ func Int64ToInt256(v int64) *HexUint256 {
 func ParseHexInt256(ctx context.Context, s string) (*HexInt256, error) {
 	bi, ok := new(big.Int).SetString(s, 0)
 	if !ok {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgTypesInvalidHexInteger, s)
+		return nil, i18n.NewError(ctx, msgs.MsgTypesInvalidHexInteger, s)
 	}
 	return (*HexInt256)(bi), nil
 }
@@ -87,7 +87,7 @@ func (hi *HexInt256) UnmarshalJSON(b []byte) error {
 		case json.Number:
 			err = hi.setJSONString(v.String())
 		default:
-			err = i18n.NewError(context.Background(), tkmsgs.MsgTypesScanFail, iVal, hi)
+			err = i18n.NewError(context.Background(), msgs.MsgTypesScanFail, iVal, hi)
 		}
 	}
 	return err
@@ -128,11 +128,11 @@ func (hi *HexInt256) Scan(src interface{}) error {
 	case string:
 		if len(v) != 65 {
 			// This type was not used to serialize to the database
-			return i18n.NewError(context.Background(), tkmsgs.MsgTypesInvalidDBInt256, v)
+			return i18n.NewError(context.Background(), msgs.MsgTypesInvalidDBInt256, v)
 		}
 		b, err := hex.DecodeString(v[1:])
 		if err != nil {
-			return i18n.WrapError(context.Background(), err, tkmsgs.MsgTypesInvalidDBInt256, v)
+			return i18n.WrapError(context.Background(), err, msgs.MsgTypesInvalidDBInt256, v)
 		}
 		bi := abi.ParseInt256TwosComplementBytes(b)
 		*hi = HexInt256(*bi)
@@ -141,7 +141,7 @@ func (hi *HexInt256) Scan(src interface{}) error {
 		*hi = (HexInt256)(*big.NewInt(v))
 		return nil
 	default:
-		return i18n.NewError(context.Background(), tkmsgs.MsgTypesScanFail, src, hi)
+		return i18n.NewError(context.Background(), msgs.MsgTypesScanFail, src, hi)
 	}
 }
 

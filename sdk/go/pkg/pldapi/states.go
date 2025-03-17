@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
@@ -72,7 +72,7 @@ func (q *StateStatusQualifier) UnmarshalJSON(b []byte) error {
 		default:
 			u, err := uuid.Parse(string(text))
 			if err != nil {
-				return i18n.NewError(context.Background(), tkmsgs.MsgTypesInvalidStateQualifier)
+				return i18n.NewError(context.Background(), msgs.MsgTypesInvalidStateQualifier)
 			}
 			*q = (StateStatusQualifier)(u.String())
 		}

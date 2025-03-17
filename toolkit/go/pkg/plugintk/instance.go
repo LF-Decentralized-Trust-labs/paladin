@@ -21,7 +21,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/inflight"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
@@ -268,7 +268,7 @@ func (pr *pluginRun[M]) RequestFromPlugin(ctx context.Context, req PluginMessage
 			err = errors.New(*msg)
 		} else {
 			// This is unexpected, but better to handle that give an empty result
-			err = i18n.NewError(ctx, tkmsgs.MsgPluginErrorFromServerNoMsg)
+			err = i18n.NewError(ctx, msgs.MsgPluginErrorFromServerNoMsg)
 		}
 		l.Infof("[%s] <== ERROR [%s]: %s", reqID, inflight.Age(), err)
 		return nil, err

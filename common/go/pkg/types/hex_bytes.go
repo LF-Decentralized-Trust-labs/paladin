@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 )
 
 // HexBytes is byte slice that is formatted in JSON with an 0x prefix, and stored in the DB as hex
@@ -35,7 +35,7 @@ type HexBytes []byte
 func ParseHexBytes(ctx context.Context, s string) (HexBytes, error) {
 	h, err := hex.DecodeString(strings.TrimPrefix(s, "0x"))
 	if err != nil {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgTypesInvalidHex, err)
+		return nil, i18n.NewError(ctx, msgs.MsgTypesInvalidHex, err)
 	}
 	return h, nil
 }
@@ -111,6 +111,6 @@ func (id *HexBytes) Scan(src interface{}) error {
 		*id = HexBytes(v)
 		return nil
 	default:
-		return i18n.NewError(context.Background(), tkmsgs.MsgTypesScanFail, src, id)
+		return i18n.NewError(context.Background(), msgs.MsgTypesScanFail, src, id)
 	}
 }

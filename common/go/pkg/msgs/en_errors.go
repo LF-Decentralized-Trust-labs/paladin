@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tkmsgs
+package msgs
 
 import (
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"

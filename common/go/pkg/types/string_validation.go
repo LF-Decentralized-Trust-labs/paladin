@@ -21,7 +21,7 @@ import (
 	"unicode"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 )
 
 const DefaultNameMaxLen = 128
@@ -40,7 +40,7 @@ func ValidateSafeCharsStartEndAlphaNum(ctx context.Context, val string, maxLen i
 		}
 	}
 	if !valid {
-		return i18n.NewError(ctx, tkmsgs.MsgTypesInvalidNameSafeCharAlphaBoxed, fieldName, maxLen, val)
+		return i18n.NewError(ctx, msgs.MsgTypesInvalidNameSafeCharAlphaBoxed, fieldName, maxLen, val)
 	}
 	return nil
 }

@@ -24,7 +24,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 )
 
 // EthAddress is an SQL serializable version of ethtypes.Address0xHex
@@ -127,12 +127,12 @@ func (a *EthAddress) Scan(src interface{}) error {
 			}
 			*a = EthAddress(*addr)
 		default:
-			return i18n.NewError(context.Background(), tkmsgs.MsgTypesRestoreFailed, src, a)
+			return i18n.NewError(context.Background(), msgs.MsgTypesRestoreFailed, src, a)
 		}
 		return nil
 
 	default:
-		return i18n.NewError(context.Background(), tkmsgs.MsgTypesRestoreFailed, src, a)
+		return i18n.NewError(context.Background(), msgs.MsgTypesRestoreFailed, src, a)
 	}
 
 }

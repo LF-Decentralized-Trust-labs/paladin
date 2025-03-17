@@ -26,7 +26,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
@@ -174,7 +174,7 @@ func (rc *rpcClient) CallRPC(ctx context.Context, result interface{}, method str
 	}
 	err = json.Unmarshal(res.Result.Bytes(), &result)
 	if err != nil {
-		err = i18n.NewError(ctx, tkmsgs.MsgRPCClientResultParseFailed, result, err)
+		err = i18n.NewError(ctx, msgs.MsgRPCClientResultParseFailed, result, err)
 		return &RPCError{Code: int64(RPCCodeParseError), Message: err.Error()}
 	}
 	return nil
@@ -215,7 +215,7 @@ func (rc *rpcClient) SyncRequest(ctx context.Context, rpcReq *RPCRequest) (rpcRe
 	// Restore the original ID
 	rpcRes.ID = rpcReq.ID
 	if err != nil {
-		err := i18n.NewError(ctx, tkmsgs.MsgRPCClientRequestFailed, err)
+		err := i18n.NewError(ctx, msgs.MsgRPCClientRequestFailed, err)
 		log.L(ctx).Errorf("RPC[%s] <-- ERROR: %s", rpcTraceID, err)
 		rpcRes = RPCErrorResponse(err, rpcReq.ID, RPCCodeInternalError)
 		return rpcRes, err
@@ -232,7 +232,7 @@ func (rc *rpcClient) SyncRequest(ctx context.Context, rpcReq *RPCRequest) (rpcRe
 			// Log the raw result in the case of JSON parse error etc. (note that Resty no longer
 			// returns this as an error - rather the body comes back raw)
 			errLog = string(res.Body())
-			rpcMsg = i18n.NewError(ctx, tkmsgs.MsgRPCClientRequestFailed, res.Status()).Error()
+			rpcMsg = i18n.NewError(ctx, msgs.MsgRPCClientRequestFailed, res.Status()).Error()
 		}
 		log.L(ctx).Errorf("RPC[%s] <-- [%d]: %s", rpcTraceID, res.StatusCode(), errLog)
 		err := errors.New(rpcMsg)
@@ -262,7 +262,7 @@ func buildRequest(ctx context.Context, method string, params []interface{}) (*RP
 	for i, param := range params {
 		b, err := json.Marshal(param)
 		if err != nil {
-			return nil, NewRPCError(ctx, RPCCodeInvalidRequest, tkmsgs.MsgRPCClientInvalidParam, i, method, err)
+			return nil, NewRPCError(ctx, RPCCodeInvalidRequest, msgs.MsgRPCClientInvalidParam, i, method, err)
 		}
 		req.Params[i] = types.RawJSON(b)
 	}

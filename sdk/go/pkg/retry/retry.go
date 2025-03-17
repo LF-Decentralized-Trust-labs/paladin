@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
@@ -90,7 +90,7 @@ func (r *Retry) WaitDelay(ctx context.Context, failureCount int) error {
 		select {
 		case <-time.After(retryDelay):
 		case <-ctx.Done():
-			return i18n.NewError(ctx, tkmsgs.MsgContextCanceled)
+			return i18n.NewError(ctx, msgs.MsgContextCanceled)
 		}
 	}
 	return nil

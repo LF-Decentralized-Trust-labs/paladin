@@ -26,7 +26,7 @@ import (
 	"strconv"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 )
 
 const MAX_SAFE_INT64 = 0x7fffffffffffffff
@@ -38,10 +38,10 @@ type HexUint64 uint64
 func ParseHexUint64(ctx context.Context, s string) (HexUint64, error) {
 	bi, ok := new(big.Int).SetString(s, 0)
 	if !ok {
-		return 0, i18n.NewError(ctx, tkmsgs.MsgTypesInvalidHexInteger, s)
+		return 0, i18n.NewError(ctx, msgs.MsgTypesInvalidHexInteger, s)
 	}
 	if !bi.IsUint64() {
-		return 0, i18n.NewError(ctx, tkmsgs.MsgTypesInvalidUint64, s)
+		return 0, i18n.NewError(ctx, msgs.MsgTypesInvalidUint64, s)
 	}
 	return HexUint64(bi.Uint64()), nil
 }
@@ -102,7 +102,7 @@ func (hi HexUint64) HexString() string {
 func (hi HexUint64) Value() (driver.Value, error) {
 	// Check not too large for DB - which does not have unsigned numerics
 	if hi > MAX_SAFE_INT64 {
-		return nil, i18n.NewError(context.Background(), tkmsgs.MsgTypesInvalidDBInt64, strconv.FormatUint(uint64(hi), 10))
+		return nil, i18n.NewError(context.Background(), msgs.MsgTypesInvalidDBInt64, strconv.FormatUint(uint64(hi), 10))
 	}
 	return int64(hi), nil
 }
@@ -117,6 +117,6 @@ func (id *HexUint64) Scan(src interface{}) error {
 		*id = HexUint64(v)
 		return nil
 	default:
-		return i18n.NewError(context.Background(), tkmsgs.MsgTypesScanFail, src, id)
+		return i18n.NewError(context.Background(), msgs.MsgTypesScanFail, src, id)
 	}
 }

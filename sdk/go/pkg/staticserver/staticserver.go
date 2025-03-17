@@ -25,7 +25,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 )
@@ -76,7 +76,7 @@ func (s *staticServer) httpHandler(w http.ResponseWriter, r *http.Request) {
 		log.L(r.Context()).Errorf("Failed to serve file: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(&fftypes.RESTError{
-			Error: i18n.ExpandWithCode(r.Context(), i18n.MessageKey(tkmsgs.MsgUIServerFailed)),
+			Error: i18n.ExpandWithCode(r.Context(), i18n.MessageKey(msgs.MsgUIServerFailed)),
 		})
 		return
 	}

@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
@@ -113,7 +113,7 @@ func (m RawJSON) BytesOrNull() []byte {
 
 func (m *RawJSON) UnmarshalJSON(data []byte) error {
 	if m == nil {
-		return i18n.NewError(context.Background(), tkmsgs.MsgTypesUnmarshalNil)
+		return i18n.NewError(context.Background(), msgs.MsgTypesUnmarshalNil)
 	}
 	*m = append((*m)[0:0], data...)
 	return nil
@@ -151,6 +151,6 @@ func (m *RawJSON) Scan(src interface{}) error {
 		*m = nil
 		return nil
 	default:
-		return i18n.NewError(context.Background(), tkmsgs.MsgTypesScanFail, src, m)
+		return i18n.NewError(context.Background(), msgs.MsgTypesScanFail, src, m)
 	}
 }

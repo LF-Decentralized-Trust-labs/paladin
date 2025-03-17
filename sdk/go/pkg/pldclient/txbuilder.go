@@ -27,7 +27,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -281,7 +281,7 @@ func (t *txBuilder) ABIJSON(abiJson []byte) TxBuilder {
 	var a abi.ABI
 	err := json.Unmarshal(abiJson, &a)
 	if err != nil {
-		t.deferError(i18n.WrapError(t.ctx, err, tkmsgs.MsgPaladinClientABIJson))
+		t.deferError(i18n.WrapError(t.ctx, err, msgs.MsgPaladinClientABIJson))
 		return t
 	}
 	return t.ABI(a)
@@ -512,7 +512,7 @@ func (t *txBuilder) BuildCallData() (callData types.HexBytes, err error) {
 
 func (t *txBuilder) ResolveDefinition() (*abi.Entry, error) {
 	if t.tx.ABI == nil {
-		return nil, i18n.NewError(t.ctx, tkmsgs.MsgPaladinClientNoABISupplied)
+		return nil, i18n.NewError(t.ctx, msgs.MsgPaladinClientNoABISupplied)
 	}
 	if t.tx.Function == "" {
 		def := t.tx.ABI.Constructor()
@@ -523,7 +523,7 @@ func (t *txBuilder) ResolveDefinition() (*abi.Entry, error) {
 	}
 	def := t.functions[t.tx.Function]
 	if def == nil {
-		return nil, i18n.NewError(t.ctx, tkmsgs.MsgPaladinClientFunctionNotFound, t.tx.Function)
+		return nil, i18n.NewError(t.ctx, msgs.MsgPaladinClientFunctionNotFound, t.tx.Function)
 	}
 	return def, nil
 }
@@ -541,7 +541,7 @@ func (t *txBuilder) BuildInputDataCV() (def *abi.Entry, cv *abi.ComponentValue, 
 	var inputJSONable any
 	if t.inputs == nil {
 		if len(typeTree.TupleChildren()) > 0 {
-			return nil, nil, i18n.NewError(t.ctx, tkmsgs.MsgPaladinClientMissingInput, def.SolString())
+			return nil, nil, i18n.NewError(t.ctx, msgs.MsgPaladinClientMissingInput, def.SolString())
 		}
 		inputJSONable = []any{}
 	} else {
@@ -566,7 +566,7 @@ func (t *txBuilder) BuildInputDataCV() (def *abi.Entry, cv *abi.ComponentValue, 
 		cv, err = typeTree.ParseExternalCtx(t.ctx, inputJSONable)
 	}
 	if err != nil {
-		return nil, nil, i18n.WrapError(t.ctx, err, tkmsgs.MsgPaladinClientInvalidInput, def.SolString())
+		return nil, nil, i18n.WrapError(t.ctx, err, msgs.MsgPaladinClientInvalidInput, def.SolString())
 	}
 	return def, cv, err
 }
@@ -588,7 +588,7 @@ func (st sendableTransaction) Send() SentTransaction {
 		chainable: st.chainable,
 	}
 	if st.tx.From == "" {
-		sent.deferError(i18n.NewError(st.ctx, tkmsgs.MsgPaladinClientMissingFrom))
+		sent.deferError(i18n.NewError(st.ctx, msgs.MsgPaladinClientMissingFrom))
 	}
 	if sent.deferredErr != nil {
 		return sent
@@ -613,7 +613,7 @@ func (st sendableTransaction) Prepare() PreparingTransaction {
 		chainable: st.chainable,
 	}
 	if st.tx.From == "" {
-		preparing.deferError(i18n.NewError(st.ctx, tkmsgs.MsgPaladinClientMissingFrom))
+		preparing.deferError(i18n.NewError(st.ctx, msgs.MsgPaladinClientMissingFrom))
 	}
 	if preparing.deferredErr != nil {
 		return preparing
@@ -736,14 +736,14 @@ func txPoller[R any](ch *chainable, timeout time.Duration, txID uuid.UUID, doGet
 		// Check we didn't timeout
 		waitTime := time.Since(startTime)
 		if waitTime > timeout {
-			ch.deferError(i18n.WrapError(ch.ctx, lastErr, tkmsgs.MsgPaladinClientPollTxTimedOut, attempt, waitTime, txID))
+			ch.deferError(i18n.WrapError(ch.ctx, lastErr, msgs.MsgPaladinClientPollTxTimedOut, attempt, waitTime, txID))
 			return result
 		}
 		// Wait before polling
 		select {
 		case <-ticker.C:
 		case <-ch.ctx.Done():
-			ch.deferError(i18n.WrapError(ch.ctx, lastErr, tkmsgs.MsgContextCanceled))
+			ch.deferError(i18n.WrapError(ch.ctx, lastErr, msgs.MsgContextCanceled))
 			return result
 		}
 	}
@@ -792,23 +792,23 @@ func (ptr *preparedTransactionResult) PreparedTransaction() *pldapi.PreparedTran
 
 func (t *txBuilder) validateForSend() error {
 	if t.tx.Type == "" {
-		return i18n.NewError(t.ctx, tkmsgs.MsgPaladinClientMissingType)
+		return i18n.NewError(t.ctx, msgs.MsgPaladinClientMissingType)
 	}
 	if t.tx.Domain == "" && t.tx.Type.V() == pldapi.TransactionTypePrivate {
-		return i18n.NewError(t.ctx, tkmsgs.MsgPaladinClientNoDomain)
+		return i18n.NewError(t.ctx, msgs.MsgPaladinClientNoDomain)
 	}
 	if t.tx.Function == "" {
 		if t.tx.To != nil {
-			return i18n.NewError(t.ctx, tkmsgs.MsgPaladinClientNoFunction)
+			return i18n.NewError(t.ctx, msgs.MsgPaladinClientNoFunction)
 		}
 		if t.tx.Type.V() == pldapi.TransactionTypePrivate && t.tx.Bytecode != nil {
-			return i18n.NewError(t.ctx, tkmsgs.MsgPaladinClientBytecodeWithPriv)
+			return i18n.NewError(t.ctx, msgs.MsgPaladinClientBytecodeWithPriv)
 		} else if t.tx.Type.V() == pldapi.TransactionTypePublic && len(t.tx.Bytecode) == 0 {
-			return i18n.NewError(t.ctx, tkmsgs.MsgPaladinClientBytecodeMissing)
+			return i18n.NewError(t.ctx, msgs.MsgPaladinClientBytecodeMissing)
 		}
 	} else {
 		if t.tx.To == nil {
-			return i18n.NewError(t.ctx, tkmsgs.MsgPaladinClientMissingTo, t.tx.Function)
+			return i18n.NewError(t.ctx, msgs.MsgPaladinClientMissingTo, t.tx.Function)
 		}
 	}
 	return nil

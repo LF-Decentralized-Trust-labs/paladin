@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 )
 
 // HexUint64OrString is used for things like block numbers, where you can provide a number or a string like "latest".
@@ -41,7 +41,7 @@ func (his *HexUint64OrString) UnmarshalJSON(b []byte) error {
 		case json.Number:
 			*his = HexUint64OrString(v.String())
 		default:
-			err = i18n.NewError(context.Background(), tkmsgs.MsgTypesScanFail, iVal, his)
+			err = i18n.NewError(context.Background(), msgs.MsgTypesScanFail, iVal, his)
 		}
 	}
 	return err

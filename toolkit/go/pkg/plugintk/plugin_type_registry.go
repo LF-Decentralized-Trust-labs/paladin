@@ -18,7 +18,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"google.golang.org/grpc"
 	pb "google.golang.org/protobuf/proto"
@@ -123,7 +123,7 @@ func (th *registryHandler) RequestToPlugin(ctx context.Context, iReq PluginMessa
 		resMsg.HandleRegistryEventsRes, err = th.api.HandleRegistryEvents(ctx, input.HandleRegistryEvents)
 		res.ResponseFromRegistry = resMsg
 	default:
-		err = i18n.NewError(ctx, tkmsgs.MsgPluginUnsupportedRequest, input)
+		err = i18n.NewError(ctx, msgs.MsgPluginUnsupportedRequest, input)
 	}
 	return th.Wrap(res), err
 }

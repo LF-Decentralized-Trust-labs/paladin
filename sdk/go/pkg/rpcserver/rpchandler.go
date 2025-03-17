@@ -24,7 +24,7 @@ import (
 	"unicode"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
@@ -85,7 +85,7 @@ func (s *rpcServer) replyRPCParseError(ctx context.Context, b []byte, err error)
 		isOK:    false,
 		sendRes: true,
 		res: rpcclient.NewRPCErrorResponse(
-			i18n.NewError(ctx, tkmsgs.MsgJSONRPCInvalidRequest),
+			i18n.NewError(ctx, msgs.MsgJSONRPCInvalidRequest),
 			types.RawJSON(`"1"`),
 			rpcclient.RPCCodeInvalidRequest,
 		),

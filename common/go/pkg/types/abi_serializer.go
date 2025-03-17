@@ -25,7 +25,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 )
 
 type JSONFormatOptions string
@@ -49,7 +49,7 @@ func (jfo JSONFormatOptions) getABISerializer(ctx context.Context, skipErrors bo
 	options, err := url.ParseQuery(string(jfo))
 	if err != nil {
 		if !skipErrors {
-			return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTypesInvalidJSONFormatOptions, jfo)
+			return nil, i18n.WrapError(ctx, err, msgs.MsgTypesInvalidJSONFormatOptions, jfo)
 		}
 	}
 	for option, values := range options {
@@ -65,7 +65,7 @@ func (jfo JSONFormatOptions) getABISerializer(ctx context.Context, skipErrors bo
 					serializer = serializer.SetFormattingMode(abi.FormatAsSelfDescribingArrays)
 				default:
 					if !skipErrors {
-						return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTypesUnknownJSONFormatOptions, option, v)
+						return nil, i18n.WrapError(ctx, err, msgs.MsgTypesUnknownJSONFormatOptions, option, v)
 					}
 				}
 			case "number":
@@ -78,7 +78,7 @@ func (jfo JSONFormatOptions) getABISerializer(ctx context.Context, skipErrors bo
 					serializer = serializer.SetIntSerializer(abi.JSONNumberIntSerializer)
 				default:
 					if !skipErrors {
-						return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTypesUnknownJSONFormatOptions, option, v)
+						return nil, i18n.WrapError(ctx, err, msgs.MsgTypesUnknownJSONFormatOptions, option, v)
 					}
 				}
 			case "bytes":
@@ -90,7 +90,7 @@ func (jfo JSONFormatOptions) getABISerializer(ctx context.Context, skipErrors bo
 				case "base64":
 					serializer = serializer.SetByteSerializer(abi.Base64ByteSerializer)
 				default:
-					return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTypesUnknownJSONFormatOptions, option, v)
+					return nil, i18n.WrapError(ctx, err, msgs.MsgTypesUnknownJSONFormatOptions, option, v)
 				}
 			case "address":
 				switch strings.ToLower(v) {
@@ -101,13 +101,13 @@ func (jfo JSONFormatOptions) getABISerializer(ctx context.Context, skipErrors bo
 				case "checksum":
 					serializer = serializer.SetAddressSerializer(abi.ChecksumAddrSerializer)
 				default:
-					return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTypesUnknownJSONFormatOptions, option, v)
+					return nil, i18n.WrapError(ctx, err, msgs.MsgTypesUnknownJSONFormatOptions, option, v)
 				}
 			case "pretty":
 				serializer = serializer.SetPretty(v != "false")
 			default:
 				if !skipErrors {
-					return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTypesUnknownJSONFormatOptions, option, v)
+					return nil, i18n.WrapError(ctx, err, msgs.MsgTypesUnknownJSONFormatOptions, option, v)
 				}
 			}
 		}
@@ -151,7 +151,7 @@ func ABIsMustMatch(ctx context.Context, a, b abi.ABI, subMatch ...abi.EntryType)
 		}
 		if mustMatch {
 			if _, inB := byDefsB[sig]; !inB {
-				return i18n.NewError(ctx, tkmsgs.MsgTypesABIDefNotInBothStructs, sig)
+				return i18n.NewError(ctx, msgs.MsgTypesABIDefNotInBothStructs, sig)
 			}
 			delete(byDefsB, sig)
 		}
@@ -166,7 +166,7 @@ func ABIsMustMatch(ctx context.Context, a, b abi.ABI, subMatch ...abi.EntryType)
 		}
 		if mustMatch {
 			if _, inA := byDefsA[sig]; !inA {
-				return i18n.NewError(ctx, tkmsgs.MsgTypesABIDefNotInBothStructs, sig)
+				return i18n.NewError(ctx, msgs.MsgTypesABIDefNotInBothStructs, sig)
 			}
 		}
 	}

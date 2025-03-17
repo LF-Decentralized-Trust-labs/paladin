@@ -25,7 +25,7 @@ import (
 	"math/big"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 )
 
 // HexUint256 is any integer (signed or unsigned) up to 256 bits in size, serialized to the DB using a 65 sortable string (a 0/1 sign character, followed by 32 hex bytes)
@@ -39,7 +39,7 @@ func Uint64ToUint256(v uint64) *HexUint256 {
 func ParseHexUint256(ctx context.Context, s string) (*HexUint256, error) {
 	bi, ok := new(big.Int).SetString(s, 0)
 	if !ok {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgTypesInvalidHexInteger, s)
+		return nil, i18n.NewError(ctx, msgs.MsgTypesInvalidHexInteger, s)
 	}
 	return (*HexUint256)(bi), nil
 }
@@ -85,7 +85,7 @@ func (hi *HexUint256) UnmarshalJSON(b []byte) error {
 		case json.Number:
 			err = hi.setJSONString(v.String())
 		default:
-			err = i18n.NewError(context.Background(), tkmsgs.MsgTypesScanFail, iVal, hi)
+			err = i18n.NewError(context.Background(), msgs.MsgTypesScanFail, iVal, hi)
 		}
 	}
 	return err
@@ -127,7 +127,7 @@ func (hi *HexUint256) Scan(src interface{}) error {
 		bi, ok := new(big.Int).SetString(v, 16)
 		if len(v) != 64 || !ok {
 			// This type was not used to serialize to the database
-			return i18n.NewError(context.Background(), tkmsgs.MsgTypesInvalidDBUint256, v)
+			return i18n.NewError(context.Background(), msgs.MsgTypesInvalidDBUint256, v)
 		}
 		*hi = (HexUint256)(*bi)
 		return nil
@@ -135,7 +135,7 @@ func (hi *HexUint256) Scan(src interface{}) error {
 		*hi = (HexUint256)(*big.NewInt(v))
 		return nil
 	default:
-		return i18n.NewError(context.Background(), tkmsgs.MsgTypesScanFail, src, hi)
+		return i18n.NewError(context.Background(), msgs.MsgTypesScanFail, src, hi)
 	}
 }
 

@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/signerapi"
 )
 
@@ -69,12 +69,12 @@ func (d *domainPrefixRouter[C]) NewSigner(ctx context.Context, conf C) (_ signer
 func (d *domainPrefixRouter[C]) getDomainSignerForAlgorithm(ctx context.Context, algorithm string) (signerapi.InMemorySigner, error) {
 	algoNoDomain, ok := strings.CutPrefix(strings.ToLower(algorithm), "domain:")
 	if !ok {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningInvalidDomainAlgorithmNoPrefix, algorithm)
+		return nil, i18n.NewError(ctx, msgs.MsgSigningInvalidDomainAlgorithmNoPrefix, algorithm)
 	}
 	domain := strings.SplitN(algoNoDomain, ":", 2)[0]
 	s, ok := d.domainSigners[domain]
 	if !ok {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningNoDomainRegisteredWithModule, domain)
+		return nil, i18n.NewError(ctx, msgs.MsgSigningNoDomainRegisteredWithModule, domain)
 	}
 	return s, nil
 }

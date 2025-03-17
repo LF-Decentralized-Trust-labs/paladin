@@ -24,7 +24,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
@@ -85,7 +85,7 @@ func (unlinked *SolidityBuildWithLinks) ResolveLinks(ctx context.Context, librar
 				addr, found = libraries[libName]
 			}
 			if !found {
-				return nil, i18n.NewError(ctx, tkmsgs.MsgSolBuildMissingLink, fullLibName)
+				return nil, i18n.NewError(ctx, msgs.MsgSolBuildMissingLink, fullLibName)
 			}
 			for _, link := range link {
 				start := 2 /* 0x */ + link.Start*2
@@ -96,7 +96,7 @@ func (unlinked *SolidityBuildWithLinks) ResolveLinks(ctx context.Context, librar
 				placeholder := string(bytecode[start+3 : start+34+3])
 				expectedPlaceholder := types.Bytes32Keccak([]byte(fullLibName)).HexString()[0:34]
 				if placeholder != expectedPlaceholder {
-					return nil, i18n.NewError(ctx, tkmsgs.MsgSolBuildParseFailed, start, fullLibName, placeholder, expectedPlaceholder)
+					return nil, i18n.NewError(ctx, msgs.MsgSolBuildParseFailed, start, fullLibName, placeholder, expectedPlaceholder)
 				}
 				bytecode = bytecode[0:start] + addr.String()[2:] /* no 0x prefix */ + bytecode[end:]
 			}

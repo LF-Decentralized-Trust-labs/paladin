@@ -26,7 +26,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
@@ -136,7 +136,7 @@ func (rc *wsRPCClient) waitConnected(ctx context.Context, connected chan struct{
 	select {
 	case <-connected:
 	case <-ctx.Done():
-		return i18n.NewError(ctx, tkmsgs.MsgContextCanceled)
+		return i18n.NewError(ctx, msgs.MsgContextCanceled)
 	}
 	return nil
 }
@@ -153,7 +153,7 @@ func (rc *wsRPCClient) handleReconnect(ctx context.Context, w wsclient.WSClient)
 		for rpcID, c := range calls {
 			rc.deliverCallResponse(c, &RPCResponse{
 				ID:    types.RawJSON(`"` + rpcID + `"`),
-				Error: NewRPCError(ctx, RPCCodeInternalError, tkmsgs.MsgRPCClientWebSocketReconnected),
+				Error: NewRPCError(ctx, RPCCodeInternalError, msgs.MsgRPCClientWebSocketReconnected),
 			})
 		}
 		for _, s := range subs {
@@ -326,7 +326,7 @@ func (rc *wsRPCClient) Subscribe(ctx context.Context, conf SubscriptionConfig, p
 		return s, rpcErr
 	case <-ctx.Done():
 		rc.removeConfiguredSub(s.localID)
-		return nil, NewRPCError(ctx, RPCCodeInternalError, tkmsgs.MsgContextCanceled, reqID)
+		return nil, NewRPCError(ctx, RPCCodeInternalError, msgs.MsgContextCanceled, reqID)
 	}
 }
 
@@ -392,7 +392,7 @@ func (rc *wsRPCClient) sendRPC(ctx context.Context, reqID string, rpcReq *RPCReq
 		err = rc.client.Send(ctx, jsonInput)
 	}
 	if err != nil {
-		rpcErr := NewRPCError(ctx, RPCCodeInternalError, tkmsgs.MsgRPCClientRequestFailed, err)
+		rpcErr := NewRPCError(ctx, RPCCodeInternalError, msgs.MsgRPCClientRequestFailed, err)
 		log.L(ctx).Errorf("RPC[%s] <-- ERROR: %s", reqID, err)
 		return rpcErr
 	}
@@ -420,7 +420,7 @@ func (rc *wsRPCClient) waitResponse(ctx context.Context, result interface{}, req
 	select {
 	case rpcRes = <-resChannel:
 	case <-ctx.Done():
-		rpcErr := NewRPCError(ctx, RPCCodeInternalError, tkmsgs.MsgContextCanceled, reqID)
+		rpcErr := NewRPCError(ctx, RPCCodeInternalError, msgs.MsgContextCanceled, reqID)
 		log.L(ctx).Errorf("RPC[%s] <-- ERROR: %s", reqID, rpcErr)
 		return rpcErr
 	}
@@ -431,7 +431,7 @@ func (rc *wsRPCClient) waitResponse(ctx context.Context, result interface{}, req
 	log.L(ctx).Infof("RPC[%s] <-- %s OK (%.2fms)", reqID, rpcReq.Method, float64(time.Since(rpcStartTime))/float64(time.Millisecond))
 	if result != nil {
 		if err := json.Unmarshal(rpcRes.Result.Bytes(), &result); err != nil {
-			err = i18n.NewError(ctx, tkmsgs.MsgRPCClientResultParseFailed, result, err)
+			err = i18n.NewError(ctx, msgs.MsgRPCClientResultParseFailed, result, err)
 			return &RPCError{Code: int64(RPCCodeParseError), Message: err.Error()}
 		}
 	}
@@ -490,7 +490,7 @@ func (rc *wsRPCClient) handleSubscriptionConfirm(ctx context.Context, inflightSu
 	if len(subscriptionID) == 0 {
 		log.L(ctx).Warnf("RPC[%s] <-- Unable to extract subscription id from eth_subscribe response: %s", rpcRes.ID.StringValue(), rpcRes.Params)
 		if resChl != nil {
-			resChl <- NewRPCError(ctx, RPCCodeInternalError, tkmsgs.MsgRPCClientSubscribeResponseInvalid)
+			resChl <- NewRPCError(ctx, RPCCodeInternalError, msgs.MsgRPCClientSubscribeResponseInvalid)
 		}
 		return
 	}

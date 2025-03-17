@@ -22,7 +22,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 )
@@ -136,7 +136,7 @@ func New() PaladinClient {
 func (c *paladinClient) WSClient(ctx context.Context) (rpcclient.WSClient, error) {
 	wsc, ok := c.Client.(rpcclient.WSClient)
 	if !ok {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgPaladinClientWebSocketRequired)
+		return nil, i18n.NewError(ctx, msgs.MsgPaladinClientWebSocketRequired)
 	}
 	return wsc, nil
 }
@@ -165,7 +165,7 @@ func (c *paladinClient) WebSocket(ctx context.Context, conf *pldconf.WSClientCon
 type unconnectedRPC struct{}
 
 func (u *unconnectedRPC) CallRPC(ctx context.Context, result interface{}, method string, params ...interface{}) rpcclient.ErrorRPC {
-	return rpcclient.NewRPCError(ctx, rpcclient.RPCCodeInternalError, tkmsgs.MsgPaladinClientNoConnection)
+	return rpcclient.NewRPCError(ctx, rpcclient.RPCCodeInternalError, msgs.MsgPaladinClientNoConnection)
 }
 
 func (c *paladinClient) ReceiptPollingInterval(t time.Duration) PaladinClient {

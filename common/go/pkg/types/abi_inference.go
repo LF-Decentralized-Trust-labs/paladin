@@ -26,7 +26,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -50,7 +50,7 @@ func ABIInferenceFromJSON(ctx context.Context, inputData RawJSON) (abi.Parameter
 		dec := json.NewDecoder(bytes.NewReader(inputData))
 		dec.UseNumber()
 		if err := dec.Decode(&rootMap); err != nil {
-			return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTypesInvalidJSONObjectForABIInference)
+			return nil, i18n.WrapError(ctx, err, msgs.MsgTypesInvalidJSONObjectForABIInference)
 		}
 	}
 	if len(rootMap) == 0 {
@@ -83,7 +83,7 @@ func recurseInferParams(ctx context.Context, in map[string]any, indexed bool) (a
 		case json.Number:
 			bf, ok := new(big.Float).SetString(v.String())
 			if !ok || !bf.IsInt() {
-				return nil, i18n.NewError(ctx, tkmsgs.MsgTypesNumberTypeInferenceRequiresInt, k, v)
+				return nil, i18n.NewError(ctx, msgs.MsgTypesNumberTypeInferenceRequiresInt, k, v)
 			}
 			params = append(params, &abi.Parameter{
 				Name:    k,
@@ -98,7 +98,7 @@ func recurseInferParams(ctx context.Context, in map[string]any, indexed bool) (a
 			})
 		case []any:
 			if len(v) == 0 {
-				return nil, i18n.NewError(ctx, tkmsgs.MsgTypesCannotInferTypeOfEmptyArray, k)
+				return nil, i18n.NewError(ctx, msgs.MsgTypesCannotInferTypeOfEmptyArray, k)
 			}
 			// Infer recursively from the first parameter, giving it a pseudo name for error reporting
 			pk := fmt.Sprintf("%s[]", k)
@@ -121,7 +121,7 @@ func recurseInferParams(ctx context.Context, in map[string]any, indexed bool) (a
 				Components:   nestedParams,
 			})
 		default:
-			return nil, i18n.NewError(ctx, tkmsgs.MsgTypesTypeInferenceNotSupportedForX, k, v)
+			return nil, i18n.NewError(ctx, msgs.MsgTypesTypeInferenceNotSupportedForX, k, v)
 		}
 	}
 

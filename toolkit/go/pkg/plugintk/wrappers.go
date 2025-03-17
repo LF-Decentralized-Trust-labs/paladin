@@ -18,7 +18,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"google.golang.org/protobuf/encoding/protojson"
 	pb "google.golang.org/protobuf/proto"
@@ -87,14 +87,14 @@ func responseToPluginAs[M, ResType, T any](ctx context.Context, msg PluginMessag
 	res := msg.ResponseToPlugin()
 	iRes, ok := res.(*ResType)
 	if !ok {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgPluginUnexpectedResponse, iRes, new(ResType))
+		return nil, i18n.NewError(ctx, msgs.MsgPluginUnexpectedResponse, iRes, new(ResType))
 	}
 	return unwrap(iRes), nil
 }
 
 func callPluginImpl[IN, OUT any](ctx context.Context, in *IN, fn func(context.Context, *IN) (*OUT, error)) (*OUT, error) {
 	if fn == nil {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgPluginUnimplementedRequest, new(IN))
+		return nil, i18n.NewError(ctx, msgs.MsgPluginUnimplementedRequest, new(IN))
 	}
 	return fn(ctx, in)
 }

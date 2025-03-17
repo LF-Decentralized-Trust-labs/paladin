@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 )
 
 func getIncludeFile(ctx context.Context, outputPath, name string) ([]byte, error) {
@@ -35,7 +35,7 @@ func getIncludeFile(ctx context.Context, outputPath, name string) ([]byte, error
 		return nil, err
 	}
 	if _, err := os.Stat(filename); err != nil {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgReferenceMarkdownMissing, filename)
+		return nil, i18n.NewError(ctx, msgs.MsgReferenceMarkdownMissing, filename)
 	}
 	return []byte(fmt.Sprintf("{%% include-markdown \"./_includes/%s_description.md\" %%}\n\n", name)), nil
 }

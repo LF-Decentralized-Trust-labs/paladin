@@ -25,7 +25,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/tlsconf"
@@ -34,7 +34,7 @@ import (
 func ParseWSConfig(ctx context.Context, config *pldconf.WSClientConfig) (*wsclient.WSConfig, error) {
 	u, err := url.Parse(config.URL)
 	if err != nil || (u.Scheme != "ws" && u.Scheme != "wss") {
-		return nil, i18n.WrapError(ctx, err, tkmsgs.MsgRPCClientInvalidWebSocketURL, u)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgRPCClientInvalidWebSocketURL, u)
 	}
 	if u.Scheme == "wss" {
 		config.TLS.Enabled = true
@@ -62,7 +62,7 @@ func ParseWSConfig(ctx context.Context, config *pldconf.WSClientConfig) (*wsclie
 func ParseHTTPConfig(ctx context.Context, config *pldconf.HTTPClientConfig) (*resty.Client, error) {
 	u, err := url.Parse(config.URL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		return nil, i18n.WrapError(ctx, err, tkmsgs.MsgRPCClientInvalidHTTPURL, u)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgRPCClientInvalidHTTPURL, u)
 	}
 	if u.Scheme == "https" {
 		config.TLS.Enabled = true

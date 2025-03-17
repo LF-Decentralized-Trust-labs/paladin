@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 )
 
 // The locator for private identities is split into two parts separate by an `@` symbol
@@ -43,21 +43,21 @@ func (pil PrivateIdentityLocator) Validate(ctx context.Context, defaultNode stri
 		identity = parts[0]
 		node = parts[1]
 	default:
-		return "", "", i18n.NewError(ctx, tkmsgs.MsgTypesPrivateIdentityLocatorInvalid, node)
+		return "", "", i18n.NewError(ctx, msgs.MsgTypesPrivateIdentityLocatorInvalid, node)
 	}
 	if err := ValidateSafeCharsStartEndAlphaNum(ctx, identity, DefaultNameMaxLen, "identity"); err != nil {
-		return "", "", i18n.WrapError(ctx, err, tkmsgs.MsgTypesPrivateIdentityLocatorInvalid, pil)
+		return "", "", i18n.WrapError(ctx, err, msgs.MsgTypesPrivateIdentityLocatorInvalid, pil)
 	}
 	if node == "" {
 		node = defaultNode
 	}
 	if node == "" /* 2nd check with any default applied */ {
 		if !allowEmptyNode {
-			return "", "", i18n.WrapError(ctx, err, tkmsgs.MsgTypesPrivateIdentityReqFullyQualified, pil)
+			return "", "", i18n.WrapError(ctx, err, msgs.MsgTypesPrivateIdentityReqFullyQualified, pil)
 		}
 	} else {
 		if err := ValidateSafeCharsStartEndAlphaNum(ctx, node, DefaultNameMaxLen, "node"); err != nil {
-			return "", "", i18n.WrapError(ctx, err, tkmsgs.MsgTypesPrivateIdentityLocatorInvalid, pil)
+			return "", "", i18n.WrapError(ctx, err, msgs.MsgTypesPrivateIdentityLocatorInvalid, pil)
 		}
 	}
 	return identity, node, nil

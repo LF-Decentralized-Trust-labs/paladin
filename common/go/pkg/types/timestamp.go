@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 )
 
 // Timestamp stores a Unix timestamp with nanoseconds.
@@ -66,7 +66,7 @@ func ParseTimeString(str string) (Timestamp, error) {
 		}
 	}
 	if err != nil {
-		return 0, i18n.NewError(context.Background(), tkmsgs.MsgTypesTimeParseFail, str)
+		return 0, i18n.NewError(context.Background(), msgs.MsgTypesTimeParseFail, str)
 	}
 	return Timestamp(t.UnixNano()), nil
 }
@@ -121,7 +121,7 @@ func (ts *Timestamp) Scan(src interface{}) error {
 		*ts = TimestampFromUnix(src)
 		return nil
 	default:
-		return i18n.NewError(context.Background(), tkmsgs.MsgTypesRestoreFailed, src, ts)
+		return i18n.NewError(context.Background(), msgs.MsgTypesRestoreFailed, src, ts)
 	}
 
 }

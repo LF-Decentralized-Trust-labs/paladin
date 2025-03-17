@@ -28,7 +28,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/msgs"
 	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
@@ -678,7 +678,7 @@ func (d *docGenerator) writeStructFields(ctx context.Context, t reflect.Type, pa
 		messageKeyName := fmt.Sprintf("%s.%s", structTag, jsonFieldName)
 		description := i18n.Expand(ctx, i18n.MessageKey(messageKeyName))
 		if description == messageKeyName {
-			return tableRowCount, i18n.NewError(ctx, tkmsgs.MsgFieldDescriptionMissing, jsonFieldName, t.Name())
+			return tableRowCount, i18n.NewError(ctx, msgs.MsgFieldDescriptionMissing, jsonFieldName, t.Name())
 		}
 
 		isArray := false
