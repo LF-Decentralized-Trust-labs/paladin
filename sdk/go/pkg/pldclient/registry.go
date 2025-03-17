@@ -18,9 +18,9 @@ package pldclient
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 type Registry interface {

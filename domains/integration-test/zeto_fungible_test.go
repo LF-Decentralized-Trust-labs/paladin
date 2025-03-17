@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -28,7 +29,6 @@ import (
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -18,7 +18,7 @@ package pldapi
 
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 )
 
 // This is a very compact wrapping structure that is automatically stored for any ABI

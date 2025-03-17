@@ -24,13 +24,13 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcserver"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

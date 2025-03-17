@@ -19,12 +19,12 @@ import (
 	"context"
 	_ "embed"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/stretchr/testify/suite"
 )
 

@@ -31,6 +31,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
@@ -41,7 +42,6 @@ import (
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/verifiers"
 )
 

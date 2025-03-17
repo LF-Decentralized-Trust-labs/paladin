@@ -20,9 +20,9 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 )
 

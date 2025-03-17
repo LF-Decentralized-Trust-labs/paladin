@@ -25,9 +25,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 func (s *rpcServer) newWSConnection(conn *websocket.Conn) {

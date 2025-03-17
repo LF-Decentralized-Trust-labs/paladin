@@ -6,6 +6,7 @@ require (
 	github.com/go-resty/resty/v2 v2.14.0
 	github.com/hyperledger/firefly-common v1.4.14
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.1
@@ -81,5 +82,7 @@ require (
 )
 
 replace github.com/kaleido-io/paladin/sdk/go => ../sdk/go
+
+replace github.com/kaleido-io/paladin/common/go => ../common/go
 
 replace github.com/kaleido-io/paladin/config => ../config

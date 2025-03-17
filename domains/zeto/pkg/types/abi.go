@@ -18,8 +18,8 @@ package types
 import (
 	_ "embed"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 //go:embed abis/IZetoFungible.json

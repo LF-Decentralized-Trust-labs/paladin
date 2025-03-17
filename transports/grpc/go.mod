@@ -4,6 +4,7 @@ go 1.22.5
 
 require (
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
@@ -38,8 +39,10 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
+replace github.com/kaleido-io/paladin/common/go => ../../common/go
 
 replace github.com/kaleido-io/paladin/sdk/go => ../../sdk/go
+
+replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
 
 replace github.com/kaleido-io/paladin/config => ../../config

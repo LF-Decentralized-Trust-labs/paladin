@@ -23,8 +23,8 @@ import (
 	"encoding/json"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
 )
 
 // EthAddress is an SQL serializable version of ethtypes.Address0xHex

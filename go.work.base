@@ -4,6 +4,8 @@ go 1.22.5
 // By running this first, we get a big head start on the pre-reqs install
 // for the build in a cached container
 use (
+	./common/go
 	./config
+	./sdk/go
 	./toolkit/go
 )

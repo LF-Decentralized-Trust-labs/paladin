@@ -13,6 +13,8 @@ require (
 	github.com/iden3/go-rapidsnark/witness/wasmer v0.0.0-20240914111027-9588ce2d7e1b
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/core v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/text v0.21.0
@@ -113,6 +115,10 @@ require (
 )
 
 replace github.com/kaleido-io/paladin/core => ../../core/go
+
+replace github.com/kaleido-io/paladin/common/go => ../../common/go
+
+replace github.com/kaleido-io/paladin/sdk/go => ../../sdk/go
 
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
 

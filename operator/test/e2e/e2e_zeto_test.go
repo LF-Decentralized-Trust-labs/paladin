@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
@@ -35,7 +36,6 @@ import (
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/verifiers"
 )
 

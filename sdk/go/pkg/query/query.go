@@ -16,7 +16,7 @@
 package query
 
 import (
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 )
 
 type addOns func(op *Op)

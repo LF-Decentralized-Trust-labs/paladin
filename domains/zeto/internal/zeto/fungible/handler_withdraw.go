@@ -23,6 +23,8 @@ import (
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
@@ -30,8 +32,6 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"

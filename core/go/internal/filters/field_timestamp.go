@@ -21,7 +21,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 )
 
 type TimestampField string

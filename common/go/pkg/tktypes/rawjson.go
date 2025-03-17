@@ -21,8 +21,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"

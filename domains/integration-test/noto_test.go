@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
@@ -28,7 +29,6 @@ import (
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

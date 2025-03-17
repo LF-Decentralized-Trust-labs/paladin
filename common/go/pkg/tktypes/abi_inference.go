@@ -25,8 +25,8 @@ import (
 	"sort"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )

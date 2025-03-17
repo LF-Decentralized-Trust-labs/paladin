@@ -18,7 +18,7 @@ package smt
 import (
 	"testing"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 

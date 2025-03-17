@@ -27,10 +27,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/iden3/go-iden3-crypto/poseidon"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 var ZetoCoinABI = &abi.Parameter{

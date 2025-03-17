@@ -19,8 +19,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 // role of transaction engine:

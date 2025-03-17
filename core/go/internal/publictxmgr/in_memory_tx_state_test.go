@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,7 +37,7 @@ import (
 // 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 // 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 // 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-// 	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
+// 	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 
 // 	"github.com/stretchr/testify/assert"
 // )

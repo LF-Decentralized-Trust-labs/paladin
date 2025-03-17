@@ -22,11 +22,11 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

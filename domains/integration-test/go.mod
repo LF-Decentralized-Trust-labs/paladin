@@ -9,6 +9,7 @@ require (
 	github.com/kaleido-io/paladin/core v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/domains/noto v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/domains/zeto v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
@@ -119,6 +120,8 @@ replace github.com/kaleido-io/paladin/core => ../../core/go
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
 
 replace github.com/kaleido-io/paladin/sdk/go => ../../sdk/go
+
+replace github.com/kaleido-io/paladin/common/go => ../../common/go
 
 replace github.com/kaleido-io/paladin/domains/noto => ../noto
 

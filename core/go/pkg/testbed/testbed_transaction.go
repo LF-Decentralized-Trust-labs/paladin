@@ -18,8 +18,8 @@ package testbed
 
 import (
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 type TransactionResult struct {

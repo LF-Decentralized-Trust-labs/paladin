@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/noto"
@@ -33,7 +34,6 @@ import (
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

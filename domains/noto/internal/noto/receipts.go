@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 

@@ -21,10 +21,10 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/verifiers"
 	"golang.org/x/crypto/sha3"
 )

@@ -20,10 +20,10 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 // RPCHandler should not be implemented directly - use RPCMethod0 ... RPCMethod5 to implement your function

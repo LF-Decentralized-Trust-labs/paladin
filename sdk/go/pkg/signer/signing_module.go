@@ -21,13 +21,13 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/signer/keystores"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/signer/signers"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/signerapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tkmsgs"
 )
 
 // SigningModule provides functions for the signerapi request/reply functions from the signerapil interface defined

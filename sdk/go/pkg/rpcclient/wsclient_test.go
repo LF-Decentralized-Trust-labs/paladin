@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -18,7 +18,7 @@ package pldapi
 
 import (
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 )
 
 type ReliableMessageType string

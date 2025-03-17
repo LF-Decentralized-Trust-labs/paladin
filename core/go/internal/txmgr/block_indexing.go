@@ -18,12 +18,12 @@ package txmgr
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
 )
 
 func (tm *txManager) blockIndexerPreCommit(

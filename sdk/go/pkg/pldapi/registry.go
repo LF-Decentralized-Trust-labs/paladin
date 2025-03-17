@@ -16,7 +16,7 @@
 
 package pldapi
 
-import "github.com/kaleido-io/paladin/sdk/go/pkg/tktypes"
+import "github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 
 // An entity within a registry with its current properties
 type RegistryEntry struct {
