@@ -298,7 +298,7 @@ func (r *BesuGenesisReconciler) wrapGenesisInConfigMap(genesis *corev1alpha1.Bes
 	}
 }
 
-// generateBesuName generates a name for the Besu resources based on the Besu name.
+// generateBesuGenesisName generates a name for the Besu resources based on the Besu name.
 // this is for generating unique names for the resources
 func generateBesuGenesisName(n string) string {
 	return fmt.Sprintf("besu-%s-genesis", n)
