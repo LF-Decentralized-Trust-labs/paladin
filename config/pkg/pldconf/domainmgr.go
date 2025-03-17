@@ -16,6 +16,7 @@
 package pldconf
 
 import (
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 )
 
@@ -38,7 +39,7 @@ type DomainConfig struct {
 	DefaultGasLimit *uint64          `json:"defaultGasLimit"`
 }
 
-var DefaultDefaultGasLimit uint64 = 4000000 // high gas limit by default (accommodating zkp transactions)
+var DefaultDefaultGasLimit types.HexUint64 = 4000000 // high gas limit by default (accommodating zkp transactions)
 
 var ContractCacheDefaults = &CacheConfig{
 	Capacity: confutil.P(1000),

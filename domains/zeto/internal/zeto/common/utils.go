@@ -27,7 +27,7 @@ import (
 
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/types"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -68,7 +68,7 @@ func GetInputSize(sizeOfEndorsableStates int) int {
 	return 10
 }
 
-func HexUint256To32ByteHexString(v *types.HexUint256) string {
+func HexUint256To32ByteHexString(v *commontypes.HexUint256) string {
 	paddedBytes := IntTo32ByteSlice(v.Int())
 	return hex.EncodeToString(paddedBytes)
 }
@@ -89,8 +89,8 @@ func LoadBabyJubKey(payload []byte) (*babyjub.PublicKey, error) {
 	}
 	return keyCompressed.Decompress()
 }
-func EncodeTransactionData(ctx context.Context, transaction *prototk.TransactionSpecification) (types.HexBytes, error) {
-	txID, err := types.ParseHexBytes(ctx, transaction.TransactionId)
+func EncodeTransactionData(ctx context.Context, transaction *prototk.TransactionSpecification) (commontypes.HexBytes, error) {
+	txID, err := commontypes.ParseHexBytes(ctx, transaction.TransactionId)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorParseTxId, err)
 	}
