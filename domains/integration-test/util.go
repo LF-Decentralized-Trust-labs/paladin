@@ -20,18 +20,18 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zeto"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/testbed"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/noto"
+	nototypes "github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/types"
+	zetotypes "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/solutils"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 	"github.com/go-resty/resty/v2"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/pkg/testbed"
-	"github.com/kaleido-io/paladin/domains/noto/pkg/noto"
-	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
-	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 

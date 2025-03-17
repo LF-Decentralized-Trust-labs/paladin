@@ -17,7 +17,7 @@
 package pldconf
 
 import (
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 )
 
 type WSClientConfig struct {

@@ -96,7 +96,7 @@ The UTXO model works extremely well for **tokens** - both fungible value, and no
 
 ![Confidential UTXO models](../images/confidential_utxo_model.png)
 
-> Note that projects do exist (such as [Anonymous Zether](https://github.com/kaleido-io/anonymous-zether-client)) that implement tokens with an account model using advanced cryptography to protect global state. The Paladin architecture supports such models, although at time of writing no project has been onboarded.
+> Note that projects do exist (such as [Anonymous Zether](https://github.com//anonymous-zether-client)) that implement tokens with an account model using advanced cryptography to protect global state. The Paladin architecture supports such models, although at time of writing no project has been onboarded.
 
 ### Programming interfaces for Layer B
 

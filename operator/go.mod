@@ -1,4 +1,4 @@
-module github.com/kaleido-io/paladin/operator
+module github.com/LF-Decentralized-Trust-labs/paladin/operator
 
 go 1.22.5
 
@@ -8,9 +8,9 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/google/uuid v1.6.0
 	github.com/hyperledger/firefly-signer v1.1.19
-	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/testinfra v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/testinfra v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/onsi/ginkgo/v2 v2.17.2
 	github.com/onsi/gomega v1.33.1
 	github.com/pelletier/go-toml/v2 v2.2.3
@@ -126,8 +126,8 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-replace github.com/kaleido-io/paladin/config => ../config
+replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../config
 
-replace github.com/kaleido-io/paladin/toolkit => ../toolkit/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/toolkit => ../toolkit/go
 
-replace github.com/kaleido-io/paladin/testinfra => ../testinfra
+replace github.com/LF-Decentralized-Trust-labs/paladin/testinfra => ../testinfra

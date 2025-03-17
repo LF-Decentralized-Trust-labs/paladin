@@ -15,7 +15,7 @@
 
 syntax = "proto3";
 
-package io.kaleido.paladin.kata.engine;
+package org.lfdt.labs.paladin.kata.engine;
 option go_package = "pkg/proto/engine";
 import "google/protobuf/any.proto";
 
@@ -83,10 +83,10 @@ message DelegationRequest {
     
     // TODO we are using google.protobuf.Any here for TransactionSpecification which is defined in toolkit protos
     // need to figure out the build magic to import these from toolkit protos
-    //google.protobuf.Any transaction_specification = 4; // serialized io.kaleido.paladin.toolkit.TransactionSpecification
-    //optional google.protobuf.Any assembled_transaction = 5; // serialized io.kaleido.paladin.toolkit.AssembledTransaction
-    //repeated google.protobuf.Any attestation_plan = 6; // serialized io.kaleido.paladin.toolkit.AttestationRequest
-    //repeated google.protobuf.Any verifiers = 7; // serialized io.kaleido.paladin.toolkit.ResolvedVerifier
+    //google.protobuf.Any transaction_specification = 4; // serialized org.lfdt.labs.paladin.toolkit.TransactionSpecification
+    //optional google.protobuf.Any assembled_transaction = 5; // serialized org.lfdt.labs.paladin.toolkit.AssembledTransaction
+    //repeated google.protobuf.Any attestation_plan = 6; // serialized org.lfdt.labs.paladin.toolkit.AttestationRequest
+    //repeated google.protobuf.Any verifiers = 7; // serialized org.lfdt.labs.paladin.toolkit.ResolvedVerifier
 }
 
 message DelegationRequestAcknowledgment {

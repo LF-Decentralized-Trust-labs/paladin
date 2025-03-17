@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /// A contract registry is a trusted smart contract that announces the existence of
 /// new smart contracts instances of that are part of a single domain.
-/// @author https://github.com/kaleido-io/paladin
+/// @author https://github.com/LF-Decentralized-Trust-labs/paladin
 /// @title Paladin contract registry
 interface IPaladinContractRegistry_V0 {
 

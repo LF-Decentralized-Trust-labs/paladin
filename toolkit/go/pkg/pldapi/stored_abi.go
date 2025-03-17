@@ -17,8 +17,8 @@
 package pldapi
 
 import (
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/tktypes"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // This is a very compact wrapping structure that is automatically stored for any ABI

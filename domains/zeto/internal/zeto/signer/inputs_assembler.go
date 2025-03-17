@@ -20,12 +20,12 @@ import (
 	"crypto/rand"
 	"math/big"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/msgs"
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/proto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/i18n"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
-	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 )
 
 func (inputs *commonWitnessInputs) assemble(keyEntry *core.KeyEntry) map[string]interface{} {

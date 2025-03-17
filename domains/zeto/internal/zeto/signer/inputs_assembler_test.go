@@ -20,8 +20,8 @@ import (
 	"math/big"
 	"testing"
 
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/proto"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/core"
-	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/stretchr/testify/assert"
 )
 

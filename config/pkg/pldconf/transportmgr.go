@@ -14,7 +14,7 @@
  */
 package pldconf
 
-import "github.com/kaleido-io/paladin/config/pkg/confutil"
+import "github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 
 type TransportManagerConfig struct {
 	NodeName              string                      `json:"nodeName"`

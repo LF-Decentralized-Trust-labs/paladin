@@ -18,7 +18,7 @@ package publictxmgr
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/log"
 )
 
 type PublicTxManagerMetricsManager interface {

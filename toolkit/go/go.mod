@@ -1,4 +1,4 @@
-module github.com/kaleido-io/paladin/toolkit
+module github.com/LF-Decentralized-Trust-labs/paladin/toolkit
 
 go 1.22.5
 
@@ -13,7 +13,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hyperledger/firefly-common v1.4.14
 	github.com/hyperledger/firefly-signer v1.1.19
-	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
 	github.com/pkg/errors v0.9.1
 	github.com/rs/cors v1.11.0
 	github.com/sirupsen/logrus v1.9.3
@@ -87,4 +87,4 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-replace github.com/kaleido-io/paladin/config => ../../config
+replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../../config

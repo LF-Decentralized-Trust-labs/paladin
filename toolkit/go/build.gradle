@@ -24,8 +24,8 @@ ext {
     targetCoverage = 100
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
-        'github.com/kaleido-io/paladin/toolkit/pkg/prototk',
-        'github.com/kaleido-io/paladin/toolkit/pkg/reference',
+        'github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk',
+        'github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/reference',
     ]
 }
 

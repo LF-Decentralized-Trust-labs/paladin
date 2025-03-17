@@ -1,4 +1,4 @@
-module github.com/kaleido-io/paladin/testinfra
+module github.com/LF-Decentralized-Trust-labs/paladin/testinfra
 
 go 1.22.5
 

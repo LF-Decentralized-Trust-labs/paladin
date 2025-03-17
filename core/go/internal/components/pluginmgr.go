@@ -18,8 +18,8 @@ package components
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type PluginManager interface {

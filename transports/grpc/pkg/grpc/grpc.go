@@ -18,8 +18,8 @@ package grpc
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/transports/grpc/internal/grpctransport"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/transports/grpc/internal/grpctransport"
 )
 
 // allow this plugin to be loaded by component tests in other packages

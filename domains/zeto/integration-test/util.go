@@ -21,12 +21,12 @@ import (
 	"os"
 	"testing"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/testbed"
+	zetotypes "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcclient"
 	"github.com/go-resty/resty/v2"
-	"github.com/kaleido-io/paladin/core/pkg/testbed"
-	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
