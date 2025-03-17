@@ -18,7 +18,7 @@ package pldclient
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 )
@@ -27,9 +27,9 @@ type Registry interface {
 	RPCModule
 
 	Registries(ctx context.Context) (registryNames []string, err error)
-	QueryEntries(ctx context.Context, registryName string, jq query.QueryJSON, activeFilter tktypes.Enum[pldapi.ActiveFilter]) (entries []*pldapi.RegistryEntry, err error)
-	QueryEntriesWithProps(ctx context.Context, registryName string, jq query.QueryJSON, activeFilter tktypes.Enum[pldapi.ActiveFilter]) (entries []*pldapi.RegistryEntryWithProperties, err error)
-	GetEntryProperties(ctx context.Context, registryName string, entryID tktypes.HexBytes, activeFilter tktypes.Enum[pldapi.ActiveFilter]) (entries []*pldapi.RegistryProperty, err error)
+	QueryEntries(ctx context.Context, registryName string, jq query.QueryJSON, activeFilter types.Enum[pldapi.ActiveFilter]) (entries []*pldapi.RegistryEntry, err error)
+	QueryEntriesWithProps(ctx context.Context, registryName string, jq query.QueryJSON, activeFilter types.Enum[pldapi.ActiveFilter]) (entries []*pldapi.RegistryEntryWithProperties, err error)
+	GetEntryProperties(ctx context.Context, registryName string, entryID types.HexBytes, activeFilter types.Enum[pldapi.ActiveFilter]) (entries []*pldapi.RegistryProperty, err error)
 }
 
 // This is necessary because there's no way to introspect function parameter names via reflection
@@ -69,17 +69,17 @@ func (r *registry) Registries(ctx context.Context) (registryNames []string, err 
 	return
 }
 
-func (r *registry) QueryEntries(ctx context.Context, registryName string, jq query.QueryJSON, activeFilter tktypes.Enum[pldapi.ActiveFilter]) (entries []*pldapi.RegistryEntry, err error) {
+func (r *registry) QueryEntries(ctx context.Context, registryName string, jq query.QueryJSON, activeFilter types.Enum[pldapi.ActiveFilter]) (entries []*pldapi.RegistryEntry, err error) {
 	err = r.c.CallRPC(ctx, &entries, "reg_queryEntries", registryName, jq, activeFilter)
 	return
 }
 
-func (r *registry) QueryEntriesWithProps(ctx context.Context, registryName string, jq query.QueryJSON, activeFilter tktypes.Enum[pldapi.ActiveFilter]) (entries []*pldapi.RegistryEntryWithProperties, err error) {
+func (r *registry) QueryEntriesWithProps(ctx context.Context, registryName string, jq query.QueryJSON, activeFilter types.Enum[pldapi.ActiveFilter]) (entries []*pldapi.RegistryEntryWithProperties, err error) {
 	err = r.c.CallRPC(ctx, &entries, "reg_queryEntriesWithProps", registryName, jq, activeFilter)
 	return
 }
 
-func (r *registry) GetEntryProperties(ctx context.Context, registryName string, entryID tktypes.HexBytes, activeFilter tktypes.Enum[pldapi.ActiveFilter]) (properties []*pldapi.RegistryProperty, err error) {
+func (r *registry) GetEntryProperties(ctx context.Context, registryName string, entryID types.HexBytes, activeFilter types.Enum[pldapi.ActiveFilter]) (properties []*pldapi.RegistryProperty, err error) {
 	err = r.c.CallRPC(ctx, &properties, "reg_getEntryProperties", registryName, entryID, activeFilter)
 	return
 }

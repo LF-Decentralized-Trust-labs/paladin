@@ -26,7 +26,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/fungible"
@@ -65,38 +65,38 @@ type Zeto struct {
 }
 
 type MintEvent struct {
-	Outputs []tktypes.HexUint256 `json:"outputs"`
-	Data    tktypes.HexBytes     `json:"data"`
+	Outputs []commontypes.HexUint256 `json:"outputs"`
+	Data    commontypes.HexBytes     `json:"data"`
 }
 
 type TransferEvent struct {
-	Inputs  []tktypes.HexUint256 `json:"inputs"`
-	Outputs []tktypes.HexUint256 `json:"outputs"`
-	Data    tktypes.HexBytes     `json:"data"`
+	Inputs  []commontypes.HexUint256 `json:"inputs"`
+	Outputs []commontypes.HexUint256 `json:"outputs"`
+	Data    commontypes.HexBytes     `json:"data"`
 }
 
 type TransferWithEncryptedValuesEvent struct {
-	Inputs          []tktypes.HexUint256 `json:"inputs"`
-	Outputs         []tktypes.HexUint256 `json:"outputs"`
-	Data            tktypes.HexBytes     `json:"data"`
-	EncryptionNonce tktypes.HexUint256   `json:"encryptionNonce"`
-	EncryptedValues []tktypes.HexUint256 `json:"encryptedValues"`
+	Inputs          []commontypes.HexUint256 `json:"inputs"`
+	Outputs         []commontypes.HexUint256 `json:"outputs"`
+	Data            commontypes.HexBytes     `json:"data"`
+	EncryptionNonce commontypes.HexUint256   `json:"encryptionNonce"`
+	EncryptedValues []commontypes.HexUint256 `json:"encryptedValues"`
 }
 
 type WithdrawEvent struct {
-	Amount tktypes.HexUint256   `json:"amount"`
-	Inputs []tktypes.HexUint256 `json:"inputs"`
-	Output tktypes.HexUint256   `json:"output"`
-	Data   tktypes.HexBytes     `json:"data"`
+	Amount commontypes.HexUint256   `json:"amount"`
+	Inputs []commontypes.HexUint256 `json:"inputs"`
+	Output commontypes.HexUint256   `json:"output"`
+	Data   commontypes.HexBytes     `json:"data"`
 }
 
 type LockedEvent struct {
-	Inputs        []tktypes.HexUint256 `json:"inputs"`
-	Outputs       []tktypes.HexUint256 `json:"outputs"`
-	LockedOutputs []tktypes.HexUint256 `json:"lockedOutputs"`
-	Delegate      tktypes.EthAddress   `json:"delegate"`
-	Submitter     tktypes.EthAddress   `json:"submitter"`
-	Data          tktypes.HexBytes     `json:"data"`
+	Inputs        []commontypes.HexUint256 `json:"inputs"`
+	Outputs       []commontypes.HexUint256 `json:"outputs"`
+	LockedOutputs []commontypes.HexUint256 `json:"lockedOutputs"`
+	Delegate      commontypes.EthAddress   `json:"delegate"`
+	Submitter     commontypes.EthAddress   `json:"submitter"`
+	Data          commontypes.HexBytes     `json:"data"`
 }
 
 type merkleTreeSpec struct {
@@ -237,7 +237,7 @@ func (z *Zeto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 
 	deployParams := &types.DeployParams{
 		TransactionID: req.Transaction.TransactionId,
-		Data:          tktypes.HexBytes(encoded),
+		Data:          commontypes.HexBytes(encoded),
 		TokenName:     initParams.TokenName,
 		InitialOwner:  req.ResolvedVerifiers[0].Verifier, // TODO: allow the initial owner to be specified by the deploy request
 		IsNonFungible: common.IsNonFungibleToken(initParams.TokenName),
@@ -348,7 +348,7 @@ func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*ty
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorAbiDecodeDomainInstanceConfig, err)
 	}
-	configJSON, err := tktypes.StandardABISerializer().SerializeJSON(configValues)
+	configJSON, err := commontypes.StandardABISerializer().SerializeJSON(configValues)
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +436,7 @@ func (z *Zeto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 		return nil, i18n.NewError(ctx, msgs.MsgErrorAbiDecodeDomainInstanceConfig, err)
 	}
 
-	contractAddress, err := tktypes.ParseEthAddress(req.ContractInfo.ContractAddress)
+	contractAddress, err := commontypes.ParseEthAddress(req.ContractInfo.ContractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
 	}
@@ -559,7 +559,7 @@ func (z *Zeto) ValidateStateHashes(ctx context.Context, req *prototk.ValidateSta
 			res.StateIds = append(res.StateIds, hashString)
 		} else {
 			// if the requested state ID is set, we compare it with the calculated hash
-			stateId := tktypes.MustParseHexUint256(state.Id)
+			stateId := commontypes.MustParseHexUint256(state.Id)
 			if hash.Int().Cmp(stateId.Int()) != 0 {
 				log.L(ctx).Errorf("State hash mismatch (hashed vs. received): %s != %s", hash.String(), state.Id)
 				return nil, i18n.NewError(ctx, msgs.MsgErrorStateHashMismatch, hash.String(), state.Id)

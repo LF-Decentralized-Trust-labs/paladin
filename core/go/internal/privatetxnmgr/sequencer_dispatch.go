@@ -25,7 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -117,7 +117,7 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 
 			signers := make([]string, len(publicTransactionsToSend))
 			for i, pt := range publicTransactionsToSend {
-				unqualifiedSigner, err := tktypes.PrivateIdentityLocator(pt.Signer).Identity(ctx)
+				unqualifiedSigner, err := types.PrivateIdentityLocator(pt.Signer).Identity(ctx)
 				if err != nil {
 					errorMessage := fmt.Sprintf("failed to parse lookup key for signer %s : %s", pt.Signer, err)
 					log.L(ctx).Error(errorMessage)
@@ -149,7 +149,7 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 				if err != nil {
 					return err
 				}
-				publicTXs[i].Data = tktypes.HexBytes(data)
+				publicTXs[i].Data = types.HexBytes(data)
 
 				err = publicTransactionEngine.ValidateTransaction(ctx, s.components.Persistence().NOTX(), publicTXs[i])
 				if err != nil {

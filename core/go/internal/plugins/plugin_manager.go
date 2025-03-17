@@ -27,7 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
@@ -35,10 +35,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-func MapLibraryTypeToProto(t tktypes.Enum[tktypes.LibraryType]) (prototk.PluginLoad_LibType, error) {
-	return tktypes.MapEnum(t, map[tktypes.LibraryType]prototk.PluginLoad_LibType{
-		tktypes.LibraryTypeCShared: prototk.PluginLoad_C_SHARED,
-		tktypes.LibraryTypeJar:     prototk.PluginLoad_JAR,
+func MapLibraryTypeToProto(t types.Enum[types.LibraryType]) (prototk.PluginLoad_LibType, error) {
+	return types.MapEnum(t, map[types.LibraryType]prototk.PluginLoad_LibType{
+		types.LibraryTypeCShared: prototk.PluginLoad_C_SHARED,
+		types.LibraryTypeJar:     prototk.PluginLoad_JAR,
 	})
 }
 
@@ -254,7 +254,7 @@ func (pm *pluginManager) WaitForInit(ctx context.Context) error {
 }
 
 func (pm *pluginManager) newReqContext() context.Context {
-	return log.WithLogField(pm.bgCtx, "plugin_reqid", tktypes.ShortID())
+	return log.WithLogField(pm.bgCtx, "plugin_reqid", types.ShortID())
 }
 
 func (pm *pluginManager) InitLoader(req *prototk.PluginLoaderInit, stream prototk.PluginController_InitLoaderServer) error {
@@ -295,7 +295,7 @@ func initPlugin[CB any](ctx context.Context, pm *pluginManager, pluginMap map[uu
 	pm.mux.Lock()
 	defer pm.mux.Unlock()
 	plugin := &plugin[CB]{pc: pm, id: uuid.New(), name: name}
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+	if err := types.ValidateSafeCharsStartEndAlphaNum(ctx, name, types.DefaultNameMaxLen, "name"); err != nil {
 		return err
 	}
 	plugin.def = &prototk.PluginLoad{
@@ -307,7 +307,7 @@ func initPlugin[CB any](ctx context.Context, pm *pluginManager, pluginMap map[uu
 		LibLocation: conf.Library,
 		Class:       conf.Class,
 	}
-	pluginType, err := tktypes.LibraryType(conf.Type).Enum().Validate()
+	pluginType, err := types.LibraryType(conf.Type).Enum().Validate()
 	if err == nil {
 		plugin.def.LibType, err = MapLibraryTypeToProto(pluginType.Enum())
 		pluginMap[plugin.id] = plugin

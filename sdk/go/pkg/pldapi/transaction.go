@@ -19,7 +19,7 @@ package pldapi
 import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 type TransactionType string
@@ -29,8 +29,8 @@ const (
 	TransactionTypePublic  TransactionType = "public"
 )
 
-func (tt TransactionType) Enum() tktypes.Enum[TransactionType] {
-	return tktypes.Enum[TransactionType](tt)
+func (tt TransactionType) Enum() types.Enum[TransactionType] {
+	return types.Enum[TransactionType](tt)
 }
 
 func (tt TransactionType) Options() []string {
@@ -46,8 +46,8 @@ const (
 	PTXEventTypeReceipts PTXEventType = "receipts"
 )
 
-func (tt PTXEventType) Enum() tktypes.Enum[PTXEventType] {
-	return tktypes.Enum[PTXEventType](tt)
+func (tt PTXEventType) Enum() types.Enum[PTXEventType] {
+	return types.Enum[PTXEventType](tt)
 }
 
 func (tt PTXEventType) Options() []string {
@@ -65,8 +65,8 @@ const (
 	SubmitModePrepare  SubmitMode = "prepare"  // occurs when writing the prepared TXN back to the DB - does not get persisted
 )
 
-func (tt SubmitMode) Enum() tktypes.Enum[SubmitMode] {
-	return tktypes.Enum[SubmitMode](tt)
+func (tt SubmitMode) Enum() types.Enum[SubmitMode] {
+	return types.Enum[SubmitMode](tt)
 }
 
 func (tt SubmitMode) Options() []string {
@@ -83,14 +83,14 @@ func (tt SubmitMode) Default() string {
 
 // The Base fields that are input and output fields
 type TransactionBase struct {
-	IdempotencyKey string                        `docstruct:"Transaction" json:"idempotencyKey,omitempty"` // externally supplied unique identifier for this transaction. 409 Conflict will be returned on attempt to re-submit
-	Type           tktypes.Enum[TransactionType] `docstruct:"Transaction" json:"type,omitempty"`           // public transactions go straight to a base ledger EVM smart contract. Private transactions use a Paladin domain to mask the on-chain data
-	Domain         string                        `docstruct:"Transaction" json:"domain,omitempty"`         // name of a domain - only required on input for private deploy transactions (n/a for public, and inferred from "to" for invoke)
-	Function       string                        `docstruct:"Transaction" json:"function,omitempty"`       // inferred from definition if not supplied. Resolved to full signature and stored. Required with abiReference on input if not constructor
-	ABIReference   *tktypes.Bytes32              `docstruct:"Transaction" json:"abiReference,omitempty"`   // calculated if not supplied (ABI will be stored for you)
-	From           string                        `docstruct:"Transaction" json:"from,omitempty"`           // locator for a local signing identity to use for submission of this transaction
-	To             *tktypes.EthAddress           `docstruct:"Transaction" json:"to,omitempty"`             // the target contract, or null for a deploy
-	Data           tktypes.RawJSON               `docstruct:"Transaction" json:"data,omitempty"`           // pre-encoded array with/without function selector, array, or object input
+	IdempotencyKey string                      `docstruct:"Transaction" json:"idempotencyKey,omitempty"` // externally supplied unique identifier for this transaction. 409 Conflict will be returned on attempt to re-submit
+	Type           types.Enum[TransactionType] `docstruct:"Transaction" json:"type,omitempty"`           // public transactions go straight to a base ledger EVM smart contract. Private transactions use a Paladin domain to mask the on-chain data
+	Domain         string                      `docstruct:"Transaction" json:"domain,omitempty"`         // name of a domain - only required on input for private deploy transactions (n/a for public, and inferred from "to" for invoke)
+	Function       string                      `docstruct:"Transaction" json:"function,omitempty"`       // inferred from definition if not supplied. Resolved to full signature and stored. Required with abiReference on input if not constructor
+	ABIReference   *types.Bytes32              `docstruct:"Transaction" json:"abiReference,omitempty"`   // calculated if not supplied (ABI will be stored for you)
+	From           string                      `docstruct:"Transaction" json:"from,omitempty"`           // locator for a local signing identity to use for submission of this transaction
+	To             *types.EthAddress           `docstruct:"Transaction" json:"to,omitempty"`             // the target contract, or null for a deploy
+	Data           types.RawJSON               `docstruct:"Transaction" json:"data,omitempty"`           // pre-encoded array with/without function selector, array, or object input
 	PublicTxOptions
 	// TODO: PrivateTransactions string list
 	// TODO: PublicTransactions string list
@@ -98,25 +98,25 @@ type TransactionBase struct {
 
 // The full transaction you query, with input and output
 type Transaction struct {
-	ID         *uuid.UUID               `docstruct:"Transaction" json:"id,omitempty"`         // server generated UUID for this transaction (query only)
-	Created    tktypes.Timestamp        `docstruct:"Transaction" json:"created,omitempty"`    // server generated creation timestamp for this transaction (query only)
-	SubmitMode tktypes.Enum[SubmitMode] `docstruct:"Transaction" json:"submitMode,omitempty"` // empty unless submitted via PrepareTransaction route
+	ID         *uuid.UUID             `docstruct:"Transaction" json:"id,omitempty"`         // server generated UUID for this transaction (query only)
+	Created    types.Timestamp        `docstruct:"Transaction" json:"created,omitempty"`    // server generated creation timestamp for this transaction (query only)
+	SubmitMode types.Enum[SubmitMode] `docstruct:"Transaction" json:"submitMode,omitempty"` // empty unless submitted via PrepareTransaction route
 	TransactionBase
 }
 
 // The input structure, containing the base input/output fields, along with some convenience fields resolved on input
 type TransactionInput struct {
 	TransactionBase
-	DependsOn []uuid.UUID      `docstruct:"TransactionInput" json:"dependsOn,omitempty"` // these transactions must be mined on the blockchain successfully (or deleted) before this transaction submits. Failure of pre-reqs results in failure of this TX
-	ABI       abi.ABI          `docstruct:"TransactionInput" json:"abi,omitempty"`       // required if abiReference not supplied
-	Bytecode  tktypes.HexBytes `docstruct:"TransactionInput" json:"bytecode,omitempty"`  // for deploy this is prepended to the encoded data inputs
+	DependsOn []uuid.UUID    `docstruct:"TransactionInput" json:"dependsOn,omitempty"` // these transactions must be mined on the blockchain successfully (or deleted) before this transaction submits. Failure of pre-reqs results in failure of this TX
+	ABI       abi.ABI        `docstruct:"TransactionInput" json:"abi,omitempty"`       // required if abiReference not supplied
+	Bytecode  types.HexBytes `docstruct:"TransactionInput" json:"bytecode,omitempty"`  // for deploy this is prepended to the encoded data inputs
 }
 
 // Call also provides some options on how to execute the call
 type TransactionCall struct {
 	TransactionInput
 	PublicCallOptions
-	DataFormat tktypes.JSONFormatOptions `docstruct:"TransactionCall" json:"dataFormat"` // formatting options for the result data
+	DataFormat types.JSONFormatOptions `docstruct:"TransactionCall" json:"dataFormat"` // formatting options for the result data
 }
 
 // Additional fields returned on output when "full" specified
@@ -129,10 +129,10 @@ type TransactionFull struct {
 }
 
 type ABIDecodedData struct {
-	Data       tktypes.RawJSON `docstruct:"ABIDecodedData" json:"data"`
-	Summary    string          `docstruct:"ABIDecodedData" json:"summary,omitempty"` // errors only
-	Definition *abi.Entry      `docstruct:"ABIDecodedData" json:"definition"`
-	Signature  string          `docstruct:"ABIDecodedData" json:"signature"`
+	Data       types.RawJSON `docstruct:"ABIDecodedData" json:"data"`
+	Summary    string        `docstruct:"ABIDecodedData" json:"summary,omitempty"` // errors only
+	Definition *abi.Entry    `docstruct:"ABIDecodedData" json:"definition"`
+	Signature  string        `docstruct:"ABIDecodedData" json:"signature"`
 }
 
 type TransactionReceipt struct {
@@ -143,7 +143,7 @@ type TransactionReceipt struct {
 type TransactionReceiptFull struct {
 	*TransactionReceipt
 	States             *TransactionStates `docstruct:"TransactionReceiptFull" json:"states,omitempty"`
-	DomainReceipt      tktypes.RawJSON    `docstruct:"TransactionReceiptFull" json:"domainReceipt,omitempty"`
+	DomainReceipt      types.RawJSON      `docstruct:"TransactionReceiptFull" json:"domainReceipt,omitempty"`
 	DomainReceiptError string             `docstruct:"TransactionReceiptFull" json:"domainReceiptError,omitempty"`
 }
 
@@ -153,31 +153,31 @@ type TransactionReceiptBatch struct {
 }
 
 type TransactionReceiptDataOnchain struct {
-	TransactionHash  *tktypes.Bytes32 `docstruct:"TransactionReceiptDataOnchain" json:"transactionHash,omitempty"`
-	BlockNumber      int64            `docstruct:"TransactionReceiptDataOnchain" json:"blockNumber,omitempty"`
-	TransactionIndex int64            `docstruct:"TransactionReceiptDataOnchain" json:"transactionIndex,omitempty"`
+	TransactionHash  *types.Bytes32 `docstruct:"TransactionReceiptDataOnchain" json:"transactionHash,omitempty"`
+	BlockNumber      int64          `docstruct:"TransactionReceiptDataOnchain" json:"blockNumber,omitempty"`
+	TransactionIndex int64          `docstruct:"TransactionReceiptDataOnchain" json:"transactionIndex,omitempty"`
 }
 
 type TransactionReceiptDataOnchainEvent struct {
-	LogIndex int64              `docstruct:"TransactionReceiptDataOnchainEvent" json:"logIndex,omitempty"`
-	Source   tktypes.EthAddress `docstruct:"TransactionReceiptDataOnchainEvent" json:"source,omitempty"`
+	LogIndex int64            `docstruct:"TransactionReceiptDataOnchainEvent" json:"logIndex,omitempty"`
+	Source   types.EthAddress `docstruct:"TransactionReceiptDataOnchainEvent" json:"source,omitempty"`
 }
 
 type TransactionReceiptData struct {
-	Indexed                             tktypes.Timestamp   `docstruct:"TransactionReceiptData" json:"indexed,omitempty"` // the time when this receipt was indexed
-	Sequence                            uint64              `docstruct:"TransactionReceiptData" json:"sequence"`          // local order only, used for listeners
-	Domain                              string              `docstruct:"TransactionReceiptData" json:"domain,omitempty"`  // only set on private transaction receipts
-	Success                             bool                `docstruct:"TransactionReceiptData" json:"success,omitempty"` // true for success (note "status" is reserved for future use)
-	*TransactionReceiptDataOnchain      `json:",inline"`    // if the result was finalized by the blockchain (note quirk of omitempty that we can't put zero-valid int pointers on main struct)
-	*TransactionReceiptDataOnchainEvent `json:",inline"`    // if the result was finalized by the blockchain by an event
-	FailureMessage                      string              `docstruct:"TransactionReceiptData" json:"failureMessage,omitempty"`  // always set to a non-empty string if the transaction reverted, with as much detail as could be extracted
-	RevertData                          tktypes.HexBytes    `docstruct:"TransactionReceiptData" json:"revertData,omitempty"`      // encoded revert data if available
-	ContractAddress                     *tktypes.EthAddress `docstruct:"TransactionReceiptData" json:"contractAddress,omitempty"` // address of the new contract address, to be used in the `To` field for subsequent invoke transactions.  Nil if this transaction itself was an invoke
+	Indexed                             types.Timestamp   `docstruct:"TransactionReceiptData" json:"indexed,omitempty"` // the time when this receipt was indexed
+	Sequence                            uint64            `docstruct:"TransactionReceiptData" json:"sequence"`          // local order only, used for listeners
+	Domain                              string            `docstruct:"TransactionReceiptData" json:"domain,omitempty"`  // only set on private transaction receipts
+	Success                             bool              `docstruct:"TransactionReceiptData" json:"success,omitempty"` // true for success (note "status" is reserved for future use)
+	*TransactionReceiptDataOnchain      `json:",inline"`  // if the result was finalized by the blockchain (note quirk of omitempty that we can't put zero-valid int pointers on main struct)
+	*TransactionReceiptDataOnchainEvent `json:",inline"`  // if the result was finalized by the blockchain by an event
+	FailureMessage                      string            `docstruct:"TransactionReceiptData" json:"failureMessage,omitempty"`  // always set to a non-empty string if the transaction reverted, with as much detail as could be extracted
+	RevertData                          types.HexBytes    `docstruct:"TransactionReceiptData" json:"revertData,omitempty"`      // encoded revert data if available
+	ContractAddress                     *types.EthAddress `docstruct:"TransactionReceiptData" json:"contractAddress,omitempty"` // address of the new contract address, to be used in the `To` field for subsequent invoke transactions.  Nil if this transaction itself was an invoke
 }
 
 type TransactionActivityRecord struct {
-	Time    tktypes.Timestamp `docstruct:"TransactionActivityRecord" json:"time"`    // time the record occurred
-	Message string            `docstruct:"TransactionActivityRecord" json:"message"` // a message
+	Time    types.Timestamp `docstruct:"TransactionActivityRecord" json:"time"`    // time the record occurred
+	Message string          `docstruct:"TransactionActivityRecord" json:"message"` // a message
 }
 
 type TransactionDependencies struct {
@@ -186,11 +186,11 @@ type TransactionDependencies struct {
 }
 
 type PreparedTransactionBase struct {
-	ID          uuid.UUID           `docstruct:"PreparedTransaction" json:"id"`
-	Domain      string              `docstruct:"PreparedTransaction" json:"domain"`
-	To          *tktypes.EthAddress `docstruct:"PreparedTransaction" json:"to"`
-	Transaction TransactionInput    `docstruct:"PreparedTransaction" json:"transaction"`
-	Metadata    tktypes.RawJSON     `docstruct:"PreparedTransaction" json:"metadata,omitempty"`
+	ID          uuid.UUID         `docstruct:"PreparedTransaction" json:"id"`
+	Domain      string            `docstruct:"PreparedTransaction" json:"domain"`
+	To          *types.EthAddress `docstruct:"PreparedTransaction" json:"to"`
+	Transaction TransactionInput  `docstruct:"PreparedTransaction" json:"transaction"`
+	Metadata    types.RawJSON     `docstruct:"PreparedTransaction" json:"metadata,omitempty"`
 }
 
 type PreparedTransaction struct {

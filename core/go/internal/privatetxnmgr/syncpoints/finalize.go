@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 )
@@ -35,7 +35,7 @@ type finalizeOperation struct {
 }
 
 // QueueTransactionFinalize
-func (s *syncPoints) QueueTransactionFinalize(ctx context.Context, domain string, contractAddress tktypes.EthAddress, transactionID uuid.UUID, failureMessage string, onCommit func(context.Context), onRollback func(context.Context, error)) {
+func (s *syncPoints) QueueTransactionFinalize(ctx context.Context, domain string, contractAddress types.EthAddress, transactionID uuid.UUID, failureMessage string, onCommit func(context.Context), onRollback func(context.Context, error)) {
 
 	op := s.writer.Queue(ctx, &syncPointOperation{
 		domainContext:   nil, // finalize does not depend on the flushing of any states

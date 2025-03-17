@@ -27,7 +27,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -127,7 +127,7 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 
 }
 
-func randID() string { return tktypes.RandHex(32) }
+func randID() string { return types.RandHex(32) }
 
 func randInt() int64 {
 	i, _ := rand.Int(rand.Reader, big.NewInt(10^9))
@@ -136,7 +136,7 @@ func randInt() int64 {
 
 func randChainInfo() *prototk.OnChainEventLocation {
 	return &prototk.OnChainEventLocation{
-		TransactionHash: tktypes.RandHex(32),
+		TransactionHash: types.RandHex(32),
 		BlockNumber:     randInt(), TransactionIndex: randInt(), LogIndex: randInt(),
 	}
 }
@@ -144,8 +144,8 @@ func randChainInfo() *prototk.OnChainEventLocation {
 func randPropFor(id string) *prototk.RegistryProperty {
 	return &prototk.RegistryProperty{
 		EntryId:  id,
-		Name:     fmt.Sprintf("prop_%s", tktypes.RandHex(5)),
-		Value:    fmt.Sprintf("val_%s", tktypes.RandHex(5)),
+		Name:     fmt.Sprintf("prop_%s", types.RandHex(5)),
+		Value:    fmt.Sprintf("val_%s", types.RandHex(5)),
 		Active:   true,
 		Location: randChainInfo(),
 	}
@@ -176,7 +176,7 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 
 	// Insert a root entry
 	rootEntry1 := &prototk.RegistryEntry{Id: randID(), Name: "entry1", Location: randChainInfo(), Active: true}
-	rootEntry1SysProp := newSystemPropFor(rootEntry1.Id, "$owner", tktypes.RandAddress().String())
+	rootEntry1SysProp := newSystemPropFor(rootEntry1.Id, "$owner", types.RandAddress().String())
 	rootEntry1Props1 := randPropFor(rootEntry1.Id)
 	rootEntry2 := &prototk.RegistryEntry{Id: randID(), Name: "entry2", Location: randChainInfo(), Active: true}
 	rootEntry2Props1 := randPropFor(rootEntry2.Id)
@@ -288,18 +288,18 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 	assert.Equal(t, rootEntry2.Id, entries[0].ID.HexString())
 
 	// Can get the complete prop set
-	allProps, err := r.GetEntryProperties(ctx, rm.p.NOTX(), "any", tktypes.MustParseHexBytes(rootEntry2.Id))
+	allProps, err := r.GetEntryProperties(ctx, rm.p.NOTX(), "any", types.MustParseHexBytes(rootEntry2.Id))
 	require.NoError(t, err)
-	propsMap := filteredPropsMap(allProps, tktypes.MustParseHexBytes(rootEntry2.Id))
+	propsMap := filteredPropsMap(allProps, types.MustParseHexBytes(rootEntry2.Id))
 	require.Len(t, propsMap, 3)
 	require.Equal(t, rootEntry2Props1.Value, propsMap[rootEntry2Props1.Name])
 	require.Equal(t, rootEntry2Props2.Value, propsMap[rootEntry2Props2.Name])
 	require.Equal(t, rootEntry2Props3.Value, propsMap[rootEntry2Props3.Name])
 
 	// Can get just the inactive props set
-	allProps, err = r.GetEntryProperties(ctx, rm.p.NOTX(), "inactive", tktypes.MustParseHexBytes(rootEntry2.Id))
+	allProps, err = r.GetEntryProperties(ctx, rm.p.NOTX(), "inactive", types.MustParseHexBytes(rootEntry2.Id))
 	require.NoError(t, err)
-	propsMap = filteredPropsMap(allProps, tktypes.MustParseHexBytes(rootEntry2.Id))
+	propsMap = filteredPropsMap(allProps, types.MustParseHexBytes(rootEntry2.Id))
 	require.Len(t, propsMap, 1)
 	require.Equal(t, rootEntry2Props2.Value, propsMap[rootEntry2Props2.Name])
 }
@@ -436,7 +436,7 @@ func TestGetEntryPropertiesQueryFail(t *testing.T) {
 
 	m.db.ExpectQuery("SELECT.*reg_entries").WillReturnRows(sqlmock.
 		NewRows([]string{"id"}).
-		AddRow(tktypes.HexBytes(tktypes.RandBytes(32))))
+		AddRow(types.HexBytes(types.RandBytes(32))))
 	m.db.ExpectQuery("SELECT.*reg_props").WillReturnError(fmt.Errorf("pop"))
 
 	_, err := tp.r.QueryEntriesWithProps(ctx, tp.r.rm.p.NOTX(), "active", query.NewQueryBuilder().Limit(100).Query())
@@ -457,11 +457,11 @@ func TestRegistryWithEventStreams(t *testing.T) {
 				},
 			},
 		}
-		addr := tktypes.RandAddress()
+		addr := types.RandAddress()
 
 		mc.blockIndexer.On("AddEventStream", mock.Anything, mock.Anything, mock.MatchedBy(func(ies *blockindexer.InternalEventStream) bool {
 			require.Len(t, ies.Definition.Sources, 1)
-			assert.JSONEq(t, tktypes.JSONString(a).String(), tktypes.JSONString(ies.Definition.Sources[0].ABI).String())
+			assert.JSONEq(t, types.JSONString(a).String(), types.JSONString(ies.Definition.Sources[0].ABI).String())
 			assert.Equal(t, addr, ies.Definition.Sources[0].Address)
 			return true
 		})).Return(es, nil)
@@ -469,7 +469,7 @@ func TestRegistryWithEventStreams(t *testing.T) {
 		regConf.EventSources = []*prototk.RegistryEventSource{
 			{
 				ContractAddress: addr.String(),
-				AbiEventsJson:   tktypes.JSONString(a).Pretty(),
+				AbiEventsJson:   types.JSONString(a).Pretty(),
 			},
 		}
 	})
@@ -546,11 +546,11 @@ func TestHandleEventBatchOk(t *testing.T) {
 					BlockNumber:      12345,
 					TransactionIndex: 10,
 					LogIndex:         20,
-					TransactionHash:  tktypes.RandBytes32(),
-					Signature:        tktypes.RandBytes32(),
+					TransactionHash:  types.RandBytes32(),
+					Signature:        types.RandBytes32(),
 				},
 				SoliditySignature: "event1()",
-				Address:           *tktypes.RandAddress(),
+				Address:           *types.RandAddress(),
 				Data:              []byte("some data"),
 			},
 		},
@@ -590,11 +590,11 @@ func TestHandleEventBatchError(t *testing.T) {
 				BlockNumber:      12345,
 				TransactionIndex: 10,
 				LogIndex:         20,
-				TransactionHash:  tktypes.RandBytes32(),
-				Signature:        tktypes.RandBytes32(),
+				TransactionHash:  types.RandBytes32(),
+				Signature:        types.RandBytes32(),
 			},
 			SoliditySignature: "event1()",
-			Address:           *tktypes.RandAddress(),
+			Address:           *types.RandAddress(),
 			Data:              []byte("some data"),
 		}},
 	}

@@ -25,7 +25,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/mocks/ethclientmocks"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/cache"
@@ -136,7 +136,7 @@ func TestFixedGasPrice(t *testing.T) {
 	gpo, err := hgc.GetGasPriceObject(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, &pldapi.PublicTxGasPricing{
-		GasPrice: tktypes.Int64ToInt256(1020304050),
+		GasPrice: types.Int64ToInt256(1020304050),
 	}, gpo)
 }
 
@@ -153,7 +153,7 @@ func TestGasPriceClient(t *testing.T) {
 
 	testNodeGasPrice := `"0x03e8"`
 	// fall back to connector when get call failed
-	mEC.On("GasPrice", ctx, mock.Anything).Return(tktypes.Uint64ToUint256(1000), nil).Once()
+	mEC.On("GasPrice", ctx, mock.Anything).Return(types.Uint64ToUint256(1000), nil).Once()
 	gasPriceJSON, err := hgc.getGasPriceJSON(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, testNodeGasPrice, gasPriceJSON.String())

@@ -19,7 +19,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 )
 
@@ -70,19 +70,19 @@ func (pte *pubTxManager) getOrchestratorCount() int {
 	return len(pte.inFlightOrchestrators)
 }
 
-func (pte *pubTxManager) getOrchestratorForAddress(signer tktypes.EthAddress) *orchestrator {
+func (pte *pubTxManager) getOrchestratorForAddress(signer types.EthAddress) *orchestrator {
 	pte.inFlightOrchestratorMux.Lock()
 	defer pte.inFlightOrchestratorMux.Unlock()
 	return pte.inFlightOrchestrators[signer]
 }
 
-func (ble *pubTxManager) flushStaleOrchestratorsGetCount(ctx context.Context) (inFlightSigningAddresses []tktypes.EthAddress, stateCounts map[string]int, totalAfterFlush int) {
+func (ble *pubTxManager) flushStaleOrchestratorsGetCount(ctx context.Context) (inFlightSigningAddresses []types.EthAddress, stateCounts map[string]int, totalAfterFlush int) {
 	ble.inFlightOrchestratorMux.Lock()
 	defer ble.inFlightOrchestratorMux.Unlock()
 
 	oldInFlight := ble.inFlightOrchestrators
-	ble.inFlightOrchestrators = make(map[tktypes.EthAddress]*orchestrator)
-	inFlightSigningAddresses = make([]tktypes.EthAddress, 0, len(oldInFlight))
+	ble.inFlightOrchestrators = make(map[types.EthAddress]*orchestrator)
+	inFlightSigningAddresses = make([]types.EthAddress, 0, len(oldInFlight))
 
 	stateCounts = make(map[string]int)
 	for _, sName := range AllOrchestratorStates {

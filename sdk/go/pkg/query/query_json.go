@@ -19,7 +19,7 @@ package query
 import (
 	"encoding/json"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 type QueryJSON struct {
@@ -49,12 +49,12 @@ type Op struct {
 
 type OpSingleVal struct {
 	Op
-	Value tktypes.RawJSON `docstruct:"OpSingleVal" json:"value,omitempty"`
+	Value types.RawJSON `docstruct:"OpSingleVal" json:"value,omitempty"`
 }
 
 type OpMultiVal struct {
 	Op
-	Values []tktypes.RawJSON `docstruct:"OpMultiVal" json:"values,omitempty"`
+	Values []types.RawJSON `docstruct:"OpMultiVal" json:"values,omitempty"`
 }
 
 type Statements struct {

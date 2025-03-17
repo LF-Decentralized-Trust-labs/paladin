@@ -26,7 +26,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
@@ -317,7 +317,7 @@ func (it *inFlightTransactionStageController) ProduceLatestInFlightStageContext(
 									rsc.StageOutputsToBePersisted.TxUpdates.NewSubmission = &DBPubTxnSubmission{
 										from:            rsc.InMemoryTx.GetFrom().String(),
 										PublicTxnID:     rsc.InMemoryTx.GetPubTxnID(),
-										Created:         tktypes.TimestampNow(),
+										Created:         types.TimestampNow(),
 										TransactionHash: *rsc.StageOutput.SignOutput.TxHash,
 										GasPricing:      gasPriceJSON,
 									}
@@ -370,7 +370,7 @@ func (it *inFlightTransactionStageController) ProduceLatestInFlightStageContext(
 									rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSubmitTransaction, fftypes.JSONAnyPtr(`{"reason":"`+string(rsIn.SubmitOutput.ErrorReason)+`"}`), fftypes.JSONAnyPtr(`{"error":"`+rsIn.SubmitOutput.Err.Error()+`"}`))
 									if rsc.InMemoryTx.GetTransactionHash() != nil {
 										// did a re-submission, no matter the result, update the last warn time to avoid another retry
-										rsc.StageOutputsToBePersisted.TxUpdates.LastSubmit = confutil.P(tktypes.TimestampNow())
+										rsc.StageOutputsToBePersisted.TxUpdates.LastSubmit = confutil.P(types.TimestampNow())
 									}
 								} else {
 									if rsIn.SubmitOutput.SubmissionOutcome == SubmissionOutcomeSubmittedNew {
@@ -546,7 +546,7 @@ func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.C
 			newGasPrice.Set(it.gasPriceIncreaseMax)
 		}
 		newGpo = &pldapi.PublicTxGasPricing{
-			GasPrice:             (*tktypes.HexUint256)(newGasPrice),
+			GasPrice:             (*types.HexUint256)(newGasPrice),
 			MaxFeePerGas:         existingGpo.MaxFeePerGas,         // copy over unchanged (although expected to be unset)
 			MaxPriorityFeePerGas: existingGpo.MaxPriorityFeePerGas, //   "
 		}
@@ -562,7 +562,7 @@ func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.C
 		}
 		newGpo = &pldapi.PublicTxGasPricing{
 			GasPrice:             existingGpo.GasPrice, // copy over unchanged (although expected to be unset)
-			MaxFeePerGas:         (*tktypes.HexUint256)(newMaxFeePerGas),
+			MaxFeePerGas:         (*types.HexUint256)(newMaxFeePerGas),
 			MaxPriorityFeePerGas: existingGpo.MaxPriorityFeePerGas,
 		}
 	}

@@ -35,7 +35,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcserver"
 	"github.com/stretchr/testify/assert"
@@ -85,7 +85,7 @@ func TestInitOK(t *testing.T) {
 								Keys: map[string]pldconf.StaticKeyEntryConfig{
 									"seed": {
 										Encoding: "hex",
-										Inline:   tktypes.RandHex(32),
+										Inline:   types.RandHex(32),
 									},
 								},
 							},

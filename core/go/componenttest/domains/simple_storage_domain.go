@@ -24,7 +24,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
@@ -151,9 +151,9 @@ type simpleStorageInitParser struct {
 
 // JSON structure for the state data
 type StorageState struct {
-	Salt    tktypes.HexBytes `json:"salt"`
-	Records string           `json:"records"` //JSON string that can be parsed as a map of keys to values of StorageRecord
-	Map     string           `json:"map"`
+	Salt    types.HexBytes `json:"salt"`
+	Records string         `json:"records"` //JSON string that can be parsed as a map of keys to values of StorageRecord
+	Map     string         `json:"map"`
 }
 
 const simpleStorageStateSchema = `{
@@ -206,20 +206,20 @@ func SimpleStorageDomain(t *testing.T, ctx context.Context) plugintk.PluginBase 
 				Statements: query.Statements{
 					Ops: query.Ops{
 						Eq: []*query.OpSingleVal{
-							{Op: query.Op{Field: "map"}, Value: tktypes.JSONString(mapName)},
+							{Op: query.Op{Field: "map"}, Value: types.JSONString(mapName)},
 						},
 					},
 				},
 			}
 			if lastStateTimestamp > 0 {
 				jq.GT = []*query.OpSingleVal{
-					{Op: query.Op{Field: ".created"}, Value: tktypes.RawJSON(strconv.FormatInt(lastStateTimestamp, 10))},
+					{Op: query.Op{Field: ".created"}, Value: types.RawJSON(strconv.FormatInt(lastStateTimestamp, 10))},
 				}
 			}
 			res, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
 				StateQueryContext: stateQueryContext,
 				SchemaId:          simpleStorageSchemaID,
-				QueryJson:         tktypes.JSONString(jq).String(),
+				QueryJson:         types.JSONString(jq).String(),
 			})
 			if err != nil {
 				return nil, err
@@ -238,21 +238,21 @@ func SimpleStorageDomain(t *testing.T, ctx context.Context) plugintk.PluginBase 
 				Statements: query.Statements{
 					Ops: query.Ops{
 						Eq: []*query.OpSingleVal{
-							{Op: query.Op{Field: "map"}, Value: tktypes.JSONString(mapName)},
+							{Op: query.Op{Field: "map"}, Value: types.JSONString(mapName)},
 						},
 					},
 				},
 			}
 			if lastStateTimestamp > 0 {
 				jq.GT = []*query.OpSingleVal{
-					{Op: query.Op{Field: ".created"}, Value: tktypes.RawJSON(strconv.FormatInt(lastStateTimestamp, 10))},
+					{Op: query.Op{Field: ".created"}, Value: types.RawJSON(strconv.FormatInt(lastStateTimestamp, 10))},
 				}
 			}
 
 			res, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
 				StateQueryContext: stateQueryContext,
 				SchemaId:          simpleStorageSchemaID,
-				QueryJson:         tktypes.JSONString(jq).String(),
+				QueryJson:         types.JSONString(jq).String(),
 			})
 			if err != nil {
 				return nil, nil, err
@@ -359,7 +359,7 @@ func SimpleStorageDomain(t *testing.T, ctx context.Context) plugintk.PluginBase 
 			case PrivacyGroupEndorsement:
 				return &prototk.EndorseTransactionResponse{
 					EndorsementResult: prototk.EndorseTransactionResponse_SIGN,
-					Payload:           tktypes.RandBytes(32),
+					Payload:           types.RandBytes(32),
 				}, nil
 			default:
 				return nil, fmt.Errorf("unsupported endorsement mode: %s", config.EndorsementMode)
@@ -400,7 +400,7 @@ func SimpleStorageDomain(t *testing.T, ctx context.Context) plugintk.PluginBase 
 			case PrivacyGroupEndorsement:
 				return &prototk.EndorseTransactionResponse{
 					EndorsementResult: prototk.EndorseTransactionResponse_SIGN,
-					Payload:           tktypes.RandBytes(32),
+					Payload:           types.RandBytes(32),
 				}, nil
 			default:
 				return nil, fmt.Errorf("unsupported endorsement mode: %s", config.EndorsementMode)
@@ -499,7 +499,7 @@ func SimpleStorageDomain(t *testing.T, ctx context.Context) plugintk.PluginBase 
 					Signer: confutil.P(fmt.Sprintf("domain1.transactions.%s", req.Transaction.TransactionId)),
 					Transaction: &prototk.PreparedTransaction{
 						FunctionAbiJson: toJSONString(t, simpleDomainABI.Functions()["newSimpleTokenNotarized"]),
-						ParamsJson:      tktypes.JSONString(params).String(),
+						ParamsJson:      types.JSONString(params).String(),
 					},
 				}, nil
 			},
@@ -507,11 +507,11 @@ func SimpleStorageDomain(t *testing.T, ctx context.Context) plugintk.PluginBase 
 			InitContract: func(ctx context.Context, icr *prototk.InitContractRequest) (*prototk.InitContractResponse, error) {
 
 				configValues, err := contractDataABI.DecodeABIData(icr.ContractConfig, 0)
-				str := tktypes.HexBytes(icr.ContractConfig).HexString0xPrefix()
+				str := types.HexBytes(icr.ContractConfig).HexString0xPrefix()
 				assert.NotEqual(t, "", str)
 				require.NoError(t, err)
 
-				configJSON, err := tktypes.StandardABISerializer().SerializeJSON(configValues)
+				configJSON, err := types.StandardABISerializer().SerializeJSON(configValues)
 				require.NoError(t, err)
 				contractConfig := &prototk.ContractConfig{
 					ContractConfigJson: string(configJSON),
@@ -622,7 +622,7 @@ func SimpleStorageDomain(t *testing.T, ctx context.Context) plugintk.PluginBase 
 
 				newStateData := &StorageState{
 					Records: toJSONString(t, storage),
-					Salt:    tktypes.RandBytes(32),
+					Salt:    types.RandBytes(32),
 					Map:     mapName,
 				}
 				newState := &prototk.NewState{
@@ -633,7 +633,7 @@ func SimpleStorageDomain(t *testing.T, ctx context.Context) plugintk.PluginBase 
 
 				//eip712Payload, err := typedDataV4TransferWithSalts(contractAddr, coinsToSpend, newCoins)
 				//require.NoError(t, err)
-				eip712Payload := tktypes.RandBytes(32)
+				eip712Payload := types.RandBytes(32)
 
 				switch config.EndorsementMode {
 
@@ -687,7 +687,7 @@ func SimpleStorageDomain(t *testing.T, ctx context.Context) plugintk.PluginBase 
 			},
 
 			PrepareTransaction: func(ctx context.Context, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-				var signerSignature tktypes.HexBytes
+				var signerSignature types.HexBytes
 				for _, att := range req.AttestationResult {
 					if att.AttestationType == prototk.AttestationType_SIGN && att.Name == "sender" {
 						signerSignature = att.Payload

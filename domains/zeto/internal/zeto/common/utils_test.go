@@ -9,7 +9,7 @@ import (
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
@@ -25,9 +25,9 @@ func TestIsNullifiersToken(t *testing.T) {
 
 // HexUint256To32ByteHexString
 func TestHexUint256To32ByteHexString(t *testing.T) {
-	// Create a big.Int and cast it to *tktypes.HexUint256.
+	// Create a big.Int and cast it to *types.HexUint256.
 	x := big.NewInt(7890)
-	hexUint := (*tktypes.HexUint256)(x)
+	hexUint := (*types.HexUint256)(x)
 	result := HexUint256To32ByteHexString(hexUint)
 	expected := hex.EncodeToString(x.FillBytes(make([]byte, 32)))
 	assert.Equal(t, expected, result)
@@ -77,7 +77,7 @@ func TestEncodeProof(t *testing.T) {
 func TestEncodeTransactionData(t *testing.T) {
 	tests := map[string]struct {
 		transactionId string
-		expected      tktypes.HexBytes
+		expected      types.HexBytes
 		expectError   bool
 	}{
 		"valid": {

@@ -26,7 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -177,7 +177,7 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 
 	p.updateReceivedStats(msg)
 
-	log.L(ctx).Debugf("transport %s message received from %s id=%s (cid=%s)", t.name, p.Name, rMsg.MessageID, tktypes.StrOrEmpty(msg.CorrelationId))
+	log.L(ctx).Debugf("transport %s message received from %s id=%s (cid=%s)", t.name, p.Name, rMsg.MessageID, types.StrOrEmpty(msg.CorrelationId))
 	if log.IsTraceEnabled() {
 		log.L(ctx).Tracef("transport %s message received: %s", t.name, protoToJSON(msg))
 	}

@@ -22,7 +22,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
@@ -148,7 +148,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	}
 	if remainder.Sign() > 0 {
 		// add the remainder as an output to the sender themselves
-		remainderHex := tktypes.HexUint256(*remainder)
+		remainderHex := commontypes.HexUint256(*remainder)
 		remainderParams := []*types.FungibleTransferParamEntry{
 			{
 				To:     tx.Transaction.From,
@@ -163,7 +163,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 		outputStates = append(outputStates, returnedStates...)
 	}
 
-	contractAddress, err := tktypes.ParseEthAddress(req.Transaction.ContractInfo.ContractAddress)
+	contractAddress, err := commontypes.ParseEthAddress(req.Transaction.ContractInfo.ContractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
 	}

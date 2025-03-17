@@ -25,12 +25,12 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 type SolidityBuild struct {
-	ABI      abi.ABI          `json:"abi"`
-	Bytecode tktypes.HexBytes `json:"bytecode"`
+	ABI      abi.ABI        `json:"abi"`
+	Bytecode types.HexBytes `json:"bytecode"`
 }
 
 type SolidityBuildWithLinks struct {
@@ -45,10 +45,10 @@ type SolidityLinkReference struct {
 }
 
 func MustLoadBuild(buildOutput []byte) *SolidityBuild {
-	return MustLoadBuildResolveLinks(buildOutput, map[string]*tktypes.EthAddress{})
+	return MustLoadBuildResolveLinks(buildOutput, map[string]*types.EthAddress{})
 }
 
-func MustLoadBuildResolveLinks(buildOutput []byte, libraries map[string]*tktypes.EthAddress) *SolidityBuild {
+func MustLoadBuildResolveLinks(buildOutput []byte, libraries map[string]*types.EthAddress) *SolidityBuild {
 	build, err := LoadBuildResolveLinks(context.Background(), buildOutput, libraries)
 	if err != nil {
 		panic(err)
@@ -57,10 +57,10 @@ func MustLoadBuildResolveLinks(buildOutput []byte, libraries map[string]*tktypes
 }
 
 func LoadBuild(ctx context.Context, buildOutput []byte) (build *SolidityBuild, err error) {
-	return LoadBuildResolveLinks(ctx, buildOutput, map[string]*tktypes.EthAddress{})
+	return LoadBuildResolveLinks(ctx, buildOutput, map[string]*types.EthAddress{})
 }
 
-func LoadBuildResolveLinks(ctx context.Context, buildOutput []byte, libraries map[string]*tktypes.EthAddress) (build *SolidityBuild, err error) {
+func LoadBuildResolveLinks(ctx context.Context, buildOutput []byte, libraries map[string]*types.EthAddress) (build *SolidityBuild, err error) {
 	var unlinked SolidityBuildWithLinks
 	err = json.Unmarshal(buildOutput, &unlinked)
 	if err == nil {
@@ -75,7 +75,7 @@ func LoadBuildResolveLinks(ctx context.Context, buildOutput []byte, libraries ma
 
 // ResolveLinks: performs linking by replacing placeholders with deployed addresses
 // See https://docs.soliditylang.org/en/latest/using-the-compiler.html#library-linking
-func (unlinked *SolidityBuildWithLinks) ResolveLinks(ctx context.Context, libraries map[string]*tktypes.EthAddress) (tktypes.HexBytes, error) {
+func (unlinked *SolidityBuildWithLinks) ResolveLinks(ctx context.Context, libraries map[string]*types.EthAddress) (types.HexBytes, error) {
 	bytecode := unlinked.Bytecode
 	for fileName, fileReferences := range unlinked.LinkReferences {
 		for libName, link := range fileReferences {
@@ -94,7 +94,7 @@ func (unlinked *SolidityBuildWithLinks) ResolveLinks(ctx context.Context, librar
 				// encoding of the keccak256 hash of the fully qualified library name
 				end := start + 3 /* __$ */ + 34 /* placeholder */ + 3 /* $__ */
 				placeholder := string(bytecode[start+3 : start+34+3])
-				expectedPlaceholder := tktypes.Bytes32Keccak([]byte(fullLibName)).HexString()[0:34]
+				expectedPlaceholder := types.Bytes32Keccak([]byte(fullLibName)).HexString()[0:34]
 				if placeholder != expectedPlaceholder {
 					return nil, i18n.NewError(ctx, tkmsgs.MsgSolBuildParseFailed, start, fullLibName, placeholder, expectedPlaceholder)
 				}
@@ -106,7 +106,7 @@ func (unlinked *SolidityBuildWithLinks) ResolveLinks(ctx context.Context, librar
 }
 
 func MustParseBuildABI(buildJSON []byte) abi.ABI {
-	var buildParsed map[string]tktypes.RawJSON
+	var buildParsed map[string]types.RawJSON
 	var buildABI abi.ABI
 	err := json.Unmarshal(buildJSON, &buildParsed)
 	if err == nil {

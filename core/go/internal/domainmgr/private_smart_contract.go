@@ -28,7 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
@@ -36,10 +36,10 @@ import (
 )
 
 type PrivateSmartContract struct {
-	DeployTX        uuid.UUID          `json:"deployTransaction"   gorm:"column:deploy_tx"`
-	RegistryAddress tktypes.EthAddress `json:"domainAddress"       gorm:"column:domain_address"`
-	Address         tktypes.EthAddress `json:"address"             gorm:"column:address"`
-	ConfigBytes     tktypes.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
+	DeployTX        uuid.UUID        `json:"deployTransaction"   gorm:"column:deploy_tx"`
+	RegistryAddress types.EthAddress `json:"domainAddress"       gorm:"column:domain_address"`
+	Address         types.EthAddress `json:"address"             gorm:"column:address"`
+	ConfigBytes     types.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
 }
 
 type domainContract struct {
@@ -111,7 +111,7 @@ func (dc *domainContract) buildTransactionSpecification(ctx context.Context, loc
 	var paramsJSON []byte
 	if err == nil {
 		// Serialize to standardized JSON before passing to domain
-		paramsJSON, err = tktypes.StandardABISerializer().SerializeJSONCtx(ctx, inputValues)
+		paramsJSON, err = types.StandardABISerializer().SerializeJSONCtx(ctx, inputValues)
 	}
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgDomainInvalidFunctionParams, fnDef.SolString())
@@ -141,7 +141,7 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 	if err != nil {
 		return err
 	}
-	txSpec.TransactionId = tktypes.Bytes32UUIDFirst16(tx.ID).String()
+	txSpec.TransactionId = types.Bytes32UUIDFirst16(tx.ID).String()
 	tx.ID = *localTx.Transaction.ID
 	tx.Domain = localTx.Transaction.Domain
 	tx.Address = *localTx.Transaction.To
@@ -209,7 +209,7 @@ func (dc *domainContract) AssembleTransaction(dCtx components.DomainContext, rea
 	if err != nil {
 		return err
 	}
-	txSpec.TransactionId = tktypes.Bytes32UUIDFirst16(tx.ID).String()
+	txSpec.TransactionId = types.Bytes32UUIDFirst16(tx.ID).String()
 	tx.PreAssembly.TransactionSpecification = txSpec
 
 	// Clear any previous assembly state out, as it's considered completely invalid
@@ -302,9 +302,9 @@ func (dc *domainContract) upsertPotentialStates(dCtx components.DomainContext, r
 		if schema == nil {
 			return nil, i18n.NewError(dCtx.Ctx(), msgs.MsgDomainUnknownSchema, s.SchemaId)
 		}
-		var id tktypes.HexBytes
+		var id types.HexBytes
 		if s.Id != nil {
-			id, err = tktypes.ParseHexBytes(dCtx.Ctx(), *s.Id)
+			id, err = types.ParseHexBytes(dCtx.Ctx(), *s.Id)
 			if err != nil {
 				return nil, err
 			}
@@ -312,7 +312,7 @@ func (dc *domainContract) upsertPotentialStates(dCtx components.DomainContext, r
 		stateUpsert := &components.StateUpsert{
 			ID:     id,
 			Schema: schema.ID(),
-			Data:   tktypes.RawJSON(s.StateDataJson),
+			Data:   types.RawJSON(s.StateDataJson),
 		}
 		if isOutput {
 			// These are marked as locked and creating in the transaction, and become available for other transaction to read
@@ -522,7 +522,7 @@ func (dc *domainContract) PrepareTransaction(dCtx components.DomainContext, read
 
 	contractAddress := &dc.info.Address
 	if res.Transaction.ContractAddress != nil {
-		contractAddress, err = tktypes.ParseEthAddress(*res.Transaction.ContractAddress)
+		contractAddress, err = types.ParseEthAddress(*res.Transaction.ContractAddress)
 		if err != nil {
 			return err
 		}
@@ -544,7 +544,7 @@ func (dc *domainContract) PrepareTransaction(dCtx components.DomainContext, read
 				Function:       functionABI.String(),
 				From:           tx.Signer,
 				To:             contractAddress,
-				Data:           tktypes.RawJSON(res.Transaction.ParamsJson),
+				Data:           types.RawJSON(res.Transaction.ParamsJson),
 				Domain:         psc.Domain().Name(),
 			},
 			ABI: abi.ABI{&functionABI},
@@ -556,7 +556,7 @@ func (dc *domainContract) PrepareTransaction(dCtx components.DomainContext, read
 				Function:        functionABI.String(),
 				From:            tx.Signer,
 				To:              contractAddress,
-				Data:            tktypes.RawJSON(res.Transaction.ParamsJson),
+				Data:            types.RawJSON(res.Transaction.ParamsJson),
 				PublicTxOptions: tx.PreAssembly.PublicTxOptions,
 			},
 			ABI: abi.ABI{&functionABI},
@@ -569,7 +569,7 @@ func (dc *domainContract) PrepareTransaction(dCtx components.DomainContext, read
 		}
 	}
 	if res.Metadata != nil {
-		tx.PreparedMetadata = tktypes.RawJSON(*res.Metadata)
+		tx.PreparedMetadata = types.RawJSON(*res.Metadata)
 	}
 	return nil
 }
@@ -635,7 +635,7 @@ func (dc *domainContract) Domain() components.Domain {
 	return dc.d
 }
 
-func (dc *domainContract) Address() tktypes.EthAddress {
+func (dc *domainContract) Address() types.EthAddress {
 	return dc.info.Address
 }
 
@@ -646,18 +646,18 @@ func (dc *domainContract) allAttestations(tx *components.PrivateTransaction) []*
 }
 
 func (dc *domainContract) loadStatesFromContext(dCtx components.DomainContext, readTX persistence.DBTX, refs []*prototk.StateRef) ([]*components.FullState, error) {
-	rawIDsBySchema := make(map[tktypes.Bytes32][]tktypes.RawJSON)
-	stateIDs := make([]tktypes.HexBytes, len(refs))
+	rawIDsBySchema := make(map[types.Bytes32][]types.RawJSON)
+	stateIDs := make([]types.HexBytes, len(refs))
 	for i, s := range refs {
-		stateID, err := tktypes.ParseHexBytes(dCtx.Ctx(), s.Id)
-		var schemaID tktypes.Bytes32
+		stateID, err := types.ParseHexBytes(dCtx.Ctx(), s.Id)
+		var schemaID types.Bytes32
 		if err == nil {
-			schemaID, err = tktypes.ParseBytes32(s.SchemaId)
+			schemaID, err = types.ParseBytes32(s.SchemaId)
 		}
 		if err != nil {
 			return nil, i18n.WrapError(dCtx.Ctx(), err, msgs.MsgDomainInvalidStateIDFromDomain, s.Id, i)
 		}
-		rawIDsBySchema[schemaID] = append(rawIDsBySchema[schemaID], tktypes.JSONString(stateID.String()))
+		rawIDsBySchema[schemaID] = append(rawIDsBySchema[schemaID], types.JSONString(stateID.String()))
 		stateIDs[i] = stateID
 	}
 	statesByID := make(map[string]*pldapi.State)
@@ -696,7 +696,7 @@ func (dc *domainContract) loadStatesFromContext(dCtx components.DomainContext, r
 
 }
 
-func mapPrivacyGroupToProto(stateID tktypes.HexBytes, pg *pldapi.PrivacyGroupGenesisState) *prototk.PrivacyGroup {
+func mapPrivacyGroupToProto(stateID types.HexBytes, pg *pldapi.PrivacyGroupGenesisState) *prototk.PrivacyGroup {
 	return &prototk.PrivacyGroup{
 		Id:            stateID.String(),
 		GenesisSalt:   pg.GenesisSalt.String(),
@@ -734,7 +734,7 @@ func (dc *domainContract) WrapPrivacyGroupEVMTX(ctx context.Context, pg *pldapi.
 	}
 	var pABI *string
 	if pgTX.Function != nil {
-		abiStr := tktypes.JSONString(pgTX.Function).String()
+		abiStr := types.JSONString(pgTX.Function).String()
 		pABI = &abiStr
 	}
 
@@ -773,7 +773,7 @@ func (dc *domainContract) WrapPrivacyGroupEVMTX(ctx context.Context, pg *pldapi.
 
 	pscAddr := dc.Address()
 	if res.Transaction.ContractAddress != nil {
-		addr, err := tktypes.ParseEthAddress(*res.Transaction.ContractAddress)
+		addr, err := types.ParseEthAddress(*res.Transaction.ContractAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -793,7 +793,7 @@ func (dc *domainContract) WrapPrivacyGroupEVMTX(ctx context.Context, pg *pldapi.
 	ptx.ABI = abi.ABI{&wrappedFnABI}
 
 	// And the inputs
-	ptx.Data = tktypes.RawJSON(res.Transaction.ParamsJson)
+	ptx.Data = types.RawJSON(res.Transaction.ParamsJson)
 
 	// Only update the signer if returned
 	if res.Transaction.RequiredSigner != nil && len(*res.Transaction.RequiredSigner) > 0 {

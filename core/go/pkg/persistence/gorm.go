@@ -27,7 +27,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	migratedb "github.com/golang-migrate/migrate/v4/database"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -168,7 +168,7 @@ func (gp *provider) TakeNamedLock(ctx context.Context, dbTX DBTX, lockName strin
 func (gp *provider) Transaction(parentCtx context.Context, fn func(ctx context.Context, tx DBTX) error) (err error) {
 
 	completed := false
-	tx := &transaction{txCtx: log.WithLogField(parentCtx, "dbtx", tktypes.ShortID())}
+	tx := &transaction{txCtx: log.WithLogField(parentCtx, "dbtx", types.ShortID())}
 	defer func() {
 		if !completed {
 			panicData := recover()

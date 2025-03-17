@@ -16,7 +16,7 @@
 package signerapi
 
 import (
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 type ResolveKeyRequest struct {
@@ -55,12 +55,12 @@ type SignRequest struct {
 	PayloadType string `json:"payloadType,omitempty"`
 
 	// the input payload to process according to the algorithm
-	Payload tktypes.HexBytes `json:"payload,omitempty"`
+	Payload types.HexBytes `json:"payload,omitempty"`
 }
 
 type SignResponse struct {
 	// an set of bytes appropriate to the Paladin signing algorithm spec used
-	Payload tktypes.HexBytes `json:"payload,omitempty"`
+	Payload types.HexBytes `json:"payload,omitempty"`
 }
 
 type ListKeysRequest struct {

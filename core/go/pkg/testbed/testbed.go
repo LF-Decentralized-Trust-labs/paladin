@@ -27,14 +27,14 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/plugins"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
 func HDWalletSeedScopedToTest() *UTInitFunction {
-	seed := tktypes.RandHex(32)
+	seed := types.RandHex(32)
 	return &UTInitFunction{
 		ModifyConfig: func(conf *pldconf.PaladinConfig) {
 			conf.Wallets[0].Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
@@ -60,7 +60,7 @@ type Testbed interface {
 type TestbedDomain struct {
 	Config          map[string]any
 	Plugin          plugintk.Plugin
-	RegistryAddress *tktypes.EthAddress
+	RegistryAddress *types.EthAddress
 	AllowSigning    bool
 }
 
@@ -181,7 +181,7 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 	for name, domain := range domains {
 		conf.DomainManagerConfig.Domains[name] = &pldconf.DomainConfig{
 			Plugin: pldconf.PluginConfig{
-				Type:    string(tktypes.LibraryTypeCShared),
+				Type:    string(types.LibraryTypeCShared),
 				Library: "loaded/via/unit/test/loader",
 			},
 			Config:          domain.Config,

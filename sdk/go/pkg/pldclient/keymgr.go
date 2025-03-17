@@ -18,7 +18,7 @@ package pldclient
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 )
 
@@ -27,7 +27,7 @@ type KeyManager interface {
 
 	Wallets(ctx context.Context) ([]string, error)
 	ResolveKey(ctx context.Context, keyIdentifier, algorithm, verifierType string) (mapping *pldapi.KeyMappingAndVerifier, err error)
-	ResolveEthAddress(ctx context.Context, keyIdentifier string) (ethAddress *tktypes.EthAddress, err error)
+	ResolveEthAddress(ctx context.Context, keyIdentifier string) (ethAddress *types.EthAddress, err error)
 	ReverseKeyLookup(ctx context.Context, algorithm, verifierType, verifier string) (mapping *pldapi.KeyMappingAndVerifier, err error)
 }
 
@@ -73,7 +73,7 @@ func (k *keymgr) ResolveKey(ctx context.Context, keyIdentifier, algorithm, verif
 	return
 }
 
-func (k *keymgr) ResolveEthAddress(ctx context.Context, keyIdentifier string) (ethAddress *tktypes.EthAddress, err error) {
+func (k *keymgr) ResolveEthAddress(ctx context.Context, keyIdentifier string) (ethAddress *types.EthAddress, err error) {
 	err = k.c.CallRPC(ctx, &ethAddress, "keymgr_resolveEthAddress", keyIdentifier)
 	return
 }

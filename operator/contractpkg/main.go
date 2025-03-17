@@ -28,7 +28,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,7 +134,7 @@ func (m *ContractMap) process(name string, b *ContractMapBuild) error {
 
 	linkReferencesJSON := ""
 	if len(build.LinkReferences) > 0 {
-		linkReferencesJSON = tktypes.JSONString(build.LinkReferences).Pretty()
+		linkReferencesJSON = types.JSONString(build.LinkReferences).Pretty()
 		libCount := 0
 		for _, libsInFile := range build.LinkReferences {
 			for range libsInFile {
@@ -170,8 +170,8 @@ func (m *ContractMap) process(name string, b *ContractMapBuild) error {
 			Node:                        "node1",
 			TxType:                      "public",
 			From:                        fmt.Sprintf("%s.operator", firstNameSegment),
-			ParamsJSON:                  tktypes.JSONString(b.Params).Pretty(),
-			ABIJSON:                     tktypes.JSONString(build.ABI).Pretty(),
+			ParamsJSON:                  types.JSONString(b.Params).Pretty(),
+			ABIJSON:                     types.JSONString(build.ABI).Pretty(),
 			Bytecode:                    build.Bytecode,
 			LinkReferencesJSON:          linkReferencesJSON,
 			RequiredContractDeployments: requiredBuilds,

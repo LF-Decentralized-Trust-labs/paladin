@@ -27,7 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -93,7 +93,7 @@ func (tp *testDomainManager) mock(t *testing.T) *componentmocks.DomainManager {
 	pluginMap := make(map[string]*pldconf.PluginConfig)
 	for name := range tp.domains {
 		pluginMap[name] = &pldconf.PluginConfig{
-			Type:    string(tktypes.LibraryTypeCShared),
+			Type:    string(types.LibraryTypeCShared),
 			Library: "/tmp/not/applicable",
 		}
 	}

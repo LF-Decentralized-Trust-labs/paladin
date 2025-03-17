@@ -21,7 +21,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/signpayloads"
@@ -29,7 +29,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-func (it *inFlightTransactionStageController) signTx(ctx context.Context, from tktypes.EthAddress, ethTx *ethsigner.Transaction) ([]byte, *tktypes.Bytes32, error) {
+func (it *inFlightTransactionStageController) signTx(ctx context.Context, from types.EthAddress, ethTx *ethsigner.Transaction) ([]byte, *types.Bytes32, error) {
 	log.L(ctx).Debugf("signTx entry")
 	signStart := time.Now()
 
@@ -46,7 +46,7 @@ func (it *inFlightTransactionStageController) signTx(ctx context.Context, from t
 	_, err = sigPayloadHash.Write(sigPayload.Bytes())
 	var signatureRSV []byte
 	if err == nil {
-		signatureRSV, err = it.keymgr.Sign(ctx, resolvedKey, signpayloads.OPAQUE_TO_RSV, tktypes.HexBytes(sigPayloadHash.Sum(nil)))
+		signatureRSV, err = it.keymgr.Sign(ctx, resolvedKey, signpayloads.OPAQUE_TO_RSV, types.HexBytes(sigPayloadHash.Sum(nil)))
 	}
 	var sig *secp256k1.SignatureData
 	if err == nil {

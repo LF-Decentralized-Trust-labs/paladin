@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -105,7 +105,7 @@ func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup str
 	// if the verifier lookup is a local key, we can resolve it here
 	// if it is a remote key, we need to delegate to the remote node
 
-	identifier, node, err := tktypes.PrivateIdentityLocator(lookup).Validate(ctx, ir.nodeName, true)
+	identifier, node, err := types.PrivateIdentityLocator(lookup).Validate(ctx, ir.nodeName, true)
 	if err != nil {
 		log.L(ctx).Errorf("Invalid resolve verifier request: %s (algorithm=%s, verifierType=%s): %s", lookup, algorithm, verifierType, err)
 		failed(ctx, err)
@@ -167,7 +167,7 @@ func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup str
 
 		requestID := uuid.New()
 
-		remoteNodeId, err := tktypes.PrivateIdentityLocator(lookup).Node(ctx, false)
+		remoteNodeId, err := types.PrivateIdentityLocator(lookup).Node(ctx, false)
 		if err != nil {
 			failed(ctx, err)
 			return
@@ -267,7 +267,7 @@ func (ir *identityResolver) handleResolveVerifierRequest(ctx context.Context, me
 	// contractAddress and transactionID in the request message are simply used to populate the response
 	// so that the requesting node can correlate the response with the transaction that needs it
 	var resolvedKey *pldapi.KeyMappingAndVerifier
-	unqualifiedLookup, err := tktypes.PrivateIdentityLocator(resolveVerifierRequest.Lookup).Identity(ctx)
+	unqualifiedLookup, err := types.PrivateIdentityLocator(resolveVerifierRequest.Lookup).Identity(ctx)
 	if err == nil {
 		resolvedKey, err = ir.keyManager.ResolveKeyNewDatabaseTX(ctx, unqualifiedLookup, resolveVerifierRequest.Algorithm, resolveVerifierRequest.VerifierType)
 	}

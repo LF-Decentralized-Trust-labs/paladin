@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
@@ -208,7 +208,7 @@ func (h *mintHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransactio
 		Amount: inParams.Amount,
 		Data:   inParams.Data,
 		Prepared: PreparedTransaction{
-			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
+			ContractAddress: (*commontypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
 		},
 	}

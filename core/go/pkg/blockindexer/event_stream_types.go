@@ -25,7 +25,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -52,19 +52,19 @@ func (est EventStreamType) Options() []string {
 		string(EventStreamTypeInternal),
 	}
 }
-func (est EventStreamType) Enum() tktypes.Enum[EventStreamType] {
-	return tktypes.Enum[EventStreamType](est)
+func (est EventStreamType) Enum() types.Enum[EventStreamType] {
+	return types.Enum[EventStreamType](est)
 }
 
 type EventStream struct {
-	ID      uuid.UUID                     `json:"id"             gorm:"primaryKey"`
-	Name    string                        `json:"name"`
-	Created tktypes.Timestamp             `json:"created"        gorm:"autoCreateTime:nano"`
-	Updated tktypes.Timestamp             `json:"updated"        gorm:"autoUpdateTime:nano"`
-	Type    tktypes.Enum[EventStreamType] `json:"type"`
-	Config  EventStreamConfig             `json:"config"         gorm:"type:bytes;serializer:json"`
-	Sources EventSources                  `json:"sources"        gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
-	Format  tktypes.JSONFormatOptions     `json:"format"`
+	ID      uuid.UUID                   `json:"id"             gorm:"primaryKey"`
+	Name    string                      `json:"name"`
+	Created types.Timestamp             `json:"created"        gorm:"autoCreateTime:nano"`
+	Updated types.Timestamp             `json:"updated"        gorm:"autoUpdateTime:nano"`
+	Type    types.Enum[EventStreamType] `json:"type"`
+	Config  EventStreamConfig           `json:"config"         gorm:"type:bytes;serializer:json"`
+	Sources EventSources                `json:"sources"        gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
+	Format  types.JSONFormatOptions     `json:"format"`
 }
 
 type EventSources []EventStreamSource
@@ -72,11 +72,11 @@ type EventSources []EventStreamSource
 // Build a hash that covers the unique set of combinations events + address.
 // - Order independent
 // - Ignores non-event parts of the ABI
-func (ess EventSources) Hash(ctx context.Context) (*tktypes.Bytes32, error) {
+func (ess EventSources) Hash(ctx context.Context) (*types.Bytes32, error) {
 	// string hashes so we can sort them in a deterministic order
 	sourceHashes := make([]string, len(ess))
 	for i, s := range ess {
-		hash, err := tktypes.ABISolDefinitionHash(ctx, s.ABI, abi.Event /* only events matter */)
+		hash, err := types.ABISolDefinitionHash(ctx, s.ABI, abi.Event /* only events matter */)
 		if err != nil {
 			return nil, err
 		}
@@ -92,14 +92,14 @@ func (ess EventSources) Hash(ctx context.Context) (*tktypes.Bytes32, error) {
 	for _, h := range sourceHashes {
 		hash.Write([]byte(h))
 	}
-	var h32 tktypes.Bytes32
+	var h32 types.Bytes32
 	_ = hash.Sum(h32[0:0])
 	return &h32, nil
 }
 
 type EventStreamSource struct {
-	ABI     abi.ABI             `json:"abi,omitempty"`
-	Address *tktypes.EthAddress `json:"address,omitempty"` // optional
+	ABI     abi.ABI           `json:"abi,omitempty"`
+	Address *types.EthAddress `json:"address,omitempty"` // optional
 }
 
 type EventStreamCheckpoint struct {
@@ -108,8 +108,8 @@ type EventStreamCheckpoint struct {
 }
 
 type EventStreamSignature struct {
-	Stream        uuid.UUID       `json:"stream"                 gorm:"primaryKey"`
-	SignatureHash tktypes.Bytes32 `json:"signatureHash"          gorm:"primaryKey"`
+	Stream        uuid.UUID     `json:"stream"                 gorm:"primaryKey"`
+	SignatureHash types.Bytes32 `json:"signatureHash"          gorm:"primaryKey"`
 }
 
 type EventDeliveryBatch struct {

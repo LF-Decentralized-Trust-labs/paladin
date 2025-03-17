@@ -16,20 +16,20 @@
 
 package pldapi
 
-import "github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+import "github.com/kaleido-io/paladin/common/go/pkg/types"
 
 type TransactionReceiptListener struct {
 	Name    string                            `docstruct:"TransactionReceiptListener" json:"name"`
-	Created tktypes.Timestamp                 `docstruct:"TransactionReceiptListener" json:"created"`
+	Created types.Timestamp                   `docstruct:"TransactionReceiptListener" json:"created"`
 	Started *bool                             `docstruct:"TransactionReceiptListener" json:"started"`
 	Filters TransactionReceiptFilters         `docstruct:"TransactionReceiptListener" json:"filters"`
 	Options TransactionReceiptListenerOptions `docstruct:"TransactionReceiptListener" json:"options"`
 }
 
 type TransactionReceiptFilters struct {
-	SequenceAbove *uint64                        `docstruct:"TransactionReceiptFilters" json:"sequenceAbove,omitempty"`
-	Type          *tktypes.Enum[TransactionType] `docstruct:"TransactionReceiptFilters" json:"type,omitempty"`
-	Domain        string                         `docstruct:"TransactionReceiptFilters" json:"domain,omitempty"`
+	SequenceAbove *uint64                      `docstruct:"TransactionReceiptFilters" json:"sequenceAbove,omitempty"`
+	Type          *types.Enum[TransactionType] `docstruct:"TransactionReceiptFilters" json:"type,omitempty"`
+	Domain        string                       `docstruct:"TransactionReceiptFilters" json:"domain,omitempty"`
 }
 
 type IncompleteStateReceiptBehavior string
@@ -39,8 +39,8 @@ const (
 	IncompleteStateReceiptBehaviorProcess       IncompleteStateReceiptBehavior = "process"
 )
 
-func (tt IncompleteStateReceiptBehavior) Enum() tktypes.Enum[IncompleteStateReceiptBehavior] {
-	return tktypes.Enum[IncompleteStateReceiptBehavior](tt)
+func (tt IncompleteStateReceiptBehavior) Enum() types.Enum[IncompleteStateReceiptBehavior] {
+	return types.Enum[IncompleteStateReceiptBehavior](tt)
 }
 
 func (tt IncompleteStateReceiptBehavior) Options() []string {
@@ -55,6 +55,6 @@ func (tt IncompleteStateReceiptBehavior) Default() string {
 }
 
 type TransactionReceiptListenerOptions struct {
-	DomainReceipts                 bool                                         `docstruct:"TransactionReceiptOptions" json:"domainReceipts"`
-	IncompleteStateReceiptBehavior tktypes.Enum[IncompleteStateReceiptBehavior] `docstruct:"TransactionReceiptOptions" json:"incompleteStateReceiptBehavior,omitempty"`
+	DomainReceipts                 bool                                       `docstruct:"TransactionReceiptOptions" json:"domainReceipts"`
+	IncompleteStateReceiptBehavior types.Enum[IncompleteStateReceiptBehavior] `docstruct:"TransactionReceiptOptions" json:"incompleteStateReceiptBehavior,omitempty"`
 }

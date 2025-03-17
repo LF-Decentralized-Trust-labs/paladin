@@ -22,7 +22,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -105,7 +105,7 @@ func TestResolveABIReferencesAndCacheFail(t *testing.T) {
 	_, err := txm.resolveABIReferencesAndCache(ctx, txm.p.NOTX(), []*components.ResolvedTransaction{
 		{Transaction: &pldapi.Transaction{
 			TransactionBase: pldapi.TransactionBase{
-				ABIReference: confutil.P((tktypes.Bytes32)(tktypes.RandBytes(32))),
+				ABIReference: confutil.P((types.Bytes32)(types.RandBytes(32))),
 			},
 		}},
 	})
@@ -113,7 +113,7 @@ func TestResolveABIReferencesAndCacheFail(t *testing.T) {
 }
 
 func TestResolveABIReferencesAndCacheBadFunc(t *testing.T) {
-	var abiHash = (tktypes.Bytes32)(tktypes.RandBytes(32))
+	var abiHash = (types.Bytes32)(types.RandBytes(32))
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
@@ -128,7 +128,7 @@ func TestResolveABIReferencesAndCacheBadFunc(t *testing.T) {
 			ID: confutil.P(uuid.New()),
 			TransactionBase: pldapi.TransactionBase{
 				Function:     "doStuff()",
-				To:           tktypes.RandAddress(),
+				To:           types.RandAddress(),
 				ABIReference: confutil.P(abiHash),
 			},
 		}},

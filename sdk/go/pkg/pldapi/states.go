@@ -24,7 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 type SchemaType string
@@ -34,8 +34,8 @@ const (
 	SchemaTypeABI SchemaType = "abi"
 )
 
-func (st SchemaType) Enum() tktypes.Enum[SchemaType] {
-	return tktypes.Enum[SchemaType](st)
+func (st SchemaType) Enum() types.Enum[SchemaType] {
+	return types.Enum[SchemaType](st)
 }
 
 func (st SchemaType) Options() []string {
@@ -81,31 +81,31 @@ func (q *StateStatusQualifier) UnmarshalJSON(b []byte) error {
 }
 
 type Schema struct {
-	ID         tktypes.Bytes32          `docstruct:"Schema" json:"id"          gorm:"primaryKey"`
-	Created    tktypes.Timestamp        `docstruct:"Schema" json:"created"     gorm:"autoCreateTime:false"` // we calculate the created time ourselves due to complex in-memory caching
-	DomainName string                   `docstruct:"Schema" json:"domain"`
-	Type       tktypes.Enum[SchemaType] `docstruct:"Schema" json:"type"`
-	Signature  string                   `docstruct:"Schema" json:"signature"`
-	Definition tktypes.RawJSON          `docstruct:"Schema" json:"definition"`
-	Labels     []string                 `docstruct:"Schema" json:"labels"      gorm:"type:text[]; serializer:json"`
+	ID         types.Bytes32          `docstruct:"Schema" json:"id"          gorm:"primaryKey"`
+	Created    types.Timestamp        `docstruct:"Schema" json:"created"     gorm:"autoCreateTime:false"` // we calculate the created time ourselves due to complex in-memory caching
+	DomainName string                 `docstruct:"Schema" json:"domain"`
+	Type       types.Enum[SchemaType] `docstruct:"Schema" json:"type"`
+	Signature  string                 `docstruct:"Schema" json:"signature"`
+	Definition types.RawJSON          `docstruct:"Schema" json:"definition"`
+	Labels     []string               `docstruct:"Schema" json:"labels"      gorm:"type:text[]; serializer:json"`
 }
 
 type StateBase struct {
-	ID              tktypes.HexBytes    `docstruct:"State" json:"id"                  gorm:"primaryKey"`
-	Created         tktypes.Timestamp   `docstruct:"State" json:"created"             gorm:"autoCreateTime:nano"`
-	DomainName      string              `docstruct:"State" json:"domain"              gorm:"primaryKey"`
-	Schema          tktypes.Bytes32     `docstruct:"State" json:"schema"`
-	ContractAddress *tktypes.EthAddress `docstruct:"State" json:"contractAddress"` // nil used for states like privacy group genesis that exists before state creation
-	Data            tktypes.RawJSON     `docstruct:"State" json:"data"`
+	ID              types.HexBytes    `docstruct:"State" json:"id"                  gorm:"primaryKey"`
+	Created         types.Timestamp   `docstruct:"State" json:"created"             gorm:"autoCreateTime:nano"`
+	DomainName      string            `docstruct:"State" json:"domain"              gorm:"primaryKey"`
+	Schema          types.Bytes32     `docstruct:"State" json:"schema"`
+	ContractAddress *types.EthAddress `docstruct:"State" json:"contractAddress"` // nil used for states like privacy group genesis that exists before state creation
+	Data            types.RawJSON     `docstruct:"State" json:"data"`
 }
 
 // Like StateBase, but encodes Data as HexBytes
 type StateEncoded struct {
-	ID              tktypes.HexBytes    `json:"id"`
-	DomainName      string              `json:"domain"`
-	Schema          tktypes.Bytes32     `json:"schema"`
-	ContractAddress *tktypes.EthAddress `json:"contractAddress"` // nil used for states like privacy group genesis that exists before state creation
-	Data            tktypes.HexBytes    `json:"data"`
+	ID              types.HexBytes    `json:"id"`
+	DomainName      string            `json:"domain"`
+	Schema          types.Bytes32     `json:"schema"`
+	ContractAddress *types.EthAddress `json:"contractAddress"` // nil used for states like privacy group genesis that exists before state creation
+	Data            types.HexBytes    `json:"data"`
 }
 
 type State struct {
@@ -125,15 +125,15 @@ func (StateBase) TableName() string {
 }
 
 type StateLabel struct {
-	DomainName string           `gorm:"primaryKey"`
-	State      tktypes.HexBytes `gorm:"primaryKey"`
+	DomainName string         `gorm:"primaryKey"`
+	State      types.HexBytes `gorm:"primaryKey"`
 	Label      string
 	Value      string
 }
 
 type StateInt64Label struct {
-	DomainName string           `gorm:"primaryKey"`
-	State      tktypes.HexBytes `gorm:"primaryKey"`
+	DomainName string         `gorm:"primaryKey"`
+	State      types.HexBytes `gorm:"primaryKey"`
 	Label      string
 	Value      int64
 }
@@ -147,7 +147,7 @@ type TransactionStates struct {
 	Unavailable *UnavailableStates `docstruct:"TransactionStates" json:"unavailable,omitempty"` // nil if we have the data for all states
 }
 
-func (ts *TransactionStates) FirstUnavailable() tktypes.HexBytes {
+func (ts *TransactionStates) FirstUnavailable() types.HexBytes {
 	switch {
 	case ts.Unavailable == nil:
 		return nil
@@ -165,10 +165,10 @@ func (ts *TransactionStates) FirstUnavailable() tktypes.HexBytes {
 }
 
 type UnavailableStates struct {
-	Confirmed []tktypes.HexBytes `docstruct:"UnavailableStates" json:"confirmed"`
-	Read      []tktypes.HexBytes `docstruct:"UnavailableStates" json:"read"`
-	Spent     []tktypes.HexBytes `docstruct:"UnavailableStates" json:"spent"`
-	Info      []tktypes.HexBytes `docstruct:"UnavailableStates" json:"info"`
+	Confirmed []types.HexBytes `docstruct:"UnavailableStates" json:"confirmed"`
+	Read      []types.HexBytes `docstruct:"UnavailableStates" json:"read"`
+	Spent     []types.HexBytes `docstruct:"UnavailableStates" json:"spent"`
+	Info      []types.HexBytes `docstruct:"UnavailableStates" json:"info"`
 }
 
 // A confirm record is written when indexing the blockchain, and can be written regardless
@@ -185,9 +185,9 @@ type UnavailableStates struct {
 // states all in a single block. In that case the state will only be "available" within
 // the in-memory domain context being managed by the sequencer for that smart contract.
 type StateConfirmRecord struct {
-	DomainName  string           `json:"-"                 gorm:"primaryKey"`
-	State       tktypes.HexBytes `json:"-"                 gorm:"primaryKey"`
-	Transaction uuid.UUID        `docstruct:"StateConfirm" json:"transaction"`
+	DomainName  string         `json:"-"                 gorm:"primaryKey"`
+	State       types.HexBytes `json:"-"                 gorm:"primaryKey"`
+	Transaction uuid.UUID      `docstruct:"StateConfirm" json:"transaction"`
 }
 
 // A spend record is written when indexing the blockchain, and can be written regardless
@@ -202,27 +202,27 @@ type StateConfirmRecord struct {
 // the transaction, to avoid us attempting to double-spend states (which of course will
 // be rejected by the blockchain).
 type StateSpendRecord struct {
-	DomainName  string           `json:"-"                 gorm:"primaryKey"`
-	State       tktypes.HexBytes `json:"-"                 gorm:"primaryKey"`
-	Transaction uuid.UUID        `docstruct:"StateSpend" json:"transaction"`
+	DomainName  string         `json:"-"                 gorm:"primaryKey"`
+	State       types.HexBytes `json:"-"                 gorm:"primaryKey"`
+	Transaction uuid.UUID      `docstruct:"StateSpend" json:"transaction"`
 }
 
 // We also record when we simply read a state during a transaction, without creating or
 // spending it. This is important for being able to re-execute the transaction in the future
 // against the exact state of the blockchain. We use this in receipt generation.
 type StateReadRecord struct {
-	DomainName  string           `json:"-"                 gorm:"primaryKey"`
-	State       tktypes.HexBytes `json:"-"                 gorm:"primaryKey"`
-	Transaction uuid.UUID        `docstruct:"StateRead" json:"transaction"`
+	DomainName  string         `json:"-"                 gorm:"primaryKey"`
+	State       types.HexBytes `json:"-"                 gorm:"primaryKey"`
+	Transaction uuid.UUID      `docstruct:"StateRead" json:"transaction"`
 }
 
 // Transactions can also refer to state that never exists before or after the transaction.
 // It is part of the transaction that is required to fully process the transaction,
 // but it originated exclusively within that transaction
 type StateInfoRecord struct {
-	DomainName  string           `json:"-"                 gorm:"primaryKey"`
-	State       tktypes.HexBytes `json:"-"                 gorm:"primaryKey"`
-	Transaction uuid.UUID        `docstruct:"StateConfirm" json:"transaction"`
+	DomainName  string         `json:"-"                 gorm:"primaryKey"`
+	State       types.HexBytes `json:"-"                 gorm:"primaryKey"`
+	Transaction uuid.UUID      `docstruct:"StateConfirm" json:"transaction"`
 }
 
 type StateLockType string
@@ -233,8 +233,8 @@ const (
 	StateLockTypeSpend  StateLockType = "spend"
 )
 
-func (tt StateLockType) Enum() tktypes.Enum[StateLockType] {
-	return tktypes.Enum[StateLockType](tt)
+func (tt StateLockType) Enum() types.Enum[StateLockType] {
+	return types.Enum[StateLockType](tt)
 }
 
 func (tt StateLockType) Options() []string {
@@ -249,10 +249,10 @@ func (tt StateLockType) Options() []string {
 // spending a previously confirmed state, or an optimistic record of creating
 // (and maybe later spending) a state that is yet to be confirmed.
 type StateLock struct {
-	DomainName  string                      `json:"-"`
-	StateID     tktypes.HexBytes            `json:"-"`
-	Transaction uuid.UUID                   `docstruct:"StateLock" json:"transaction"`
-	Type        tktypes.Enum[StateLockType] `docstruct:"StateLock" json:"type"`
+	DomainName  string                    `json:"-"`
+	StateID     types.HexBytes            `json:"-"`
+	Transaction uuid.UUID                 `docstruct:"StateLock" json:"transaction"`
+	Type        types.Enum[StateLockType] `docstruct:"StateLock" json:"type"`
 }
 
 // State nullifiers are used when a domain chooses to use a separate identifier
@@ -263,7 +263,7 @@ type StateLock struct {
 // Immutable once written
 type StateNullifier struct {
 	DomainName string            `json:"-"               gorm:"primaryKey"`
-	State      tktypes.HexBytes  `json:"-"`
-	ID         tktypes.HexBytes  `json:"id"              gorm:"primaryKey"`
+	State      types.HexBytes    `json:"-"`
+	ID         types.HexBytes    `json:"id"              gorm:"primaryKey"`
 	Spent      *StateSpendRecord `json:"spent,omitempty" gorm:"foreignKey:state;references:id;"`
 }

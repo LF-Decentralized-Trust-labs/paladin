@@ -19,7 +19,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
@@ -29,12 +29,12 @@ type PrivacyGroups interface {
 	RPCModule
 
 	CreateGroup(ctx context.Context, spec *pldapi.PrivacyGroupInput) (group pldapi.PrivacyGroup, err error)
-	GetGroupById(ctx context.Context, domainName string, id tktypes.HexBytes) (group *pldapi.PrivacyGroup, err error)
-	GetGroupByAddress(ctx context.Context, addr tktypes.EthAddress) (group *pldapi.PrivacyGroup, err error)
+	GetGroupById(ctx context.Context, domainName string, id types.HexBytes) (group *pldapi.PrivacyGroup, err error)
+	GetGroupByAddress(ctx context.Context, addr types.EthAddress) (group *pldapi.PrivacyGroup, err error)
 	QueryGroups(ctx context.Context, jq *query.QueryJSON) (groups []*pldapi.PrivacyGroup, err error)
 	QueryGroupsWithMember(ctx context.Context, member string, jq *query.QueryJSON) (groups []*pldapi.PrivacyGroup, err error)
 	SendTransaction(ctx context.Context, tx *pldapi.PrivacyGroupEVMTXInput) (txID uuid.UUID, err error)
-	Call(ctx context.Context, call *pldapi.PrivacyGroupEVMCall) (data tktypes.RawJSON, err error)
+	Call(ctx context.Context, call *pldapi.PrivacyGroupEVMCall) (data types.RawJSON, err error)
 
 	SendMessage(ctx context.Context, msg *pldapi.PrivacyGroupMessageInput) (msgID uuid.UUID, err error)
 	GetMessageById(ctx context.Context, id uuid.UUID) (msg *pldapi.PrivacyGroupMessage, err error)
@@ -150,12 +150,12 @@ func (r *pgroup) CreateGroup(ctx context.Context, spec *pldapi.PrivacyGroupInput
 	return
 }
 
-func (r *pgroup) GetGroupById(ctx context.Context, domainName string, id tktypes.HexBytes) (group *pldapi.PrivacyGroup, err error) {
+func (r *pgroup) GetGroupById(ctx context.Context, domainName string, id types.HexBytes) (group *pldapi.PrivacyGroup, err error) {
 	err = r.c.CallRPC(ctx, &group, "pgroup_getGroupById", domainName, id)
 	return
 }
 
-func (r *pgroup) GetGroupByAddress(ctx context.Context, addr tktypes.EthAddress) (group *pldapi.PrivacyGroup, err error) {
+func (r *pgroup) GetGroupByAddress(ctx context.Context, addr types.EthAddress) (group *pldapi.PrivacyGroup, err error) {
 	err = r.c.CallRPC(ctx, &group, "pgroup_getGroupByAddress", addr)
 	return
 }
@@ -175,7 +175,7 @@ func (r *pgroup) SendTransaction(ctx context.Context, tx *pldapi.PrivacyGroupEVM
 	return
 }
 
-func (r *pgroup) Call(ctx context.Context, call *pldapi.PrivacyGroupEVMCall) (data tktypes.RawJSON, err error) {
+func (r *pgroup) Call(ctx context.Context, call *pldapi.PrivacyGroupEVMCall) (data types.RawJSON, err error) {
 	err = r.c.CallRPC(ctx, &data, "pgroup_call", call)
 	return
 }

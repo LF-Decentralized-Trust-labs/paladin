@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -38,17 +38,17 @@ var nextReq atomic.Uint64
 
 func rpcTestRequest(method string, params ...any) (uint64, []byte) {
 	reqID := nextReq.Add(1)
-	jsonParams := make([]tktypes.RawJSON, len(params))
+	jsonParams := make([]types.RawJSON, len(params))
 	for i, p := range params {
-		jsonParams[i] = tktypes.JSONString(p)
+		jsonParams[i] = types.JSONString(p)
 	}
 	req := &rpcclient.RPCRequest{
 		JSONRpc: "2.0",
-		ID:      tktypes.RawJSON(fmt.Sprintf("%d", reqID)),
+		ID:      types.RawJSON(fmt.Sprintf("%d", reqID)),
 		Method:  method,
 		Params:  jsonParams,
 	}
-	return reqID, []byte(tktypes.JSONString((req)).Pretty())
+	return reqID, []byte(types.JSONString((req)).Pretty())
 }
 
 func TestRPCEventListenerE2E(t *testing.T) {
@@ -129,7 +129,7 @@ func TestRPCEventListenerE2E(t *testing.T) {
 		txs[i] = &components.ReceiptInput{
 			ReceiptType:   components.RT_Success,
 			TransactionID: uuid.New(),
-			OnChain:       randOnChain(tktypes.RandAddress()),
+			OnChain:       randOnChain(types.RandAddress()),
 		}
 	}
 
@@ -254,7 +254,7 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 			{
 				ReceiptType:   components.RT_Success,
 				TransactionID: uuid.New(),
-				OnChain:       randOnChain(tktypes.RandAddress()),
+				OnChain:       randOnChain(types.RandAddress()),
 			},
 		})
 	})
@@ -414,7 +414,7 @@ func TestHandleLifecycleUnkonwn(t *testing.T) {
 
 	res := txm.rpcEventStreams.HandleLifecycle(ctx, &rpcclient.RPCRequest{
 		Method: "wrong",
-		Params: []tktypes.RawJSON{tktypes.RawJSON(`"any"`)},
+		Params: []types.RawJSON{types.RawJSON(`"any"`)},
 	})
 	require.Regexp(t, "PD012239", res.Error.Error())
 
@@ -441,9 +441,9 @@ func TestHandleLifecycleNoBlockNack(t *testing.T) {
 
 	res := es.HandleLifecycle(ctx, &rpcclient.RPCRequest{
 		JSONRpc: "2.0",
-		ID:      tktypes.RawJSON("12345"),
+		ID:      types.RawJSON("12345"),
 		Method:  "ptx_nack",
-		Params:  []tktypes.RawJSON{tktypes.RawJSON(`"sub1"`)},
+		Params:  []types.RawJSON{types.RawJSON(`"sub1"`)},
 	})
 	require.Nil(t, res)
 

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -95,7 +95,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	log.L(ctx).Info("*************************************")
 	zeto.Mint(ctx, controllerName, []uint64{10, 20}).SignAndSend(controllerName, true).Wait()
 
-	var controllerAddr tktypes.Bytes32
+	var controllerAddr commontypes.Bytes32
 	rpcerr = s.rpc.CallRPC(ctx, &controllerAddr, "ptx_resolveVerifier", controllerName, zetosignerapi.AlgoDomainZetoSnarkBJJ(s.domainName), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
 	require.Nil(t, rpcerr)
 
@@ -210,7 +210,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	var recipient1EthAddrStr string
 	rpcerr = s.rpc.CallRPC(ctx, &recipient1EthAddrStr, "ptx_resolveVerifier", recipient1Name, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.Nil(t, rpcerr)
-	recipient1EthAddr := tktypes.MustEthAddress(recipient1EthAddrStr)
+	recipient1EthAddr := commontypes.MustEthAddress(recipient1EthAddrStr)
 	zeto.Lock(ctx, recipient1EthAddr, 1).SignAndSend(controllerName, true).Wait()
 	zeto.Lock(ctx, recipient1EthAddr, 1).SignAndSend(controllerName, true).Wait()
 
@@ -235,7 +235,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	rpcerr = s.rpc.CallRPC(ctx, &recipient2EthAddrStr, "ptx_resolveVerifier", recipient2Name, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.Nil(t, rpcerr)
 
-	recipient2EthAddr := tktypes.MustEthAddress(recipient2EthAddrStr)
+	recipient2EthAddr := commontypes.MustEthAddress(recipient2EthAddrStr)
 	zeto.DelegateLock(ctx, s.tb, locked1, recipient2EthAddr, recipient1Name)
 
 	log.L(ctx).Info("*************************************")
@@ -248,7 +248,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 }
 
 func (s *zetoDomainTestSuite) setupContractsAbi(t *testing.T, ctx context.Context, tokenName string) {
-	var result tktypes.HexBytes
+	var result commontypes.HexBytes
 
 	contractAbi, ok := s.deployedContracts.DeployedContractAbis[tokenName]
 	require.True(t, ok, "Missing ABI for contract %s", tokenName)

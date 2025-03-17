@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
@@ -129,7 +129,7 @@ func TestRPCLocalDetails(t *testing.T) {
 	assert.Equal(t, queryEntries[0].IsKey, true)
 	assert.Equal(t, queryEntries[0].HasChildren, false)
 
-	var ethAddress *tktypes.EthAddress
+	var ethAddress *types.EthAddress
 	err = rpc.CallRPC(ctx, &ethAddress, "keymgr_resolveEthAddress", "my.key.1")
 	require.NoError(t, err)
 	assert.Equal(t, resolvedKey.Verifier.Verifier, ethAddress.String())

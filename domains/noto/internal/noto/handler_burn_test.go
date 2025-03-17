@@ -24,7 +24,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/verifiers"
@@ -48,10 +48,10 @@ func TestBurn(t *testing.T) {
 	require.NoError(t, err)
 
 	inputCoin := &types.NotoCoinState{
-		ID: tktypes.RandBytes32(),
+		ID: commontypes.RandBytes32(),
 		Data: types.NotoCoin{
-			Owner:  (*tktypes.EthAddress)(&senderKey.Address),
-			Amount: tktypes.Int64ToInt256(100),
+			Owner:  (*commontypes.EthAddress)(&senderKey.Address),
+			Amount: commontypes.Int64ToInt256(100),
 		},
 	}
 	mockCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
@@ -133,7 +133,7 @@ func TestBurn(t *testing.T) {
 	require.NoError(t, err)
 	signature, err := senderKey.SignDirect(encodedTransfer)
 	require.NoError(t, err)
-	signatureBytes := tktypes.HexBytes(signature.CompactRSV())
+	signatureBytes := commontypes.HexBytes(signature.CompactRSV())
 
 	inputStates := []*prototk.EndorsableState{
 		{
@@ -211,7 +211,7 @@ func TestBurn(t *testing.T) {
 		NotaryMode:   types.NotaryModeHooks.Enum(),
 		Options: types.NotoOptions{
 			Hooks: &types.NotoHooksOptions{
-				PublicAddress:     tktypes.MustEthAddress(hookAddress),
+				PublicAddress:     commontypes.MustEthAddress(hookAddress),
 				DevUsePublicHooks: true,
 			},
 		},
@@ -246,5 +246,5 @@ func TestBurn(t *testing.T) {
 			"contractAddress": "%s",
 			"encodedCall": "%s"
 		}
-	}`, senderKey.Address, senderKey.Address, contractAddress, tktypes.HexBytes(encodedCall)), prepareRes.Transaction.ParamsJson)
+	}`, senderKey.Address, senderKey.Address, contractAddress, commontypes.HexBytes(encodedCall)), prepareRes.Transaction.ParamsJson)
 }

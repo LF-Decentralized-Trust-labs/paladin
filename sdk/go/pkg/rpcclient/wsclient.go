@@ -27,7 +27,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/sirupsen/logrus"
@@ -62,23 +62,23 @@ type RPCSubscriptionNotification interface {
 	Ack(ctx context.Context) ErrorRPC
 	Nack(ctx context.Context) ErrorRPC
 	GetCurrentSubID() string
-	GetResult() tktypes.RawJSON
+	GetResult() types.RawJSON
 }
 
 type rpcSubscriptionNotification struct {
 	wsc          *wsRPCClient
 	sub          *sub
 	CurrentSubID string // will change on each reconnect
-	Result       tktypes.RawJSON
+	Result       types.RawJSON
 }
 
 func (n *rpcSubscriptionNotification) Ack(ctx context.Context) ErrorRPC {
-	id, req := n.wsc.newAsyncReq(n.sub.AckMethod, tktypes.JSONString(n.CurrentSubID))
+	id, req := n.wsc.newAsyncReq(n.sub.AckMethod, types.JSONString(n.CurrentSubID))
 	return n.wsc.sendRPC(ctx, id, req)
 }
 
 func (n *rpcSubscriptionNotification) Nack(ctx context.Context) ErrorRPC {
-	id, req := n.wsc.newAsyncReq(n.sub.NackMethod, tktypes.JSONString(n.CurrentSubID))
+	id, req := n.wsc.newAsyncReq(n.sub.NackMethod, types.JSONString(n.CurrentSubID))
 	return n.wsc.sendRPC(ctx, id, req)
 }
 
@@ -86,7 +86,7 @@ func (n *rpcSubscriptionNotification) GetCurrentSubID() string {
 	return n.CurrentSubID
 }
 
-func (n *rpcSubscriptionNotification) GetResult() tktypes.RawJSON {
+func (n *rpcSubscriptionNotification) GetResult() types.RawJSON {
 	return n.Result
 }
 
@@ -152,7 +152,7 @@ func (rc *wsRPCClient) handleReconnect(ctx context.Context, w wsclient.WSClient)
 		calls, subs := rc.clearActiveReturnConfiguredSubs()
 		for rpcID, c := range calls {
 			rc.deliverCallResponse(c, &RPCResponse{
-				ID:    tktypes.RawJSON(`"` + rpcID + `"`),
+				ID:    types.RawJSON(`"` + rpcID + `"`),
 				Error: NewRPCError(ctx, RPCCodeInternalError, tkmsgs.MsgRPCClientWebSocketReconnected),
 			})
 		}
@@ -172,14 +172,14 @@ func (rc *wsRPCClient) handleReconnect(ctx context.Context, w wsclient.WSClient)
 	return nil
 }
 
-func (rc *wsRPCClient) newAsyncReq(method string, params ...tktypes.RawJSON) (string, *RPCRequest) {
+func (rc *wsRPCClient) newAsyncReq(method string, params ...types.RawJSON) (string, *RPCRequest) {
 	rc.mux.Lock()
 	defer rc.mux.Unlock()
 	rc.requestCounter++
 	reqID := fmt.Sprintf(`"%.9d"`, rc.requestCounter)
 	return reqID, &RPCRequest{
 		JSONRpc: "2.0",
-		ID:      tktypes.RawJSON(reqID),
+		ID:      types.RawJSON(reqID),
 		Method:  method,
 		Params:  params,
 	}
@@ -190,7 +190,7 @@ func (rc *wsRPCClient) addInflightRequest(req *RPCRequest) (string, chan *RPCRes
 	defer rc.mux.Unlock()
 	rc.requestCounter++
 	reqID := fmt.Sprintf("%.9d", rc.requestCounter)
-	req.ID = tktypes.RawJSON(`"` + reqID + `"`)
+	req.ID = types.RawJSON(`"` + reqID + `"`)
 	resChl := make(chan *RPCResponse, 1)
 	rc.calls[reqID] = resChl
 	return reqID, resChl
@@ -336,7 +336,7 @@ func (s *sub) sendSubscribe(ctx context.Context) (string, ErrorRPC) {
 		return "", rpcErr
 	}
 	reqID := s.rc.addInflightSub(s)
-	rpcReq.ID = tktypes.RawJSON(`"` + reqID + `"`)
+	rpcReq.ID = types.RawJSON(`"` + reqID + `"`)
 
 	return reqID, s.rc.sendRPC(ctx, s.pendingReqID, rpcReq)
 }
@@ -440,8 +440,8 @@ func (rc *wsRPCClient) waitResponse(ctx context.Context, result interface{}, req
 
 func (rc *wsRPCClient) handleSubscriptionNotification(ctx context.Context, rpcRes *RPCResponse) {
 	type rpcSubscriptionParams struct {
-		Subscription string          `json:"subscription"` // probably hex, but not protocol assured
-		Result       tktypes.RawJSON `json:"result,omitempty"`
+		Subscription string        `json:"subscription"` // probably hex, but not protocol assured
+		Result       types.RawJSON `json:"result,omitempty"`
 	}
 	var subParams rpcSubscriptionParams
 	if rpcRes.Params != nil {

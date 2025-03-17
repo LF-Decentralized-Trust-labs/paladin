@@ -26,7 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -39,7 +39,7 @@ type eventStream struct {
 	bi             *blockIndexer
 	definition     *EventStream
 	signatures     map[string]bool
-	signatureList  []tktypes.Bytes32
+	signatureList  []types.Bytes32
 	batchSize      int
 	batchTimeout   time.Duration
 	blocks         chan *eventStreamBlock
@@ -103,7 +103,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 	def.Type = EventStreamTypeInternal.Enum()
 
 	// Validate the name
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+	if err := types.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, types.DefaultNameMaxLen, "name"); err != nil {
 		return nil, err
 	}
 
@@ -127,7 +127,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 			return nil, i18n.NewError(ctx, msgs.MsgBlockIndexerESSourceError)
 		}
 		for i := range existing[0].Sources {
-			if err := tktypes.ABIsMustMatch(ctx, existing[0].Sources[i].ABI, def.Sources[i].ABI,
+			if err := types.ABIsMustMatch(ctx, existing[0].Sources[i].ABI, def.Sources[i].ABI,
 				abi.Event, // we only need to compare on the events
 			); err != nil {
 				return nil, err
@@ -209,7 +209,7 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 
 		for _, abiEntry := range source.ABI {
 			if abiEntry.Type == abi.Event {
-				sig := tktypes.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
+				sig := types.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
 				sigStr := sig.String()
 				if _, dup := es.signatures[sigStr]; !dup {
 					es.signatures[sigStr] = true
@@ -579,7 +579,7 @@ func (es *eventStream) processCatchupEventPage(lastCatchupEvent *pldapi.IndexedE
 	enrichments := make(chan error)
 	for txStr, _events := range byTxID {
 		events := _events // not safe to pass loop pointer
-		tx := tktypes.MustParseBytes32(txStr)
+		tx := types.MustParseBytes32(txStr)
 		for _, _source := range es.definition.Sources {
 			source := _source // not safe to pass loop pointer
 			go func() {

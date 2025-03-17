@@ -16,24 +16,24 @@
 
 package pldapi
 
-import "github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+import "github.com/kaleido-io/paladin/common/go/pkg/types"
 
 type PeerInfo struct {
-	Name              string            `docstruct:"PeerInfo" json:"name"`
-	Stats             PeerStats         `docstruct:"PeerInfo" json:"stats"`
-	Activated         tktypes.Timestamp `docstruct:"PeerInfo" json:"activated"`
-	OutboundTransport string            `docstruct:"PeerInfo" json:"outboundTransport,omitempty"`
-	Outbound          map[string]any    `docstruct:"PeerInfo" json:"outbound,omitempty"`
-	OutboundError     error             `docstruct:"PeerInfo" json:"outboundError,omitempty"`
+	Name              string          `docstruct:"PeerInfo" json:"name"`
+	Stats             PeerStats       `docstruct:"PeerInfo" json:"stats"`
+	Activated         types.Timestamp `docstruct:"PeerInfo" json:"activated"`
+	OutboundTransport string          `docstruct:"PeerInfo" json:"outboundTransport,omitempty"`
+	Outbound          map[string]any  `docstruct:"PeerInfo" json:"outbound,omitempty"`
+	OutboundError     error           `docstruct:"PeerInfo" json:"outboundError,omitempty"`
 }
 
 type PeerStats struct {
-	SentMsgs            uint64             `docstruct:"PeerStats" json:"sentMsgs"`
-	ReceivedMsgs        uint64             `docstruct:"PeerStats" json:"receivedMsgs"`
-	SentBytes           uint64             `docstruct:"PeerStats" json:"sentBytes"`
-	ReceivedBytes       uint64             `docstruct:"PeerStats" json:"receivedBytes"`
-	LastSend            *tktypes.Timestamp `docstruct:"PeerStats" json:"lastSend"`
-	LastReceive         *tktypes.Timestamp `docstruct:"PeerStats" json:"lastReceive"`
-	ReliableHighestSent uint64             `docstruct:"PeerStats" json:"reliableHighestSent"`
-	ReliableAckBase     uint64             `docstruct:"PeerStats" json:"reliableAckBase"`
+	SentMsgs            uint64           `docstruct:"PeerStats" json:"sentMsgs"`
+	ReceivedMsgs        uint64           `docstruct:"PeerStats" json:"receivedMsgs"`
+	SentBytes           uint64           `docstruct:"PeerStats" json:"sentBytes"`
+	ReceivedBytes       uint64           `docstruct:"PeerStats" json:"receivedBytes"`
+	LastSend            *types.Timestamp `docstruct:"PeerStats" json:"lastSend"`
+	LastReceive         *types.Timestamp `docstruct:"PeerStats" json:"lastReceive"`
+	ReliableHighestSent uint64           `docstruct:"PeerStats" json:"reliableHighestSent"`
+	ReliableAckBase     uint64           `docstruct:"PeerStats" json:"reliableAckBase"`
 }

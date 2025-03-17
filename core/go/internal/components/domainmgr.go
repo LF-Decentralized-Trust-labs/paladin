@@ -21,7 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -41,7 +41,7 @@ type DomainManager interface {
 	ConfiguredDomains() map[string]*pldconf.PluginConfig
 	DomainRegistered(name string, toDomain DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
 	GetDomainByName(ctx context.Context, name string) (Domain, error)
-	GetSmartContractByAddress(ctx context.Context, dbTX persistence.DBTX, addr tktypes.EthAddress) (DomainSmartContract, error)
+	GetSmartContractByAddress(ctx context.Context, dbTX persistence.DBTX, addr types.EthAddress) (DomainSmartContract, error)
 	ExecDeployAndWait(ctx context.Context, txID uuid.UUID, call func() error) (dc DomainSmartContract, err error)
 	ExecAndWaitTransaction(ctx context.Context, txID uuid.UUID, call func() error) error
 	GetSigner() signerapi.InMemorySigner
@@ -51,30 +51,30 @@ type DomainManager interface {
 type Domain interface {
 	Initialized() bool
 	Name() string
-	RegistryAddress() *tktypes.EthAddress
+	RegistryAddress() *types.EthAddress
 	Configuration() *prototk.DomainConfig
 	CustomHashFunction() bool
 
 	// Specific to domains that support privacy groups (domain should return error if it does not).
 	// Validates the input properties, and turns it into the full genesis configuration for a group
 	ConfigurePrivacyGroup(ctx context.Context, inputConfiguration map[string]string) (configuration map[string]string, err error)
-	InitPrivacyGroup(ctx context.Context, id tktypes.HexBytes, genesis *pldapi.PrivacyGroupGenesisState) (tx *pldapi.TransactionInput, err error)
+	InitPrivacyGroup(ctx context.Context, id types.HexBytes, genesis *pldapi.PrivacyGroupGenesisState) (tx *pldapi.TransactionInput, err error)
 
 	InitDeploy(ctx context.Context, tx *PrivateContractDeploy) error
 	PrepareDeploy(ctx context.Context, tx *PrivateContractDeploy) error
 
 	// The state manager calls this when states are received for a domain that has a custom hash function.
 	// Any nil IDs should be filled in, and any mis-matched IDs should result in an error
-	ValidateStateHashes(ctx context.Context, states []*FullState) ([]tktypes.HexBytes, error)
+	ValidateStateHashes(ctx context.Context, states []*FullState) ([]types.HexBytes, error)
 
-	GetDomainReceipt(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID) (tktypes.RawJSON, error)
-	BuildDomainReceipt(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID, txStates *pldapi.TransactionStates) (tktypes.RawJSON, error)
+	GetDomainReceipt(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID) (types.RawJSON, error)
+	BuildDomainReceipt(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID, txStates *pldapi.TransactionStates) (types.RawJSON, error)
 }
 
 // External interface for other components to call against a private smart contract
 type DomainSmartContract interface {
 	Domain() Domain
-	Address() tktypes.EthAddress
+	Address() types.EthAddress
 	ContractConfig() *prototk.ContractConfig
 
 	InitTransaction(ctx context.Context, ptx *PrivateTransaction, localTx *ResolvedTransaction) error

@@ -17,7 +17,7 @@
 package pldapi
 
 import (
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 type EthTransactionResult string
@@ -27,8 +27,8 @@ const (
 	TXResult_SUCCESS EthTransactionResult = "success"
 )
 
-func (lt EthTransactionResult) Enum() tktypes.Enum[EthTransactionResult] {
-	return tktypes.Enum[EthTransactionResult](lt)
+func (lt EthTransactionResult) Enum() types.Enum[EthTransactionResult] {
+	return types.Enum[EthTransactionResult](lt)
 }
 
 func (pl EthTransactionResult) Options() []string {
@@ -39,34 +39,34 @@ func (pl EthTransactionResult) Options() []string {
 }
 
 type IndexedBlock struct {
-	Number    int64             `docstruct:"IndexedBlock" json:"number"`
-	Hash      tktypes.Bytes32   `docstruct:"IndexedBlock" json:"hash"           gorm:"primaryKey"`
-	Timestamp tktypes.Timestamp `docstruct:"IndexedBlock" json:"timestamp"`
+	Number    int64           `docstruct:"IndexedBlock" json:"number"`
+	Hash      types.Bytes32   `docstruct:"IndexedBlock" json:"hash"           gorm:"primaryKey"`
+	Timestamp types.Timestamp `docstruct:"IndexedBlock" json:"timestamp"`
 }
 
 type EmbeddedBlockInfo struct {
-	BlockHash      tktypes.Bytes32   `docstruct:"IndexedEvent" json:"blockHash"`
-	BlockTimestamp tktypes.Timestamp `docstruct:"IndexedEvent" json:"blockTimestamp"`
+	BlockHash      types.Bytes32   `docstruct:"IndexedEvent" json:"blockHash"`
+	BlockTimestamp types.Timestamp `docstruct:"IndexedEvent" json:"blockTimestamp"`
 }
 
 type IndexedTransaction struct {
-	Hash             tktypes.Bytes32                    `docstruct:"IndexedTransaction" json:"hash"               gorm:"primaryKey"`
-	BlockNumber      int64                              `docstruct:"IndexedTransaction" json:"blockNumber"`
-	TransactionIndex int64                              `docstruct:"IndexedTransaction" json:"transactionIndex"`
-	From             *tktypes.EthAddress                `docstruct:"IndexedTransaction" json:"from"`
-	To               *tktypes.EthAddress                `docstruct:"IndexedTransaction" json:"to,omitempty"`
-	Nonce            uint64                             `docstruct:"IndexedTransaction" json:"nonce"`
-	ContractAddress  *tktypes.EthAddress                `docstruct:"IndexedTransaction" json:"contractAddress,omitempty"`
-	Result           tktypes.Enum[EthTransactionResult] `docstruct:"IndexedTransaction" json:"result,omitempty"`
-	Block            *IndexedBlock                      `docstruct:"IndexedTransaction" json:"block,omitempty"        gorm:"foreignKey:number;references:block_number"`
+	Hash             types.Bytes32                    `docstruct:"IndexedTransaction" json:"hash"               gorm:"primaryKey"`
+	BlockNumber      int64                            `docstruct:"IndexedTransaction" json:"blockNumber"`
+	TransactionIndex int64                            `docstruct:"IndexedTransaction" json:"transactionIndex"`
+	From             *types.EthAddress                `docstruct:"IndexedTransaction" json:"from"`
+	To               *types.EthAddress                `docstruct:"IndexedTransaction" json:"to,omitempty"`
+	Nonce            uint64                           `docstruct:"IndexedTransaction" json:"nonce"`
+	ContractAddress  *types.EthAddress                `docstruct:"IndexedTransaction" json:"contractAddress,omitempty"`
+	Result           types.Enum[EthTransactionResult] `docstruct:"IndexedTransaction" json:"result,omitempty"`
+	Block            *IndexedBlock                    `docstruct:"IndexedTransaction" json:"block,omitempty"        gorm:"foreignKey:number;references:block_number"`
 }
 
 type IndexedEvent struct {
 	BlockNumber      int64               `docstruct:"IndexedEvent" json:"blockNumber"            gorm:"primaryKey"`
 	TransactionIndex int64               `docstruct:"IndexedEvent" json:"transactionIndex"       gorm:"primaryKey"`
 	LogIndex         int64               `docstruct:"IndexedEvent" json:"logIndex"               gorm:"primaryKey"`
-	TransactionHash  tktypes.Bytes32     `docstruct:"IndexedEvent" json:"transactionHash"`
-	Signature        tktypes.Bytes32     `docstruct:"IndexedEvent" json:"signature"`
+	TransactionHash  types.Bytes32       `docstruct:"IndexedEvent" json:"transactionHash"`
+	Signature        types.Bytes32       `docstruct:"IndexedEvent" json:"signature"`
 	Transaction      *IndexedTransaction `docstruct:"IndexedEvent" json:"transaction,omitempty"  gorm:"foreignKey:block_number,transaction_index;references:block_number,transaction_index"`
 	Block            *IndexedBlock       `docstruct:"IndexedEvent" json:"block,omitempty"        gorm:"foreignKey:number;references:block_number"`
 }
@@ -80,6 +80,6 @@ type EventWithData struct {
 	// Things like whitespace etc. subject to change (so should not stored for later comparison)
 	SoliditySignature string `docstruct:"EventWithData" json:"soliditySignature"`
 
-	Address tktypes.EthAddress `docstruct:"EventWithData" json:"address"`
-	Data    tktypes.RawJSON    `docstruct:"EventWithData" json:"data"`
+	Address types.EthAddress `docstruct:"EventWithData" json:"address"`
+	Data    types.RawJSON    `docstruct:"EventWithData" json:"data"`
 }

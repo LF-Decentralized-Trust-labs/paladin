@@ -16,7 +16,7 @@
 package query
 
 import (
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 type addOns func(op *Op)
@@ -118,7 +118,7 @@ func buildOp(field string, adds ...addOns) *Op {
 func buildSingleValueOp(field string, value any, adds ...addOns) *OpSingleVal {
 	return &OpSingleVal{
 		Op:    *buildOp(field, adds...),
-		Value: tktypes.JSONString(value),
+		Value: types.JSONString(value),
 	}
 }
 
@@ -127,7 +127,7 @@ func buildMultiValueOp(field string, values []any, adds ...addOns) *OpMultiVal {
 		Op: *buildOp(field, adds...),
 	}
 	for _, value := range values {
-		omv.Values = append(omv.Values, tktypes.JSONString(value))
+		omv.Values = append(omv.Values, types.JSONString(value))
 	}
 	return omv
 }

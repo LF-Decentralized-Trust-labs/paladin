@@ -20,7 +20,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,13 +36,13 @@ func TestHandleEventBatch_NotoTransfer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	input := tktypes.RandBytes32()
-	output := tktypes.RandBytes32()
+	input := commontypes.RandBytes32()
+	output := commontypes.RandBytes32()
 	event := &NotoTransfer_Event{
-		Inputs:    []tktypes.Bytes32{input},
-		Outputs:   []tktypes.Bytes32{output},
-		Signature: tktypes.MustParseHexBytes("0x1234"),
-		Data:      tktypes.MustParseHexBytes("0x"),
+		Inputs:    []types.Bytes32{input},
+		Outputs:   []types.Bytes32{output},
+		Signature: commontypes.MustParseHexBytes("0x1234"),
+		Data:      commontypes.MustParseHexBytes("0x"),
 	}
 	notoEventJson, err := json.Marshal(event)
 	require.NoError(t, err)
@@ -98,7 +99,7 @@ func TestHandleEventBatch_NotoTransferBadTransactionData(t *testing.T) {
 	require.NoError(t, err)
 
 	event := &NotoTransfer_Event{
-		Data: tktypes.MustParseHexBytes("0x00010000"),
+		Data: commontypes.MustParseHexBytes("0x00010000"),
 	}
 	notoEventJson, err := json.Marshal(event)
 	require.NoError(t, err)
@@ -124,15 +125,15 @@ func TestHandleEventBatch_NotoLock(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	input := tktypes.RandBytes32()
-	output := tktypes.RandBytes32()
-	lockedOutput := tktypes.RandBytes32()
+	input := commontypes.RandBytes32()
+	output := commontypes.RandBytes32()
+	lockedOutput := commontypes.RandBytes32()
 	event := &NotoLock_Event{
-		Inputs:        []tktypes.Bytes32{input},
-		Outputs:       []tktypes.Bytes32{output},
-		LockedOutputs: []tktypes.Bytes32{lockedOutput},
-		Signature:     tktypes.MustParseHexBytes("0x1234"),
-		Data:          tktypes.MustParseHexBytes("0x"),
+		Inputs:        []types.Bytes32{input},
+		Outputs:       []types.Bytes32{output},
+		LockedOutputs: []types.Bytes32{lockedOutput},
+		Signature:     commontypes.MustParseHexBytes("0x1234"),
+		Data:          commontypes.MustParseHexBytes("0x"),
 	}
 	notoEventJson, err := json.Marshal(event)
 	require.NoError(t, err)
@@ -190,7 +191,7 @@ func TestHandleEventBatch_NotoLockBadTransactionData(t *testing.T) {
 	require.NoError(t, err)
 
 	event := &NotoTransfer_Event{
-		Data: tktypes.MustParseHexBytes("0x00010000"),
+		Data: commontypes.MustParseHexBytes("0x00010000"),
 	}
 	notoEventJson, err := json.Marshal(event)
 	require.NoError(t, err)
@@ -216,15 +217,15 @@ func TestHandleEventBatch_NotoUnlock(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	lockedInput := tktypes.RandBytes32()
-	output := tktypes.RandBytes32()
-	lockedOutput := tktypes.RandBytes32()
+	lockedInput := commontypes.RandBytes32()
+	output := commontypes.RandBytes32()
+	lockedOutput := commontypes.RandBytes32()
 	event := &NotoUnlock_Event{
-		LockedInputs:  []tktypes.Bytes32{lockedInput},
-		LockedOutputs: []tktypes.Bytes32{lockedOutput},
-		Outputs:       []tktypes.Bytes32{output},
-		Signature:     tktypes.MustParseHexBytes("0x1234"),
-		Data:          tktypes.MustParseHexBytes("0x"),
+		LockedInputs:  []types.Bytes32{lockedInput},
+		LockedOutputs: []types.Bytes32{lockedOutput},
+		Outputs:       []types.Bytes32{output},
+		Signature:     commontypes.MustParseHexBytes("0x1234"),
+		Data:          commontypes.MustParseHexBytes("0x"),
 	}
 	notoEventJson, err := json.Marshal(event)
 	require.NoError(t, err)
@@ -285,7 +286,7 @@ func TestHandleEventBatch_NotoUnlockBadTransactionData(t *testing.T) {
 	require.NoError(t, err)
 
 	event := &NotoTransfer_Event{
-		Data: tktypes.MustParseHexBytes("0x00010000"),
+		Data: commontypes.MustParseHexBytes("0x00010000"),
 	}
 	notoEventJson, err := json.Marshal(event)
 	require.NoError(t, err)

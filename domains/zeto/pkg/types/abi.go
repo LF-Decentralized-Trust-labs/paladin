@@ -18,7 +18,7 @@ package types
 import (
 	_ "embed"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 )
 
@@ -47,11 +47,11 @@ type InitializerParams struct {
 }
 
 type DeployParams struct {
-	TransactionID string           `json:"transactionId"`
-	Data          tktypes.HexBytes `json:"data"`
-	TokenName     string           `json:"tokenName"`
-	InitialOwner  string           `json:"initialOwner"`
-	IsNonFungible bool             `json:"isNonFungible"`
+	TransactionID string         `json:"transactionId"`
+	Data          types.HexBytes `json:"data"`
+	TokenName     string         `json:"tokenName"`
+	InitialOwner  string         `json:"initialOwner"`
+	IsNonFungible bool           `json:"isNonFungible"`
 }
 
 type NonFungibleMintParams struct {
@@ -66,12 +66,12 @@ type FungibleTransferParams struct {
 }
 
 type FungibleTransferParamEntry struct {
-	To     string              `json:"to"`
-	Amount *tktypes.HexUint256 `json:"amount"`
+	To     string            `json:"to"`
+	Amount *types.HexUint256 `json:"amount"`
 }
 
 type FungibleTransferLockedParams struct {
-	LockedInputs []*tktypes.HexUint256         `json:"lockedInputs"`
+	LockedInputs []*types.HexUint256           `json:"lockedInputs"`
 	Delegate     string                        `json:"delegate"`
 	Transfers    []*FungibleTransferParamEntry `json:"transfers"`
 }
@@ -81,20 +81,20 @@ type NonFungibleTransferParams struct {
 }
 
 type NonFungibleTransferParamEntry struct {
-	To      string              `json:"to"`
-	URI     string              `json:"uri,omitempty"`
-	TokenID *tktypes.HexUint256 `json:"tokenID"`
+	To      string            `json:"to"`
+	URI     string            `json:"uri,omitempty"`
+	TokenID *types.HexUint256 `json:"tokenID"`
 }
 
 type LockParams struct {
-	Amount   *tktypes.HexUint256 `json:"amount"`
-	Delegate *tktypes.EthAddress `json:"delegate"`
+	Amount   *types.HexUint256 `json:"amount"`
+	Delegate *types.EthAddress `json:"delegate"`
 }
 
 type DepositParams struct {
-	Amount *tktypes.HexUint256 `json:"amount"`
+	Amount *types.HexUint256 `json:"amount"`
 }
 
 type WithdrawParams struct {
-	Amount *tktypes.HexUint256 `json:"amount"`
+	Amount *types.HexUint256 `json:"amount"`
 }

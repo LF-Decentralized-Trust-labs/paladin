@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
@@ -38,19 +38,19 @@ type SwapHelper struct {
 	t       *testing.T
 	tb      testbed.Testbed
 	pld     pldclient.PaladinClient
-	Address *tktypes.EthAddress
+	Address *types.EthAddress
 	ABI     abi.ABI
 }
 
 type TradeRequestInput struct {
-	Holder1       string              `json:"holder1"`
-	Holder2       string              `json:"holder2"`
-	TokenAddress1 *tktypes.EthAddress `json:"tokenAddress1"`
-	TokenAddress2 *tktypes.EthAddress `json:"tokenAddress2"`
-	TokenValue1   *tktypes.HexUint256 `json:"tokenValue1"`
-	TokenValue2   *tktypes.HexUint256 `json:"tokenValue2"`
-	TradeData1    tktypes.HexBytes    `json:"tradeData1"`
-	TradeData2    tktypes.HexBytes    `json:"tradeData2"`
+	Holder1       string            `json:"holder1"`
+	Holder2       string            `json:"holder2"`
+	TokenAddress1 *types.EthAddress `json:"tokenAddress1"`
+	TokenAddress2 *types.EthAddress `json:"tokenAddress2"`
+	TokenValue1   *types.HexUint256 `json:"tokenValue1"`
+	TokenValue2   *types.HexUint256 `json:"tokenValue2"`
+	TradeData1    types.HexBytes    `json:"tradeData1"`
+	TradeData2    types.HexBytes    `json:"tradeData2"`
 }
 
 type StateData struct {

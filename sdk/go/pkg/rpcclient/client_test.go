@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -143,14 +143,14 @@ func TestSyncRPCCallOK(t *testing.T) {
 		return 200, &RPCResponse{
 			JSONRpc: "2.0",
 			ID:      rpcReq.ID,
-			Result:  tktypes.RawJSON(`"0x26"`),
+			Result:  types.RawJSON(`"0x26"`),
 		}
 	})
 	rb.requestCounter = 12345
 	defer done()
 
-	var txCount tktypes.HexUint64
-	err := rb.CallRPC(ctx, &txCount, "eth_getTransactionCount", tktypes.MustEthAddress("0xfb075bb99f2aa4c49955bf703509a227d7a12248"), "pending")
+	var txCount types.HexUint64
+	err := rb.CallRPC(ctx, &txCount, "eth_getTransactionCount", types.MustEthAddress("0xfb075bb99f2aa4c49955bf703509a227d7a12248"), "pending")
 	assert.Empty(t, err)
 	assert.Equal(t, uint64(0x26), txCount.Uint64())
 }
@@ -172,10 +172,10 @@ func TestSyncRPCCallNullResponse(t *testing.T) {
 	defer done()
 
 	rpcRes, err := rb.SyncRequest(ctx, &RPCRequest{
-		ID:     tktypes.RawJSON("1"),
+		ID:     types.RawJSON("1"),
 		Method: "eth_getTransactionReceipt",
-		Params: []tktypes.RawJSON{
-			tktypes.RawJSON(`"0xf44d5387087f61237bdb5132e9cf0f38ab20437128f7291b8df595305a1a8284"`),
+		Params: []types.RawJSON{
+			types.RawJSON(`"0xf44d5387087f61237bdb5132e9cf0f38ab20437128f7291b8df595305a1a8284"`),
 		},
 	})
 	assert.NoError(t, err)
@@ -196,8 +196,8 @@ func TestSyncRPCCallErrorResponse(t *testing.T) {
 	rb.requestCounter = 12345
 	defer done()
 
-	var txCount tktypes.HexUint64
-	err := rb.CallRPC(ctx, &txCount, "eth_getTransactionCount", tktypes.MustEthAddress("0xfb075bb99f2aa4c49955bf703509a227d7a12248"), "pending")
+	var txCount types.HexUint64
+	err := rb.CallRPC(ctx, &txCount, "eth_getTransactionCount", types.MustEthAddress("0xfb075bb99f2aa4c49955bf703509a227d7a12248"), "pending")
 	assert.Regexp(t, "pop", err)
 }
 
@@ -215,8 +215,8 @@ func TestSyncRPCCallBadJSONResponse(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	var txCount tktypes.HexUint64
-	rpcErr := c.CallRPC(context.Background(), &txCount, "eth_getTransactionCount", tktypes.MustEthAddress("0xfb075bb99f2aa4c49955bf703509a227d7a12248"), "pending")
+	var txCount types.HexUint64
+	rpcErr := c.CallRPC(context.Background(), &txCount, "eth_getTransactionCount", types.MustEthAddress("0xfb075bb99f2aa4c49955bf703509a227d7a12248"), "pending")
 	assert.Regexp(t, "PD020502", rpcErr)
 }
 
@@ -235,7 +235,7 @@ func TestSyncRPCCallFailParseJSONResponse(t *testing.T) {
 	assert.NoError(t, err)
 
 	var mapResult map[string]interface{}
-	rpcErr := c.CallRPC(context.Background(), &mapResult, "eth_getTransactionCount", tktypes.MustEthAddress("0xfb075bb99f2aa4c49955bf703509a227d7a12248"), "pending")
+	rpcErr := c.CallRPC(context.Background(), &mapResult, "eth_getTransactionCount", types.MustEthAddress("0xfb075bb99f2aa4c49955bf703509a227d7a12248"), "pending")
 	assert.Regexp(t, "PD020504", rpcErr)
 }
 
@@ -244,7 +244,7 @@ func TestSyncRPCCallErrorBadInput(t *testing.T) {
 	ctx, rb, done := newTestServer(t, func(rpcReq *RPCRequest) (status int, rpcRes *RPCResponse) { return 500, nil })
 	defer done()
 
-	var txCount tktypes.HexUint64
+	var txCount types.HexUint64
 	err := rb.CallRPC(ctx, &txCount, "test-bad-params", map[bool]bool{false: true})
 	assert.Regexp(t, "PD020505", err)
 }
@@ -254,7 +254,7 @@ func TestSyncRPCCallServerDown(t *testing.T) {
 	ctx, rb, done := newTestServer(t, func(rpcReq *RPCRequest) (status int, rpcRes *RPCResponse) { return 500, nil })
 	done()
 
-	var txCount tktypes.HexUint64
+	var txCount types.HexUint64
 	err := rb.CallRPC(ctx, &txCount, "net_version")
 	assert.Regexp(t, "PD020502", err)
 }
@@ -265,10 +265,10 @@ func TestSafeMessageGetter(t *testing.T) {
 }
 
 func TestRPCErrorResponse(t *testing.T) {
-	rpcRes := NewRPCErrorResponse(fmt.Errorf("pop"), tktypes.RawJSON(`"1"`), RPCCodeInternalError)
+	rpcRes := NewRPCErrorResponse(fmt.Errorf("pop"), types.RawJSON(`"1"`), RPCCodeInternalError)
 	assert.Equal(t, &RPCResponse{
 		JSONRpc: "2.0",
-		ID:      tktypes.RawJSON(`"1"`),
+		ID:      types.RawJSON(`"1"`),
 		Error: &RPCError{
 			Code:    -32603,
 			Message: "pop",

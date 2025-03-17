@@ -17,14 +17,14 @@ package types
 
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 type NotoDomainReceipt struct {
 	States    ReceiptStates      `json:"states"`
 	Transfers []*ReceiptTransfer `json:"transfers,omitempty"`
 	LockInfo  *ReceiptLockInfo   `json:"lockInfo,omitempty"`
-	Data      tktypes.HexBytes   `json:"data,omitempty"`
+	Data      types.HexBytes     `json:"data,omitempty"`
 }
 
 type ReceiptStates struct {
@@ -39,34 +39,34 @@ type ReceiptStates struct {
 }
 
 type ReceiptLockInfo struct {
-	LockID       tktypes.Bytes32     `json:"lockId"`
-	Delegate     *tktypes.EthAddress `json:"delegate,omitempty"`     // only set for delegateLock
+	LockID       types.Bytes32       `json:"lockId"`
+	Delegate     *types.EthAddress   `json:"delegate,omitempty"`     // only set for delegateLock
 	UnlockParams *UnlockPublicParams `json:"unlockParams,omitempty"` // only set for prepareUnlock
-	UnlockCall   tktypes.HexBytes    `json:"unlockCall,omitempty"`   // only set for prepareUnlock
+	UnlockCall   types.HexBytes      `json:"unlockCall,omitempty"`   // only set for prepareUnlock
 }
 
 type ReceiptState struct {
-	ID   tktypes.HexBytes `json:"id"`
-	Data tktypes.RawJSON  `json:"data"`
+	ID   types.HexBytes `json:"id"`
+	Data types.RawJSON  `json:"data"`
 }
 
 type ReceiptTransfer struct {
-	From   *tktypes.EthAddress `json:"from,omitempty"`
-	To     *tktypes.EthAddress `json:"to,omitempty"`
-	Amount *tktypes.HexUint256 `json:"amount"`
+	From   *types.EthAddress `json:"from,omitempty"`
+	To     *types.EthAddress `json:"to,omitempty"`
+	Amount *types.HexUint256 `json:"amount"`
 }
 
 type NotoCoinState struct {
-	ID              tktypes.Bytes32    `json:"id"`
-	Created         tktypes.Timestamp  `json:"created"`
-	ContractAddress tktypes.EthAddress `json:"contractAddress"`
-	Data            NotoCoin           `json:"data"`
+	ID              types.Bytes32    `json:"id"`
+	Created         types.Timestamp  `json:"created"`
+	ContractAddress types.EthAddress `json:"contractAddress"`
+	Data            NotoCoin         `json:"data"`
 }
 
 type NotoCoin struct {
-	Salt   tktypes.Bytes32     `json:"salt"`
-	Owner  *tktypes.EthAddress `json:"owner"`
-	Amount *tktypes.HexUint256 `json:"amount"`
+	Salt   types.Bytes32     `json:"salt"`
+	Owner  *types.EthAddress `json:"owner"`
+	Amount *types.HexUint256 `json:"amount"`
 }
 
 var NotoCoinABI = &abi.Parameter{
@@ -81,17 +81,17 @@ var NotoCoinABI = &abi.Parameter{
 }
 
 type NotoLockedCoinState struct {
-	ID              tktypes.Bytes32    `json:"id"`
-	Created         tktypes.Timestamp  `json:"created"`
-	ContractAddress tktypes.EthAddress `json:"contractAddress"`
-	Data            NotoLockedCoin     `json:"data"`
+	ID              types.Bytes32    `json:"id"`
+	Created         types.Timestamp  `json:"created"`
+	ContractAddress types.EthAddress `json:"contractAddress"`
+	Data            NotoLockedCoin   `json:"data"`
 }
 
 type NotoLockedCoin struct {
-	Salt   tktypes.Bytes32     `json:"salt"`
-	LockID tktypes.Bytes32     `json:"lockId"`
-	Owner  *tktypes.EthAddress `json:"owner"`
-	Amount *tktypes.HexUint256 `json:"amount"`
+	Salt   types.Bytes32     `json:"salt"`
+	LockID types.Bytes32     `json:"lockId"`
+	Owner  *types.EthAddress `json:"owner"`
+	Amount *types.HexUint256 `json:"amount"`
 }
 
 var NotoLockedCoinABI = &abi.Parameter{
@@ -107,10 +107,10 @@ var NotoLockedCoinABI = &abi.Parameter{
 }
 
 type NotoLockInfo struct {
-	Salt     tktypes.Bytes32     `json:"salt"`
-	LockID   tktypes.Bytes32     `json:"lockId"`
-	Owner    *tktypes.EthAddress `json:"owner"`
-	Delegate *tktypes.EthAddress `json:"delegate"`
+	Salt     types.Bytes32     `json:"salt"`
+	LockID   types.Bytes32     `json:"lockId"`
+	Owner    *types.EthAddress `json:"owner"`
+	Delegate *types.EthAddress `json:"delegate"`
 }
 
 var NotoLockInfoABI = &abi.Parameter{
@@ -126,8 +126,8 @@ var NotoLockInfoABI = &abi.Parameter{
 }
 
 type TransactionData struct {
-	Salt string           `json:"salt"`
-	Data tktypes.HexBytes `json:"data"`
+	Salt string         `json:"salt"`
+	Data types.HexBytes `json:"data"`
 }
 
 var TransactionDataABI = &abi.Parameter{

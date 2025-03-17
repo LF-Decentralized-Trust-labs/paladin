@@ -23,7 +23,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -37,17 +37,17 @@ import (
 type transactionReceipt struct {
 	TransactionID    uuid.UUID            `gorm:"column:transaction"`
 	Sequence         uint64               `gorm:"column:sequence;autoIncrement"`
-	Indexed          tktypes.Timestamp    `gorm:"column:indexed"`
+	Indexed          types.Timestamp      `gorm:"column:indexed"`
 	Domain           string               `gorm:"column:domain"`
 	Success          bool                 `gorm:"column:success"`
-	TransactionHash  *tktypes.Bytes32     `gorm:"column:tx_hash"`
+	TransactionHash  *types.Bytes32       `gorm:"column:tx_hash"`
 	BlockNumber      *int64               `gorm:"column:block_number"`
 	TransactionIndex *int64               `gorm:"column:tx_index"`
 	LogIndex         *int64               `gorm:"column:log_index"`
-	Source           *tktypes.EthAddress  `gorm:"column:source"`
+	Source           *types.EthAddress    `gorm:"column:source"`
 	FailureMessage   *string              `gorm:"column:failure_message"`
-	RevertData       tktypes.HexBytes     `gorm:"column:revert_data"`
-	ContractAddress  *tktypes.EthAddress  `gorm:"column:contract_address"`
+	RevertData       types.HexBytes       `gorm:"column:revert_data"`
+	ContractAddress  *types.EthAddress    `gorm:"column:contract_address"`
 	Gap              *persistedReceiptGap `gorm:"foreignKey:Source;references:Source;"`
 }
 
@@ -106,10 +106,10 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 		receipt := &transactionReceipt{
 			Domain:          ri.Domain,
 			TransactionID:   ri.TransactionID,
-			Indexed:         tktypes.TimestampNow(),
+			Indexed:         types.TimestampNow(),
 			ContractAddress: ri.ContractAddress,
 		}
-		if ri.OnChain.Type != tktypes.NotOnChain {
+		if ri.OnChain.Type != types.NotOnChain {
 			receipt.TransactionHash = &ri.OnChain.TransactionHash
 			receipt.BlockNumber = &ri.OnChain.BlockNumber
 			receipt.TransactionIndex = &ri.OnChain.TransactionIndex
@@ -121,19 +121,19 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 		switch ri.ReceiptType {
 		case components.RT_Success:
 			if ri.FailureMessage != "" || ri.RevertData != nil {
-				return i18n.NewError(ctx, msgs.MsgTxMgrInvalidReceiptNotification, tktypes.JSONString(ri))
+				return i18n.NewError(ctx, msgs.MsgTxMgrInvalidReceiptNotification, types.JSONString(ri))
 			}
 			receipt.Success = true
 		case components.RT_FailedWithMessage:
 			if ri.FailureMessage == "" || ri.RevertData != nil {
-				return i18n.NewError(ctx, msgs.MsgTxMgrInvalidReceiptNotification, tktypes.JSONString(ri))
+				return i18n.NewError(ctx, msgs.MsgTxMgrInvalidReceiptNotification, types.JSONString(ri))
 			}
 			receipt.Success = false
 			failureMsg = ri.FailureMessage
 			receipt.FailureMessage = &ri.FailureMessage
 		case components.RT_FailedOnChainWithRevertData:
 			if ri.FailureMessage != "" {
-				return i18n.NewError(ctx, msgs.MsgTxMgrInvalidReceiptNotification, tktypes.JSONString(ri))
+				return i18n.NewError(ctx, msgs.MsgTxMgrInvalidReceiptNotification, types.JSONString(ri))
 			}
 			receipt.Success = false
 			receipt.RevertData = ri.RevertData
@@ -141,7 +141,7 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 			failureMsg = tm.CalculateRevertError(ctx, dbTX, ri.RevertData).Error()
 			receipt.FailureMessage = &failureMsg
 		default:
-			return i18n.NewError(ctx, msgs.MsgTxMgrInvalidReceiptNotification, tktypes.JSONString(ri))
+			return i18n.NewError(ctx, msgs.MsgTxMgrInvalidReceiptNotification, types.JSONString(ri))
 		}
 		log.L(ctx).Infof("Inserting receipt txId=%s success=%t failure=%s txHash=%v", receipt.TransactionID, receipt.Success, failureMsg, receipt.TransactionHash)
 		receiptsToInsert = append(receiptsToInsert, receipt)
@@ -176,7 +176,7 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 	return nil
 }
 
-func (tm *txManager) CalculateRevertError(ctx context.Context, dbTX persistence.DBTX, revertData tktypes.HexBytes) error {
+func (tm *txManager) CalculateRevertError(ctx context.Context, dbTX persistence.DBTX, revertData types.HexBytes) error {
 	de, err := tm.DecodeRevertError(ctx, dbTX, revertData, "")
 	if err != nil {
 		return err
@@ -184,12 +184,12 @@ func (tm *txManager) CalculateRevertError(ctx context.Context, dbTX persistence.
 	return i18n.NewError(ctx, msgs.MsgTxMgrRevertedDecodedData, de.Summary)
 }
 
-func (tm *txManager) DecodeRevertError(ctx context.Context, dbTX persistence.DBTX, revertData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
+func (tm *txManager) DecodeRevertError(ctx context.Context, dbTX persistence.DBTX, revertData types.HexBytes, dataFormat types.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
 
 	if len(revertData) < 4 {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrRevertedNoData)
 	}
-	selector := tktypes.HexBytes(revertData[0:4])
+	selector := types.HexBytes(revertData[0:4])
 
 	// There is potential with a 4 byte selector for clashes, so we do a distinct on the full hash
 	var errorDefs []*PersistedABIEntry
@@ -232,12 +232,12 @@ func (tm *txManager) DecodeRevertError(ctx context.Context, dbTX persistence.DBT
 	return de, nil
 }
 
-func (tm *txManager) DecodeCall(ctx context.Context, dbTX persistence.DBTX, callData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
+func (tm *txManager) DecodeCall(ctx context.Context, dbTX persistence.DBTX, callData types.HexBytes, dataFormat types.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
 
 	if len(callData) < 4 {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrDecodeCallNoData)
 	}
-	selector := tktypes.HexBytes(callData[0:4])
+	selector := types.HexBytes(callData[0:4])
 
 	// There is potential with a 4 byte selector for clashes, so we do a distinct on the full hash
 	var functionDefs []*PersistedABIEntry
@@ -276,7 +276,7 @@ func (tm *txManager) DecodeCall(ctx context.Context, dbTX persistence.DBTX, call
 	return de, err
 }
 
-func (tm *txManager) DecodeEvent(ctx context.Context, dbTX persistence.DBTX, topics []tktypes.Bytes32, eventData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
+func (tm *txManager) DecodeEvent(ctx context.Context, dbTX persistence.DBTX, topics []types.Bytes32, eventData types.HexBytes, dataFormat types.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
 
 	if len(topics) < 1 {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrDecodeCallNoData)
@@ -374,7 +374,7 @@ func (tm *txManager) GetTransactionReceiptByIDFull(ctx context.Context, id uuid.
 	return tm.buildFullReceipt(ctx, receipt, true)
 }
 
-func (tm *txManager) GetDomainReceiptByID(ctx context.Context, domain string, id uuid.UUID) (tktypes.RawJSON, error) {
+func (tm *txManager) GetDomainReceiptByID(ctx context.Context, domain string, id uuid.UUID) (types.RawJSON, error) {
 	d, err := tm.domainMgr.GetDomainByName(ctx, domain)
 	if err != nil {
 		return nil, err

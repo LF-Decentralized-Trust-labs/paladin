@@ -23,7 +23,7 @@ import (
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -145,8 +145,8 @@ func prepareOutputsForTransfer(ctx context.Context, useNullifiers bool, params [
 		salt := crypto.NewSalt()
 		compressedKeyStr := zetosigner.EncodeBabyJubJubPublicKey(recipientKey)
 		newCoin := &types.ZetoCoin{
-			Salt:   (*tktypes.HexUint256)(salt),
-			Owner:  tktypes.MustParseHexBytes(compressedKeyStr),
+			Salt:   (*commontypes.HexUint256)(salt),
+			Owner:  commontypes.MustParseHexBytes(compressedKeyStr),
 			Amount: param.Amount,
 			Locked: isLocked,
 		}

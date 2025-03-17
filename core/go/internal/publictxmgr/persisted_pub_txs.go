@@ -18,21 +18,21 @@ package publictxmgr
 
 import (
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 )
 
 // public_transactions
 type DBPublicTxn struct {
 	PublicTxnID     uint64                 `gorm:"column:pub_txn_id;primaryKey"`
-	From            tktypes.EthAddress     `gorm:"column:from"`
+	From            types.EthAddress       `gorm:"column:from"`
 	Nonce           *uint64                `gorm:"column:nonce"`
-	Created         tktypes.Timestamp      `gorm:"column:created;autoCreateTime:nano"`
-	To              *tktypes.EthAddress    `gorm:"column:to"`
+	Created         types.Timestamp        `gorm:"column:created;autoCreateTime:nano"`
+	To              *types.EthAddress      `gorm:"column:to"`
 	Gas             uint64                 `gorm:"column:gas"`
-	FixedGasPricing tktypes.RawJSON        `gorm:"column:fixed_gas_pricing"`
-	Value           *tktypes.HexUint256    `gorm:"column:value"`
-	Data            tktypes.HexBytes       `gorm:"column:data"`
+	FixedGasPricing types.RawJSON          `gorm:"column:fixed_gas_pricing"`
+	Value           *types.HexUint256      `gorm:"column:value"`
+	Data            types.HexBytes         `gorm:"column:data"`
 	Suspended       bool                   `gorm:"column:suspended"`                            // excluded from processing because it's suspended by user
 	Completed       *DBPublicTxnCompletion `gorm:"foreignKey:pub_txn_id;references:pub_txn_id"` // excluded from processing because it's done
 	Submissions     []*DBPubTxnSubmission  `gorm:"-"`                                           // we do the aggregation, not GORM
@@ -45,9 +45,9 @@ func (DBPublicTxn) TableName() string {
 }
 
 type DBPublicTxnBinding struct {
-	PublicTxnID     uint64                               `gorm:"column:pub_txn_id;primaryKey"`
-	Transaction     uuid.UUID                            `gorm:"column:transaction"`
-	TransactionType tktypes.Enum[pldapi.TransactionType] `gorm:"column:tx_type"`
+	PublicTxnID     uint64                             `gorm:"column:pub_txn_id;primaryKey"`
+	Transaction     uuid.UUID                          `gorm:"column:transaction"`
+	TransactionType types.Enum[pldapi.TransactionType] `gorm:"column:tx_type"`
 }
 
 func (DBPublicTxnBinding) TableName() string {
@@ -55,11 +55,11 @@ func (DBPublicTxnBinding) TableName() string {
 }
 
 type DBPubTxnSubmission struct {
-	from            string            `gorm:"-"` // just used to ensure we dispatch to same writer as the associated pubic TX
-	PublicTxnID     uint64            `gorm:"column:pub_txn_id"`
-	Created         tktypes.Timestamp `gorm:"column:created;autoCreateTime:false"` // we set this as we track the record in memory too
-	TransactionHash tktypes.Bytes32   `gorm:"column:tx_hash;primaryKey"`
-	GasPricing      tktypes.RawJSON   `gorm:"column:gas_pricing"` // no filtering allowed on this field as it's complex JSON gasPrice/maxFeePerGas/maxPriorityFeePerGas calculation
+	from            string          `gorm:"-"` // just used to ensure we dispatch to same writer as the associated pubic TX
+	PublicTxnID     uint64          `gorm:"column:pub_txn_id"`
+	Created         types.Timestamp `gorm:"column:created;autoCreateTime:false"` // we set this as we track the record in memory too
+	TransactionHash types.Bytes32   `gorm:"column:tx_hash;primaryKey"`
+	GasPricing      types.RawJSON   `gorm:"column:gas_pricing"` // no filtering allowed on this field as it's complex JSON gasPrice/maxFeePerGas/maxPriorityFeePerGas calculation
 }
 
 func (DBPubTxnSubmission) TableName() string {
@@ -67,11 +67,11 @@ func (DBPubTxnSubmission) TableName() string {
 }
 
 type DBPublicTxnCompletion struct {
-	PublicTxnID     uint64            `gorm:"column:pub_txn_id;primaryKey"`
-	Created         tktypes.Timestamp `gorm:"column:created;autoCreateTime:nano"`
-	TransactionHash tktypes.Bytes32   `gorm:"column:tx_hash"`
-	Success         bool              `gorm:"column:success"`
-	RevertData      tktypes.HexBytes  `gorm:"column:revert_data"` // block indexer does not keep this for all TXs
+	PublicTxnID     uint64          `gorm:"column:pub_txn_id;primaryKey"`
+	Created         types.Timestamp `gorm:"column:created;autoCreateTime:nano"`
+	TransactionHash types.Bytes32   `gorm:"column:tx_hash"`
+	Success         bool            `gorm:"column:success"`
+	RevertData      types.HexBytes  `gorm:"column:revert_data"` // block indexer does not keep this for all TXs
 }
 
 func (DBPublicTxnCompletion) TableName() string {
@@ -89,5 +89,5 @@ type bindingsMatchingSubmission struct {
 }
 
 type txFromOnly struct {
-	From tktypes.EthAddress
+	From types.EthAddress
 }

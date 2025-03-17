@@ -18,16 +18,16 @@ package components
 import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type TransactionStateRefs struct {
-	Confirmed []tktypes.HexBytes
-	Read      []tktypes.HexBytes
-	Spent     []tktypes.HexBytes
-	Info      []tktypes.HexBytes
+	Confirmed []types.HexBytes
+	Read      []types.HexBytes
+	Spent     []types.HexBytes
+	Info      []types.HexBytes
 }
 
 type PreparedTransactionWithRefs struct {
@@ -43,20 +43,20 @@ type TransactionPreAssembly struct {
 }
 
 type FullState struct {
-	ID     tktypes.HexBytes `json:"id"`
-	Schema tktypes.Bytes32  `json:"schema"`
-	Data   tktypes.RawJSON  `json:"data"`
+	ID     types.HexBytes `json:"id"`
+	Schema types.Bytes32  `json:"schema"`
+	Data   types.RawJSON  `json:"data"`
 }
 
 type EthTransaction struct {
 	FunctionABI *abi.Entry
-	To          tktypes.EthAddress
+	To          types.EthAddress
 	Inputs      *abi.ComponentValue
 }
 
 type EthDeployTransaction struct {
 	ConstructorABI *abi.Entry
-	Bytecode       tktypes.HexBytes
+	Bytecode       types.HexBytes
 	Inputs         *abi.ComponentValue
 }
 
@@ -81,9 +81,9 @@ type TransactionPostAssembly struct {
 type PrivateTransaction struct {
 
 	// The identifier for the transaction
-	ID      uuid.UUID          `json:"id"`
-	Domain  string             `json:"domain"`
-	Address tktypes.EthAddress `json:"address"`
+	ID      uuid.UUID        `json:"id"`
+	Domain  string           `json:"domain"`
+	Address types.EthAddress `json:"address"`
 
 	// This enum describes the point in the private transaction flow where processing of the transaction should stop
 	Intent prototk.TransactionSpecification_Intent `json:"intent"`
@@ -99,7 +99,7 @@ type PrivateTransaction struct {
 	Signer                     string                   `json:"signer"`
 	PreparedPublicTransaction  *pldapi.TransactionInput `json:"-"`
 	PreparedPrivateTransaction *pldapi.TransactionInput `json:"-"`
-	PreparedMetadata           tktypes.RawJSON          `json:"-"`
+	PreparedMetadata           types.RawJSON            `json:"-"`
 }
 
 // PrivateContractDeploy is a simpler transaction type that constructs new private smart contract instances
@@ -110,7 +110,7 @@ type PrivateContractDeploy struct {
 	ID     uuid.UUID
 	Domain string
 	From   string
-	Inputs tktypes.RawJSON
+	Inputs types.RawJSON
 
 	// ASSEMBLY PHASE
 	TransactionSpecification *prototk.DeployTransactionSpecification

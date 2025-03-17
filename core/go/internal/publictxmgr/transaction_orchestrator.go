@@ -26,7 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
@@ -115,9 +115,9 @@ type orchestrator struct {
 	transactionSubmissionRetry *retry.Retry
 
 	// each transaction orchestrator has its own go routine
-	orchestratorBirthTime       time.Time          // when transaction orchestrator is created
-	orchestratorPollingInterval time.Duration      // between how long the transaction orchestrator will do a poll and trigger none-event driven transaction process actions
-	signingAddress              tktypes.EthAddress // the signing address of the transaction managed by the current transaction orchestrator
+	orchestratorBirthTime       time.Time        // when transaction orchestrator is created
+	orchestratorPollingInterval time.Duration    // between how long the transaction orchestrator will do a poll and trigger none-event driven transaction process actions
+	signingAddress              types.EthAddress // the signing address of the transaction managed by the current transaction orchestrator
 
 	// balance check settings
 	hasZeroGasPrice                    bool
@@ -149,7 +149,7 @@ const veryShortMinimum = 50 * time.Millisecond
 
 func NewOrchestrator(
 	ble *pubTxManager,
-	signingAddress tktypes.EthAddress,
+	signingAddress types.EthAddress,
 	conf *pldconf.PublicTxManagerConfig,
 ) *orchestrator {
 	ctx := ble.ctx

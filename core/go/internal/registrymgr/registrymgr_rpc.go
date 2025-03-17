@@ -19,7 +19,7 @@ package registrymgr
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
@@ -57,7 +57,7 @@ func (rm *registryManager) rpcQueryEntries() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
 		registryName string,
 		jq query.QueryJSON,
-		activeFilter tktypes.Enum[pldapi.ActiveFilter],
+		activeFilter types.Enum[pldapi.ActiveFilter],
 	) ([]*pldapi.RegistryEntry, error) {
 		return withRegistry(ctx, rm, registryName,
 			func(r components.Registry) ([]*pldapi.RegistryEntry, error) {
@@ -71,7 +71,7 @@ func (rm *registryManager) rpcQueryEntriesWithProps() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
 		registryName string,
 		jq query.QueryJSON,
-		activeFilter tktypes.Enum[pldapi.ActiveFilter],
+		activeFilter types.Enum[pldapi.ActiveFilter],
 	) ([]*pldapi.RegistryEntryWithProperties, error) {
 		return withRegistry(ctx, rm, registryName,
 			func(r components.Registry) ([]*pldapi.RegistryEntryWithProperties, error) {
@@ -84,8 +84,8 @@ func (rm *registryManager) rpcQueryEntriesWithProps() rpcserver.RPCHandler {
 func (rm *registryManager) rpcGetEntryProperties() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
 		registryName string,
-		entryID tktypes.HexBytes,
-		activeFilter tktypes.Enum[pldapi.ActiveFilter],
+		entryID types.HexBytes,
+		activeFilter types.Enum[pldapi.ActiveFilter],
 	) ([]*pldapi.RegistryProperty, error) {
 		return withRegistry(ctx, rm, registryName,
 			func(r components.Registry) ([]*pldapi.RegistryProperty, error) {

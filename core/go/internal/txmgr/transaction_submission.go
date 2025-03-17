@@ -25,7 +25,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
@@ -42,19 +42,19 @@ import (
 // We keep this separate from the pldapi.TransactionXYZ interfaces that clients and applications use to interact
 // with this, so we have a separation of concerns on the GORM annotations and data serialization format
 type persistedTransaction struct {
-	ID                 uuid.UUID                            `gorm:"column:id;primaryKey"`
-	IdempotencyKey     *string                              `gorm:"column:idempotency_key"`
-	SubmitMode         tktypes.Enum[pldapi.SubmitMode]      `gorm:"column:submit_mode"`
-	Type               tktypes.Enum[pldapi.TransactionType] `gorm:"column:type"`
-	Created            tktypes.Timestamp                    `gorm:"column:created;autoCreateTime:false"` // set by code before insert
-	ABIReference       *tktypes.Bytes32                     `gorm:"column:abi_ref"`
-	Function           *string                              `gorm:"column:function"`
-	Domain             *string                              `gorm:"column:domain"`
-	From               string                               `gorm:"column:from"`
-	To                 *tktypes.EthAddress                  `gorm:"column:to"`
-	Data               tktypes.RawJSON                      `gorm:"column:data"` // we always store in JSON object format
-	TransactionDeps    []*transactionDep                    `gorm:"foreignKey:transaction;references:id"`
-	TransactionReceipt *transactionReceipt                  `gorm:"foreignKey:transaction;references:id"`
+	ID                 uuid.UUID                          `gorm:"column:id;primaryKey"`
+	IdempotencyKey     *string                            `gorm:"column:idempotency_key"`
+	SubmitMode         types.Enum[pldapi.SubmitMode]      `gorm:"column:submit_mode"`
+	Type               types.Enum[pldapi.TransactionType] `gorm:"column:type"`
+	Created            types.Timestamp                    `gorm:"column:created;autoCreateTime:false"` // set by code before insert
+	ABIReference       *types.Bytes32                     `gorm:"column:abi_ref"`
+	Function           *string                            `gorm:"column:function"`
+	Domain             *string                            `gorm:"column:domain"`
+	From               string                             `gorm:"column:from"`
+	To                 *types.EthAddress                  `gorm:"column:to"`
+	Data               types.RawJSON                      `gorm:"column:data"` // we always store in JSON object format
+	TransactionDeps    []*transactionDep                  `gorm:"foreignKey:transaction;references:id"`
+	TransactionReceipt *transactionReceipt                `gorm:"foreignKey:transaction;references:id"`
 }
 
 type transactionDep struct {
@@ -72,7 +72,7 @@ var defaultConstructorSignature = func() string {
 	return sig
 }()
 
-func (tm *txManager) resolveFunction(ctx context.Context, dbTX persistence.DBTX, inputABI abi.ABI, inputABIRef *tktypes.Bytes32, requiredFunction string, to *tktypes.EthAddress) (_ *components.ResolvedFunction, err error) {
+func (tm *txManager) resolveFunction(ctx context.Context, dbTX persistence.DBTX, inputABI abi.ABI, inputABIRef *types.Bytes32, requiredFunction string, to *types.EthAddress) (_ *components.ResolvedFunction, err error) {
 
 	// Lookup the ABI we're working with.
 	// Only needs to contain the function definition we're calling, but can be the whole ABI of the contract.
@@ -117,7 +117,7 @@ func (tm *txManager) resolveFunction(ctx context.Context, dbTX persistence.DBTX,
 	return resolvedFunction, nil
 }
 
-func (tm *txManager) pickFunction(ctx context.Context, pa *pldapi.StoredABI, requiredFunction string, to *tktypes.EthAddress) (_ *components.ResolvedFunction, err error) {
+func (tm *txManager) pickFunction(ctx context.Context, pa *pldapi.StoredABI, requiredFunction string, to *types.EthAddress) (_ *components.ResolvedFunction, err error) {
 
 	// If a function is specified, we cannot be invoking the constructor
 	if requiredFunction != "" && to == nil {
@@ -185,10 +185,10 @@ func (tm *txManager) parseDataBytes(ctx context.Context, e *abi.Entry, dataBytes
 func (tm *txManager) parseInputs(
 	ctx context.Context,
 	e *abi.Entry,
-	txType tktypes.Enum[pldapi.TransactionType],
-	data tktypes.RawJSON,
-	bytecode tktypes.HexBytes,
-) (cv *abi.ComponentValue, jsonData tktypes.RawJSON, err error) {
+	txType types.Enum[pldapi.TransactionType],
+	data types.RawJSON,
+	bytecode types.HexBytes,
+) (cv *abi.ComponentValue, jsonData types.RawJSON, err error) {
 
 	if (e.Type != abi.Constructor || txType.V() != pldapi.TransactionTypePublic) && len(bytecode) != 0 {
 		return nil, nil, i18n.NewError(ctx, msgs.MsgTxMgrBytecodeNonPublicConstructor, txType.V(), e.String())
@@ -214,7 +214,7 @@ func (tm *txManager) parseInputs(
 	case string:
 		// Must be a byte array pre-encoded
 		var dataBytes []byte
-		dataBytes, err = tktypes.ParseHexBytes(ctx, decoded)
+		dataBytes, err = types.ParseHexBytes(ctx, decoded)
 		if err == nil {
 			cv, err = tm.parseDataBytes(ctx, e, dataBytes)
 		}
@@ -226,7 +226,7 @@ func (tm *txManager) parseInputs(
 	if err != nil {
 		return nil, nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrInvalidInputData, e.String())
 	}
-	jsonData, err = tktypes.StandardABISerializer().SerializeJSONCtx(ctx, cv)
+	jsonData, err = types.StandardABISerializer().SerializeJSONCtx(ctx, cv)
 	return
 }
 
@@ -300,7 +300,7 @@ func (tm *txManager) callTransactionPublic(ctx context.Context, result any, call
 			Serializer(serializer).
 			Output(result)
 		if call.From != "" {
-			var senderAddr *tktypes.EthAddress
+			var senderAddr *types.EthAddress
 			senderAddr, err = tm.keyManager.ResolveEthAddressNewDatabaseTX(ctx, txi.LocalFrom)
 			if err == nil {
 				callReq = callReq.Signer(senderAddr.String())
@@ -430,7 +430,7 @@ func (tm *txManager) processNewTransactions(ctx context.Context, dbTX persistenc
 		for i, ptx := range publicTxs {
 			resolvedKey, err := kr.ResolveKey(ctx, publicTxSenders[i], algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 			if err == nil {
-				ptx.From, err = tktypes.ParseEthAddress(resolvedKey.Verifier.Verifier)
+				ptx.From, err = types.ParseEthAddress(resolvedKey.Verifier.Verifier)
 			}
 			if err == nil {
 				err = tm.publicTxMgr.ValidateTransaction(ctx, dbTX, ptx)
@@ -552,7 +552,7 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX persistence
 		(submitMode == pldapi.SubmitModeCall && tx.From == "") /* call is allowed no sender */
 	if !bypassFromCheck {
 
-		identifier, node, err := tktypes.PrivateIdentityLocator(tx.From).Validate(ctx, tm.localNodeName, false)
+		identifier, node, err := types.PrivateIdentityLocator(tx.From).Validate(ctx, tm.localNodeName, false)
 		if err != nil || node != tm.localNodeName {
 			return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrPublicSenderNotValidLocal, tx.From)
 		}
@@ -575,7 +575,7 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX persistence
 	}, nil
 }
 
-func (tm *txManager) ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*components.ResolvedFunction, *abi.ComponentValue, tktypes.RawJSON, error) {
+func (tm *txManager) ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*components.ResolvedFunction, *abi.ComponentValue, types.RawJSON, error) {
 	fn, err := tm.resolveFunction(ctx, dbTX, tx.ABI, tx.ABIReference, tx.Function, tx.To)
 	if err != nil {
 		return nil, nil, nil, err
@@ -620,7 +620,7 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX persistence.DB
 	for i, txi := range txis {
 		// Resolve the finalized fields on the input object for return
 		tx := txi.Transaction
-		tx.Created = tktypes.TimestampNow()
+		tx.Created = types.TimestampNow()
 		tx.ABIReference = txi.Function.ABIReference
 		tx.Function = txi.Function.Signature
 		// Build the object to insert

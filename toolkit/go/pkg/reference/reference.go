@@ -29,7 +29,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
@@ -96,7 +96,7 @@ var allTypes = []interface{}{
 				StateMutability: "pure",
 			},
 		},
-		Hash: tktypes.Bytes32{},
+		Hash: types.Bytes32{},
 	},
 	pldapi.State{},
 	pldapi.StateConfirmRecord{},
@@ -127,7 +127,7 @@ var allTypes = []interface{}{
 	pldapi.PrivacyGroupMessageListener{},
 	pldapi.PrivacyGroupMessage{},
 	pldapi.PrivacyGroupMessageInput{},
-	tktypes.JSONFormatOptions(""),
+	types.JSONFormatOptions(""),
 	pldapi.StateStatusQualifier(""),
 	query.QueryJSON{
 		Limit: ptr.To(10),
@@ -139,7 +139,7 @@ var allTypes = []interface{}{
 						Op: query.Op{
 							Field: "field1",
 						},
-						Value: tktypes.RawJSON(`"abcde"`),
+						Value: types.RawJSON(`"abcde"`),
 					},
 					{
 						Op: query.Op{
@@ -147,7 +147,7 @@ var allTypes = []interface{}{
 							Not:             true,
 							CaseInsensitive: true,
 						},
-						Value: tktypes.RawJSON(`"abcde"`),
+						Value: types.RawJSON(`"abcde"`),
 					},
 				},
 				NEq: []*query.OpSingleVal{
@@ -155,7 +155,7 @@ var allTypes = []interface{}{
 						Op: query.Op{
 							Field: "field2",
 						},
-						Value: tktypes.RawJSON(`"abcde"`),
+						Value: types.RawJSON(`"abcde"`),
 					},
 				},
 				Like: []*query.OpSingleVal{
@@ -163,7 +163,7 @@ var allTypes = []interface{}{
 						Op: query.Op{
 							Field: "field3",
 						},
-						Value: tktypes.RawJSON(`"abcde"`),
+						Value: types.RawJSON(`"abcde"`),
 					},
 				},
 				LT: []*query.OpSingleVal{
@@ -171,7 +171,7 @@ var allTypes = []interface{}{
 						Op: query.Op{
 							Field: "field4",
 						},
-						Value: tktypes.RawJSON([]byte(`12345`)),
+						Value: types.RawJSON([]byte(`12345`)),
 					},
 				},
 				LTE: []*query.OpSingleVal{
@@ -179,7 +179,7 @@ var allTypes = []interface{}{
 						Op: query.Op{
 							Field: "field5",
 						},
-						Value: tktypes.RawJSON([]byte(`12345`)),
+						Value: types.RawJSON([]byte(`12345`)),
 					},
 				},
 				GT: []*query.OpSingleVal{
@@ -187,7 +187,7 @@ var allTypes = []interface{}{
 						Op: query.Op{
 							Field: "field6",
 						},
-						Value: tktypes.RawJSON([]byte(`12345`)),
+						Value: types.RawJSON([]byte(`12345`)),
 					},
 				},
 				GTE: []*query.OpSingleVal{
@@ -195,7 +195,7 @@ var allTypes = []interface{}{
 						Op: query.Op{
 							Field: "field7",
 						},
-						Value: tktypes.RawJSON([]byte(`12345`)),
+						Value: types.RawJSON([]byte(`12345`)),
 					},
 				},
 				In: []*query.OpMultiVal{
@@ -203,7 +203,7 @@ var allTypes = []interface{}{
 						Op: query.Op{
 							Field: "field8",
 						},
-						Values: []tktypes.RawJSON{[]byte(`"abcde"`), []byte(`"fghij"`)},
+						Values: []types.RawJSON{[]byte(`"abcde"`), []byte(`"fghij"`)},
 					},
 				},
 				NIn: []*query.OpMultiVal{
@@ -211,7 +211,7 @@ var allTypes = []interface{}{
 						Op: query.Op{
 							Field: "field9",
 						},
-						Values: []tktypes.RawJSON{[]byte(`"abcde"`), []byte(`"fghij"`)},
+						Values: []types.RawJSON{[]byte(`"abcde"`), []byte(`"fghij"`)},
 					},
 				},
 				Null: []*query.Op{
@@ -238,17 +238,17 @@ var allAPITypes = []pldclient.RPCModule{
 }
 
 var allSimpleTypes = []interface{}{
-	tktypes.Bytes32{},
-	tktypes.HexBytes{},
-	tktypes.EthAddress{},
-	tktypes.HexUint256{},
-	tktypes.HexInt256{},
+	types.Bytes32{},
+	types.HexBytes{},
+	types.EthAddress{},
+	types.HexUint256{},
+	types.HexInt256{},
 	uuid.UUID{},
-	tktypes.HexUint64OrString(""),
-	tktypes.HexUint64(0),
-	tktypes.Timestamp(0),
-	tktypes.RawJSON([]byte{}),
-	tktypes.PrivateIdentityLocator(""),
+	types.HexUint64OrString(""),
+	types.HexUint64(0),
+	types.Timestamp(0),
+	types.RawJSON([]byte{}),
+	types.PrivateIdentityLocator(""),
 }
 
 type docGenerator struct {

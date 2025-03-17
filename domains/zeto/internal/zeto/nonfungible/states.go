@@ -22,7 +22,7 @@ import (
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -93,7 +93,7 @@ func prepareOutputsForTransfer(ctx context.Context, useNullifiers bool, params [
 			if err != nil {
 				return nil, nil, i18n.NewError(ctx, msgs.MsgErrorGenerateRandomNumber, err)
 			}
-			tokenID = (*tktypes.HexUint256)(r)
+			tokenID = (*commontypes.HexUint256)(r)
 		}
 
 		newToken := types.NewZetoNFToken(tokenID, param.URI, recipientKey, NewSalt())

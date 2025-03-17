@@ -17,83 +17,83 @@ package noto
 
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 )
 
 type MintHookParams struct {
-	Sender   *tktypes.EthAddress `json:"sender"`
-	To       *tktypes.EthAddress `json:"to"`
-	Amount   *tktypes.HexUint256 `json:"amount"`
-	Data     tktypes.HexBytes    `json:"data"`
-	Prepared PreparedTransaction `json:"prepared"`
+	Sender   *commontypes.EthAddress `json:"sender"`
+	To       *commontypes.EthAddress `json:"to"`
+	Amount   *commontypes.HexUint256 `json:"amount"`
+	Data     commontypes.HexBytes    `json:"data"`
+	Prepared PreparedTransaction     `json:"prepared"`
 }
 
 type TransferHookParams struct {
-	Sender   *tktypes.EthAddress `json:"sender"`
-	From     *tktypes.EthAddress `json:"from"`
-	To       *tktypes.EthAddress `json:"to"`
-	Amount   *tktypes.HexUint256 `json:"amount"`
-	Data     tktypes.HexBytes    `json:"data"`
-	Prepared PreparedTransaction `json:"prepared"`
+	Sender   *commontypes.EthAddress `json:"sender"`
+	From     *commontypes.EthAddress `json:"from"`
+	To       *commontypes.EthAddress `json:"to"`
+	Amount   *commontypes.HexUint256 `json:"amount"`
+	Data     commontypes.HexBytes    `json:"data"`
+	Prepared PreparedTransaction     `json:"prepared"`
 }
 
 type BurnHookParams struct {
-	Sender   *tktypes.EthAddress `json:"sender"`
-	From     *tktypes.EthAddress `json:"from"`
-	Amount   *tktypes.HexUint256 `json:"amount"`
-	Data     tktypes.HexBytes    `json:"data"`
-	Prepared PreparedTransaction `json:"prepared"`
+	Sender   *commontypes.EthAddress `json:"sender"`
+	From     *commontypes.EthAddress `json:"from"`
+	Amount   *commontypes.HexUint256 `json:"amount"`
+	Data     commontypes.HexBytes    `json:"data"`
+	Prepared PreparedTransaction     `json:"prepared"`
 }
 
 type ApproveTransferHookParams struct {
-	Sender   *tktypes.EthAddress `json:"sender"`
-	From     *tktypes.EthAddress `json:"from"`
-	Delegate *tktypes.EthAddress `json:"delegate"`
-	Data     tktypes.HexBytes    `json:"data"`
-	Prepared PreparedTransaction `json:"prepared"`
+	Sender   *commontypes.EthAddress `json:"sender"`
+	From     *commontypes.EthAddress `json:"from"`
+	Delegate *commontypes.EthAddress `json:"delegate"`
+	Data     commontypes.HexBytes    `json:"data"`
+	Prepared PreparedTransaction     `json:"prepared"`
 }
 
 type LockHookParams struct {
-	Sender   *tktypes.EthAddress `json:"sender"`
-	LockID   tktypes.Bytes32     `json:"lockId"`
-	From     *tktypes.EthAddress `json:"from"`
-	Amount   *tktypes.HexUint256 `json:"amount"`
-	Data     tktypes.HexBytes    `json:"data"`
-	Prepared PreparedTransaction `json:"prepared"`
+	Sender   *commontypes.EthAddress `json:"sender"`
+	LockID   commontypes.Bytes32     `json:"lockId"`
+	From     *commontypes.EthAddress `json:"from"`
+	Amount   *commontypes.HexUint256 `json:"amount"`
+	Data     commontypes.HexBytes    `json:"data"`
+	Prepared PreparedTransaction     `json:"prepared"`
 }
 
 type UnlockHookParams struct {
-	Sender     *tktypes.EthAddress        `json:"sender"`
-	LockID     tktypes.Bytes32            `json:"lockId"`
+	Sender     *commontypes.EthAddress    `json:"sender"`
+	LockID     commontypes.Bytes32        `json:"lockId"`
 	Recipients []*ResolvedUnlockRecipient `json:"recipients"`
-	Data       tktypes.HexBytes           `json:"data"`
+	Data       commontypes.HexBytes       `json:"data"`
 	Prepared   PreparedTransaction        `json:"prepared"`
 }
 
 type ApproveUnlockHookParams struct {
-	Sender   *tktypes.EthAddress `json:"sender"`
-	LockID   tktypes.Bytes32     `json:"lockId"`
-	Delegate *tktypes.EthAddress `json:"delegate"`
-	Data     tktypes.HexBytes    `json:"data"`
-	Prepared PreparedTransaction `json:"prepared"`
+	Sender   *commontypes.EthAddress `json:"sender"`
+	LockID   commontypes.Bytes32     `json:"lockId"`
+	Delegate *commontypes.EthAddress `json:"delegate"`
+	Data     commontypes.HexBytes    `json:"data"`
+	Prepared PreparedTransaction     `json:"prepared"`
 }
 
 type DelegateUnlockHookParams struct {
-	Sender     *tktypes.EthAddress        `json:"sender"`
-	LockID     tktypes.Bytes32            `json:"lockId"`
+	Sender     *commontypes.EthAddress    `json:"sender"`
+	LockID     commontypes.Bytes32        `json:"lockId"`
 	Recipients []*ResolvedUnlockRecipient `json:"recipients"`
-	Data       tktypes.HexBytes           `json:"data"`
+	Data       commontypes.HexBytes       `json:"data"`
 }
 
 type PreparedTransaction struct {
-	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
-	EncodedCall     tktypes.HexBytes    `json:"encodedCall"`
+	ContractAddress *commontypes.EthAddress `json:"contractAddress"`
+	EncodedCall     commontypes.HexBytes    `json:"encodedCall"`
 }
 
 type ResolvedUnlockRecipient struct {
-	To     *tktypes.EthAddress `json:"to"`
-	Amount *tktypes.HexUint256 `json:"amount"`
+	To     *commontypes.EthAddress `json:"to"`
+	Amount *commontypes.HexUint256 `json:"amount"`
 }
 
 func penteInvokeABI(name string, inputs abi.ParameterArray) *abi.Entry {
@@ -124,6 +124,6 @@ func penteInvokeABI(name string, inputs abi.ParameterArray) *abi.Entry {
 
 type PenteInvokeParams struct {
 	Group  *types.PentePrivateGroup `json:"group"`
-	To     *tktypes.EthAddress      `json:"to"`
+	To     *commontypes.EthAddress  `json:"to"`
 	Inputs any                      `json:"inputs"`
 }

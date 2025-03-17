@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
@@ -52,7 +52,7 @@ type notoTestSuite struct {
 
 func (s *notoTestSuite) SetupSuite() {
 	ctx := context.Background()
-	s.domainName = "noto_" + tktypes.RandHex(8)
+	s.domainName = "noto_" + commontypes.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", s.domainName)
 
 	s.hdWalletSeed = testbed.HDWalletSeedScopedToTest()
@@ -109,7 +109,7 @@ func (s *notoTestSuite) TestNoto() {
 			Function: "mint",
 			Data: toJSON(t, &types.MintParams{
 				To:     notaryName,
-				Amount: tktypes.Int64ToInt256(100),
+				Amount: commontypes.Int64ToInt256(100),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -129,7 +129,7 @@ func (s *notoTestSuite) TestNoto() {
 			Function: "mint",
 			Data: toJSON(t, &types.MintParams{
 				To:     recipient1Name,
-				Amount: tktypes.Int64ToInt256(100),
+				Amount: commontypes.Int64ToInt256(100),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -148,7 +148,7 @@ func (s *notoTestSuite) TestNoto() {
 			Function: "transfer",
 			Data: toJSON(t, &types.TransferParams{
 				To:     recipient1Name,
-				Amount: tktypes.Int64ToInt256(150),
+				Amount: commontypes.Int64ToInt256(150),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -167,7 +167,7 @@ func (s *notoTestSuite) TestNoto() {
 			Function: "transfer",
 			Data: toJSON(t, &types.TransferParams{
 				To:     recipient1Name,
-				Amount: tktypes.Int64ToInt256(50),
+				Amount: commontypes.Int64ToInt256(50),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -191,7 +191,7 @@ func (s *notoTestSuite) TestNoto() {
 			Function: "transfer",
 			Data: toJSON(t, &types.TransferParams{
 				To:     recipient2Name,
-				Amount: tktypes.Int64ToInt256(50),
+				Amount: commontypes.Int64ToInt256(50),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -214,7 +214,7 @@ func (s *notoTestSuite) TestNoto() {
 			To:       noto.Address,
 			Function: "burn",
 			Data: toJSON(t, &types.BurnParams{
-				Amount: tktypes.Int64ToInt256(25),
+				Amount: commontypes.Int64ToInt256(25),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -260,7 +260,7 @@ func (s *notoTestSuite) TestNotoApprove() {
 			Function: "mint",
 			Data: toJSON(t, &types.MintParams{
 				To:     notaryName,
-				Amount: tktypes.Int64ToInt256(100),
+				Amount: commontypes.Int64ToInt256(100),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -276,7 +276,7 @@ func (s *notoTestSuite) TestNotoApprove() {
 			Function: "transfer",
 			Data: toJSON(t, &types.TransferParams{
 				To:     recipient1Name,
-				Amount: tktypes.Int64ToInt256(50),
+				Amount: commontypes.Int64ToInt256(50),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -295,8 +295,8 @@ func (s *notoTestSuite) TestNotoApprove() {
 			Data: toJSON(t, &types.ApproveParams{
 				Inputs:   prepared.InputStates,
 				Outputs:  prepared.OutputStates,
-				Data:     tktypes.MustParseHexBytes(transferParams["data"].(string)),
-				Delegate: tktypes.MustEthAddress(recipient1Key.Verifier.Verifier),
+				Data:     commontypes.MustParseHexBytes(transferParams["data"].(string)),
+				Delegate: commontypes.MustEthAddress(recipient1Key.Verifier.Verifier),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -311,7 +311,7 @@ func (s *notoTestSuite) TestNotoApprove() {
 			Function: "transferWithApproval",
 			From:     recipient1Name,
 			To:       noto.Address,
-			Data:     tktypes.JSONString(transferParams),
+			Data:     commontypes.JSONString(transferParams),
 		},
 		ABI: notoBuild.ABI,
 	})
@@ -353,7 +353,7 @@ func (s *notoTestSuite) TestNotoLock() {
 			Function: "mint",
 			Data: toJSON(t, &types.MintParams{
 				To:     recipient1Name,
-				Amount: tktypes.Int64ToInt256(100),
+				Amount: commontypes.Int64ToInt256(100),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -372,7 +372,7 @@ func (s *notoTestSuite) TestNotoLock() {
 			To:       noto.Address,
 			Function: "lock",
 			Data: toJSON(t, &types.LockParams{
-				Amount: tktypes.Int64ToInt256(50),
+				Amount: commontypes.Int64ToInt256(50),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -401,7 +401,7 @@ func (s *notoTestSuite) TestNotoLock() {
 			Function: "transfer",
 			Data: toJSON(t, &types.TransferParams{
 				To:     recipient2Name,
-				Amount: tktypes.Int64ToInt256(50),
+				Amount: commontypes.Int64ToInt256(50),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -428,9 +428,9 @@ func (s *notoTestSuite) TestNotoLock() {
 				From:   recipient1Name,
 				Recipients: []*types.UnlockRecipient{{
 					To:     recipient2Name,
-					Amount: tktypes.Int64ToInt256(50),
+					Amount: commontypes.Int64ToInt256(50),
 				}},
-				Data: tktypes.HexBytes{},
+				Data: commontypes.HexBytes{},
 			}),
 		},
 		ABI: types.NotoABI,
@@ -449,7 +449,7 @@ func (s *notoTestSuite) TestNotoLock() {
 			Data: toJSON(t, &types.DelegateLockParams{
 				LockID:   lockInfo.LockID,
 				Unlock:   unlockParams,
-				Delegate: tktypes.MustEthAddress(recipient2Key.Verifier.Verifier),
+				Delegate: commontypes.MustEthAddress(recipient2Key.Verifier.Verifier),
 			}),
 		},
 		ABI: types.NotoABI,

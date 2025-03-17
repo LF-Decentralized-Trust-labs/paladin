@@ -19,7 +19,7 @@ import (
 	"context"
 	_ "embed"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
@@ -56,7 +56,7 @@ func (s *zetoDomainTestSuite) SetupSuite() {
 	domainContracts := helpers.DeployZetoContracts(s.T(), s.hdWalletSeed, contractsFile, controllerName)
 	s.deployedContracts = domainContracts
 	ctx := context.Background()
-	domainName := "zeto_" + tktypes.RandHex(8)
+	domainName := "zeto_" + types.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
 	config := helpers.PrepareZetoConfig(s.T(), s.deployedContracts, "../zeto/zkp")
 	waitForZeto, zetoTestbed := newZetoDomain(s.T(), config, domainContracts.FactoryAddress)

@@ -22,7 +22,7 @@ import (
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 )
 
@@ -164,7 +164,7 @@ func mapResponse(ctx context.Context, req *rpcclient.RPCRequest, result interfac
 			return &rpcclient.RPCResponse{
 				JSONRpc: "2.0",
 				ID:      req.ID,
-				Result:  tktypes.RawJSON(b),
+				Result:  types.RawJSON(b),
 			}
 		}
 	}

@@ -27,7 +27,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
@@ -100,104 +100,104 @@ type Noto struct {
 }
 
 type NotoDeployParams struct {
-	Name          string             `json:"name,omitempty"`
-	TransactionID string             `json:"transactionId"`
-	NotaryAddress tktypes.EthAddress `json:"notaryAddress"`
-	Data          tktypes.HexBytes   `json:"data"`
+	Name          string                 `json:"name,omitempty"`
+	TransactionID string                 `json:"transactionId"`
+	NotaryAddress commontypes.EthAddress `json:"notaryAddress"`
+	Data          commontypes.HexBytes   `json:"data"`
 }
 
 type NotoMintParams struct {
-	Outputs   []string         `json:"outputs"`
-	Signature tktypes.HexBytes `json:"signature"`
-	Data      tktypes.HexBytes `json:"data"`
+	Outputs   []string             `json:"outputs"`
+	Signature commontypes.HexBytes `json:"signature"`
+	Data      commontypes.HexBytes `json:"data"`
 }
 
 type NotoTransferParams struct {
-	Inputs    []string         `json:"inputs"`
-	Outputs   []string         `json:"outputs"`
-	Signature tktypes.HexBytes `json:"signature"`
-	Data      tktypes.HexBytes `json:"data"`
+	Inputs    []string             `json:"inputs"`
+	Outputs   []string             `json:"outputs"`
+	Signature commontypes.HexBytes `json:"signature"`
+	Data      commontypes.HexBytes `json:"data"`
 }
 
 type NotoBurnParams struct {
-	Inputs    []string         `json:"inputs"`
-	Outputs   []string         `json:"outputs"`
-	Signature tktypes.HexBytes `json:"signature"`
-	Data      tktypes.HexBytes `json:"data"`
+	Inputs    []string             `json:"inputs"`
+	Outputs   []string             `json:"outputs"`
+	Signature commontypes.HexBytes `json:"signature"`
+	Data      commontypes.HexBytes `json:"data"`
 }
 
 type NotoApproveTransferParams struct {
-	Delegate  *tktypes.EthAddress `json:"delegate"`
-	TXHash    tktypes.Bytes32     `json:"txhash"`
-	Signature tktypes.HexBytes    `json:"signature"`
-	Data      tktypes.HexBytes    `json:"data"`
+	Delegate  *commontypes.EthAddress `json:"delegate"`
+	TXHash    commontypes.Bytes32     `json:"txhash"`
+	Signature commontypes.HexBytes    `json:"signature"`
+	Data      commontypes.HexBytes    `json:"data"`
 }
 
 type NotoLockParams struct {
-	Inputs        []string         `json:"inputs"`
-	Outputs       []string         `json:"outputs"`
-	LockedOutputs []string         `json:"lockedOutputs"`
-	Signature     tktypes.HexBytes `json:"signature"`
-	Data          tktypes.HexBytes `json:"data"`
+	Inputs        []string             `json:"inputs"`
+	Outputs       []string             `json:"outputs"`
+	LockedOutputs []string             `json:"lockedOutputs"`
+	Signature     commontypes.HexBytes `json:"signature"`
+	Data          commontypes.HexBytes `json:"data"`
 }
 
 type NotoPrepareUnlockParams struct {
-	LockedInputs []string         `json:"lockedInputs"`
-	UnlockHash   tktypes.Bytes32  `json:"unlockHash"`
-	Signature    tktypes.HexBytes `json:"signature"`
-	Data         tktypes.HexBytes `json:"data"`
+	LockedInputs []string             `json:"lockedInputs"`
+	UnlockHash   commontypes.Bytes32  `json:"unlockHash"`
+	Signature    commontypes.HexBytes `json:"signature"`
+	Data         commontypes.HexBytes `json:"data"`
 }
 
 type NotoDelegateLockParams struct {
-	UnlockHash tktypes.Bytes32     `json:"unlockHash"`
-	Delegate   *tktypes.EthAddress `json:"delegate"`
-	Signature  tktypes.HexBytes    `json:"signature"`
-	Data       tktypes.HexBytes    `json:"data"`
+	UnlockHash commontypes.Bytes32     `json:"unlockHash"`
+	Delegate   *commontypes.EthAddress `json:"delegate"`
+	Signature  commontypes.HexBytes    `json:"signature"`
+	Data       commontypes.HexBytes    `json:"data"`
 }
 
 type NotoTransfer_Event struct {
-	Inputs    []tktypes.Bytes32 `json:"inputs"`
-	Outputs   []tktypes.Bytes32 `json:"outputs"`
-	Signature tktypes.HexBytes  `json:"signature"`
-	Data      tktypes.HexBytes  `json:"data"`
+	Inputs    []commontypes.Bytes32 `json:"inputs"`
+	Outputs   []commontypes.Bytes32 `json:"outputs"`
+	Signature commontypes.HexBytes  `json:"signature"`
+	Data      commontypes.HexBytes  `json:"data"`
 }
 
 type NotoApproved_Event struct {
-	Delegate  tktypes.EthAddress `json:"delegate"`
-	TXHash    tktypes.Bytes32    `json:"txhash"`
-	Signature tktypes.HexBytes   `json:"signature"`
-	Data      tktypes.HexBytes   `json:"data"`
+	Delegate  commontypes.EthAddress `json:"delegate"`
+	TXHash    commontypes.Bytes32    `json:"txhash"`
+	Signature commontypes.HexBytes   `json:"signature"`
+	Data      commontypes.HexBytes   `json:"data"`
 }
 
 type NotoLock_Event struct {
-	Inputs        []tktypes.Bytes32 `json:"inputs"`
-	Outputs       []tktypes.Bytes32 `json:"outputs"`
-	LockedOutputs []tktypes.Bytes32 `json:"lockedOutputs"`
-	Signature     tktypes.HexBytes  `json:"signature"`
-	Data          tktypes.HexBytes  `json:"data"`
+	Inputs        []commontypes.Bytes32 `json:"inputs"`
+	Outputs       []commontypes.Bytes32 `json:"outputs"`
+	LockedOutputs []commontypes.Bytes32 `json:"lockedOutputs"`
+	Signature     commontypes.HexBytes  `json:"signature"`
+	Data          commontypes.HexBytes  `json:"data"`
 }
 
 type NotoUnlock_Event struct {
-	Sender        *tktypes.EthAddress `json:"sender"`
-	LockedInputs  []tktypes.Bytes32   `json:"lockedInputs"`
-	LockedOutputs []tktypes.Bytes32   `json:"lockedOutputs"`
-	Outputs       []tktypes.Bytes32   `json:"outputs"`
-	Signature     tktypes.HexBytes    `json:"signature"`
-	Data          tktypes.HexBytes    `json:"data"`
+	Sender        *commontypes.EthAddress `json:"sender"`
+	LockedInputs  []commontypes.Bytes32   `json:"lockedInputs"`
+	LockedOutputs []commontypes.Bytes32   `json:"lockedOutputs"`
+	Outputs       []commontypes.Bytes32   `json:"outputs"`
+	Signature     commontypes.HexBytes    `json:"signature"`
+	Data          commontypes.HexBytes    `json:"data"`
 }
 
 type NotoUnlockPrepared_Event struct {
-	LockedInputs []tktypes.Bytes32 `json:"lockedInputs"`
-	UnlockHash   tktypes.Bytes32   `json:"unlockHash"`
-	Signature    tktypes.HexBytes  `json:"signature"`
-	Data         tktypes.HexBytes  `json:"data"`
+	LockedInputs []commontypes.Bytes32 `json:"lockedInputs"`
+	UnlockHash   commontypes.Bytes32   `json:"unlockHash"`
+	Signature    commontypes.HexBytes  `json:"signature"`
+	Data         commontypes.HexBytes  `json:"data"`
 }
 
 type NotoLockDelegated_Event struct {
-	UnlockHash tktypes.Bytes32     `json:"unlockHash"`
-	Delegate   *tktypes.EthAddress `json:"delegate"`
-	Signature  tktypes.HexBytes    `json:"signature"`
-	Data       tktypes.HexBytes    `json:"data"`
+	UnlockHash commontypes.Bytes32     `json:"unlockHash"`
+	Delegate   *commontypes.EthAddress `json:"delegate"`
+	Signature  commontypes.HexBytes    `json:"signature"`
+	Data       commontypes.HexBytes    `json:"data"`
 }
 
 type parsedCoins struct {
@@ -349,7 +349,7 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 		return nil, err
 	}
 	localNodeName, _ := n.Callbacks.LocalNodeName(ctx, &prototk.LocalNodeNameRequest{})
-	notaryQualified, err := tktypes.PrivateIdentityLocator(params.Notary).FullyQualified(ctx, localNodeName.Name)
+	notaryQualified, err := commontypes.PrivateIdentityLocator(params.Notary).FullyQualified(ctx, localNodeName.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +428,7 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 	}
 
 	localNodeName, _ := n.Callbacks.LocalNodeName(ctx, &prototk.LocalNodeNameRequest{})
-	_, notaryNodeName, err := tktypes.PrivateIdentityLocator(decodedData.NotaryLookup).Validate(ctx, localNodeName.Name, true)
+	_, notaryNodeName, err := commontypes.PrivateIdentityLocator(decodedData.NotaryLookup).Validate(ctx, localNodeName.Name, true)
 	if err != nil {
 		return nil, err
 	}
@@ -513,7 +513,7 @@ func (n *Noto) decodeConfig(ctx context.Context, domainConfig []byte) (*types.No
 	}
 	var config types.NotoConfig_V0
 	var decodedData types.NotoConfigData_V0
-	configJSON, err := tktypes.StandardABISerializer().SerializeJSON(configValues)
+	configJSON, err := commontypes.StandardABISerializer().SerializeJSON(configValues)
 	if err == nil {
 		err = json.Unmarshal(configJSON, &config)
 	}
@@ -652,17 +652,17 @@ func (n *Noto) parseCoinList(ctx context.Context, label string, states []*protot
 	return result, nil
 }
 
-func (n *Noto) encodeTransactionData(ctx context.Context, transaction *prototk.TransactionSpecification, infoStates []*prototk.EndorsableState) (tktypes.HexBytes, error) {
+func (n *Noto) encodeTransactionData(ctx context.Context, transaction *prototk.TransactionSpecification, infoStates []*prototk.EndorsableState) (commontypes.HexBytes, error) {
 	var err error
-	stateIDs := make([]tktypes.Bytes32, len(infoStates))
+	stateIDs := make([]commontypes.Bytes32, len(infoStates))
 	for i, state := range infoStates {
-		stateIDs[i], err = tktypes.ParseBytes32Ctx(ctx, state.Id)
+		stateIDs[i], err = commontypes.ParseBytes32Ctx(ctx, state.Id)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	transactionID, err := tktypes.ParseBytes32Ctx(ctx, transaction.TransactionId)
+	transactionID, err := commontypes.ParseBytes32Ctx(ctx, transaction.TransactionId)
 	if err != nil {
 		return nil, err
 	}
@@ -685,7 +685,7 @@ func (n *Noto) encodeTransactionData(ctx context.Context, transaction *prototk.T
 	return data, nil
 }
 
-func (n *Noto) decodeTransactionData(ctx context.Context, data tktypes.HexBytes) (*types.NotoTransactionData_V0, error) {
+func (n *Noto) decodeTransactionData(ctx context.Context, data commontypes.HexBytes) (*types.NotoTransactionData_V0, error) {
 	var dataValues types.NotoTransactionData_V0
 	if len(data) >= 4 {
 		dataPrefix := data[0:4]
@@ -705,12 +705,12 @@ func (n *Noto) decodeTransactionData(ctx context.Context, data tktypes.HexBytes)
 	}
 	if dataValues.TransactionID.IsZero() {
 		// If no transaction ID could be decoded, assign a random one
-		dataValues.TransactionID = tktypes.RandBytes32()
+		dataValues.TransactionID = commontypes.RandBytes32()
 	}
 	return &dataValues, nil
 }
 
-func (n *Noto) wrapHookTransaction(domainConfig *types.NotoParsedConfig, functionABI *abi.Entry, params any) (pldapi.TransactionType, *abi.Entry, tktypes.HexBytes, error) {
+func (n *Noto) wrapHookTransaction(domainConfig *types.NotoParsedConfig, functionABI *abi.Entry, params any) (pldapi.TransactionType, *abi.Entry, commontypes.HexBytes, error) {
 	if domainConfig.Options.Hooks.DevUsePublicHooks {
 		paramsJSON, err := json.Marshal(params)
 		return pldapi.TransactionTypePublic, functionABI, paramsJSON, err

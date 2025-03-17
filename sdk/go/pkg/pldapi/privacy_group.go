@@ -21,21 +21,21 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 type PrivacyGroup struct {
-	ID                 tktypes.HexBytes    `docstruct:"PrivacyGroup" json:"id"`
-	Domain             string              `docstruct:"PrivacyGroup" json:"domain"`
-	Created            tktypes.Timestamp   `docstruct:"PrivacyGroup" json:"created"`
-	Name               string              `docstruct:"PrivacyGroup" json:"name"`
-	Members            []string            `docstruct:"PrivacyGroup" json:"members"`
-	Properties         map[string]string   `docstruct:"PrivacyGroup" json:"properties"`
-	Configuration      map[string]string   `docstruct:"PrivacyGroup" json:"configuration"`
-	GenesisSalt        tktypes.Bytes32     `docstruct:"PrivacyGroup" json:"genesisSalt"`
-	GenesisSchema      tktypes.Bytes32     `docstruct:"PrivacyGroup" json:"genesisSchema"`
-	GenesisTransaction uuid.UUID           `docstruct:"PrivacyGroup" json:"genesisTransaction"`
-	ContractAddress    *tktypes.EthAddress `docstruct:"PrivacyGroup" json:"contractAddress"`
+	ID                 types.HexBytes    `docstruct:"PrivacyGroup" json:"id"`
+	Domain             string            `docstruct:"PrivacyGroup" json:"domain"`
+	Created            types.Timestamp   `docstruct:"PrivacyGroup" json:"created"`
+	Name               string            `docstruct:"PrivacyGroup" json:"name"`
+	Members            []string          `docstruct:"PrivacyGroup" json:"members"`
+	Properties         map[string]string `docstruct:"PrivacyGroup" json:"properties"`
+	Configuration      map[string]string `docstruct:"PrivacyGroup" json:"configuration"`
+	GenesisSalt        types.Bytes32     `docstruct:"PrivacyGroup" json:"genesisSalt"`
+	GenesisSchema      types.Bytes32     `docstruct:"PrivacyGroup" json:"genesisSchema"`
+	GenesisTransaction uuid.UUID         `docstruct:"PrivacyGroup" json:"genesisTransaction"`
+	ContractAddress    *types.EthAddress `docstruct:"PrivacyGroup" json:"contractAddress"`
 }
 
 type PrivacyGroupTXOptions struct {
@@ -44,20 +44,20 @@ type PrivacyGroupTXOptions struct {
 }
 
 type PrivacyGroupMessage struct {
-	ID            uuid.UUID         `docstruct:"PrivacyGroupMessage" json:"id"`
-	LocalSequence uint64            `docstruct:"PrivacyGroupMessage" json:"localSequence"`
-	Sent          tktypes.Timestamp `docstruct:"PrivacyGroupMessage" json:"sent"`
-	Received      tktypes.Timestamp `docstruct:"PrivacyGroupMessage" json:"received"`
-	Node          string            `docstruct:"PrivacyGroupMessage" json:"node"`
+	ID            uuid.UUID       `docstruct:"PrivacyGroupMessage" json:"id"`
+	LocalSequence uint64          `docstruct:"PrivacyGroupMessage" json:"localSequence"`
+	Sent          types.Timestamp `docstruct:"PrivacyGroupMessage" json:"sent"`
+	Received      types.Timestamp `docstruct:"PrivacyGroupMessage" json:"received"`
+	Node          string          `docstruct:"PrivacyGroupMessage" json:"node"`
 	PrivacyGroupMessageInput
 }
 
 type PrivacyGroupMessageInput struct {
-	CorrelationID *uuid.UUID       `docstruct:"PrivacyGroupMessage" json:"correlationId,omitempty"`
-	Domain        string           `docstruct:"PrivacyGroupMessage" json:"domain"`
-	Group         tktypes.HexBytes `docstruct:"PrivacyGroupMessage" json:"group"`
-	Topic         string           `docstruct:"PrivacyGroupMessage" json:"topic,omitempty"`
-	Data          tktypes.RawJSON  `docstruct:"PrivacyGroupMessage" json:"data,omitempty"`
+	CorrelationID *uuid.UUID     `docstruct:"PrivacyGroupMessage" json:"correlationId,omitempty"`
+	Domain        string         `docstruct:"PrivacyGroupMessage" json:"domain"`
+	Group         types.HexBytes `docstruct:"PrivacyGroupMessage" json:"group"`
+	Topic         string         `docstruct:"PrivacyGroupMessage" json:"topic,omitempty"`
+	Data          types.RawJSON  `docstruct:"PrivacyGroupMessage" json:"data,omitempty"`
 }
 
 type PrivacyGroupInput struct {
@@ -70,36 +70,36 @@ type PrivacyGroupInput struct {
 }
 
 type PrivacyGroupEVMTX struct {
-	From     string              `docstruct:"PrivacyGroupEVMTX" json:"from,omitempty"` // signing key reference
-	To       *tktypes.EthAddress `docstruct:"PrivacyGroupEVMTX" json:"to,omitempty"`
-	Gas      *tktypes.HexUint64  `docstruct:"PrivacyGroupEVMTX" json:"gas,omitempty"`
-	Value    *tktypes.HexUint256 `docstruct:"PrivacyGroupEVMTX" json:"value,omitempty"`
-	Input    tktypes.RawJSON     `docstruct:"PrivacyGroupEVMTX" json:"input,omitempty"`    // hex encoded bytes or object
-	Function *abi.Entry          `docstruct:"PrivacyGroupEVMTX" json:"function,omitempty"` // required when JSON object/array input is supplied
-	Bytecode tktypes.HexBytes    `docstruct:"PrivacyGroupEVMTX" json:"bytecode,omitempty"` // bytes or object
+	From     string            `docstruct:"PrivacyGroupEVMTX" json:"from,omitempty"` // signing key reference
+	To       *types.EthAddress `docstruct:"PrivacyGroupEVMTX" json:"to,omitempty"`
+	Gas      *types.HexUint64  `docstruct:"PrivacyGroupEVMTX" json:"gas,omitempty"`
+	Value    *types.HexUint256 `docstruct:"PrivacyGroupEVMTX" json:"value,omitempty"`
+	Input    types.RawJSON     `docstruct:"PrivacyGroupEVMTX" json:"input,omitempty"`    // hex encoded bytes or object
+	Function *abi.Entry        `docstruct:"PrivacyGroupEVMTX" json:"function,omitempty"` // required when JSON object/array input is supplied
+	Bytecode types.HexBytes    `docstruct:"PrivacyGroupEVMTX" json:"bytecode,omitempty"` // bytes or object
 }
 
 // Transaction for a privacy group - is an ethereum style transaction input
 type PrivacyGroupEVMTXInput struct {
-	IdempotencyKey string           `docstruct:"PrivacyGroupEVMTX" json:"idempotencyKey,omitempty"`
-	Domain         string           `docstruct:"PrivacyGroupEVMTX" json:"domain,omitempty"`
-	Group          tktypes.HexBytes `docstruct:"PrivacyGroupEVMTX" json:"group,omitempty"`
+	IdempotencyKey string         `docstruct:"PrivacyGroupEVMTX" json:"idempotencyKey,omitempty"`
+	Domain         string         `docstruct:"PrivacyGroupEVMTX" json:"domain,omitempty"`
+	Group          types.HexBytes `docstruct:"PrivacyGroupEVMTX" json:"group,omitempty"`
 	PrivacyGroupEVMTX
 	PublicTxOptions PublicTxOptions `docstruct:"PrivacyGroupEVMTX" json:"publicTxOptions,omitempty"`
 }
 
 // Call for a privacy group
 type PrivacyGroupEVMCall struct {
-	Domain string           `docstruct:"PrivacyGroupEVMTX" json:"domain,omitempty"`
-	Group  tktypes.HexBytes `docstruct:"PrivacyGroupEVMTX" json:"group,omitempty"`
+	Domain string         `docstruct:"PrivacyGroupEVMTX" json:"domain,omitempty"`
+	Group  types.HexBytes `docstruct:"PrivacyGroupEVMTX" json:"group,omitempty"`
 	PrivacyGroupEVMTX
 	PublicCallOptions
-	DataFormat tktypes.JSONFormatOptions `docstruct:"TransactionCall" json:"dataFormat"` // formatting options for the result data
+	DataFormat types.JSONFormatOptions `docstruct:"TransactionCall" json:"dataFormat"` // formatting options for the result data
 }
 
 type PrivacyGroupMessageListener struct {
 	Name    string                             `docstruct:"PrivacyGroupMessageListener" json:"name"`
-	Created tktypes.Timestamp                  `docstruct:"PrivacyGroupMessageListener" json:"created"`
+	Created types.Timestamp                    `docstruct:"PrivacyGroupMessageListener" json:"created"`
 	Started *bool                              `docstruct:"PrivacyGroupMessageListener" json:"started"`
 	Filters PrivacyGroupMessageListenerFilters `docstruct:"PrivacyGroupMessageListener" json:"filters"`
 	Options PrivacyGroupMessageListenerOptions `docstruct:"PrivacyGroupMessageListener" json:"options"`
@@ -111,10 +111,10 @@ type PrivacyGroupMessageBatch struct {
 }
 
 type PrivacyGroupMessageListenerFilters struct {
-	SequenceAbove *uint64          `docstruct:"MessageListenerFilters" json:"sequenceAbove,omitempty"`
-	Domain        string           `docstruct:"MessageListenerFilters" json:"domain,omitempty"`
-	Group         tktypes.HexBytes `docstruct:"MessageListenerFilters" json:"group,omitempty"`
-	Topic         string           `docstruct:"MessageListenerFilters" json:"topic,omitempty"`
+	SequenceAbove *uint64        `docstruct:"MessageListenerFilters" json:"sequenceAbove,omitempty"`
+	Domain        string         `docstruct:"MessageListenerFilters" json:"domain,omitempty"`
+	Group         types.HexBytes `docstruct:"MessageListenerFilters" json:"group,omitempty"`
+	Topic         string         `docstruct:"MessageListenerFilters" json:"topic,omitempty"`
 }
 
 type PrivacyGroupMessageListenerOptions struct {
@@ -127,8 +127,8 @@ const (
 	PGroupEventTypeMessages PGroupEventType = "messages"
 )
 
-func (tt PGroupEventType) Enum() tktypes.Enum[PGroupEventType] {
-	return tktypes.Enum[PGroupEventType](tt)
+func (tt PGroupEventType) Enum() types.Enum[PGroupEventType] {
+	return types.Enum[PGroupEventType](tt)
 }
 
 func (tt PGroupEventType) Options() []string {
@@ -187,7 +187,7 @@ type KeyValueStringProperty struct {
 }
 
 type PrivacyGroupGenesisState struct {
-	GenesisSalt   tktypes.Bytes32          `docstruct:"PrivacyGroupGenesisState" json:"genesisSalt"`
+	GenesisSalt   types.Bytes32            `docstruct:"PrivacyGroupGenesisState" json:"genesisSalt"`
 	Name          string                   `docstruct:"PrivacyGroupGenesisState" json:"name"`
 	Members       []string                 `docstruct:"PrivacyGroupGenesisState" json:"members"`
 	Properties    KeyValueStringProperties `docstruct:"PrivacyGroupGenesisState" json:"properties"`

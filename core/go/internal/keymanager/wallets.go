@@ -20,7 +20,7 @@ import (
 	"regexp"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -42,7 +42,7 @@ func (km *keyManager) newWallet(ctx context.Context, walletConf *pldconf.WalletC
 		name: walletConf.Name,
 	}
 
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, w.name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+	if err := types.ValidateSafeCharsStartEndAlphaNum(ctx, w.name, types.DefaultNameMaxLen, "name"); err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgKeyManagerInvalidConfig, w.name)
 	}
 

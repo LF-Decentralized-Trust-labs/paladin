@@ -15,7 +15,7 @@
 
 package pldapi
 
-import "github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+import "github.com/kaleido-io/paladin/common/go/pkg/types"
 
 type PenteDomainReceipt struct {
 	Transaction *PrivateEVMTransaction `json:"transaction"`
@@ -23,24 +23,24 @@ type PenteDomainReceipt struct {
 }
 
 type PrivateEVMTransaction struct {
-	From  tktypes.EthAddress  `json:"from"`
-	To    *tktypes.EthAddress `json:"to"`
-	Nonce tktypes.HexUint64   `json:"nonce"`
-	Gas   tktypes.HexUint64   `json:"gas,omitempty"`
-	Value *tktypes.HexUint256 `json:"value,omitempty"`
-	Data  tktypes.HexBytes    `json:"data"`
+	From  types.EthAddress  `json:"from"`
+	To    *types.EthAddress `json:"to"`
+	Nonce types.HexUint64   `json:"nonce"`
+	Gas   types.HexUint64   `json:"gas,omitempty"`
+	Value *types.HexUint256 `json:"value,omitempty"`
+	Data  types.HexBytes    `json:"data"`
 }
 
 type PrivateEVMReceipt struct {
-	From            tktypes.EthAddress  `json:"from"`
-	To              *tktypes.EthAddress `json:"to"`
-	GasUsed         tktypes.HexUint64   `json:"gasUsed"`
-	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
-	Logs            []*PrivateEVMLog    `json:"logs"`
+	From            types.EthAddress  `json:"from"`
+	To              *types.EthAddress `json:"to"`
+	GasUsed         types.HexUint64   `json:"gasUsed"`
+	ContractAddress *types.EthAddress `json:"contractAddress"`
+	Logs            []*PrivateEVMLog  `json:"logs"`
 }
 
 type PrivateEVMLog struct {
-	Address tktypes.EthAddress `json:"address"`
-	Topics  []tktypes.Bytes32  `json:"topics"`
-	Data    tktypes.HexBytes   `json:"data"`
+	Address types.EthAddress `json:"address"`
+	Topics  []types.Bytes32  `json:"topics"`
+	Data    types.HexBytes   `json:"data"`
 }

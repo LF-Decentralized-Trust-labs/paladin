@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
@@ -67,9 +67,9 @@ func (es *rpcEventStreams) HandleStart(ctx context.Context, req *rpcclient.RPCRe
 	es.subLock.Lock()
 	defer es.subLock.Unlock()
 
-	var eventType tktypes.Enum[pldapi.PTXEventType]
+	var eventType types.Enum[pldapi.PTXEventType]
 	if len(req.Params) >= 1 {
-		eventType = tktypes.Enum[pldapi.PTXEventType](req.Params[0].StringValue())
+		eventType = types.Enum[pldapi.PTXEventType](req.Params[0].StringValue())
 	}
 	if _, err := eventType.Validate(); err != nil {
 		return nil, rpcclient.NewRPCErrorResponse(err, req.ID, rpcclient.RPCCodeInvalidRequest)
@@ -95,7 +95,7 @@ func (es *rpcEventStreams) HandleStart(ctx context.Context, req *rpcclient.RPCRe
 	return sub, &rpcclient.RPCResponse{
 		JSONRpc: "2.0",
 		ID:      req.ID,
-		Result:  tktypes.JSONString(ctrl.ID()),
+		Result:  types.JSONString(ctrl.ID()),
 	}
 }
 
@@ -141,7 +141,7 @@ func (es *rpcEventStreams) HandleLifecycle(ctx context.Context, req *rpcclient.R
 		return &rpcclient.RPCResponse{
 			JSONRpc: "2.0",
 			ID:      req.ID,
-			Result:  tktypes.JSONString(sub != nil),
+			Result:  types.JSONString(sub != nil),
 		}
 	default:
 		return rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, msgs.MsgTxMgrLifecycleMethodUnknown, req.Method), req.ID, rpcclient.RPCCodeInvalidRequest)

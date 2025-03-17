@@ -34,7 +34,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcserver"
@@ -296,7 +296,7 @@ func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName str
 	// use this "send" must be fault tolerant to message loss.
 	select {
 	case p.sendQueue <- msg:
-		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageId, tktypes.StrOrEmpty(msg.CorrelationId), p.Name)
+		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageId, types.StrOrEmpty(msg.CorrelationId), p.Name)
 		return nil
 	case <-ctx.Done():
 		return i18n.NewError(ctx, msgs.MsgContextCanceled)
@@ -312,7 +312,7 @@ func (tm *transportManager) SendReliable(ctx context.Context, dbTX persistence.D
 		var p *peer
 
 		msg.ID = uuid.New()
-		msg.Created = tktypes.TimestampNow()
+		msg.Created = types.TimestampNow()
 		_, err = msg.MessageType.Validate()
 
 		if err == nil {
@@ -349,7 +349,7 @@ func (tm *transportManager) SendReliable(ctx context.Context, dbTX persistence.D
 func (tm *transportManager) writeAcks(ctx context.Context, dbTX persistence.DBTX, acks ...*pldapi.ReliableMessageAck) error {
 	for _, ack := range acks {
 		log.L(ctx).Infof("ack received for message %s", ack.MessageID)
-		ack.Time = tktypes.TimestampNow()
+		ack.Time = types.TimestampNow()
 	}
 	return dbTX.DB().
 		WithContext(ctx).

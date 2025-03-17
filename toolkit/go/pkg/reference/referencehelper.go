@@ -47,7 +47,7 @@ func shouldFilter(t reflect.Type) bool {
 }
 
 func isEnum(f reflect.Type) bool {
-	return f.PkgPath() == "github.com/kaleido-io/paladin/toolkit/pkg/tktypes" && strings.HasPrefix(f.Name(), "Enum[")
+	return f.PkgPath() == "github.com/kaleido-io/paladin/toolkit/pkg/types" && strings.HasPrefix(f.Name(), "Enum[")
 }
 
 func generateEnumList(f reflect.Type) string {

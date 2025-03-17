@@ -18,18 +18,18 @@ package pldapi
 
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 // This is a very compact wrapping structure that is automatically stored for any ABI
 // used in a transaction. A deterministic hashing is performed of the ABI that preserves
 // all the details including parameter names, indexed flags, errors, event etc.
-// (see tktypes.ABISolDefinitionHash()).
+// (see types.ABISolDefinitionHash()).
 //
 // In the future a _separate_ metadata object might be added to allow CRUD style storage
 // and query of associated ABI details, like devDocs, contract name, times etc.
 // However, this record is intended to stay unchanged and deliberately thin
 type StoredABI struct {
-	Hash tktypes.Bytes32 `docstruct:"StoredABI" json:"hash,omitempty"`
-	ABI  abi.ABI         `docstruct:"StoredABI" json:"abi,omitempty"`
+	Hash types.Bytes32 `docstruct:"StoredABI" json:"hash,omitempty"`
+	ABI  abi.ABI       `docstruct:"StoredABI" json:"abi,omitempty"`
 }

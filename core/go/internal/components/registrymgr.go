@@ -20,7 +20,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -54,5 +54,5 @@ type RegistryManager interface {
 type Registry interface {
 	QueryEntries(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, jq *query.QueryJSON) ([]*pldapi.RegistryEntry, error)
 	QueryEntriesWithProps(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, jq *query.QueryJSON) ([]*pldapi.RegistryEntryWithProperties, error)
-	GetEntryProperties(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, entityIDs ...tktypes.HexBytes) ([]*pldapi.RegistryProperty, error)
+	GetEntryProperties(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, entityIDs ...types.HexBytes) ([]*pldapi.RegistryProperty, error)
 }

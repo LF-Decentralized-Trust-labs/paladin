@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -93,10 +93,10 @@ func TestBlockIndexRPCCalls(t *testing.T) {
 	assert.Equal(t, rpcBlock.Transactions[0].Hash.String(), decodedEvents[1].TransactionHash.String())
 	assert.JSONEq(t, `["1000000", "event_b_in_block_0"]`, decodedEvents[1].Data.Pretty())
 
-	var blockHeight tktypes.HexUint64
+	var blockHeight types.HexUint64
 	err = rpc.CallRPC(ctx, &blockHeight, "bidx_getConfirmedBlockHeight")
 	require.NoError(t, err)
-	assert.Equal(t, tktypes.HexUint64(0), blockHeight)
+	assert.Equal(t, types.HexUint64(0), blockHeight)
 }
 
 func newBlockIndexerWithOneBlock(t *testing.T) (context.Context, *BlockInfoJSONRPC, *blockIndexer, func()) {

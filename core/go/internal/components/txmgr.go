@@ -20,7 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
@@ -38,13 +38,13 @@ const (
 )
 
 type ReceiptInput struct {
-	Domain          string                  // set when the receipt is from a domain
-	ReceiptType     ReceiptType             // required
-	TransactionID   uuid.UUID               // required
-	OnChain         tktypes.OnChainLocation // OnChain.Type must be set for an on-chain transaction/event
-	ContractAddress *tktypes.EthAddress     // the contract address - deployments only
-	FailureMessage  string                  // set for RT_FailedWithMessage
-	RevertData      tktypes.HexBytes        // set for RT_FailedOnChainWithRevertData
+	Domain          string                // set when the receipt is from a domain
+	ReceiptType     ReceiptType           // required
+	TransactionID   uuid.UUID             // required
+	OnChain         types.OnChainLocation // OnChain.Type must be set for an on-chain transaction/event
+	ContractAddress *types.EthAddress     // the contract address - deployments only
+	FailureMessage  string                // set for RT_FailedWithMessage
+	RevertData      types.HexBytes        // set for RT_FailedOnChainWithRevertData
 }
 
 type TxCompletion struct {
@@ -68,9 +68,9 @@ type ValidatedTransaction struct {
 // A resolved function on the ABI
 type ResolvedFunction struct {
 	// ABI          abi.ABI          `json:"abi"`
-	ABIReference *tktypes.Bytes32 `json:"abiReference"`
-	Definition   *abi.Entry       `json:"definition"`
-	Signature    string           `json:"signature"`
+	ABIReference *types.Bytes32 `json:"abiReference"`
+	Definition   *abi.Entry     `json:"definition"`
+	Signature    string         `json:"signature"`
 }
 
 type ReceiptReceiver interface {
@@ -87,19 +87,19 @@ type TXManager interface {
 	// These are the general purpose functions exposed also as JSON/RPC APIs on the TX Manager
 
 	FinalizeTransactions(ctx context.Context, dbTX persistence.DBTX, info []*ReceiptInput) error // requires all transactions to be known
-	CalculateRevertError(ctx context.Context, dbTX persistence.DBTX, revertData tktypes.HexBytes) error
-	DecodeRevertError(ctx context.Context, dbTX persistence.DBTX, revertData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
-	DecodeCall(ctx context.Context, dbTX persistence.DBTX, callData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
-	DecodeEvent(ctx context.Context, dbTX persistence.DBTX, topics []tktypes.Bytes32, eventData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
+	CalculateRevertError(ctx context.Context, dbTX persistence.DBTX, revertData types.HexBytes) error
+	DecodeRevertError(ctx context.Context, dbTX persistence.DBTX, revertData types.HexBytes, dataFormat types.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
+	DecodeCall(ctx context.Context, dbTX persistence.DBTX, callData types.HexBytes, dataFormat types.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
+	DecodeEvent(ctx context.Context, dbTX persistence.DBTX, topics []types.Bytes32, eventData types.HexBytes, dataFormat types.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
 	SendTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
-	ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*ResolvedFunction, *abi.ComponentValue, tktypes.RawJSON, error)
+	ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*ResolvedFunction, *abi.ComponentValue, types.RawJSON, error)
 	PrepareTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (*pldapi.Transaction, error)
 	GetResolvedTransactionByID(ctx context.Context, id uuid.UUID) (*ResolvedTransaction, error) // cache optimized
 	GetTransactionByIDFull(ctx context.Context, id uuid.UUID) (result *pldapi.TransactionFull, err error)
 	GetTransactionDependencies(ctx context.Context, id uuid.UUID) (*pldapi.TransactionDependencies, error)
-	GetPublicTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce tktypes.HexUint64) (*pldapi.PublicTxWithBinding, error)
-	GetPublicTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error)
+	GetPublicTransactionByNonce(ctx context.Context, from types.EthAddress, nonce types.HexUint64) (*pldapi.PublicTxWithBinding, error)
+	GetPublicTransactionByHash(ctx context.Context, hash types.Bytes32) (*pldapi.PublicTxWithBinding, error)
 	QueryTransactions(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*pldapi.Transaction, error)
 	QueryTransactionsResolved(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*ResolvedTransaction, error)
 	QueryTransactionsFull(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) (results []*pldapi.TransactionFull, err error)

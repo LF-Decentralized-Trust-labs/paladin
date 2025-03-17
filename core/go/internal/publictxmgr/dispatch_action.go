@@ -18,7 +18,7 @@ package publictxmgr
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 )
 
@@ -30,7 +30,7 @@ const (
 	ActionCompleted
 )
 
-func (pte *pubTxManager) persistSuspendedFlag(ctx context.Context, from tktypes.EthAddress, nonce uint64, suspended bool) error {
+func (pte *pubTxManager) persistSuspendedFlag(ctx context.Context, from types.EthAddress, nonce uint64, suspended bool) error {
 	log.L(ctx).Infof("Setting suspend status to '%t' for transaction %s:%d", suspended, from, nonce)
 	return pte.p.DB().
 		WithContext(ctx).
@@ -41,7 +41,7 @@ func (pte *pubTxManager) persistSuspendedFlag(ctx context.Context, from tktypes.
 		Error
 }
 
-func (pte *pubTxManager) dispatchAction(ctx context.Context, from tktypes.EthAddress, nonce uint64, action AsyncRequestType) error {
+func (pte *pubTxManager) dispatchAction(ctx context.Context, from types.EthAddress, nonce uint64, action AsyncRequestType) error {
 	pte.inFlightOrchestratorMux.Lock()
 	defer pte.inFlightOrchestratorMux.Unlock()
 	inFlightOrchestrator, orchestratorInFlight := pte.inFlightOrchestrators[from]

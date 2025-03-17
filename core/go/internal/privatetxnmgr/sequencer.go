@@ -30,7 +30,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 )
 
@@ -106,7 +106,7 @@ type Sequencer struct {
 
 	pendingTransactionEvents chan ptmgrtypes.PrivateTransactionEvent
 
-	contractAddress          tktypes.EthAddress // the contract address managed by the current sequencer
+	contractAddress          types.EthAddress // the contract address managed by the current sequencer
 	defaultSigner            string
 	nodeName                 string
 	domainAPI                components.DomainSmartContract
@@ -130,7 +130,7 @@ func NewSequencer(
 	ctx context.Context,
 	privateTxManager components.PrivateTxManager,
 	nodeName string,
-	contractAddress tktypes.EthAddress,
+	contractAddress types.EthAddress,
 	sequencerConfig *pldconf.PrivateTxManagerSequencerConfig,
 	allComponents components.AllComponents,
 	domainAPI components.DomainSmartContract,

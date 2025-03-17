@@ -22,7 +22,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/stretchr/testify/assert"
@@ -38,7 +38,7 @@ func TestRCPMethod0(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse tktypes.RawJSON
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -69,7 +69,7 @@ func TestRCPMethod1(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse tktypes.RawJSON
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -103,7 +103,7 @@ func TestRCPMethod2(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse tktypes.RawJSON
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -139,7 +139,7 @@ func TestRCPMethod3(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse tktypes.RawJSON
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -177,7 +177,7 @@ func TestRCPMethod4(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse tktypes.RawJSON
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -217,7 +217,7 @@ func TestRCPMethod5(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse tktypes.RawJSON
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -255,7 +255,7 @@ func TestRCPMethodNullParamPointerPassed(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse tktypes.RawJSON
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -290,7 +290,7 @@ func TestRCPMethodNullParamNonPointerEmptyVal(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse tktypes.RawJSON
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",

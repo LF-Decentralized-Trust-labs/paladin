@@ -18,7 +18,7 @@ package pldclient
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 )
@@ -27,11 +27,11 @@ type StateStore interface {
 	RPCModule
 
 	ListSchemas(ctx context.Context, domain string) (schemas []*pldapi.Schema, err error)
-	StoreState(ctx context.Context, domain string, contractAddress tktypes.EthAddress, schemaRef tktypes.Bytes32, data tktypes.RawJSON) (state *pldapi.State, err error)
-	QueryStates(ctx context.Context, domain string, schemaRef tktypes.Bytes32, query *query.QueryJSON, qualifier pldapi.StateStatusQualifier) (states []*pldapi.State, err error)
-	QueryContractStates(ctx context.Context, domain string, contractAddress tktypes.EthAddress, schemaRef tktypes.Bytes32, query *query.QueryJSON, qualifier pldapi.StateStatusQualifier) (states []*pldapi.State, err error)
-	QueryNullifiers(ctx context.Context, domain string, schemaRef tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error)
-	QueryContractNullifiers(ctx context.Context, domain string, contractAddress tktypes.EthAddress, schemaRef tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error)
+	StoreState(ctx context.Context, domain string, contractAddress types.EthAddress, schemaRef types.Bytes32, data types.RawJSON) (state *pldapi.State, err error)
+	QueryStates(ctx context.Context, domain string, schemaRef types.Bytes32, query *query.QueryJSON, qualifier pldapi.StateStatusQualifier) (states []*pldapi.State, err error)
+	QueryContractStates(ctx context.Context, domain string, contractAddress types.EthAddress, schemaRef types.Bytes32, query *query.QueryJSON, qualifier pldapi.StateStatusQualifier) (states []*pldapi.State, err error)
+	QueryNullifiers(ctx context.Context, domain string, schemaRef types.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error)
+	QueryContractNullifiers(ctx context.Context, domain string, contractAddress types.EthAddress, schemaRef types.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error)
 }
 
 // This is necessary because there's no way to introspect function parameter names via reflection
@@ -79,27 +79,27 @@ func (r *stateStore) ListSchemas(ctx context.Context, domain string) (schemas []
 	return
 }
 
-func (r *stateStore) StoreState(ctx context.Context, domain string, contractAddress tktypes.EthAddress, schemaRef tktypes.Bytes32, data tktypes.RawJSON) (state *pldapi.State, err error) {
+func (r *stateStore) StoreState(ctx context.Context, domain string, contractAddress types.EthAddress, schemaRef types.Bytes32, data types.RawJSON) (state *pldapi.State, err error) {
 	err = r.c.CallRPC(ctx, &state, "pstate_storeState", domain, contractAddress, schemaRef, data)
 	return
 }
 
-func (r *stateStore) QueryStates(ctx context.Context, domain string, schemaRef tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error) {
+func (r *stateStore) QueryStates(ctx context.Context, domain string, schemaRef types.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error) {
 	err = r.c.CallRPC(ctx, &states, "pstate_queryStates", domain, schemaRef, query)
 	return
 }
 
-func (r *stateStore) QueryContractStates(ctx context.Context, domain string, contractAddress tktypes.EthAddress, schemaRef tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error) {
+func (r *stateStore) QueryContractStates(ctx context.Context, domain string, contractAddress types.EthAddress, schemaRef types.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error) {
 	err = r.c.CallRPC(ctx, &states, "pstate_queryContractStates", domain, contractAddress, schemaRef, query)
 	return
 }
 
-func (r *stateStore) QueryNullifiers(ctx context.Context, domain string, schemaRef tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error) {
+func (r *stateStore) QueryNullifiers(ctx context.Context, domain string, schemaRef types.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error) {
 	err = r.c.CallRPC(ctx, &states, "pstate_queryNullifiers", domain, schemaRef, query)
 	return
 }
 
-func (r *stateStore) QueryContractNullifiers(ctx context.Context, domain string, contractAddress tktypes.EthAddress, schemaRef tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error) {
+func (r *stateStore) QueryContractNullifiers(ctx context.Context, domain string, contractAddress types.EthAddress, schemaRef types.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (states []*pldapi.State, err error) {
 	err = r.c.CallRPC(ctx, &states, "pstate_queryContractNullifiers", domain, contractAddress, schemaRef, query)
 	return
 }

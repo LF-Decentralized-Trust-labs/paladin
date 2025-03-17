@@ -23,7 +23,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/statemgr"
@@ -46,15 +46,15 @@ var testStateSchema = &abi.Parameter{
 	},
 }
 
-func writeStates(t *testing.T, txm *txManager, dbTX persistence.DBTX, testSchemaID tktypes.Bytes32, fakeContractAddr tktypes.EthAddress, count int) ([]*pldapi.StateBase, []tktypes.HexBytes) {
+func writeStates(t *testing.T, txm *txManager, dbTX persistence.DBTX, testSchemaID types.Bytes32, fakeContractAddr types.EthAddress, count int) ([]*pldapi.StateBase, []types.HexBytes) {
 	stateInputs := make([]*components.StateUpsertOutsideContext, count)
 	for i := range stateInputs {
 		stateInputs[i] = &components.StateUpsertOutsideContext{
-			SchemaID:        tktypes.Bytes32(testSchemaID),
+			SchemaID:        types.Bytes32(testSchemaID),
 			ContractAddress: &fakeContractAddr,
-			Data: tktypes.JSONString(map[string]any{
-				"salt":   tktypes.RandHex(32),
-				"owner":  tktypes.RandAddress(),
+			Data: types.JSONString(map[string]any{
+				"salt":   types.RandHex(32),
+				"owner":  types.RandAddress(),
 				"amount": 10000 + i,
 			}),
 		}
@@ -63,7 +63,7 @@ func writeStates(t *testing.T, txm *txManager, dbTX persistence.DBTX, testSchema
 	require.NoError(t, err)
 
 	states := make([]*pldapi.StateBase, len(written))
-	stateIDs := make([]tktypes.HexBytes, len(written))
+	stateIDs := make([]types.HexBytes, len(written))
 	for i, s := range written {
 		states[i] = &s.StateBase
 		stateIDs[i] = s.ID
@@ -84,8 +84,8 @@ func newRealStateManager(t *testing.T, mc *mockComponents) components.StateManag
 
 func TestPreparedTransactionRealDB(t *testing.T) {
 
-	contractAddressDomain1 := *tktypes.RandAddress()
-	contractAddressDomain2 := *tktypes.RandAddress()
+	contractAddressDomain1 := *types.RandAddress()
+	contractAddressDomain2 := *types.RandAddress()
 
 	var stateMgr components.StateManager
 	ctx, txm, done := newTestTransactionManager(t, true,
@@ -103,7 +103,7 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 	txm.stateMgr = stateMgr
 	defer txm.stateMgr.Stop()
 
-	var testSchemaID tktypes.Bytes32
+	var testSchemaID types.Bytes32
 	var parentTx *components.ValidatedTransaction
 	err := txm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 
@@ -143,7 +143,7 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 				ID:       *parentTx.Transaction.ID,
 				Domain:   parentTx.Transaction.Domain,
 				To:       &contractAddressDomain1,
-				Metadata: tktypes.RawJSON(`{"some":"data"}`),
+				Metadata: types.RawJSON(`{"some":"data"}`),
 				Transaction: pldapi.TransactionInput{
 					TransactionBase: pldapi.TransactionBase{
 						From:           "me@node1",
@@ -182,12 +182,12 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 					Type:           pldapi.TransactionTypePrivate.Enum(),
 					Domain:         "domain2",
 					To:             &contractAddressDomain2,
-					Function:       "doThing2()",          // now fully qualified
-					ABIReference:   &storedABI.Hash,       // now resolved
-					Data:           tktypes.RawJSON(`{}`), // normalized
+					Function:       "doThing2()",        // now fully qualified
+					ABIReference:   &storedABI.Hash,     // now resolved
+					Data:           types.RawJSON(`{}`), // normalized
 				},
 			},
-			Metadata: tktypes.RawJSON(`{"some":"data"}`),
+			Metadata: types.RawJSON(`{"some":"data"}`),
 		}
 
 		// Query it back
@@ -222,8 +222,8 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 
 }
 
-func stateIDs(states []*pldapi.StateBase) []tktypes.HexBytes {
-	stateIDs := make([]tktypes.HexBytes, len(states))
+func stateIDs(states []*pldapi.StateBase) []types.HexBytes {
+	stateIDs := make([]types.HexBytes, len(states))
 	for i, s := range states {
 		stateIDs[i] = s.ID
 	}

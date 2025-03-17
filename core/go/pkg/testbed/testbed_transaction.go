@@ -18,18 +18,18 @@ package testbed
 
 import (
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 )
 
 type TransactionResult struct {
 	ID                  uuid.UUID                `json:"id"`
-	EncodedCall         tktypes.HexBytes         `json:"encodedCall"`
+	EncodedCall         types.HexBytes           `json:"encodedCall"`
 	PreparedTransaction *pldapi.TransactionInput `json:"preparedTransaction"`
-	PreparedMetadata    tktypes.RawJSON          `json:"preparedMetadata"`
+	PreparedMetadata    types.RawJSON            `json:"preparedMetadata"`
 	InputStates         []*pldapi.StateEncoded   `json:"inputStates"`
 	OutputStates        []*pldapi.StateEncoded   `json:"outputStates"`
 	ReadStates          []*pldapi.StateEncoded   `json:"readStates"`
 	InfoStates          []*pldapi.StateEncoded   `json:"infoStates"`
-	DomainData          tktypes.RawJSON          `json:"domainData"` // TODO: remove (only used for finding Pente contract address)
+	DomainData          types.RawJSON            `json:"domainData"` // TODO: remove (only used for finding Pente contract address)
 }

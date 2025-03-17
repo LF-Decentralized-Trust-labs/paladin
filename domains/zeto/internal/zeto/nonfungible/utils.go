@@ -3,7 +3,7 @@ package nonfungible
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	encodeTransactionDataFunc func(context.Context, *pb.TransactionSpecification) (tktypes.HexBytes, error) = common.EncodeTransactionData
-	encodeProofFunc           func(proof *corepb.SnarkProof) map[string]interface{}                         = common.EncodeProof
-	findVerifierFunc          func(string, string, string, []*pb.ResolvedVerifier) *pb.ResolvedVerifier     = domain.FindVerifier
-	findAttestationFunc       func(string, []*pb.AttestationResult) *pb.AttestationResult                   = domain.FindAttestation
+	encodeTransactionDataFunc func(context.Context, *pb.TransactionSpecification) (types.HexBytes, error) = common.EncodeTransactionData
+	encodeProofFunc           func(proof *corepb.SnarkProof) map[string]interface{}                       = common.EncodeProof
+	findVerifierFunc          func(string, string, string, []*pb.ResolvedVerifier) *pb.ResolvedVerifier   = domain.FindVerifier
+	findAttestationFunc       func(string, []*pb.AttestationResult) *pb.AttestationResult                 = domain.FindAttestation
 )
 
 type baseHandler struct {

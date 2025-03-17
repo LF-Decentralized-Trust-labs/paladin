@@ -21,7 +21,7 @@ import (
 	"math/big"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
@@ -133,7 +133,7 @@ func (h *delegateLockHandler) decodeStates(states []*pldapi.StateEncoded) []*pro
 		result[i] = &prototk.EndorsableState{
 			Id:            state.ID.String(),
 			SchemaId:      state.Schema.String(),
-			StateDataJson: tktypes.RawJSON(state.Data).String(),
+			StateDataJson: commontypes.RawJSON(state.Data).String(),
 		}
 	}
 	return result
@@ -185,7 +185,7 @@ func (h *delegateLockHandler) baseLedgerInvoke(ctx context.Context, tx *types.Pa
 		return nil, err
 	}
 	params := &NotoDelegateLockParams{
-		UnlockHash: tktypes.Bytes32(unlockHash),
+		UnlockHash: commontypes.Bytes32(unlockHash),
 		Delegate:   inParams.Delegate,
 		Signature:  sender.Payload,
 		Data:       data,
@@ -218,7 +218,7 @@ func (h *delegateLockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTr
 		Delegate: inParams.Delegate,
 		Data:     inParams.Data,
 		Prepared: PreparedTransaction{
-			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
+			ContractAddress: (*commontypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
 		},
 	}

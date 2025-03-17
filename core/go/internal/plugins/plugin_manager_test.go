@@ -25,7 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	prototk "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
@@ -36,9 +36,9 @@ import (
 
 func TestAllLibraryTypesMapped(t *testing.T) {
 	// Validates we don't change the map in config, without changing this map
-	var libraryTypeEnum tktypes.Enum[tktypes.LibraryType]
+	var libraryTypeEnum types.Enum[types.LibraryType]
 	for _, o := range libraryTypeEnum.V().Options() {
-		protoLibType, err := MapLibraryTypeToProto(tktypes.LibraryType(o).Enum())
+		protoLibType, err := MapLibraryTypeToProto(types.LibraryType(o).Enum())
 		require.NoError(t, err)
 		require.NotEmpty(t, string(protoLibType))
 	}
@@ -220,7 +220,7 @@ func TestLoaderErrors(t *testing.T) {
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				conf: &pldconf.PluginConfig{
-					Type:    string(tktypes.LibraryTypeCShared),
+					Type:    string(types.LibraryTypeCShared),
 					Library: "some/where",
 				},
 			},
@@ -304,7 +304,7 @@ func TestLoaderErrors(t *testing.T) {
 			connectFactory: domainConnectFactory,
 			headerAccessor: domainHeaderAccessor,
 			conf: &pldconf.PluginConfig{
-				Type:    string(tktypes.LibraryTypeJar),
+				Type:    string(types.LibraryTypeJar),
 				Library: "some/where/else",
 			},
 		},

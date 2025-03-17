@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -41,17 +41,17 @@ var nextReq atomic.Uint64
 
 func rpcTestRequest(method string, params ...any) (uint64, []byte) {
 	reqID := nextReq.Add(1)
-	jsonParams := make([]tktypes.RawJSON, len(params))
+	jsonParams := make([]types.RawJSON, len(params))
 	for i, p := range params {
-		jsonParams[i] = tktypes.JSONString(p)
+		jsonParams[i] = types.JSONString(p)
 	}
 	req := &rpcclient.RPCRequest{
 		JSONRpc: "2.0",
-		ID:      tktypes.RawJSON(fmt.Sprintf("%d", reqID)),
+		ID:      types.RawJSON(fmt.Sprintf("%d", reqID)),
 		Method:  method,
 		Params:  jsonParams,
 	}
-	return reqID, []byte(tktypes.JSONString((req)).Pretty())
+	return reqID, []byte(types.JSONString((req)).Pretty())
 }
 
 func newTestGroupManagerWithWebSocketRPC(t *testing.T, init ...func(mc *mockComponents, conf *pldconf.GroupManagerConfig)) (context.Context, string, *groupManager, *mockComponents, func()) {
@@ -177,7 +177,7 @@ func TestRPCEventListenerE2E(t *testing.T) {
 		testMsgs[i] = &pldapi.PrivacyGroupMessageInput{
 			Domain: "domain1",
 			Group:  groupID,
-			Data:   tktypes.JSONString("some data"),
+			Data:   types.JSONString("some data"),
 			Topic:  "my/topic",
 		}
 	}
@@ -330,7 +330,7 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 		_, err := gm.SendMessage(ctx, dbTX, &pldapi.PrivacyGroupMessageInput{
 			Domain: "domain1",
 			Group:  groupID,
-			Data:   tktypes.JSONString("some data"),
+			Data:   types.JSONString("some data"),
 			Topic:  "my/topic",
 		})
 		return err
@@ -471,7 +471,7 @@ func TestHandleLifecycleUnknown(t *testing.T) {
 
 	res := gm.rpcEventStreams.HandleLifecycle(ctx, &rpcclient.RPCRequest{
 		Method: "wrong",
-		Params: []tktypes.RawJSON{tktypes.RawJSON(`"any"`)},
+		Params: []types.RawJSON{types.RawJSON(`"any"`)},
 	})
 	require.Regexp(t, "PD012517", res.Error.Error())
 
@@ -498,9 +498,9 @@ func TestHandleLifecycleNoBlockNack(t *testing.T) {
 
 	res := es.HandleLifecycle(ctx, &rpcclient.RPCRequest{
 		JSONRpc: "2.0",
-		ID:      tktypes.RawJSON("12345"),
+		ID:      types.RawJSON("12345"),
 		Method:  "pgroup_nack",
-		Params:  []tktypes.RawJSON{tktypes.RawJSON(`"sub1"`)},
+		Params:  []types.RawJSON{types.RawJSON(`"sub1"`)},
 	})
 	require.Nil(t, res)
 

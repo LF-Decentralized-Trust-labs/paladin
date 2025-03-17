@@ -19,7 +19,7 @@ package pldapi
 import (
 	"testing"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,8 +64,8 @@ func TestKeyValueStringProperties(t *testing.T) {
 		"configuration": [
 			{"key": "conf1", "value": "value1"}
 		]
-	}`, tktypes.JSONString((&PrivacyGroup{
-		GenesisSalt:   tktypes.MustParseBytes32("e29c67c5f341d94da089d78460f8080e76e75e07d714a030037d5ace8e1626b8"),
+	}`, types.JSONString((&PrivacyGroup{
+		GenesisSalt:   types.MustParseBytes32("e29c67c5f341d94da089d78460f8080e76e75e07d714a030037d5ace8e1626b8"),
 		Name:          "pg1",
 		Members:       []string{"me@node1", "you@node2"},
 		Properties:    m,

@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
@@ -37,17 +37,17 @@ var NotoInterfaceJSON []byte
 type NotoHelper struct {
 	t       *testing.T
 	rpc     rpcclient.Client
-	Address *tktypes.EthAddress
+	Address *commontypes.EthAddress
 	ABI     abi.ABI
 }
 
-func DeployNoto(ctx context.Context, t *testing.T, rpc rpcclient.Client, domainName, notary string, hooks *tktypes.EthAddress) *NotoHelper {
+func DeployNoto(ctx context.Context, t *testing.T, rpc rpcclient.Client, domainName, notary string, hooks *commontypes.EthAddress) *NotoHelper {
 	notaryMode := types.NotaryModeBasic
 	if hooks != nil {
 		notaryMode = types.NotaryModeHooks
 	}
 
-	var addr tktypes.EthAddress
+	var addr commontypes.EthAddress
 	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deploy", domainName, "notary", &types.ConstructorParams{
 		Notary:     notary + "@node1",
 		NotaryMode: notaryMode,
@@ -73,7 +73,7 @@ func (n *NotoHelper) Mint(ctx context.Context, to string, amount int64) *DomainT
 	fn := types.NotoABI.Functions()["mint"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.MintParams{
 		To:     to,
-		Amount: tktypes.Int64ToInt256(amount),
+		Amount: commontypes.Int64ToInt256(amount),
 	}))
 }
 
@@ -81,7 +81,7 @@ func (n *NotoHelper) Transfer(ctx context.Context, to string, amount int64) *Dom
 	fn := types.NotoABI.Functions()["transfer"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.TransferParams{
 		To:     to,
-		Amount: tktypes.Int64ToInt256(amount),
+		Amount: commontypes.Int64ToInt256(amount),
 	}))
 }
 

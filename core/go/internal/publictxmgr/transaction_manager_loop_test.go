@@ -23,7 +23,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,8 +36,8 @@ func TestNewEnginePollingCancelledContext(t *testing.T) {
 }
 
 func TestNewEnginePollingStoppingAnOrchestratorForFairnessControl(t *testing.T) {
-	testSigningAddr1 := tktypes.RandAddress()
-	testSigningAddr2 := tktypes.RandAddress()
+	testSigningAddr1 := types.RandAddress()
+	testSigningAddr2 := types.RandAddress()
 
 	ctx, ble, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		mocks.disableManagerStart = true                         // we don't want the manager running... yet
@@ -57,7 +57,7 @@ func TestNewEnginePollingStoppingAnOrchestratorForFairnessControl(t *testing.T) 
 		InFlightTxsStale:            make(chan bool, 1),
 		stopProcess:                 make(chan bool, 1),
 	}
-	ble.inFlightOrchestrators = map[tktypes.EthAddress]*orchestrator{
+	ble.inFlightOrchestrators = map[types.EthAddress]*orchestrator{
 		*testSigningAddr1: existingOrchestrator, // already has an orchestrator for 0x1
 	}
 
@@ -73,7 +73,7 @@ func TestNewEnginePollingStoppingAnOrchestratorForFairnessControl(t *testing.T) 
 
 func TestNewEnginePollingExcludePausedOrchestrator(t *testing.T) {
 
-	testSigningAddr1 := *tktypes.RandAddress()
+	testSigningAddr1 := *types.RandAddress()
 
 	ctx, ble, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		mocks.disableManagerStart = true                         // we don't want the manager running... yet
@@ -85,8 +85,8 @@ func TestNewEnginePollingExcludePausedOrchestrator(t *testing.T) {
 	m.db.ExpectQuery("SELECT.*public_txn").WillReturnRows(sqlmock.NewRows([]string{"from"}))
 
 	// already has a running orchestrator for the address so no new orchestrator should be started
-	ble.inFlightOrchestrators = map[tktypes.EthAddress]*orchestrator{}
-	ble.signingAddressesPausedUntil = map[tktypes.EthAddress]time.Time{testSigningAddr1: time.Now().Add(1 * time.Hour)}
+	ble.inFlightOrchestrators = map[types.EthAddress]*orchestrator{}
+	ble.signingAddressesPausedUntil = map[types.EthAddress]time.Time{testSigningAddr1: time.Now().Add(1 * time.Hour)}
 
 	ble.poll(ctx)
 

@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -39,11 +39,11 @@ import (
 )
 
 type persistedMessageListener struct {
-	Name    string            `gorm:"column:name"`
-	Created tktypes.Timestamp `gorm:"column:created"`
-	Started *bool             `gorm:"column:started"`
-	Filters tktypes.RawJSON   `gorm:"column:filters"`
-	Options tktypes.RawJSON   `gorm:"column:options"`
+	Name    string          `gorm:"column:name"`
+	Created types.Timestamp `gorm:"column:created"`
+	Started *bool           `gorm:"column:started"`
+	Filters types.RawJSON   `gorm:"column:filters"`
+	Options types.RawJSON   `gorm:"column:options"`
 }
 
 var messageListenerFilters = filters.FieldMap{
@@ -57,9 +57,9 @@ func (persistedMessageListener) TableName() string {
 }
 
 type persistedMessageCheckpoint struct {
-	Listener string            `gorm:"column:listener"`
-	Sequence uint64            `gorm:"column:sequence"`
-	Time     tktypes.Timestamp `gorm:"column:time"`
+	Listener string          `gorm:"column:listener"`
+	Sequence uint64          `gorm:"column:sequence"`
+	Time     types.Timestamp `gorm:"column:time"`
 }
 
 func (persistedMessageCheckpoint) TableName() string {
@@ -131,9 +131,9 @@ func (gm *groupManager) CreateMessageListener(ctx context.Context, spec *pldapi.
 	dbSpec := &persistedMessageListener{
 		Name:    spec.Name,
 		Started: &started,
-		Created: tktypes.TimestampNow(),
-		Filters: tktypes.JSONString(&spec.Filters),
-		Options: tktypes.JSONString(&spec.Options),
+		Created: types.TimestampNow(),
+		Filters: types.JSONString(&spec.Filters),
+		Options: types.JSONString(&spec.Options),
 	}
 	if insertErr := gm.p.DB().
 		WithContext(ctx).
@@ -349,7 +349,7 @@ func (gm *groupManager) stopMessageListeners() {
 }
 
 func (gm *groupManager) validateListenerSpec(ctx context.Context, spec *pldapi.PrivacyGroupMessageListener) (topicMatch *regexp.Regexp, err error) {
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, spec.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+	if err := types.ValidateSafeCharsStartEndAlphaNum(ctx, spec.Name, types.DefaultNameMaxLen, "name"); err != nil {
 		return nil, err
 	}
 
@@ -617,7 +617,7 @@ func (l *messageListener) updateCheckpoint(newSequence uint64) error {
 			Create(&persistedMessageCheckpoint{
 				Listener: l.spec.Name,
 				Sequence: newSequence,
-				Time:     tktypes.TimestampNow(),
+				Time:     types.TimestampNow(),
 			}).
 			Error
 		if err != nil {

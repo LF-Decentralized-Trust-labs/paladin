@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcserver"
@@ -46,7 +46,7 @@ func (bi *blockIndexer) initRPC() {
 
 func (bi *blockIndexer) rpcGetBlockByNumber() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
-		number tktypes.HexUint64,
+		number types.HexUint64,
 	) (*pldapi.IndexedBlock, error) {
 		return bi.GetIndexedBlockByNumber(ctx, number.Uint64())
 	})
@@ -54,7 +54,7 @@ func (bi *blockIndexer) rpcGetBlockByNumber() rpcserver.RPCHandler {
 
 func (bi *blockIndexer) rpcGetTransactionByHash() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
-		hash tktypes.Bytes32,
+		hash types.Bytes32,
 	) (*pldapi.IndexedTransaction, error) {
 		return bi.GetIndexedTransactionByHash(ctx, hash)
 	})
@@ -62,8 +62,8 @@ func (bi *blockIndexer) rpcGetTransactionByHash() rpcserver.RPCHandler {
 
 func (bi *blockIndexer) rpcGetTransactionByNonce() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
-		from tktypes.EthAddress,
-		nonce tktypes.HexUint64,
+		from types.EthAddress,
+		nonce types.HexUint64,
 	) (*pldapi.IndexedTransaction, error) {
 		return bi.GetIndexedTransactionByNonce(ctx, from, nonce.Uint64())
 	})
@@ -71,7 +71,7 @@ func (bi *blockIndexer) rpcGetTransactionByNonce() rpcserver.RPCHandler {
 
 func (bi *blockIndexer) rpcGetBlockTransactionsByNumber() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
-		blockNumber tktypes.HexUint64,
+		blockNumber types.HexUint64,
 	) ([]*pldapi.IndexedTransaction, error) {
 		return bi.GetBlockTransactionsByNumber(ctx, int64(blockNumber.Uint64()))
 	})
@@ -79,7 +79,7 @@ func (bi *blockIndexer) rpcGetBlockTransactionsByNumber() rpcserver.RPCHandler {
 
 func (bi *blockIndexer) rpcGetTransactionEventsByHash() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
-		hash tktypes.Bytes32,
+		hash types.Bytes32,
 	) ([]*pldapi.IndexedEvent, error) {
 		return bi.GetTransactionEventsByHash(ctx, hash)
 	})
@@ -87,7 +87,7 @@ func (bi *blockIndexer) rpcGetTransactionEventsByHash() rpcserver.RPCHandler {
 
 func (bi *blockIndexer) rpcGetConfirmedBlockHeight() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod0(func(ctx context.Context,
-	) (tktypes.HexUint64, error) {
+	) (types.HexUint64, error) {
 		return bi.GetConfirmedBlockHeight(ctx)
 	})
 }
@@ -118,9 +118,9 @@ func (bi *blockIndexer) rpcQueryIndexedEvents() rpcserver.RPCHandler {
 
 func (bi *blockIndexer) rpcDecodeTransactionEvents() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
-		hash tktypes.Bytes32,
+		hash types.Bytes32,
 		abi abi.ABI,
-		resultFormat tktypes.JSONFormatOptions,
+		resultFormat types.JSONFormatOptions,
 	) ([]*pldapi.EventWithData, error) {
 		return bi.DecodeTransactionEvents(ctx, hash, abi, resultFormat)
 	})

@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -54,7 +54,7 @@ func TestRunBatchFinalizeOperations(t *testing.T) {
 
 	testRevertReason := "test error"
 	testTxnID := uuid.New()
-	testContractAddress := tktypes.RandAddress()
+	testContractAddress := types.RandAddress()
 	testSyncPointOperations := []*syncPointOperation{
 		{
 			domainContext:   dc,
@@ -101,8 +101,8 @@ func TestRunBatchFinalizeOperationsMixedContractAddresses(t *testing.T) {
 	testTxnID1 := uuid.New()
 	testTxnID2a := uuid.New()
 	testTxnID2b := uuid.New()
-	testContractAddress1 := tktypes.RandAddress()
-	testContractAddress2 := tktypes.RandAddress()
+	testContractAddress1 := types.RandAddress()
+	testContractAddress2 := types.RandAddress()
 	testSyncPointOperations := []*syncPointOperation{
 		{
 			domainContext:   dc,

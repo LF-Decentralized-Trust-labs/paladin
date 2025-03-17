@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 )
@@ -35,7 +35,7 @@ type ValueSet interface {
 	GetValue(ctx context.Context, fieldName string, resolver FieldResolver) (driver.Value, error)
 }
 
-type ResolvingValueSet map[string]tktypes.RawJSON
+type ResolvingValueSet map[string]types.RawJSON
 
 func (vs ResolvingValueSet) GetValue(ctx context.Context, fieldName string, resolver FieldResolver) (driver.Value, error) {
 	val, err := resolver.SQLValue(ctx, vs[fieldName])

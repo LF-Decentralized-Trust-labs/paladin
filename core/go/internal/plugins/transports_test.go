@@ -26,7 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
@@ -59,7 +59,7 @@ func (tp *testTransportManager) mock(t *testing.T) *componentmocks.TransportMana
 	pluginMap := make(map[string]*pldconf.PluginConfig)
 	for name := range tp.transports {
 		pluginMap[name] = &pldconf.PluginConfig{
-			Type:    string(tktypes.LibraryTypeCShared),
+			Type:    string(types.LibraryTypeCShared),
 			Library: "/tmp/not/applicable",
 		}
 	}

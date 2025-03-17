@@ -21,7 +21,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -32,17 +32,17 @@ import (
 )
 
 type PersistedABI struct {
-	Hash    tktypes.Bytes32   `gorm:"column:hash"`
-	ABI     tktypes.RawJSON   `gorm:"column:abi"`
-	Created tktypes.Timestamp `gorm:"column:created;autoCreateTime:nano"`
+	Hash    types.Bytes32   `gorm:"column:hash"`
+	ABI     types.RawJSON   `gorm:"column:abi"`
+	Created types.Timestamp `gorm:"column:created;autoCreateTime:nano"`
 }
 
 type PersistedABIEntry struct {
-	Selector   tktypes.HexBytes `gorm:"column:selector"`
-	Type       string           `gorm:"column:type"`
-	FullHash   tktypes.HexBytes `gorm:"column:full_hash"`
-	ABIHash    tktypes.Bytes32  `gorm:"column:abi_hash"`
-	Definition tktypes.RawJSON  `gorm:"column:definition"`
+	Selector   types.HexBytes `gorm:"column:selector"`
+	Type       string         `gorm:"column:type"`
+	FullHash   types.HexBytes `gorm:"column:full_hash"`
+	ABIHash    types.Bytes32  `gorm:"column:abi_hash"`
+	Definition types.RawJSON  `gorm:"column:definition"`
 }
 
 var abiFilters = filters.FieldMap{
@@ -50,7 +50,7 @@ var abiFilters = filters.FieldMap{
 	"created": filters.TimestampField("created"),
 }
 
-func (tm *txManager) getABIByHash(ctx context.Context, dbTX persistence.DBTX, hash tktypes.Bytes32) (*pldapi.StoredABI, error) {
+func (tm *txManager) getABIByHash(ctx context.Context, dbTX persistence.DBTX, hash types.Bytes32) (*pldapi.StoredABI, error) {
 	pa, found := tm.abiCache.Get(hash)
 	if found {
 		return pa, nil
@@ -73,7 +73,7 @@ func (tm *txManager) getABIByHash(ctx context.Context, dbTX persistence.DBTX, ha
 	return pa, nil
 }
 
-func (tm *txManager) storeABINewDBTX(ctx context.Context, a abi.ABI) (hash *tktypes.Bytes32, err error) {
+func (tm *txManager) storeABINewDBTX(ctx context.Context, a abi.ABI) (hash *types.Bytes32, err error) {
 	err = tm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
 		hash, err = tm.storeABI(ctx, dbTX, a)
 		return err
@@ -82,7 +82,7 @@ func (tm *txManager) storeABINewDBTX(ctx context.Context, a abi.ABI) (hash *tkty
 
 }
 
-func (tm *txManager) storeABI(ctx context.Context, dbTX persistence.DBTX, a abi.ABI) (*tktypes.Bytes32, error) {
+func (tm *txManager) storeABI(ctx context.Context, dbTX persistence.DBTX, a abi.ABI) (*types.Bytes32, error) {
 	pa, err := tm.UpsertABI(ctx, dbTX, a)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (tm *txManager) storeABI(ctx context.Context, dbTX persistence.DBTX, a abi.
 }
 
 func (tm *txManager) UpsertABI(ctx context.Context, dbTX persistence.DBTX, a abi.ABI) (*pldapi.StoredABI, error) {
-	hash, err := tktypes.ABISolDefinitionHash(ctx, a)
+	hash, err := types.ABISolDefinitionHash(ctx, a)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrInvalidABI)
 	}
@@ -112,8 +112,8 @@ func (tm *txManager) UpsertABI(ctx context.Context, dbTX persistence.DBTX, a abi
 			abiEntries = append(abiEntries, &PersistedABIEntry{
 				ABIHash:    *hash,
 				Type:       string(entry.Type),
-				Selector:   tktypes.HexBytes(fullHash[0:4]),
-				FullHash:   tktypes.HexBytes(fullHash),
+				Selector:   types.HexBytes(fullHash[0:4]),
+				FullHash:   types.HexBytes(fullHash),
 				Definition: defBytes,
 			})
 		}

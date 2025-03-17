@@ -19,7 +19,7 @@ package pldapi
 import (
 	"testing"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,30 +30,30 @@ func TestTransactionStatesHasUnavailable(t *testing.T) {
 	}).FirstUnavailable())
 	assert.NotNil(t, (&TransactionStates{
 		Unavailable: &UnavailableStates{
-			Confirmed: []tktypes.HexBytes{tktypes.RandBytes(32)},
+			Confirmed: []types.HexBytes{types.RandBytes(32)},
 		},
 	}).FirstUnavailable())
 	assert.NotNil(t, (&TransactionStates{
 		Unavailable: &UnavailableStates{
-			Spent: []tktypes.HexBytes{tktypes.RandBytes(32)},
+			Spent: []types.HexBytes{types.RandBytes(32)},
 		},
 	}).FirstUnavailable())
 	assert.NotNil(t, (&TransactionStates{
 		Unavailable: &UnavailableStates{
-			Read: []tktypes.HexBytes{tktypes.RandBytes(32)},
+			Read: []types.HexBytes{types.RandBytes(32)},
 		},
 	}).FirstUnavailable())
 	assert.NotNil(t, (&TransactionStates{
 		Unavailable: &UnavailableStates{
-			Info: []tktypes.HexBytes{tktypes.RandBytes(32)},
+			Info: []types.HexBytes{types.RandBytes(32)},
 		},
 	}).FirstUnavailable())
 	assert.Nil(t, (&TransactionStates{
 		Unavailable: &UnavailableStates{
-			Confirmed: []tktypes.HexBytes{},
-			Spent:     []tktypes.HexBytes{},
-			Read:      []tktypes.HexBytes{},
-			Info:      []tktypes.HexBytes{},
+			Confirmed: []types.HexBytes{},
+			Spent:     []types.HexBytes{},
+			Read:      []types.HexBytes{},
+			Info:      []types.HexBytes{},
 		},
 	}).FirstUnavailable())
 }

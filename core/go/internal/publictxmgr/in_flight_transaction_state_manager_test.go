@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
@@ -199,7 +199,7 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 	go func() {
 		for i := 0; i < expectedNumberOfSubmitSuccessOutput; i++ {
 			go func() {
-				stateManager.AddSubmitOutput(ctx, confutil.P(tktypes.Bytes32Keccak([]byte("0x000031"))), confutil.P(tktypes.TimestampNow()), SubmissionOutcomeAlreadyKnown, "", nil)
+				stateManager.AddSubmitOutput(ctx, confutil.P(types.Bytes32Keccak([]byte("0x000031"))), confutil.P(types.TimestampNow()), SubmissionOutcomeAlreadyKnown, "", nil)
 				countChanel <- true
 			}()
 		}
@@ -208,7 +208,7 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 	go func() {
 		for i := 0; i < expectedNumberOfSubmitErrorOutput; i++ {
 			go func() {
-				stateManager.AddSubmitOutput(ctx, nil, confutil.P(tktypes.TimestampNow()), SubmissionOutcomeFailedRequiresRetry, "error", fmt.Errorf("error"))
+				stateManager.AddSubmitOutput(ctx, nil, confutil.P(types.TimestampNow()), SubmissionOutcomeFailedRequiresRetry, "error", fmt.Errorf("error"))
 				countChanel <- true
 			}()
 		}
@@ -217,7 +217,7 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 	go func() {
 		for i := 0; i < expectedNumberOfSignSuccessOutput; i++ {
 			go func() {
-				stateManager.AddSignOutput(ctx, []byte("data"), confutil.P(tktypes.RandBytes32()), nil)
+				stateManager.AddSignOutput(ctx, []byte("data"), confutil.P(types.RandBytes32()), nil)
 				countChanel <- true
 			}()
 		}
@@ -234,7 +234,7 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 		for i := 0; i < expectedNumberOfGasPriceSuccessOutput; i++ {
 			go func() {
 				stateManager.AddGasPriceOutput(ctx, &pldapi.PublicTxGasPricing{
-					GasPrice: tktypes.Int64ToInt256(100),
+					GasPrice: types.Int64ToInt256(100),
 				}, nil)
 				countChanel <- true
 			}()
@@ -369,7 +369,7 @@ func TestStateManagerTxPersistenceManagementUpdateErrors(t *testing.T) {
 	rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{
 		NewSubmission: &DBPubTxnSubmission{
 			from:            "0x12345",
-			TransactionHash: tktypes.RandBytes32(),
+			TransactionHash: types.RandBytes32(),
 		},
 	}
 

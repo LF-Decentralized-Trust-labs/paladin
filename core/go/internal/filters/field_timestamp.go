@@ -21,7 +21,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 type TimestampField string
@@ -34,11 +34,11 @@ func (sf TimestampField) SupportsLIKE() bool {
 	return false
 }
 
-func (sf TimestampField) SQLValue(ctx context.Context, jsonValue tktypes.RawJSON) (driver.Value, error) {
+func (sf TimestampField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
 	if jsonValue.IsNil() {
 		return nil, nil
 	}
-	var timestamp tktypes.Timestamp
+	var timestamp types.Timestamp
 	err := json.Unmarshal(jsonValue, &timestamp)
 	return int64(timestamp), err
 }

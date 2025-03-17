@@ -19,7 +19,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
@@ -43,7 +43,7 @@ func newZetoSigningModule(t *testing.T) (context.Context, signer.SigningModule, 
 					Keys: map[string]pldconf.StaticKeyEntryConfig{
 						"seed": {
 							Encoding: "hex",
-							Inline:   tktypes.RandHex(32),
+							Inline:   types.RandHex(32),
 						},
 					},
 				},

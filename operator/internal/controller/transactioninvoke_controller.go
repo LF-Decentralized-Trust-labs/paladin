@@ -36,7 +36,7 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 )
@@ -139,7 +139,7 @@ func (r *TransactionInvokeReconciler) buildDeployTransaction(txi *corev1alpha1.T
 	if err = toTemplate.Execute(toBuff, crMap); err != nil {
 		return false, nil, fmt.Errorf("toTemplate failed: %s", err)
 	}
-	to, err := tktypes.ParseEthAddress(toBuff.String())
+	to, err := commontypes.ParseEthAddress(toBuff.String())
 	if err != nil {
 		return false, nil, fmt.Errorf("toTemplate result '%s' not a valid address: %s", toBuff, err)
 	}
@@ -156,7 +156,7 @@ func (r *TransactionInvokeReconciler) buildDeployTransaction(txi *corev1alpha1.T
 
 	return true, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
-			Type:   tktypes.Enum[pldapi.TransactionType](txi.Spec.TxType),
+			Type:   commontypes.Enum[pldapi.TransactionType](txi.Spec.TxType),
 			Domain: txi.Spec.Domain,
 			From:   txi.Spec.From,
 			To:     to,

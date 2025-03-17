@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -48,12 +48,12 @@ func mockGetStateRetryThenOk(mc *mockComponents, conf *pldconf.TransportManagerC
 func mockGetStateOk(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 	mGS := mc.stateManager.On("GetStatesByID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false)
 	mGS.Run(func(args mock.Arguments) {
-		id := (args[4].([]tktypes.HexBytes))[0]
+		id := (args[4].([]types.HexBytes))[0]
 		mGS.Return([]*pldapi.State{
 			{
 				StateBase: pldapi.StateBase{
 					DomainName:      args[2].(string),
-					ContractAddress: args[3].(*tktypes.EthAddress),
+					ContractAddress: args[3].(*types.EthAddress),
 					ID:              id,
 					Data:            []byte(fmt.Sprintf(`{"dataFor": "%s"}`, id.HexString())),
 				},
@@ -107,9 +107,9 @@ func TestReliableMessageResendRealDB(t *testing.T) {
 	for i := range sds {
 		sds[i] = &components.StateDistribution{
 			Domain:          "domain1",
-			ContractAddress: tktypes.RandAddress().String(),
-			SchemaID:        tktypes.RandHex(32),
-			StateID:         tktypes.RandHex(32),
+			ContractAddress: types.RandAddress().String(),
+			SchemaID:        types.RandHex(32),
+			StateID:         types.RandHex(32),
 		}
 	}
 
@@ -124,7 +124,7 @@ func TestReliableMessageResendRealDB(t *testing.T) {
 			err := tm.SendReliable(ctx, dbTX, &pldapi.ReliableMessage{
 				MessageType: pldapi.RMTState.Enum(),
 				Node:        node,
-				Metadata:    tktypes.JSONString(sds[i]),
+				Metadata:    types.JSONString(sds[i]),
 			})
 			require.NoError(t, err)
 		}
@@ -203,16 +203,16 @@ func TestReliableMessageSendSendQuiesceRealDB(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		sd := &components.StateDistribution{
 			Domain:          "domain1",
-			ContractAddress: tktypes.RandAddress().String(),
-			SchemaID:        tktypes.RandHex(32),
-			StateID:         tktypes.RandHex(32),
+			ContractAddress: types.RandAddress().String(),
+			SchemaID:        types.RandHex(32),
+			StateID:         types.RandHex(32),
 		}
 
 		err := tm.persistence.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 			return tm.SendReliable(ctx, dbTX, &pldapi.ReliableMessage{
 				MessageType: pldapi.RMTState.Enum(),
 				Node:        "node2",
-				Metadata:    tktypes.JSONString(sd),
+				Metadata:    types.JSONString(sd),
 			})
 		})
 		require.NoError(t, err)
@@ -281,11 +281,11 @@ func TestSendBadReliableMessageMarkedFailRealDB(t *testing.T) {
 	rm2 := &pldapi.ReliableMessage{
 		MessageType: pldapi.RMTState.Enum(),
 		Node:        "node2",
-		Metadata: tktypes.JSONString(&components.StateDistribution{
+		Metadata: types.JSONString(&components.StateDistribution{
 			Domain:          "domain1",
-			ContractAddress: tktypes.RandAddress().String(),
-			SchemaID:        tktypes.RandHex(32),
-			StateID:         tktypes.RandHex(32),
+			ContractAddress: types.RandAddress().String(),
+			SchemaID:        types.RandHex(32),
+			StateID:         types.RandHex(32),
 		}),
 	}
 	err = tm.persistence.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
@@ -467,7 +467,7 @@ func TestProcessReliableMsgPageIgnoreBeforeHWM(t *testing.T) {
 		{
 			ID:       uuid.New(),
 			Sequence: 50,
-			Created:  tktypes.TimestampNow(),
+			Created:  types.TimestampNow(),
 		},
 	})
 	require.NoError(t, err)
@@ -490,7 +490,7 @@ func TestProcessReliableMsgPageIgnoreUnsupported(t *testing.T) {
 		{
 			ID:          uuid.New(),
 			Sequence:    50,
-			Created:     tktypes.TimestampNow(),
+			Created:     types.TimestampNow(),
 			MessageType: pldapi.RMTReceipt.Enum(),
 		},
 	})
@@ -515,9 +515,9 @@ func TestProcessReliableMsgPageInsertFail(t *testing.T) {
 
 	sd := &components.StateDistribution{
 		Domain:          "domain1",
-		ContractAddress: tktypes.RandAddress().String(),
-		SchemaID:        tktypes.RandHex(32),
-		StateID:         tktypes.RandHex(32),
+		ContractAddress: types.RandAddress().String(),
+		SchemaID:        types.RandHex(32),
+		StateID:         types.RandHex(32),
 	}
 
 	rm := &pldapi.ReliableMessage{
@@ -525,8 +525,8 @@ func TestProcessReliableMsgPageInsertFail(t *testing.T) {
 		Sequence:    50,
 		MessageType: pldapi.RMTState.Enum(),
 		Node:        "node2",
-		Metadata:    tktypes.JSONString(sd),
-		Created:     tktypes.TimestampNow(),
+		Metadata:    types.JSONString(sd),
+		Created:     types.TimestampNow(),
 	}
 
 	err := p.processReliableMsgPage(tm.persistence.NOTX(), []*pldapi.ReliableMessage{rm})
@@ -536,7 +536,7 @@ func TestProcessReliableMsgPageInsertFail(t *testing.T) {
 
 func TestProcessReliableMsgPagePrivacyGroup(t *testing.T) {
 
-	schemaID := tktypes.RandBytes32()
+	schemaID := types.RandBytes32()
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGetStateOk,
 		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
@@ -555,9 +555,9 @@ func TestProcessReliableMsgPagePrivacyGroup(t *testing.T) {
 		GenesisState: components.StateDistributionWithData{
 			StateDistribution: components.StateDistribution{
 				Domain:          "domain1",
-				ContractAddress: tktypes.RandAddress().String(),
+				ContractAddress: types.RandAddress().String(),
 				SchemaID:        schemaID.String(),
-				StateID:         tktypes.RandHex(32),
+				StateID:         types.RandHex(32),
 			},
 		},
 	}
@@ -567,8 +567,8 @@ func TestProcessReliableMsgPagePrivacyGroup(t *testing.T) {
 		Sequence:    50,
 		MessageType: pldapi.RMTPrivacyGroup.Enum(),
 		Node:        "node2",
-		Metadata:    tktypes.JSONString(pgd),
-		Created:     tktypes.TimestampNow(),
+		Metadata:    types.JSONString(pgd),
+		Created:     types.TimestampNow(),
 	}
 
 	sentMessages := make(chan *prototk.PaladinMsg, 1)
@@ -599,12 +599,12 @@ func TestProcessReliableMsgPagePrivacyGroupMessage(t *testing.T) {
 
 	origMsg := &pldapi.PrivacyGroupMessage{
 		ID:   uuid.New(),
-		Sent: tktypes.TimestampNow(),
+		Sent: types.TimestampNow(),
 		PrivacyGroupMessageInput: pldapi.PrivacyGroupMessageInput{
 			Domain: "domain1",
-			Group:  tktypes.RandBytes(32),
+			Group:  types.RandBytes(32),
 			Topic:  "topic1",
-			Data:   tktypes.JSONString("some data"),
+			Data:   types.JSONString("some data"),
 		},
 	}
 	ctx, tm, tp, done := newTestTransport(t, false,
@@ -624,7 +624,7 @@ func TestProcessReliableMsgPagePrivacyGroupMessage(t *testing.T) {
 
 	pmd := &components.PrivacyGroupMessageDistribution{
 		Domain: "domain1",
-		Group:  tktypes.RandBytes(32),
+		Group:  types.RandBytes(32),
 		ID:     origMsg.ID,
 	}
 
@@ -633,8 +633,8 @@ func TestProcessReliableMsgPagePrivacyGroupMessage(t *testing.T) {
 		Sequence:    50,
 		MessageType: pldapi.RMTPrivacyGroupMessage.Enum(),
 		Node:        "node2",
-		Metadata:    tktypes.JSONString(pmd),
-		Created:     tktypes.TimestampNow(),
+		Metadata:    types.JSONString(pmd),
+		Created:     types.TimestampNow(),
 	}
 
 	sentMessages := make(chan *prototk.PaladinMsg, 1)

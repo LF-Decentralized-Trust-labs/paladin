@@ -28,7 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
@@ -64,8 +64,8 @@ type TxBuilder interface {
 	Function(fn string) TxBuilder // fhe name or full signature of a function - can be left unset for a constructor
 	GetFunction() string
 
-	ABIReference(hash *tktypes.Bytes32) TxBuilder
-	GetABIReference() *tktypes.Bytes32 // not calculated client set when an ABI is used - only returns non-nil if set explicitly
+	ABIReference(hash *types.Bytes32) TxBuilder
+	GetABIReference() *types.Bytes32 // not calculated client set when an ABI is used - only returns non-nil if set explicitly
 
 	IdempotencyKey(idempotencyKey string) TxBuilder // A unique identifier for your business transaction, allowing exactly-once submission over the JSON/RPC API
 	GetIdempotencyKey() string
@@ -73,16 +73,16 @@ type TxBuilder interface {
 	From(from string) TxBuilder // the identifier for the signing address to use to create the signature that authorizes the transaction
 	GetFrom() string
 
-	To(to *tktypes.EthAddress) TxBuilder // the contract address to send the transaction to, or nil for a constructor
-	GetTo() *tktypes.EthAddress
+	To(to *types.EthAddress) TxBuilder // the contract address to send the transaction to, or nil for a constructor
+	GetTo() *types.EthAddress
 
 	Bytecode(bytecode []byte) TxBuilder // for public transaction constructors this is required (not applicable to private transactions directly - Pente is a special case handled separately)
-	GetBytecode() tktypes.HexBytes
+	GetBytecode() types.HexBytes
 
 	Domain(domain string) TxBuilder // for private transaction constructors the domain must be specified. It is optional for private transactions as it will be inferred from the to address
 	GetDomain() string
 
-	Inputs(inputs any) TxBuilder // can be string and tktypes.RawJSON are interpreted as JSON, abi.ComponentValue trees can be used, and any other type will be serialized to JSON then parsed against the ABI inputs. Errors processing this input against the ABI function definition are deferred
+	Inputs(inputs any) TxBuilder // can be string and types.RawJSON are interpreted as JSON, abi.ComponentValue trees can be used, and any other type will be serialized to JSON then parsed against the ABI inputs. Errors processing this input against the ABI function definition are deferred
 	GetInputs() any
 
 	Outputs(outputs any) TxBuilder // only used for call - must be a pointer to the place to store the return value. Same type rules as Inputs
@@ -94,17 +94,17 @@ type TxBuilder interface {
 	PublicCallOptions(opts pldapi.PublicCallOptions) TxBuilder // allows you to set the block number the call happens against, when running queries directly against the base ledger
 	GetPublicCallOptions() pldapi.PublicCallOptions
 
-	DataFormat(format tktypes.JSONFormatOptions) TxBuilder // determines how JSON will be sent/received to/from the server as serialized JSON
-	GetDataFormat() tktypes.JSONFormatOptions
+	DataFormat(format types.JSONFormatOptions) TxBuilder // determines how JSON will be sent/received to/from the server as serialized JSON
+	GetDataFormat() types.JSONFormatOptions
 
 	Clone() TxBuilder                           // creates a copy that is useful as a way to create a common reference builder for multiple calls
 	Wrap(*pldapi.TransactionInput) TxBuilder    // initializes a TxBuilder from an existing transaction, including setting the inputs to be the Data from the TX
 	WrapCall(*pldapi.TransactionCall) TxBuilder // initializes a TxBuilder from an existing call, including setting the inputs to be the Data from the TX
 
 	ResolveDefinition() (*abi.Entry, error)                                // resolves the function/constructor client-side against the ABI and returns the full definition
-	BuildCallData() (callData tktypes.HexBytes, err error)                 // builds binary call data, useful for various low level functions on ABI
+	BuildCallData() (callData types.HexBytes, err error)                   // builds binary call data, useful for various low level functions on ABI
 	BuildInputDataCV() (def *abi.Entry, cv *abi.ComponentValue, err error) // build the intermediate abi.ComponentValue tree for the inputs
-	BuildInputDataJSON() (jsonData tktypes.RawJSON, err error)             // build the input data as JSON (object by default, with serialization options via Serializer())
+	BuildInputDataJSON() (jsonData types.RawJSON, err error)               // build the input data as JSON (object by default, with serialization options via Serializer())
 	BuildTX() SendableTransaction                                          // builds the full TransactionInput object for use with Paladin - copies the TX so the builder can be re-used safely
 	Send() SentTransaction                                                 // shortcut to BuildTX() then Send() with a chainable result (errors deferred)
 	Prepare() PreparingTransaction                                         // shortcut to BuildTX() then Prepare() with a chainable result (errors deferred)
@@ -136,7 +136,7 @@ type TransactionResult interface {
 	Chainable
 
 	ID() uuid.UUID
-	TransactionHash() *tktypes.Bytes32   // non-nil if this made it to the chain - which is possible when error is true, for revert cases
+	TransactionHash() *types.Bytes32     // non-nil if this made it to the chain - which is possible when error is true, for revert cases
 	Error() error                        // could be a failure to submit, or an error at any point up to and including execution reversion on-chain
 	Receipt() *pldapi.TransactionReceipt // if nil, then error is guaranteed to be non-nil
 }
@@ -287,7 +287,7 @@ func (t *txBuilder) ABIJSON(abiJson []byte) TxBuilder {
 	return t.ABI(a)
 }
 
-func (t *txBuilder) ABIReference(hash *tktypes.Bytes32) TxBuilder {
+func (t *txBuilder) ABIReference(hash *types.Bytes32) TxBuilder {
 	t.tx.ABIReference = hash
 	return t
 }
@@ -320,11 +320,11 @@ func (t *txBuilder) GetABI() abi.ABI {
 	return t.tx.ABI
 }
 
-func (t *txBuilder) GetABIReference() *tktypes.Bytes32 {
+func (t *txBuilder) GetABIReference() *types.Bytes32 {
 	return t.tx.ABIReference
 }
 
-func (t *txBuilder) GetBytecode() tktypes.HexBytes {
+func (t *txBuilder) GetBytecode() types.HexBytes {
 	return t.tx.Bytecode
 }
 
@@ -352,7 +352,7 @@ func (t *txBuilder) GetOutputs() any {
 	return t.outputs
 }
 
-func (t *txBuilder) GetDataFormat() tktypes.JSONFormatOptions {
+func (t *txBuilder) GetDataFormat() types.JSONFormatOptions {
 	return t.tx.DataFormat
 }
 
@@ -364,7 +364,7 @@ func (t *txBuilder) GetPublicCallOptions() pldapi.PublicCallOptions {
 	return t.tx.PublicCallOptions
 }
 
-func (t *txBuilder) GetTo() *tktypes.EthAddress {
+func (t *txBuilder) GetTo() *types.EthAddress {
 	return t.tx.To
 }
 
@@ -387,7 +387,7 @@ func (t *txBuilder) Outputs(outputs any) TxBuilder {
 	return t
 }
 
-func (t *txBuilder) DataFormat(format tktypes.JSONFormatOptions) TxBuilder {
+func (t *txBuilder) DataFormat(format types.JSONFormatOptions) TxBuilder {
 	t.tx.DataFormat = format
 	return t
 }
@@ -416,7 +416,7 @@ func (t *txBuilder) SolidityBuild(build *solutils.SolidityBuild) TxBuilder {
 	return t.ABI(build.ABI).Bytecode(build.Bytecode)
 }
 
-func (t *txBuilder) To(to *tktypes.EthAddress) TxBuilder {
+func (t *txBuilder) To(to *types.EthAddress) TxBuilder {
 	t.tx.To = to
 	return t
 }
@@ -464,7 +464,7 @@ func (t *txBuilder) copyTX() (*pldapi.TransactionCall, error) {
 		case []byte:
 			tx.Data = tv
 		case string:
-			tx.Data = tktypes.RawJSON(tv)
+			tx.Data = types.RawJSON(tv)
 		default:
 			tx.Data, err = json.Marshal(tv)
 		}
@@ -484,7 +484,7 @@ func (t *txBuilder) Call() error {
 	return t.BuildTX().Call()
 }
 
-func (t *txBuilder) BuildCallData() (callData tktypes.HexBytes, err error) {
+func (t *txBuilder) BuildCallData() (callData types.HexBytes, err error) {
 	var inputDataRLP []byte
 	def, cv, err := t.BuildInputDataCV()
 	if err == nil {
@@ -550,7 +550,7 @@ func (t *txBuilder) BuildInputDataCV() (def *abi.Entry, cv *abi.ComponentValue, 
 			err = json.Unmarshal([]byte(input), &inputJSONable)
 		case []byte:
 			err = json.Unmarshal(input, &inputJSONable)
-		case tktypes.RawJSON:
+		case types.RawJSON:
 			err = json.Unmarshal(input, &inputJSONable)
 		case *abi.ComponentValue:
 			cv = input
@@ -571,7 +571,7 @@ func (t *txBuilder) BuildInputDataCV() (def *abi.Entry, cv *abi.ComponentValue, 
 	return def, cv, err
 }
 
-func (t *txBuilder) BuildInputDataJSON() (jsonData tktypes.RawJSON, err error) {
+func (t *txBuilder) BuildInputDataJSON() (jsonData types.RawJSON, err error) {
 	var serializer *abi.Serializer
 	_, cv, err := t.BuildInputDataCV()
 	if err == nil {
@@ -768,7 +768,7 @@ func (tr *transactionResult) Receipt() *pldapi.TransactionReceipt {
 	return tr.receipt
 }
 
-func (tr *transactionResult) TransactionHash() *tktypes.Bytes32 {
+func (tr *transactionResult) TransactionHash() *types.Bytes32 {
 	if tr.receipt != nil && tr.receipt.TransactionReceiptDataOnchain != nil {
 		return tr.receipt.TransactionHash
 	}

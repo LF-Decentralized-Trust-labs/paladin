@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,7 +80,7 @@ func TestZeroContractAddress(t *testing.T) {
 
 func TestGoodConfigJSON(t *testing.T) {
 
-	addr := tktypes.RandAddress()
+	addr := types.RandAddress()
 
 	callbacks := &testCallbacks{}
 	transport := NewEVMRegistry(callbacks).(*evmRegistry)
@@ -98,14 +98,14 @@ func TestGoodConfigJSON(t *testing.T) {
 
 func TestHandleEventBatchOk(t *testing.T) {
 
-	txHash1 := tktypes.RandBytes32().String()
-	txHash2 := tktypes.RandBytes32().String()
+	txHash1 := types.RandBytes32().String()
+	txHash2 := types.RandBytes32().String()
 
 	identityRegistered := IdentityRegisteredEvent{
-		ParentIdentityHash: tktypes.RandBytes32(),
-		IdentityHash:       tktypes.RandBytes32(),
+		ParentIdentityHash: types.RandBytes32(),
+		IdentityHash:       types.RandBytes32(),
 		Name:               "node1",
-		Owner:              *tktypes.RandAddress(),
+		Owner:              *types.RandAddress(),
 	}
 
 	propSet := PropertySetEvent{
@@ -172,13 +172,13 @@ func TestHandleEventBatchOk(t *testing.T) {
 				Location:          &prototk.OnChainEventLocation{TransactionHash: txHash1, BlockNumber: 100, TransactionIndex: 10, LogIndex: 5},
 				Signature:         contractDetail.identityRegisteredSignature.String(),
 				SoliditySignature: identityRegisteredEventSolSig,
-				DataJson:          tktypes.JSONString(&identityRegistered).Pretty(),
+				DataJson:          types.JSONString(&identityRegistered).Pretty(),
 			},
 			{
 				Location:          &prototk.OnChainEventLocation{TransactionHash: txHash2, BlockNumber: 200, TransactionIndex: 20, LogIndex: 10},
 				Signature:         contractDetail.propertySetSignature.String(),
 				SoliditySignature: propertySetEventSolSig,
-				DataJson:          tktypes.JSONString(&propSet).Pretty(),
+				DataJson:          types.JSONString(&propSet).Pretty(),
 			},
 		},
 	})
@@ -188,7 +188,7 @@ func TestHandleEventBatchOk(t *testing.T) {
 
 func TestHandleEventBadIdentityRegistered(t *testing.T) {
 
-	txHash := tktypes.RandBytes32().String()
+	txHash := types.RandBytes32().String()
 	callbacks := &testCallbacks{}
 
 	transport := NewEVMRegistry(callbacks).(*evmRegistry)
@@ -209,7 +209,7 @@ func TestHandleEventBadIdentityRegistered(t *testing.T) {
 
 func TestHandleEventBadSetProperty(t *testing.T) {
 
-	txHash := tktypes.RandBytes32().String()
+	txHash := types.RandBytes32().String()
 	callbacks := &testCallbacks{}
 
 	transport := NewEVMRegistry(callbacks).(*evmRegistry)
@@ -246,7 +246,7 @@ func TestHandleEventBadSig(t *testing.T) {
 }
 func TestHandleEventUnknownSig(t *testing.T) {
 
-	txHash := tktypes.RandBytes32().String()
+	txHash := types.RandBytes32().String()
 	callbacks := &testCallbacks{}
 
 	transport := NewEVMRegistry(callbacks).(*evmRegistry)
@@ -255,7 +255,7 @@ func TestHandleEventUnknownSig(t *testing.T) {
 		Events: []*prototk.OnChainEvent{
 			{
 				Location:          &prototk.OnChainEventLocation{TransactionHash: txHash, BlockNumber: 100, TransactionIndex: 10, LogIndex: 5},
-				Signature:         tktypes.RandHex(32),
+				Signature:         types.RandHex(32),
 				SoliditySignature: "event any()",
 				DataJson:          `{}`,
 			},
@@ -269,14 +269,14 @@ func TestHandleEventUnknownSig(t *testing.T) {
 
 func TestHandleEventBadEntryName(t *testing.T) {
 
-	txHash := tktypes.RandBytes32().String()
+	txHash := types.RandBytes32().String()
 	callbacks := &testCallbacks{}
 
 	identityRegistered := IdentityRegisteredEvent{
-		ParentIdentityHash: tktypes.RandBytes32(),
-		IdentityHash:       tktypes.RandBytes32(),
+		ParentIdentityHash: types.RandBytes32(),
+		IdentityHash:       types.RandBytes32(),
 		Name:               "___ wrong",
-		Owner:              *tktypes.RandAddress(),
+		Owner:              *types.RandAddress(),
 	}
 
 	transport := NewEVMRegistry(callbacks).(*evmRegistry)
@@ -287,7 +287,7 @@ func TestHandleEventBadEntryName(t *testing.T) {
 				Location:          &prototk.OnChainEventLocation{TransactionHash: txHash, BlockNumber: 100, TransactionIndex: 10, LogIndex: 5},
 				Signature:         contractDetail.identityRegisteredSignature.String(),
 				SoliditySignature: identityRegisteredEventSolSig,
-				DataJson:          tktypes.JSONString(&identityRegistered).Pretty(),
+				DataJson:          types.JSONString(&identityRegistered).Pretty(),
 			},
 		},
 	})
@@ -299,10 +299,10 @@ func TestHandleEventBadEntryName(t *testing.T) {
 
 func TestHandleEventBatchPropBadName(t *testing.T) {
 
-	txHash := tktypes.RandBytes32().String()
+	txHash := types.RandBytes32().String()
 
 	propSet := PropertySetEvent{
-		IdentityHash: tktypes.RandBytes32(),
+		IdentityHash: types.RandBytes32(),
 		Name:         "___ wrong",
 		Value:        `{"endpoint":"details"}`,
 	}
@@ -317,7 +317,7 @@ func TestHandleEventBatchPropBadName(t *testing.T) {
 				Location:          &prototk.OnChainEventLocation{TransactionHash: txHash, BlockNumber: 200, TransactionIndex: 20, LogIndex: 10},
 				Signature:         contractDetail.propertySetSignature.String(),
 				SoliditySignature: propertySetEventSolSig,
-				DataJson:          tktypes.JSONString(&propSet).Pretty(),
+				DataJson:          types.JSONString(&propSet).Pretty(),
 			},
 		},
 	})
@@ -344,7 +344,7 @@ func TestHandleRoot(t *testing.T) {
 				Location:          &prototk.OnChainEventLocation{TransactionHash: "0xe61757256ff80c8f1d70380c7f9d6cb3e91f030cb68dbecb928f52aa6bf56db9", BlockNumber: 200, TransactionIndex: 20, LogIndex: 10},
 				Signature:         contractDetail.identityRegisteredSignature.String(),
 				SoliditySignature: identityRegisteredEventSolSig,
-				DataJson:          tktypes.RawJSON(rootNotification).Pretty(),
+				DataJson:          types.RawJSON(rootNotification).Pretty(),
 			},
 		},
 	})
@@ -360,7 +360,7 @@ func TestHandleRoot(t *testing.T) {
 			"transaction_hash":"0xe61757256ff80c8f1d70380c7f9d6cb3e91f030cb68dbecb928f52aa6bf56db9",
 			"transaction_index":20
 		}
-	}`, tktypes.JSONString(res.Entries[0]).Pretty())
+	}`, types.JSONString(res.Entries[0]).Pretty())
 	require.Len(t, res.Properties, 1)
 	require.JSONEq(t, `{
 		"active": true,
@@ -374,6 +374,6 @@ func TestHandleRoot(t *testing.T) {
 		  	"transaction_hash":"0xe61757256ff80c8f1d70380c7f9d6cb3e91f030cb68dbecb928f52aa6bf56db9",
 		  	"transaction_index":20
 		}		
-	}`, tktypes.JSONString(res.Properties[0]).Pretty())
+	}`, types.JSONString(res.Properties[0]).Pretty())
 
 }

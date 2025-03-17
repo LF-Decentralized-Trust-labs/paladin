@@ -23,7 +23,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -90,8 +90,8 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod4(func(ctx context.Context,
 		from string,
 		abi abi.ABI,
-		bytecode tktypes.HexBytes,
-		params tktypes.RawJSON,
+		bytecode types.HexBytes,
+		params types.RawJSON,
 	) (*ethtypes.Address0xHex, error) {
 
 		receipt, err := tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{
@@ -101,7 +101,7 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 				Data: params,
 			},
 			ABI:      abi,
-			Bytecode: tktypes.HexBytes(bytecode),
+			Bytecode: types.HexBytes(bytecode),
 		})
 		if err != nil {
 			return nil, err
@@ -131,8 +131,8 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
 		domainName string,
 		from string,
-		constructorParams tktypes.RawJSON,
-	) (*tktypes.EthAddress, error) {
+		constructorParams types.RawJSON,
+	) (*types.EthAddress, error) {
 
 		domain, err := tb.c.DomainManager().GetDomainByName(ctx, domainName)
 		if err != nil {
@@ -496,8 +496,8 @@ func (tb *testbed) rpcResolveVerifier() rpcserver.RPCHandler {
 func (tb *testbed) rpcTestbedCall() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
 		invocation *pldapi.TransactionInput,
-		dataFormat tktypes.JSONFormatOptions,
-	) (tktypes.RawJSON, error) {
+		dataFormat types.JSONFormatOptions,
+	) (types.RawJSON, error) {
 		tx, err := tb.newTestbedTransaction(ctx, invocation, prototk.TransactionSpecification_CALL)
 		if err != nil {
 			return nil, err

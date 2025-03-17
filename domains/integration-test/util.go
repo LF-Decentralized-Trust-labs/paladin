@@ -25,7 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/noto"
@@ -122,7 +122,7 @@ func deployContracts(ctx context.Context, t *testing.T, hdWalletSeed *testbed.UT
 		build := solutils.MustLoadBuild(contract)
 		var addr string
 		rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
-			deployer, build.ABI, build.Bytecode.String(), tktypes.RawJSON(`{}`))
+			deployer, build.ABI, build.Bytecode.String(), types.RawJSON(`{}`))
 		if rpcerr != nil {
 			assert.NoError(t, rpcerr)
 		}
@@ -140,12 +140,12 @@ func newNotoDomain(t *testing.T, config *nototypes.DomainConfig) (chan noto.Noto
 			waitForDomain <- domain
 			return domain
 		}),
-		RegistryAddress: tktypes.MustEthAddress(config.FactoryAddress),
+		RegistryAddress: types.MustEthAddress(config.FactoryAddress),
 	}
 	return waitForDomain, tbd
 }
 
-func newZetoDomain(t *testing.T, config *zetotypes.DomainFactoryConfig, factoryAddress *tktypes.EthAddress) (chan zeto.Zeto, *testbed.TestbedDomain) {
+func newZetoDomain(t *testing.T, config *zetotypes.DomainFactoryConfig, factoryAddress *types.EthAddress) (chan zeto.Zeto, *testbed.TestbedDomain) {
 	waitForDomain := make(chan zeto.Zeto, 1)
 	tbd := &testbed.TestbedDomain{
 		Config: mapConfig(t, config),
@@ -160,7 +160,7 @@ func newZetoDomain(t *testing.T, config *zetotypes.DomainFactoryConfig, factoryA
 	return waitForDomain, tbd
 }
 
-func findAvailableCoins[T any](t *testing.T, ctx context.Context, rpc rpcclient.Client, domainName, coinSchemaID, methodName string, address *tktypes.EthAddress, jq *query.QueryJSON, readiness ...func(coins []*T) bool) []*T {
+func findAvailableCoins[T any](t *testing.T, ctx context.Context, rpc rpcclient.Client, domainName, coinSchemaID, methodName string, address *types.EthAddress, jq *query.QueryJSON, readiness ...func(coins []*T) bool) []*T {
 	if jq == nil {
 		jq = query.NewQueryBuilder().Limit(100).Query()
 	}

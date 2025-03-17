@@ -22,7 +22,7 @@ import (
 	"slices"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -67,7 +67,7 @@ func NewCoordinatorSelector(ctx context.Context, nodeName string, contractConfig
 		staticCoordinator := contractConfig.GetStaticCoordinator()
 		//staticCoordinator must be a fully qualified identity because it is also used to locate the signing key
 		// but at this point, we only need the node name
-		staticCoordinatorNode, err := tktypes.PrivateIdentityLocator(staticCoordinator).Node(ctx, false)
+		staticCoordinatorNode, err := types.PrivateIdentityLocator(staticCoordinator).Node(ctx, false)
 		if err != nil {
 			log.L(ctx).Errorf("Error resolving node for static coordinator %s: %s", staticCoordinator, err)
 			return nil, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, err)
@@ -121,7 +121,7 @@ func (s *endorsementSetHashSelection) SelectCoordinatorNode(ctx context.Context,
 		for _, attestationPlan := range transaction.PostAssembly.AttestationPlan {
 			if attestationPlan.AttestationType == prototk.AttestationType_ENDORSE {
 				for _, party := range attestationPlan.Parties {
-					identity, node, err := tktypes.PrivateIdentityLocator(party).Validate(ctx, s.localNode, false)
+					identity, node, err := types.PrivateIdentityLocator(party).Validate(ctx, s.localNode, false)
 					if err != nil {
 						log.L(ctx).Errorf("SelectCoordinatorNode: Error resolving node for party %s: %s", party, err)
 						return -1, "", i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, err)
@@ -175,7 +175,7 @@ func (s *roundRobinCoordinatorSelectorPolicy) SelectCoordinatorNode(ctx context.
 			for _, attestationPlan := range transaction.PostAssembly.AttestationPlan {
 				if attestationPlan.AttestationType == prototk.AttestationType_ENDORSE {
 					for _, party := range attestationPlan.Parties {
-						node, err := tktypes.PrivateIdentityLocator(party).Node(ctx, true)
+						node, err := types.PrivateIdentityLocator(party).Node(ctx, true)
 						if err != nil {
 							log.L(ctx).Errorf("SelectCoordinatorNode: Error resolving node for party %s: %s", party, err)
 							return -1, "", i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, err)

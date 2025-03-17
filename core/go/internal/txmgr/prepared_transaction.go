@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -32,12 +32,12 @@ import (
 
 // DB persisted record for a prepared transaction
 type preparedTransaction struct {
-	ID          uuid.UUID           `gorm:"column:id"`
-	Domain      string              `gorm:"column:domain"`
-	To          *tktypes.EthAddress `gorm:"column:to"`
-	Created     tktypes.Timestamp   `gorm:"column:created"`
-	Transaction tktypes.RawJSON     `gorm:"column:transaction"`
-	Metadata    tktypes.RawJSON     `gorm:"column:metadata"`
+	ID          uuid.UUID         `gorm:"column:id"`
+	Domain      string            `gorm:"column:domain"`
+	To          *types.EthAddress `gorm:"column:to"`
+	Created     types.Timestamp   `gorm:"column:created"`
+	Transaction types.RawJSON     `gorm:"column:transaction"`
+	Metadata    types.RawJSON     `gorm:"column:metadata"`
 }
 
 func (preparedTransaction) TableName() string {
@@ -56,7 +56,7 @@ const (
 type preparedTransactionState struct {
 	Transaction uuid.UUID         `gorm:"column:transaction"`
 	DomainName  string            `gorm:"column:domain_name"`
-	StateID     tktypes.HexBytes  `gorm:"column:state"`
+	StateID     types.HexBytes    `gorm:"column:state"`
 	StateIdx    int               `gorm:"column:state_idx"`
 	Type        preparedStateType `gorm:"column:type"`
 	State       *pldapi.StateBase `gorm:"foreignKey:state;references:id;"`

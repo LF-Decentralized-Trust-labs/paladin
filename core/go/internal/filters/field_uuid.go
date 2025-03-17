@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 )
 
@@ -37,7 +37,7 @@ func (sf UUIDField) SupportsLIKE() bool {
 	return false
 }
 
-func (sf UUIDField) SQLValue(ctx context.Context, jsonValue tktypes.RawJSON) (driver.Value, error) {
+func (sf UUIDField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
 	if jsonValue.IsNil() {
 		return nil, nil
 	}

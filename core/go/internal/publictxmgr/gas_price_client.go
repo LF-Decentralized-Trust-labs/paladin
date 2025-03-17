@@ -28,7 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/cache"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
@@ -160,7 +160,7 @@ func NewGasPriceClient(ctx context.Context, conf *pldconf.PublicTxManagerConfig)
 func (hGpc *HybridGasPriceClient) ParseGasPriceJSON(ctx context.Context, input *fftypes.JSONAny) (gpo *pldapi.PublicTxGasPricing, err error) {
 	gpo = &pldapi.PublicTxGasPricing{}
 	if input == nil {
-		gpo.GasPrice = (*tktypes.HexUint256)(big.NewInt(0))
+		gpo.GasPrice = (*types.HexUint256)(big.NewInt(0))
 		log.L(ctx).Tracef("Gas price object generated using empty input, gasPrice=%+v", gpo)
 		return gpo, nil
 	}
@@ -170,15 +170,15 @@ func (hGpc *HybridGasPriceClient) ParseGasPriceJSON(ctx context.Context, input *
 	maxFeePerGas := gasPriceObject.GetInteger("maxFeePerGas")
 	if maxPriorityFeePerGas.Sign() > 0 || maxFeePerGas.Sign() > 0 {
 		gpo = &pldapi.PublicTxGasPricing{
-			MaxPriorityFeePerGas: (*tktypes.HexUint256)(maxPriorityFeePerGas),
-			MaxFeePerGas:         (*tktypes.HexUint256)(maxFeePerGas),
+			MaxPriorityFeePerGas: (*types.HexUint256)(maxPriorityFeePerGas),
+			MaxFeePerGas:         (*types.HexUint256)(maxFeePerGas),
 		}
 		log.L(ctx).Tracef("Gas price object generated using EIP1559 fields, gasPrice=%+v", gpo)
 		return gpo, nil
 	}
-	gpo.GasPrice = (*tktypes.HexUint256)(gasPriceObject.GetInteger("gasPrice"))
+	gpo.GasPrice = (*types.HexUint256)(gasPriceObject.GetInteger("gasPrice"))
 	if gpo.GasPrice.Int().Sign() == 0 {
-		tempHexInt := (*tktypes.HexUint256)(big.NewInt(0))
+		tempHexInt := (*types.HexUint256)(big.NewInt(0))
 		err := json.Unmarshal(input.Bytes(), tempHexInt)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgGasPriceError, input.String(), err.Error())

@@ -24,7 +24,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -91,9 +91,9 @@ func TestRPC(t *testing.T) {
 	require.NoError(t, rpcErr)
 	require.NotNil(t, rpcSchema)
 
-	contractAddress := tktypes.RandAddress()
+	contractAddress := types.RandAddress()
 	var state *pldapi.State
-	rpcErr = c.CallRPC(ctx, &state, "pstate_storeState", "domain1", contractAddress.String(), schemas[0].ID, tktypes.RawJSON(`{
+	rpcErr = c.CallRPC(ctx, &state, "pstate_storeState", "domain1", contractAddress.String(), schemas[0].ID, types.RawJSON(`{
 	    "salt": "fd2724ce91a859e24c228e50ae17b9443454514edce9a64437c208b0184d8910",
 		"size": 10,
 		"color": "blue",
@@ -109,7 +109,7 @@ func TestRPC(t *testing.T) {
 	assert.Equal(t, "0x30e278bca8d876cdceb24520b0ebe736a64a9cb8019157f40fa5b03f083f824d", state.ID.String())
 
 	var states []*pldapi.State
-	rpcErr = c.CallRPC(ctx, &states, "pstate_queryContractStates", "domain1", contractAddress.String(), schemas[0].ID, tktypes.RawJSON(`{
+	rpcErr = c.CallRPC(ctx, &states, "pstate_queryContractStates", "domain1", contractAddress.String(), schemas[0].ID, types.RawJSON(`{
 		"eq": [{
 		  "field": "color",
 		  "value": "blue"
@@ -120,7 +120,7 @@ func TestRPC(t *testing.T) {
 	assert.Len(t, states, 1)
 	assert.Equal(t, state, states[0])
 
-	rpcErr = c.CallRPC(ctx, &states, "pstate_queryStates", "domain1", schemas[0].ID, tktypes.RawJSON(`{
+	rpcErr = c.CallRPC(ctx, &states, "pstate_queryStates", "domain1", schemas[0].ID, types.RawJSON(`{
 		"eq": [{
 		  "field": "color",
 		  "value": "blue"
@@ -132,7 +132,7 @@ func TestRPC(t *testing.T) {
 	assert.Equal(t, state, states[0])
 
 	// Write some nullifiers and query them back
-	nullifier1 := tktypes.HexBytes(tktypes.RandHex(32))
+	nullifier1 := types.HexBytes(types.RandHex(32))
 	err = ss.WriteNullifiersForReceivedStates(ctx, ss.p.NOTX(), "domain1", []*components.NullifierUpsert{
 		{
 			ID:    nullifier1,
@@ -141,7 +141,7 @@ func TestRPC(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	rpcErr = c.CallRPC(ctx, &states, "pstate_queryContractNullifiers", "domain1", contractAddress.String(), schemas[0].ID, tktypes.RawJSON(`{
+	rpcErr = c.CallRPC(ctx, &states, "pstate_queryContractNullifiers", "domain1", contractAddress.String(), schemas[0].ID, types.RawJSON(`{
 		"eq": [{
 		  "field": "color",
 		  "value": "blue"
@@ -153,7 +153,7 @@ func TestRPC(t *testing.T) {
 	assert.Equal(t, state.ID, states[0].ID)
 	assert.Equal(t, nullifier1, states[0].Nullifier.ID)
 
-	rpcErr = c.CallRPC(ctx, &states, "pstate_queryNullifiers", "domain1", schemas[0].ID, tktypes.RawJSON(`{
+	rpcErr = c.CallRPC(ctx, &states, "pstate_queryNullifiers", "domain1", schemas[0].ID, types.RawJSON(`{
 		"eq": [{
 		  "field": "color",
 		  "value": "blue"

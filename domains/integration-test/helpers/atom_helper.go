@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
@@ -41,7 +41,7 @@ type AtomFactoryHelper struct {
 	t           *testing.T
 	tb          testbed.Testbed
 	pld         pldclient.PaladinClient
-	Address     *tktypes.EthAddress
+	Address     *types.EthAddress
 	FactoryABI  abi.ABI
 	InstanceABI abi.ABI
 }
@@ -50,17 +50,17 @@ type AtomHelper struct {
 	t           *testing.T
 	tb          testbed.Testbed
 	pld         pldclient.PaladinClient
-	Address     *tktypes.EthAddress
+	Address     *types.EthAddress
 	InstanceABI abi.ABI
 }
 
 type AtomOperation struct {
-	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
-	CallData        tktypes.HexBytes    `json:"callData"`
+	ContractAddress *types.EthAddress `json:"contractAddress"`
+	CallData        types.HexBytes    `json:"callData"`
 }
 
 type AtomDeployed struct {
-	Address *tktypes.EthAddress `json:"addr"`
+	Address *types.EthAddress `json:"addr"`
 }
 
 func InitAtom(
@@ -73,7 +73,7 @@ func InitAtom(
 		t:           t,
 		tb:          tb,
 		pld:         pld,
-		Address:     tktypes.MustEthAddress(address),
+		Address:     types.MustEthAddress(address),
 		FactoryABI:  solutils.MustLoadBuild(AtomFactoryJSON).ABI,
 		InstanceABI: solutils.MustLoadBuild(AtomJSON).ABI,
 	}

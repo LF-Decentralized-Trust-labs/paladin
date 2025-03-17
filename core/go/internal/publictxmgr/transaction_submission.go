@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
@@ -29,18 +29,18 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-func calculateTransactionHash(rawTxnData []byte) *tktypes.Bytes32 {
+func calculateTransactionHash(rawTxnData []byte) *types.Bytes32 {
 	if rawTxnData == nil {
 		return nil
 	}
 	msgHash := sha3.NewLegacyKeccak256()
 	msgHash.Write(rawTxnData)
-	hashBytes := tktypes.MustParseBytes32(hex.EncodeToString(msgHash.Sum(nil)))
+	hashBytes := types.MustParseBytes32(hex.EncodeToString(msgHash.Sum(nil)))
 	return &hashBytes
 }
 
-func (it *inFlightTransactionStageController) submitTX(ctx context.Context, mtx InMemoryTxStateReadOnly, signedMessage []byte) (*tktypes.Bytes32, *tktypes.Timestamp, ethclient.ErrorReason, SubmissionOutcome, error) {
-	var txHash *tktypes.Bytes32
+func (it *inFlightTransactionStageController) submitTX(ctx context.Context, mtx InMemoryTxStateReadOnly, signedMessage []byte) (*types.Bytes32, *types.Timestamp, ethclient.ErrorReason, SubmissionOutcome, error) {
+	var txHash *types.Bytes32
 	sendStart := time.Now()
 	calculatedTxHash := mtx.GetTransactionHash() // must have been persisted in previous stage
 	if calculatedTxHash == nil {
@@ -48,13 +48,13 @@ func (it *inFlightTransactionStageController) submitTX(ctx context.Context, mtx 
 	}
 	log.L(ctx).Debugf("Sending raw transaction %s (lastSubmit=%s), Hash=%s", mtx.GetSignerNonce(), mtx.GetLastSubmitTime(), txHash)
 
-	submissionTime := confutil.P(tktypes.TimestampNow())
+	submissionTime := confutil.P(types.TimestampNow())
 	var submissionErrorReason ethclient.ErrorReason // TODO: fix reason parsing
 	var submissionOutcome SubmissionOutcome
 	var submissionError error
 
 	retryError := it.transactionSubmissionRetry.Do(ctx, func(attempt int) ( /*retry*/ bool, error) {
-		txHash, submissionError = it.ethClient.SendRawTransaction(ctx, tktypes.HexBytes(signedMessage))
+		txHash, submissionError = it.ethClient.SendRawTransaction(ctx, types.HexBytes(signedMessage))
 		if submissionError == nil {
 			submissionOutcome = SubmissionOutcomeFailedRequiresRetry
 			it.thMetrics.RecordOperationMetrics(ctx, string(InFlightTxOperationTransactionSend), string(GenericStatusSuccess), time.Since(sendStart).Seconds())

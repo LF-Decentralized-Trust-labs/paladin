@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
@@ -38,7 +38,7 @@ type NotoTrackerHelper struct {
 	t       *testing.T
 	tb      testbed.Testbed
 	pld     pldclient.PaladinClient
-	Address *tktypes.EthAddress
+	Address *types.EthAddress
 	ABI     abi.ABI
 }
 

@@ -25,7 +25,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -94,8 +94,8 @@ func TestE2EReceiptListenerDeliveryLateAttach(t *testing.T) {
 	require.NoError(t, err)
 
 	// Write some receipts (before we attach to the listener to consume events)
-	contractAddr1 := tktypes.RandAddress()
-	contractAddr2 := tktypes.RandAddress()
+	contractAddr1 := types.RandAddress()
+	contractAddr2 := types.RandAddress()
 	crackleData, err := defaultErrorABI.EncodeCallDataJSON([]byte(`{
 	    "message": "crackle"
 	}`))
@@ -116,9 +116,9 @@ func TestE2EReceiptListenerDeliveryLateAttach(t *testing.T) {
 			Domain:        "domain1", // private, failed on-chain
 			TransactionID: uuid.New(),
 			RevertData:    crackleData,
-			OnChain: tktypes.OnChainLocation{
-				Type:             tktypes.OnChainEvent,
-				TransactionHash:  tktypes.Bytes32(tktypes.RandBytes(32)),
+			OnChain: types.OnChainLocation{
+				Type:             types.OnChainEvent,
+				TransactionHash:  types.Bytes32(types.RandBytes(32)),
 				BlockNumber:      12345,
 				TransactionIndex: 20,
 				LogIndex:         10,
@@ -130,9 +130,9 @@ func TestE2EReceiptListenerDeliveryLateAttach(t *testing.T) {
 			Domain:        "", // public, failed on-chain
 			TransactionID: uuid.New(),
 			RevertData:    popData,
-			OnChain: tktypes.OnChainLocation{
-				Type:             tktypes.OnChainTransaction,
-				TransactionHash:  tktypes.Bytes32(tktypes.RandBytes(32)),
+			OnChain: types.OnChainLocation{
+				Type:             types.OnChainTransaction,
+				TransactionHash:  types.Bytes32(types.RandBytes(32)),
 				BlockNumber:      12345,
 				TransactionIndex: 10,
 				Source:           contractAddr2,
@@ -167,9 +167,9 @@ func TestE2EReceiptListenerDeliveryLateAttach(t *testing.T) {
 			ReceiptType:   components.RT_Success,
 			Domain:        "", // public, success
 			TransactionID: uuid.New(),
-			OnChain: tktypes.OnChainLocation{
-				Type:             tktypes.OnChainTransaction,
-				TransactionHash:  tktypes.Bytes32(tktypes.RandBytes(32)),
+			OnChain: types.OnChainLocation{
+				Type:             types.OnChainTransaction,
+				TransactionHash:  types.Bytes32(types.RandBytes(32)),
 				BlockNumber:      23456,
 				TransactionIndex: 30,
 				Source:           contractAddr2,
@@ -188,10 +188,10 @@ func TestE2EReceiptListenerDeliveryLateAttach(t *testing.T) {
 
 }
 
-func randOnChain(addr *tktypes.EthAddress) tktypes.OnChainLocation {
-	return tktypes.OnChainLocation{
-		Type:             tktypes.OnChainTransaction,
-		TransactionHash:  tktypes.Bytes32(tktypes.RandBytes(32)),
+func randOnChain(addr *types.EthAddress) types.OnChainLocation {
+	return types.OnChainLocation{
+		Type:             types.OnChainTransaction,
+		TransactionHash:  types.Bytes32(types.RandBytes(32)),
 		BlockNumber:      23456,
 		TransactionIndex: 30,
 		Source:           addr,
@@ -280,7 +280,7 @@ func TestLoadListenersMultiPageFilters(t *testing.T) {
 				ReceiptType:   components.RT_Success,
 				Domain:        "domain2",
 				TransactionID: tx1,
-				OnChain:       randOnChain(tktypes.RandAddress()),
+				OnChain:       randOnChain(types.RandAddress()),
 			},
 		})
 	})
@@ -295,7 +295,7 @@ func TestLoadListenersMultiPageFilters(t *testing.T) {
 				ReceiptType:   components.RT_Success,
 				Domain:        "domain1",
 				TransactionID: tx2,
-				OnChain:       randOnChain(tktypes.RandAddress()),
+				OnChain:       randOnChain(types.RandAddress()),
 			},
 		})
 	})
@@ -311,7 +311,7 @@ func TestLoadListenersMultiPageFilters(t *testing.T) {
 				ReceiptType:   components.RT_Success,
 				Domain:        "",
 				TransactionID: tx3,
-				OnChain:       randOnChain(tktypes.RandAddress()),
+				OnChain:       randOnChain(types.RandAddress()),
 			},
 		})
 	})
@@ -342,7 +342,7 @@ func TestLoadListenersMultiPageFilters(t *testing.T) {
 				ReceiptType:   components.RT_Success,
 				Domain:        "",
 				TransactionID: tx4,
-				OnChain:       randOnChain(tktypes.RandAddress()),
+				OnChain:       randOnChain(types.RandAddress()),
 			},
 		})
 	})
@@ -366,8 +366,8 @@ func testGapsDomainsForNonAvailableReceipts(t *testing.T, pageSize int) {
 	txID4 := uuid.New()
 	txID5 := uuid.New()
 	txID6 := uuid.New()
-	missingStateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
-	missingStateID2 := tktypes.HexBytes(tktypes.RandBytes(32))
+	missingStateID1 := types.HexBytes(types.RandBytes(32))
+	missingStateID2 := types.HexBytes(types.RandBytes(32))
 
 	ctx, txm, done := newTestTransactionManager(t, true,
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
@@ -375,7 +375,7 @@ func testGapsDomainsForNonAvailableReceipts(t *testing.T, pageSize int) {
 			mc.stateMgr.On("GetTransactionStates", mock.Anything, mock.Anything, txID2).
 				Return(&pldapi.TransactionStates{
 					Unavailable: &pldapi.UnavailableStates{
-						Confirmed: []tktypes.HexBytes{missingStateID1},
+						Confirmed: []types.HexBytes{missingStateID1},
 					},
 				}, nil).
 				Once()
@@ -383,7 +383,7 @@ func testGapsDomainsForNonAvailableReceipts(t *testing.T, pageSize int) {
 			mc.stateMgr.On("GetTransactionStates", mock.Anything, mock.Anything, txID3).
 				Return(&pldapi.TransactionStates{
 					Unavailable: &pldapi.UnavailableStates{
-						Spent: []tktypes.HexBytes{missingStateID2},
+						Spent: []types.HexBytes{missingStateID2},
 					},
 				}, nil).
 				Once()
@@ -412,8 +412,8 @@ func testGapsDomainsForNonAvailableReceipts(t *testing.T, pageSize int) {
 	require.NoError(t, err)
 	defer close1.Close()
 
-	contract1 := tktypes.RandAddress()
-	contract2 := tktypes.RandAddress()
+	contract1 := types.RandAddress()
+	contract2 := types.RandAddress()
 	err = txm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		return txm.FinalizeTransactions(ctx, dbTX, []*components.ReceiptInput{
 			{
@@ -471,7 +471,7 @@ func testGapsDomainsForNonAvailableReceipts(t *testing.T, pageSize int) {
 
 	// Write the state that's missing
 	err = txm.p.DB().WithContext(ctx).Exec("INSERT INTO states ( id, created, domain_name, contract_address ) VALUES ( ?, ?, ?, ? )",
-		missingStateID1, tktypes.TimestampNow(), "domain1", contract1,
+		missingStateID1, types.TimestampNow(), "domain1", contract1,
 	).Error
 	require.NoError(t, err)
 
@@ -483,7 +483,7 @@ func testGapsDomainsForNonAvailableReceipts(t *testing.T, pageSize int) {
 
 	// Write the second state that's missing
 	err = txm.p.DB().WithContext(ctx).Exec("INSERT INTO states ( id, created, domain_name, contract_address ) VALUES ( ?, ?, ?, ? )",
-		missingStateID2, tktypes.TimestampNow(), "domain1", contract1,
+		missingStateID2, types.TimestampNow(), "domain1", contract1,
 	).Error
 	require.NoError(t, err)
 
@@ -538,7 +538,7 @@ func TestCreateBadListener(t *testing.T) {
 	err := txm.CreateReceiptListener(ctx, &pldapi.TransactionReceiptListener{
 		Name: "badly-behaved",
 		Options: pldapi.TransactionReceiptListenerOptions{
-			IncompleteStateReceiptBehavior: tktypes.Enum[pldapi.IncompleteStateReceiptBehavior]("misbehave"),
+			IncompleteStateReceiptBehavior: types.Enum[pldapi.IncompleteStateReceiptBehavior]("misbehave"),
 		},
 	})
 	require.Regexp(t, "PD020003", err)
@@ -635,7 +635,7 @@ func TestDeleteReceiptListenerFail(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = txm.loadListener(ctx, &persistedReceiptListener{Name: "test1", Filters: tktypes.RawJSON(`{}`), Options: tktypes.RawJSON(`{}`)})
+	_, err = txm.loadListener(ctx, &persistedReceiptListener{Name: "test1", Filters: types.RawJSON(`{}`), Options: types.RawJSON(`{}`)})
 	assert.Regexp(t, "PD012235", err)
 
 	err = txm.DeleteReceiptListener(ctx, "test1")
@@ -698,13 +698,13 @@ func TestCreateListenerBadOptions(t *testing.T) {
 	defer done()
 
 	_, err := txm.loadListener(ctx, &persistedReceiptListener{
-		Filters: tktypes.RawJSON(`{ !badness`),
+		Filters: types.RawJSON(`{ !badness`),
 	})
 	assert.Regexp(t, "PD012233", err)
 
 	_, err = txm.loadListener(ctx, &persistedReceiptListener{
-		Filters: tktypes.RawJSON(`{}`),
-		Options: tktypes.RawJSON(`{ !badness`),
+		Filters: types.RawJSON(`{}`),
+		Options: types.RawJSON(`{ !badness`),
 	})
 	assert.Regexp(t, "PD012234", err)
 
@@ -788,7 +788,7 @@ func mockPublicReceipts(count int) func(conf *pldconf.TxManagerConfig, mc *mockC
 			rows = rows.AddRow(
 				uuid.NewString(),
 				int64(1000),
-				tktypes.RandHex(32),
+				types.RandHex(32),
 			)
 		}
 		mc.db.ExpectQuery("SELECT.*transaction_receipts").WillReturnRows(rows)
@@ -807,7 +807,7 @@ func mockPrivateReceipt(conf *pldconf.TxManagerConfig, mc *mockComponents) {
 		AddRow(
 			uuid.NewString(),
 			int64(1000),
-			tktypes.RandHex(32),
+			types.RandHex(32),
 			"domain1",
 		))
 }
@@ -1010,9 +1010,9 @@ func TestProcessPersistedReceiptPostFilter(t *testing.T) {
 
 func mockGap(conf *pldconf.TxManagerConfig, mc *mockComponents) {
 	mc.db.MatchExpectationsInOrder(false)
-	contractAddr := tktypes.RandAddress()
+	contractAddr := types.RandAddress()
 	txID := uuid.New()
-	stateID := tktypes.HexBytes(tktypes.RandBytes(32))
+	stateID := types.HexBytes(types.RandBytes(32))
 	mc.db.ExpectQuery("SELECT.*receipt_listener_gap").WillReturnRows(sqlmock.NewRows([]string{
 		"listener", "source", "transaction", "sequence", "domain_name", "state",
 	}).AddRow(

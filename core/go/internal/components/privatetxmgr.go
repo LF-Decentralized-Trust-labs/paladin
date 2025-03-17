@@ -20,7 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 )
 
@@ -73,7 +73,7 @@ type StateDistribution struct {
 // A StateDistributionWithData is an intent to send private data for a given state to a remote party
 type StateDistributionWithData struct {
 	StateDistribution
-	StateData tktypes.RawJSON `json:"stateData"`
+	StateData types.RawJSON `json:"stateData"`
 }
 
 type PrivateTxManager interface {

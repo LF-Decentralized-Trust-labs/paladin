@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
@@ -493,7 +493,7 @@ func TestResolveLateBindMemSignerError(t *testing.T) {
 				Keys: map[string]pldconf.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "hex",
-						Inline:   tktypes.RandHex(32),
+						Inline:   types.RandHex(32),
 					},
 				},
 			},

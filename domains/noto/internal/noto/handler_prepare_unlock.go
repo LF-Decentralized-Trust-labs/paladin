@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
@@ -134,7 +134,7 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 	}
 	params := &NotoPrepareUnlockParams{
 		LockedInputs: endorsableStateIDs(lockedInputs),
-		UnlockHash:   tktypes.Bytes32(unlockHash),
+		UnlockHash:   commontypes.Bytes32(unlockHash),
 		Signature:    sender.Payload,
 		Data:         data,
 	}
@@ -174,7 +174,7 @@ func (h *prepareUnlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedT
 		Recipients: recipients,
 		Data:       inParams.Data,
 		Prepared: PreparedTransaction{
-			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
+			ContractAddress: (*commontypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
 		},
 	}

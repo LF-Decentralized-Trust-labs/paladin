@@ -19,7 +19,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
@@ -209,7 +209,7 @@ func TestUpdateMerkleTree(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	err = z.updateMerkleTree(ctx, merkleTree, storage, tktypes.HexBytes("0x1234"), []tktypes.HexUint256{*tktypes.MustParseHexUint256("0x1234"), *tktypes.MustParseHexUint256("0x0")})
+	err = z.updateMerkleTree(ctx, merkleTree, storage, types.HexBytes("0x1234"), []types.HexUint256{*types.MustParseHexUint256("0x1234"), *types.MustParseHexUint256("0x0")})
 	assert.NoError(t, err)
 }
 
@@ -246,8 +246,8 @@ func TestHandleWithdrawEvent(t *testing.T) {
 }
 
 func TestParseStatesFromEvent(t *testing.T) {
-	txID := tktypes.MustParseHexBytes("0x1234")
-	states := parseStatesFromEvent(txID, []tktypes.HexUint256{*tktypes.MustParseHexUint256("0x1234"), *tktypes.MustParseHexUint256("0x0")})
+	txID := types.MustParseHexBytes("0x1234")
+	states := parseStatesFromEvent(txID, []types.HexUint256{*types.MustParseHexUint256("0x1234"), *types.MustParseHexUint256("0x0")})
 	assert.Len(t, states, 2)
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000001234", states[0].Id)
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", states[1].Id)

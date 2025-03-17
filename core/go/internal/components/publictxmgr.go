@@ -19,7 +19,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -45,7 +45,7 @@ type PublicTxSubmission struct {
 
 type PaladinTXReference struct {
 	TransactionID   uuid.UUID
-	TransactionType tktypes.Enum[pldapi.TransactionType]
+	TransactionType types.Enum[pldapi.TransactionType]
 }
 
 type PublicTxMatch struct {
@@ -59,7 +59,7 @@ type PublicTxManager interface {
 	// Synchronous functions that are executed on the callers thread
 	QueryPublicTxForTransactions(ctx context.Context, dbTX persistence.DBTX, boundToTxns []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*pldapi.PublicTx, error)
 	QueryPublicTxWithBindings(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.PublicTxWithBinding, error)
-	GetPublicTransactionForHash(ctx context.Context, dbTX persistence.DBTX, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error)
+	GetPublicTransactionForHash(ctx context.Context, dbTX persistence.DBTX, hash types.Bytes32) (*pldapi.PublicTxWithBinding, error)
 
 	// Perform (potentially expensive) transaction level validation, such as gas estimation. Call before starting a DB transaction
 	ValidateTransaction(ctx context.Context, dbTX persistence.DBTX, transaction *PublicTxSubmission) error

@@ -19,7 +19,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
@@ -31,9 +31,9 @@ type PrivacyGroupGenesis struct {
 }
 
 type PrivacyGroupMessageDistribution struct {
-	Domain string           `json:"domain"`
-	Group  tktypes.HexBytes `json:"group"`
-	ID     uuid.UUID        `json:"id"`
+	Domain string         `json:"domain"`
+	Group  types.HexBytes `json:"group"`
+	ID     uuid.UUID      `json:"id"`
 }
 
 type PrivacyGroupDistribution struct {
@@ -54,7 +54,7 @@ type GroupManager interface {
 
 	CreateGroup(ctx context.Context, dbTX persistence.DBTX, spec *pldapi.PrivacyGroupInput) (group *pldapi.PrivacyGroup, err error)
 	StoreReceivedGroup(context.Context, persistence.DBTX, string, uuid.UUID, *pldapi.State) (error, error)
-	GetGroupByID(ctx context.Context, dbTX persistence.DBTX, domainName string, groupID tktypes.HexBytes) (*pldapi.PrivacyGroup, error)
+	GetGroupByID(ctx context.Context, dbTX persistence.DBTX, domainName string, groupID types.HexBytes) (*pldapi.PrivacyGroup, error)
 	QueryGroups(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.PrivacyGroup, error)
 
 	SendMessage(ctx context.Context, dbTX persistence.DBTX, msg *pldapi.PrivacyGroupMessageInput) (*uuid.UUID, error)

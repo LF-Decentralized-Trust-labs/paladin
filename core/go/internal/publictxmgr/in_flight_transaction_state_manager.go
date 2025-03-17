@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
@@ -220,7 +220,7 @@ func (iftxs *inFlightTransactionState) CanBeRemoved(ctx context.Context) bool {
 	return iftxs.IsReadyToExit() && iftxs.runningStageContext == nil
 }
 
-func (iftxs *inFlightTransactionState) AddSubmitOutput(ctx context.Context, txHash *tktypes.Bytes32, submissionTime *tktypes.Timestamp, submissionOutcome SubmissionOutcome, errorReason ethclient.ErrorReason, err error) {
+func (iftxs *inFlightTransactionState) AddSubmitOutput(ctx context.Context, txHash *types.Bytes32, submissionTime *types.Timestamp, submissionOutcome SubmissionOutcome, errorReason ethclient.ErrorReason, err error) {
 	start := time.Now()
 	log.L(ctx).Debugf("%s Setting submit output, submissionOutcome: %s, errReason: %s, err %+v", iftxs.InMemoryTxStateManager.GetSignerNonce(), submissionOutcome, errorReason, err)
 	iftxs.AddStageOutputs(ctx, &StageOutput{
@@ -236,7 +236,7 @@ func (iftxs *inFlightTransactionState) AddSubmitOutput(ctx context.Context, txHa
 	log.L(ctx).Debugf("%s AddSubmitOutput took %s to write the result", iftxs.InMemoryTxStateManager.GetSignerNonce(), time.Since(start))
 }
 
-func (iftxs *inFlightTransactionState) AddSignOutput(ctx context.Context, signedMessage []byte, txHash *tktypes.Bytes32, err error) {
+func (iftxs *inFlightTransactionState) AddSignOutput(ctx context.Context, signedMessage []byte, txHash *types.Bytes32, err error) {
 	start := time.Now()
 	log.L(ctx).Debugf("%s Setting signed message, hash %s, signed message not nil %t, err %+v", iftxs.InMemoryTxStateManager.GetSignerNonce(), txHash, signedMessage != nil, err)
 	iftxs.AddStageOutputs(ctx, &StageOutput{

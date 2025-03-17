@@ -20,7 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
@@ -33,7 +33,7 @@ type PTX interface {
 	SendTransactions(ctx context.Context, txs []*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
 	PrepareTransaction(ctx context.Context, tx *pldapi.TransactionInput) (txID *uuid.UUID, err error)
 	PrepareTransactions(ctx context.Context, txs []*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
-	Call(ctx context.Context, tx *pldapi.TransactionCall) (data tktypes.RawJSON, err error)
+	Call(ctx context.Context, tx *pldapi.TransactionCall) (data types.RawJSON, err error)
 
 	GetTransaction(ctx context.Context, txID uuid.UUID) (receipt *pldapi.Transaction, err error)
 	GetTransactionFull(ctx context.Context, txID uuid.UUID) (receipt *pldapi.TransactionFull, err error)
@@ -43,17 +43,17 @@ type PTX interface {
 
 	GetTransactionReceipt(ctx context.Context, txID uuid.UUID) (receipt *pldapi.TransactionReceipt, err error)
 	GetTransactionReceiptFull(ctx context.Context, txID uuid.UUID) (receipt *pldapi.TransactionReceiptFull, err error)
-	GetDomainReceipt(ctx context.Context, domain string, txID uuid.UUID) (domainReceipt tktypes.RawJSON, err error)
+	GetDomainReceipt(ctx context.Context, domain string, txID uuid.UUID) (domainReceipt types.RawJSON, err error)
 	GetStateReceipt(ctx context.Context, txID uuid.UUID) (stateReceipt *pldapi.TransactionStates, err error)
 	QueryTransactionReceipts(ctx context.Context, jq *query.QueryJSON) (receipts []*pldapi.TransactionReceipt, err error)
 	GetPreparedTransaction(ctx context.Context, txID uuid.UUID) (preparedTransaction *pldapi.PreparedTransaction, err error)
 	QueryPreparedTransactions(ctx context.Context, jq *query.QueryJSON) (preparedTransactions []*pldapi.PreparedTransaction, err error)
-	DecodeError(ctx context.Context, revertData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (decodedError *pldapi.ABIDecodedData, err error)
-	DecodeCall(ctx context.Context, callData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (decodedCall *pldapi.ABIDecodedData, err error)
-	DecodeEvent(ctx context.Context, topics []tktypes.Bytes32, eventData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (decodedEvent *pldapi.ABIDecodedData, err error)
+	DecodeError(ctx context.Context, revertData types.HexBytes, dataFormat types.JSONFormatOptions) (decodedError *pldapi.ABIDecodedData, err error)
+	DecodeCall(ctx context.Context, callData types.HexBytes, dataFormat types.JSONFormatOptions) (decodedCall *pldapi.ABIDecodedData, err error)
+	DecodeEvent(ctx context.Context, topics []types.Bytes32, eventData types.HexBytes, dataFormat types.JSONFormatOptions) (decodedEvent *pldapi.ABIDecodedData, err error)
 
 	StoreABI(ctx context.Context, abi abi.ABI) (storedABI *pldapi.StoredABI, err error)
-	GetStoredABI(ctx context.Context, hashRef tktypes.Bytes32) (storedABI *pldapi.StoredABI, err error)
+	GetStoredABI(ctx context.Context, hashRef types.Bytes32) (storedABI *pldapi.StoredABI, err error)
 	QueryStoredABIs(ctx context.Context, jq *query.QueryJSON) (storedABIs []*pldapi.StoredABI, err error)
 
 	ResolveVerifier(ctx context.Context, keyIdentifier string, algorithm string, verifierType string) (verifier string, err error)
@@ -239,7 +239,7 @@ func (p *ptx) PrepareTransactions(ctx context.Context, txs []*pldapi.Transaction
 	return
 }
 
-func (p *ptx) Call(ctx context.Context, tx *pldapi.TransactionCall) (data tktypes.RawJSON, err error) {
+func (p *ptx) Call(ctx context.Context, tx *pldapi.TransactionCall) (data types.RawJSON, err error) {
 	err = p.c.CallRPC(ctx, &data, "ptx_call", tx)
 	return
 }
@@ -284,7 +284,7 @@ func (p *ptx) GetPreparedTransaction(ctx context.Context, txID uuid.UUID) (prepa
 	return
 }
 
-func (p *ptx) GetDomainReceipt(ctx context.Context, domain string, txID uuid.UUID) (domainReceipt tktypes.RawJSON, err error) {
+func (p *ptx) GetDomainReceipt(ctx context.Context, domain string, txID uuid.UUID) (domainReceipt types.RawJSON, err error) {
 	err = p.c.CallRPC(ctx, &domainReceipt, "ptx_getDomainReceipt", domain, txID)
 	return
 }
@@ -309,7 +309,7 @@ func (p *ptx) StoreABI(ctx context.Context, abi abi.ABI) (storedABI *pldapi.Stor
 	return
 }
 
-func (p *ptx) GetStoredABI(ctx context.Context, hashRef tktypes.Bytes32) (storedABI *pldapi.StoredABI, err error) {
+func (p *ptx) GetStoredABI(ctx context.Context, hashRef types.Bytes32) (storedABI *pldapi.StoredABI, err error) {
 	err = p.c.CallRPC(ctx, &storedABI, "ptx_getStoredABI", hashRef)
 	return
 }
@@ -319,17 +319,17 @@ func (p *ptx) QueryStoredABIs(ctx context.Context, jq *query.QueryJSON) (storedA
 	return
 }
 
-func (p *ptx) DecodeError(ctx context.Context, revertData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (decodedError *pldapi.ABIDecodedData, err error) {
+func (p *ptx) DecodeError(ctx context.Context, revertData types.HexBytes, dataFormat types.JSONFormatOptions) (decodedError *pldapi.ABIDecodedData, err error) {
 	err = p.c.CallRPC(ctx, &decodedError, "ptx_decodeError", revertData, dataFormat)
 	return
 }
 
-func (p *ptx) DecodeCall(ctx context.Context, callData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (decodedCall *pldapi.ABIDecodedData, err error) {
+func (p *ptx) DecodeCall(ctx context.Context, callData types.HexBytes, dataFormat types.JSONFormatOptions) (decodedCall *pldapi.ABIDecodedData, err error) {
 	err = p.c.CallRPC(ctx, &decodedCall, "ptx_decodeCall", callData, dataFormat)
 	return
 }
 
-func (p *ptx) DecodeEvent(ctx context.Context, topics []tktypes.Bytes32, data tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (decodedEvent *pldapi.ABIDecodedData, err error) {
+func (p *ptx) DecodeEvent(ctx context.Context, topics []types.Bytes32, data types.HexBytes, dataFormat types.JSONFormatOptions) (decodedEvent *pldapi.ABIDecodedData, err error) {
 	err = p.c.CallRPC(ctx, &decodedEvent, "ptx_decodeEvent", topics, data, dataFormat)
 	return
 }

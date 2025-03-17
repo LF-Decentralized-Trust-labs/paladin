@@ -22,7 +22,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
@@ -134,7 +134,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxOutputs, err)
 	}
 
-	contractAddress, err := tktypes.ParseEthAddress(req.Transaction.ContractInfo.ContractAddress)
+	contractAddress, err := commontypes.ParseEthAddress(req.Transaction.ContractInfo.ContractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
 	}
@@ -239,7 +239,7 @@ func prepareState(ctx context.Context, state *pb.EndorsableState) (string, error
 
 }
 
-func (h *transferHandler) formatProvingRequest(ctx context.Context, input, output []*types.ZetoNFToken, circuit *zetosignerapi.Circuit, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
+func (h *transferHandler) formatProvingRequest(ctx context.Context, input, output []*types.ZetoNFToken, circuit *zetosignerapi.Circuit, tokenName, stateQueryContext string, contractAddress *commontypes.EthAddress) ([]byte, error) {
 
 	inputCommitments, inputSalts, tokenURIs, tokenIDs, inputOwners, err := processTokens(ctx, input)
 	if err != nil {

@@ -22,7 +22,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
@@ -94,7 +94,7 @@ func TestHDSigningStaticExamplePreResolved(t *testing.T) {
 				Keys: map[string]pldconf.StaticKeyEntryConfig{
 					"directly.resolved": {
 						Encoding: "hex",
-						Inline:   tktypes.RandHex(32),
+						Inline:   types.RandHex(32),
 					},
 				},
 			},
@@ -271,7 +271,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 
 	testSign, err := testKeyPair.SignDirect(([]byte)("some data"))
 	require.NoError(t, err)
-	assert.Equal(t, tktypes.HexBytes(testSign.CompactRSV()), resSign.Payload)
+	assert.Equal(t, types.HexBytes(testSign.CompactRSV()), resSign.Payload)
 	sig, err := secp256k1.DecodeCompactRSV(ctx, resSign.Payload)
 	require.NoError(t, err)
 	assert.Equal(t, testSign, sig)

@@ -27,7 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"gorm.io/gorm"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/cache"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
@@ -166,7 +166,7 @@ func (km *keyManager) ResolveKeyNewDatabaseTX(ctx context.Context, identifier, a
 	return resolvedKeys[0], nil
 }
 
-func (km *keyManager) ResolveEthAddressNewDatabaseTX(ctx context.Context, identifier string) (ethAddress *tktypes.EthAddress, err error) {
+func (km *keyManager) ResolveEthAddressNewDatabaseTX(ctx context.Context, identifier string) (ethAddress *types.EthAddress, err error) {
 	ethAddresses, err := km.ResolveEthAddressBatchNewDatabaseTX(ctx, []string{identifier})
 	if err != nil {
 		return nil, err
@@ -174,12 +174,12 @@ func (km *keyManager) ResolveEthAddressNewDatabaseTX(ctx context.Context, identi
 	return ethAddresses[0], nil
 }
 
-func (km *keyManager) ResolveEthAddressBatchNewDatabaseTX(ctx context.Context, identifiers []string) (ethAddresses []*tktypes.EthAddress, err error) {
-	ethAddresses = make([]*tktypes.EthAddress, len(identifiers))
+func (km *keyManager) ResolveEthAddressBatchNewDatabaseTX(ctx context.Context, identifiers []string) (ethAddresses []*types.EthAddress, err error) {
+	ethAddresses = make([]*types.EthAddress, len(identifiers))
 	resolvedKeys, err := km.ResolveBatchNewDatabaseTX(ctx, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, identifiers)
 	for i := 0; i < len(identifiers); i++ {
 		if err == nil {
-			ethAddresses[i], err = tktypes.ParseEthAddress(resolvedKeys[i].Verifier.Verifier)
+			ethAddresses[i], err = types.ParseEthAddress(resolvedKeys[i].Verifier.Verifier)
 		}
 	}
 	if err != nil {

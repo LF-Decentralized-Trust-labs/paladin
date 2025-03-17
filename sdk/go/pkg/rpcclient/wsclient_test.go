@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -123,7 +123,7 @@ func TestWSRPCSubscribe(t *testing.T) {
 	newHead := <-s.Notifications()
 	assert.NotNil(t, newHead)
 
-	blockNumber, err := tktypes.ParseHexUint256(ctx, newHead.GetResult().ToMap()["number"].(string))
+	blockNumber, err := types.ParseHexUint256(ctx, newHead.GetResult().ToMap()["number"].(string))
 	require.NoError(t, err)
 	assert.Equal(t, big.NewInt(1263817), blockNumber.Int())
 
@@ -221,7 +221,7 @@ func TestWSRPCUnsubscribeError(t *testing.T) {
 	newHead := <-s.Notifications()
 	assert.NotNil(t, newHead)
 
-	blockNumber, err := tktypes.ParseHexUint256(ctx, newHead.GetResult().ToMap()["number"].(string))
+	blockNumber, err := types.ParseHexUint256(ctx, newHead.GetResult().ToMap()["number"].(string))
 	require.NoError(t, err)
 	assert.Equal(t, big.NewInt(1263817), blockNumber.Int())
 
@@ -245,7 +245,7 @@ func TestCallRPC(t *testing.T) {
 		fromServer <- `{"jsonrpc":"2.0","id":"000000001","result":"0x123456"}`
 	}()
 
-	var verResult tktypes.HexUint64
+	var verResult types.HexUint64
 	rpcErr := rc.CallRPC(ctx, &verResult, "net_version")
 	assert.Nil(t, rpcErr)
 	assert.Equal(t, uint64(0x123456), verResult.Uint64())
@@ -299,7 +299,7 @@ func TestWaitResponseBadUnmarshal(t *testing.T) {
 	resChl := make(chan *RPCResponse)
 	go func() {
 		resChl <- &RPCResponse{
-			Result: tktypes.RawJSON(`false`),
+			Result: types.RawJSON(`false`),
 		}
 	}()
 
@@ -323,7 +323,7 @@ func TestHandleSubscriptionNotificationClosed(t *testing.T) {
 		ctx: ctx, // closed
 	}
 	rc.handleSubscriptionNotification(ctx, &RPCResponse{
-		Params: tktypes.RawJSON(`{"subscription":"12345"}`),
+		Params: types.RawJSON(`{"subscription":"12345"}`),
 	})
 }
 

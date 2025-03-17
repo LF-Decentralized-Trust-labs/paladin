@@ -24,7 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -53,7 +53,7 @@ type mockPlugin[T any] struct {
 func (tp *mockPlugin[T]) Conf() *pldconf.PluginConfig {
 	if tp.conf == nil {
 		tp.conf = &pldconf.PluginConfig{
-			Type:    string(tktypes.LibraryTypeCShared),
+			Type:    string(types.LibraryTypeCShared),
 			Library: "/any/where",
 		}
 	}

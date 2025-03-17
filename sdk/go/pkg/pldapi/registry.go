@@ -16,21 +16,21 @@
 
 package pldapi
 
-import "github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+import "github.com/kaleido-io/paladin/common/go/pkg/types"
 
 // An entity within a registry with its current properties
 type RegistryEntry struct {
 	Registry         string              `docstruct:"RegistryEntry" json:"registry"`           // the registry that maintains this record
-	ID               tktypes.HexBytes    `docstruct:"RegistryEntry" json:"id"`                 // unique within the registry, across all records in the hierarchy
+	ID               types.HexBytes      `docstruct:"RegistryEntry" json:"id"`                 // unique within the registry, across all records in the hierarchy
 	Name             string              `docstruct:"RegistryEntry" json:"name"`               // unique across entries with the same parent, within the particular registry
-	ParentID         tktypes.HexBytes    `docstruct:"RegistryEntry" json:"parentId,omitempty"` // nil a root record, otherwise will be a reference to another entity in the same registry
+	ParentID         types.HexBytes      `docstruct:"RegistryEntry" json:"parentId,omitempty"` // nil a root record, otherwise will be a reference to another entity in the same registry
 	*OnChainLocation `json:",omitempty"` // only included if the registry uses blockchain indexing
 	*ActiveFlag      `json:",omitempty"` // only returned from queries that explicitly look for inactive entries
 }
 
 type RegistryProperty struct {
 	Registry         string              `docstruct:"RegistryProperty" json:"registry"` // the registry that maintains this record
-	EntryID          tktypes.HexBytes    `docstruct:"RegistryProperty" json:"entryId"`  // the ID of the entity that owns this record within the registry
+	EntryID          types.HexBytes      `docstruct:"RegistryProperty" json:"entryId"`  // the ID of the entity that owns this record within the registry
 	Name             string              `docstruct:"RegistryProperty" json:"name"`     // unique across entries with the same parent, within the particular registry
 	Value            string              `docstruct:"RegistryProperty" json:"value"`    // unique across entries with the same parent, within the particular registry
 	*OnChainLocation `json:",omitempty"` // only included if the registry uses blockchain indexing
@@ -63,8 +63,8 @@ const (
 	ActiveFilterAny      ActiveFilter = "any"
 )
 
-func (af ActiveFilter) Enum() tktypes.Enum[ActiveFilter] {
-	return tktypes.Enum[ActiveFilter](af)
+func (af ActiveFilter) Enum() types.Enum[ActiveFilter] {
+	return types.Enum[ActiveFilter](af)
 }
 
 func (af ActiveFilter) Options() []string {

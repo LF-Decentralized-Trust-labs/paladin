@@ -19,7 +19,7 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 )
@@ -84,27 +84,27 @@ func (c *paladinClient) BlockIndex() BlockIndex {
 	return &blockIndex{rpcModuleInfo: blockIndexInfo, c: c}
 }
 
-func (r *blockIndex) GetBlockByNumber(ctx context.Context, blockNumber tktypes.HexUint64) (block *pldapi.IndexedBlock, err error) {
+func (r *blockIndex) GetBlockByNumber(ctx context.Context, blockNumber types.HexUint64) (block *pldapi.IndexedBlock, err error) {
 	err = r.c.CallRPC(ctx, &blockNumber, "bidx_getBlockByNumber", blockNumber)
 	return
 }
 
-func (r *blockIndex) GetTransactionByHash(ctx context.Context, transactionHash tktypes.Bytes32) (transaction *pldapi.IndexedTransaction, err error) {
+func (r *blockIndex) GetTransactionByHash(ctx context.Context, transactionHash types.Bytes32) (transaction *pldapi.IndexedTransaction, err error) {
 	err = r.c.CallRPC(ctx, &transaction, "bidx_getTransactionByHash", transactionHash)
 	return
 }
 
-func (r *blockIndex) GetTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce tktypes.HexUint64) (transaction *pldapi.IndexedTransaction, err error) {
+func (r *blockIndex) GetTransactionByNonce(ctx context.Context, from types.EthAddress, nonce types.HexUint64) (transaction *pldapi.IndexedTransaction, err error) {
 	err = r.c.CallRPC(ctx, &transaction, "bidx_getTransactionByNonce", from, nonce)
 	return
 }
 
-func (r *blockIndex) GetBlockTransactionsByNumber(ctx context.Context, blockNumber tktypes.HexUint64) (transactions []*pldapi.IndexedTransaction, err error) {
+func (r *blockIndex) GetBlockTransactionsByNumber(ctx context.Context, blockNumber types.HexUint64) (transactions []*pldapi.IndexedTransaction, err error) {
 	err = r.c.CallRPC(ctx, &transactions, "bidx_getBlockTransactionsByNumber", blockNumber)
 	return
 }
 
-func (r *blockIndex) GetTransactionEventsByHash(ctx context.Context, transactionHash tktypes.Bytes32) (transactions []*pldapi.IndexedEvent, err error) {
+func (r *blockIndex) GetTransactionEventsByHash(ctx context.Context, transactionHash types.Bytes32) (transactions []*pldapi.IndexedEvent, err error) {
 	err = r.c.CallRPC(ctx, &transactions, "bidx_getTransactionEventsByHash", transactionHash)
 	return
 }
@@ -124,12 +124,12 @@ func (r *blockIndex) QueryIndexedEvents(ctx context.Context, query *query.QueryJ
 	return
 }
 
-func (r *blockIndex) GetConfirmedBlockHeight(ctx context.Context) (blockHeight tktypes.HexUint64, err error) {
+func (r *blockIndex) GetConfirmedBlockHeight(ctx context.Context) (blockHeight types.HexUint64, err error) {
 	err = r.c.CallRPC(ctx, &blockHeight, "bidx_getConfirmedBlockHeight")
 	return
 }
 
-func (r *blockIndex) DecodeTransactionEvents(ctx context.Context, transactionHash tktypes.Bytes32, abi abi.ABI, resultFormat tktypes.JSONFormatOptions) (events []*pldapi.EventWithData, err error) {
+func (r *blockIndex) DecodeTransactionEvents(ctx context.Context, transactionHash types.Bytes32, abi abi.ABI, resultFormat types.JSONFormatOptions) (events []*pldapi.EventWithData, err error) {
 	err = r.c.CallRPC(ctx, &events, "bidx_decodeTransactionEvents", transactionHash, abi, resultFormat)
 	return
 }

@@ -24,7 +24,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	commontypes "github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/verifiers"
@@ -49,13 +49,13 @@ func TestUnlock(t *testing.T) {
 	senderKey, err := secp256k1.GenerateSecp256k1KeyPair()
 	require.NoError(t, err)
 
-	lockID := tktypes.RandBytes32()
+	lockID := commontypes.RandBytes32()
 	inputCoin := &types.NotoLockedCoinState{
-		ID: tktypes.RandBytes32(),
+		ID: commontypes.RandBytes32(),
 		Data: types.NotoLockedCoin{
 			LockID: lockID,
-			Owner:  (*tktypes.EthAddress)(&senderKey.Address),
-			Amount: tktypes.Int64ToInt256(100),
+			Owner:  (*commontypes.EthAddress)(&senderKey.Address),
+			Amount: commontypes.Int64ToInt256(100),
 		},
 	}
 	mockCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
@@ -150,7 +150,7 @@ func TestUnlock(t *testing.T) {
 	require.NoError(t, err)
 	signature, err := senderKey.SignDirect(encodedTransfer)
 	require.NoError(t, err)
-	signatureBytes := tktypes.HexBytes(signature.CompactRSV())
+	signatureBytes := commontypes.HexBytes(signature.CompactRSV())
 
 	inputStates := []*prototk.EndorsableState{
 		{
@@ -243,7 +243,7 @@ func TestUnlock(t *testing.T) {
 		NotaryMode:   types.NotaryModeHooks.Enum(),
 		Options: types.NotoOptions{
 			Hooks: &types.NotoHooksOptions{
-				PublicAddress:     tktypes.MustEthAddress(hookAddress),
+				PublicAddress:     commontypes.MustEthAddress(hookAddress),
 				DevUsePublicHooks: true,
 			},
 		},
@@ -282,5 +282,5 @@ func TestUnlock(t *testing.T) {
 			"contractAddress": "%s",
 			"encodedCall": "%s"
 		}
-	}`, senderKey.Address, lockID, contractAddress, tktypes.HexBytes(encodedCall)), prepareRes.Transaction.ParamsJson)
+	}`, senderKey.Address, lockID, contractAddress, commontypes.HexBytes(encodedCall)), prepareRes.Transaction.ParamsJson)
 }

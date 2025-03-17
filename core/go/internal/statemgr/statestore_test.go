@@ -24,7 +24,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -104,10 +104,10 @@ func TestGetTransactionStatesUnavailable(t *testing.T) {
 	defer done()
 
 	txID := uuid.New()
-	stateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID2 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID3 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID4 := tktypes.HexBytes(tktypes.RandBytes(32))
+	stateID1 := types.HexBytes(types.RandBytes(32))
+	stateID2 := types.HexBytes(types.RandBytes(32))
+	stateID3 := types.HexBytes(types.RandBytes(32))
+	stateID4 := types.HexBytes(types.RandBytes(32))
 
 	err := ss.WriteStateFinalizations(ctx, ss.p.NOTX(),
 		[]*pldapi.StateSpendRecord{
@@ -129,10 +129,10 @@ func TestGetTransactionStatesUnavailable(t *testing.T) {
 	require.Empty(t, txStates.Spent)
 	require.Empty(t, txStates.Read)
 	require.Empty(t, txStates.Confirmed)
-	require.Equal(t, []tktypes.HexBytes{stateID1}, txStates.Unavailable.Spent)
-	require.Equal(t, []tktypes.HexBytes{stateID2}, txStates.Unavailable.Read)
-	require.Equal(t, []tktypes.HexBytes{stateID3}, txStates.Unavailable.Confirmed)
-	require.Equal(t, []tktypes.HexBytes{stateID4}, txStates.Unavailable.Info)
+	require.Equal(t, []types.HexBytes{stateID1}, txStates.Unavailable.Spent)
+	require.Equal(t, []types.HexBytes{stateID2}, txStates.Unavailable.Read)
+	require.Equal(t, []types.HexBytes{stateID3}, txStates.Unavailable.Confirmed)
+	require.Equal(t, []types.HexBytes{stateID4}, txStates.Unavailable.Info)
 }
 
 func TestGetTransactionStatesFail(t *testing.T) {

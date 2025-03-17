@@ -16,9 +16,9 @@
 package evmregistry
 
 import (
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 )
 
 type Config struct {
-	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
+	ContractAddress *types.EthAddress `json:"contractAddress"`
 }

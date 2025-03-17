@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -72,13 +72,13 @@ func (th *TransactionHelper) SignAndSend(signer string) pldclient.SentTransactio
 	return stx
 }
 
-func (th *TransactionHelper) Prepare() tktypes.HexBytes {
+func (th *TransactionHelper) Prepare() types.HexBytes {
 	b, err := th.builder.BuildCallData()
 	require.NoError(th.t, err)
 	return b
 }
 
-func (th *TransactionHelper) FindEvent(txHash *tktypes.Bytes32, abi abi.ABI, eventName string, eventParams any) *pldapi.EventWithData {
+func (th *TransactionHelper) FindEvent(txHash *types.Bytes32, abi abi.ABI, eventName string, eventParams any) *pldapi.EventWithData {
 	targetEvent := abi.Events()[eventName]
 	assert.NotNil(th.t, targetEvent)
 	assert.NotEmpty(th.t, targetEvent.SolString())
@@ -94,7 +94,7 @@ func (th *TransactionHelper) FindEvent(txHash *tktypes.Bytes32, abi abi.ABI, eve
 	return nil
 }
 
-func NewDomainTransactionHelper(ctx context.Context, t *testing.T, rpc rpcclient.Client, to *tktypes.EthAddress, fn *abi.Entry, inputs tktypes.RawJSON) *DomainTransactionHelper {
+func NewDomainTransactionHelper(ctx context.Context, t *testing.T, rpc rpcclient.Client, to *types.EthAddress, fn *abi.Entry, inputs types.RawJSON) *DomainTransactionHelper {
 	return &DomainTransactionHelper{
 		ctx: ctx,
 		t:   t,

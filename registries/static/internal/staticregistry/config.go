@@ -15,13 +15,13 @@
 
 package staticregistry
 
-import "github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+import "github.com/kaleido-io/paladin/common/go/pkg/types"
 
 type Config struct {
 	Entries map[string]*StaticEntry `json:"entries"`
 }
 
 type StaticEntry struct {
-	Properties map[string]tktypes.RawJSON `json:"properties"`
-	Children   map[string]*StaticEntry    `json:"children"`
+	Properties map[string]types.RawJSON `json:"properties"`
+	Children   map[string]*StaticEntry  `json:"children"`
 }

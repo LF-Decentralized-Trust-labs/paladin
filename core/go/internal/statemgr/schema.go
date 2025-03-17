@@ -27,7 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"gorm.io/gorm/clause"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 )
 
@@ -50,14 +50,14 @@ type schemaLabelInfo struct {
 }
 
 type idOnly struct {
-	ID tktypes.HexBytes `gorm:"primaryKey"`
+	ID types.HexBytes `gorm:"primaryKey"`
 }
 
 type labelInfoAccess interface {
 	labelInfo() []*schemaLabelInfo
 }
 
-func schemaCacheKey(domainName string, id tktypes.Bytes32) string {
+func schemaCacheKey(domainName string, id types.Bytes32) string {
 	return domainName + "/" + id.String()
 }
 
@@ -76,7 +76,7 @@ func (ss *stateManager) persistSchemas(ctx context.Context, dbTX persistence.DBT
 		Error
 }
 
-func (ss *stateManager) GetSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (*pldapi.Schema, error) {
+func (ss *stateManager) GetSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID types.Bytes32, failNotFound bool) (*pldapi.Schema, error) {
 	s, err := ss.getSchemaByID(ctx, dbTX, domainName, schemaID, failNotFound)
 	if err != nil || s == nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (ss *stateManager) GetSchemaByID(ctx context.Context, dbTX persistence.DBTX
 	return s.Persisted(), nil
 }
 
-func (ss *stateManager) getSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (components.Schema, error) {
+func (ss *stateManager) getSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID types.Bytes32, failNotFound bool) (components.Schema, error) {
 
 	cacheKey := schemaCacheKey(domainName, schemaID)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)
@@ -137,7 +137,7 @@ func (ss *stateManager) ListSchemas(ctx context.Context, dbTX persistence.DBTX, 
 	}
 	results = make([]components.Schema, len(ids))
 	for i, id := range ids {
-		if results[i], err = ss.getSchemaByID(ctx, dbTX, domainName, tktypes.Bytes32(id.ID), true); err != nil {
+		if results[i], err = ss.getSchemaByID(ctx, dbTX, domainName, types.Bytes32(id.ID), true); err != nil {
 			return nil, err
 		}
 	}

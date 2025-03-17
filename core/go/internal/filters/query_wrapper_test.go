@@ -24,7 +24,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/stretchr/testify/assert"
@@ -38,16 +38,16 @@ var testFilters = FieldMap{
 }
 
 type testQueryObject struct {
-	ID      uuid.UUID         `gorm:"column:id;primaryKey"`
-	Created tktypes.Timestamp `gorm:"column:created"`
-	Name    string            `gorm:"column:name"`
-	Parent  *testQueryObject  `gorm:"foreignKey:Parent;references:ID"`
+	ID      uuid.UUID        `gorm:"column:id;primaryKey"`
+	Created types.Timestamp  `gorm:"column:created"`
+	Name    string           `gorm:"column:name"`
+	Parent  *testQueryObject `gorm:"foreignKey:Parent;references:ID"`
 }
 
 type testOutputObject struct {
-	ID      uuid.UUID         `json:"id"`
-	Created tktypes.Timestamp `json:"created"`
-	Name    string            `json:"name"`
+	ID      uuid.UUID       `json:"id"`
+	Created types.Timestamp `json:"created"`
+	Name    string          `json:"name"`
 }
 
 func (tq testQueryObject) TableName() string {
@@ -85,7 +85,7 @@ func TestQueryWrapperMapFail(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*test_object").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "created", "name"}).
-			AddRow(uuid.New(), tktypes.TimestampNow(), "sally"),
+			AddRow(uuid.New(), types.TimestampNow(), "sally"),
 	)
 
 	_, err = qw.Run(context.Background(), nil)
@@ -116,7 +116,7 @@ func TestQueryWrapperFinalizeOK(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*test_object_1.*LEFT JOIN.*test_object_1").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "created", "name"}).
-			AddRow(uuid.New(), tktypes.TimestampNow(), "sally"),
+			AddRow(uuid.New(), types.TimestampNow(), "sally"),
 	)
 
 	objs, err := qw.Run(context.Background(), nil)

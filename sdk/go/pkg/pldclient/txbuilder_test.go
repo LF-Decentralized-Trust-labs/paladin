@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcserver"
@@ -120,9 +120,9 @@ func TestBuildAndSubmitPublicTXHTTPOk(t *testing.T) {
 	ctx, c, rpcServer, done := newTestClientAndServerHTTP(t)
 	defer done()
 
-	contractAddr := tktypes.RandAddress()
+	contractAddr := types.RandAddress()
 	txID := uuid.New()
-	txHash := tktypes.RandBytes32()
+	txHash := types.RandBytes32()
 
 	rpcServer.Register(rpcserver.NewRPCModule("ptx").
 		Add(
@@ -138,7 +138,7 @@ func TestBuildAndSubmitPublicTXHTTPOk(t *testing.T) {
 				require.Equal(t, "newWidget", tx.Function)
 				require.Equal(t, contractAddr, tx.To)
 				require.Equal(t, "tx.sender", tx.From)
-				require.Equal(t, tktypes.HexUint64(100000), *tx.PublicTxOptions.Gas)
+				require.Equal(t, types.HexUint64(100000), *tx.PublicTxOptions.Gas)
 				return &txID, nil
 			}),
 		).
@@ -179,7 +179,7 @@ func TestBuildAndSubmitPublicTXHTTPOk(t *testing.T) {
 		From("tx.sender").
 		To(contractAddr).
 		PublicTxOptions(pldapi.PublicTxOptions{
-			Gas: confutil.P(tktypes.HexUint64(100000)),
+			Gas: confutil.P(types.HexUint64(100000)),
 		}).
 		Send()
 
@@ -206,7 +206,7 @@ func TestBuildAndSubmitPrivateTXHTTPRevert(t *testing.T) {
 	ctx, c, rpcServer, done := newTestClientAndServerHTTP(t)
 	defer done()
 
-	contractAddr := tktypes.RandAddress()
+	contractAddr := types.RandAddress()
 	txID := uuid.New()
 
 	rpcServer.Register(rpcserver.NewRPCModule("ptx").
@@ -224,7 +224,7 @@ func TestBuildAndSubmitPrivateTXHTTPRevert(t *testing.T) {
 				require.Equal(t, "newWidget", tx.Function)
 				require.Equal(t, contractAddr, tx.To)
 				require.Equal(t, "tx.sender", tx.From)
-				require.Equal(t, tktypes.HexUint64(100000), *tx.PublicTxOptions.Gas)
+				require.Equal(t, types.HexUint64(100000), *tx.PublicTxOptions.Gas)
 				return &txID, nil
 			}),
 		).
@@ -263,7 +263,7 @@ func TestBuildAndSubmitPrivateTXHTTPRevert(t *testing.T) {
 		From("tx.sender").
 		To(contractAddr).
 		PublicTxOptions(pldapi.PublicTxOptions{
-			Gas: confutil.P(tktypes.HexUint64(100000)),
+			Gas: confutil.P(types.HexUint64(100000)),
 		}).
 		Send()
 
@@ -278,7 +278,7 @@ func TestBuildAndPreparePrivateTXHTTPOk(t *testing.T) {
 	ctx, c, rpcServer, done := newTestClientAndServerHTTP(t)
 	defer done()
 
-	contractAddr := tktypes.RandAddress()
+	contractAddr := types.RandAddress()
 	txID := uuid.New()
 
 	rpcServer.Register(rpcserver.NewRPCModule("ptx").
@@ -296,7 +296,7 @@ func TestBuildAndPreparePrivateTXHTTPOk(t *testing.T) {
 				require.Equal(t, "newWidget", tx.Function)
 				require.Equal(t, contractAddr, tx.To)
 				require.Equal(t, "tx.sender", tx.From)
-				require.Equal(t, tktypes.HexUint64(100000), *tx.PublicTxOptions.Gas)
+				require.Equal(t, types.HexUint64(100000), *tx.PublicTxOptions.Gas)
 				return &txID, nil
 			}),
 		).
@@ -338,7 +338,7 @@ func TestBuildAndPreparePrivateTXHTTPOk(t *testing.T) {
 		From("tx.sender").
 		To(contractAddr).
 		PublicTxOptions(pldapi.PublicTxOptions{
-			Gas: confutil.P(tktypes.HexUint64(100000)),
+			Gas: confutil.P(types.HexUint64(100000)),
 		}).
 		Prepare()
 
@@ -365,16 +365,16 @@ func TestBuildAndSubmitPublicCallHTTPOk(t *testing.T) {
 	ctx, c, rpcServer, done := newTestClientAndServerHTTP(t)
 	defer done()
 
-	contractAddr := tktypes.RandAddress()
+	contractAddr := types.RandAddress()
 	rpcServer.Register(rpcserver.NewRPCModule("ptx").
 		Add(
-			"ptx_call", rpcserver.RPCMethod1(func(ctx context.Context, tx pldapi.TransactionCall) (tktypes.RawJSON, error) {
+			"ptx_call", rpcserver.RPCMethod1(func(ctx context.Context, tx pldapi.TransactionCall) (types.RawJSON, error) {
 				require.JSONEq(t, `["12345"]`, string(tx.Data))
 				require.Equal(t, pldapi.TransactionTypePublic, tx.Type.V())
 				require.Equal(t, "getWidgets", tx.Function)
 				require.Equal(t, contractAddr, tx.To)
 				require.Equal(t, "latest", tx.Block.String())
-				return tktypes.RawJSON(`[[
+				return types.RawJSON(`[[
 					"0x172ea50b3535721154ae5b368e850825615882bb",
 					"12345",
 					["blue", "round"]
@@ -411,7 +411,7 @@ func TestBuildAndSubmitPublicDeployWSFail(t *testing.T) {
 	ctx, c, rpcServer, done := newTestClientAndServerWebSockets(t)
 	defer done()
 
-	bytecode := tktypes.HexBytes(tktypes.RandBytes(64))
+	bytecode := types.HexBytes(types.RandBytes(64))
 	txID := uuid.New()
 
 	rpcServer.Register(rpcserver.NewRPCModule("ptx").
@@ -458,7 +458,7 @@ func TestBuildAndPreparePrivateHTTPFail(t *testing.T) {
 	ctx, c, rpcServer, done := newTestClientAndServerWebSockets(t)
 	defer done()
 
-	bytecode := tktypes.HexBytes(tktypes.RandBytes(64))
+	bytecode := types.HexBytes(types.RandBytes(64))
 	txID := uuid.New()
 
 	rpcServer.Register(rpcserver.NewRPCModule("ptx").
@@ -506,7 +506,7 @@ func TestSendUnconnectedFail(t *testing.T) {
 		Public().
 		From("tx.sender").
 		Function("someFunc").
-		To(tktypes.RandAddress()).
+		To(types.RandAddress()).
 		Inputs(`{"supplier": "0x172EA50B3535721154ae5B368E850825615882BB"}`).
 		Send()
 	require.Regexp(t, "PD020210", res.Error())
@@ -568,7 +568,7 @@ func TestDeferFunctionSelectError(t *testing.T) {
 		Public().
 		ABIJSON(testABIJSON).
 		Function("wrong").
-		To(tktypes.RandAddress()).
+		To(types.RandAddress()).
 		Send().
 		Wait(25 * time.Millisecond)
 	require.Regexp(t, "PD020208", res.Error()) // function not found
@@ -585,7 +585,7 @@ func TestBuildABIDataJSONArray(t *testing.T) {
 		Public().
 		ABIJSON(testABIJSON).
 		Function("getWidgets(uint256)").
-		To(tktypes.RandAddress()).
+		To(types.RandAddress()).
 		Inputs(`{"sku": 73588229205}`).
 		DataFormat("mode=array&number=hex").
 		BuildInputDataJSON()
@@ -616,10 +616,10 @@ func TestSendNoABI(t *testing.T) {
 	builder := c.ReceiptPollingInterval(1 * time.Millisecond).
 		TxBuilder(ctx).
 		Public().
-		ABIReference((*tktypes.Bytes32)(tktypes.RandBytes(32))).
+		ABIReference((*types.Bytes32)(types.RandBytes(32))).
 		Function("getWidgets(uint256)").
 		From("tx.sender").
-		To(tktypes.RandAddress())
+		To(types.RandAddress())
 
 	res := builder.Inputs(`{"sku": 73588229205}`).Send()
 	require.NoError(t, res.Error())
@@ -648,10 +648,10 @@ func TestBuildBadABIFunction(t *testing.T) {
 		TxBuilder(ctx).
 		ABIFunction(&abi.Entry{Type: abi.Function, Inputs: abi.ParameterArray{{Type: "wrongness"}}}).
 		Public().
-		ABIReference((*tktypes.Bytes32)(tktypes.RandBytes(32))).
+		ABIReference((*types.Bytes32)(types.RandBytes(32))).
 		Function("getWidgets(uint256)").
 		From("tx.sender").
-		To(tktypes.RandAddress()).
+		To(types.RandAddress()).
 		Inputs(`{"sku": 73588229205}`).
 		Send()
 	assert.Regexp(t, "FF22025", res.Error())
@@ -694,10 +694,10 @@ func TestBuildBadABIJSON(t *testing.T) {
 		TxBuilder(ctx).
 		ABIJSON([]byte(`{!!!! wrong`)).
 		Public().
-		ABIReference((*tktypes.Bytes32)(tktypes.RandBytes(32))).
+		ABIReference((*types.Bytes32)(types.RandBytes(32))).
 		Function("getWidgets(uint256)").
 		From("tx.sender").
-		To(tktypes.RandAddress()).
+		To(types.RandAddress()).
 		Inputs(`{"sku": 73588229205}`).
 		Send()
 	assert.Regexp(t, "PD020207", res.Error())
@@ -710,16 +710,16 @@ func TestGetters(t *testing.T) {
 			IdempotencyKey: "tx1",
 			Type:           pldapi.TransactionTypePrivate.Enum(),
 			Domain:         "domain1",
-			ABIReference:   confutil.P(tktypes.RandBytes32()),
+			ABIReference:   confutil.P(types.RandBytes32()),
 			From:           "tx.sender",
-			To:             tktypes.RandAddress(),
+			To:             types.RandAddress(),
 			Function:       "function1",
 			PublicTxOptions: pldapi.PublicTxOptions{
-				Gas: confutil.P(tktypes.HexUint64(100000)),
+				Gas: confutil.P(types.HexUint64(100000)),
 			},
 		},
 		ABI:      abi.ABI{{Type: abi.Constructor}},
-		Bytecode: tktypes.HexBytes(tktypes.RandBytes(64)),
+		Bytecode: types.HexBytes(types.RandBytes(64)),
 	}
 
 	// This isn't a valid TX, but we're just testing getters
@@ -751,8 +751,8 @@ func TestGetters(t *testing.T) {
 	}
 	b = b.WrapCall(callTX)
 	require.Equal(t, callTX.PublicCallOptions, b.GetPublicCallOptions())
-	require.Equal(t, tktypes.JSONFormatOptions("mode=array"), b.GetDataFormat())
-	var result tktypes.RawJSON
+	require.Equal(t, types.JSONFormatOptions("mode=array"), b.GetDataFormat())
+	var result types.RawJSON
 	b.Outputs(&result)
 	require.Equal(t, &result, b.GetOutputs())
 
@@ -765,7 +765,7 @@ func TestBuildCallDataFunction(t *testing.T) {
 	builder := New().ForABI(context.Background(), testABI).Function("getWidgets(uint256)")
 
 	type skuInput struct {
-		SKU tktypes.HexUint64 `json:"sku"`
+		SKU types.HexUint64 `json:"sku"`
 	}
 
 	// A JSON serializable structure
@@ -803,7 +803,7 @@ func TestBuildCallDataFunction(t *testing.T) {
 	// Nil when no value is required (default constructor)
 	callData, err = New().ForABI(context.Background(), abi.ABI{}).
 		Constructor().Inputs(nil).
-		Bytecode(tktypes.MustParseHexBytes("0xfeedbeef")).
+		Bytecode(types.MustParseHexBytes("0xfeedbeef")).
 		BuildCallData()
 	require.NoError(t, err)
 	require.Equal(t, "0xfeedbeef", callData.String())
@@ -813,7 +813,7 @@ func TestBuildCallDataFunction(t *testing.T) {
 	assert.Regexp(t, "PD020203", err)
 
 	// Some broken JSON
-	_, err = builder.Inputs(tktypes.RawJSON(`{!!!! bad json`)).BuildCallData()
+	_, err = builder.Inputs(types.RawJSON(`{!!!! bad json`)).BuildCallData()
 	assert.Regexp(t, "PD020200", err)
 
 }
@@ -832,7 +832,7 @@ func TestMissingFunction(t *testing.T) {
 	res := New().TxBuilder(context.Background()).
 		Private().
 		Domain("noto").
-		To(tktypes.RandAddress()).
+		To(types.RandAddress()).
 		Send()
 	assert.Regexp(t, "PD020215", res.Error())
 }
@@ -851,7 +851,7 @@ func TestIncorrectlyAddingBytecode(t *testing.T) {
 		Private().
 		Domain("noto").
 		Constructor().
-		Bytecode(tktypes.MustParseHexBytes("0xfeedbeef")).
+		Bytecode(types.MustParseHexBytes("0xfeedbeef")).
 		Send()
 	assert.Regexp(t, "PD020205", res.Error())
 }

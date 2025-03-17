@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	pb "github.com/kaleido-io/paladin/core/pkg/proto/engine"
@@ -30,7 +30,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func NewTransportWriter(domainName string, contractAddress *tktypes.EthAddress, nodeID string, transportManager components.TransportManager) *transportWriter {
+func NewTransportWriter(domainName string, contractAddress *types.EthAddress, nodeID string, transportManager components.TransportManager) *transportWriter {
 	return &transportWriter{
 		nodeID:           nodeID,
 		transportManager: transportManager,
@@ -43,7 +43,7 @@ type transportWriter struct {
 	nodeID           string
 	transportManager components.TransportManager
 	domainName       string
-	contractAddress  *tktypes.EthAddress
+	contractAddress  *types.EthAddress
 }
 
 func (tw *transportWriter) SendDelegationRequest(

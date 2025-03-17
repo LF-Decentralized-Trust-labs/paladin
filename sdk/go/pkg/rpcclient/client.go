@@ -27,7 +27,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/sirupsen/logrus"
@@ -65,7 +65,7 @@ func NewRPCErrorResponse(err error, id Byteable, code RPCCode) *RPCResponse {
 	}
 	return &RPCResponse{
 		JSONRpc: "2.0",
-		ID:      tktypes.RawJSON(byteID),
+		ID:      types.RawJSON(byteID),
 		Error: &RPCError{
 			Code:    int64(code),
 			Message: err.Error(),
@@ -117,16 +117,16 @@ type RPCClientOptions struct {
 }
 
 type RPCRequest struct {
-	JSONRpc string            `json:"jsonrpc"`
-	ID      tktypes.RawJSON   `json:"id"`
-	Method  string            `json:"method"`
-	Params  []tktypes.RawJSON `json:"params,omitempty"`
+	JSONRpc string          `json:"jsonrpc"`
+	ID      types.RawJSON   `json:"id"`
+	Method  string          `json:"method"`
+	Params  []types.RawJSON `json:"params,omitempty"`
 }
 
 type RPCError struct {
-	Code    int64           `json:"code"`
-	Message string          `json:"message"`
-	Data    tktypes.RawJSON `json:"data,omitempty"`
+	Code    int64         `json:"code"`
+	Message string        `json:"message"`
+	Data    types.RawJSON `json:"data,omitempty"`
 }
 
 func (e *RPCError) Error() string {
@@ -138,13 +138,13 @@ func (e *RPCError) RPCError() *RPCError {
 }
 
 type RPCResponse struct {
-	JSONRpc string          `json:"jsonrpc"`
-	ID      tktypes.RawJSON `json:"id"`
-	Result  tktypes.RawJSON `json:"result,omitempty"`
-	Error   *RPCError       `json:"error,omitempty"`
+	JSONRpc string        `json:"jsonrpc"`
+	ID      types.RawJSON `json:"id"`
+	Result  types.RawJSON `json:"result,omitempty"`
+	Error   *RPCError     `json:"error,omitempty"`
 	// Only for subscription notifications
-	Method string          `json:"method,omitempty"`
-	Params tktypes.RawJSON `json:"params,omitempty"`
+	Method string        `json:"method,omitempty"`
+	Params types.RawJSON `json:"params,omitempty"`
 }
 
 func (r *RPCResponse) Message() string {
@@ -156,7 +156,7 @@ func (r *RPCResponse) Message() string {
 
 func (rc *rpcClient) allocateRequestID(req *RPCRequest) string {
 	reqID := fmt.Sprintf(`%.9d`, atomic.AddInt64(&rc.requestCounter, 1))
-	req.ID = tktypes.RawJSON(`"` + reqID + `"`)
+	req.ID = types.RawJSON(`"` + reqID + `"`)
 	return reqID
 }
 
@@ -242,7 +242,7 @@ func (rc *rpcClient) SyncRequest(ctx context.Context, rpcReq *RPCRequest) (rpcRe
 	return rpcRes, nil
 }
 
-func RPCErrorResponse(err error, id tktypes.RawJSON, code RPCCode) *RPCResponse {
+func RPCErrorResponse(err error, id types.RawJSON, code RPCCode) *RPCResponse {
 	return &RPCResponse{
 		JSONRpc: "2.0",
 		ID:      id,
@@ -257,14 +257,14 @@ func buildRequest(ctx context.Context, method string, params []interface{}) (*RP
 	req := &RPCRequest{
 		JSONRpc: "2.0",
 		Method:  method,
-		Params:  make([]tktypes.RawJSON, len(params)),
+		Params:  make([]types.RawJSON, len(params)),
 	}
 	for i, param := range params {
 		b, err := json.Marshal(param)
 		if err != nil {
 			return nil, NewRPCError(ctx, RPCCodeInvalidRequest, tkmsgs.MsgRPCClientInvalidParam, i, method, err)
 		}
-		req.Params[i] = tktypes.RawJSON(b)
+		req.Params[i] = types.RawJSON(b)
 	}
 	return req, nil
 }

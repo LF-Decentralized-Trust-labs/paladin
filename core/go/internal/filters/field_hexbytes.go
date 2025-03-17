@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 )
 
@@ -38,7 +38,7 @@ func (sf HexBytesField) SupportsLIKE() bool {
 	return false
 }
 
-func (sf HexBytesField) SQLValue(ctx context.Context, jsonValue tktypes.RawJSON) (driver.Value, error) {
+func (sf HexBytesField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
 	if jsonValue.IsNil() {
 		return nil, nil
 	}

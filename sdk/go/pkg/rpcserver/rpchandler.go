@@ -25,7 +25,7 @@ import (
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 )
@@ -73,7 +73,7 @@ func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader, wsc *webSocketC
 		log.L(ctx).Debugf("RPC-server[%s] <-- %s [%.2fms]", rpcRequest.ID.StringValue(), rpcRequest.Method, durationMS)
 	}
 	if log.IsTraceEnabled() {
-		log.L(ctx).Tracef("RPC-server[%s] <-- %s", rpcRequest.ID.StringValue(), tktypes.JSONString(res))
+		log.L(ctx).Tracef("RPC-server[%s] <-- %s", rpcRequest.ID.StringValue(), types.JSONString(res))
 	}
 	return handlerResult{isOK: isOK, sendRes: res != nil, res: res}
 
@@ -86,7 +86,7 @@ func (s *rpcServer) replyRPCParseError(ctx context.Context, b []byte, err error)
 		sendRes: true,
 		res: rpcclient.NewRPCErrorResponse(
 			i18n.NewError(ctx, tkmsgs.MsgJSONRPCInvalidRequest),
-			tktypes.RawJSON(`"1"`),
+			types.RawJSON(`"1"`),
 			rpcclient.RPCCodeInvalidRequest,
 		),
 	}
@@ -125,7 +125,7 @@ func (s *rpcServer) handleRPCBatch(ctx context.Context, rpcArray []*rpcclient.RP
 				log.L(ctx).Debugf("RPC-server[%s] (b=%d) <-- %s [%.2fms]", rpcRequest.ID.StringValue(), i, rpcRequest.Method, durationMS)
 			}
 			if log.IsTraceEnabled() {
-				log.L(ctx).Tracef("RPC-server[%s] (b=%d) <-- %s", rpcRequest.ID.StringValue(), i, tktypes.JSONString(res))
+				log.L(ctx).Tracef("RPC-server[%s] (b=%d) <-- %s", rpcRequest.ID.StringValue(), i, types.JSONString(res))
 			}
 			rpcResponses[responseNumber] = res
 			results <- ok

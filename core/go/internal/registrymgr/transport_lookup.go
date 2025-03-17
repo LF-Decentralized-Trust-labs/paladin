@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -81,7 +81,7 @@ func (tl *transportLookup) getNodeTransports(ctx context.Context, dbTX persisten
 	}
 
 	// Resolve all the items in the hierarchy to find the leaf
-	var lookupParentID tktypes.HexBytes
+	var lookupParentID types.HexBytes
 	var entry *pldapi.RegistryEntryWithProperties
 	for _, entryName := range hierarchy {
 		q := query.NewQueryBuilder().Equal(".name", entryName).Limit(1)

@@ -19,7 +19,7 @@ package keymanager
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcserver"
@@ -59,7 +59,7 @@ func (km *keyManager) rpcResolveKey() rpcserver.RPCHandler {
 func (km *keyManager) rpcResolveEthAddress() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		identifier string,
-	) (*tktypes.EthAddress, error) {
+	) (*types.EthAddress, error) {
 		return km.ResolveEthAddressNewDatabaseTX(ctx, identifier)
 	})
 }

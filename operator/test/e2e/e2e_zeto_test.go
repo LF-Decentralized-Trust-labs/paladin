@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
@@ -96,7 +96,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 							verifier, err := rpc[src].PTX().ResolveVerifier(ctx, fmt.Sprintf("test@%s", dest),
 								algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 							if err == nil {
-								addr, err := tktypes.ParseEthAddress(verifier)
+								addr, err := types.ParseEthAddress(verifier)
 								Expect(err).To(BeNil())
 								Expect(addr).ToNot(BeNil())
 							}
@@ -107,7 +107,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 			}
 		})
 
-		var zetoContract *tktypes.EthAddress
+		var zetoContract *types.EthAddress
 		operator := "zeto.operator@node1"
 		It("deploys a zeto", func() {
 			deploy := rpc["node1"].ForABI(ctx, abi.ABI{zetoConstructorABI}).
@@ -126,7 +126,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 			testLog("Zeto (%s) contract %s deployed by TX %s", tokenType, zetoContract, deploy.ID())
 		})
 
-		var zetoCoinSchemaID *tktypes.Bytes32
+		var zetoCoinSchemaID *types.Bytes32
 		It("gets the coin schema", func() {
 			var schemas []*pldapi.Schema
 			err := rpc["node1"].CallRPC(ctx, &schemas, "pstate_listSchemas", "zeto")
@@ -140,7 +140,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 		})
 
 		logWallet := func(identity, node string) {
-			var addr tktypes.HexBytes
+			var addr types.HexBytes
 			err := rpc[node].CallRPC(ctx, &addr, "ptx_resolveVerifier", identity, "domain:zeto:snark:babyjubjub", "iden3_pubkey_babyjubjub_compressed_0x")
 			Expect(err).To(BeNil())
 			method := "pstate_queryContractStates"
@@ -196,7 +196,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 		})
 
 		It("sends some zetos to sally on node2", func() {
-			for _, amount := range []*tktypes.HexUint256{
+			for _, amount := range []*types.HexUint256{
 				with10Decimals(33), // 79
 				with10Decimals(66), // 13
 			} {
@@ -281,7 +281,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 				To(zetoContract).
 				From("bob@node1").
 				Inputs(&zetotypes.FungibleTransferLockedParams{
-					LockedInputs: []*tktypes.HexUint256{&coins[0].ID},
+					LockedInputs: []*types.HexUint256{&coins[0].ID},
 					Delegate:     "sally@node2",
 					Transfers: []*zetotypes.FungibleTransferParamEntry{
 						{

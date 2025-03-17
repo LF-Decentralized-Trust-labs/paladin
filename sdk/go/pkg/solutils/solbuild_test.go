@@ -19,7 +19,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,9 +47,9 @@ func TestLibraryLinkingSuccess(t *testing.T) {
 		}
 	}`)
 
-	resolvedAddresses := map[string]*tktypes.EthAddress{
-		"Dependency1": tktypes.RandAddress(),
-		"contracts/lib/MyContract.sol:Dependency2": tktypes.RandAddress(),
+	resolvedAddresses := map[string]*types.EthAddress{
+		"Dependency1": types.RandAddress(),
+		"contracts/lib/MyContract.sol:Dependency2": types.RandAddress(),
 	}
 
 	build, err := LoadBuildResolveLinks(context.Background(), unlinkedBuildJSON, resolvedAddresses)

@@ -23,7 +23,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -117,7 +117,7 @@ func TestRPCReliableMessages(t *testing.T) {
 		msg := &pldapi.ReliableMessage{
 			MessageType: pldapi.RMTPrivacyGroup.Enum(),
 			Node:        "node2",
-			Metadata:    tktypes.RawJSON(`{}`),
+			Metadata:    types.RawJSON(`{}`),
 		}
 		err := tm.SendReliable(ctx, dbTX, msg)
 		msgID = msg.ID

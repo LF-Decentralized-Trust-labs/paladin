@@ -26,7 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/stretchr/testify/assert"
@@ -40,13 +40,13 @@ func TestProduceLatestInFlightStageContextSubmitPanic(t *testing.T) {
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *types.Timestamp) error {
 			return nil
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(10),
+			GasPrice: types.Uint64ToUint256(10),
 		},
 	})
 
@@ -78,26 +78,26 @@ func TestProduceLatestInFlightStageContextSubmitComplete(t *testing.T) {
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *types.Timestamp) error {
 			return nil
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(10),
+			GasPrice: types.Uint64ToUint256(10),
 		},
 	})
 
 	// switch to submit
 	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
 	signedMsg := []byte("signedMessage")
-	txHash := confutil.P(tktypes.Bytes32Keccak([]byte("0x000031")))
+	txHash := confutil.P(types.Bytes32Keccak([]byte("0x000031")))
 	it.TriggerNewStageRun(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived, signedMsg)
 	rsc := it.stateManager.GetRunningStageContext(ctx)
 	// submission attempt completed - new transaction submitted
 	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
 
-	submissionTime := confutil.P(tktypes.TimestampNow())
+	submissionTime := confutil.P(types.TimestampNow())
 	it.stateManager.AddSubmitOutput(ctx, txHash, submissionTime, SubmissionOutcomeSubmittedNew, ethclient.ErrorReason(""), nil)
 	rsc.StageOutputsToBePersisted = nil
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
@@ -138,14 +138,14 @@ func TestProduceLatestInFlightStageContextCannotSubmit(t *testing.T) {
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *types.Timestamp) error {
 			return nil
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         tktypes.Uint64ToUint256(32247127816),
-			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(32146027800),
+			MaxFeePerGas:         types.Uint64ToUint256(32247127816),
+			MaxPriorityFeePerGas: types.Uint64ToUint256(32146027800),
 		},
 	})
 
@@ -172,27 +172,27 @@ func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *types.Timestamp) error {
 			return nil
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(10),
+			GasPrice: types.Uint64ToUint256(10),
 		},
-		FirstSubmit: confutil.P(tktypes.TimestampNow()),
+		FirstSubmit: confutil.P(types.TimestampNow()),
 	})
 
 	// switch to submit
 	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
 	signedMsg := []byte("signedMessage")
-	txHash := confutil.P(tktypes.Bytes32Keccak([]byte("0x000031")))
+	txHash := confutil.P(types.Bytes32Keccak([]byte("0x000031")))
 	it.TriggerNewStageRun(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived, signedMsg)
 	rsc := it.stateManager.GetRunningStageContext(ctx)
 	// submission attempt completed - new transaction submitted
 	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
 
-	submissionTime := confutil.P(tktypes.TimestampNow())
+	submissionTime := confutil.P(types.TimestampNow())
 	// // submission attempt completed - already known
 	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
 	rsc.StageOutputsToBePersisted = nil
@@ -232,8 +232,8 @@ func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.
 	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
 	rsc.StageOutputsToBePersisted = nil
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		FirstSubmit:     confutil.P(tktypes.TimestampNow()),
-		TransactionHash: confutil.P(tktypes.Bytes32Keccak([]byte("already known"))),
+		FirstSubmit:     confutil.P(types.TimestampNow()),
+		TransactionHash: confutil.P(types.Bytes32Keccak([]byte("already known"))),
 	})
 	rsc = it.stateManager.GetRunningStageContext(ctx)
 	it.stateManager.AddSubmitOutput(ctx, txHash, submissionTime, SubmissionOutcomeAlreadyKnown, ethclient.ErrorReason(""), nil)
@@ -254,26 +254,26 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *types.Timestamp) error {
 			return nil
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(10),
+			GasPrice: types.Uint64ToUint256(10),
 		},
-		FirstSubmit: confutil.P(tktypes.TimestampNow()),
+		FirstSubmit: confutil.P(types.TimestampNow()),
 	})
 
 	// switch to submit
 	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
 	signedMsg := []byte("signedMessage")
-	txHash := confutil.P(tktypes.Bytes32Keccak([]byte("0x000001")))
+	txHash := confutil.P(types.Bytes32Keccak([]byte("0x000001")))
 
 	it.TriggerNewStageRun(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived, signedMsg)
 	rsc := it.stateManager.GetRunningStageContext(ctx)
 
-	submissionTime := confutil.P(tktypes.TimestampNow())
+	submissionTime := confutil.P(types.TimestampNow())
 	submissionErr := fmt.Errorf("submission error")
 
 	// submission attempt errored - required re-preparation
@@ -301,9 +301,9 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
 	rsc.StageOutputsToBePersisted = nil
 	rsc = it.stateManager.GetRunningStageContext(ctx)
-	newWarnTime := confutil.P(tktypes.TimestampNow())
+	newWarnTime := confutil.P(types.TimestampNow())
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		FirstSubmit:     confutil.P(tktypes.TimestampNow()),
+		FirstSubmit:     confutil.P(types.TimestampNow()),
 		TransactionHash: txHash,
 	})
 	it.stateManager.AddSubmitOutput(ctx, nil, newWarnTime, SubmissionOutcomeFailedRequiresRetry, ethclient.ErrorReasonTransactionReverted, submissionErr)
@@ -370,15 +370,15 @@ func TestProduceLatestInFlightStageContextSubmitRePrepare(t *testing.T) {
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *types.Timestamp) error {
 			return nil
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(10),
+			GasPrice: types.Uint64ToUint256(10),
 		},
-		TransactionHash: confutil.P(tktypes.Bytes32Keccak([]byte("0x000001"))),
+		TransactionHash: confutil.P(types.Bytes32Keccak([]byte("0x000001"))),
 	})
 
 	// switch to submit
@@ -415,15 +415,15 @@ func TestProduceLatestInFlightStageContextTriggerSubmit(t *testing.T) {
 	it.testOnlyNoActionMode = false
 	it.testOnlyNoEventMode = false
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *types.Timestamp) error {
 			return nil
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(10),
+			GasPrice: types.Uint64ToUint256(10),
 		},
-		TransactionHash: confutil.P(tktypes.Bytes32Keccak([]byte("0x000001"))),
+		TransactionHash: confutil.P(types.Bytes32Keccak([]byte("0x000001"))),
 	})
 
 	// trigger signing

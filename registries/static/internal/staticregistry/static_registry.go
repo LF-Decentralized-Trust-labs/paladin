@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/registries/static/internal/msgs"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
@@ -82,14 +82,14 @@ func (r *staticRegistry) HandleRegistryEvents(ctx context.Context, req *prototk.
 	return nil, i18n.NewError(ctx, msgs.MsgFunctionUnsupported)
 }
 
-func (r *staticRegistry) recurseBuildUpsert(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest, parentID tktypes.HexBytes, name string, inEntry *StaticEntry) error {
+func (r *staticRegistry) recurseBuildUpsert(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest, parentID types.HexBytes, name string, inEntry *StaticEntry) error {
 
 	idHash := sha3.NewLegacyKeccak256()
 	if parentID != nil {
 		idHash.Write([]byte(parentID))
 	}
 	idHash.Write([]byte(name))
-	entryID := tktypes.HexBytes(idHash.Sum(nil))
+	entryID := types.HexBytes(idHash.Sum(nil))
 	entry := prototk.RegistryEntry{
 		Id:       entryID.String(),
 		Name:     name,

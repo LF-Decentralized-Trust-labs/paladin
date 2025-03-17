@@ -23,7 +23,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -69,7 +69,7 @@ func TestReceiveMessageStateWithNullifierSendAckRealDB(t *testing.T) {
 		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
 				Return(nil, nil).Once()
-			nullifier := &components.NullifierUpsert{ID: tktypes.RandBytes(32)}
+			nullifier := &components.NullifierUpsert{ID: types.RandBytes(32)}
 			mc.stateManager.On("WriteNullifiersForReceivedStates", mock.Anything, mock.Anything, "domain1", []*components.NullifierUpsert{nullifier}).
 				Return(nil).Once()
 			mkr := componentmocks.NewKeyResolver(t)
@@ -85,12 +85,12 @@ func TestReceiveMessageStateWithNullifierSendAckRealDB(t *testing.T) {
 		CorrelationId: confutil.P(uuid.NewString()),
 		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
 		MessageType:   RMHMessageTypeStateDistribution,
-		Payload: tktypes.JSONString(&components.StateDistributionWithData{
+		Payload: types.JSONString(&components.StateDistributionWithData{
 			StateDistribution: components.StateDistribution{
 				Domain:                "domain1",
-				ContractAddress:       tktypes.RandAddress().String(),
-				SchemaID:              tktypes.RandHex(32),
-				StateID:               tktypes.RandHex(32),
+				ContractAddress:       types.RandAddress().String(),
+				SchemaID:              types.RandHex(32),
+				StateID:               types.RandHex(32),
 				NullifierAlgorithm:    confutil.P("algo1"),
 				NullifierVerifierType: confutil.P("vtype1"),
 				NullifierPayloadType:  confutil.P("ptype1"),
@@ -118,7 +118,7 @@ func testReceivedReliableMsg(msgType string, payloadObj any) *components.Receive
 		MessageID:     uuid.New(),
 		CorrelationID: confutil.P(uuid.New()),
 		MessageType:   msgType,
-		Payload:       tktypes.JSONString(payloadObj),
+		Payload:       types.JSONString(payloadObj),
 	}
 }
 
@@ -140,9 +140,9 @@ func TestHandleStateDistroBadState(t *testing.T) {
 		&components.StateDistributionWithData{
 			StateDistribution: components.StateDistribution{
 				Domain:          "domain1",
-				ContractAddress: tktypes.RandAddress().String(),
-				SchemaID:        tktypes.RandHex(32),
-				StateID:         tktypes.RandHex(32),
+				ContractAddress: types.RandAddress().String(),
+				SchemaID:        types.RandHex(32),
+				StateID:         types.RandHex(32),
 			},
 			StateData: []byte(`{"some":"data"}`),
 		})
@@ -184,9 +184,9 @@ func TestHandleStateDistroMixedBatchBadAndGoodStates(t *testing.T) {
 		&components.StateDistributionWithData{
 			StateDistribution: components.StateDistribution{
 				Domain:          "domain1",
-				ContractAddress: tktypes.RandAddress().String(),
-				SchemaID:        tktypes.RandHex(32),
-				StateID:         tktypes.RandHex(32),
+				ContractAddress: types.RandAddress().String(),
+				SchemaID:        types.RandHex(32),
+				StateID:         types.RandHex(32),
 			},
 			StateData: []byte(`{"some":"data"}`),
 		})
@@ -227,9 +227,9 @@ func TestHandleStateDistroBadNullifier(t *testing.T) {
 		&components.StateDistributionWithData{
 			StateDistribution: components.StateDistribution{
 				Domain:                "domain1",
-				ContractAddress:       tktypes.RandAddress().String(),
-				SchemaID:              tktypes.RandHex(32),
-				StateID:               tktypes.RandHex(32),
+				ContractAddress:       types.RandAddress().String(),
+				SchemaID:              types.RandHex(32),
+				StateID:               types.RandHex(32),
 				NullifierAlgorithm:    confutil.P("algo1"),
 				NullifierVerifierType: confutil.P("vtype1"),
 				NullifierPayloadType:  confutil.P("ptype1"),
@@ -270,9 +270,9 @@ func TestHandleStateDistroBadMsg(t *testing.T) {
 		&components.StateDistributionWithData{
 			StateDistribution: components.StateDistribution{
 				Domain:          "domain1",
-				ContractAddress: tktypes.RandAddress().String(),
+				ContractAddress: types.RandAddress().String(),
 				SchemaID:        "wrongness",
-				StateID:         tktypes.RandHex(32),
+				StateID:         types.RandHex(32),
 			},
 			StateData: []byte(`{"some":"data"}`),
 		})
@@ -498,7 +498,7 @@ func TestHandleNullifierFail(t *testing.T) {
 			mc.db.Mock.ExpectBegin()
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
 				Return(nil, nil).Once()
-			nullifier := &components.NullifierUpsert{ID: tktypes.RandBytes(32)}
+			nullifier := &components.NullifierUpsert{ID: types.RandBytes(32)}
 			mc.stateManager.On("WriteNullifiersForReceivedStates", mock.Anything, mock.Anything, "domain1", []*components.NullifierUpsert{nullifier}).
 				Return(fmt.Errorf("pop")).Once()
 			mkr := componentmocks.NewKeyResolver(t)
@@ -513,9 +513,9 @@ func TestHandleNullifierFail(t *testing.T) {
 		&components.StateDistributionWithData{
 			StateDistribution: components.StateDistribution{
 				Domain:                "domain1",
-				ContractAddress:       tktypes.RandAddress().String(),
-				SchemaID:              tktypes.RandHex(32),
-				StateID:               tktypes.RandHex(32),
+				ContractAddress:       types.RandAddress().String(),
+				SchemaID:              types.RandHex(32),
+				StateID:               types.RandHex(32),
 				NullifierAlgorithm:    confutil.P("algo1"),
 				NullifierVerifierType: confutil.P("vtype1"),
 				NullifierPayloadType:  confutil.P("ptype1"),
@@ -634,8 +634,8 @@ func TestHandlePreparedOk(t *testing.T) {
 }
 
 func TestHandlePrivacyGroupOK(t *testing.T) {
-	var stateID tktypes.HexBytes = tktypes.RandBytes(32)
-	schemaID := tktypes.RandBytes32()
+	var stateID types.HexBytes = types.RandBytes(32)
+	schemaID := types.RandBytes32()
 	schema := componentmocks.NewSchema(t)
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
@@ -664,7 +664,7 @@ func TestHandlePrivacyGroupOK(t *testing.T) {
 			GenesisState: components.StateDistributionWithData{
 				StateDistribution: components.StateDistribution{
 					Domain:          "domain1",
-					ContractAddress: tktypes.RandAddress().String(),
+					ContractAddress: types.RandAddress().String(),
 					SchemaID:        schemaID.String(),
 					StateID:         stateID.String(),
 				},
@@ -690,8 +690,8 @@ func TestHandlePrivacyGroupOK(t *testing.T) {
 }
 
 func TestHandlePrivacyGroupBadState(t *testing.T) {
-	var stateID tktypes.HexBytes = tktypes.RandBytes(32)
-	schemaID := tktypes.RandBytes32()
+	var stateID types.HexBytes = types.RandBytes(32)
+	schemaID := types.RandBytes32()
 	schema := componentmocks.NewSchema(t)
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
@@ -716,7 +716,7 @@ func TestHandlePrivacyGroupBadState(t *testing.T) {
 			GenesisState: components.StateDistributionWithData{
 				StateDistribution: components.StateDistribution{
 					Domain:          "domain1",
-					ContractAddress: tktypes.RandAddress().String(),
+					ContractAddress: types.RandAddress().String(),
 					SchemaID:        schemaID.String(),
 					StateID:         stateID.String(),
 				},
@@ -742,8 +742,8 @@ func TestHandlePrivacyGroupBadState(t *testing.T) {
 }
 
 func TestHandlePrivacyGroupGroupFail(t *testing.T) {
-	var stateID tktypes.HexBytes = tktypes.RandBytes(32)
-	schemaID := tktypes.RandBytes32()
+	var stateID types.HexBytes = types.RandBytes(32)
+	schemaID := types.RandBytes32()
 	schema := componentmocks.NewSchema(t)
 	ctx, tm, _, done := newTestTransport(t, false,
 		mockEmptyReliableMsgs,
@@ -772,7 +772,7 @@ func TestHandlePrivacyGroupGroupFail(t *testing.T) {
 			GenesisState: components.StateDistributionWithData{
 				StateDistribution: components.StateDistribution{
 					Domain:          "domain1",
-					ContractAddress: tktypes.RandAddress().String(),
+					ContractAddress: types.RandAddress().String(),
 					SchemaID:        schemaID.String(),
 					StateID:         stateID.String(),
 				},
@@ -810,9 +810,9 @@ func TestHandlePrivacyGroupBuiltInABIFail(t *testing.T) {
 			GenesisState: components.StateDistributionWithData{
 				StateDistribution: components.StateDistribution{
 					Domain:          "domain1",
-					ContractAddress: tktypes.RandAddress().String(),
-					SchemaID:        tktypes.RandHex(32),
-					StateID:         tktypes.RandHex(32),
+					ContractAddress: types.RandAddress().String(),
+					SchemaID:        types.RandHex(32),
+					StateID:         types.RandHex(32),
 				},
 				StateData: []byte(`{"some":"data"}`),
 			},
@@ -884,14 +884,14 @@ func testReceivedMesage() *components.ReceivedMessage {
 		MessageID:     msgID,
 		CorrelationID: confutil.P(uuid.New()),
 		MessageType:   RMHMessageTypePrivacyGroupMessage,
-		Payload: tktypes.JSONString(&pldapi.PrivacyGroupMessage{
-			Sent: tktypes.TimestampNow(),
+		Payload: types.JSONString(&pldapi.PrivacyGroupMessage{
+			Sent: types.TimestampNow(),
 			ID:   msgID,
 			PrivacyGroupMessageInput: pldapi.PrivacyGroupMessageInput{
 				Domain: "domain1",
-				Group:  tktypes.RandBytes(32),
+				Group:  types.RandBytes(32),
 				Topic:  "topic.1",
-				Data:   tktypes.JSONString("some data"),
+				Data:   types.JSONString("some data"),
 			},
 		}),
 	}
@@ -1055,14 +1055,14 @@ func TestBuildPrivacyGroupDistributionMsgGetStatesError(t *testing.T) {
 	_, _, err := tm.buildPrivacyGroupDistributionMsg(ctx, tm.persistence.NOTX(), &pldapi.ReliableMessage{
 		ID:          distroID,
 		MessageType: pldapi.RMTPrivacyGroup.Enum(),
-		Metadata: tktypes.JSONString(&components.PrivacyGroupDistribution{
+		Metadata: types.JSONString(&components.PrivacyGroupDistribution{
 			GenesisTransaction: uuid.New(),
 			GenesisState: components.StateDistributionWithData{
 				StateDistribution: components.StateDistribution{
 					Domain:          "domain1",
-					ContractAddress: tktypes.RandAddress().String(),
-					SchemaID:        tktypes.RandHex(32),
-					StateID:         tktypes.RandHex(32),
+					ContractAddress: types.RandAddress().String(),
+					SchemaID:        types.RandHex(32),
+					StateID:         types.RandHex(32),
 				},
 			},
 		}),
@@ -1088,14 +1088,14 @@ func TestBuildPrivacyGroupDistributionMsgGetStatesNotFound(t *testing.T) {
 	_, parseErr, err := tm.buildPrivacyGroupDistributionMsg(ctx, tm.persistence.NOTX(), &pldapi.ReliableMessage{
 		ID:          distroID,
 		MessageType: pldapi.RMTPrivacyGroup.Enum(),
-		Metadata: tktypes.JSONString(&components.PrivacyGroupDistribution{
+		Metadata: types.JSONString(&components.PrivacyGroupDistribution{
 			GenesisTransaction: uuid.New(),
 			GenesisState: components.StateDistributionWithData{
 				StateDistribution: components.StateDistribution{
 					Domain:          "domain1",
-					ContractAddress: tktypes.RandAddress().String(),
-					SchemaID:        tktypes.RandHex(32),
-					StateID:         tktypes.RandHex(32),
+					ContractAddress: types.RandAddress().String(),
+					SchemaID:        types.RandHex(32),
+					StateID:         types.RandHex(32),
 				},
 			},
 		}),
@@ -1142,9 +1142,9 @@ func TestParsePrivacyGroupMessageGetMessageError(t *testing.T) {
 	_, _, err := tm.buildPrivacyGroupMessageMsg(ctx, tm.persistence.NOTX(), &pldapi.ReliableMessage{
 		ID:          distroID,
 		MessageType: pldapi.RMTPrivacyGroup.Enum(),
-		Metadata: tktypes.JSONString(&components.PrivacyGroupMessageDistribution{
+		Metadata: types.JSONString(&components.PrivacyGroupMessageDistribution{
 			Domain: "domain1",
-			Group:  tktypes.RandBytes(32),
+			Group:  types.RandBytes(32),
 			ID:     uuid.New(),
 		}),
 	})
@@ -1168,9 +1168,9 @@ func TestParsePrivacyGroupMessageGetMessageNotFound(t *testing.T) {
 	_, parseErr, err := tm.buildPrivacyGroupMessageMsg(ctx, tm.persistence.NOTX(), &pldapi.ReliableMessage{
 		ID:          distroID,
 		MessageType: pldapi.RMTPrivacyGroup.Enum(),
-		Metadata: tktypes.JSONString(&components.PrivacyGroupMessageDistribution{
+		Metadata: types.JSONString(&components.PrivacyGroupMessageDistribution{
 			Domain: "domain1",
-			Group:  tktypes.RandBytes(32),
+			Group:  types.RandBytes(32),
 			ID:     uuid.New(),
 		}),
 	})

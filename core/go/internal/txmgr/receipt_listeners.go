@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -39,11 +39,11 @@ import (
 )
 
 type persistedReceiptListener struct {
-	Name    string            `gorm:"column:name"`
-	Created tktypes.Timestamp `gorm:"column:created"`
-	Started *bool             `gorm:"column:started"`
-	Filters tktypes.RawJSON   `gorm:"column:filters"`
-	Options tktypes.RawJSON   `gorm:"column:options"`
+	Name    string          `gorm:"column:name"`
+	Created types.Timestamp `gorm:"column:created"`
+	Started *bool           `gorm:"column:started"`
+	Filters types.RawJSON   `gorm:"column:filters"`
+	Options types.RawJSON   `gorm:"column:options"`
 }
 
 var receiptListenerFilters = filters.FieldMap{
@@ -57,9 +57,9 @@ func (persistedReceiptListener) TableName() string {
 }
 
 type persistedReceiptCheckpoint struct {
-	Listener string            `gorm:"column:listener"`
-	Sequence uint64            `gorm:"column:sequence"`
-	Time     tktypes.Timestamp `gorm:"column:time"`
+	Listener string          `gorm:"column:listener"`
+	Sequence uint64          `gorm:"column:sequence"`
+	Time     types.Timestamp `gorm:"column:time"`
 }
 
 func (persistedReceiptCheckpoint) TableName() string {
@@ -67,8 +67,8 @@ func (persistedReceiptCheckpoint) TableName() string {
 }
 
 type stateRef struct {
-	DomainName string           `gorm:"column:domain_name;primaryKey"`
-	ID         tktypes.HexBytes `gorm:"column:id;primaryKey"`
+	DomainName string         `gorm:"column:domain_name;primaryKey"`
+	ID         types.HexBytes `gorm:"column:id;primaryKey"`
 }
 
 func (sr stateRef) TableName() string {
@@ -76,13 +76,13 @@ func (sr stateRef) TableName() string {
 }
 
 type persistedReceiptGap struct {
-	Listener    string              `gorm:"column:listener;primaryKey"`
-	Source      *tktypes.EthAddress `gorm:"column:source;primaryKey"`
-	Transaction uuid.UUID           `gorm:"column:transaction"`
-	Sequence    uint64              `gorm:"column:sequence"`
-	DomainName  string              `gorm:"column:domain_name"`
-	StateID     tktypes.HexBytes    `gorm:"column:state"`
-	State       *stateRef           `gorm:"foreignKey:DomainName,ID;references:DomainName,StateID"`
+	Listener    string            `gorm:"column:listener;primaryKey"`
+	Source      *types.EthAddress `gorm:"column:source;primaryKey"`
+	Transaction uuid.UUID         `gorm:"column:transaction"`
+	Sequence    uint64            `gorm:"column:sequence"`
+	DomainName  string            `gorm:"column:domain_name"`
+	StateID     types.HexBytes    `gorm:"column:state"`
+	State       *stateRef         `gorm:"foreignKey:DomainName,ID;references:DomainName,StateID"`
 }
 
 func (persistedReceiptGap) TableName() string {
@@ -125,7 +125,7 @@ func (tm *txManager) receiptsInit() {
 	tm.receiptListeners = make(map[string]*receiptListener)
 	tm.receiptListenersLoadPageSize = 100 /* not currently tunable */
 	tm.receiptsStateGapCheckTime = confutil.DurationMin(tm.conf.ReceiptListeners.StateGapCheckInterval, 100*time.Millisecond, *pldconf.TxManagerDefaults.ReceiptListeners.StateGapCheckInterval)
-	tm.lastStateUpdateTime.Store(int64(tktypes.TimestampNow()))
+	tm.lastStateUpdateTime.Store(int64(types.TimestampNow()))
 }
 
 func (tm *txManager) CreateReceiptListener(ctx context.Context, spec *pldapi.TransactionReceiptListener) error {
@@ -139,9 +139,9 @@ func (tm *txManager) CreateReceiptListener(ctx context.Context, spec *pldapi.Tra
 	dbSpec := &persistedReceiptListener{
 		Name:    spec.Name,
 		Started: &started,
-		Created: tktypes.TimestampNow(),
-		Filters: tktypes.JSONString(&spec.Filters),
-		Options: tktypes.JSONString(&spec.Options),
+		Created: types.TimestampNow(),
+		Filters: types.JSONString(&spec.Filters),
+		Options: types.JSONString(&spec.Options),
 	}
 	if insertErr := tm.p.DB().
 		WithContext(ctx).
@@ -205,7 +205,7 @@ func (tm *txManager) StopReceiptListener(ctx context.Context, name string) error
 }
 
 func (tm *txManager) NotifyStatesDBChanged(ctx context.Context) {
-	tm.lastStateUpdateTime.Store(int64(tktypes.TimestampNow()))
+	tm.lastStateUpdateTime.Store(int64(types.TimestampNow()))
 }
 
 func (tm *txManager) setReceiptListenerStatus(ctx context.Context, name string, started bool) error {
@@ -360,7 +360,7 @@ func (tm *txManager) stopReceiptListeners() {
 }
 
 func (tm *txManager) validateListenerSpec(ctx context.Context, spec *pldapi.TransactionReceiptListener) error {
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, spec.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+	if err := types.ValidateSafeCharsStartEndAlphaNum(ctx, spec.Name, types.DefaultNameMaxLen, "name"); err != nil {
 		return err
 	}
 	icrb, err := spec.Options.IncompleteStateReceiptBehavior.Validate()
@@ -699,7 +699,7 @@ func (l *receiptListener) updateCheckpoint(batch *receiptDeliveryBatch, newSeque
 			Create(&persistedReceiptCheckpoint{
 				Listener: l.spec.Name,
 				Sequence: newSequence,
-				Time:     tktypes.TimestampNow(),
+				Time:     types.TimestampNow(),
 			}).
 			Error
 		if err == nil && len(batch.Gaps) > 0 {
@@ -921,7 +921,7 @@ func (l *receiptListener) runListener() {
 				newReceipts = true
 			case <-stateGapCheckTicker.C:
 				// Only do the DB check if we've had the tap that new states have been received
-				newStates = tktypes.Timestamp(l.tm.lastStateUpdateTime.Load()).Time().After(lastStateCheck)
+				newStates = types.Timestamp(l.tm.lastStateUpdateTime.Load()).Time().After(lastStateCheck)
 			case <-l.ctx.Done():
 				log.L(l.ctx).Warnf("listener stopping (waiting for new receipts/states)") // cancelled context
 				return

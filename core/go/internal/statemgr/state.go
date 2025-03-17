@@ -29,18 +29,18 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 )
 
 type transactionStateRecord struct {
 	pldapi.StateBase
-	State          tktypes.HexBytes `gorm:"column:state"`
-	RecordType     string           `gorm:"column:record_type"`
-	SpentState     tktypes.HexBytes `gorm:"column:spent_state"`
-	ReadState      tktypes.HexBytes `gorm:"column:read_state"`
-	ConfirmedState tktypes.HexBytes `gorm:"column:confirmed_state"`
+	State          types.HexBytes `gorm:"column:state"`
+	RecordType     string         `gorm:"column:record_type"`
+	SpentState     types.HexBytes `gorm:"column:spent_state"`
+	ReadState      types.HexBytes `gorm:"column:read_state"`
+	ConfirmedState types.HexBytes `gorm:"column:confirmed_state"`
 }
 
 func (transactionStateRecord) TableName() string {
@@ -183,7 +183,7 @@ func (ss *stateManager) writeStates(ctx context.Context, dbTX persistence.DBTX, 
 	return err
 }
 
-func (ss *stateManager) GetStatesByID(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress *tktypes.EthAddress, stateIDs []tktypes.HexBytes, failNotFound, withLabels bool) ([]*pldapi.State, error) {
+func (ss *stateManager) GetStatesByID(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress *types.EthAddress, stateIDs []types.HexBytes, failNotFound, withLabels bool) ([]*pldapi.State, error) {
 	q := dbTX.DB().Table("states")
 	if withLabels {
 		q = q.Preload("Labels").Preload("Int64Labels")
@@ -211,7 +211,7 @@ var baseStateFields = map[string]filters.FieldResolver{
 	".created": filters.TimestampField(`"states"."created"`),
 }
 
-func addStateBaseLabels(labelValues filters.PassthroughValueSet, id tktypes.HexBytes, createdAt tktypes.Timestamp) filters.PassthroughValueSet {
+func addStateBaseLabels(labelValues filters.PassthroughValueSet, id types.HexBytes, createdAt types.Timestamp) filters.PassthroughValueSet {
 	labelValues[".id"] = id.HexString()
 	labelValues[".created"] = int64(createdAt)
 	return labelValues
@@ -243,22 +243,22 @@ func (ss *stateManager) labelSetFor(schema components.Schema) *trackingLabelSet 
 	return &tls
 }
 
-func (ss *stateManager) FindContractStates(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress *tktypes.EthAddress, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
+func (ss *stateManager) FindContractStates(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress *types.EthAddress, schemaID types.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
 	_, s, err = ss.findStates(ctx, dbTX, domainName, contractAddress, schemaID, query, &components.StateQueryOptions{StatusQualifier: status})
 	return s, err
 }
 
-func (ss *stateManager) FindStates(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, query *query.QueryJSON, options *components.StateQueryOptions) (s []*pldapi.State, err error) {
+func (ss *stateManager) FindStates(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID types.Bytes32, query *query.QueryJSON, options *components.StateQueryOptions) (s []*pldapi.State, err error) {
 	_, s, err = ss.findStates(ctx, dbTX, domainName, nil, schemaID, query, options)
 	return s, err
 }
 
-func (ss *stateManager) FindContractNullifiers(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress tktypes.EthAddress, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
+func (ss *stateManager) FindContractNullifiers(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress types.EthAddress, schemaID types.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
 	_, s, err = ss.findNullifiers(ctx, dbTX, domainName, &contractAddress, schemaID, query, status, nil, nil)
 	return s, err
 }
 
-func (ss *stateManager) FindNullifiers(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
+func (ss *stateManager) FindNullifiers(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID types.Bytes32, query *query.QueryJSON, status pldapi.StateStatusQualifier) (s []*pldapi.State, err error) {
 	_, s, err = ss.findNullifiers(ctx, dbTX, domainName, nil, schemaID, query, status, nil, nil)
 	return s, err
 }
@@ -267,8 +267,8 @@ func (ss *stateManager) findStates(
 	ctx context.Context,
 	dbTX persistence.DBTX,
 	domainName string,
-	contractAddress *tktypes.EthAddress,
-	schemaID tktypes.Bytes32,
+	contractAddress *types.EthAddress,
+	schemaID types.Bytes32,
 	jq *query.QueryJSON,
 	options *components.StateQueryOptions,
 ) (schema components.Schema, s []*pldapi.State, err error) {
@@ -316,12 +316,12 @@ func (ss *stateManager) findNullifiers(
 	ctx context.Context,
 	dbTX persistence.DBTX,
 	domainName string,
-	contractAddress *tktypes.EthAddress,
-	schemaID tktypes.Bytes32,
+	contractAddress *types.EthAddress,
+	schemaID types.Bytes32,
 	jq *query.QueryJSON,
 	status pldapi.StateStatusQualifier,
-	spendingStates []tktypes.HexBytes,
-	spendingNullifiers []tktypes.HexBytes,
+	spendingStates []types.HexBytes,
+	spendingNullifiers []types.HexBytes,
 ) (schema components.Schema, s []*pldapi.State, err error) {
 	whereClause, isPlainDB := whereClauseForQual(dbTX.DB(), status, "Nullifier__Spent")
 	if isPlainDB {
@@ -364,8 +364,8 @@ func (ss *stateManager) findStatesCommon(
 	ctx context.Context,
 	dbTX persistence.DBTX,
 	domainName string,
-	contractAddress *tktypes.EthAddress,
-	schemaID tktypes.Bytes32,
+	contractAddress *types.EthAddress,
+	schemaID types.Bytes32,
 	jq *query.QueryJSON,
 	modifyQuery func(dbTX persistence.DBTX, q *gorm.DB) *gorm.DB,
 ) (schema components.Schema, s []*pldapi.State, err error) {

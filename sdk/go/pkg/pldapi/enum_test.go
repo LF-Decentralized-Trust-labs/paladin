@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +52,7 @@ func TestStateStatusQualifierJSON(t *testing.T) {
 	require.Equal(t, StateStatusAll, q)
 
 	u := uuid.New().String()
-	err = json.Unmarshal(tktypes.JSONString(u), &q)
+	err = json.Unmarshal(types.JSONString(u), &q)
 	require.NoError(t, err)
 	assert.Equal(t, u, (string)(q))
 }

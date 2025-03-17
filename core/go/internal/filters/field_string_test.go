@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,13 +29,13 @@ func TestStringField(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := StringField("test").SQLValue(ctx, (tktypes.RawJSON)(`!json`))
+	_, err := StringField("test").SQLValue(ctx, (types.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = StringField("test").SQLValue(ctx, (tktypes.RawJSON)(`[]`))
+	_, err = StringField("test").SQLValue(ctx, (types.RawJSON)(`[]`))
 	assert.Regexp(t, "PD010705", err)
 
-	nv, err := StringField("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
+	nv, err := StringField("test").SQLValue(ctx, (types.RawJSON)(`null`))
 	require.NoError(t, err)
 	assert.Nil(t, nv)
 

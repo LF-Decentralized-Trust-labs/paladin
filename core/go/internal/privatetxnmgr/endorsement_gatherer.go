@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -52,7 +52,7 @@ func (e *endorsementGatherer) DomainContext() components.DomainContext {
 
 func (e *endorsementGatherer) GatherEndorsement(ctx context.Context, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, readStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState, partyName string, endorsementRequest *prototk.AttestationRequest) (*prototk.AttestationResult, *string, error) {
 
-	unqualifiedLookup, err := tktypes.PrivateIdentityLocator(partyName).Identity(ctx)
+	unqualifiedLookup, err := types.PrivateIdentityLocator(partyName).Identity(ctx)
 	if err != nil {
 		errorMessage := fmt.Sprintf("failed to parse lookup key for party %s : %s", partyName, err)
 		log.L(ctx).Error(errorMessage)

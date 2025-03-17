@@ -29,7 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
@@ -54,7 +54,7 @@ func TestResolveFunctionABIAndDef(t *testing.T) {
 	_, err := txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type:         pldapi.TransactionTypePublic.Enum(),
-			ABIReference: confutil.P(tktypes.RandBytes32()),
+			ABIReference: confutil.P(types.RandBytes32()),
 		},
 		ABI: abi.ABI{},
 	})
@@ -70,7 +70,7 @@ func TestResolveFunctionNoABI(t *testing.T) {
 	_, err := txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type: pldapi.TransactionTypePublic.Enum(),
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
+			To:   types.MustEthAddress(types.RandHex(20)),
 		},
 		ABI: abi.ABI{},
 	})
@@ -86,7 +86,7 @@ func TestResolveFunctionBadABI(t *testing.T) {
 	_, err := txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type: pldapi.TransactionTypePublic.Enum(),
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
+			To:   types.MustEthAddress(types.RandHex(20)),
 		},
 		ABI: abi.ABI{{Type: abi.Function, Name: "doIt", Inputs: abi.ParameterArray{{Type: "wrong"}}}},
 	})
@@ -157,11 +157,11 @@ func mockQueryPublicTxWithBindings(cb func(jq *query.QueryJSON) ([]*pldapi.Publi
 	}
 }
 
-func mockGetPublicTransactionForHash(cb func(hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error)) func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+func mockGetPublicTransactionForHash(cb func(hash types.Bytes32) (*pldapi.PublicTxWithBinding, error)) func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
 	return func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
 		mqb := mc.publicTxMgr.On("GetPublicTransactionForHash", mock.Anything, mock.Anything, mock.Anything)
 		mqb.Run(func(args mock.Arguments) {
-			result, err := cb(args[2].(tktypes.Bytes32))
+			result, err := cb(args[2].(types.Bytes32))
 			mqb.Return(result, err)
 		})
 	}
@@ -188,8 +188,8 @@ func TestSubmitBadFromAddr(t *testing.T) {
 			Type:     pldapi.TransactionTypePublic.Enum(),
 			Function: exampleABI[0].FunctionSelectorBytes().String(),
 			From:     "sender1",
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:       types.MustEthAddress(types.RandHex(20)),
+			Data:     types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -200,7 +200,7 @@ func TestResolveFunctionHexInputOK(t *testing.T) {
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
 		mockInsertABIAndTransactionOK(true),
-		mockSubmitPublicTxOk(t, tktypes.RandAddress()),
+		mockSubmitPublicTxOk(t, types.RandAddress()),
 	)
 	defer done()
 
@@ -213,8 +213,8 @@ func TestResolveFunctionHexInputOK(t *testing.T) {
 			Type:     pldapi.TransactionTypePublic.Enum(),
 			Function: exampleABI[0].FunctionSelectorBytes().String(),
 			From:     "sender1",
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:       types.MustEthAddress(types.RandHex(20)),
+			Data:     types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -233,8 +233,8 @@ func TestResolveFunctionHexInputFail(t *testing.T) {
 		TransactionBase: pldapi.TransactionBase{
 			Type:     pldapi.TransactionTypePublic.Enum(),
 			Function: exampleABI[0].FunctionSelectorBytes().String(),
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.RawJSON(`"0x"`),
+			To:       types.MustEthAddress(types.RandHex(20)),
+			Data:     types.RawJSON(`"0x"`),
 		},
 		ABI: exampleABI,
 	})
@@ -253,8 +253,8 @@ func TestResolveFunctionUnsupportedInput(t *testing.T) {
 		TransactionBase: pldapi.TransactionBase{
 			Type:     pldapi.TransactionTypePublic.Enum(),
 			Function: exampleABI[0].FunctionSelectorBytes().String(),
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.RawJSON(`false`),
+			To:       types.MustEthAddress(types.RandHex(20)),
+			Data:     types.RawJSON(`false`),
 		},
 		ABI: exampleABI,
 	})
@@ -264,7 +264,7 @@ func TestResolveFunctionUnsupportedInput(t *testing.T) {
 func TestResolveFunctionPlainNameOK(t *testing.T) {
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
-		mockInsertABIAndTransactionOK(true), mockSubmitPublicTxOk(t, tktypes.RandAddress()))
+		mockInsertABIAndTransactionOK(true), mockSubmitPublicTxOk(t, types.RandAddress()))
 	defer done()
 
 	exampleABI := abi.ABI{{Type: abi.Function, Name: "doIt"}}
@@ -276,8 +276,8 @@ func TestResolveFunctionPlainNameOK(t *testing.T) {
 			Type:     pldapi.TransactionTypePublic.Enum(),
 			From:     "sender1",
 			Function: "doIt",
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:       types.MustEthAddress(types.RandHex(20)),
+			Data:     types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -302,7 +302,7 @@ func TestSendTransactionPrivateDeploy(t *testing.T) {
 			From:   "me",
 			Type:   pldapi.TransactionTypePrivate.Enum(),
 			Domain: "domain1",
-			Data:   tktypes.JSONString(tktypes.HexBytes(callData)),
+			Data:   types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -328,8 +328,8 @@ func TestSendTransactionPrivateInvoke(t *testing.T) {
 			Type:     pldapi.TransactionTypePrivate.Enum(),
 			Domain:   "domain1",
 			Function: "doIt",
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:       types.MustEthAddress(types.RandHex(20)),
+			Data:     types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -355,8 +355,8 @@ func TestSendTransactionPrivateInvokeFail(t *testing.T) {
 			Type:     pldapi.TransactionTypePrivate.Enum(),
 			Domain:   "domain1",
 			Function: "doIt",
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:       types.MustEthAddress(types.RandHex(20)),
+			Data:     types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -366,7 +366,7 @@ func TestSendTransactionPrivateInvokeFail(t *testing.T) {
 func TestResolveFunctionOnlyOneToMatch(t *testing.T) {
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
-		mockInsertABIAndTransactionOK(true), mockSubmitPublicTxOk(t, tktypes.RandAddress()))
+		mockInsertABIAndTransactionOK(true), mockSubmitPublicTxOk(t, types.RandAddress()))
 	defer done()
 
 	exampleABI := abi.ABI{{Type: abi.Function, Name: "doIt"}}
@@ -377,8 +377,8 @@ func TestResolveFunctionOnlyOneToMatch(t *testing.T) {
 		TransactionBase: pldapi.TransactionBase{
 			Type: pldapi.TransactionTypePublic.Enum(),
 			From: "sender1",
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data: tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:   types.MustEthAddress(types.RandHex(20)),
+			Data: types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -401,8 +401,8 @@ func TestResolveFunctionOnlyDuplicateMatch(t *testing.T) {
 	_, err = txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type: pldapi.TransactionTypePublic.Enum(),
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data: tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:   types.MustEthAddress(types.RandHex(20)),
+			Data: types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -425,8 +425,8 @@ func TestResolveFunctionNoMatch(t *testing.T) {
 		TransactionBase: pldapi.TransactionBase{
 			Type:     pldapi.TransactionTypePublic.Enum(),
 			Function: "nope",
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:       types.MustEthAddress(types.RandHex(20)),
+			Data:     types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -447,8 +447,8 @@ func TestParseInputsBadTxType(t *testing.T) {
 
 	_, err = txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data: tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:   types.MustEthAddress(types.RandHex(20)),
+			Data: types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -466,7 +466,7 @@ func TestParseInputsPrivateLookupFail(t *testing.T) {
 	_, err := txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type: pldapi.TransactionTypePrivate.Enum(),
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
+			To:   types.MustEthAddress(types.RandHex(20)),
 		},
 	})
 	assert.Regexp(t, "pop", err)
@@ -482,7 +482,7 @@ func TestParseInputsPrivateDomainMismatch(t *testing.T) {
 		TransactionBase: pldapi.TransactionBase{
 			Domain: "domain2",
 			Type:   pldapi.TransactionTypePrivate.Enum(),
-			To:     tktypes.MustEthAddress(tktypes.RandHex(20)),
+			To:     types.MustEthAddress(types.RandHex(20)),
 		},
 	})
 	assert.Regexp(t, "PD012231", err)
@@ -518,8 +518,8 @@ func TestParseInputsBadFromRemoteNode(t *testing.T) {
 		TransactionBase: pldapi.TransactionBase{
 			Type: pldapi.TransactionTypePublic.Enum(),
 			From: "me@node2",
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data: tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:   types.MustEthAddress(types.RandHex(20)),
+			Data: types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -541,11 +541,11 @@ func TestParseInputsBytecodeNonConstructor(t *testing.T) {
 	_, err = txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type: pldapi.TransactionTypePublic.Enum(),
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data: tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:   types.MustEthAddress(types.RandHex(20)),
+			Data: types.JSONString(types.HexBytes(callData)),
 		},
 		ABI:      exampleABI,
-		Bytecode: tktypes.HexBytes(tktypes.RandBytes(1)),
+		Bytecode: types.HexBytes(types.RandBytes(1)),
 	})
 	assert.Regexp(t, "PD012207", err)
 }
@@ -565,7 +565,7 @@ func TestParseInputsBytecodeMissingConstructor(t *testing.T) {
 	_, err = txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type: pldapi.TransactionTypePublic.Enum(),
-			Data: tktypes.JSONString(tktypes.HexBytes(callData)),
+			Data: types.JSONString(types.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -585,8 +585,8 @@ func TestParseInputsBadDataJSON(t *testing.T) {
 	_, err := txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type: pldapi.TransactionTypePublic.Enum(),
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data: tktypes.RawJSON(`{!!! bad json`),
+			To:   types.MustEthAddress(types.RandHex(20)),
+			Data: types.RawJSON(`{!!! bad json`),
 		},
 		ABI: exampleABI,
 	})
@@ -606,8 +606,8 @@ func TestParseInputsBadDataForFunction(t *testing.T) {
 	_, err := txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type: pldapi.TransactionTypePublic.Enum(),
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data: tktypes.RawJSON(`["not a number"]`),
+			To:   types.MustEthAddress(types.RandHex(20)),
+			Data: types.RawJSON(`["not a number"]`),
 		},
 		ABI: exampleABI,
 	})
@@ -627,8 +627,8 @@ func TestParseInputsBadByteString(t *testing.T) {
 	_, err := txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type: pldapi.TransactionTypePublic.Enum(),
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data: tktypes.RawJSON(`"not hex"`),
+			To:   types.MustEthAddress(types.RandHex(20)),
+			Data: types.RawJSON(`"not hex"`),
 		},
 		ABI: exampleABI,
 	})
@@ -644,7 +644,7 @@ func TestInsertTransactionFail(t *testing.T) {
 			mc.db.ExpectExec("INSERT.*abi_entries").WillReturnResult(driver.ResultNoRows)
 			mc.db.ExpectExec("INSERT.*transactions").WillReturnError(fmt.Errorf("pop"))
 			mc.db.ExpectRollback()
-			mockResolveKeyOKThenFail(t, mc, "sender1", tktypes.RandAddress())
+			mockResolveKeyOKThenFail(t, mc, "sender1", types.RandAddress())
 			mc.publicTxMgr.On("ValidateTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		})
 	defer done()
@@ -656,8 +656,8 @@ func TestInsertTransactionFail(t *testing.T) {
 			Type:     pldapi.TransactionTypePublic.Enum(),
 			Function: exampleABI[0].FunctionSelectorBytes().String(),
 			From:     "sender1",
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.RawJSON(`[]`),
+			To:       types.MustEthAddress(types.RandHex(20)),
+			Data:     types.RawJSON(`[]`),
 		},
 		ABI: exampleABI,
 	})
@@ -668,7 +668,7 @@ func TestInsertTransactionPublicTxPrepareFail(t *testing.T) {
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
 		mockInsertABI, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-			mockResolveKeyOKThenFail(t, mc, "sender1", tktypes.RandAddress())
+			mockResolveKeyOKThenFail(t, mc, "sender1", types.RandAddress())
 			mc.publicTxMgr.On("ValidateTransaction", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("pop"))
 		})
 	defer done()
@@ -680,8 +680,8 @@ func TestInsertTransactionPublicTxPrepareFail(t *testing.T) {
 			Type:     pldapi.TransactionTypePublic.Enum(),
 			Function: exampleABI[0].FunctionSelectorBytes().String(),
 			From:     "sender1",
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.RawJSON(`[]`),
+			To:       types.MustEthAddress(types.RandHex(20)),
+			Data:     types.RawJSON(`[]`),
 		},
 		ABI: exampleABI,
 	})
@@ -692,7 +692,7 @@ func TestInsertTransactionPublicTxPrepareReject(t *testing.T) {
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
 		mockInsertABI, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-			mockResolveKeyOKThenFail(t, mc, "sender1", tktypes.RandAddress())
+			mockResolveKeyOKThenFail(t, mc, "sender1", types.RandAddress())
 			mc.publicTxMgr.On("ValidateTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			mc.db.ExpectExec("INSERT.*transactions").WillReturnResult(driver.ResultNoRows)
 			mc.publicTxMgr.On("WriteNewTransactions", mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
@@ -705,7 +705,7 @@ func TestInsertTransactionPublicTxPrepareReject(t *testing.T) {
 			Type: pldapi.TransactionTypePublic.Enum(),
 			From: "sender1",
 		},
-		Bytecode: tktypes.HexBytes(tktypes.RandBytes(1)),
+		Bytecode: types.HexBytes(types.RandBytes(1)),
 	})
 	assert.Regexp(t, "pop", err)
 }
@@ -714,7 +714,7 @@ func TestInsertTransactionOkDefaultConstructor(t *testing.T) {
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
 		mockInsertABIAndTransactionOK(true),
-		mockSubmitPublicTxOk(t, tktypes.RandAddress()))
+		mockSubmitPublicTxOk(t, types.RandAddress()))
 	defer done()
 
 	// Default public constructor invoke
@@ -724,7 +724,7 @@ func TestInsertTransactionOkDefaultConstructor(t *testing.T) {
 			From: "sender1",
 		},
 		ABI:      abi.ABI{{Name: "notConstructor", Type: abi.Function, Inputs: abi.ParameterArray{}}},
-		Bytecode: tktypes.HexBytes(tktypes.RandBytes(1)),
+		Bytecode: types.HexBytes(types.RandBytes(1)),
 	})
 	assert.NoError(t, err)
 }
@@ -786,7 +786,7 @@ func TestCallTransactionNoFrom(t *testing.T) {
 		}).
 		Function("getSpins").
 		Public().
-		To(tktypes.RandAddress()).
+		To(types.RandAddress()).
 		Inputs(map[string]any{"wheel": "of fortune"}).
 		BuildTX()
 	require.NoError(t, tx.Error())
@@ -805,7 +805,7 @@ func TestCallTransactionWithFrom(t *testing.T) {
 		mockInsertABIBeginCommit,
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
 			mc.keyManager.On("ResolveEthAddressNewDatabaseTX", mock.Anything, "red.one").
-				Return(tktypes.RandAddress(), nil)
+				Return(types.RandAddress(), nil)
 			mc.ethClientFactory.On("HTTPClient").Return(ec)
 		})
 	defer done()
@@ -826,7 +826,7 @@ func TestCallTransactionWithFrom(t *testing.T) {
 		Function("getSpins").
 		Public().
 		From("red.one").
-		To(tktypes.RandAddress()).
+		To(types.RandAddress()).
 		Inputs(map[string]any{"wheel": "of fortune"}).
 		BuildTX()
 	require.NoError(t, tx.Error())
@@ -875,13 +875,13 @@ func TestCallTransactionPrivOk(t *testing.T) {
 		Function("getSpins").
 		Private().
 		Domain("domain1").
-		To(tktypes.RandAddress()).
+		To(types.RandAddress()).
 		Inputs(map[string]any{"wheel": "of fortune"}).
 		DataFormat("mode=array&number=json-number").
 		BuildTX()
 	require.NoError(t, tx.Error())
 
-	var result tktypes.RawJSON
+	var result types.RawJSON
 	err := txm.CallTransaction(ctx, txm.p.NOTX(), &result, tx.CallTX())
 	require.NoError(t, err)
 	require.JSONEq(t, `[42]`, result.Pretty())
@@ -904,11 +904,11 @@ func TestCallTransactionPrivFail(t *testing.T) {
 		Function("ohSnap").
 		Private().
 		Domain("domain1").
-		To(tktypes.RandAddress()).
+		To(types.RandAddress()).
 		BuildTX()
 	require.NoError(t, tx.Error())
 
-	var result tktypes.RawJSON
+	var result types.RawJSON
 	err := txm.CallTransaction(ctx, txm.p.NOTX(), &result, tx.CallTX())
 	assert.Regexp(t, "snap", err)
 
@@ -960,7 +960,7 @@ func newTestInternalTransaction(idempotencyKey string) *pldapi.TransactionInput 
 			Type:           pldapi.TransactionTypePrivate.Enum(),
 			Domain:         "domain1",
 			Function:       "doStuff",
-			To:             tktypes.RandAddress(),
+			To:             types.RandAddress(),
 			IdempotencyKey: idempotencyKey,
 		},
 		ABI: abi.ABI{testInternalTransactionFn},
