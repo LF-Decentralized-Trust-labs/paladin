@@ -175,6 +175,13 @@ type TransactionReceiptData struct {
 	ContractAddress                     *tktypes.EthAddress `docstruct:"TransactionReceiptData" json:"contractAddress,omitempty"` // address of the new contract address, to be used in the `To` field for subsequent invoke transactions.  Nil if this transaction itself was an invoke
 }
 
+type TransactionEvent struct{}
+
+type TransactionEventBatch struct {
+	BatchID uuid.UUID        `docstruct:"TransactionEventBatch" json:"batchId,omitempty"`
+	Events  []*EventWithData `docstruct:"TransactionEventBatch" json:"events,omitempty"`
+}
+
 type TransactionActivityRecord struct {
 	Time    tktypes.Timestamp `docstruct:"TransactionActivityRecord" json:"time"`    // time the record occurred
 	Message string            `docstruct:"TransactionActivityRecord" json:"message"` // a message

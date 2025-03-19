@@ -642,7 +642,7 @@ func TestPrepareTransactions(t *testing.T) {
 
 }
 
-func TestRCPReceiptListenersCRUDRealDB(t *testing.T) {
+func TestRPCReceiptListenersCRUDRealDB(t *testing.T) {
 	ctx, url, txm, done := newTestTransactionManagerWithRPC(t)
 	defer done()
 
@@ -744,3 +744,5 @@ func TestRCPReceiptListenersCRUDRealDB(t *testing.T) {
 	require.NotNil(t, txm.receiptListeners["listener1"].done)
 
 }
+
+// TODO AM TestRPCEventListenersCRUDRealDB

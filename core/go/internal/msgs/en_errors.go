@@ -439,6 +439,9 @@ var (
 	MsgTxMgrListenerNameRequired         = pde("PD012241", "Receipt listener name is required")
 	MsgTxMgrJSONRPCSubscriptionClosed    = pde("PD012242", "JSON/RPC subscription '%s' closed")
 	MsgTxMgrJSONRPCSubscriptionNack      = pde("PD012243", "JSON/RPC subscription '%s' returned nack for receipt batch")
+	MsgTxMgrDuplicateEventListenerName   = pde("PD012244", "An event listener named '%s' already exists")
+	MsgTxMgrEventListenerDupLoad         = pde("PD012245", "Transaction event listener '%s' already loaded")
+	MsgTxMgrEventListenerNotLoaded       = pde("PD012238", "Event listener '%s' does not exist")
 
 	// FlushWriter module PD0123XX
 	MsgFlushWriterQuiescing      = pde("PD012300", "Writer shutting down")

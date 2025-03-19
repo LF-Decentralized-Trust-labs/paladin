@@ -73,8 +73,13 @@ type ResolvedFunction struct {
 	Signature    string           `json:"signature"`
 }
 
+// TODO AM: can generics be used to not need to duplicate this?
 type ReceiptReceiver interface {
 	DeliverReceiptBatch(ctx context.Context, batchID uint64, receipts []*pldapi.TransactionReceiptFull) error
+}
+
+type EventReceiver interface {
+	DeliverEventBatch(ctx context.Context, batchID uuid.UUID, receipts []*pldapi.EventWithData) error
 }
 
 type ReceiptReceiverCloser interface {

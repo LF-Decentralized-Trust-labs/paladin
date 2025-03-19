@@ -432,7 +432,7 @@ func TestHandleLifecycleNoBlockNack(t *testing.T) {
 
 	ctrl := &mockRPCAsyncControl{}
 	es := txm.rpcEventStreams
-	es.receiptSubs["sub1"] = &receiptListenerSubscription{
+	es.subs["sub1"] = &listenerSubscription{
 		es:        es,
 		ctrl:      ctrl,
 		acksNacks: make(chan *rpcAckNack),
@@ -448,6 +448,6 @@ func TestHandleLifecycleNoBlockNack(t *testing.T) {
 	require.Nil(t, res)
 
 	es.getSubscription("sub1").ConnectionClosed()
-	require.Empty(t, es.receiptSubs)
+	require.Empty(t, es.subs)
 
 }

@@ -46,6 +46,8 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
+// TODO AM: can't remove an event stream
+// TODO AM: can't start/stop an event stream - probably future
 type BlockIndexer interface {
 	Start(...*InternalEventStream) error
 	Stop()
@@ -163,6 +165,7 @@ func (bi *blockIndexer) Start(internalStreams ...*InternalEventStream) error {
 	return nil
 }
 
+// TODO AM: this is the function we need to call
 func (bi *blockIndexer) AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error) {
 	es, err := bi.upsertInternalEventStream(ctx, dbTX, stream)
 	if err != nil {

@@ -100,6 +100,9 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 	}
 
 	// This will need to open up when we have more externally consumable event streams
+	// TODO: this is a place holder for a comment that will show at review time
+	// I don't think any of my changes require any difference in behaviour at this level yet
+	// I also feel like I'm adding the "external" event stream type.
 	def.Type = EventStreamTypeInternal.Enum()
 
 	// Validate the name
@@ -164,7 +167,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 	}
 
 	// We call init here
-	// TODO: Full stop/start lifecycle
+	// TODO: Full stop/start lifecycle // TODO AM: need to action this todo
 	es := bi.initEventStream(ctx, def, ies.Handler)
 
 	return es, nil
