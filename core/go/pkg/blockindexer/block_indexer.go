@@ -46,12 +46,17 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-// TODO AM: can't remove an event stream
-// TODO AM: can't start/stop an event stream - probably future
 type BlockIndexer interface {
 	Start(...*InternalEventStream) error
 	Stop()
 	AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error)
+	RemoveEventStream(ctx context.Context, dbTX persistence.DBTX, name string, esType tktypes.Enum[EventStreamType]) error
+	GetEventStreamDefinition(ctx context.Context, name string, esType tktypes.Enum[EventStreamType]) (*EventStream, error)
+	QueryEventStreamDefinitions(ctx context.Context, esType tktypes.Enum[EventStreamType], jq *query.QueryJSON) ([]*EventStream, error)
+	// TODO AM: need to be able to create an event stream which isn't started?
+	// TODO AM: need to be able to create an event stream that starts indexing from a later block (and latest?)
+	StartEventStream(ctx context.Context, name string, esType tktypes.Enum[EventStreamType]) error
+	StopEventStream(ctx context.Context, name string, esType tktypes.Enum[EventStreamType]) error
 	GetIndexedBlockByNumber(ctx context.Context, number uint64) (*pldapi.IndexedBlock, error)
 	GetIndexedTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*pldapi.IndexedTransaction, error)
 	GetIndexedTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce uint64) (*pldapi.IndexedTransaction, error)
@@ -163,24 +168,6 @@ func (bi *blockIndexer) Start(internalStreams ...*InternalEventStream) error {
 	bi.startOrReset()
 	bi.startEventStreams()
 	return nil
-}
-
-// TODO AM: this is the function we need to call
-func (bi *blockIndexer) AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error) {
-	es, err := bi.upsertInternalEventStream(ctx, dbTX, stream)
-	if err != nil {
-		return nil, err
-	}
-
-	// Can be called before start as managers start before the block indexer
-	bi.stateLock.Lock()
-	started := bi.started
-	bi.stateLock.Unlock()
-
-	if started {
-		bi.startEventStream(es)
-	}
-	return es.definition, nil
 }
 
 func (bi *blockIndexer) startOrReset() {

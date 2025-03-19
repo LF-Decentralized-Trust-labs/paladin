@@ -202,6 +202,7 @@ var (
 	MsgBlockIndexerTransactionReverted      = pde("PD011309", "Transaction reverted: %s")
 	MsgBlockIndexerConfirmedBlockNotFound   = pde("PD011310", "Block %s (%d) not found on retrieval after detection and requested number of confirmations")
 	MsgBlockIndexerLimitRequired            = pde("PD011311", "limit is required on all queries")
+	MsgBlockIndexerEventStreamNotFound      = pde("PD011312", "Event stream not found: %s")
 
 	// EthClient module PD0115XX
 	MsgEthClientInvalidInput            = pde("PD011500", "Unable to convert to ABI function input (func=%s)")
@@ -441,7 +442,9 @@ var (
 	MsgTxMgrJSONRPCSubscriptionNack      = pde("PD012243", "JSON/RPC subscription '%s' returned nack for receipt batch")
 	MsgTxMgrDuplicateEventListenerName   = pde("PD012244", "An event listener named '%s' already exists")
 	MsgTxMgrEventListenerDupLoad         = pde("PD012245", "Transaction event listener '%s' already loaded")
-	MsgTxMgrEventListenerNotLoaded       = pde("PD012238", "Event listener '%s' does not exist")
+	MsgTxMgrEventListenerNotLoaded       = pde("PD012246", "Event listener '%s' does not exist")
+	MsgTxMgrBadEventListenerSources      = pde("PD012247", "Transaction event listener '%s' sources are invalid")
+	MsgTxMgrBadEventListenerOptions      = pde("PD012248", "Transaction event listener '%s' options are invalid")
 
 	// FlushWriter module PD0123XX
 	MsgFlushWriterQuiescing      = pde("PD012300", "Writer shutting down")

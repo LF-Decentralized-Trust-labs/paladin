@@ -17,7 +17,10 @@ package txmgr
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -36,7 +39,7 @@ type persistedEventListener struct {
 	Name    string            `gorm:"column:name"`
 	Created tktypes.Timestamp `gorm:"column:created"`
 	Started *bool             `gorm:"column:started"`
-	Sources tktypes.RawJSON   `gorm:"sources:filters"`
+	Sources tktypes.RawJSON   `gorm:"column:sources"`
 	Options tktypes.RawJSON   `gorm:"column:options"`
 }
 
@@ -82,6 +85,8 @@ func (tm *txManager) CreateEventListener(ctx context.Context, spec *pldapi.Trans
 		Name:    spec.Name,
 		Started: &started,
 		Created: tktypes.TimestampNow(),
+		Sources: tktypes.JSONString(spec.Sources),
+		Options: tktypes.JSONString(spec.Options),
 	}
 
 	return tm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
@@ -162,13 +167,17 @@ func (tm *txManager) DeleteEventListener(ctx context.Context, name string) error
 }
 
 func (tm *txManager) validateEventListenerSpec(ctx context.Context, spec *pldapi.TransactionEventListener) error {
-	// TODO AM: validate batch timeout opion parses to a time string
-	return tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, spec.Name, tktypes.DefaultNameMaxLen, "name")
+	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, spec.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+		return err
+	}
+	if spec.Options.BatchTimeout != nil && *spec.Options.BatchTimeout != "" {
+		if _, err := time.ParseDuration(*spec.Options.BatchTimeout); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// TODO AM: does this function need to create the internal event listener? - not sure that is the role of the load
-// is it a one time start action because the block indexer manages the loading? How do we keep the link back?
-// no it's fine we can
 func (tm *txManager) loadEventListener(ctx context.Context, pl *persistedEventListener, dbTX persistence.DBTX) (*eventListener, error) {
 	spec, err := tm.mapEventListener(ctx, pl)
 	if err != nil {
@@ -191,14 +200,24 @@ func (tm *txManager) loadEventListener(ctx context.Context, pl *persistedEventLi
 	tm.eventListeners[pl.Name] = el
 
 	eventStream := &blockindexer.EventStream{
-		Name: spec.Name, // TODO AM: add a prefix
+		Name: fmt.Sprintf("ptx-el-%s", spec.Name),
 		Config: blockindexer.EventStreamConfig{
 			BatchSize:    spec.Options.BatchSize,
 			BatchTimeout: spec.Options.BatchTimeout,
 		},
-		Sources: blockindexer.EventSources{},
 	}
 
+	for _, source := range spec.Sources {
+		eventStream.Sources = append(eventStream.Sources, blockindexer.EventStreamSource{
+			ABI:     source.ABI,
+			Address: source.Address,
+		})
+	}
+
+	// this is an upsert under the covers- we just need to ensure that Definition.Name does not change
+	// TODO AM: should we instead create and then persist the id? probably because we can't safely prefix the name
+	// if it goes above a certain number of characters
+	// and I think we will want the id for deletion- going to implement that side and decide what to do here
 	_, err = tm.blockIndexer.AddEventStream(ctx, dbTX, &blockindexer.InternalEventStream{
 		Type:       blockindexer.IESTypeEventStream,
 		Definition: eventStream,
@@ -216,10 +235,13 @@ func (tm *txManager) mapEventListener(ctx context.Context, pl *persistedEventLis
 		Name:    pl.Name,
 		Started: pl.Started,
 		Created: pl.Created,
-		Options: pldapi.TransactionEventListenerOptions{
-			BatchSize:    pl.BatchSize,
-			BatchTimeout: pl.BatchTimeout,
-		},
+	}
+
+	if err := json.Unmarshal(pl.Sources, &spec.Sources); err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrBadEventListenerSources, pl.Name)
+	}
+	if err := json.Unmarshal(pl.Options, &spec.Options); err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrBadEventListenerOptions, pl.Name)
 	}
 	if err := tm.validateEventListenerSpec(ctx, spec); err != nil {
 		return nil, err

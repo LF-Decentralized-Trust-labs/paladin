@@ -22,9 +22,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -91,6 +93,23 @@ func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
 	return nil
 }
 
+func (bi *blockIndexer) AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error) {
+	es, err := bi.upsertInternalEventStream(ctx, dbTX, stream)
+	if err != nil {
+		return nil, err
+	}
+
+	// Can be called before start as managers start before the block indexer
+	bi.stateLock.Lock()
+	started := bi.started
+	bi.stateLock.Unlock()
+
+	if started {
+		bi.startEventStream(es)
+	}
+	return es.definition, nil
+}
+
 func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX persistence.DBTX, ies *InternalEventStream) (*eventStream, error) {
 
 	// Defensive coding against panics
@@ -103,6 +122,8 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 	// TODO: this is a place holder for a comment that will show at review time
 	// I don't think any of my changes require any difference in behaviour at this level yet
 	// I also feel like I'm adding the "external" event stream type.
+	// TODO AM: oh this might be how I get to just pass the name through
+	// going a step forwards do I even need separate database or do I just need more crud functions on the block indexer
 	def.Type = EventStreamTypeInternal.Enum()
 
 	// Validate the name
@@ -230,6 +251,99 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	return es
 }
 
+func (bi *blockIndexer) RemoveEventStream(ctx context.Context, dbTX persistence.DBTX, name string, esType tktypes.Enum[EventStreamType]) error {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+
+	return bi.persistence.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		definition, err := bi.getEventStreamDBTX(ctx, dbTX, name, esType)
+		if err != nil {
+			return err
+		}
+		if definition == nil {
+			return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, name)
+		}
+		id := definition.ID
+		es := bi.eventStreams[id]
+		err = dbTX.DB().
+			WithContext(ctx).
+			Table("event_streams").
+			Where("id = ?", id).
+			Delete(&EventStream{}).
+			Error
+		if err != nil {
+			log.L(ctx).Errorf("Failed to delete event stream %s: %s", id, err)
+			return err
+		}
+		es.stop()
+		delete(bi.eventStreams, id)
+		delete(bi.eventStreamsHeadSet, id)
+		return nil
+	})
+}
+
+func (bi *blockIndexer) GetEventStreamDefinition(ctx context.Context, name string, esType tktypes.Enum[EventStreamType]) (*EventStream, error) {
+	return bi.getEventStreamDBTX(ctx, bi.persistence.NOTX(), name, esType)
+}
+
+func (bi *blockIndexer) QueryEventStreamDefinitions(ctx context.Context, esType tktypes.Enum[EventStreamType], jq *query.QueryJSON) ([]*EventStream, error) {
+	if jq.Limit == nil || *jq.Limit == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgBlockIndexerLimitRequired)
+	}
+	db := bi.persistence.DB()
+	q := db.Table("event_streams").
+		WithContext(ctx).
+		Where("type = ?", esType)
+	if jq != nil {
+		q = filters.BuildGORM(ctx, jq, q, EventStreamFilters)
+	}
+	var results []*EventStream
+	err := q.Find(&results).Error
+	return results, err
+}
+
+func (bi *blockIndexer) StartEventStream(ctx context.Context, name string, esType tktypes.Enum[EventStreamType]) error {
+	definition, err := bi.GetEventStreamDefinition(ctx, name, esType)
+	if err != nil {
+		return err
+	}
+	if definition == nil || bi.eventStreams[definition.ID] == nil {
+		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, name)
+	}
+	bi.startEventStream(bi.eventStreams[definition.ID])
+	return nil
+}
+
+func (bi *blockIndexer) StopEventStream(ctx context.Context, name string, esType tktypes.Enum[EventStreamType]) error {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+
+	definition, err := bi.GetEventStreamDefinition(ctx, name, esType)
+	if err != nil {
+		return err
+	}
+	if definition == nil || bi.eventStreams[definition.ID] == nil {
+		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, name)
+	}
+	bi.eventStreams[definition.ID].stop()
+	return nil
+}
+
+func (bi *blockIndexer) getEventStreamDBTX(ctx context.Context, dbTX persistence.DBTX, name string, esType tktypes.Enum[EventStreamType]) (*EventStream, error) {
+	var es *EventStream
+	err := dbTX.DB().
+		Table("event_streams").
+		Where("type = ?", esType).
+		Where("name = ?", name).
+		WithContext(ctx).
+		Find(es).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return es, nil
+}
+
 func (bi *blockIndexer) getStreamList() []*eventStream {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
@@ -266,12 +380,15 @@ func (es *eventStream) start() {
 func (es *eventStream) stop() {
 	if es.cancelCtx != nil {
 		es.cancelCtx()
+		es.cancelCtx = nil
 	}
 	if es.detectorDone != nil {
 		<-es.detectorDone
+		es.detectorDone = nil
 	}
 	if es.dispatcherDone != nil {
 		<-es.dispatcherDone
+		es.dispatcherDone = nil
 	}
 }
 
