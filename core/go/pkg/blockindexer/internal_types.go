@@ -48,8 +48,8 @@ var IndexedEventFilters filters.FieldSet = filters.FieldMap{
 var EventStreamFilters filters.FieldSet = filters.FieldMap{
 	"name":    filters.StringField("name"),
 	"created": filters.TimestampField("created"),
-	// "started": filters.BooleanField("started"), // TODO AM: add in later
-	"type": filters.StringField("type"),
+	"started": filters.BooleanField("started"),
+	"type":    filters.StringField("type"),
 }
 
 // Contains additional data that the block indexer does not persist, but allows other code to process

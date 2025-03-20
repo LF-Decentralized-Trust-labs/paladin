@@ -50,13 +50,11 @@ type BlockIndexer interface {
 	Start(...*InternalEventStream) error
 	Stop()
 	AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error)
-	RemoveEventStream(ctx context.Context, dbTX persistence.DBTX, name string, esType tktypes.Enum[EventStreamType]) error
-	GetEventStreamDefinition(ctx context.Context, name string, esType tktypes.Enum[EventStreamType]) (*EventStream, error)
-	QueryEventStreamDefinitions(ctx context.Context, esType tktypes.Enum[EventStreamType], jq *query.QueryJSON) ([]*EventStream, error)
-	// TODO AM: need to be able to create an event stream which isn't started?
+	RemoveEventStream(ctx context.Context, id uuid.UUID) error
+	QueryEventStreamDefinitions(ctx context.Context, dbTX persistence.DBTX, esType tktypes.Enum[EventStreamType], jq *query.QueryJSON) ([]*EventStream, error)
 	// TODO AM: need to be able to create an event stream that starts indexing from a later block (and latest?)
-	StartEventStream(ctx context.Context, name string, esType tktypes.Enum[EventStreamType]) error
-	StopEventStream(ctx context.Context, name string, esType tktypes.Enum[EventStreamType]) error
+	StartEventStream(ctx context.Context, id uuid.UUID) error
+	StopEventStream(ctx context.Context, id uuid.UUID) error
 	GetIndexedBlockByNumber(ctx context.Context, number uint64) (*pldapi.IndexedBlock, error)
 	GetIndexedTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*pldapi.IndexedTransaction, error)
 	GetIndexedTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce uint64) (*pldapi.IndexedTransaction, error)

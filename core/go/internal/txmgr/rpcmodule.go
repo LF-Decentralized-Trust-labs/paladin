@@ -66,12 +66,12 @@ func (tm *txManager) buildRPCModule() {
 		Add("ptx_startReceiptListener", tm.rpcStartReceiptListener()).
 		Add("ptx_stopReceiptListener", tm.rpcStopReceiptListener()).
 		Add("ptx_deleteReceiptListener", tm.rpcDeleteReceiptListener()).
-		Add("ptx_createEventListener", tm.rpcCreateEventListener()).
-		Add("ptx_queryEventListeners", tm.rpcQueryEventListeners()).
-		Add("ptx_getEventListener", tm.rpcGetEventListener()).
-		Add("ptx_startEventListener", tm.rpcStartEventListener()).
-		Add("ptx_stopEventListener", tm.rpcStopEventListener()).
-		Add("ptx_deleteEventListener", tm.rpcDeleteEventListener()).
+		Add("ptx_createBlockchainEventListener", tm.rpcCreateBlockchainEventListener()).
+		Add("ptx_queryBlockchainEventListeners", tm.rpcQueryBlockchainEventListeners()).
+		Add("ptx_getBlockchainEventListener", tm.rpcGetBlockchainEventListener()).
+		Add("ptx_startBlockchainEventListener", tm.rpcStartBlockchainEventListener()).
+		Add("ptx_stopBlockchainEventListener", tm.rpcStopBlockchainEventListener()).
+		Add("ptx_deleteBlockchainEventListener", tm.rpcDeleteBlockchainEventListener()).
 		AddAsync(tm.rpcEventStreams)
 
 	tm.debugRpcModule = rpcserver.NewRPCModule("debug").
@@ -398,51 +398,51 @@ func (tm *txManager) rpcDeleteReceiptListener() rpcserver.RPCHandler {
 	})
 }
 
-func (tm *txManager) rpcCreateEventListener() rpcserver.RPCHandler {
+func (tm *txManager) rpcCreateBlockchainEventListener() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
-		listener *pldapi.TransactionEventListener,
+		listener *pldapi.BlockchainEventListener,
 	) (bool, error) {
-		err := tm.CreateEventListener(ctx, listener)
+		err := tm.CreateBlockchainEventListener(ctx, listener)
 		return err == nil, err
 	})
 }
 
-func (tm *txManager) rpcQueryEventListeners() rpcserver.RPCHandler {
+func (tm *txManager) rpcQueryBlockchainEventListeners() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		query query.QueryJSON,
-	) ([]*pldapi.TransactionEventListener, error) {
-		return tm.QueryEventListeners(ctx, tm.p.NOTX(), &query)
+	) ([]*pldapi.BlockchainEventListener, error) {
+		return tm.QueryBlockchainEventListeners(ctx, tm.p.NOTX(), &query)
 	})
 }
 
-func (tm *txManager) rpcGetEventListener() rpcserver.RPCHandler {
+func (tm *txManager) rpcGetBlockchainEventListener() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		name string,
-	) (*pldapi.TransactionEventListener, error) {
-		return tm.GetEventListener(ctx, name), nil
+	) (*pldapi.BlockchainEventListener, error) {
+		return tm.GetBlockchainEventListener(ctx, name), nil
 	})
 }
 
-func (tm *txManager) rpcStartEventListener() rpcserver.RPCHandler {
-	return rpcserver.RPCMethod1(func(ctx context.Context,
-		name string,
-	) (bool, error) {
-		return true, tm.StartEventListener(ctx, name)
-	})
-}
-
-func (tm *txManager) rpcStopEventListener() rpcserver.RPCHandler {
+func (tm *txManager) rpcStartBlockchainEventListener() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		name string,
 	) (bool, error) {
-		return true, tm.StopEventListener(ctx, name)
+		return true, tm.StartBlockchainEventListener(ctx, name)
 	})
 }
 
-func (tm *txManager) rpcDeleteEventListener() rpcserver.RPCHandler {
+func (tm *txManager) rpcStopBlockchainEventListener() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		name string,
 	) (bool, error) {
-		return true, tm.DeleteEventListener(ctx, name)
+		return true, tm.StopBlockchainEventListener(ctx, name)
+	})
+}
+
+func (tm *txManager) rpcDeleteBlockchainEventListener() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		name string,
+	) (bool, error) {
+		return true, tm.DeleteBlockchainEventListener(ctx, name)
 	})
 }

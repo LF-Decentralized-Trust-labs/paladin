@@ -1,0 +1,1 @@
+ALTER TABLE "event_streams" ADD "started" BOOLEAN DEFAULT TRUE;

@@ -58,7 +58,7 @@ type rpcAckNack struct {
 
 type listenerSubscription struct {
 	es        *rpcEventStreams
-	rrc       components.ReceiptReceiverCloser
+	rrc       components.ReceiverCloser
 	ctrl      rpcserver.RPCAsyncControl
 	acksNacks chan *rpcAckNack
 	closed    chan struct{}
@@ -76,9 +76,12 @@ func (es *rpcEventStreams) HandleStart(ctx context.Context, req *rpcclient.RPCRe
 		return nil, rpcclient.NewRPCErrorResponse(err, req.ID, rpcclient.RPCCodeInvalidRequest)
 	}
 
-	// Only one type right now
 	if len(req.Params) < 2 {
-		return nil, rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, msgs.MsgTxMgrListenerNameRequired), req.ID, rpcclient.RPCCodeInvalidRequest)
+		if eventType == pldapi.PTXEventTypeEvents.Enum() {
+			return nil, rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, msgs.MsgTxMgrBlockchainEventListenerNameRequired), req.ID, rpcclient.RPCCodeInvalidRequest)
+		} else {
+			return nil, rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, msgs.MsgTxMgrReceiptListenerNameRequired), req.ID, rpcclient.RPCCodeInvalidRequest)
+		}
 	}
 	sub := &listenerSubscription{
 		es:        es,
@@ -88,7 +91,11 @@ func (es *rpcEventStreams) HandleStart(ctx context.Context, req *rpcclient.RPCRe
 	}
 	es.subs[ctrl.ID()] = sub
 	var err error
-	sub.rrc, err = es.tm.AddReceiptReceiver(ctx, req.Params[1].StringValue(), sub)
+	if eventType == pldapi.PTXEventTypeEvents.Enum() {
+		sub.rrc, err = es.tm.AddBlockchainEventReceiver(ctx, req.Params[1].StringValue(), sub)
+	} else {
+		sub.rrc, err = es.tm.AddReceiptReceiver(ctx, req.Params[1].StringValue(), sub)
+	}
 	if err != nil {
 		return nil, rpcclient.NewRPCErrorResponse(err, req.ID, rpcclient.RPCCodeInvalidRequest)
 	}
@@ -185,7 +192,6 @@ func (sub *listenerSubscription) DeliverReceiptBatch(ctx context.Context, batchI
 	}
 }
 
-// TODO AM: batch id needs to be a uint64 for consistency
 func (sub *listenerSubscription) DeliverEventBatch(ctx context.Context, batchID uuid.UUID, events []*pldapi.EventWithData) error {
 	log.L(ctx).Infof("Delivering event batch %d to subscription %s over JSON/RPC", batchID, sub.ctrl.ID())
 

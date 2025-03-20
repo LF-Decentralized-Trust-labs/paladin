@@ -43,6 +43,7 @@ func NewTXManager(ctx context.Context, conf *pldconf.TxManagerConfig) components
 		txCache:  cache.NewCache[uuid.UUID, *components.ResolvedTransaction](&conf.Transactions.Cache, &pldconf.TxManagerDefaults.Transactions.Cache),
 	}
 	tm.receiptsInit()
+	tm.blockchainEventsInit()
 	tm.rpcEventStreams = newRPCEventStreams(tm)
 	return tm
 }
@@ -74,8 +75,9 @@ type txManager struct {
 	receiptListenerLock          sync.Mutex
 	receiptListeners             map[string]*receiptListener
 
-	eventListenerLock sync.Mutex
-	eventListeners    map[string]*eventListener
+	blockchainEventListenerLock          sync.Mutex
+	blockchainEventListeners             map[string]*blockchainEventListener
+	blockchainEventListenersLoadPageSize int
 }
 
 func (tm *txManager) PreInit(c components.PreInitComponents) (*components.ManagerInitResult, error) {
@@ -98,15 +100,20 @@ func (tm *txManager) PostInit(c components.AllComponents) error {
 	tm.blockIndexer = c.BlockIndexer()
 	tm.localNodeName = c.TransportManager().LocalNodeName()
 
-	return tm.loadReceiptListeners()
+	err := tm.loadReceiptListeners()
+	if err == nil {
+		err = tm.loadBlockchainEventListeners()
+	}
+	return err
 }
 
 func (tm *txManager) Start() error {
 	tm.startReceiptListeners()
-	return nil
+	return tm.startBlockchainEventListeners()
 }
 
 func (tm *txManager) Stop() {
 	tm.rpcEventStreams.stop()
 	tm.stopReceiptListeners()
+	tm.stopBlockchainEventListeners()
 }

@@ -44,12 +44,14 @@ var EventStreamDefaults = &EventStreamConfig{
 type EventStreamType string
 
 const (
-	EventStreamTypeInternal EventStreamType = "internal" // a core Paladin component, such as the state confirmation engine
+	EventStreamTypeInternal                   EventStreamType = "internal"                      // a core Paladin component, such as the state confirmation engine
+	EventStreamTypePTXBlockchainEventListener EventStreamType = "ptx-blockchain-event-listener" // an event stream that backs an external PTX blockchain event listener
 )
 
 func (est EventStreamType) Options() []string {
 	return []string{
 		string(EventStreamTypeInternal),
+		string(EventStreamTypePTXBlockchainEventListener),
 	}
 }
 func (est EventStreamType) Enum() tktypes.Enum[EventStreamType] {
@@ -65,6 +67,7 @@ type EventStream struct {
 	Config  EventStreamConfig             `json:"config"         gorm:"type:bytes;serializer:json"`
 	Sources EventSources                  `json:"sources"        gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
 	Format  tktypes.JSONFormatOptions     `json:"format"`
+	Started *bool                         `json:"started"`
 }
 
 type EventSources []EventStreamSource

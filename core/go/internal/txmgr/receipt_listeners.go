@@ -171,7 +171,7 @@ func (rr *registeredReceiptReceiver) Close() {
 	rr.l.removeReceiver(rr.id)
 }
 
-func (tm *txManager) AddReceiptReceiver(ctx context.Context, name string, r components.ReceiptReceiver) (components.ReceiptReceiverCloser, error) {
+func (tm *txManager) AddReceiptReceiver(ctx context.Context, name string, r components.ReceiptReceiver) (components.ReceiverCloser, error) {
 	tm.receiptListenerLock.Lock()
 	defer tm.receiptListenerLock.Unlock()
 

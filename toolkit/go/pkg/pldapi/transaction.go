@@ -44,6 +44,7 @@ type PTXEventType string
 
 const (
 	PTXEventTypeReceipts PTXEventType = "receipts"
+	PTXEventTypeEvents   PTXEventType = "blockchainevents"
 )
 
 func (tt PTXEventType) Enum() tktypes.Enum[PTXEventType] {
@@ -53,6 +54,7 @@ func (tt PTXEventType) Enum() tktypes.Enum[PTXEventType] {
 func (tt PTXEventType) Options() []string {
 	return []string{
 		string(PTXEventTypeReceipts),
+		string(PTXEventTypeEvents),
 	}
 }
 
