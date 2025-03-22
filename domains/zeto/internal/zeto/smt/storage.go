@@ -22,6 +22,7 @@ import (
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/node"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -143,7 +144,7 @@ func (s *statesStorage) GetRootNodeRef() (core.NodeRef, error) {
 		return nil, core.ErrNotFound
 	}
 
-	var root MerkleTreeRoot
+	var root types.MerkleTreeRoot
 	err = json.Unmarshal([]byte(res.States[0].DataJson), &root)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalRootIdx, err)
@@ -196,7 +197,7 @@ func (s *statesStorage) GetNode(ref core.NodeRef) (core.Node, error) {
 	if len(res.States) == 0 {
 		return nil, core.ErrNotFound
 	}
-	var n MerkleTreeNode
+	var n types.MerkleTreeNode
 	err = json.Unmarshal([]byte(res.States[0].DataJson), &n)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalSMTNode, err)
@@ -282,7 +283,7 @@ func (s *statesStorage) makeNewStateFromTreeNode(ctx context.Context, n *smtNode
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorParseNodeRef, err)
 	}
-	newNode := &MerkleTreeNode{
+	newNode := &types.MerkleTreeNode{
 		RefKey: refBytes,
 		Type:   tktypes.HexBytes([]byte{node.Type().ToByte()}),
 	}
@@ -325,7 +326,7 @@ func (s *statesStorage) makeNewStateFromRootNode(ctx context.Context, rootNode *
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorParseRootNodeIdx, err)
 	}
-	newRoot := &MerkleTreeRoot{
+	newRoot := &types.MerkleTreeRoot{
 		SmtName:   s.smtName,
 		RootIndex: bytes,
 	}

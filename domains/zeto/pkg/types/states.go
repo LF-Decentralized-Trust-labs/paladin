@@ -17,6 +17,7 @@ package types
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -32,6 +33,19 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
+var ZetoCoinABI = &abi.Parameter{
+	Name:         "ZetoCoin",
+	Indexed:      true,
+	Type:         "tuple",
+	InternalType: "struct ZetoCoin",
+	Components: abi.ParameterArray{
+		{Name: "salt", Type: "uint256"},
+		{Name: "owner", Type: "bytes32", Indexed: true},
+		{Name: "amount", Type: "uint256"},
+		{Name: "locked", Type: "bool", Indexed: true},
+	},
+}
+
 type ZetoCoinState struct {
 	ID              tktypes.HexUint256 `json:"id"`
 	Created         tktypes.Timestamp  `json:"created"`
@@ -43,32 +57,8 @@ type ZetoCoin struct {
 	Salt   *tktypes.HexUint256 `json:"salt"`
 	Owner  tktypes.HexBytes    `json:"owner"`
 	Amount *tktypes.HexUint256 `json:"amount"`
+	Locked bool                `json:"locked"`
 	hash   *tktypes.HexUint256
-}
-
-var ZetoCoinABI = &abi.Parameter{
-	Name:         "ZetoCoin",
-	Indexed:      true,
-	Type:         "tuple",
-	InternalType: "struct ZetoCoin",
-	Components: abi.ParameterArray{
-		{Name: "salt", Type: "uint256"},
-		{Name: "owner", Type: "bytes32", Indexed: true},
-		{Name: "amount", Type: "uint256", Indexed: true},
-	},
-}
-
-var ZetoNFTokenABI = &abi.Parameter{
-	Name:         "ZetoNFToken",
-	Indexed:      true,
-	Type:         "tuple",
-	InternalType: "struct ZetoNFToken",
-	Components: abi.ParameterArray{
-		{Name: "salt", Type: "uint256"},
-		{Name: "uri", Type: "string"},
-		{Name: "owner", Type: "bytes32", Indexed: true},
-		{Name: "tokenID", Type: "uint256", Indexed: true},
-	},
 }
 
 func (z *ZetoCoin) Hash(ctx context.Context) (*tktypes.HexUint256, error) {
@@ -89,6 +79,19 @@ func (z *ZetoCoin) Hash(ctx context.Context) (*tktypes.HexUint256, error) {
 		z.hash = (*tktypes.HexUint256)(commitment)
 	}
 	return z.hash, nil
+}
+
+var ZetoNFTokenABI = &abi.Parameter{
+	Name:         "ZetoNFToken",
+	Indexed:      true,
+	Type:         "tuple",
+	InternalType: "struct ZetoNFToken",
+	Components: abi.ParameterArray{
+		{Name: "salt", Type: "uint256"},
+		{Name: "uri", Type: "string"},
+		{Name: "owner", Type: "bytes32", Indexed: true},
+		{Name: "tokenID", Type: "uint256", Indexed: true},
+	},
 }
 
 // ZetoNFTState represents the overall state of an NFT.
@@ -176,4 +179,64 @@ func (z *ZetoNFToken) validate() error {
 		return fmt.Errorf("salt is missing")
 	}
 	return nil
+}
+
+var MerkleTreeRootABI = &abi.Parameter{
+	Type:         "tuple",
+	InternalType: "struct MerkleTreeRoot",
+	Components: abi.ParameterArray{
+		{Name: "smtName", Type: "string", Indexed: true},
+		{Name: "rootIndex", Type: "bytes32"},
+	},
+}
+
+type MerkleTreeRoot struct {
+	SmtName   string          `json:"smtName"`
+	RootIndex tktypes.Bytes32 `json:"rootIndex"`
+}
+
+func (m *MerkleTreeRoot) Hash() (string, error) {
+	h := sha256.New()
+	h.Write([]byte(m.SmtName))
+	h.Write(m.RootIndex.Bytes())
+	return tktypes.Bytes32(h.Sum(nil)).HexString(), nil
+}
+
+var MerkleTreeNodeABI = &abi.Parameter{
+	Type:         "tuple",
+	InternalType: "struct MerkleTreeNode",
+	Components: abi.ParameterArray{
+		{Name: "refKey", Type: "bytes32", Indexed: true},
+		{Name: "index", Type: "bytes32"},
+		{Name: "type", Type: "bytes1"},
+		{Name: "leftChild", Type: "bytes32"},
+		{Name: "rightChild", Type: "bytes32"},
+	},
+}
+
+type MerkleTreeNode struct {
+	RefKey     tktypes.Bytes32  `json:"refKey"`
+	Index      tktypes.Bytes32  `json:"index"`
+	Type       tktypes.HexBytes `json:"type"`
+	LeftChild  tktypes.Bytes32  `json:"leftChild"`
+	RightChild tktypes.Bytes32  `json:"rightChild"`
+}
+
+func (m *MerkleTreeNode) Hash() (string, error) {
+	h := sha256.New()
+	h.Write(m.RefKey.Bytes())
+	h.Write(m.Index.Bytes())
+	h.Write([]byte(m.Type))
+	h.Write(m.LeftChild.Bytes())
+	h.Write(m.RightChild.Bytes())
+	return tktypes.Bytes32(h.Sum(nil)).HexString(), nil
+}
+
+func GetStateSchemas() ([]string, error) {
+	coinJSON, _ := json.Marshal(ZetoCoinABI)
+	nftJSON, _ := json.Marshal(ZetoNFTokenABI)
+	smtRootJSON, _ := json.Marshal(MerkleTreeRootABI)
+	smtNodeJSON, _ := json.Marshal(MerkleTreeNodeABI)
+
+	return []string{string(coinJSON), string(nftJSON), string(smtRootJSON), string(smtNodeJSON)}, nil
 }
