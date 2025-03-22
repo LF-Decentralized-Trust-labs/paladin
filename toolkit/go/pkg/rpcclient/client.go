@@ -41,7 +41,7 @@ const (
 	RPCCodeInternalError  RPCCode = -32603
 )
 
-// NewRPCClient Constructor
+// NewHTTPClient Constructor
 func NewHTTPClient(ctx context.Context, conf *pldconf.HTTPClientConfig) (Client, error) {
 	rc, err := ParseHTTPConfig(ctx, conf)
 	if err != nil {
