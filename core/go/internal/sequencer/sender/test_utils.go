@@ -52,6 +52,7 @@ type SenderBuilderForTesting struct {
 	committeeMembers []string
 	contractAddress  *tktypes.EthAddress
 	emitFunction     func(event common.Event)
+	transactions     []*transaction.Transaction
 }
 
 type SenderDependencyMocks struct {
@@ -74,6 +75,11 @@ func (b *SenderBuilderForTesting) ContractAddress(contractAddress *tktypes.EthAd
 
 func (b *SenderBuilderForTesting) CommitteeMembers(committeeMembers ...string) *SenderBuilderForTesting {
 	b.committeeMembers = committeeMembers
+	return b
+}
+
+func (b *SenderBuilderForTesting) Transactions(transactions ...*transaction.Transaction) *SenderBuilderForTesting {
+	b.transactions = transactions
 	return b
 }
 
@@ -116,6 +122,11 @@ func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDe
 		TestDefault_HeartbeatIntervalMs,
 		TestDefault_HeartbeatThreshold,
 	)
+
+	for _, tx := range b.transactions {
+		sender.transactionsByID[tx.ID] = tx
+		sender.transactionsOrdered = append(sender.transactionsOrdered, &tx.ID)
+	}
 
 	if err != nil {
 		panic(err)

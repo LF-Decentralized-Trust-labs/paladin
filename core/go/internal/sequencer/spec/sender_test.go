@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -66,9 +67,36 @@ func TestStateMachine_Observing_ToSending_OnTransactionCreated(t *testing.T) {
 
 func TestStateMachine_Sending_ToObserving_OnTransactionConfirmed_IfNoTransactionsInflight(t *testing.T) {
 	ctx := context.Background()
-	s, _ := sender.NewSenderBuilderForTesting(sender.State_Sending).Build(ctx)
 
-	err := s.HandleEvent(ctx, &sender.TransactionConfirmedEvent{})
+	soleTransaction := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+
+	s, _ := sender.NewSenderBuilderForTesting(sender.State_Sending).
+		Transactions(soleTransaction).
+		Build(ctx)
+
+	err := s.HandleEvent(ctx, &sender.TransactionConfirmedEvent{
+		From:  soleTransaction.GetSignerAddress(),
+		Nonce: *soleTransaction.GetNonce(),
+		Hash:  *soleTransaction.GetLatestSubmissionHash(),
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, sender.State_Observing, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
+}
+
+func TestStateMachine_Sending_NoTransition_OnTransactionConfirmed_IfHasTransactionsInflight(t *testing.T) {
+	ctx := context.Background()
+	txn1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+	txn2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+
+	s, _ := sender.NewSenderBuilderForTesting(sender.State_Sending).
+		Transactions(txn1, txn2).
+		Build(ctx)
+
+	err := s.HandleEvent(ctx, &sender.TransactionConfirmedEvent{
+		From:  txn1.GetSignerAddress(),
+		Nonce: *txn1.GetNonce(),
+		Hash:  *txn1.GetLatestSubmissionHash(),
+	})
 	assert.NoError(t, err)
 	assert.Equal(t, sender.State_Observing, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 }

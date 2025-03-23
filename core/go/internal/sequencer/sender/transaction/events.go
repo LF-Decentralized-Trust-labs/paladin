@@ -193,12 +193,52 @@ func (event *CoordinatorChangedEvent) ApplyToTransaction(_ context.Context, txn 
 	return nil
 }
 
-type DispatchHeartbeatReceivedEvent struct {
+type DispatchedEvent struct {
 	BaseEvent
+	SignerAddress tktypes.EthAddress
 }
 
-func (_ *DispatchHeartbeatReceivedEvent) Type() EventType {
-	return Event_DispatchHeartbeatReceived
+func (_ *DispatchedEvent) Type() EventType {
+	return Event_Dispatched
+}
+
+func (event *DispatchedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
+	txn.signerAddress = &event.SignerAddress
+	return nil
+}
+
+type NonceAssignedEvent struct {
+	BaseEvent
+	SignerAddress tktypes.EthAddress // include the signer address in case we never actually saw a dispatch event
+	Nonce         uint64
+}
+
+func (_ *NonceAssignedEvent) Type() EventType {
+	return Event_NonceAssigned
+}
+
+func (event *NonceAssignedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
+	txn.signerAddress = &event.SignerAddress //TODO should we throw an error if the signer address is already set to something else?
+	txn.nonce = &event.Nonce
+	return nil
+}
+
+type SubmittedEvent struct {
+	BaseEvent
+	SignerAddress        tktypes.EthAddress // include the signer address and nonce in case we never actually saw a dispatch event or nonce assigned event
+	Nonce                uint64
+	LatestSubmissionHash tktypes.Bytes32
+}
+
+func (_ *SubmittedEvent) Type() EventType {
+	return Event_Submitted
+}
+
+func (event *SubmittedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
+	txn.signerAddress = &event.SignerAddress //TODO should we throw an error if the signer address or nonce are already set to something else?
+	txn.nonce = &event.Nonce
+	txn.latestSubmissionHash = &event.LatestSubmissionHash
+	return nil
 }
 
 type ResumedEvent struct {

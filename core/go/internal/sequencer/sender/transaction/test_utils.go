@@ -18,6 +18,7 @@ package transaction
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/google/uuid"
@@ -25,6 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/testutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -85,6 +87,10 @@ type TransactionBuilderForTesting struct {
 
 	/* Post Assembling States (e.g. endorsing, reverted, parked)*/
 	latestFulfilledAssembleRequestID uuid.UUID
+
+	latestSubmissionHash *tktypes.Bytes32
+	signerAddress        *tktypes.EthAddress
+	nonce                *uint64
 }
 
 // Function NewTransactionBuilderForTesting creates a TransactionBuilderForTesting with random values for all fields.
@@ -112,6 +118,27 @@ func (b *TransactionBuilderForTesting) GetCoordinator() string {
 
 func (b *TransactionBuilderForTesting) GetLatestFulfilledAssembleRequestID() uuid.UUID {
 	return b.latestFulfilledAssembleRequestID
+}
+
+func (b *TransactionBuilderForTesting) GetSignerAddress() tktypes.EthAddress {
+	if b.signerAddress == nil {
+		b.signerAddress = tktypes.RandAddress()
+	}
+	return *b.signerAddress
+}
+
+func (b *TransactionBuilderForTesting) GetNonce() uint64 {
+	if b.nonce == nil {
+		b.nonce = ptrTo(rand.Uint64())
+	}
+	return *b.nonce
+}
+
+func (b *TransactionBuilderForTesting) GetLatestSubmissionHash() tktypes.Bytes32 {
+	if b.latestSubmissionHash == nil {
+		b.latestSubmissionHash = ptrTo(tktypes.RandBytes32())
+	}
+	return *b.latestSubmissionHash
 }
 
 type TransactionDependencyFakes struct {
@@ -180,8 +207,16 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		}
 	case State_Prepared:
 		txn.currentDelegate = b.currentDelegate
+
+	case State_Submitted:
+		txn.latestSubmissionHash = ptrTo(b.GetLatestSubmissionHash())
+		fallthrough
+	case State_Sequenced:
+		txn.nonce = ptrTo(b.GetNonce())
+		fallthrough
 	case State_Dispatched:
 		txn.currentDelegate = b.currentDelegate
+		txn.signerAddress = ptrTo(b.GetSignerAddress())
 
 	}
 

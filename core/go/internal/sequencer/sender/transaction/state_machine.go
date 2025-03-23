@@ -43,6 +43,8 @@ const (
 	State_Signing              // we have assembled the transaction and are waiting for the signing module to sign it before we respond to the coordinator with the signed assembled transaction
 	State_Prepared             // we know that the coordinator has got as far as preparing a public transaction and we have sent a positive response to a coordinator's dispatch confirmation request but have not yet received a heartbeat that notifies us that the coordinator has dispatched the transaction to a public transaction manager for submission
 	State_Dispatched           // the active coordinator that this transaction was delegated to has dispatched the transaction to a public transaction manager for submission
+	State_Sequenced            // the transaction has been assigned a nonce by the public transaction manager
+	State_Submitted            // the transaction has been submitted to the blockchain
 	State_Confirmed            // the public transaction has been confirmed by the blockchain as successful
 	State_Reverted             // upon attempting to assemble the transaction, the domain code has determined that the intent is not valid and the transaction is finalized as reverted
 	State_Parked               // upon attempting to assemble the transaction, the domain code has determined that the transaction is not ready to be assembled and it is parked for later processing.  All remaining transactions for the current sender can continue - unless they have an explicit dependency on this transaction
@@ -54,7 +56,6 @@ type EventType = common.EventType
 const (
 	Event_HeartbeatInterval                   EventType = iota // the heartbeat interval has passed since the last time a heartbeat was received or the last time this event was received
 	Event_HeartbeatReceived                                    // a heartbeat message was received from the current active coordinator
-	Event_DispatchHeartbeatReceived                            // a heartbeat message was received from the current active coordinator with this transaction in the list of dispatched transactions
 	Event_CoordinatorChanged                                   // the coordinator has changed
 	Event_Created                                              // Transaction initially received by the sender or has been loaded from the database after a restart / swap-in
 	Event_ConfirmedSuccess                                     // confirmation received from the blockchain of base ledge transaction successful completion
@@ -68,6 +69,8 @@ const (
 	Event_Dispatched                                           // coordinator has dispatched the transaction to a public transaction manager
 	Event_DispatchConfirmationRequestReceived                  // coordinator has requested confirmation that the transaction has been dispatched
 	Event_Resumed                                              // Received an RPC call to resume a parked transaction
+	Event_NonceAssigned                                        // the public transaction manager has assigned a nonce to the transaction
+	Event_Submitted                                            // the transaction has been submitted to the blockchain
 )
 
 type StateMachine struct {
@@ -210,7 +213,7 @@ func init() {
 		},
 		State_Prepared: {
 			Events: map[EventType]EventHandler{
-				Event_DispatchHeartbeatReceived: {
+				Event_Dispatched: {
 					//Note: no validator here although this event may or may not match the most recent dispatch confirmation response.
 					// It is possible that we timed out  on Prepared state, delegated to another coordinator, got as far as prepared again and now just learning that
 					// the original coordinator has dispatched the transaction.
@@ -248,6 +251,11 @@ func init() {
 			},
 		},
 		State_Dispatched: {
+			//TODO this is modelled as a state that is discrete to sequenced and submitted but it may be more elegant to model those as sub states of dispatch
+			// because there is a set of rules that apply to all of them given that it is possible that it all happens so quickly from dispatch -> sequenced -> submitted -> confirmed
+			// that we don't have time to see the heartbeat for those intermediate states so all of those states do actually behave like substates
+			// the difference between each one is whether we have the signer address, or also the nonce or also the submission hash
+			// for now, we simply copy some event handler rules across dispatched , sequenced and submitted
 			Events: map[EventType]EventHandler{
 				Event_ConfirmedSuccess: {
 					Transitions: []Transition{{
@@ -256,14 +264,16 @@ func init() {
 				},
 				Event_ConfirmedReverted: {
 					Transitions: []Transition{{
-						To: State_Pending,
+						To: State_Delegated, //trust coordinator to retry
 					}},
 				},
 				Event_CoordinatorChanged: {
 					// coordinator has changed after we have seen the transaction dispatched.
 					// we will either see the dispatched transaction confirmed or reverted by the blockchain but that might not be for a long long time
-					// the fact that the coordinator has been changed on us means that we have lost contact with the original coordinator.  That may or may not have lost contact with the base ledger. If so, it may be days or months before it reconnects and managed to submit the transaction.
-					// rather than waiting in hope, we carry on with the new coordinator.  The double intent protection in the base ledger will ensure that only one of the coordinators manages to get the transaction through
+					// the fact that the coordinator has been changed on us means that we have lost contact with the original coordinator.
+					// The original coordinator may or may not have lost contact with the base ledger.
+					// If so, it may be days or months before it reconnects and managed to submit the transaction.
+					// Rather than waiting in hope, we carry on with the new coordinator.  The double intent protection in the base ledger will ensure that only one of the coordinators manages to get the transaction through
 					// and the other one will revert.  We just need to make sure that we don't overreact when we see a revert.
 					// We _could_ introduce a new state that we transition here to give some time, after realizing the coordinator has gone AWOL in case the transaction has made it to that coordinator's
 					// EVM node which is actively trying to get it into a block and we just don't get heartbeats for that.
@@ -277,8 +287,73 @@ func init() {
 						},
 					},
 				},
+				Event_NonceAssigned: {
+					Transitions: []Transition{
+						{
+							To: State_Sequenced,
+						},
+					},
+				},
+				Event_Submitted: {
+					//we can skip past sequenced and go straight to submitted.
+					Transitions: []Transition{
+						{
+							To: State_Submitted,
+						},
+					},
+				},
 			},
 		},
+		State_Sequenced: {
+			Events: map[EventType]EventHandler{
+				Event_ConfirmedSuccess: {
+					Transitions: []Transition{{
+						To: State_Confirmed,
+					}},
+				},
+				Event_ConfirmedReverted: {
+					Transitions: []Transition{{
+						To: State_Delegated, //trust coordinator to retry
+					}},
+				},
+				Event_CoordinatorChanged: {
+					Transitions: []Transition{
+						{
+							To: State_Delegated,
+						},
+					},
+				},
+				Event_Submitted: {
+					Transitions: []Transition{
+						{
+							To: State_Submitted,
+						},
+					},
+				},
+			},
+		},
+		State_Submitted: {
+			Events: map[EventType]EventHandler{
+				Event_ConfirmedSuccess: {
+					Transitions: []Transition{{
+						To: State_Confirmed,
+					}},
+				},
+				Event_ConfirmedReverted: {
+					Transitions: []Transition{{
+						To: State_Delegated, //trust coordinator to retry
+					}},
+				},
+				Event_CoordinatorChanged: {
+					Transitions: []Transition{
+						{
+							To: State_Delegated,
+						},
+					},
+				},
+			},
+		},
+
 		State_Parked: {
 			Events: map[EventType]EventHandler{
 				Event_AssembleRequestReceived: {

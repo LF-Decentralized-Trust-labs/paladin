@@ -42,6 +42,9 @@ type Transaction struct {
 	latestAssembleRequest            *assembleRequestFromCoordinator
 	latestFulfilledAssembleRequestID uuid.UUID
 	emit                             common.EmitEvent
+	signerAddress                    *tktypes.EthAddress
+	latestSubmissionHash             *tktypes.Bytes32
+	nonce                            *uint64
 }
 
 func NewTransaction(
@@ -96,4 +99,16 @@ func ptrTo[T any](v T) *T {
 
 func (t *Transaction) GetCurrentState() State {
 	return t.stateMachine.currentState
+}
+
+func (t *Transaction) GetSignerAddress() *tktypes.EthAddress {
+	return t.signerAddress
+}
+
+func (t *Transaction) GetLatestSubmissionHash() *tktypes.Bytes32 {
+	return t.latestSubmissionHash
+}
+
+func (t *Transaction) GetNonce() *uint64 {
+	return t.nonce
 }

@@ -16,10 +16,10 @@
 package sender
 
 import (
-	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type Event interface {
@@ -50,7 +50,10 @@ func (_ *TransactionCreatedEvent) Type() EventType {
 }
 
 type TransactionConfirmedEvent struct {
-	TransactionID uuid.UUID
+	From         *tktypes.EthAddress
+	Nonce        uint64
+	Hash         tktypes.Bytes32
+	RevertReason tktypes.HexBytes
 }
 
 func (_ *TransactionConfirmedEvent) Type() EventType {

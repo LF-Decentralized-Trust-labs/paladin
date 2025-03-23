@@ -457,14 +457,17 @@ func TestSenderTransaction_EndorsementGathering_ToDelegated_OnCoordinatorChanged
 
 }
 
-func TestSenderTransaction_Prepared_ToDispatched_OnDispatchHeartbeatReceived(t *testing.T) {
+func TestSenderTransaction_Prepared_ToDispatched_OnDispatched(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Prepared).Build()
 
-	err := txn.HandleEvent(ctx, &transaction.DispatchHeartbeatReceivedEvent{
+	signerAddress := tktypes.EthAddress(tktypes.RandBytes(20))
+
+	err := txn.HandleEvent(ctx, &transaction.DispatchedEvent{
 		BaseEvent: transaction.BaseEvent{
 			TransactionID: txn.ID,
 		},
+		SignerAddress: signerAddress,
 	})
 	assert.NoError(t, err)
 
@@ -565,7 +568,40 @@ func TestSenderTransaction_Dispatched_ToConfirmed_OnConfirmedSuccess(t *testing.
 	assert.Equal(t, transaction.State_Confirmed, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Dispatched_ToPending_OnConfirmedReverted(t *testing.T) {
+func TestSenderTransaction_Dispatched_ToSequenced_OnNonceAssigned(t *testing.T) {
+	ctx := context.Background()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Dispatched).Build()
+
+	err := txn.HandleEvent(ctx, &transaction.NonceAssignedEvent{
+		BaseEvent: transaction.BaseEvent{
+			TransactionID: txn.ID,
+		},
+		SignerAddress: tktypes.EthAddress(tktypes.RandBytes(20)),
+		Nonce:         42,
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, transaction.State_Sequenced, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+}
+
+func TestSenderTransaction_Dispatched_ToSubmitted_OnSubmitted(t *testing.T) {
+	ctx := context.Background()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Dispatched).Build()
+
+	err := txn.HandleEvent(ctx, &transaction.SubmittedEvent{
+		BaseEvent: transaction.BaseEvent{
+			TransactionID: txn.ID,
+		},
+		SignerAddress:        tktypes.EthAddress(tktypes.RandBytes(20)),
+		Nonce:                42,
+		LatestSubmissionHash: tktypes.Bytes32(tktypes.RandBytes(32)),
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, transaction.State_Submitted, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+}
+
+func TestSenderTransaction_Dispatched_ToDelegated_OnConfirmedReverted(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Dispatched).Build()
 
@@ -576,7 +612,7 @@ func TestSenderTransaction_Dispatched_ToPending_OnConfirmedReverted(t *testing.T
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, transaction.State_Pending, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
 func TestSenderTransaction_Dispatched_ToDelegated_OnCoordinatorChanged(t *testing.T) {
@@ -595,6 +631,110 @@ func TestSenderTransaction_Dispatched_ToDelegated_OnCoordinatorChanged(t *testin
 
 }
 
+func TestSenderTransaction_Sequenced_ToConfirmed_OnConfirmedSuccess(t *testing.T) {
+	ctx := context.Background()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Sequenced).Build()
+
+	err := txn.HandleEvent(ctx, &transaction.ConfirmedSuccessEvent{
+		BaseEvent: transaction.BaseEvent{
+			TransactionID: txn.ID,
+		},
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, transaction.State_Confirmed, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+}
+
+func TestSenderTransaction_Sequenced_ToSubmitted_OnSubmitted(t *testing.T) {
+	ctx := context.Background()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Sequenced).Build()
+
+	err := txn.HandleEvent(ctx, &transaction.SubmittedEvent{
+		BaseEvent: transaction.BaseEvent{
+			TransactionID: txn.ID,
+		},
+		SignerAddress:        tktypes.EthAddress(tktypes.RandBytes(20)),
+		Nonce:                42,
+		LatestSubmissionHash: tktypes.Bytes32(tktypes.RandBytes(32)),
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, transaction.State_Submitted, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+}
+
+func TestSenderTransaction_Sequenced_ToDelegated_OnConfirmedReverted(t *testing.T) {
+	ctx := context.Background()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Sequenced).Build()
+
+	err := txn.HandleEvent(ctx, &transaction.ConfirmedRevertedEvent{
+		BaseEvent: transaction.BaseEvent{
+			TransactionID: txn.ID,
+		},
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+}
+
+func TestSenderTransaction_Sequenced_ToDelegated_OnCoordinatorChanged(t *testing.T) {
+	ctx := context.Background()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Sequenced).Build()
+
+	err := txn.HandleEvent(ctx, &transaction.CoordinatorChangedEvent{
+		BaseEvent: transaction.BaseEvent{
+			TransactionID: txn.ID,
+		},
+		Coordinator: uuid.New().String(),
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+
+}
+
+func TestSenderTransaction_Submitted_ToConfirmed_OnConfirmedSuccess(t *testing.T) {
+	ctx := context.Background()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+
+	err := txn.HandleEvent(ctx, &transaction.ConfirmedSuccessEvent{
+		BaseEvent: transaction.BaseEvent{
+			TransactionID: txn.ID,
+		},
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, transaction.State_Confirmed, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+}
+
+func TestSenderTransaction_Submitted_ToDelegated_OnConfirmedReverted(t *testing.T) {
+	ctx := context.Background()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+
+	err := txn.HandleEvent(ctx, &transaction.ConfirmedRevertedEvent{
+		BaseEvent: transaction.BaseEvent{
+			TransactionID: txn.ID,
+		},
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+}
+
+func TestSenderTransaction_Submitted_ToDelegated_OnCoordinatorChanged(t *testing.T) {
+	ctx := context.Background()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+
+	err := txn.HandleEvent(ctx, &transaction.CoordinatorChangedEvent{
+		BaseEvent: transaction.BaseEvent{
+			TransactionID: txn.ID,
+		},
+		Coordinator: uuid.New().String(),
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+
+}
 func TestSenderTransaction_Parked_ToDelegated_OnResumed(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Parked).Build()
