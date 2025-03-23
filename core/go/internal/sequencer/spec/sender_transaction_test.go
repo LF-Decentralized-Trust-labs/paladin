@@ -735,7 +735,7 @@ func TestSenderTransaction_Submitted_ToDelegated_OnCoordinatorChanged(t *testing
 	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 
 }
-func TestSenderTransaction_Parked_ToDelegated_OnResumed(t *testing.T) {
+func TestSenderTransaction_Parked_ToPending_OnResumed(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Parked).Build()
 
@@ -746,7 +746,7 @@ func TestSenderTransaction_Parked_ToDelegated_OnResumed(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+	assert.Equal(t, transaction.State_Pending, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
 func ptrTo[T any](v T) *T {

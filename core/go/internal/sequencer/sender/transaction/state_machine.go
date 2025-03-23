@@ -366,7 +366,7 @@ func init() {
 				},
 				Event_Resumed: {
 					Transitions: []Transition{{
-						To: State_Delegated,
+						To: State_Pending,
 					}},
 				},
 			},
