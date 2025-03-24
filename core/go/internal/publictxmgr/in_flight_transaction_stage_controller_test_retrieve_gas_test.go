@@ -48,32 +48,32 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	}
 
 	// trigger retrieve gas price
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
 
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 
-	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	retrievedGasPrice := &pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Int64ToInt256(10),
 	}
 	// succeed retrieving gas price
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddGasPriceOutput(ctx, retrievedGasPrice, nil)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddGasPriceOutput(ctx, retrievedGasPrice, nil)
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
-	rsc = it.stateManager.GetRunningStageContext(ctx)
+	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, retrievedGasPrice.GasPrice, rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.GasPrice)
 	assert.Nil(t, rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.MaxFeePerGas)
@@ -81,9 +81,9 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	assert.Equal(t, 1, len(rsc.StageOutputsToBePersisted.StatusUpdates))
 	_ = rsc.StageOutputsToBePersisted.StatusUpdates[0](mTS.statusUpdater)
 	// failed retrieving gas price
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddGasPriceOutput(ctx, nil, fmt.Errorf("gas retrieve error"))
-	rsc = it.stateManager.GetRunningStageContext(ctx)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddGasPriceOutput(ctx, nil, fmt.Errorf("gas retrieve error"))
+	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	rsc.StageOutputsToBePersisted = nil
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
@@ -97,8 +97,8 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	// persisting error waiting for persistence retry timeout
 	assert.False(t, rsc.StageErrored)
 	it.persistenceRetryTimeout = 5 * time.Second
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now().Add(it.persistenceRetryTimeout*2), fmt.Errorf("persist gas price error"))
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now().Add(it.persistenceRetryTimeout*2), fmt.Errorf("persist gas price error"))
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
@@ -107,8 +107,8 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	// persisting error retrying
 	assert.False(t, rsc.StageErrored)
 	it.persistenceRetryTimeout = 0
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now(), fmt.Errorf("persist gas price error"))
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now(), fmt.Errorf("persist gas price error"))
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
@@ -117,8 +117,8 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	it.persistenceRetryTimeout = 5 * time.Second
 
 	// persisted stage error
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now(), nil)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now(), nil)
 	assert.NotNil(t, rsc.StageOutput.GasPriceOutput.Err)
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
@@ -128,19 +128,19 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	assert.True(t, rsc.StageErrored)
 
 	// persisted stage success and move on
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now(), nil)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now(), nil)
 	rsc.StageOutput.GasPriceOutput.Err = nil
 	rsc.StageErrored = false
-	it.stateManager.SetValidatedTransactionHashMatchState(ctx, true)
+	it.stateManager.GetCurrentGeneration(ctx).SetValidatedTransactionHashMatchState(ctx, true)
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
-	assert.False(t, it.stateManager.ValidatedTransactionHashMatchState(ctx))
+	assert.False(t, it.stateManager.GetCurrentGeneration(ctx).ValidatedTransactionHashMatchState(ctx))
 	// switched running stage context
-	assert.NotEqual(t, rsc, it.stateManager.GetRunningStageContext(ctx))
+	assert.NotEqual(t, rsc, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 }
 
 func TestProduceLatestInFlightStageContextRetrieveGasFixedGasPricing(t *testing.T) {
@@ -159,7 +159,7 @@ func TestProduceLatestInFlightStageContextRetrieveGasFixedGasPricing(t *testing.
 	}
 
 	// trigger retrieve gas price
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
@@ -168,8 +168,8 @@ func TestProduceLatestInFlightStageContextRetrieveGasFixedGasPricing(t *testing.
 		assert.Equal(t, int64(20000), tOut.Cost.Int64())
 	}
 
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	// skip the retrieve gas price stage
 	assert.Equal(t, InFlightTxStageSigning, rsc.Stage)
@@ -189,22 +189,22 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrements(t *testing.T) {
 	mTS.statusUpdater = mSU
 
 	// trigger retrieve gas price
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
 
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 
-	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	// Set old gas price in memory
-	mTS.InMemoryTxStateManager.(*inMemoryTxState).mtx.GasPricing = &pldapi.PublicTxGasPricing{
+	mTS.InMemoryTxStateManager.(*inMemoryTxState).mtx.GasPricing = pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Int64ToInt256(20),
 	}
 
@@ -215,15 +215,15 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrements(t *testing.T) {
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 
 	// Simulate the run of the stage
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddGasPriceOutput(ctx, retrievedGasPrice, nil)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddGasPriceOutput(ctx, retrievedGasPrice, nil)
 	rsc.StageOutputsToBePersisted = nil
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Equal(t, "40000", tOut.Cost.String())
-	rsc = it.stateManager.GetRunningStageContext(ctx)
+	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, big.NewInt(30), rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.GasPrice.Int())
 	assert.Equal(t, 1, len(rsc.StageOutputsToBePersisted.StatusUpdates))
@@ -245,19 +245,19 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsReachedCap(t *tes
 	mTS.statusUpdater = mSU
 
 	// trigger retrieve gas price
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
 
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 
-	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
@@ -271,15 +271,15 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsReachedCap(t *tes
 	}
 
 	it.gasPriceIncreaseMax = big.NewInt(26)
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddGasPriceOutput(ctx, retrievedGasPrice, nil)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddGasPriceOutput(ctx, retrievedGasPrice, nil)
 	rsc.StageOutputsToBePersisted = nil
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Equal(t, "40000", tOut.Cost.String())
-	rsc = it.stateManager.GetRunningStageContext(ctx)
+	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, big.NewInt(26), rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.GasPrice.Int())
 	assert.Equal(t, 1, len(rsc.StageOutputsToBePersisted.StatusUpdates))
@@ -301,19 +301,19 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsRetrievedHigherPr
 	mTS.statusUpdater = mSU
 
 	// trigger retrieve gas price
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
 
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 
-	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 	// retrieved price is higher
@@ -326,15 +326,15 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsRetrievedHigherPr
 		GasPrice: tktypes.Int64ToInt256(21),
 	}
 	it.gasPriceIncreaseMax = big.NewInt(26)
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddGasPriceOutput(ctx, higherRetrievedPrice, nil)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddGasPriceOutput(ctx, higherRetrievedPrice, nil)
 	rsc.StageOutputsToBePersisted = nil
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Equal(t, "40000", tOut.Cost.String())
-	rsc = it.stateManager.GetRunningStageContext(ctx)
+	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, higherRetrievedPrice.GasPrice, rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.GasPrice)
 	assert.Equal(t, 1, len(rsc.StageOutputsToBePersisted.StatusUpdates))
@@ -356,19 +356,19 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559HigherExis
 	mTS.statusUpdater = mSU
 
 	// trigger retrieve gas price
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
 
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 
-	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 	// EIP-1559 gas price
@@ -386,15 +386,15 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559HigherExis
 	})
 
 	it.gasPriceClient = NewTestFixedPriceGasPriceClientEIP1559(t)
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddGasPriceOutput(ctx, retrievedGasPriceEIP1559, nil)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddGasPriceOutput(ctx, retrievedGasPriceEIP1559, nil)
 	rsc.StageOutputsToBePersisted = nil
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Equal(t, "40000", tOut.Cost.String())
-	rsc = it.stateManager.GetRunningStageContext(ctx)
+	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, big.NewInt(30), rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.MaxFeePerGas.Int())
 	assert.Equal(t, big.NewInt(1), rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.MaxPriorityFeePerGas.Int())
@@ -418,19 +418,19 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559MismatchFo
 	mTS.statusUpdater = mSU
 
 	// trigger retrieve gas price
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
 
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 
-	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	retrievedGasPrice := &pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Int64ToInt256(10),
@@ -445,15 +445,15 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559MismatchFo
 	})
 
 	it.gasPriceIncreaseMax = big.NewInt(26)
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddGasPriceOutput(ctx, retrievedGasPrice, nil)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddGasPriceOutput(ctx, retrievedGasPrice, nil)
 	rsc.StageOutputsToBePersisted = nil
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Equal(t, "40000", tOut.Cost.String())
-	rsc = it.stateManager.GetRunningStageContext(ctx)
+	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, retrievedGasPrice.GasPrice, rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.GasPrice)
 	assert.Equal(t, 1, len(rsc.StageOutputsToBePersisted.StatusUpdates))
@@ -475,17 +475,17 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559ReachedCap
 	mTS.statusUpdater = mSU
 
 	// trigger retrieve gas price
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
-	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	retrievedGasPrice := &pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Uint64ToUint256(10),
@@ -506,15 +506,15 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559ReachedCap
 	})
 
 	it.gasPriceIncreaseMax = big.NewInt(26)
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddGasPriceOutput(ctx, retrievedGasPrice, nil)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddGasPriceOutput(ctx, retrievedGasPrice, nil)
 	rsc.StageOutputsToBePersisted = nil
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Equal(t, "40000", tOut.Cost.String())
-	rsc = it.stateManager.GetRunningStageContext(ctx)
+	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, retrievedGasPrice.GasPrice, rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.GasPrice)
 	assert.Nil(t, rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.MaxFeePerGas)
@@ -532,16 +532,16 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559ReachedCap
 	})
 
 	it.gasPriceIncreaseMax = big.NewInt(26)
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
 
-	it.stateManager.AddGasPriceOutput(ctx, retrievedGasPriceEIP1559, nil)
+	it.stateManager.GetCurrentGeneration(ctx).AddGasPriceOutput(ctx, retrievedGasPriceEIP1559, nil)
 	rsc.StageOutputsToBePersisted = nil
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Equal(t, "40000", tOut.Cost.String())
-	rsc = it.stateManager.GetRunningStageContext(ctx)
+	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, big.NewInt(26), rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.MaxFeePerGas.Int())
 	assert.Equal(t, big.NewInt(1), rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.MaxPriorityFeePerGas.Int())
@@ -566,29 +566,29 @@ func TestProduceLatestInFlightStageContextRetrieveGasPanic(t *testing.T) {
 	mTS.statusUpdater = mSU
 
 	// trigger retrieve gas price
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 
-	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	// unexpected error
-	rsc = it.stateManager.GetRunningStageContext(ctx)
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddPanicOutput(ctx, InFlightTxStageRetrieveGasPrice)
+	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddPanicOutput(ctx, InFlightTxStageRetrieveGasPrice)
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.NotEmpty(t, *tOut)
 	assert.Regexp(t, "PD011919", tOut.Error)
-	assert.NotEqual(t, rsc, it.stateManager.GetRunningStageContext(ctx))
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
+	assert.NotEqual(t, rsc, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
 }

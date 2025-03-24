@@ -33,6 +33,7 @@ func (tm *txManager) buildRPCModule() {
 		Add("ptx_sendTransactions", tm.rpcSendTransactions()).
 		Add("ptx_prepareTransaction", tm.rpcPrepareTransaction()).
 		Add("ptx_prepareTransactions", tm.rpcPrepareTransactions()).
+		Add("ptx_updateTransaction", tm.rpcUpdateTransaction()).
 		Add("ptx_call", tm.rpcCall()).
 		Add("ptx_getTransaction", tm.rpcGetTransaction()).
 		Add("ptx_getTransactionFull", tm.rpcGetTransactionFull()).
@@ -100,6 +101,15 @@ func (tm *txManager) rpcPrepareTransactions() rpcserver.RPCHandler {
 		txs []*pldapi.TransactionInput,
 	) ([]uuid.UUID, error) {
 		return tm.prepareTransactionsNewDBTX(ctx, txs)
+	})
+}
+
+func (tm *txManager) rpcUpdateTransaction() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod2(func(ctx context.Context,
+		id uuid.UUID,
+		tx *pldapi.TransactionInput,
+	) (uuid.UUID, error) {
+		return tm.UpdateTransaction(ctx, id, tx)
 	})
 }
 

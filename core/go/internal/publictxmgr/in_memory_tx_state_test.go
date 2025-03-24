@@ -26,22 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// import (
-// 	"context"
-// 	"encoding/json"
-// 	"testing"
-
-// 	"github.com/google/uuid"
-// 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
-// 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-// 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-// 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-// 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-// 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-
-// 	"github.com/stretchr/testify/assert"
-// )
-
 const testTransactionData string = "0x7369676e6564206d657373616765"
 
 func NewTestInMemoryTxState(t *testing.T) InMemoryTxStateManager {

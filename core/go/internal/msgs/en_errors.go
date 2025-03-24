@@ -361,6 +361,10 @@ var (
 	MsgInvalidAutoFuelSource           = pde("PD011934", "Invalid auto-fueling source '%s'")
 	MsgInvalidStateMissingTXHash       = pde("PD011935", "Invalid state - missing transaction hash from previous sign stage")
 	MsgInvalidTXMissingFromAddr        = pde("PD011936", "From address missing for transaction")
+	MsgTransactionAlreadyComplete      = pde("PD011937", "Transaction cannot be updated as it is already complete")
+	MsgUpdateGasPriceLower             = pde("PD011938", "Gas price cannot be lowered for transaction (current=%s requested=%s)")
+	MsgUpdateMaxFeePerGasLower         = pde("PD011939", "Max fee per gas cannot be lowered for transaction (current=%s requested=%s)")
+	MsgUpdateNoFixedPricing            = pde("PD011940", "Cannot unset gas price for transaction with fixed gas pricing")
 
 	// TransportManager module PD0120XX
 	MsgTransportInvalidMessage                 = pde("PD012000", "Invalid message")
@@ -439,6 +443,8 @@ var (
 	MsgTxMgrListenerNameRequired         = pde("PD012241", "Receipt listener name is required")
 	MsgTxMgrJSONRPCSubscriptionClosed    = pde("PD012242", "JSON/RPC subscription '%s' closed")
 	MsgTxMgrJSONRPCSubscriptionNack      = pde("PD012243", "JSON/RPC subscription '%s' returned nack for receipt batch")
+	MsgTxMgrTransactionNotFound          = pde("PD012244", "Transaction not found with id %s")
+	MsgTxMgrUpdateInvalidType            = pde("PD012245", "Private transaction cannot be updated")
 
 	// FlushWriter module PD0123XX
 	MsgFlushWriterQuiescing      = pde("PD012300", "Writer shutting down")

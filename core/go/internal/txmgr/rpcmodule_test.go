@@ -133,6 +133,7 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 			return publicTxns, nil
 		}),
 		func(tmc *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.publicTxMgr.On("UpdateTransaction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			mc.keyManager.On("ResolveEthAddressNewDatabaseTX", mock.Anything, "sender1").Return(senderAddr, nil) // used in call
 
 			unconnected := ethclient.NewUnconnectedRPCClient(context.Background(), &pldconf.EthClientConfig{}, 0)
@@ -258,6 +259,9 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 	err = rpcClient.CallRPC(ctx, &txIDs, "ptx_sendTransactions", []*pldapi.TransactionInput{tx2Input})
 	assert.NoError(t, err)
 	tx2ID := txIDs[0]
+	publicTxns[tx2ID] = []*pldapi.PublicTx{{
+		LocalID: confutil.P(uint64(1)),
+	}}
 	var tx2 *pldapi.TransactionFull
 	err = rpcClient.CallRPC(ctx, &tx2, "ptx_getTransactionFull", tx2ID)
 	require.NoError(t, err)
@@ -273,9 +277,15 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 
 	// Null on not found is the consistent ethereum pattern
 	var txNotFound *pldapi.Transaction
-	err = rpcClient.CallRPC(ctx, &txns, "ptx_getTransaction", uuid.New())
+	err = rpcClient.CallRPC(ctx, &txNotFound, "ptx_getTransaction", uuid.New())
 	require.NoError(t, err)
 	assert.Nil(t, txNotFound)
+
+	// Update the gas limit on the transaction
+	gas := tktypes.HexUint64(12345)
+	tx2Input.Gas = &gas
+	err = rpcClient.CallRPC(ctx, nil, "ptx_updateTransaction", tx2ID, tx2Input)
+	require.NoError(t, err)
 
 	// Finalize the deploy as a success
 	txHash1 := tktypes.RandBytes32()

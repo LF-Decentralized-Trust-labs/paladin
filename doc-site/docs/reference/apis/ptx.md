@@ -308,3 +308,14 @@ title: ptx_*
 
 0. `storedABI`: [`StoredABI`](../types/storedabi.md#storedabi)
 
+## `ptx_updateTransaction`
+
+### Parameters
+
+0. `transactionId`: [`UUID`](../types/simpletypes.md#uuid)
+1. `transaction`: [`TransactionInput`](../types/transactioninput.md#transactioninput)
+
+### Returns
+
+0. `transactionId`: [`UUID`](../types/simpletypes.md#uuid)
+

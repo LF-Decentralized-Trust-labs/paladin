@@ -110,6 +110,7 @@ type componentTestInstance struct {
 	client                 rpcclient.Client
 	resolveEthereumAddress func(identity string) string
 	cm                     componentmgr.ComponentManager
+	wsConfig               *pldconf.WSClientConfig
 }
 
 func deployDomainRegistry(t *testing.T) *tktypes.EthAddress {
@@ -117,7 +118,7 @@ func deployDomainRegistry(t *testing.T) *tktypes.EthAddress {
 	//Actually, we only need a bare bones engine that is capable of deploying the base ledger contracts
 	// could make do with assembling some core components like key manager, eth client factory, block indexer, persistence and any other dependencies they pull in
 	// but is easier to just create a throwaway component manager with no domains
-	tmpConf := testConfig(t)
+	tmpConf, _ := testConfig(t, false)
 	// wouldn't need to do this if we just created the core coponents directly
 	f, err := os.CreateTemp("", "component-test.*.sock")
 	require.NoError(t, err)
@@ -165,7 +166,7 @@ func newNodeConfiguration(t *testing.T, nodeName string) *nodeConfiguration {
 	}
 }
 
-func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes.EthAddress, binding *nodeConfiguration, peerNodes []*nodeConfiguration, domainConfig interface{}) *componentTestInstance {
+func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes.EthAddress, binding *nodeConfiguration, peerNodes []*nodeConfiguration, domainConfig interface{}, enableWS bool) *componentTestInstance {
 	if binding == nil {
 		binding = newNodeConfiguration(t, "default")
 	}
@@ -180,11 +181,12 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 	err = os.Remove(grpcTarget)
 	require.NoError(t, err)
 
-	conf := testConfig(t)
+	conf, wsConfig := testConfig(t, enableWS)
 	i := &componentTestInstance{
 		grpcTarget: grpcTarget,
 		name:       binding.name,
 		conf:       &conf,
+		wsConfig:   &wsConfig,
 	}
 	i.ctx = log.WithLogField(context.Background(), "node-name", binding.name)
 
@@ -358,7 +360,7 @@ func initPostgres(t *testing.T, ctx context.Context) (dns string, cleanup func()
 	}
 }
 
-func testConfig(t *testing.T) pldconf.PaladinConfig {
+func testConfig(t *testing.T, enableWS bool) (pldconf.PaladinConfig, pldconf.WSClientConfig) {
 	ctx := context.Background()
 
 	var conf *pldconf.PaladinConfig
@@ -371,14 +373,25 @@ func testConfig(t *testing.T) pldconf.PaladinConfig {
 	// conf.DB.Postgres.DebugQueries = true
 	conf.DB.Postgres.MigrationsDir = "../db/migrations/postgres"
 
-	port, err := getFreePort()
-	require.NoError(t, err, "Error finding a free port")
+	httpPort, err := getFreePort()
+	require.NoError(t, err, "Error finding a free port for http")
 	conf.GRPC.ShutdownTimeout = confutil.P("0s")
 	conf.RPCServer.HTTP.ShutdownTimeout = confutil.P("0s")
-	conf.RPCServer.HTTP.Port = &port
+	conf.RPCServer.HTTP.Port = &httpPort
 	conf.RPCServer.HTTP.Address = confutil.P("127.0.0.1")
-	conf.RPCServer.WS.ShutdownTimeout = confutil.P("0s")
-	conf.RPCServer.WS.Disabled = true
+
+	var wsConfig pldconf.WSClientConfig
+	if enableWS {
+		wsPort, err := getFreePort()
+		require.NoError(t, err, "Error finding a free port for ws")
+		conf.RPCServer.WS.Disabled = false
+		conf.RPCServer.WS.ShutdownTimeout = confutil.P("0s")
+		conf.RPCServer.WS.Port = &wsPort
+		conf.RPCServer.WS.Address = confutil.P("127.0.0.1")
+
+		wsConfig.URL = fmt.Sprintf("ws://127.0.0.1:%d", wsPort)
+	}
+
 	conf.Log.Level = confutil.P("info")
 
 	conf.TransportManagerConfig.ReliableMessageWriter.BatchMaxSize = confutil.P(1)
@@ -397,7 +410,7 @@ func testConfig(t *testing.T) pldconf.PaladinConfig {
 	}
 	log.InitConfig(&conf.Log)
 
-	return *conf
+	return *conf, wsConfig
 
 }
 
@@ -477,7 +490,7 @@ func (p *partyForTesting) peer(peers ...*nodeConfiguration) {
 }
 
 func (p *partyForTesting) start(t *testing.T, domainConfig interface{}) {
-	p.instance = newInstanceForComponentTesting(t, p.domainRegistryAddress, p.nodeConfig, p.peers, domainConfig)
+	p.instance = newInstanceForComponentTesting(t, p.domainRegistryAddress, p.nodeConfig, p.peers, domainConfig, false)
 	p.client = p.instance.client
 
 }
