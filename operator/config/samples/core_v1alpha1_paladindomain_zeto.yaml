@@ -71,6 +71,23 @@ spec:
                 "usesNullifiers": true
               }
             }
+          },
+          {
+            "name": "Zeto_NfAnon",
+            "circuits": {
+              "transfer": {
+                "name": "nfanon"
+              },
+              "transferLocked": {
+                "name": "nfanon"
+              },
+              "deposit": {
+                "name": "deposit"
+              },
+              "withdraw": {
+                "name": "withdraw"
+              }
+            }
           }
         ]
       },
