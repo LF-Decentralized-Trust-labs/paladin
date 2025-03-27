@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -32,7 +31,7 @@ func TestMintHandler_Prepare(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		encodeFunc   func(context.Context, *pb.TransactionSpecification, ethtypes.HexBytes0xPrefix) (tktypes.HexBytes, error)
+		encodeFunc   func(context.Context, *pb.TransactionSpecification) (tktypes.HexBytes, error)
 		outputStates []*pb.EndorsableState
 		expectErr    bool
 		errContains  string
@@ -76,7 +75,7 @@ func TestMintHandler_Prepare(t *testing.T) {
 					StateDataJson: `{"owner":"0x638e6824da3eb00687eefdeefb17dc646ba9f00fae6020f1b6d640487b07fdac","salt":"3949625438621963838695705020414673764457825239260453211443343787973144679466","tokenID":"12889917038846740459390665944266706251653790785225711651704434901540173766845","uri":"https://example.com/token/name2"}`,
 				},
 			},
-			encodeFunc: func(context.Context, *pb.TransactionSpecification, ethtypes.HexBytes0xPrefix) (tktypes.HexBytes, error) {
+			encodeFunc: func(context.Context, *pb.TransactionSpecification) (tktypes.HexBytes, error) {
 				return nil, assert.AnError
 			},
 			expectErr:   true,
@@ -179,7 +178,7 @@ func TestMintHandler_Assemble(t *testing.T) {
 	tx := &types.ParsedTransaction{
 		DomainConfig: &types.DomainInstanceConfig{
 			TokenName: constants.TOKEN_NF_ANON,
-			CircuitId: constants.CIRCUIT_NF_ANON,
+			Circuits:  &zetosignerapi.Circuits{},
 		},
 	}
 

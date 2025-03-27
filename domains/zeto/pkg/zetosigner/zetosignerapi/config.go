@@ -17,6 +17,7 @@ package zetosignerapi
 
 import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 )
 
@@ -27,6 +28,48 @@ type SnarkProverConfig struct {
 	CircuitsDir         string `json:"circuitsDir"`         // directory for the circuits runtime (WASM currently supported)
 	ProvingKeysDir      string `json:"provingKeysDir"`      // public parameters for the prover, specific to each circuit
 	MaxProverPerCircuit *int   `json:"maxProverPerCircuit"` // maximum number of proving runtime per circuit, each prover owns a standalone WASM instance
+}
+
+type CircuitType string
+
+const (
+	Deposit        CircuitType = "deposit"
+	Withdraw       CircuitType = "withdraw"
+	Transfer       CircuitType = "transfer"
+	TransferLocked CircuitType = "transferLocked"
+)
+
+type Circuit struct {
+	Name           string      `yaml:"name" json:"name"`
+	Type           CircuitType `yaml:"type" json:"type"`
+	UsesNullifiers bool        `yaml:"usesNullifiers" json:"usesNullifiers"`
+	UsesEncryption bool        `yaml:"usesEncryption" json:"usesEncryption"`
+}
+
+func (c *Circuit) ToProto() *proto.Circuit {
+	return &proto.Circuit{
+		Name:           c.Name,
+		Type:           string(c.Type),
+		UsesNullifiers: c.UsesNullifiers,
+		UsesEncryption: c.UsesEncryption,
+	}
+}
+
+type Circuits map[string]*Circuit
+
+func (cs Circuits) Init() {
+	for circuitType, circuit := range cs {
+		circuit.Type = CircuitType(circuitType)
+	}
+}
+
+func NewCircuitFromProto(pb *proto.Circuit) *Circuit {
+	return &Circuit{
+		Name:           pb.Name,
+		Type:           CircuitType(pb.Type),
+		UsesNullifiers: pb.UsesNullifiers,
+		UsesEncryption: pb.UsesEncryption,
+	}
 }
 
 // Implements the extensible config interface of the signer

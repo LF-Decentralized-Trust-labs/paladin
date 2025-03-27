@@ -23,6 +23,7 @@ import (
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/node"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -32,6 +33,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"google.golang.org/protobuf/proto"
 )
 
 // due to the ZKP circuit needing to check if the amount is positive,
@@ -40,7 +42,8 @@ import (
 var MAX_TRANSFER_AMOUNT = big.NewInt(0).Exp(big.NewInt(2), big.NewInt(100), nil)
 
 type baseHandler struct {
-	name string
+	name         string
+	stateSchemas *common.StateSchemas
 }
 
 func (h *baseHandler) getAlgoZetoSnarkBJJ() string {
@@ -78,8 +81,44 @@ func validateAmountParam(ctx context.Context, amount *tktypes.HexUint256, i int)
 	return nil
 }
 
-func generateMerkleProofs(ctx context.Context, callbacks plugintk.DomainCallbacks, merkleTreeRootSchema *prototk.StateSchema, merkleTreeNodeSchema *prototk.StateSchema, tokenName string, stateQueryContext string, contractAddress *tktypes.EthAddress, inputCoins []*types.ZetoCoin) ([]core.Proof, *corepb.ProvingRequestExtras_Nullifiers, error) {
+func utxosFromInputStates(ctx context.Context, states []*prototk.EndorsableState, desiredSize int) ([]string, error) {
+	return utxosFromStates(ctx, states, desiredSize, true)
+}
+
+func utxosFromOutputStates(ctx context.Context, states []*prototk.EndorsableState, desiredSize int) ([]string, error) {
+	return utxosFromStates(ctx, states, desiredSize, false)
+}
+
+func utxosFromStates(ctx context.Context, states []*prototk.EndorsableState, desiredSize int, isInputs bool) ([]string, error) {
+	utxos := make([]string, desiredSize)
+	for i := 0; i < desiredSize; i++ {
+		if i < len(states) {
+			msgTemplate := msgs.MsgErrorParseInputStates
+			if !isInputs {
+				msgTemplate = msgs.MsgErrorParseOutputStates
+			}
+			state := states[i]
+			coin, err := makeCoin(state.StateDataJson)
+			if err != nil {
+				return nil, i18n.NewError(ctx, msgTemplate, err)
+			}
+			hash, err := coin.Hash(ctx)
+			if err != nil {
+				return nil, i18n.NewError(ctx, msgTemplate, err)
+			}
+			utxos[i] = hash.String()
+		} else {
+			utxos[i] = "0"
+		}
+	}
+	return utxos, nil
+}
+
+func generateMerkleProofs(ctx context.Context, callbacks plugintk.DomainCallbacks, merkleTreeRootSchema *prototk.StateSchema, merkleTreeNodeSchema *prototk.StateSchema, tokenName string, stateQueryContext string, contractAddress *tktypes.EthAddress, inputCoins []*types.ZetoCoin, locked bool) ([]core.Proof, *corepb.ProvingRequestExtras_Nullifiers, error) {
 	smtName := smt.MerkleTreeName(tokenName, contractAddress)
+	if locked {
+		smtName = smt.MerkleTreeNameForLockedStates(tokenName, contractAddress)
+	}
 	storage := smt.NewStatesStorage(callbacks, smtName, stateQueryContext, merkleTreeRootSchema.Id, merkleTreeNodeSchema.Id)
 	mt, err := smt.NewSmt(storage)
 	if err != nil {
@@ -147,9 +186,102 @@ func generateMerkleProofs(ctx context.Context, callbacks plugintk.DomainCallback
 
 	return proofs, &extrasObj, nil
 }
+
+// formatTransferProvingRequest formats the proving request for a transfer transaction.
+// the same function is used for both the transfer and lock transactions because they
+// both require the same proof from the transfer circuit
+func formatTransferProvingRequest(ctx context.Context, callbacks plugintk.DomainCallbacks, merkleTreeRootSchema *prototk.StateSchema, merkleTreeNodeSchema *prototk.StateSchema, inputCoins, outputCoins []*types.ZetoCoin, circuit *zetosignerapi.Circuit, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress, delegate ...string) ([]byte, error) {
+	inputSize := common.GetInputSize(len(inputCoins))
+	inputCommitments := make([]string, inputSize)
+	inputValueInts := make([]uint64, inputSize)
+	inputSalts := make([]string, inputSize)
+	inputOwner := inputCoins[0].Owner.String()
+	for i := 0; i < inputSize; i++ {
+		if i < len(inputCoins) {
+			coin := inputCoins[i]
+			hash, err := coin.Hash(ctx)
+			if err != nil {
+				return nil, i18n.NewError(ctx, msgs.MsgErrorHashInputState, err)
+			}
+			inputCommitments[i] = hash.Int().Text(16)
+			inputValueInts[i] = coin.Amount.Int().Uint64()
+			inputSalts[i] = coin.Salt.Int().Text(16)
+		} else {
+			inputCommitments[i] = "0"
+			inputSalts[i] = "0"
+		}
+	}
+
+	outputValueInts := make([]uint64, inputSize)
+	outputSalts := make([]string, inputSize)
+	outputOwners := make([]string, inputSize)
+	for i := 0; i < inputSize; i++ {
+		if i < len(outputCoins) {
+			coin := outputCoins[i]
+			outputValueInts[i] = coin.Amount.Int().Uint64()
+			outputSalts[i] = coin.Salt.Int().Text(16)
+			outputOwners[i] = coin.Owner.String()
+		} else {
+			outputSalts[i] = "0"
+		}
+	}
+
+	var extras []byte
+	if circuit.UsesNullifiers {
+		forLockedStates := len(delegate) > 0
+		proofs, extrasObj, err := generateMerkleProofs(ctx, callbacks, merkleTreeRootSchema, merkleTreeNodeSchema, tokenName, stateQueryContext, contractAddress, inputCoins, forLockedStates)
+		if err != nil {
+			return nil, i18n.NewError(ctx, msgs.MsgErrorGenerateMTP, err)
+		}
+		for i := len(proofs); i < inputSize; i++ {
+			extrasObj.MerkleProofs = append(extrasObj.MerkleProofs, &smt.Empty_Proof)
+			extrasObj.Enabled = append(extrasObj.Enabled, false)
+		}
+		if len(delegate) > 0 {
+			extrasObj.Delegate = delegate[0]
+		}
+		protoExtras, err := proto.Marshal(extrasObj)
+		if err != nil {
+			return nil, i18n.NewError(ctx, msgs.MsgErrorMarshalExtraObj, err)
+		}
+		extras = protoExtras
+	}
+	tokenSecrets, err := marshalTokenSecrets(inputValueInts, outputValueInts)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorMarshalValuesFungible, err)
+	}
+	payload := &corepb.ProvingRequest{
+		Circuit: circuit.ToProto(),
+		Common: &corepb.ProvingRequestCommon{
+			InputCommitments: inputCommitments,
+			InputSalts:       inputSalts,
+			InputOwner:       inputOwner,
+			OutputSalts:      outputSalts,
+			OutputOwners:     outputOwners,
+			TokenSecrets:     tokenSecrets,
+			TokenType:        corepb.TokenType_fungible,
+		},
+	}
+	if extras != nil {
+		payload.Extras = extras
+	}
+	return proto.Marshal(payload)
+}
+
+func trimZeroUtxos(utxos []string) []string {
+	var trimmed []string
+	for _, utxo := range utxos {
+		if utxo != "0" {
+			trimmed = append(trimmed, utxo)
+		}
+	}
+	return trimmed
+}
+
 func getAlgoZetoSnarkBJJ(name string) string {
 	return zetosignerapi.AlgoDomainZetoSnarkBJJ(name)
 }
+
 func marshalTokenSecrets(input, output []uint64) ([]byte, error) {
 	return json.Marshal(corepb.TokenSecrets_Fungible{InputValues: input, OutputValues: output})
 }

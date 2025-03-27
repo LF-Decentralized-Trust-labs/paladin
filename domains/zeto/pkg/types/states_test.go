@@ -106,7 +106,7 @@ func TestABIParameters(t *testing.T) {
 			param:              ZetoCoinABI,
 			expectedName:       "ZetoCoin",
 			expectedType:       "tuple",
-			expectedComponents: 3,
+			expectedComponents: 4,
 		},
 		{
 			name:               "ZetoNFToken ABI",

@@ -23,7 +23,6 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
@@ -40,15 +39,12 @@ var _ types.DomainHandler = &transferHandler{}
 
 type transferHandler struct {
 	baseHandler
-	callbacks            plugintk.DomainCallbacks
-	coinSchema           *pb.StateSchema
-	merkleTreeRootSchema *prototk.StateSchema
-	merkleTreeNodeSchema *prototk.StateSchema
+	callbacks plugintk.DomainCallbacks
 }
 
 var transferABI = &abi.Entry{
 	Type: abi.Function,
-	Name: "transfer",
+	Name: types.METHOD_TRANSFER,
 	Inputs: abi.ParameterArray{
 		{Name: "inputs", Type: "uint256[]"},
 		{Name: "outputs", Type: "uint256[]"},
@@ -57,9 +53,9 @@ var transferABI = &abi.Entry{
 	},
 }
 
-var transferABI_nullifiers = &abi.Entry{
+var transferABINullifiers = &abi.Entry{
 	Type: abi.Function,
-	Name: "transfer",
+	Name: types.METHOD_TRANSFER,
 	Inputs: abi.ParameterArray{
 		{Name: "nullifiers", Type: "uint256[]"},
 		{Name: "outputs", Type: "uint256[]"},
@@ -71,25 +67,10 @@ var transferABI_nullifiers = &abi.Entry{
 
 var transferABI_withEncryption = &abi.Entry{
 	Type: abi.Function,
-	Name: "transfer",
+	Name: types.METHOD_TRANSFER,
 	Inputs: abi.ParameterArray{
 		{Name: "inputs", Type: "uint256[]"},
 		{Name: "outputs", Type: "uint256[]"},
-		{Name: "encryptionNonce", Type: "uint256"},
-		{Name: "ecdhPublicKey", Type: "uint256[2]"},
-		{Name: "encryptedValues", Type: "uint256[]"},
-		{Name: "proof", Type: "tuple", InternalType: "struct Commonlib.Proof", Components: common.ProofComponents},
-		{Name: "data", Type: "bytes"},
-	},
-}
-
-var transferABI_withEncryption_nullifiers = &abi.Entry{
-	Type: abi.Function,
-	Name: "transfer",
-	Inputs: abi.ParameterArray{
-		{Name: "nullifiers", Type: "uint256[]"},
-		{Name: "outputs", Type: "uint256[]"},
-		{Name: "root", Type: "uint256"},
 		{Name: "encryptionNonce", Type: "uint256"},
 		{Name: "ecdhPublicKey", Type: "uint256[2]"},
 		{Name: "encryptedValues", Type: "uint256[]"},
@@ -102,11 +83,13 @@ func NewTransferHandler(name string, callbacks plugintk.DomainCallbacks, coinSch
 	return &transferHandler{
 		baseHandler: baseHandler{
 			name: name,
+			stateSchemas: &common.StateSchemas{
+				CoinSchema:           coinSchema,
+				MerkleTreeRootSchema: merkleTreeRootSchema,
+				MerkleTreeNodeSchema: merkleTreeNodeSchema,
+			},
 		},
-		callbacks:            callbacks,
-		coinSchema:           coinSchema,
-		merkleTreeRootSchema: merkleTreeRootSchema,
-		merkleTreeNodeSchema: merkleTreeNodeSchema,
+		callbacks: callbacks,
 	}
 }
 
@@ -155,11 +138,11 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	}
 
 	useNullifiers := common.IsNullifiersToken(tx.DomainConfig.TokenName)
-	inputCoins, inputStates, _, remainder, err := prepareInputsForTransfer(ctx, h.callbacks, h.coinSchema, useNullifiers, req.StateQueryContext, resolvedSender.Verifier, params)
+	inputCoins, inputStates, _, remainder, err := prepareInputsForTransfer(ctx, h.callbacks, h.stateSchemas.CoinSchema, useNullifiers, req.StateQueryContext, resolvedSender.Verifier, params)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxInputs, err)
 	}
-	outputCoins, outputStates, err := prepareOutputsForTransfer(ctx, useNullifiers, params, req.ResolvedVerifiers, h.coinSchema, h.name)
+	outputCoins, outputStates, err := prepareOutputsForTransfer(ctx, useNullifiers, params, req.ResolvedVerifiers, h.stateSchemas.CoinSchema, h.name)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxOutputs, err)
 	}
@@ -172,7 +155,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 				Amount: &remainderHex,
 			},
 		}
-		returnedCoins, returnedStates, err := prepareOutputsForTransfer(ctx, useNullifiers, remainderParams, req.ResolvedVerifiers, h.coinSchema, h.name)
+		returnedCoins, returnedStates, err := prepareOutputsForTransfer(ctx, useNullifiers, remainderParams, req.ResolvedVerifiers, h.stateSchemas.CoinSchema, h.name)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxChange, err)
 		}
@@ -184,7 +167,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
 	}
-	payloadBytes, err := h.formatProvingRequest(ctx, inputCoins, outputCoins, tx.DomainConfig.CircuitId, tx.DomainConfig.TokenName, req.StateQueryContext, contractAddress)
+	payloadBytes, err := formatTransferProvingRequest(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, inputCoins, outputCoins, (*tx.DomainConfig.Circuits)[types.METHOD_TRANSFER], tx.DomainConfig.TokenName, req.StateQueryContext, contractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorFormatProvingReq, err)
 	}
@@ -224,42 +207,16 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	}
 
 	inputSize := common.GetInputSize(len(req.InputStates))
-	inputs := make([]string, inputSize)
-	for i := 0; i < inputSize; i++ {
-		if i < len(req.InputStates) {
-			state := req.InputStates[i]
-			coin, err := makeCoin(state.StateDataJson)
-			if err != nil {
-				return nil, i18n.NewError(ctx, msgs.MsgErrorParseInputStates, err)
-			}
-			hash, err := coin.Hash(ctx)
-			if err != nil {
-				return nil, i18n.NewError(ctx, msgs.MsgErrorHashInputState, err)
-			}
-			inputs[i] = hash.String()
-		} else {
-			inputs[i] = "0"
-		}
+	inputs, err := utxosFromInputStates(ctx, req.InputStates, inputSize)
+	if err != nil {
+		return nil, err
 	}
-	outputs := make([]string, inputSize)
-	for i := 0; i < inputSize; i++ {
-		if i < len(req.OutputStates) {
-			state := req.OutputStates[i]
-			coin, err := makeCoin(state.StateDataJson)
-			if err != nil {
-				return nil, i18n.NewError(ctx, msgs.MsgErrorParseOutputStates, err)
-			}
-			hash, err := coin.Hash(ctx)
-			if err != nil {
-				return nil, i18n.NewError(ctx, msgs.MsgErrorHashOutputState, err)
-			}
-			outputs[i] = hash.String()
-		} else {
-			outputs[i] = "0"
-		}
+	outputs, err := utxosFromOutputStates(ctx, req.OutputStates, inputSize)
+	if err != nil {
+		return nil, err
 	}
 
-	data, err := common.EncodeTransactionData(ctx, req.Transaction, types.ZetoTransactionData_V0)
+	data, err := common.EncodeTransactionData(ctx, req.Transaction)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorEncodeTxData, err)
 	}
@@ -304,91 +261,12 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	}, nil
 }
 
-func (h *transferHandler) formatProvingRequest(ctx context.Context, inputCoins, outputCoins []*types.ZetoCoin, circuitId, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
-	inputSize := common.GetInputSize(len(inputCoins))
-	inputCommitments := make([]string, inputSize)
-	inputValueInts := make([]uint64, inputSize)
-	inputSalts := make([]string, inputSize)
-	inputOwner := inputCoins[0].Owner.String()
-	for i := 0; i < inputSize; i++ {
-		if i < len(inputCoins) {
-			coin := inputCoins[i]
-			hash, err := coin.Hash(ctx)
-			if err != nil {
-				return nil, i18n.NewError(ctx, msgs.MsgErrorHashInputState, err)
-			}
-			inputCommitments[i] = hash.Int().Text(16)
-			inputValueInts[i] = coin.Amount.Int().Uint64()
-			inputSalts[i] = coin.Salt.Int().Text(16)
-		} else {
-			inputCommitments[i] = "0"
-			inputSalts[i] = "0"
-		}
-	}
-
-	outputValueInts := make([]uint64, inputSize)
-	outputSalts := make([]string, inputSize)
-	outputOwners := make([]string, inputSize)
-	for i := 0; i < inputSize; i++ {
-		if i < len(outputCoins) {
-			coin := outputCoins[i]
-			outputValueInts[i] = coin.Amount.Int().Uint64()
-			outputSalts[i] = coin.Salt.Int().Text(16)
-			outputOwners[i] = coin.Owner.String()
-		} else {
-			outputSalts[i] = "0"
-		}
-	}
-
-	var extras []byte
-	if common.IsNullifiersCircuit(circuitId) {
-		proofs, extrasObj, err := generateMerkleProofs(ctx, h.callbacks, h.merkleTreeRootSchema, h.merkleTreeNodeSchema, tokenName, stateQueryContext, contractAddress, inputCoins)
-		if err != nil {
-			return nil, i18n.NewError(ctx, msgs.MsgErrorGenerateMTP, err)
-		}
-		for i := len(proofs); i < inputSize; i++ {
-			extrasObj.MerkleProofs = append(extrasObj.MerkleProofs, &smt.Empty_Proof)
-			extrasObj.Enabled = append(extrasObj.Enabled, false)
-		}
-		protoExtras, err := proto.Marshal(extrasObj)
-		if err != nil {
-			return nil, i18n.NewError(ctx, msgs.MsgErrorMarshalExtraObj, err)
-		}
-		extras = protoExtras
-	}
-
-	tokenSecrets, err := marshalTokenSecrets(inputValueInts, outputValueInts)
-	if err != nil {
-		return nil, i18n.NewError(ctx, msgs.MsgErrorMarshalValuesFungible, err)
-	}
-
-	payload := &corepb.ProvingRequest{
-		CircuitId: circuitId,
-		Common: &corepb.ProvingRequestCommon{
-			InputCommitments: inputCommitments,
-			InputSalts:       inputSalts,
-			InputOwner:       inputOwner,
-			OutputSalts:      outputSalts,
-			OutputOwners:     outputOwners,
-			TokenSecrets:     tokenSecrets,
-			TokenType:        corepb.TokenType_fungible,
-		},
-	}
-	if extras != nil {
-		payload.Extras = extras
-	}
-	return proto.Marshal(payload)
-}
-
 func getTransferABI(tokenName string) *abi.Entry {
 	transferFunction := transferABI
 	if common.IsEncryptionToken(tokenName) {
 		transferFunction = transferABI_withEncryption
-		if common.IsNullifiersToken(tokenName) {
-			transferFunction = transferABI_withEncryption_nullifiers
-		}
 	} else if common.IsNullifiersToken(tokenName) {
-		transferFunction = transferABI_nullifiers
+		transferFunction = transferABINullifiers
 	}
 	return transferFunction
 }

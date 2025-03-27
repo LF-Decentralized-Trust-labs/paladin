@@ -13,25 +13,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package integration_test
+package helpers
 
 import (
 	"context"
 	_ "embed"
 	"fmt"
 	"os"
+	"testing"
+
+	"github.com/go-resty/resty/v2"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
+	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 )
 
 //go:embed abis/ZetoFactory.json
 var zetoFactoryJSON []byte
+
+type ZetoDomainConfig struct {
+	DomainContracts zetoDomainContracts `yaml:"contracts"`
+}
 
 type ZetoDomainContracts struct {
 	FactoryAddress       *tktypes.EthAddress
@@ -42,7 +53,7 @@ type ZetoDomainContracts struct {
 }
 
 type cloneableContract struct {
-	circuitId             string
+	circuits              *zetosignerapi.Circuits
 	verifier              string
 	batchVerifier         string
 	depositVerifier       string
@@ -50,6 +61,96 @@ type cloneableContract struct {
 	batchWithdrawVerifier string
 	lockVerifier          string
 	batchLockVerifier     string
+}
+
+type zetoDomainContracts struct {
+	Factory         zetoDomainContract   `yaml:"factory"`
+	Implementations []zetoDomainContract `yaml:"implementations"`
+}
+
+type zetoDomainContract struct {
+	Name                  string                  `yaml:"name"`
+	Verifier              string                  `yaml:"verifier"`
+	BatchVerifier         string                  `yaml:"batchVerifier"`
+	DepositVerifier       string                  `yaml:"depositVerifier"`
+	WithdrawVerifier      string                  `yaml:"withdrawVerifier"`
+	BatchWithdrawVerifier string                  `yaml:"batchWithdrawVerifier"`
+	LockVerifier          string                  `yaml:"lockVerifier"`
+	BatchLockVerifier     string                  `yaml:"batchLockVerifier"`
+	Circuits              *zetosignerapi.Circuits `yaml:"circuits"`
+	AbiAndBytecode        abiAndBytecode          `yaml:"abiAndBytecode"`
+	Libraries             []string                `yaml:"libraries"`
+	Cloneable             bool                    `yaml:"cloneable"`
+}
+
+type abiAndBytecode struct {
+	Path string `yaml:"path"`
+}
+
+type setImplementationParams struct {
+	Name           string             `json:"name"`
+	Implementation implementationInfo `json:"implementation"`
+}
+
+type implementationInfo struct {
+	Implementation string        `json:"implementation"`
+	Verifiers      verifiersInfo `json:"verifiers"`
+}
+
+type verifiersInfo struct {
+	Verifier              string `json:"verifier"`
+	BatchVerifier         string `json:"batchVerifier"`
+	DepositVerifier       string `json:"depositVerifier"`
+	WithdrawVerifier      string `json:"withdrawVerifier"`
+	BatchWithdrawVerifier string `json:"batchWithdrawVerifier"`
+	LockVerifier          string `json:"lockVerifier"`
+	BatchLockVerifier     string `json:"batchLockVerifier"`
+}
+
+func DeployZetoContracts(t *testing.T, hdWalletSeed *testbed.UTInitFunction, configFile string, controller string) *ZetoDomainContracts {
+	ctx := context.Background()
+	log.L(ctx).Infof("Deploy Zeto Contracts")
+
+	tb := testbed.NewTestBed()
+	url, _, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{}, hdWalletSeed)
+	require.NoError(t, err)
+	defer done()
+	rpc := rpcclient.WrapRestyClient(resty.New().SetBaseURL(url))
+
+	var config ZetoDomainConfig
+	testZetoConfigYaml, err := os.ReadFile(configFile)
+	require.NoError(t, err)
+	err = yaml.Unmarshal(testZetoConfigYaml, &config)
+	require.NoError(t, err)
+
+	deployedContracts, err := deployDomainContracts(ctx, rpc, controller, &config)
+	require.NoError(t, err)
+
+	err = configureFactoryContract(ctx, tb, controller, deployedContracts)
+	require.NoError(t, err)
+
+	return deployedContracts
+}
+
+func PrepareZetoConfig(t *testing.T, domainContracts *ZetoDomainContracts, zkpDir string) *zetotypes.DomainFactoryConfig {
+	config := zetotypes.DomainFactoryConfig{
+		SnarkProver: zetosignerapi.SnarkProverConfig{
+			CircuitsDir:    zkpDir,
+			ProvingKeysDir: zkpDir,
+		},
+	}
+
+	var impls []*zetotypes.DomainContract
+	for name, implContract := range domainContracts.cloneableContracts {
+		implContract.circuits.Init()
+		contract := zetotypes.DomainContract{
+			Name:     name,
+			Circuits: implContract.circuits,
+		}
+		impls = append(impls, &contract)
+	}
+	config.DomainContracts.Implementations = impls
+	return &config
 }
 
 func newZetoDomainContracts() *ZetoDomainContracts {
@@ -60,7 +161,7 @@ func newZetoDomainContracts() *ZetoDomainContracts {
 	}
 }
 
-func deployDomainContracts(ctx context.Context, rpc rpcclient.Client, deployer string, config *domainConfig) (*ZetoDomainContracts, error) {
+func deployDomainContracts(ctx context.Context, rpc rpcclient.Client, deployer string, config *ZetoDomainConfig) (*ZetoDomainContracts, error) {
 	if len(config.DomainContracts.Implementations) == 0 {
 		return nil, fmt.Errorf("no implementations specified for factory contract")
 	}
@@ -90,12 +191,12 @@ func deployDomainContracts(ctx context.Context, rpc rpcclient.Client, deployer s
 	return ctrs, nil
 }
 
-func findCloneableContracts(config *domainConfig) map[string]cloneableContract {
+func findCloneableContracts(config *ZetoDomainConfig) map[string]cloneableContract {
 	cloneableContracts := make(map[string]cloneableContract)
 	for _, contract := range config.DomainContracts.Implementations {
 		if contract.Cloneable {
 			cloneableContracts[contract.Name] = cloneableContract{
-				circuitId:             contract.CircuitId,
+				circuits:              contract.Circuits,
 				verifier:              contract.Verifier,
 				batchVerifier:         contract.BatchVerifier,
 				depositVerifier:       contract.DepositVerifier,
@@ -109,7 +210,7 @@ func findCloneableContracts(config *domainConfig) map[string]cloneableContract {
 	return cloneableContracts
 }
 
-func deployImplementations(ctx context.Context, rpc rpcclient.Client, deployer string, contracts []domainContract) (map[string]*tktypes.EthAddress, map[string]abi.ABI, error) {
+func deployImplementations(ctx context.Context, rpc rpcclient.Client, deployer string, contracts []zetoDomainContract) (map[string]*tktypes.EthAddress, map[string]abi.ABI, error) {
 	deployedContracts := make(map[string]*tktypes.EthAddress)
 	deployedContractAbis := make(map[string]abi.ABI)
 	for _, contract := range contracts {
@@ -125,7 +226,7 @@ func deployImplementations(ctx context.Context, rpc rpcclient.Client, deployer s
 	return deployedContracts, deployedContractAbis, nil
 }
 
-func deployContract(ctx context.Context, rpc rpcclient.Client, deployer string, contract *domainContract, deployedContracts map[string]*tktypes.EthAddress) (*tktypes.EthAddress, abi.ABI, error) {
+func deployContract(ctx context.Context, rpc rpcclient.Client, deployer string, contract *zetoDomainContract, deployedContracts map[string]*tktypes.EthAddress) (*tktypes.EthAddress, abi.ABI, error) {
 	if contract.AbiAndBytecode.Path == "" {
 		return nil, nil, fmt.Errorf("no path or JSON specified for the abi and bytecode for contract %s", contract.Name)
 	}
@@ -141,7 +242,7 @@ func deployContract(ctx context.Context, rpc rpcclient.Client, deployer string, 
 	return addr, build.ABI, nil
 }
 
-func getContractSpec(contract *domainContract, deployedContracts map[string]*tktypes.EthAddress) (*solutils.SolidityBuild, error) {
+func getContractSpec(contract *zetoDomainContract, deployedContracts map[string]*tktypes.EthAddress) (*solutils.SolidityBuild, error) {
 	bytes, err := os.ReadFile(contract.AbiAndBytecode.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read abi+bytecode file %s. %s", contract.AbiAndBytecode.Path, err)
@@ -205,8 +306,8 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 	if !ok {
 		return fmt.Errorf("verifier contract %s not found among the deployed contracts", verifierName)
 	}
-	params.Implementation.Verifier = verifierAddr.String()
-	if params.Implementation.Verifier == "" {
+	params.Implementation.Verifiers.Verifier = verifierAddr.String()
+	if params.Implementation.Verifiers.Verifier == "" {
 		return nil
 	}
 
@@ -215,7 +316,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("batch verifier contract %s not found among the deployed contracts", batchVerifierName)
 		}
-		params.Implementation.BatchVerifier = batchVerifierAddr.String()
+		params.Implementation.Verifiers.BatchVerifier = batchVerifierAddr.String()
 	}
 
 	if depositVerifierName != "" {
@@ -223,7 +324,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("deposit verifier contract not found among the deployed contracts")
 		}
-		params.Implementation.DepositVerifier = depositVerifierAddr.String()
+		params.Implementation.Verifiers.DepositVerifier = depositVerifierAddr.String()
 	}
 
 	if withdrawVerifierName != "" {
@@ -231,7 +332,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("withdraw verifier contract not found among the deployed contracts")
 		}
-		params.Implementation.WithdrawVerifier = withdrawVerifierAddr.String()
+		params.Implementation.Verifiers.WithdrawVerifier = withdrawVerifierAddr.String()
 	}
 
 	if batchWithdrawVerifierName != "" {
@@ -239,7 +340,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("batch withdraw verifier contract not found among the deployed contracts")
 		}
-		params.Implementation.BatchWithdrawVerifier = batchWithdrawVerifierAddr.String()
+		params.Implementation.Verifiers.BatchWithdrawVerifier = batchWithdrawVerifierAddr.String()
 	}
 
 	if lockVerifierName != "" {
@@ -247,7 +348,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("lock verifier contract not found among the deployed contracts")
 		}
-		params.Implementation.LockVerifier = lockVerifierAddr.String()
+		params.Implementation.Verifiers.LockVerifier = lockVerifierAddr.String()
 	}
 
 	if batchLockVerifierName != "" {
@@ -255,7 +356,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		if !ok {
 			return fmt.Errorf("batch lock verifier contract not found among the deployed contracts")
 		}
-		params.Implementation.BatchLockVerifier = batchLockVerifierAddr.String()
+		params.Implementation.Verifiers.BatchLockVerifier = batchLockVerifierAddr.String()
 	}
 
 	_, err := tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{

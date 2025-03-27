@@ -13,13 +13,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package integration_test
+package integrationtest
 
 import (
 	"context"
 	_ "embed"
 
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
+	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
@@ -27,13 +28,11 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-//go:embed abis/SampleERC20.json
-var erc20ABI []byte
+//go:embed helpers/abis/Zeto_Anon.json
+var zetoAnonAbi []byte
 
 var (
 	controllerName = "controller"
-	recipient1Name = "recipient1"
-	recipient2Name = "recipient2"
 )
 
 // This is the path to the contracts file
@@ -43,7 +42,7 @@ var contractsFile string
 type zetoDomainTestSuite struct {
 	suite.Suite
 	hdWalletSeed      *testbed.UTInitFunction
-	deployedContracts *ZetoDomainContracts
+	deployedContracts *helpers.ZetoDomainContracts
 	domainName        string
 	domain            zeto.Zeto
 	rpc               rpcclient.Client
@@ -54,18 +53,18 @@ type zetoDomainTestSuite struct {
 func (s *zetoDomainTestSuite) SetupSuite() {
 	log.SetLevel("debug")
 	s.hdWalletSeed = testbed.HDWalletSeedScopedToTest()
-	domainContracts := DeployZetoContracts(s.T(), s.hdWalletSeed, contractsFile, controllerName)
+	domainContracts := helpers.DeployZetoContracts(s.T(), s.hdWalletSeed, contractsFile, controllerName)
 	s.deployedContracts = domainContracts
 	ctx := context.Background()
 	domainName := "zeto_" + tktypes.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
-	config := PrepareZetoConfig(s.T(), s.deployedContracts, "../zkp")
-	zeto, zetoTestbed := newZetoDomain(s.T(), domainContracts, config)
-	done, tb, rpc := newTestbed(s.T(), s.hdWalletSeed, map[string]*testbed.TestbedDomain{
+	config := helpers.PrepareZetoConfig(s.T(), s.deployedContracts, "../zeto/zkp")
+	waitForZeto, zetoTestbed := newZetoDomain(s.T(), config, domainContracts.FactoryAddress)
+	done, _, tb, rpc := newTestbed(s.T(), s.hdWalletSeed, map[string]*testbed.TestbedDomain{
 		domainName: zetoTestbed,
 	})
 	s.domainName = domainName
-	s.domain = zeto
+	s.domain = <-waitForZeto
 	s.rpc = rpc
 	s.tb = tb
 	s.done = done

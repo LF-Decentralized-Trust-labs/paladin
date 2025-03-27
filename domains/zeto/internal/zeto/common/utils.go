@@ -21,11 +21,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"slices"
 
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
@@ -34,45 +33,17 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
+type StateSchemas struct {
+	CoinSchema           *prototk.StateSchema
+	NftSchema            *prototk.StateSchema
+	MerkleTreeRootSchema *prototk.StateSchema
+	MerkleTreeNodeSchema *prototk.StateSchema
+}
+
 const modulus = "21888242871839275222246405745257275088548364400416034343698204186575808495617"
-
-func IsNullifiersCircuit(circuitId string) bool {
-	return IsFungibleNullifiersCircuit(circuitId) || IsNonFungibleNullifiersCircuit(circuitId)
-}
-
-func IsFungibleNullifiersCircuit(circuitId string) bool {
-	nullifierCircuits := []string{
-		constants.CIRCUIT_ANON_NULLIFIER,
-		constants.CIRCUIT_ANON_NULLIFIER_BATCH,
-		constants.CIRCUIT_WITHDRAW_NULLIFIER,
-		constants.CIRCUIT_WITHDRAW_NULLIFIER_BATCH,
-	}
-	return slices.Contains(nullifierCircuits, circuitId)
-}
-
-func IsNonFungibleNullifiersCircuit(circuitId string) bool {
-	return constants.CIRCUIT_NF_ANON_NULLIFIER == circuitId
-}
-
-func IsEncryptionCircuit(circuitId string) bool {
-	encryptionCircuits := []string{
-		constants.CIRCUIT_ANON_ENC,
-		constants.CIRCUIT_ANON_ENC_BATCH,
-	}
-	for _, c := range encryptionCircuits {
-		if circuitId == c {
-			return true
-		}
-	}
-	return false
-}
 
 func IsBatchCircuit(sizeOfEndorsableStates int) bool {
 	return sizeOfEndorsableStates > 2
-}
-
-func IsNonFungibleCircuit(circuitId string) bool {
-	return circuitId == constants.CIRCUIT_NF_ANON || circuitId == constants.CIRCUIT_NF_ANON_NULLIFIER
 }
 
 func IsNullifiersToken(tokenName string) bool {
@@ -118,13 +89,13 @@ func LoadBabyJubKey(payload []byte) (*babyjub.PublicKey, error) {
 	}
 	return keyCompressed.Decompress()
 }
-func EncodeTransactionData(ctx context.Context, transaction *prototk.TransactionSpecification, transactionData ethtypes.HexBytes0xPrefix) (tktypes.HexBytes, error) {
+func EncodeTransactionData(ctx context.Context, transaction *prototk.TransactionSpecification) (tktypes.HexBytes, error) {
 	txID, err := tktypes.ParseHexBytes(ctx, transaction.TransactionId)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorParseTxId, err)
 	}
 	var data []byte
-	data = append(data, transactionData...)
+	data = append(data, types.ZetoTransactionData_V0...)
 	data = append(data, txID...)
 	return data, nil
 }
