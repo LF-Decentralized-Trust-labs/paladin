@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -57,15 +58,17 @@ func TestWithdrawAssemble(t *testing.T) {
 	h := withdrawHandler{
 		baseHandler: baseHandler{
 			name: "test1",
-		},
-		coinSchema: &prototk.StateSchema{
-			Id: "coin",
-		},
-		merkleTreeRootSchema: &prototk.StateSchema{
-			Id: "merkle_tree_root",
-		},
-		merkleTreeNodeSchema: &prototk.StateSchema{
-			Id: "merkle_tree_node",
+			stateSchemas: &common.StateSchemas{
+				CoinSchema: &prototk.StateSchema{
+					Id: "coin",
+				},
+				MerkleTreeRootSchema: &prototk.StateSchema{
+					Id: "merkle_tree_root",
+				},
+				MerkleTreeNodeSchema: &prototk.StateSchema{
+					Id: "merkle_tree_node",
+				},
+			},
 		},
 	}
 	ctx := context.Background()
@@ -80,7 +83,11 @@ func TestWithdrawAssemble(t *testing.T) {
 		Transaction: txSpec,
 		DomainConfig: &types.DomainInstanceConfig{
 			TokenName: "tokenContract1",
-			CircuitId: "circuit1",
+			Circuits: &zetosignerapi.Circuits{
+				"deposit":  &zetosignerapi.Circuit{Name: "circuit-deposit"},
+				"transfer": &zetosignerapi.Circuit{Name: "circuit-transfer"},
+				"withdraw": &zetosignerapi.Circuit{Name: "circuit-withdraw"},
+			},
 		},
 	}
 	req := &prototk.AssembleTransactionRequest{
@@ -151,7 +158,7 @@ func TestWithdrawAssemble(t *testing.T) {
 	assert.Equal(t, "100", *res.AssembledTransaction.DomainData)
 
 	tx.DomainConfig.TokenName = constants.TOKEN_ANON_NULLIFIER
-	tx.DomainConfig.CircuitId = constants.CIRCUIT_ANON_NULLIFIER
+	(*tx.DomainConfig.Circuits)["withdraw"] = &zetosignerapi.Circuit{Name: "withdraw_nullifier", Type: "withdraw", UsesNullifiers: true}
 	called := 0
 	h.callbacks = &testDomainCallbacks{
 		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
@@ -227,6 +234,9 @@ func TestWithdrawPrepare(t *testing.T) {
 		Transaction: txSpec,
 		DomainConfig: &types.DomainInstanceConfig{
 			TokenName: constants.TOKEN_ANON_ENC,
+			Circuits: &zetosignerapi.Circuits{
+				"deposit": &zetosignerapi.Circuit{Name: "circuit-deposit"},
+			},
 		},
 	}
 	amountStr := "100"
@@ -308,7 +318,7 @@ func TestWithdrawPrepare(t *testing.T) {
 	assert.Equal(t, "{\"amount\":\"100\",\"data\":\"0x000100001234567890123456789012345678901234567890123456789012345678901234\",\"inputs\":[\"0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f\",\"0\"],\"output\":\"0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f\",\"proof\":{\"pA\":[\"0x1234567890\",\"0x1234567890\"],\"pB\":[[\"0x1234567890\",\"0x1234567890\"],[\"0x1234567890\",\"0x1234567890\"]],\"pC\":[\"0x1234567890\",\"0x1234567890\"]}}", res.Transaction.ParamsJson)
 
 	tx.DomainConfig.TokenName = constants.TOKEN_ANON_NULLIFIER
-	tx.DomainConfig.CircuitId = constants.CIRCUIT_ANON_NULLIFIER
+	(*tx.DomainConfig.Circuits)["deposit"] = &zetosignerapi.Circuit{Name: "circuit-deposit"}
 	proofReq.PublicInputs = map[string]string{
 		"nullifiers": "0x1234567890,0x1234567890",
 		"root":       "0x1234567890",
@@ -331,7 +341,7 @@ func TestNewWithdrawHandler(t *testing.T) {
 
 	assert.Equal(t, name, handler.name)
 	assert.Equal(t, callbacks, handler.callbacks)
-	assert.Equal(t, coinSchema, handler.coinSchema)
-	assert.Equal(t, merkleTreeRootSchema, handler.merkleTreeRootSchema)
-	assert.Equal(t, merkleTreeNodeSchema, handler.merkleTreeNodeSchema)
+	assert.Equal(t, coinSchema, handler.stateSchemas.CoinSchema)
+	assert.Equal(t, merkleTreeRootSchema, handler.stateSchemas.MerkleTreeRootSchema)
+	assert.Equal(t, merkleTreeNodeSchema, handler.stateSchemas.MerkleTreeNodeSchema)
 }

@@ -47,7 +47,7 @@ type transferHandler struct {
 
 var transferABI = &abi.Entry{
 	Type: abi.Function,
-	Name: "transfer",
+	Name: types.METHOD_TRANSFER,
 	Inputs: abi.ParameterArray{
 		{Name: "input", Type: "uint256"},
 		{Name: "output", Type: "uint256"},
@@ -138,7 +138,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
 	}
-	payloadBytes, err := h.formatProvingRequest(ctx, inputTokens, outputTokens, tx.DomainConfig.CircuitId, tx.DomainConfig.TokenName, req.StateQueryContext, contractAddress)
+	payloadBytes, err := h.formatProvingRequest(ctx, inputTokens, outputTokens, (*tx.DomainConfig.Circuits)[types.METHOD_TRANSFER], tx.DomainConfig.TokenName, req.StateQueryContext, contractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorFormatProvingReq, err)
 	}
@@ -192,7 +192,7 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 		return nil, err
 	}
 
-	data, err := encodeTransactionDataFunc(ctx, req.Transaction, types.ZetoTransactionData_V0)
+	data, err := encodeTransactionDataFunc(ctx, req.Transaction)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorEncodeTxData, err)
 	}
@@ -239,7 +239,7 @@ func prepareState(ctx context.Context, state *pb.EndorsableState) (string, error
 
 }
 
-func (h *transferHandler) formatProvingRequest(ctx context.Context, input, output []*types.ZetoNFToken, circuitId, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
+func (h *transferHandler) formatProvingRequest(ctx context.Context, input, output []*types.ZetoNFToken, circuit *zetosignerapi.Circuit, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
 
 	inputCommitments, inputSalts, tokenURIs, tokenIDs, inputOwners, err := processTokens(ctx, input)
 	if err != nil {
@@ -275,7 +275,7 @@ func (h *transferHandler) formatProvingRequest(ctx context.Context, input, outpu
 	}
 
 	payload := &corepb.ProvingRequest{
-		CircuitId: circuitId,
+		Circuit: circuit.ToProto(),
 		Common: &corepb.ProvingRequestCommon{
 			InputCommitments:  inputCommitments,
 			InputSalts:        inputSalts,

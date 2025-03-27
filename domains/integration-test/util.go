@@ -19,8 +19,10 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
@@ -29,11 +31,67 @@ import (
 	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+const (
+	recipient1Name = "recipient1@node1"
+	recipient2Name = "recipient2@node1"
+	recipient3Name = "recipient3@node1"
+)
+
+type zetoDomainConfig struct {
+	DomainContracts zetoDomainContracts `yaml:"contracts"`
+}
+
+type zetoDomainContracts struct {
+	Factory         zetoDomainContract   `yaml:"factory"`
+	Implementations []zetoDomainContract `yaml:"implementations"`
+}
+
+type zetoDomainContract struct {
+	Name                  string                  `yaml:"name"`
+	Verifier              string                  `yaml:"verifier"`
+	BatchVerifier         string                  `yaml:"batchVerifier"`
+	DepositVerifier       string                  `yaml:"depositVerifier"`
+	WithdrawVerifier      string                  `yaml:"withdrawVerifier"`
+	BatchWithdrawVerifier string                  `yaml:"batchWithdrawVerifier"`
+	LockVerifier          string                  `yaml:"lockVerifier"`
+	BatchLockVerifier     string                  `yaml:"batchLockVerifier"`
+	Circuits              *zetosignerapi.Circuits `yaml:"circuits"`
+	AbiAndBytecode        abiAndBytecode          `yaml:"abiAndBytecode"`
+	Libraries             []string                `yaml:"libraries"`
+	Cloneable             bool                    `yaml:"cloneable"`
+}
+
+type abiAndBytecode struct {
+	Path string `yaml:"path"`
+}
+
+type setImplementationParams struct {
+	Name           string             `json:"name"`
+	Implementation implementationInfo `json:"implementation"`
+}
+
+type implementationInfo struct {
+	Implementation string        `json:"implementation"`
+	Verifiers      verifiersInfo `json:"verifiers"`
+}
+
+type verifiersInfo struct {
+	Verifier              string `json:"verifier"`
+	BatchVerifier         string `json:"batchVerifier"`
+	DepositVerifier       string `json:"depositVerifier"`
+	WithdrawVerifier      string `json:"withdrawVerifier"`
+	BatchWithdrawVerifier string `json:"batchWithdrawVerifier"`
+	LockVerifier          string `json:"lockVerifier"`
+	BatchLockVerifier     string `json:"batchLockVerifier"`
+}
 
 func mapConfig(t *testing.T, config any) (m map[string]any) {
 	configJSON, err := json.Marshal(&config)
@@ -100,4 +158,34 @@ func newZetoDomain(t *testing.T, config *zetotypes.DomainFactoryConfig, factoryA
 		AllowSigning:    true,
 	}
 	return waitForDomain, tbd
+}
+
+func findAvailableCoins[T any](t *testing.T, ctx context.Context, rpc rpcclient.Client, domainName, coinSchemaID, methodName string, address *tktypes.EthAddress, jq *query.QueryJSON, readiness ...func(coins []*T) bool) []*T {
+	if jq == nil {
+		jq = query.NewQueryBuilder().Limit(100).Query()
+	}
+	var states []*T
+notReady:
+	for {
+		rpcerr := rpc.CallRPC(ctx, &states, methodName,
+			domainName,
+			address,
+			coinSchemaID,
+			jq,
+			"available")
+		if rpcerr != nil {
+			require.NoError(t, rpcerr)
+		}
+		for _, fn := range readiness {
+			if t.Failed() {
+				panic("test failed")
+			}
+			if !fn(states) {
+				time.Sleep(100 * time.Millisecond)
+				continue notReady
+			}
+		}
+		break
+	}
+	return states
 }

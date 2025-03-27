@@ -80,10 +80,10 @@ func prepareInputsForTransfer(ctx context.Context, callbacks plugintk.DomainCall
 		expectedTotal = expectedTotal.Add(expectedTotal, param.Amount.Int())
 	}
 
-	return buildInputsForExpectedTotal(ctx, callbacks, coinSchema, useNullifiers, stateQueryContext, senderKey, expectedTotal)
+	return buildInputsForExpectedTotal(ctx, callbacks, coinSchema, useNullifiers, stateQueryContext, senderKey, expectedTotal, false)
 }
 
-func buildInputsForExpectedTotal(ctx context.Context, callbacks plugintk.DomainCallbacks, coinSchema *pb.StateSchema, useNullifiers bool, stateQueryContext, senderKey string, expectedTotal *big.Int) ([]*types.ZetoCoin, []*pb.StateRef, *big.Int, *big.Int, error) {
+func buildInputsForExpectedTotal(ctx context.Context, callbacks plugintk.DomainCallbacks, coinSchema *pb.StateSchema, useNullifiers bool, stateQueryContext, senderKey string, expectedTotal *big.Int, locked bool) ([]*types.ZetoCoin, []*pb.StateRef, *big.Int, *big.Int, error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*pb.StateRef{}
@@ -92,7 +92,8 @@ func buildInputsForExpectedTotal(ctx context.Context, callbacks plugintk.DomainC
 		queryBuilder := query.NewQueryBuilder().
 			Limit(10).
 			Sort(".created").
-			Equal("owner", senderKey)
+			Equal("owner", senderKey).
+			Equal("locked", locked)
 
 		if lastStateTimestamp > 0 {
 			queryBuilder.GreaterThan(".created", lastStateTimestamp)
@@ -127,9 +128,10 @@ func buildInputsForExpectedTotal(ctx context.Context, callbacks plugintk.DomainC
 	}
 }
 
-func prepareOutputsForTransfer(ctx context.Context, useNullifiers bool, params []*types.FungibleTransferParamEntry, resolvedVerifiers []*pb.ResolvedVerifier, coinSchema *prototk.StateSchema, name string) ([]*types.ZetoCoin, []*pb.NewState, error) {
+func prepareOutputsForTransfer(ctx context.Context, useNullifiers bool, params []*types.FungibleTransferParamEntry, resolvedVerifiers []*pb.ResolvedVerifier, coinSchema *prototk.StateSchema, name string, locked ...bool) ([]*types.ZetoCoin, []*pb.NewState, error) {
 	var coins []*types.ZetoCoin
 	var newStates []*pb.NewState
+	isLocked := len(locked) > 0 && locked[0]
 	for _, param := range params {
 		resolvedRecipient := domain.FindVerifier(param.To, getAlgoZetoSnarkBJJ(name), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X, resolvedVerifiers)
 		if resolvedRecipient == nil {
@@ -146,6 +148,7 @@ func prepareOutputsForTransfer(ctx context.Context, useNullifiers bool, params [
 			Salt:   (*tktypes.HexUint256)(salt),
 			Owner:  tktypes.MustParseHexBytes(compressedKeyStr),
 			Amount: param.Amount,
+			Locked: isLocked,
 		}
 
 		newState, err := makeNewState(ctx, coinSchema, useNullifiers, newCoin, name, param.To)

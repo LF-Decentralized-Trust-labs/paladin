@@ -39,30 +39,33 @@ func TestHandleMintEvent(t *testing.T) {
 	}
 	res := &prototk.HandleEventBatchResponse{}
 
+	smtSpec := &merkleTreeSpec{tree: merkleTree, storage: storage}
+
 	// bad transaction data for the mint event - should be logged and move on
-	err = z.handleMintEvent(ctx, merkleTree, storage, ev, "testToken1", res)
+	err = z.handleMintEvent(ctx, smtSpec, ev, "testToken1", res)
 	assert.NoError(t, err)
 	ev.DataJson = "{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleMintEvent(ctx, merkleTree, storage, ev, "testToken1", res)
+	err = z.handleMintEvent(ctx, smtSpec, ev, "testToken1", res)
 	assert.NoError(t, err)
 	ev.DataJson = "{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleMintEvent(ctx, merkleTree, storage, ev, "testToken1", res)
+	err = z.handleMintEvent(ctx, smtSpec, ev, "testToken1", res)
 	assert.NoError(t, err)
 
 	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleMintEvent(ctx, merkleTree, storage, ev, "testToken1", res)
+	err = z.handleMintEvent(ctx, smtSpec, ev, "testToken1", res)
 	assert.NoError(t, err)
 	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res.TransactionsComplete[0].TransactionId)
 
 	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleMintEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleMintEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.ErrorContains(t, err, "PD210061: Failed to update merkle tree for the UTXOMint event. PD210056: Failed to create new node index from hash. 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 
 	storage = smt.NewStatesStorage(testCallbacks, "testToken1", "context1", "merkle_tree_root", "merkle_tree_node")
 	merkleTree, err = smt.NewSmt(storage)
 	require.NoError(t, err)
+	smtSpec.tree = merkleTree
 	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleMintEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleMintEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.NoError(t, err)
 	assert.Len(t, res.TransactionsComplete, 3)
 	newStates, err := storage.GetNewStates()
@@ -86,30 +89,33 @@ func TestHandleTransferEvent(t *testing.T) {
 	}
 	res := &prototk.HandleEventBatchResponse{}
 
+	smtSpec := &merkleTreeSpec{tree: merkleTree, storage: storage}
+
 	// bad data for the transfer event - should be logged and move on
-	err = z.handleTransferEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.NoError(t, err)
 	ev.DataJson = "{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleTransferEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.NoError(t, err)
 	ev.DataJson = "{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleTransferEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.NoError(t, err)
 
 	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleTransferEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.NoError(t, err)
 	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res.TransactionsComplete[0].TransactionId)
 
 	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleTransferEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.ErrorContains(t, err, "PD210061: Failed to update merkle tree for the UTXOTransfer event. PD210056: Failed to create new node index from hash. 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 
 	storage = smt.NewStatesStorage(testCallbacks, "testToken1", "context1", "merkle_tree_root", "merkle_tree_node")
 	merkleTree, err = smt.NewSmt(storage)
 	require.NoError(t, err)
+	smtSpec.tree = merkleTree
 	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleTransferEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.NoError(t, err)
 	assert.Len(t, res.TransactionsComplete, 3)
 	// assert.Len(t, res6.NewStates, 2)
@@ -130,32 +136,70 @@ func TestHandleTransferWithEncryptionEvent(t *testing.T) {
 	}
 	res := &prototk.HandleEventBatchResponse{}
 
+	smtSpec := &merkleTreeSpec{tree: merkleTree, storage: storage}
+
 	// bad data for the transfer event - should be logged and move on
-	err = z.handleTransferWithEncryptionEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferWithEncryptionEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.NoError(t, err)
 	ev.DataJson = "{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleTransferWithEncryptionEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferWithEncryptionEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.NoError(t, err)
 	ev.DataJson = "{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleTransferWithEncryptionEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferWithEncryptionEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.NoError(t, err)
 
 	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleTransferWithEncryptionEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferWithEncryptionEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.NoError(t, err)
 	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res.TransactionsComplete[0].TransactionId)
 
 	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleTransferWithEncryptionEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferWithEncryptionEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.ErrorContains(t, err, "PD210061: Failed to update merkle tree for the UTXOTransferWithEncryptedValues event. PD210056: Failed to create new node index from hash. 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 
 	storage = smt.NewStatesStorage(testCallbacks, "testToken1", "context1", "merkle_tree_root", "merkle_tree_node")
 	merkleTree, err = smt.NewSmt(storage)
 	require.NoError(t, err)
+	smtSpec.tree = merkleTree
 	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleTransferWithEncryptionEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleTransferWithEncryptionEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.NoError(t, err)
 	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res.TransactionsComplete[0].TransactionId)
+}
+
+func TestHandleLockedEvent(t *testing.T) {
+	z, testCallbacks := newTestZeto()
+	storage1 := smt.NewStatesStorage(testCallbacks, "testToken1", "context1", "merkle_tree_root", "merkle_tree_node")
+	merkleTree1, err := smt.NewSmt(storage1)
+	require.NoError(t, err)
+	storage2 := smt.NewStatesStorage(testCallbacks, "testToken2", "context1", "merkle_tree_root", "merkle_tree_node")
+	merkleTree2, err := smt.NewSmt(storage2)
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	ev := &prototk.OnChainEvent{
+		DataJson:          "bad json",
+		SoliditySignature: "event UTXOsLocked(uint256[] inputs, uint256[] outputs, uint256[] lockedOutputs, address indexed delegate, address indexed submitter, bytes data)",
+	}
+	res := &prototk.HandleEventBatchResponse{}
+
+	smtSpec1 := &merkleTreeSpec{tree: merkleTree1, storage: storage1}
+	smtSpec2 := &merkleTreeSpec{tree: merkleTree2, storage: storage2}
+
+	// bad data for the locked event - should be logged and move on
+	err = z.handleLockedEvent(ctx, smtSpec1, smtSpec2, ev, "Zeto_AnonNullifier", res)
+	assert.NoError(t, err)
+	ev.DataJson = "{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	err = z.handleLockedEvent(ctx, smtSpec1, smtSpec2, ev, "Zeto_AnonNullifier", res)
+	assert.NoError(t, err)
+	ev.DataJson = "{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	err = z.handleLockedEvent(ctx, smtSpec1, smtSpec2, ev, "Zeto_AnonNullifier", res)
+	assert.NoError(t, err)
+
+	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	err = z.handleLockedEvent(ctx, smtSpec1, smtSpec2, ev, "Zeto_AnonNullifier", res)
+	assert.NoError(t, err)
+	assert.Len(t, res.TransactionsComplete, 1)
 }
 
 func TestUpdateMerkleTree(t *testing.T) {
@@ -182,20 +226,22 @@ func TestHandleWithdrawEvent(t *testing.T) {
 	}
 	res := &prototk.HandleEventBatchResponse{}
 
+	smtSpec := &merkleTreeSpec{tree: merkleTree, storage: storage}
+
 	// bad data for the withdraw event - should be logged and move on
-	err = z.handleWithdrawEvent(ctx, merkleTree, storage, ev, "Zeto_Anon", res)
+	err = z.handleWithdrawEvent(ctx, smtSpec, ev, "Zeto_Anon", res)
 	assert.NoError(t, err)
 
 	ev.DataJson = "{\"data\":\"0x0001\",\"inputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"output\":\"7980718117603030807695495350922077879582656644717071592146865497574198464253\",\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleWithdrawEvent(ctx, merkleTree, storage, ev, "Zeto_Anon", res)
+	err = z.handleWithdrawEvent(ctx, smtSpec, ev, "Zeto_Anon", res)
 	assert.NoError(t, err)
 
 	ev.DataJson = "{\"data\":\"0x0001ffff\",\"inputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"output\":\"7980718117603030807695495350922077879582656644717071592146865497574198464253\",\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleWithdrawEvent(ctx, merkleTree, storage, ev, "Zeto_Anon", res)
+	err = z.handleWithdrawEvent(ctx, smtSpec, ev, "Zeto_Anon", res)
 	assert.NoError(t, err)
 
 	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"output\":\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
-	err = z.handleWithdrawEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	err = z.handleWithdrawEvent(ctx, smtSpec, ev, "Zeto_AnonNullifier", res)
 	assert.ErrorContains(t, err, "PD210061: Failed to update merkle tree for the UTXOWithdraw event. PD210056: Failed to create new node index from hash. 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 }
 
@@ -205,31 +251,4 @@ func TestParseStatesFromEvent(t *testing.T) {
 	assert.Len(t, states, 2)
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000001234", states[0].Id)
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", states[1].Id)
-}
-func TestHandleLockedEvent(t *testing.T) {
-	z, _ := newTestZeto()
-	ctx := context.Background()
-
-	ev := &prototk.OnChainEvent{
-		DataJson:          "bad json",
-		SoliditySignature: "event Locked(bytes data)",
-	}
-	res := &prototk.HandleEventBatchResponse{}
-
-	// bad data for the locked event - should be logged and move on
-	err := z.handleLockedEvent(ctx, ev, res)
-	assert.NoError(t, err)
-
-	ev.DataJson = "{\"data\":\"0x0001\"}"
-	err = z.handleLockedEvent(ctx, ev, res)
-	assert.NoError(t, err)
-
-	ev.DataJson = "{\"data\":\"0x0001ffff\"}"
-	err = z.handleLockedEvent(ctx, ev, res)
-	assert.NoError(t, err)
-
-	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\"}"
-	err = z.handleLockedEvent(ctx, ev, res)
-	assert.NoError(t, err)
-	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res.TransactionsComplete[0].TransactionId)
 }

@@ -8,50 +8,38 @@
     "pente_factory": {
         "filename": "test/e2e/abis/PenteFactory.json"
     },
-    "zeto_g16_verifier_anon": {
+    "zeto_g16_anon": {
         "filename": "test/e2e/abis/zeto/Groth16Verifier_Anon.json"
     },
-    "zeto_g16_verifier_anon_batch": {
+    "zeto_g16_anon_batch": {
         "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonBatch.json"
     },
-    "zeto_g16_verifier_anon_enc": {
+    "zeto_g16_anon_enc": {
         "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonEnc.json"
     },
-    "zeto_g16_verifier_anon_enc_batch": {
+    "zeto_g16_anon_enc_batch": {
         "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonEncBatch.json"
     },
-    "zeto_g16_verifier_anon_nullifier": {
-        "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonNullifier.json"
+    "zeto_g16_anon_nullifier_transfer": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonNullifierTransfer.json"
     },
-    "zeto_g16_verifier_anon_nullifier_batch": {
-        "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonNullifierBatch.json"
+    "zeto_g16_anon_nullifier_transfer_batch": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonNullifierTransferBatch.json"
     },
-    "zeto_g16_check_hashes_value": {
-        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckHashesValue.json"
+    "zeto_g16_deposit": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_Deposit.json"
     },
-    "zeto_g16_check_inputs_outputs": {
-        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckInputsOutputsValue.json"
+    "zeto_g16_withdraw": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_Withdraw.json"
     },
-    "zeto_g16_check_inputs_outputs_batch": {
-        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckInputsOutputsValueBatch.json"
+    "zeto_g16_withdraw_batch": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_WithdrawBatch.json"
     },
-    "zeto_g16_check_nullifier": {
-        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckNullifierValue.json"
+    "zeto_g16_withdraw_nullifier": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_WithdrawNullifier.json"
     },
-    "zeto_g16_check_nullifier_batch": {
-        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckNullifierValueBatch.json"
-    },
-    "zeto_g16_check_nullifiers_owner": {
-        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckNullifiersOwner.json"
-    },
-    "zeto_g16_check_nullifiers_owner_batch": {
-        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckNullifiersOwnerBatch.json"
-    },
-    "zeto_g16_check_utxos_owner": {
-        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckUtxosOwner.json"
-    },
-    "zeto_g16_check_utxos_owner_batch": {
-        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckUtxosOwnerBatch.json"
+    "zeto_g16_withdraw_nullifier_batch": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_WithdrawNullifierBatch.json"
     },
     "zeto_poseidon_unit2l": {
         "filename": "test/e2e/abis/zeto/Poseidon2.json"

@@ -5,6 +5,12 @@ db:
     dsn: ':memory:'
     autoMigrate: true
     migrationsDir: '../../core/go/db/migrations/sqlite'
+# type: postgres
+# postgres:
+#   dsn: 'postgres://postgres:my-secret@localhost:5432/postgres?sslmode=disable'
+#   autoMigrate: true
+#   migrationsDir: '../../../core/go/db/migrations/postgres'
+#   debugQueries: false
 rpcServer:
   http:
     port: 0
@@ -28,15 +34,15 @@ log:
   file:
     filename: build/testbed.domain-integration-test.log
 wallets:
-- name: wallet1
-  keySelector: .*
-  signer:
-    keyDerivation:
-      type: "bip32"
-    keyStore:
-      type: "static"
-      static:
-        keys:
-          seed:
-            encoding: none
-            inline: REPLACED BY GENERATED KEY IN TEST
+  - name: wallet1
+    keySelector: .*
+    signer:
+      keyDerivation:
+        type: 'bip32'
+      keyStore:
+        type: 'static'
+        static:
+          keys:
+            seed:
+              encoding: none
+              inline: REPLACED BY GENERATED KEY IN TEST

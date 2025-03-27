@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package common
 
 import (
 	"math/big"

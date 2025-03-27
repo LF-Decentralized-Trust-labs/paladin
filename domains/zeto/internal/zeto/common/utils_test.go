@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 
@@ -16,28 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// IsFungibleNullifiersCircuit
-func TestIsFungibleNullifiersCircuit(t *testing.T) {
-	assert.True(t, IsFungibleNullifiersCircuit(constants.CIRCUIT_ANON_NULLIFIER))
-	assert.True(t, IsFungibleNullifiersCircuit(constants.CIRCUIT_ANON_NULLIFIER_BATCH))
-	assert.True(t, IsFungibleNullifiersCircuit(constants.CIRCUIT_WITHDRAW_NULLIFIER))
-	assert.True(t, IsFungibleNullifiersCircuit(constants.CIRCUIT_WITHDRAW_NULLIFIER_BATCH))
-	assert.False(t, IsFungibleNullifiersCircuit("other"))
-}
-
-// IsNonFungibleNullifiersCircuit
-func TestIsNonFungibleNullifiersCircuit(t *testing.T) {
-	assert.True(t, IsNonFungibleNullifiersCircuit(constants.CIRCUIT_NF_ANON_NULLIFIER))
-	assert.False(t, IsNonFungibleNullifiersCircuit("other"))
-}
-
-// IsNonFungibleCircuit
-func TestIsNonFungibleCircuit(t *testing.T) {
-	assert.True(t, IsNonFungibleCircuit(constants.CIRCUIT_NF_ANON))
-	assert.True(t, IsNonFungibleCircuit(constants.CIRCUIT_NF_ANON_NULLIFIER))
-	assert.False(t, IsNonFungibleCircuit("other"))
-}
 
 // IsNullifiersToken
 func TestIsNullifiersToken(t *testing.T) {
@@ -99,24 +76,21 @@ func TestEncodeProof(t *testing.T) {
 // TestEncodeTransactionData uses a table-driven approach to test both valid and invalid scenarios.
 func TestEncodeTransactionData(t *testing.T) {
 	tests := map[string]struct {
-		transactionId   string
-		transactionData ethtypes.HexBytes0xPrefix
-		expected        tktypes.HexBytes
-		expectError     bool
+		transactionId string
+		expected      tktypes.HexBytes
+		expectError   bool
 	}{
 		"valid": {
-			transactionId:   "0x1234",
-			transactionData: ethtypes.HexBytes0xPrefix{0xab, 0xcd},
+			transactionId: "0x1234",
 			// Expected: transactionData appended with the parsed TransactionId.
 			// "0x1234" → []byte{0x12, 0x34} so the expected result is {0xab, 0xcd, 0x12, 0x34}
-			expected:    []byte{0xab, 0xcd, 0x12, 0x34},
+			expected:    []byte{0x0, 0x1, 0x0, 0x0, 0x12, 0x34},
 			expectError: false,
 		},
 		"invalid TransactionId": {
-			transactionId:   "invalid",
-			transactionData: ethtypes.HexBytes0xPrefix{0xab, 0xcd},
-			expected:        nil,
-			expectError:     true,
+			transactionId: "invalid",
+			expected:      nil,
+			expectError:   true,
 		},
 	}
 
@@ -126,7 +100,7 @@ func TestEncodeTransactionData(t *testing.T) {
 			txn := &prototk.TransactionSpecification{
 				TransactionId: tc.transactionId,
 			}
-			result, err := EncodeTransactionData(ctx, txn, tc.transactionData)
+			result, err := EncodeTransactionData(ctx, txn)
 			if tc.expectError {
 				assert.Error(t, err, "expected an error when transactionId is invalid")
 				assert.Nil(t, result)

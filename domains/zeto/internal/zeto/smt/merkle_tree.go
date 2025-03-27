@@ -44,3 +44,7 @@ func NewSmt(storage StatesStorage) (core.SparseMerkleTree, error) {
 func MerkleTreeName(tokenName string, domainInstanceContract *tktypes.EthAddress) string {
 	return "smt_" + tokenName + "_" + domainInstanceContract.String()
 }
+
+func MerkleTreeNameForLockedStates(tokenName string, domainInstanceContract *tktypes.EthAddress) string {
+	return "smtLocked_" + tokenName + "_" + domainInstanceContract.String()
+}

@@ -482,13 +482,8 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 
 		})
 
-		getEthAddress := func(identity, node string) tktypes.EthAddress {
-			addr, err := rpc[node].PTX().ResolveVerifier(ctx, fmt.Sprintf("%s@%s", identity, node), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
-			Expect(err).To(BeNil())
-			return *tktypes.MustEthAddress(addr)
-		}
 		getERC20Balance := func(identity, node string) *tktypes.HexUint256 {
-			addr := getEthAddress(identity, node)
+			addr := getEthAddress(ctx, rpc[node], identity, node)
 			type ercBalanceOf struct {
 				Param0 *tktypes.HexUint256 `json:"0"`
 			}
@@ -524,7 +519,7 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 					Group: penteGroupNodes1and2,
 					To:    *erc20StarsAddr,
 					Inputs: map[string]any{
-						"to":     getEthAddress("seren", "node1"),
+						"to":     getEthAddress(ctx, rpc["node1"], "seren", "node1"),
 						"amount": with18Decimals(1977),
 					},
 				}).
@@ -556,7 +551,7 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 					Group: penteGroupNodes1and2,
 					To:    *erc20StarsAddr,
 					Inputs: map[string]any{
-						"to":    getEthAddress("sally", "node2"),
+						"to":    getEthAddress(ctx, rpc["node2"], "sally", "node2"),
 						"value": with18Decimals(42),
 					},
 				}).
@@ -600,7 +595,7 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 				"from": "%s",
 				"to": "%s",
 				"value": "42000000000000000000"
-			}`, getEthAddress("seren", "node1"), getEthAddress("sally", "node2"))))
+			}`, getEthAddress(ctx, rpc["node1"], "seren", "node1"), getEthAddress(ctx, rpc["node2"], "sally", "node2"))))
 		})
 
 		It("check ERC-20 balance of Seren and Sally", func() {
@@ -754,3 +749,9 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 		})
 	})
 })
+
+func getEthAddress(ctx context.Context, rpc pldclient.PaladinClient, identity, node string) tktypes.EthAddress {
+	addr, err := rpc.PTX().ResolveVerifier(ctx, fmt.Sprintf("%s@%s", identity, node), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	Expect(err).To(BeNil())
+	return *tktypes.MustEthAddress(addr)
+}

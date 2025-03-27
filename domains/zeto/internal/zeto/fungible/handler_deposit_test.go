@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -55,9 +56,11 @@ func TestDepositAssemble(t *testing.T) {
 	h := depositHandler{
 		baseHandler: baseHandler{
 			name: "test1",
-		},
-		coinSchema: &prototk.StateSchema{
-			Id: "coin",
+			stateSchemas: &common.StateSchemas{
+				CoinSchema: &prototk.StateSchema{
+					Id: "coin",
+				},
+			},
 		},
 	}
 	ctx := context.Background()
@@ -72,7 +75,9 @@ func TestDepositAssemble(t *testing.T) {
 		Transaction: txSpec,
 		DomainConfig: &types.DomainInstanceConfig{
 			TokenName: "tokenContract1",
-			CircuitId: "circuit1",
+			Circuits: &zetosignerapi.Circuits{
+				"deposit": &zetosignerapi.Circuit{Name: "circuit-deposit"},
+			},
 		},
 	}
 	req := &prototk.AssembleTransactionRequest{
@@ -207,5 +212,5 @@ func TestNewDepositHandler(t *testing.T) {
 
 	assert.NotNil(t, handler)
 	assert.Equal(t, name, handler.name)
-	assert.Equal(t, coinSchema, handler.coinSchema)
+	assert.Equal(t, coinSchema, handler.stateSchemas.CoinSchema)
 }

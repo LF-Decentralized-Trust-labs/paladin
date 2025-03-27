@@ -19,6 +19,10 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
+    zetoArtifacts {
+        canBeConsumed = false
+        canBeResolved = true
+    }
 
     // Consumable configurations
     buildSDK {
@@ -29,6 +33,7 @@ configurations {
 
 dependencies {
     contractCompile project(path: ":solidity", configuration: "compiledContracts")
+    zetoArtifacts project(path: ":domains:zeto", configuration: "zetoArtifacts")
 }
 
 task install(type: Exec) {
@@ -46,6 +51,7 @@ task copyABI(type: Exec, dependsOn: install) {
     args 'abi'
 
     inputs.files(configurations.contractCompile)
+    inputs.files(configurations.zetoArtifacts)
     outputs.dir('src/domains/abis')
 }
 
@@ -61,6 +67,7 @@ task build(type: Exec, dependsOn: [install, copyABI]) {
 task clean(type: Delete) {
     delete "node_modules"
     delete "build"
+    delete "src/domains/abis"
 }
 
 dependencies {

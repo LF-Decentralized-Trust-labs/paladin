@@ -2,6 +2,7 @@ import { TransactionType } from "../interfaces";
 import PaladinClient from "../paladin";
 import { PaladinVerifier } from "../verifier";
 import * as zetoPrivateJSON from "./abis/IZetoFungible.json";
+import * as zetoPublicJSON from "./abis/Zeto_Anon.json";
 
 const POLL_TIMEOUT_MS = 10000;
 
@@ -10,6 +11,7 @@ export interface ZetoOptions {
 }
 
 const zetoAbi = zetoPrivateJSON.abi;
+const zetoPublicAbi = zetoPublicJSON.abi;
 
 export const zetoConstructorABI = {
   type: "constructor",
@@ -29,8 +31,19 @@ export interface ZetoTransferParams {
 }
 
 export interface ZetoLockParams {
+  amount: number;
   delegate: string;
-  call: string;
+}
+
+export interface ZetoTransferLockedParams {
+  lockedInputs: string[];
+  delegate: string;
+  transfers: ZetoTransfer[];
+}
+
+export interface ZetoDelegateLockParams {
+  utxos: string[];
+  delegate: string;
 }
 
 export interface ZetoSetERC20Params {
@@ -137,14 +150,16 @@ export class ZetoInstance {
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
   }
 
-  prepareTransfer(from: PaladinVerifier, data: ZetoTransferParams) {
+  prepareTransferLocked(from: PaladinVerifier, data: ZetoTransferLockedParams) {
     return this.paladin.prepareTransaction({
       type: TransactionType.PRIVATE,
       abi: zetoAbi,
-      function: "transfer",
+      function: "transferLocked",
       to: this.address,
       from: from.lookup,
       data: {
+        lockedInputs: data.lockedInputs,
+        delegate: data.delegate,
         transfers: data.transfers.map((t) => ({ ...t, to: t.to.lookup })),
       },
     });
@@ -158,6 +173,22 @@ export class ZetoInstance {
       to: this.address,
       from: from.lookup,
       data,
+    });
+    return this.paladin.pollForReceipt(txID, POLL_TIMEOUT_MS);
+  }
+
+  async delegateLock(from: PaladinVerifier, data: ZetoDelegateLockParams) {
+    const txID = await this.paladin.sendTransaction({
+      type: TransactionType.Public,
+      abi: zetoPublicAbi,
+      function: "delegateLock",
+      to: this.address,
+      from: from.lookup,
+      data: {
+        data: "0x",
+        utxos: data.utxos,
+        delegate: data.delegate,
+      },
     });
     return this.paladin.pollForReceipt(txID, POLL_TIMEOUT_MS);
   }
