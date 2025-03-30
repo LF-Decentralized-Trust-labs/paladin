@@ -32,7 +32,7 @@ Because the base ledger smart contract cannot access or leak the data involved i
 2. A zero-knowledge proof is verified during execution of the transaction
     - The smart contract uses advanced cryptography to verify the rules were obeyed
     - Anyone can submit a transaction, as long as it comes with a suitable proof
-    - Example 1: a cash token with total conversation of value and ownership enforced via ZKP
+    - Example 1: a cash token with total conservation of value and ownership enforced via ZKP
     - Example 2: a non-fungible token with uniqueness and ownership enforced via ZKP
 
 There are strong reasons why both of these approaches exist - some related to efficiency/performance, and others related to fundamental characteristics of each model. The Paladin project embraces both approaches, and allows them coexist and interoperate atomically.
