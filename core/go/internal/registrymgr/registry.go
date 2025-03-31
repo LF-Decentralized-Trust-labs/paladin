@@ -159,7 +159,7 @@ func (r *registry) UpsertRegistryRecords(ctx context.Context, req *prototk.Upser
 	return &prototk.UpsertRegistryRecordsResponse{}, nil
 }
 
-func (r *registry) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, batch *blockindexer.EventDeliveryBatch) error {
+func (r *registry) handleEventBatch(ctx context.Context, batch *blockindexer.EventDeliveryBatch) (func(persistence.DBTX) error, error) {
 
 	// Build the proto version of these events
 	events := make([]*prototk.OnChainEvent, len(batch.Events))
@@ -183,11 +183,13 @@ func (r *registry) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, 
 		Events:  events,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Upsert any transport details that are detected by the registry
-	return r.upsertRegistryRecords(ctx, dbTX, res.Entries, res.Properties)
+	return func(dbTX persistence.DBTX) error {
+		return r.upsertRegistryRecords(ctx, dbTX, res.Entries, res.Properties)
+	}, nil
 
 }
 

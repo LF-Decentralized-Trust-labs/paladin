@@ -17,6 +17,7 @@ package txmgr
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"sync/atomic"
@@ -51,7 +52,7 @@ func rpcTestRequest(method string, params ...any) (uint64, []byte) {
 	return reqID, []byte(tktypes.JSONString((req)).Pretty())
 }
 
-func TestRPCEventListenerE2E(t *testing.T) {
+func TestRPCReceiptListenerE2E(t *testing.T) {
 	ctx, url, txm, done := newTestTransactionManagerWithWebSocketRPC(t)
 	defer done()
 
@@ -166,7 +167,7 @@ func TestRPCEventListenerE2E(t *testing.T) {
 
 }
 
-func TestRPCEventListenerE2ENack(t *testing.T) {
+func TestRPCReceiptListenerE2ENack(t *testing.T) {
 	ctx, url, txm, done := newTestTransactionManagerWithWebSocketRPC(t)
 	defer done()
 
@@ -275,6 +276,83 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 	<-unSubChan
 
 }
+
+// func TestRPCEventListenerE2E(t *testing.T) {
+// 	ctx, url, txm, done := newTestTransactionManagerWithWebSocketRPC(t,
+// 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+// 			// mockKeyResolver := componentmocks.NewKeyResolver(t)
+// 			// mockKeyResolver.On("ResolveKey")
+// 			// mc.keyManager.On("KeyResolverForDBTX", mock.Anything).Return(mockKeyResolver)
+// 		})
+// 	defer done()
+
+// 	wscConf, err := rpcclient.ParseWSConfig(ctx, &pldconf.WSClientConfig{
+// 		HTTPClientConfig: pldconf.HTTPClientConfig{URL: url},
+// 	})
+// 	require.NoError(t, err)
+
+// 	err = txm.CreateReceiptListener(ctx, &pldapi.TransactionReceiptListener{
+// 		Name: "listener1",
+// 	})
+// 	require.NoError(t, err)
+
+// 	wsc, err := wsclient.New(ctx, wscConf, nil, nil)
+// 	require.NoError(t, err)
+// 	err = wsc.Connect()
+// 	require.NoError(t, err)
+// 	defer wsc.Close()
+
+// 	subReqID, req := rpcTestRequest("ptx_subscribe", "receipts", "listener1")
+// 	err = wsc.Send(ctx, req)
+// 	require.NoError(t, err)
+
+// 	build, err := solutils.LoadBuild(context.Background(), simpleStorageBuildJSON)
+// 	require.NoError(t, err)
+
+// 	ids, err := txm.sendTransactionsNewDBTX(ctx, []*pldapi.TransactionInput{{
+// 		ABI:      build.ABI,
+// 		Bytecode: build.Bytecode,
+// 		TransactionBase: pldapi.TransactionBase{
+// 			Type: pldapi.TransactionTypePublic.Enum(),
+// 			From: "test",
+// 			Data: tktypes.RawJSON(`{"x":"22"}`),
+// 		},
+// 	}})
+// 	require.NoError(t, err)
+
+// 	deployed := make(chan bool, 1)
+
+// 	go func() {
+// 		for payload := range wsc.Receive() {
+// 			var rpcPayload *rpcclient.RPCResponse
+// 			err := json.Unmarshal(payload, &rpcPayload)
+// 			require.NoError(t, err)
+
+// 			if rpcPayload.Error != nil {
+// 				require.NoError(t, rpcPayload.Error)
+// 			}
+
+// 			if rpcPayload.Method == "ptx_subscription" {
+// 				var batchPayload pldapi.JSONRPCSubscriptionNotification[pldapi.TransactionReceiptBatch]
+// 				err := json.Unmarshal(rpcPayload.Params.Bytes(), &batchPayload)
+// 				require.NoError(t, err)
+
+// 				for _, r := range batchPayload.Result.Receipts {
+// 					if r.ID == ids[0] {
+// 						deployed <- true
+// 					}
+// 				}
+
+// 				_, req := rpcTestRequest("ptx_ack", subReqID) // TODO AM: not this id
+// 				err = wsc.Send(ctx, req)
+// 				require.NoError(t, err)
+// 			}
+// 		}
+// 	}()
+
+// 	<-deployed
+
+// }
 
 func TestRPCSubscribeNoType(t *testing.T) {
 	ctx, url, txm, done := newTestTransactionManagerWithWebSocketRPC(t)

@@ -227,7 +227,7 @@ func (bi *blockIndexer) Stop() {
 	if wasStarted {
 		bi.eventStreamsLock.Lock()
 		for _, es := range bi.eventStreams {
-			es.stop()
+			es.stop(false)
 		}
 		bi.eventStreamsLock.Unlock()
 

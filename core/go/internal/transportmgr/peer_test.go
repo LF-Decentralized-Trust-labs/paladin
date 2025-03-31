@@ -169,6 +169,7 @@ func TestReliableMessageResendRealDB(t *testing.T) {
 
 }
 
+// TODO AM: this is the failing test
 func TestReliableMessageSendSendQuiesceRealDB(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, true,
@@ -181,6 +182,7 @@ func TestReliableMessageSendSendQuiesceRealDB(t *testing.T) {
 	defer done()
 
 	log.SetLevel("debug")
+	fmt.Println("a")
 
 	tm.sendShortRetry = retry.NewRetryLimited(&pldconf.RetryConfigWithMax{
 		MaxAttempts: confutil.P(1),

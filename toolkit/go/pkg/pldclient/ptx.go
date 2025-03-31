@@ -66,10 +66,18 @@ type PTX interface {
 	StopReceiptListener(ctx context.Context, listenerName string) (success bool, err error)
 	DeleteReceiptListener(ctx context.Context, listenerName string) (success bool, err error)
 
+	CreateBlockchainEventListener(ctx context.Context, listener *pldapi.BlockchainEventListener) (success bool, err error)
+	QueryBlockchainEventListeners(ctx context.Context, jq *query.QueryJSON) (listeners []*pldapi.BlockchainEventListener, err error)
+	GetBlockchainEventListener(ctx context.Context, listenerName string) (listener *pldapi.BlockchainEventListener, err error)
+	StartBlockchainEventListener(ctx context.Context, listenerName string) (success bool, err error)
+	StopBlockchainEventListener(ctx context.Context, listenerName string) (success bool, err error)
+	DeleteBlockchainEventListener(ctx context.Context, listenerName string) (success bool, err error)
+
 	SubscribeReceipts(ctx context.Context, listenerName string) (sub rpcclient.Subscription, err error)
+	SubscribeBlockchainEvents(ctx context.Context, listenerName string) (sub rpcclient.Subscription, err error)
 }
 
-var ptxReceiptsSubscriptionConfig = rpcclient.SubscriptionConfig{
+var ptxSubscriptionConfig = rpcclient.SubscriptionConfig{
 	SubscribeMethod:    "ptx_subscribe",
 	UnsubscribeMethod:  "ptx_unsubscribe",
 	NotificationMethod: "ptx_subscription",
@@ -205,11 +213,40 @@ var ptxInfo = &rpcModuleInfo{
 			Inputs: []string{"listenerName"},
 			Output: "success",
 		},
+		"ptx_createBlockchainEventListener": {
+			Inputs: []string{"listener"},
+			Output: "success",
+		},
+		"ptx_queryBlockchainEventListeners": {
+			Inputs: []string{"query"},
+			Output: "listeners",
+		},
+		"ptx_getBlockchainEventListener": {
+			Inputs: []string{"listenerName"},
+			Output: "listener",
+		},
+		"ptx_startBlockchainEventListener": {
+			Inputs: []string{"listenerName"},
+			Output: "success",
+		},
+		"ptx_stopBlockchainEventListener": {
+			Inputs: []string{"listenerName"},
+			Output: "success",
+		},
+		"ptx_deleteBlockchainEventListener": {
+			Inputs: []string{"listenerName"},
+			Output: "success",
+		},
 	},
 	subscriptions: []RPCSubscriptionInfo{
 		{
-			SubscriptionConfig: ptxReceiptsSubscriptionConfig,
+			SubscriptionConfig: ptxSubscriptionConfig,
 			FixedInputs:        []string{"receipts"},
+			Inputs:             []string{"listenerName"},
+		},
+		{
+			SubscriptionConfig: ptxSubscriptionConfig,
+			FixedInputs:        []string{"blockchainevents"},
 			Inputs:             []string{"listenerName"},
 		},
 	},
@@ -379,10 +416,48 @@ func (p *ptx) DeleteReceiptListener(ctx context.Context, listenerName string) (s
 	return
 }
 
+func (p *ptx) CreateBlockchainEventListener(ctx context.Context, listener *pldapi.BlockchainEventListener) (success bool, err error) {
+	err = p.c.CallRPC(ctx, &success, "ptx_createBlockchainEventListener", listener)
+	return
+}
+
+func (p *ptx) QueryBlockchainEventListeners(ctx context.Context, jq *query.QueryJSON) (listeners []*pldapi.BlockchainEventListener, err error) {
+	err = p.c.CallRPC(ctx, &listeners, "ptx_queryBlockchainEventListeners", jq)
+	return
+}
+
+func (p *ptx) GetBlockchainEventListener(ctx context.Context, listenerName string) (listener *pldapi.BlockchainEventListener, err error) {
+	err = p.c.CallRPC(ctx, &listener, "ptx_getBlockchainEventListener", listenerName)
+	return
+}
+
+func (p *ptx) StartBlockchainEventListener(ctx context.Context, listenerName string) (success bool, err error) {
+	err = p.c.CallRPC(ctx, &success, "ptx_startBlockchainEventListener", listenerName)
+	return
+}
+
+func (p *ptx) StopBlockchainEventListener(ctx context.Context, listenerName string) (success bool, err error) {
+	err = p.c.CallRPC(ctx, &success, "ptx_stopBlockchainEventListener", listenerName)
+	return
+}
+
+func (p *ptx) DeleteBlockchainEventListener(ctx context.Context, listenerName string) (success bool, err error) {
+	err = p.c.CallRPC(ctx, &success, "ptx_deleteBlockchainEventListener", listenerName)
+	return
+}
+
 func (p *ptx) SubscribeReceipts(ctx context.Context, listenerName string) (sub rpcclient.Subscription, err error) {
 	ws, err := p.c.WSClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return ws.Subscribe(ctx, ptxReceiptsSubscriptionConfig, "receipts", listenerName)
+	return ws.Subscribe(ctx, ptxSubscriptionConfig, "receipts", listenerName)
+}
+
+func (p *ptx) SubscribeBlockchainEvents(ctx context.Context, listenerName string) (sub rpcclient.Subscription, err error) {
+	ws, err := p.c.WSClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return ws.Subscribe(ctx, ptxSubscriptionConfig, "blockchainevents", listenerName)
 }

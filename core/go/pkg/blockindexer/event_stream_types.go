@@ -124,7 +124,7 @@ type EventDeliveryBatch struct {
 
 type PreCommitHandler func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) error
 
-type InternalStreamCallback func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error
+type InternalStreamCallback func(ctx context.Context, batch *EventDeliveryBatch) (func(dbTX persistence.DBTX) error, error)
 
 type IESType int
 

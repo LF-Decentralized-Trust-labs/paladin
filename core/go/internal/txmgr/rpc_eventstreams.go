@@ -192,7 +192,7 @@ func (sub *listenerSubscription) DeliverReceiptBatch(ctx context.Context, batchI
 	}
 }
 
-func (sub *listenerSubscription) DeliverEventBatch(ctx context.Context, batchID uuid.UUID, events []*pldapi.EventWithData) error {
+func (sub *listenerSubscription) DeliverBlockchainEventBatch(ctx context.Context, batchID uuid.UUID, events []*pldapi.EventWithData) error {
 	log.L(ctx).Infof("Delivering event batch %d to subscription %s over JSON/RPC", batchID, sub.ctrl.ID())
 
 	sub.ctrl.Send("ptx_subscription", &pldapi.JSONRPCSubscriptionNotification[pldapi.TransactionEventBatch]{

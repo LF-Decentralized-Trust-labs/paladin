@@ -508,7 +508,7 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 }
 
 func TestEngineSuspendResumeRealDB(t *testing.T) {
-
+	fmt.Println("aa")
 	ctx, ptm, m, done := newTestPublicTxManager(t, true, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Manager.Interval = confutil.P("50ms")
 		conf.Orchestrator.Interval = confutil.P("50ms")

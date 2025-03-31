@@ -78,7 +78,7 @@ type ReceiptReceiver interface {
 }
 
 type BlockchainEventReceiver interface {
-	DeliverEventBatch(ctx context.Context, batchID uuid.UUID, receipts []*pldapi.EventWithData) error
+	DeliverBlockchainEventBatch(ctx context.Context, batchID uuid.UUID, events []*pldapi.EventWithData) error
 }
 
 type ReceiverCloser interface {

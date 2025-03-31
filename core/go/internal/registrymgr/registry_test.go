@@ -570,7 +570,11 @@ func TestHandleEventBatchOk(t *testing.T) {
 	}
 
 	err := tp.r.rm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
-		return tp.r.handleEventBatch(ctx, dbTX, batch)
+		fn, err := tp.r.handleEventBatch(ctx, batch)
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	require.NoError(t, err)
 
@@ -604,7 +608,11 @@ func TestHandleEventBatchError(t *testing.T) {
 	}
 
 	err := tp.r.rm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
-		return tp.r.handleEventBatch(ctx, dbTX, batch)
+		fn, err := tp.r.handleEventBatch(ctx, batch)
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	require.Regexp(t, "pop", err)
 

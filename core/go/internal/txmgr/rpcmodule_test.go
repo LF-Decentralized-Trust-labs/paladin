@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
@@ -667,7 +668,7 @@ func TestRPCReceiptListenersCRUDRealDB(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, *boolRes)
 
-	// Duplpicate
+	// Duplicate
 	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_createReceiptListener", &pldapi.TransactionReceiptListener{
 		Name: "listener1",
 	})
@@ -755,4 +756,85 @@ func TestRPCReceiptListenersCRUDRealDB(t *testing.T) {
 
 }
 
-// TODO AM TestRPCEventListenersCRUDRealDB
+func TestRPCBlockchainEventListenersCRUD(t *testing.T) {
+	// this test doesn't use the DB because all persistence is done in the block indexer component
+	// it is still valuable for testing the RPC layer though and a component test covers the full stack
+	id := uuid.New()
+	name := "listener1"
+	testABI := abi.ABI{{Type: abi.Event, Name: "Event1"}}
+	address := tktypes.RandAddress()
+	eventStreamSources := blockindexer.EventSources{{
+		ABI:     testABI,
+		Address: address,
+	}}
+	es := &blockindexer.EventStream{
+		ID:      id,
+		Name:    name,
+		Started: confutil.P(true),
+		Sources: eventStreamSources,
+	}
+
+	ctx, url, _, done := newTestTransactionManagerWithRPC(t, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+
+		mc.blockIndexer.On("AddEventStream", mock.Anything, mock.Anything, mock.Anything).
+			Return(es, nil)
+		mc.blockIndexer.On("QueryEventStreamDefinitions", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return([]*blockindexer.EventStream{es}, nil)
+		mc.blockIndexer.On("StartEventStream", mock.Anything, id).Return(nil)
+		mc.blockIndexer.On("StopEventStream", mock.Anything, id).Return(nil)
+		mc.blockIndexer.On("RemoveEventStream", mock.Anything, id).Return(nil)
+	})
+	defer done()
+
+	rpcClient, err := rpcclient.NewHTTPClient(ctx, &pldconf.HTTPClientConfig{URL: url})
+	require.NoError(t, err)
+
+	eventListener := pldapi.BlockchainEventListener{
+		Name:    name,
+		Started: confutil.P(true),
+		Sources: []pldapi.BlockchainEventListenerSource{{
+			ABI:     testABI,
+			Address: address,
+		}},
+	}
+
+	// Create listener
+	var boolRes *bool
+	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_createBlockchainEventListener", eventListener)
+	require.NoError(t, err)
+	assert.True(t, *boolRes)
+
+	// Query listener
+	var listeners []*pldapi.BlockchainEventListener
+	err = rpcClient.CallRPC(ctx, &listeners, "ptx_queryBlockchainEventListeners", query.NewQueryBuilder().Limit(1).Query())
+	require.NoError(t, err)
+	require.Len(t, listeners, 1)
+	require.NotNil(t, listeners[0])
+	assert.Equal(t, eventListener, *listeners[0])
+
+	// Get listener
+	var l *pldapi.BlockchainEventListener
+	err = rpcClient.CallRPC(ctx, &l, "ptx_getBlockchainEventListener", "listener1")
+	require.NoError(t, err)
+	require.NotNil(t, l)
+	assert.Equal(t, eventListener, *l)
+
+	// Stop listener
+	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_stopBlockchainEventListener", "listener1")
+	require.NoError(t, err)
+	assert.True(t, *boolRes)
+
+	// Start listener
+	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_startBlockchainEventListener", "listener1")
+	require.NoError(t, err)
+	assert.True(t, *boolRes)
+
+	// Delete listener
+	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_deleteBlockchainEventListener", "listener1")
+	require.NoError(t, err)
+	assert.True(t, *boolRes)
+
+	err = rpcClient.CallRPC(ctx, &l, "ptx_getBlockchainEventListener", "listener1")
+	require.NoError(t, err)
+	assert.Nil(t, l)
+}
