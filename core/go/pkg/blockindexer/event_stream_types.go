@@ -124,6 +124,10 @@ type EventDeliveryBatch struct {
 
 type PreCommitHandler func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) error
 
+// A stream callback may return a function that executes as part of the same DB transaction that the eventstream checkpoint is committed
+// it is important that there is no blocking or slow operations in this function as it will stall any other eventstreams that need to write
+// a checkpoint. Any blocking or slow operations (e.g. waiting on an external consumer to ack an event) should be performed as part of the
+// callback function itself.
 type InternalStreamCallback func(ctx context.Context, batch *EventDeliveryBatch) (func(dbTX persistence.DBTX) error, error)
 
 type IESType int

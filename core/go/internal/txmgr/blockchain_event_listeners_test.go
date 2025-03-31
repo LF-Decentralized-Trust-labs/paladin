@@ -507,10 +507,11 @@ func TestHandleEventBatch(t *testing.T) {
 		},
 	})
 
-	el.handleEventBatch(context.Background(), &blockindexer.EventDeliveryBatch{
+	_, err := el.handleEventBatch(context.Background(), &blockindexer.EventDeliveryBatch{
 		BatchID: testBatchID,
 		Events:  testEvents,
 	})
+	require.NoError(t, err)
 
 	r.Close()
 

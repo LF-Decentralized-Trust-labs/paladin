@@ -169,7 +169,6 @@ func TestReliableMessageResendRealDB(t *testing.T) {
 
 }
 
-// TODO AM: this is the failing test
 func TestReliableMessageSendSendQuiesceRealDB(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, true,

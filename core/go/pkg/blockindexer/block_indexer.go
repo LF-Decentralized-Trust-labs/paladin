@@ -52,7 +52,6 @@ type BlockIndexer interface {
 	AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error)
 	RemoveEventStream(ctx context.Context, id uuid.UUID) error
 	QueryEventStreamDefinitions(ctx context.Context, dbTX persistence.DBTX, esType tktypes.Enum[EventStreamType], jq *query.QueryJSON) ([]*EventStream, error)
-	// TODO AM: need to be able to create an event stream that starts indexing from a later block (and latest?)
 	StartEventStream(ctx context.Context, id uuid.UUID) error
 	StopEventStream(ctx context.Context, id uuid.UUID) error
 	GetIndexedBlockByNumber(ctx context.Context, number uint64) (*pldapi.IndexedBlock, error)
@@ -227,7 +226,8 @@ func (bi *blockIndexer) Stop() {
 	if wasStarted {
 		bi.eventStreamsLock.Lock()
 		for _, es := range bi.eventStreams {
-			es.stop(false)
+			// no possibility of error if not updating DB
+			_ = es.stop(false)
 		}
 		bi.eventStreamsLock.Unlock()
 

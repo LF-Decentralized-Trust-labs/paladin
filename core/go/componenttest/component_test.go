@@ -94,7 +94,8 @@ func TestRunSimpleStorageEthTransaction(t *testing.T) {
 					eventData <- e.Data.String()
 				}
 			}
-			subNotification.Ack(ctx)
+			err = subNotification.Ack(ctx)
+			require.NoError(t, err)
 		}
 	}()
 

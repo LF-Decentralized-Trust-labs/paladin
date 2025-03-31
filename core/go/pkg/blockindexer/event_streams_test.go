@@ -18,6 +18,7 @@ package blockindexer
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1086,4 +1087,39 @@ func TestEventSourcesHashing(t *testing.T) {
 	_, err := ess.Hash(context.Background())
 	assert.Regexp(t, "FF22025", err)
 
+}
+
+func TestRunBatchHandlerError(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &pldconf.BlockIndexerConfig{})
+	defer done()
+
+	p.Mock.ExpectBegin()
+	p.Mock.ExpectBegin()
+	p.Mock.ExpectExec("INSERT.*event_stream_checkpoints").WillReturnResult(driver.ResultNoRows)
+	p.Mock.ExpectCommit()
+	returnErr := true
+
+	es := &eventStream{
+		bi:  bi,
+		ctx: ctx,
+		definition: &EventStream{
+			ID: uuid.New(),
+			Sources: []EventStreamSource{{
+				ABI: testABI,
+			}},
+		},
+		handler: func(_ context.Context, _ *EventDeliveryBatch) (func(persistence.DBTX) error, error) {
+			if returnErr {
+				returnErr = false
+				return func(persistence.DBTX) error {
+					return errors.New("pop")
+				}, nil
+			}
+			return nil, nil
+		},
+	}
+
+	err := es.runBatch(&eventBatch{})
+	assert.NoError(t, err)
+	assert.False(t, returnErr)
 }

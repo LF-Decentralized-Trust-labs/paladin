@@ -223,7 +223,7 @@ func (tm *txManager) validateBlockchainEventListenerSpec(ctx context.Context, sp
 		return err
 	}
 
-	if spec.Sources == nil || len(spec.Sources) == 0 {
+	if len(spec.Sources) == 0 {
 		return i18n.NewError(ctx, msgs.MsgTxMgrBlockchainEventListenerNoSources, spec.Name)
 	}
 

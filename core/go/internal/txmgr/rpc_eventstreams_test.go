@@ -26,12 +26,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -277,82 +280,134 @@ func TestRPCReceiptListenerE2ENack(t *testing.T) {
 
 }
 
-// func TestRPCEventListenerE2E(t *testing.T) {
-// 	ctx, url, txm, done := newTestTransactionManagerWithWebSocketRPC(t,
-// 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-// 			// mockKeyResolver := componentmocks.NewKeyResolver(t)
-// 			// mockKeyResolver.On("ResolveKey")
-// 			// mc.keyManager.On("KeyResolverForDBTX", mock.Anything).Return(mockKeyResolver)
-// 		})
-// 	defer done()
+func TestRPCEventListenerE2E(t *testing.T) {
+	ctx, url, txm, done := newTestTransactionManagerWithWebSocketRPC(t,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.blockIndexer.On("AddEventStream", mock.Anything, mock.Anything, mock.Anything).Return(&blockindexer.EventStream{
+				ID: uuid.New(),
+			}, nil)
+			mc.blockIndexer.On("StopEventStream", mock.Anything, mock.Anything).Return(nil)
+		})
+	defer done()
 
-// 	wscConf, err := rpcclient.ParseWSConfig(ctx, &pldconf.WSClientConfig{
-// 		HTTPClientConfig: pldconf.HTTPClientConfig{URL: url},
-// 	})
-// 	require.NoError(t, err)
+	wscConf, err := rpcclient.ParseWSConfig(ctx, &pldconf.WSClientConfig{
+		HTTPClientConfig: pldconf.HTTPClientConfig{URL: url},
+	})
+	require.NoError(t, err)
 
-// 	err = txm.CreateReceiptListener(ctx, &pldapi.TransactionReceiptListener{
-// 		Name: "listener1",
-// 	})
-// 	require.NoError(t, err)
+	err = txm.CreateBlockchainEventListener(ctx, &pldapi.BlockchainEventListener{
+		Name: "listener1",
+		Sources: []pldapi.BlockchainEventListenerSource{{
+			ABI: abi.ABI{{
+				Name: "DataStored",
+				Inputs: abi.ParameterArray{
+					{Name: "data", Type: "uint256"},
+				},
+				Type: abi.Event,
+			}},
+		}},
+	})
+	require.NoError(t, err)
 
-// 	wsc, err := wsclient.New(ctx, wscConf, nil, nil)
-// 	require.NoError(t, err)
-// 	err = wsc.Connect()
-// 	require.NoError(t, err)
-// 	defer wsc.Close()
+	wsc, err := wsclient.New(ctx, wscConf, nil, nil)
+	require.NoError(t, err)
+	err = wsc.Connect()
+	require.NoError(t, err)
+	defer wsc.Close()
 
-// 	subReqID, req := rpcTestRequest("ptx_subscribe", "receipts", "listener1")
-// 	err = wsc.Send(ctx, req)
-// 	require.NoError(t, err)
+	_, req := rpcTestRequest("ptx_subscribe", "blockchainevents")
+	err = wsc.Send(ctx, req)
+	require.NoError(t, err)
 
-// 	build, err := solutils.LoadBuild(context.Background(), simpleStorageBuildJSON)
-// 	require.NoError(t, err)
+	payload := <-wsc.Receive()
 
-// 	ids, err := txm.sendTransactionsNewDBTX(ctx, []*pldapi.TransactionInput{{
-// 		ABI:      build.ABI,
-// 		Bytecode: build.Bytecode,
-// 		TransactionBase: pldapi.TransactionBase{
-// 			Type: pldapi.TransactionTypePublic.Enum(),
-// 			From: "test",
-// 			Data: tktypes.RawJSON(`{"x":"22"}`),
-// 		},
-// 	}})
-// 	require.NoError(t, err)
+	var subscribeErrResponse *rpcclient.RPCResponse
+	err = json.Unmarshal(payload, &subscribeErrResponse)
+	require.NoError(t, err)
+	require.ErrorContains(t, subscribeErrResponse.Error, "PD012249")
 
-// 	deployed := make(chan bool, 1)
+	_, req = rpcTestRequest("ptx_subscribe", "blockchainevents", "listener1")
+	err = wsc.Send(ctx, req)
+	require.NoError(t, err)
 
-// 	go func() {
-// 		for payload := range wsc.Receive() {
-// 			var rpcPayload *rpcclient.RPCResponse
-// 			err := json.Unmarshal(payload, &rpcPayload)
-// 			require.NoError(t, err)
+	payload = <-wsc.Receive()
 
-// 			if rpcPayload.Error != nil {
-// 				require.NoError(t, rpcPayload.Error)
-// 			}
+	var subscribeResponse *rpcclient.RPCResponse
+	err = json.Unmarshal(payload, &subscribeResponse)
+	require.NoError(t, err)
+	require.Nil(t, subscribeResponse.Error)
+	subID := subscribeResponse.Result.StringValue()
 
-// 			if rpcPayload.Method == "ptx_subscription" {
-// 				var batchPayload pldapi.JSONRPCSubscriptionNotification[pldapi.TransactionReceiptBatch]
-// 				err := json.Unmarshal(rpcPayload.Params.Bytes(), &batchPayload)
-// 				require.NoError(t, err)
+	// there should be exactly one blockchain event listener- find it and send a batch of events
+	require.Contains(t, txm.blockchainEventListeners, "listener1")
+	el := txm.blockchainEventListeners["listener1"]
+	require.NotNil(t, el)
 
-// 				for _, r := range batchPayload.Result.Receipts {
-// 					if r.ID == ids[0] {
-// 						deployed <- true
-// 					}
-// 				}
+	go func() {
+		<-wsc.Receive()
 
-// 				_, req := rpcTestRequest("ptx_ack", subReqID) // TODO AM: not this id
-// 				err = wsc.Send(ctx, req)
-// 				require.NoError(t, err)
-// 			}
-// 		}
-// 	}()
+		_, req := rpcTestRequest("ptx_nack", subID)
+		err = wsc.Send(ctx, req)
+		require.NoError(t, err)
 
-// 	<-deployed
+		payload := <-wsc.Receive()
 
-// }
+		var batchResponse *rpcclient.RPCResponse
+		err = json.Unmarshal(payload, &batchResponse)
+		require.NoError(t, err)
+
+		var batchPayload pldapi.JSONRPCSubscriptionNotification[pldapi.TransactionEventBatch]
+		err := json.Unmarshal(batchResponse.Params.Bytes(), &batchPayload)
+		require.NoError(t, err)
+
+		require.Len(t, batchPayload.Result.Events, 2)
+
+		_, req = rpcTestRequest("ptx_ack", subID)
+		err = wsc.Send(ctx, req)
+		require.NoError(t, err)
+
+		<-wsc.Receive()
+
+		_, req = rpcTestRequest("ptx_unsubscribe", subID)
+		err = wsc.Send(ctx, req)
+		require.NoError(t, err)
+	}()
+
+	batch1 := &blockindexer.EventDeliveryBatch{
+		Events: []*pldapi.EventWithData{
+			{
+				IndexedEvent: &pldapi.IndexedEvent{
+					BlockNumber: 1,
+				},
+			},
+			{
+				IndexedEvent: &pldapi.IndexedEvent{
+					BlockNumber: 2,
+				},
+			},
+		},
+	}
+
+	_, err = el.handleEventBatch(ctx, batch1)
+	require.ErrorContains(t, err, "PD012243")
+
+	_, err = el.handleEventBatch(ctx, batch1)
+	require.NoError(t, err)
+
+	batch2 := &blockindexer.EventDeliveryBatch{
+		Events: []*pldapi.EventWithData{
+			{
+				IndexedEvent: &pldapi.IndexedEvent{
+					BlockNumber: 3,
+				},
+			},
+		},
+	}
+
+	_, err = el.handleEventBatch(ctx, batch2)
+	require.ErrorContains(t, err, "PD012242")
+
+}
 
 func TestRPCSubscribeNoType(t *testing.T) {
 	ctx, url, txm, done := newTestTransactionManagerWithWebSocketRPC(t)

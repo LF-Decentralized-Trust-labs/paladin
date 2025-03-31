@@ -107,7 +107,8 @@ func (bi *blockIndexer) AddEventStream(ctx context.Context, dbTX persistence.DBT
 	es.definition.Started = confutil.P(es.definition.Started == nil || *es.definition.Started)
 
 	if blockIndexerStarted && *es.definition.Started {
-		bi.startEventStream(es, false)
+		// no possibility of error if not updating DB
+		_ = bi.startEventStream(es, false)
 	}
 	return es.definition, nil
 }
@@ -267,7 +268,8 @@ func (bi *blockIndexer) RemoveEventStream(ctx context.Context, id uuid.UUID) err
 		log.L(ctx).Errorf("Failed to delete event stream %s: %s", id, err)
 		return err
 	}
-	es.stop(false)
+	// no possibility of error if not updating DB
+	_ = es.stop(false)
 	delete(bi.eventStreams, id)
 	delete(bi.eventStreamsHeadSet, id)
 	return nil
@@ -319,7 +321,8 @@ func (bi *blockIndexer) getStreamList() []*eventStream {
 func (bi *blockIndexer) startEventStreams() {
 	for _, es := range bi.getStreamList() {
 		if es.definition.Started == nil || *es.definition.Started {
-			es.start(false)
+			// no possibility of error if not updating DB
+			_ = es.start(false)
 		}
 	}
 }
@@ -549,7 +552,6 @@ func (es *eventStream) dispatcher() {
 			timeoutContext = es.ctx
 		}
 		select {
-		// TODO AM: is there an issue with writing more events to this channel?
 		case d := <-es.dispatch:
 			if batch == nil {
 				batch = &eventBatch{
@@ -597,40 +599,34 @@ func (es *eventStream) dispatcher() {
 
 func (es *eventStream) runBatch(batch *eventBatch) error {
 
-	// We start a database transaction, run the callback function
+	// run the callback function, then start a database transaction,
 	return es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
-		// TODO AM: this is the problem- we create DB transaction which cannot complete until the consumer acks the batch
-		// for internal event streams this isn't a problem
-		// I think this maybe needs to be separated into two for internal and external where
-		// external does not get a dbTX
-		// alternative is handler returns the DB function to be ran here
 		fn, err := es.handler(es.ctx, &batch.EventDeliveryBatch)
-		if err != nil {
-			return true, err
-		}
-		err = es.bi.persistence.Transaction(es.ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
-			if fn != nil {
-				err := fn(dbTX)
-				if err != nil {
-					return err // TODO AM: add test for this
+		if err == nil {
+			err = es.bi.persistence.Transaction(es.ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
+				if fn != nil {
+					err := fn(dbTX)
+					if err != nil {
+						return err
+					}
 				}
-			}
-			// commit the checkpoint
-			return dbTX.DB().
-				WithContext(ctx).
-				Table("event_stream_checkpoints").
-				Clauses(clause.OnConflict{
-					Columns: []clause.Column{{Name: "stream"}},
-					DoUpdates: clause.AssignmentColumns([]string{
-						"block_number",
-					}),
-				}).
-				Create(&EventStreamCheckpoint{
-					Stream:      es.definition.ID,
-					BlockNumber: int64(batch.checkpointAfterBatch),
-				}).
-				Error
-		})
+				// commit the checkpoint
+				return dbTX.DB().
+					WithContext(ctx).
+					Table("event_stream_checkpoints").
+					Clauses(clause.OnConflict{
+						Columns: []clause.Column{{Name: "stream"}},
+						DoUpdates: clause.AssignmentColumns([]string{
+							"block_number",
+						}),
+					}).
+					Create(&EventStreamCheckpoint{
+						Stream:      es.definition.ID,
+						BlockNumber: int64(batch.checkpointAfterBatch),
+					}).
+					Error
+			})
+		}
 		return true, err
 	})
 
