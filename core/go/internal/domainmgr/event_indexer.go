@@ -183,83 +183,84 @@ func (d *domain) batchEventsByAddress(ctx context.Context, dbTX persistence.DBTX
 	return batches, nil
 }
 
-func (d *domain) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, batch *blockindexer.EventDeliveryBatch) error {
-
-	// First index any domain contract deployments
-	nonDeployEvents, txCompletions, err := d.dm.registrationIndexer(ctx, dbTX, batch)
-	if err != nil {
-		return err
-	}
-
-	// Then divide remaining events by contract address and dispatch to the appropriate domain context
-	batchesByAddress, err := d.batchEventsByAddress(ctx, dbTX, batch.BatchID.String(), nonDeployEvents)
-	if err != nil {
-		return err
-	}
-	for addr, batch := range batchesByAddress {
-		res, err := d.handleEventBatchForContract(ctx, dbTX, addr, batch)
+func (d *domain) handleEventBatch(ctx context.Context, batch *blockindexer.EventDeliveryBatch) (func(dbTX persistence.DBTX) error, error) {
+	return func(dbTX persistence.DBTX) error {
+		// First index any domain contract deployments
+		nonDeployEvents, txCompletions, err := d.dm.registrationIndexer(ctx, dbTX, batch)
 		if err != nil {
 			return err
 		}
-		for _, txCompletionEvent := range res.TransactionsComplete {
-			var txHash tktypes.Bytes32
-			txID, err := d.recoverTransactionID(ctx, txCompletionEvent.TransactionId)
-			if err == nil {
-				txHash, err = tktypes.ParseBytes32(txCompletionEvent.Location.TransactionHash)
-			}
+
+		// Then divide remaining events by contract address and dispatch to the appropriate domain context
+		batchesByAddress, err := d.batchEventsByAddress(ctx, dbTX, batch.BatchID.String(), nonDeployEvents)
+		if err != nil {
+			return err
+		}
+		for addr, batch := range batchesByAddress {
+			res, err := d.handleEventBatchForContract(ctx, dbTX, addr, batch)
 			if err != nil {
 				return err
 			}
-			log.L(ctx).Infof("Domain transaction completion: %s", txID)
-			completion := &components.TxCompletion{
-				PSC: batch.psc,
-				ReceiptInput: components.ReceiptInput{
-					TransactionID: *txID,
-					Domain:        d.name,
-					ReceiptType:   components.RT_Success,
-					OnChain: tktypes.OnChainLocation{
-						Type:             tktypes.OnChainEvent, // the on-chain confirmation is an event (even though it's a private transaction we're confirming)
-						TransactionHash:  txHash,
-						BlockNumber:      txCompletionEvent.Location.BlockNumber,
-						TransactionIndex: txCompletionEvent.Location.TransactionIndex,
-						LogIndex:         txCompletionEvent.Location.LogIndex,
-						Source:           &addr,
+			for _, txCompletionEvent := range res.TransactionsComplete {
+				var txHash tktypes.Bytes32
+				txID, err := d.recoverTransactionID(ctx, txCompletionEvent.TransactionId)
+				if err == nil {
+					txHash, err = tktypes.ParseBytes32(txCompletionEvent.Location.TransactionHash)
+				}
+				if err != nil {
+					return err
+				}
+				log.L(ctx).Infof("Domain transaction completion: %s", txID)
+				completion := &components.TxCompletion{
+					PSC: batch.psc,
+					ReceiptInput: components.ReceiptInput{
+						TransactionID: *txID,
+						Domain:        d.name,
+						ReceiptType:   components.RT_Success,
+						OnChain: tktypes.OnChainLocation{
+							Type:             tktypes.OnChainEvent, // the on-chain confirmation is an event (even though it's a private transaction we're confirming)
+							TransactionHash:  txHash,
+							BlockNumber:      txCompletionEvent.Location.BlockNumber,
+							TransactionIndex: txCompletionEvent.Location.TransactionIndex,
+							LogIndex:         txCompletionEvent.Location.LogIndex,
+							Source:           &addr,
+						},
 					},
-				},
+				}
+				txCompletions = append(txCompletions, completion)
 			}
-			txCompletions = append(txCompletions, completion)
-		}
-	}
-
-	if len(txCompletions) > 0 {
-		// Ensure we are sorted in block order, as the above processing extracted the array in two
-		// phases (contract deployments, then transactions) so the list will be out of order.
-		sort.Sort(txCompletions)
-
-		receipts := make([]*components.ReceiptInput, len(txCompletions))
-		for i, txc := range txCompletions {
-			receipts[i] = &txc.ReceiptInput
 		}
 
-		// We have completions to hand to the TxManager to write as completions
-		// Note we go directly to the TxManager (bypassing the private TX manager) during the database
-		// transaction to write these receipts. We only write receipts for transactions where
-		// we are the sender.
-		//
-		// Note separately below there is a notification to the private TX manager (after DB commit)
-		// for ALL private transactions (not just those where we're the sender) as there
-		// might be in-memory coordination activities that need to re-process now these
-		// transactions have been finalized.
-		err = d.dm.txManager.FinalizeTransactions(ctx, dbTX, receipts)
-		if err != nil {
-			return err
-		}
-	}
+		if len(txCompletions) > 0 {
+			// Ensure we are sorted in block order, as the above processing extracted the array in two
+			// phases (contract deployments, then transactions) so the list will be out of order.
+			sort.Sort(txCompletions)
 
-	dbTX.AddPostCommit(func(txCtx context.Context) {
-		d.dm.notifyTransactions(txCompletions)
-	})
-	return nil
+			receipts := make([]*components.ReceiptInput, len(txCompletions))
+			for i, txc := range txCompletions {
+				receipts[i] = &txc.ReceiptInput
+			}
+
+			// We have completions to hand to the TxManager to write as completions
+			// Note we go directly to the TxManager (bypassing the private TX manager) during the database
+			// transaction to write these receipts. We only write receipts for transactions where
+			// we are the sender.
+			//
+			// Note separately below there is a notification to the private TX manager (after DB commit)
+			// for ALL private transactions (not just those where we're the sender) as there
+			// might be in-memory coordination activities that need to re-process now these
+			// transactions have been finalized.
+			err = d.dm.txManager.FinalizeTransactions(ctx, dbTX, receipts)
+			if err != nil {
+				return err
+			}
+		}
+
+		dbTX.AddPostCommit(func(txCtx context.Context) {
+			d.dm.notifyTransactions(txCompletions)
+		})
+		return nil
+	}, nil
 }
 
 func (d *domain) recoverTransactionID(ctx context.Context, txIDString string) (*uuid.UUID, error) {

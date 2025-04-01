@@ -45,6 +45,13 @@ var IndexedEventFilters filters.FieldSet = filters.FieldMap{
 	"signature":        filters.HexBytesField("signature"),
 }
 
+var EventStreamFilters filters.FieldSet = filters.FieldMap{
+	"name":    filters.StringField("name"),
+	"created": filters.TimestampField("created"),
+	"started": filters.BooleanField("started"),
+	"type":    filters.StringField("type"),
+}
+
 // Contains additional data that the block indexer does not persist, but allows other code to process
 // and persist during PreCommitHandlers and PostCommitHandlers (no JSON serialization for these)
 type IndexedTransactionNotify struct {

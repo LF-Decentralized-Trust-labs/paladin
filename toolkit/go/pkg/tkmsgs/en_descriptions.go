@@ -167,6 +167,15 @@ var (
 	TransactionReceiptFiltersDomain                         = pdm("TransactionReceiptFilters.domain", "Only deliver receipts for an individual domain (only valid with type=private)")
 	TransactionReceiptOptionsDomainReceipts                 = pdm("TransactionReceiptOptions.domainReceipts", "When true, a full domain receipt will be generated for each event with complete state data")
 	TransactionReceiptOptionsIncompleteStateReceiptBehavior = pdm("TransactionReceiptOptions.incompleteStateReceiptBehavior", "When set to 'block_contract', if a transaction with incomplete state data is detected then delivery of all receipts on that individual smart contract address will pause until the missing state arrives. Receipts for other contract addresses continue to be delivered")
+	BlockchainEventListenerName                             = pdm("BlockchainEventListener.name", "Unique name for the blockchain event listener")
+	BlockchainEventListenerCreated                          = pdm("BlockchainEventListener.created", "Time the listener was created")
+	BlockchainEventListenerStarted                          = pdm("BlockchainEventListener.started", "If the listener is started - can be set to false to disable delivery server-side")
+	BlockchainEventListenerSources                          = pdm("BlockchainEventListener.sources", "Sources of events")
+	BlockchainEventListenerOptions                          = pdm("BlockchainEventListener.options", "Options for the event listener")
+	BlockchainEventListenerOptionsBatchSize                 = pdm("BlockchainEventListenerOptions.batchSize", "The maximum number of events to deliver in each batch")
+	BlockchainEventListenerOptionsBatchTimeout              = pdm("BlockchainEventListenerOptions.batchTimeout", "The maximum time to wait for a batch to fill before delivering")
+	BlockchainEventListenerSourceABI                        = pdm("BlockchainEventListenerSource.abi", "The ABI containing events to listen for")
+	BlockchainEventListenerSourceAddress                    = pdm("BlockchainEventListenerSource.address", "The address to listen for events from")
 )
 
 // query/query_json.go

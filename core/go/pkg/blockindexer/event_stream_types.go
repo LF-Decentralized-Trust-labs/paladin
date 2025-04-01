@@ -44,12 +44,14 @@ var EventStreamDefaults = &EventStreamConfig{
 type EventStreamType string
 
 const (
-	EventStreamTypeInternal EventStreamType = "internal" // a core Paladin component, such as the state confirmation engine
+	EventStreamTypeInternal                   EventStreamType = "internal"                      // a core Paladin component, such as the state confirmation engine
+	EventStreamTypePTXBlockchainEventListener EventStreamType = "ptx-blockchain-event-listener" // an event stream that backs an external PTX blockchain event listener
 )
 
 func (est EventStreamType) Options() []string {
 	return []string{
 		string(EventStreamTypeInternal),
+		string(EventStreamTypePTXBlockchainEventListener),
 	}
 }
 func (est EventStreamType) Enum() tktypes.Enum[EventStreamType] {
@@ -65,6 +67,7 @@ type EventStream struct {
 	Config  EventStreamConfig             `json:"config"         gorm:"type:bytes;serializer:json"`
 	Sources EventSources                  `json:"sources"        gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
 	Format  tktypes.JSONFormatOptions     `json:"format"`
+	Started *bool                         `json:"started"`
 }
 
 type EventSources []EventStreamSource
@@ -121,7 +124,11 @@ type EventDeliveryBatch struct {
 
 type PreCommitHandler func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) error
 
-type InternalStreamCallback func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error
+// A stream callback may return a function that executes as part of the same DB transaction that the eventstream checkpoint is committed
+// it is important that there is no blocking or slow operations in this function as it will stall any other eventstreams that need to write
+// a checkpoint. Any blocking or slow operations (e.g. waiting on an external consumer to ack an event) should be performed as part of the
+// callback function itself.
+type InternalStreamCallback func(ctx context.Context, batch *EventDeliveryBatch) (func(dbTX persistence.DBTX) error, error)
 
 type IESType int
 

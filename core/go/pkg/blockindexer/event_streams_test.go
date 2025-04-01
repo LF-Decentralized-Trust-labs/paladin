@@ -18,7 +18,9 @@ package blockindexer
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -33,6 +35,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
@@ -72,7 +75,7 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 	var esID string
 	calledPostCommit := false
 	err := bi.Start(&InternalEventStream{
-		Handler: func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error {
+		Handler: func(ctx context.Context, batch *EventDeliveryBatch) (func(persistence.DBTX) error, error) {
 			if esID == "" {
 				esID = batch.StreamID.String()
 			} else {
@@ -87,8 +90,10 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 				case <-ctx.Done():
 				}
 			}
-			dbTX.AddPostCommit(func(ctx context.Context) { calledPostCommit = true })
-			return nil
+			return func(dbTX persistence.DBTX) error {
+				dbTX.AddPostCommit(func(ctx context.Context) { calledPostCommit = true })
+				return nil
+			}, nil
 		},
 		Definition: &EventStream{
 			Name: "unit_test",
@@ -165,7 +170,7 @@ func TestInternalEventStreamDeliveryAtHeadWithSourceAddress(t *testing.T) {
 	var esID string
 	calledPostCommit := false
 	err := bi.Start(&InternalEventStream{
-		Handler: func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error {
+		Handler: func(ctx context.Context, batch *EventDeliveryBatch) (func(persistence.DBTX) error, error) {
 			if esID == "" {
 				esID = batch.StreamID.String()
 			} else {
@@ -180,8 +185,10 @@ func TestInternalEventStreamDeliveryAtHeadWithSourceAddress(t *testing.T) {
 				case <-ctx.Done():
 				}
 			}
-			dbTX.AddPostCommit(func(ctx context.Context) { calledPostCommit = true })
-			return nil
+			return func(dbTX persistence.DBTX) error {
+				dbTX.AddPostCommit(func(ctx context.Context) { calledPostCommit = true })
+				return nil
+			}, nil
 		},
 		Definition: definition,
 	})
@@ -215,7 +222,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 	// Set up our handler, even though it won't be driven with anything yet
 	eventCollector := make(chan *pldapi.EventWithData)
 	var esID string
-	handler := func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error {
+	handler := func(ctx context.Context, batch *EventDeliveryBatch) (func(persistence.DBTX) error, error) {
 		if esID == "" {
 			esID = batch.StreamID.String()
 		} else {
@@ -230,7 +237,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 			case <-ctx.Done():
 			}
 		}
-		return nil
+		return nil, nil
 	}
 
 	// Do a full start now without a block listener, and wait for the ut notification of all the blocks
@@ -364,9 +371,9 @@ func TestNoMatchingEvents(t *testing.T) {
 			return nil
 		},
 	}, &InternalEventStream{
-		Handler: func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error {
+		Handler: func(ctx context.Context, batch *EventDeliveryBatch) (func(persistence.DBTX) error, error) {
 			require.Fail(t, "should not be called")
-			return nil
+			return nil, nil
 		},
 		Definition: &EventStream{
 			Name: "unit_test",
@@ -571,6 +578,134 @@ func TestUpsertInternalEventStreamCreateFail(t *testing.T) {
 	require.NoError(t, p.Mock.ExpectationsWereMet())
 }
 
+func TestRemoveEventStream(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &pldconf.BlockIndexerConfig{})
+	defer done()
+	esID := uuid.New()
+	eventStream := &eventStream{
+		definition: &EventStream{
+			ID: esID,
+		},
+	}
+
+	// doesn't exist
+	err := bi.RemoveEventStream(ctx, esID)
+	require.ErrorContains(t, err, "PD011312")
+
+	// error calling delete
+	bi.eventStreams[esID] = eventStream
+	bi.eventStreamsHeadSet[esID] = eventStream
+
+	p.Mock.ExpectExec("DELETE.*event_streams").WillReturnError(fmt.Errorf("pop"))
+	err = bi.RemoveEventStream(ctx, esID)
+	require.ErrorContains(t, err, "pop")
+
+	// success
+	p.Mock.ExpectExec("DELETE.*event_streams").WithArgs(esID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	err = bi.RemoveEventStream(ctx, esID)
+	require.NoError(t, err)
+	assert.NotContains(t, bi.eventStreams, esID)
+	assert.NotContains(t, bi.eventStreamsHeadSet, esID)
+
+	require.NoError(t, p.Mock.ExpectationsWereMet())
+}
+
+func TestQueryEventStreamDefinitions(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &pldconf.BlockIndexerConfig{})
+	defer done()
+
+	q := query.NewQueryBuilder().
+		Equal("name", "test-es").
+		Limit(10).
+		Query()
+
+	// limit errors
+	_, err := bi.QueryEventStreamDefinitions(ctx, bi.persistence.NOTX(), EventStreamTypePTXBlockchainEventListener.Enum(), nil)
+	assert.ErrorContains(t, err, "PD011311")
+	_, err = bi.QueryEventStreamDefinitions(ctx, bi.persistence.NOTX(), EventStreamTypePTXBlockchainEventListener.Enum(), query.NewQueryBuilder().Query())
+	assert.ErrorContains(t, err, "PD011311")
+	_, err = bi.QueryEventStreamDefinitions(ctx, bi.persistence.NOTX(), EventStreamTypePTXBlockchainEventListener.Enum(), query.NewQueryBuilder().Limit(0).Query())
+	assert.ErrorContains(t, err, "PD011311")
+
+	// error
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnError(fmt.Errorf("pop"))
+	_, err = bi.QueryEventStreamDefinitions(ctx, bi.persistence.NOTX(), EventStreamTypePTXBlockchainEventListener.Enum(), q)
+	assert.ErrorContains(t, err, "pop")
+
+	//success
+	p.Mock.ExpectQuery("SELECT.*event_streams").WithArgs(EventStreamTypePTXBlockchainEventListener.Enum(), "test-es", 10).
+		WillReturnRows(sqlmock.NewRows(
+			[]string{"id", "name", "type"},
+		).AddRow(uuid.New().String(), "test-es", EventStreamTypePTXBlockchainEventListener.Enum()))
+	result, err := bi.QueryEventStreamDefinitions(ctx, bi.persistence.NOTX(), EventStreamTypePTXBlockchainEventListener.Enum(), q)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, "test-es", result[0].Name)
+	assert.Equal(t, EventStreamTypePTXBlockchainEventListener.Enum(), result[0].Type)
+
+	require.NoError(t, p.Mock.ExpectationsWereMet())
+}
+
+func TestStartStopEventStream(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &pldconf.BlockIndexerConfig{})
+	defer done()
+	esID := uuid.New()
+
+	// doesn't exist
+	err := bi.StartEventStream(ctx, esID)
+	require.ErrorContains(t, err, "PD011312")
+
+	err = bi.StopEventStream(ctx, esID)
+	require.ErrorContains(t, err, "PD011312")
+
+	// these are the DB calls that will be made when starting the the event stream
+	p.Mock.ExpectExec("UPDATE.*event_streams").WillReturnError(errors.New("pop"))
+	p.Mock.ExpectExec("UPDATE.*event_streams").WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// these are the DB calls that the detector go routine might call
+	p.Mock.ExpectQuery("SELECT.*event_stream_checkpoints").WillReturnRows(sqlmock.NewRows([]string{}))
+	p.Mock.ExpectQuery("SELECT.*indexed_blocks").WillReturnRows(sqlmock.NewRows([]string{}))
+
+	// these are the DB calls that will be made when stopping the the event stream
+	p.Mock.ExpectExec("UPDATE.*event_streams").WillReturnError(errors.New("pop"))
+	p.Mock.ExpectExec("UPDATE.*event_streams").WillReturnResult(sqlmock.NewResult(1, 1))
+
+	eventStream := &eventStream{
+		definition: &EventStream{
+			ID: esID,
+		},
+		handler: func(ctx context.Context, batch *EventDeliveryBatch) (func(persistence.DBTX) error, error) {
+			return nil, nil
+		},
+		bi: bi,
+	}
+
+	bi.eventStreams[esID] = eventStream
+
+	err = bi.StartEventStream(ctx, esID)
+	require.ErrorContains(t, err, "pop")
+
+	err = bi.StartEventStream(ctx, esID)
+	require.NoError(t, err)
+
+	assert.NotNil(t, eventStream.detectorDone)
+	assert.NotNil(t, eventStream.dispatcherDone)
+
+	// wait because the detector DB mocks run in a different thread and we can't guarantee the ordering otherwise
+	time.Sleep(100 * time.Millisecond)
+
+	err = bi.StopEventStream(ctx, esID)
+	require.ErrorContains(t, err, "pop")
+
+	err = bi.StopEventStream(ctx, esID)
+	require.NoError(t, err)
+
+	assert.Nil(t, eventStream.detectorDone)
+	assert.Nil(t, eventStream.dispatcherDone)
+}
+
 func TestProcessCheckpointFail(t *testing.T) {
 	ctx, bi, _, p, done := newMockBlockIndexer(t, &pldconf.BlockIndexerConfig{})
 	defer done()
@@ -745,9 +880,9 @@ func TestDispatcherDispatchClosed(t *testing.T) {
 		batchTimeout:   1 * time.Microsecond, // but not going to wait
 		dispatch:       make(chan *eventDispatch),
 		dispatcherDone: make(chan struct{}),
-		handler: func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error {
+		handler: func(ctx context.Context, batch *EventDeliveryBatch) (func(persistence.DBTX) error, error) {
 			called = true
-			return fmt.Errorf("pop")
+			return nil, fmt.Errorf("pop")
 		},
 	}
 	go func() {
@@ -952,4 +1087,39 @@ func TestEventSourcesHashing(t *testing.T) {
 	_, err := ess.Hash(context.Background())
 	assert.Regexp(t, "FF22025", err)
 
+}
+
+func TestRunBatchHandlerError(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &pldconf.BlockIndexerConfig{})
+	defer done()
+
+	p.Mock.ExpectBegin()
+	p.Mock.ExpectBegin()
+	p.Mock.ExpectExec("INSERT.*event_stream_checkpoints").WillReturnResult(driver.ResultNoRows)
+	p.Mock.ExpectCommit()
+	returnErr := true
+
+	es := &eventStream{
+		bi:  bi,
+		ctx: ctx,
+		definition: &EventStream{
+			ID: uuid.New(),
+			Sources: []EventStreamSource{{
+				ABI: testABI,
+			}},
+		},
+		handler: func(_ context.Context, _ *EventDeliveryBatch) (func(persistence.DBTX) error, error) {
+			if returnErr {
+				returnErr = false
+				return func(persistence.DBTX) error {
+					return errors.New("pop")
+				}, nil
+			}
+			return nil, nil
+		},
+	}
+
+	err := es.runBatch(&eventBatch{})
+	assert.NoError(t, err)
+	assert.False(t, returnErr)
 }

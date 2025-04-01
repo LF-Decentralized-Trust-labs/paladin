@@ -44,6 +44,7 @@ type PTXEventType string
 
 const (
 	PTXEventTypeReceipts PTXEventType = "receipts"
+	PTXEventTypeEvents   PTXEventType = "blockchainevents"
 )
 
 func (tt PTXEventType) Enum() tktypes.Enum[PTXEventType] {
@@ -53,6 +54,7 @@ func (tt PTXEventType) Enum() tktypes.Enum[PTXEventType] {
 func (tt PTXEventType) Options() []string {
 	return []string{
 		string(PTXEventTypeReceipts),
+		string(PTXEventTypeEvents),
 	}
 }
 
@@ -179,6 +181,13 @@ type TransactionReceiptData struct {
 	FailureMessage                      string              `docstruct:"TransactionReceiptData" json:"failureMessage,omitempty"`  // always set to a non-empty string if the transaction reverted, with as much detail as could be extracted
 	RevertData                          tktypes.HexBytes    `docstruct:"TransactionReceiptData" json:"revertData,omitempty"`      // encoded revert data if available
 	ContractAddress                     *tktypes.EthAddress `docstruct:"TransactionReceiptData" json:"contractAddress,omitempty"` // address of the new contract address, to be used in the `To` field for subsequent invoke transactions.  Nil if this transaction itself was an invoke
+}
+
+type TransactionEvent struct{}
+
+type TransactionEventBatch struct {
+	BatchID uuid.UUID        `docstruct:"TransactionEventBatch" json:"batchId,omitempty"`
+	Events  []*EventWithData `docstruct:"TransactionEventBatch" json:"events,omitempty"`
 }
 
 type TransactionActivityRecord struct {

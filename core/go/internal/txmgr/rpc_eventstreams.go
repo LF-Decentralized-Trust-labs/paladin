@@ -19,6 +19,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
@@ -30,15 +31,15 @@ import (
 )
 
 type rpcEventStreams struct {
-	tm          *txManager
-	subLock     sync.Mutex
-	receiptSubs map[string]*receiptListenerSubscription
+	tm      *txManager
+	subLock sync.Mutex
+	subs    map[string]*listenerSubscription
 }
 
 func newRPCEventStreams(tm *txManager) *rpcEventStreams {
 	es := &rpcEventStreams{
-		tm:          tm,
-		receiptSubs: make(map[string]*receiptListenerSubscription),
+		tm:   tm,
+		subs: make(map[string]*listenerSubscription),
 	}
 	return es
 }
@@ -55,9 +56,9 @@ type rpcAckNack struct {
 	ack bool
 }
 
-type receiptListenerSubscription struct {
+type listenerSubscription struct {
 	es        *rpcEventStreams
-	rrc       components.ReceiptReceiverCloser
+	rrc       components.ReceiverCloser
 	ctrl      rpcserver.RPCAsyncControl
 	acksNacks chan *rpcAckNack
 	closed    chan struct{}
@@ -75,19 +76,26 @@ func (es *rpcEventStreams) HandleStart(ctx context.Context, req *rpcclient.RPCRe
 		return nil, rpcclient.NewRPCErrorResponse(err, req.ID, rpcclient.RPCCodeInvalidRequest)
 	}
 
-	// Only one type right now
 	if len(req.Params) < 2 {
-		return nil, rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, msgs.MsgTxMgrListenerNameRequired), req.ID, rpcclient.RPCCodeInvalidRequest)
+		if eventType == pldapi.PTXEventTypeEvents.Enum() {
+			return nil, rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, msgs.MsgTxMgrBlockchainEventListenerNameRequired), req.ID, rpcclient.RPCCodeInvalidRequest)
+		} else {
+			return nil, rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, msgs.MsgTxMgrReceiptListenerNameRequired), req.ID, rpcclient.RPCCodeInvalidRequest)
+		}
 	}
-	sub := &receiptListenerSubscription{
+	sub := &listenerSubscription{
 		es:        es,
 		ctrl:      ctrl,
 		acksNacks: make(chan *rpcAckNack, 1),
 		closed:    make(chan struct{}),
 	}
-	es.receiptSubs[ctrl.ID()] = sub
+	es.subs[ctrl.ID()] = sub
 	var err error
-	sub.rrc, err = es.tm.AddReceiptReceiver(ctx, req.Params[1].StringValue(), sub)
+	if eventType == pldapi.PTXEventTypeEvents.Enum() {
+		sub.rrc, err = es.tm.AddBlockchainEventReceiver(ctx, req.Params[1].StringValue(), sub)
+	} else {
+		sub.rrc, err = es.tm.AddReceiptReceiver(ctx, req.Params[1].StringValue(), sub)
+	}
 	if err != nil {
 		return nil, rpcclient.NewRPCErrorResponse(err, req.ID, rpcclient.RPCCodeInvalidRequest)
 	}
@@ -103,17 +111,17 @@ func (es *rpcEventStreams) cleanupSubscription(subID string) {
 	es.subLock.Lock()
 	defer es.subLock.Unlock()
 
-	sub := es.receiptSubs[subID]
+	sub := es.subs[subID]
 	if sub != nil {
 		es.cleanupLocked(sub)
 	}
 }
 
-func (es *rpcEventStreams) getSubscription(subID string) *receiptListenerSubscription {
+func (es *rpcEventStreams) getSubscription(subID string) *listenerSubscription {
 	es.subLock.Lock()
 	defer es.subLock.Unlock()
 
-	return es.receiptSubs[subID]
+	return es.subs[subID]
 }
 
 func (es *rpcEventStreams) HandleLifecycle(ctx context.Context, req *rpcclient.RPCRequest) *rpcclient.RPCResponse {
@@ -149,7 +157,7 @@ func (es *rpcEventStreams) HandleLifecycle(ctx context.Context, req *rpcclient.R
 
 }
 
-func (sub *receiptListenerSubscription) DeliverReceiptBatch(ctx context.Context, batchID uint64, receipts []*pldapi.TransactionReceiptFull) error {
+func (sub *listenerSubscription) DeliverReceiptBatch(ctx context.Context, batchID uint64, receipts []*pldapi.TransactionReceiptFull) error {
 	log.L(ctx).Infof("Delivering receipt batch %d to subscription %s over JSON/RPC", batchID, sub.ctrl.ID())
 
 	// Note we attempt strong consistency with etH_subscribe semantics here, as described in https://geth.ethereum.org/docs/interacting-with-geth/rpc/pubsub
@@ -184,12 +192,35 @@ func (sub *receiptListenerSubscription) DeliverReceiptBatch(ctx context.Context,
 	}
 }
 
-func (sub *receiptListenerSubscription) ConnectionClosed() {
+func (sub *listenerSubscription) DeliverBlockchainEventBatch(ctx context.Context, batchID uuid.UUID, events []*pldapi.EventWithData) error {
+	log.L(ctx).Infof("Delivering event batch %d to subscription %s over JSON/RPC", batchID, sub.ctrl.ID())
+
+	sub.ctrl.Send("ptx_subscription", &pldapi.JSONRPCSubscriptionNotification[pldapi.TransactionEventBatch]{
+		Subscription: sub.ctrl.ID(),
+		Result: pldapi.TransactionEventBatch{
+			BatchID: batchID,
+			Events:  events,
+		},
+	})
+	select {
+	case ackNack := <-sub.acksNacks:
+		if !ackNack.ack {
+			log.L(ctx).Warnf("Batch %d negatively acknowledged by subscription %s over JSON/RPC", batchID, sub.ctrl.ID())
+			return i18n.NewError(ctx, msgs.MsgTxMgrJSONRPCSubscriptionNack, sub.ctrl.ID())
+		}
+		log.L(ctx).Infof("Batch %d acknowledged by subscription %s over JSON/RPC", batchID, sub.ctrl.ID())
+		return nil
+	case <-sub.closed:
+		return i18n.NewError(ctx, msgs.MsgTxMgrJSONRPCSubscriptionClosed, sub.ctrl.ID())
+	}
+}
+
+func (sub *listenerSubscription) ConnectionClosed() {
 	sub.es.cleanupSubscription(sub.ctrl.ID())
 }
 
-func (es *rpcEventStreams) cleanupLocked(sub *receiptListenerSubscription) {
-	delete(sub.es.receiptSubs, sub.ctrl.ID())
+func (es *rpcEventStreams) cleanupLocked(sub *listenerSubscription) {
+	delete(sub.es.subs, sub.ctrl.ID())
 	if sub.rrc != nil {
 		sub.rrc.Close()
 	}
@@ -200,7 +231,7 @@ func (es *rpcEventStreams) stop() {
 	es.subLock.Lock()
 	defer es.subLock.Unlock()
 
-	for _, sub := range es.receiptSubs {
+	for _, sub := range es.subs {
 		es.cleanupLocked(sub)
 	}
 

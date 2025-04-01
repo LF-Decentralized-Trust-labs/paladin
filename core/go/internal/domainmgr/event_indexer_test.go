@@ -356,10 +356,14 @@ func TestHandleEventBatch(t *testing.T) {
 
 	req := d.dm.privateTxWaiter.AddInflight(ctx, txID)
 	err = mp.P.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
-		return d.handleEventBatch(ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := d.handleEventBatch(ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events:  []*pldapi.EventWithData{event1, event2},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	require.NoError(t, err)
 
@@ -379,7 +383,7 @@ func TestHandleEventBatchFinalizeFail(t *testing.T) {
 	defer done()
 
 	err := td.dm.persistence.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -396,6 +400,10 @@ func TestHandleEventBatchFinalizeFail(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.Regexp(t, "pop", err)
 
@@ -408,7 +416,7 @@ func TestHandleEventIgnoreUnknownDomain(t *testing.T) {
 	defer done()
 
 	err := td.dm.persistence.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -425,6 +433,10 @@ func TestHandleEventIgnoreUnknownDomain(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	require.NoError(t, err)
 
@@ -444,7 +456,7 @@ func TestHandleEventBatchContractLookupFail(t *testing.T) {
 	mp.Mock.ExpectQuery("SELECT.*private_smart_contracts").WillReturnError(fmt.Errorf("pop"))
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -453,6 +465,10 @@ func TestHandleEventBatchContractLookupFail(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.EqualError(t, err, "pop")
 }
@@ -476,7 +492,7 @@ func TestHandleEventBatchRegistrationError(t *testing.T) {
 	require.NoError(t, err)
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -487,6 +503,10 @@ func TestHandleEventBatchRegistrationError(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.EqualError(t, err, "pop")
 }
@@ -514,7 +534,7 @@ func TestHandleEventBatchDomainError(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -524,6 +544,10 @@ func TestHandleEventBatchDomainError(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.EqualError(t, err, "pop")
 }
@@ -559,7 +583,7 @@ func TestHandleEventBatchSpentBadTransactionID(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -569,6 +593,10 @@ func TestHandleEventBatchSpentBadTransactionID(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.ErrorContains(t, err, "PD020007")
 }
@@ -604,7 +632,7 @@ func TestHandleEventBatchReadBadTransactionID(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -614,6 +642,10 @@ func TestHandleEventBatchReadBadTransactionID(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.ErrorContains(t, err, "PD020007")
 }
@@ -649,7 +681,7 @@ func TestHandleEventBatchConfirmBadTransactionID(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -659,6 +691,10 @@ func TestHandleEventBatchConfirmBadTransactionID(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.ErrorContains(t, err, "PD020007")
 }
@@ -694,7 +730,7 @@ func TestHandleEventBatchInfoBadTransactionID(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -704,6 +740,10 @@ func TestHandleEventBatchInfoBadTransactionID(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.ErrorContains(t, err, "PD020007")
 }
@@ -738,7 +778,7 @@ func TestHandleEventBatchSpentBadSchemaID(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -748,6 +788,10 @@ func TestHandleEventBatchSpentBadSchemaID(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.ErrorContains(t, err, "PD011650")
 }
@@ -782,7 +826,7 @@ func TestHandleEventBatchReadBadSchemaID(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -792,6 +836,10 @@ func TestHandleEventBatchReadBadSchemaID(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.ErrorContains(t, err, "PD011650")
 }
@@ -826,7 +874,7 @@ func TestHandleEventBatchConfirmBadSchemaID(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -836,6 +884,10 @@ func TestHandleEventBatchConfirmBadSchemaID(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.ErrorContains(t, err, "PD011650")
 }
@@ -869,7 +921,7 @@ func TestHandleEventBatchNewBadTransactionID(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -879,6 +931,10 @@ func TestHandleEventBatchNewBadTransactionID(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.ErrorContains(t, err, "PD020007")
 }
@@ -913,7 +969,7 @@ func TestHandleEventBatchNewBadSchemaID(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -923,6 +979,10 @@ func TestHandleEventBatchNewBadSchemaID(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.ErrorContains(t, err, "PD011641")
 }
@@ -957,7 +1017,7 @@ func TestHandleEventBatchNewBadStateID(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -967,6 +1027,10 @@ func TestHandleEventBatchNewBadStateID(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.ErrorContains(t, err, "PD011650")
 }
@@ -1002,7 +1066,7 @@ func TestHandleEventBatchBadTransactionID(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -1012,6 +1076,10 @@ func TestHandleEventBatchBadTransactionID(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.ErrorContains(t, err, "PD020008")
 }
@@ -1052,7 +1120,7 @@ func TestHandleEventBatchMarkConfirmedFail(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -1062,6 +1130,10 @@ func TestHandleEventBatchMarkConfirmedFail(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.EqualError(t, err, "pop")
 }
@@ -1099,7 +1171,7 @@ func TestHandleEventBatchUpsertStateFail(t *testing.T) {
 	}
 
 	err = mp.P.Transaction(context.Background(), func(ctx context.Context, dbTX persistence.DBTX) error {
-		return td.d.handleEventBatch(td.ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		fn, err := td.d.handleEventBatch(td.ctx, &blockindexer.EventDeliveryBatch{
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
@@ -1109,6 +1181,10 @@ func TestHandleEventBatchUpsertStateFail(t *testing.T) {
 				},
 			},
 		})
+		if err != nil {
+			return err
+		}
+		return fn(dbTX)
 	})
 	assert.EqualError(t, err, "pop")
 }

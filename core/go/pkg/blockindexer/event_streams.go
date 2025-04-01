@@ -22,9 +22,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -91,6 +93,26 @@ func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
 	return nil
 }
 
+func (bi *blockIndexer) AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error) {
+	es, err := bi.upsertInternalEventStream(ctx, dbTX, stream)
+	if err != nil {
+		return nil, err
+	}
+
+	// Can be called before start as managers start before the block indexer
+	bi.stateLock.Lock()
+	blockIndexerStarted := bi.started
+	bi.stateLock.Unlock()
+
+	es.definition.Started = confutil.P(es.definition.Started == nil || *es.definition.Started)
+
+	if blockIndexerStarted && *es.definition.Started {
+		// no possibility of error if not updating DB
+		_ = bi.startEventStream(es, false)
+	}
+	return es.definition, nil
+}
+
 func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX persistence.DBTX, ies *InternalEventStream) (*eventStream, error) {
 
 	// Defensive coding against panics
@@ -99,8 +121,9 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 		def = &EventStream{}
 	}
 
-	// This will need to open up when we have more externally consumable event streams
-	def.Type = EventStreamTypeInternal.Enum()
+	if def.Type == "" {
+		def.Type = EventStreamTypeInternal.Enum()
+	}
 
 	// Validate the name
 	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
@@ -164,7 +187,6 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 	}
 
 	// We call init here
-	// TODO: Full stop/start lifecycle
 	es := bi.initEventStream(ctx, def, ies.Handler)
 
 	return es, nil
@@ -227,6 +249,65 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	return es
 }
 
+func (bi *blockIndexer) RemoveEventStream(ctx context.Context, id uuid.UUID) error {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+
+	es := bi.eventStreams[id]
+	if es == nil {
+		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, id)
+	}
+
+	err := bi.persistence.NOTX().DB().
+		WithContext(ctx).
+		Table("event_streams").
+		Where("id = ?", id).
+		Delete(&EventStream{}).
+		Error
+	if err != nil {
+		log.L(ctx).Errorf("Failed to delete event stream %s: %s", id, err)
+		return err
+	}
+	// no possibility of error if not updating DB
+	_ = es.stop(false)
+	delete(bi.eventStreams, id)
+	delete(bi.eventStreamsHeadSet, id)
+	return nil
+}
+
+func (bi *blockIndexer) QueryEventStreamDefinitions(ctx context.Context, dbTX persistence.DBTX, esType tktypes.Enum[EventStreamType], jq *query.QueryJSON) ([]*EventStream, error) {
+	if jq == nil || jq.Limit == nil || *jq.Limit == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgBlockIndexerLimitRequired)
+	}
+	q := dbTX.DB().
+		Table("event_streams").
+		WithContext(ctx).
+		Where("type = ?", esType)
+
+	q = filters.BuildGORM(ctx, jq, q, EventStreamFilters)
+
+	var results []*EventStream
+	err := q.Find(&results).Error
+	return results, err
+}
+
+func (bi *blockIndexer) StartEventStream(ctx context.Context, id uuid.UUID) error {
+	if bi.eventStreams[id] == nil {
+		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, id)
+	}
+	return bi.startEventStream(bi.eventStreams[id], true)
+}
+
+func (bi *blockIndexer) StopEventStream(ctx context.Context, id uuid.UUID) error {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+
+	if bi.eventStreams[id] == nil {
+		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, id)
+	}
+	return bi.eventStreams[id].stop(true)
+}
+
 func (bi *blockIndexer) getStreamList() []*eventStream {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
@@ -239,37 +320,67 @@ func (bi *blockIndexer) getStreamList() []*eventStream {
 
 func (bi *blockIndexer) startEventStreams() {
 	for _, es := range bi.getStreamList() {
-		es.start()
+		if es.definition.Started == nil || *es.definition.Started {
+			// no possibility of error if not updating DB
+			_ = es.start(false)
+		}
 	}
 }
 
-func (bi *blockIndexer) startEventStream(es *eventStream) {
+func (bi *blockIndexer) startEventStream(es *eventStream, updateDB bool) error {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
-	es.start()
+	return es.start(updateDB)
 }
 
-func (es *eventStream) start() {
+func (es *eventStream) start(updateDB bool) error {
 	if es.handler != nil && es.detectorDone == nil && es.dispatcherDone == nil {
 		es.ctx, es.cancelCtx = context.WithCancel(log.WithLogField(es.bi.parentCtxForReset, "eventstream", es.definition.ID.String()))
 		log.L(es.ctx).Infof("Starting event stream %s [%s]", es.definition.Name, es.definition.ID)
+		if updateDB {
+			err := es.bi.persistence.NOTX().DB().
+				WithContext(es.ctx).
+				Table("event_streams").
+				Where("id = ?", es.definition.ID).
+				Update("started", true).
+				Error
+			if err != nil {
+				return err
+			}
+		}
 		es.detectorDone = make(chan struct{})
 		es.dispatcherDone = make(chan struct{})
 		go es.detector()
 		go es.dispatcher()
 	}
+	return nil
 }
 
-func (es *eventStream) stop() {
+func (es *eventStream) stop(updateDB bool) error {
+	if updateDB {
+		err := es.bi.persistence.NOTX().DB().
+			WithContext(es.ctx).
+			Table("event_streams").
+			Where("id = ?", es.definition.ID).
+			Update("started", false).
+			Error
+		if err != nil {
+			return err
+		}
+	}
 	if es.cancelCtx != nil {
 		es.cancelCtx()
+		es.cancelCtx = nil
 	}
 	if es.detectorDone != nil {
 		<-es.detectorDone
+		es.detectorDone = nil
 	}
 	if es.dispatcherDone != nil {
 		<-es.dispatcherDone
+		es.dispatcherDone = nil
 	}
+	return nil
 }
 
 func (es *eventStream) readDBCheckpoint() (int64, error) {
@@ -488,29 +599,34 @@ func (es *eventStream) dispatcher() {
 
 func (es *eventStream) runBatch(batch *eventBatch) error {
 
-	// We start a database transaction, run the callback function
+	// run the callback function, then start a database transaction,
 	return es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
-		err = es.bi.persistence.Transaction(es.ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
-			err = es.handler(ctx, dbTX, &batch.EventDeliveryBatch)
-			if err != nil {
-				return err
-			}
-			// commit the checkpoint
-			return dbTX.DB().
-				WithContext(ctx).
-				Table("event_stream_checkpoints").
-				Clauses(clause.OnConflict{
-					Columns: []clause.Column{{Name: "stream"}},
-					DoUpdates: clause.AssignmentColumns([]string{
-						"block_number",
-					}),
-				}).
-				Create(&EventStreamCheckpoint{
-					Stream:      es.definition.ID,
-					BlockNumber: int64(batch.checkpointAfterBatch),
-				}).
-				Error
-		})
+		fn, err := es.handler(es.ctx, &batch.EventDeliveryBatch)
+		if err == nil {
+			err = es.bi.persistence.Transaction(es.ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
+				if fn != nil {
+					err := fn(dbTX)
+					if err != nil {
+						return err
+					}
+				}
+				// commit the checkpoint
+				return dbTX.DB().
+					WithContext(ctx).
+					Table("event_stream_checkpoints").
+					Clauses(clause.OnConflict{
+						Columns: []clause.Column{{Name: "stream"}},
+						DoUpdates: clause.AssignmentColumns([]string{
+							"block_number",
+						}),
+					}).
+					Create(&EventStreamCheckpoint{
+						Stream:      es.definition.ID,
+						BlockNumber: int64(batch.checkpointAfterBatch),
+					}).
+					Error
+			})
+		}
 		return true, err
 	})
 
