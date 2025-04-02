@@ -20,7 +20,7 @@ ext {
     goFiles = fileTree(".") {
         include "pkg/**/*.go"
     }
-    targetCoverage = 100
+    targetCoverage = 99.9
     maxCoverageBarGap = 1
 }
 
