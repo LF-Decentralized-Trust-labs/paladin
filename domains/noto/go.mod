@@ -20,7 +20,6 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/hyperledger/firefly-common v1.4.14 // indirect
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
