@@ -1,5 +1,6 @@
 rootProject.name = 'paladin'
 
+include 'common:go'
 include 'config'
 include 'core:go'
 include 'core:java'

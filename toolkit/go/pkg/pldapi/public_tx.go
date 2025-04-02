@@ -18,7 +18,7 @@ package pldapi
 
 import (
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 )
 
 // These are user-supplied directly on the external interface (vs. calculated)

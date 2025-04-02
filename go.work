@@ -1,6 +1,7 @@
 go 1.22.5
 
 use (
+	./common/go
 	./config
 	./core/go
 	./domains/integration-test

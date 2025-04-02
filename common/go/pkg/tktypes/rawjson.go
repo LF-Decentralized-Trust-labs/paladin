@@ -21,10 +21,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
 	"gopkg.in/yaml.v3"
 )
 
@@ -33,11 +31,6 @@ type RawJSON []byte
 
 func JSONString(s any) RawJSON {
 	b, _ := json.Marshal(s)
-	return b
-}
-
-func ProtoToJSON(m proto.Message) RawJSON {
-	b, _ := protojson.Marshal(m)
 	return b
 }
 

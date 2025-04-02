@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,11 +88,4 @@ func TestRawJSON(t *testing.T) {
 	assert.Equal(t, "thing", RawJSON(`{"some":"thing"}`).ToMap()["some"])
 	assert.Nil(t, RawJSON(nil).ToMap()["some"])
 
-}
-
-func TestProtoToJSON(t *testing.T) {
-	m := &prototk.PaladinMsg{
-		MessageId: "3d472892-8c5c-4290-910d-beeec5858e47",
-	}
-	assert.JSONEq(t, `{"messageId":"3d472892-8c5c-4290-910d-beeec5858e47"}`, ProtoToJSON(m).String())
 }

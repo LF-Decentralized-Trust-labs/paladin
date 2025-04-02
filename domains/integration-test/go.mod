@@ -5,6 +5,7 @@ go 1.22.5
 require (
 	github.com/go-resty/resty/v2 v2.14.0
 	github.com/hyperledger/firefly-signer v1.1.19
+	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/core v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/domains/noto v0.0.0-00010101000000-000000000000
@@ -112,6 +113,8 @@ require (
 	gorm.io/gorm v1.25.12 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+replace github.com/kaleido-io/paladin/common/go => ../../common/go
 
 replace github.com/kaleido-io/paladin/core => ../../core/go
 

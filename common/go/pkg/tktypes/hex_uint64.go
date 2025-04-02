@@ -25,8 +25,8 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/tkmsgs"
 )
 
 const MAX_SAFE_INT64 = 0x7fffffffffffffff
