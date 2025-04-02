@@ -16,8 +16,8 @@
 package pldconf
 
 import (
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // Intended to be embedded at root level of paladin config

@@ -18,7 +18,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"google.golang.org/grpc"
 )

@@ -5,8 +5,9 @@ go 1.22.5
 require (
 	github.com/go-resty/resty/v2 v2.14.0
 	github.com/hyperledger/firefly-common v1.4.14
+	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/client_model v0.6.1
@@ -20,7 +21,6 @@ require (
 require (
 	github.com/hyperledger/firefly-signer v1.1.19 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
@@ -80,6 +80,8 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-replace github.com/kaleido-io/paladin/toolkit => ../toolkit/go
+replace github.com/kaleido-io/paladin/common/go => ../common/go
+
+replace github.com/kaleido-io/paladin/sdk/go => ../sdk/go
 
 replace github.com/kaleido-io/paladin/config => ../config

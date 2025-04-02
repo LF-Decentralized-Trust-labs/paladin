@@ -18,7 +18,7 @@ package publictxmgr
 import (
 	"testing"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/stretchr/testify/require"
 )
 

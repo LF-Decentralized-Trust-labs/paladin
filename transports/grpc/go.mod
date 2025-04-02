@@ -3,7 +3,9 @@ module github.com/kaleido-io/paladin/transports/grpc
 go 1.22.5
 
 require (
+	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/text v0.21.0
@@ -18,7 +20,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hyperledger/firefly-common v1.4.14 // indirect
 	github.com/hyperledger/firefly-signer v1.1.19 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
@@ -32,10 +33,13 @@ require (
 	golang.org/x/term v0.27.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241007155032-5fefd90f89a9 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+replace github.com/kaleido-io/paladin/common/go => ../../common/go
+
+replace github.com/kaleido-io/paladin/sdk/go => ../../sdk/go
 
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
 

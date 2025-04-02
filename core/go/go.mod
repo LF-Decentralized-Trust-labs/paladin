@@ -9,8 +9,10 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hyperledger/firefly-common v1.4.14
 	github.com/hyperledger/firefly-signer v1.1.19
+	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/registries/static v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/transports/grpc v0.0.0-00010101000000-000000000000
 	github.com/serialx/hashring v0.0.0-20200727003509-22c0c7ab6b1b
@@ -109,6 +111,10 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
+
+replace github.com/kaleido-io/paladin/common/go => ../../common/go
+
+replace github.com/kaleido-io/paladin/sdk/go => ../../sdk/go
 
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
 

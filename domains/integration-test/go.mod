@@ -5,12 +5,15 @@ go 1.22.5
 require (
 	github.com/go-resty/resty/v2 v2.14.0
 	github.com/hyperledger/firefly-signer v1.1.19
+	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/core v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/domains/noto v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/domains/zeto v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -105,7 +108,6 @@ require (
 	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/postgres v1.5.9 // indirect
 	gorm.io/driver/sqlite v1.5.6 // indirect
@@ -113,7 +115,11 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
+replace github.com/kaleido-io/paladin/common/go => ../../common/go
+
 replace github.com/kaleido-io/paladin/core => ../../core/go
+
+replace github.com/kaleido-io/paladin/sdk/go => ../../sdk/go
 
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
 

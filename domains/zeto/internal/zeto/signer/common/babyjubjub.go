@@ -20,8 +20,8 @@ import (
 
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/iden3/go-iden3-crypto/utils"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 )
 
 func EncodeBabyJubJubPublicKey(pubKey *babyjub.PublicKey) string {

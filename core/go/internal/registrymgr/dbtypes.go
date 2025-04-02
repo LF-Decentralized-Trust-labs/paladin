@@ -16,7 +16,7 @@
 package registrymgr
 
 import (
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 )
 
 type DBEntry struct {
