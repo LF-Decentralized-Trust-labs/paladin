@@ -18,7 +18,7 @@ package zeto
 import (
 	"testing"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	"github.com/stretchr/testify/assert"
 )
 

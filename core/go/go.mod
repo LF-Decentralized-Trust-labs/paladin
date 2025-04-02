@@ -12,6 +12,7 @@ require (
 	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/registries/static v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/transports/grpc v0.0.0-00010101000000-000000000000
 	github.com/serialx/hashring v0.0.0-20200727003509-22c0c7ab6b1b
@@ -112,6 +113,8 @@ require (
 )
 
 replace github.com/kaleido-io/paladin/common/go => ../../common/go
+
+replace github.com/kaleido-io/paladin/sdk/go => ../../sdk/go
 
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
 

@@ -28,14 +28,14 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/algorithms"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/cache"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcserver"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/signerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/verifiers"
 )
 
 type keyManager struct {

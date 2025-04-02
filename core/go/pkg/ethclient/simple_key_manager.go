@@ -23,8 +23,8 @@ import (
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signer"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/signer"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/signerapi"
 )
 
 type simpleKeyManager struct {

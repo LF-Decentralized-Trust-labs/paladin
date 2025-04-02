@@ -11,6 +11,7 @@ use (
 	./perf
 	./registries/evm
 	./registries/static
+	./sdk/go
 	./testinfra
 	./toolkit/go
 	./transports/grpc

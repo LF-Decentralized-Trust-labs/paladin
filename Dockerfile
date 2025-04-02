@@ -100,6 +100,7 @@ RUN gradle --no-daemon --parallel :buildSrc:jar
 COPY solidity solidity
 COPY common/go common/go
 COPY config config
+COPY sdk/go sdk/go
 COPY toolkit/proto toolkit/proto
 COPY toolkit toolkit
 COPY go.work.sum ./

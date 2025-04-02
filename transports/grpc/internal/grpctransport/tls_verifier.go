@@ -26,7 +26,7 @@ import (
 	"sync/atomic"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/log"
 	"github.com/kaleido-io/paladin/transports/grpc/internal/msgs"
 	"google.golang.org/grpc/credentials"
 )

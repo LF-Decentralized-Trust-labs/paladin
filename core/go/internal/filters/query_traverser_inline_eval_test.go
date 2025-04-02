@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -40,7 +40,7 @@ import (
 
 	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 )
 
 var _ = Describe("SmartContractDeployment Controller", func() {

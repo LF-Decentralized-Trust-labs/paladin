@@ -35,8 +35,8 @@ import (
 	wtns "github.com/kaleido-io/paladin/domains/zeto/internal/zeto/signer/witness"
 	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/cache"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/signerapi"
 	"google.golang.org/protobuf/proto"
 )
 

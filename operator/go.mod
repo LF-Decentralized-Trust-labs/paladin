@@ -10,8 +10,10 @@ require (
 	github.com/hyperledger/firefly-signer v1.1.19
 	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/domains/noto v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/domains/zeto v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/testinfra v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/onsi/ginkgo/v2 v2.17.2
 	github.com/onsi/gomega v1.33.1
 	github.com/pelletier/go-toml/v2 v2.2.3
@@ -131,6 +133,10 @@ replace github.com/kaleido-io/paladin/common/go => ../common/go
 
 replace github.com/kaleido-io/paladin/config => ../config
 
-replace github.com/kaleido-io/paladin/toolkit => ../toolkit/go
+replace github.com/kaleido-io/paladin/domains/noto => ../domains/noto
+
+replace github.com/kaleido-io/paladin/domains/zeto => ../domains/zeto
+
+replace github.com/kaleido-io/paladin/sdk/go => ../sdk/go
 
 replace github.com/kaleido-io/paladin/testinfra => ../testinfra

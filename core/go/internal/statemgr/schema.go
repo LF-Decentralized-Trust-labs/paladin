@@ -28,7 +28,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 )
 
 type labelType int

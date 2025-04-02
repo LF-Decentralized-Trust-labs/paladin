@@ -30,7 +30,7 @@ import (
 
 	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/yaml"

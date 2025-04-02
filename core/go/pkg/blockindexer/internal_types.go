@@ -19,7 +19,7 @@ package blockindexer
 import (
 	"github.com/kaleido-io/paladin/common/go/pkg/tktypes"
 	"github.com/kaleido-io/paladin/core/internal/filters"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 )
 
 var IndexedBlockFilters filters.FieldSet = filters.FieldMap{
