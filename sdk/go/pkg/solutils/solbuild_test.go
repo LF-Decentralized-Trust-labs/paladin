@@ -104,4 +104,24 @@ func TestMustParseBuildABI(t *testing.T) {
 	]}`))
 	assert.Equal(t, 1, len(abi.Functions()))
 	assert.Equal(t, "foo", abi.Functions()["foo"].Name)
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		}
+	}()
+
+	MustParseBuildABI([]byte(`{
+		"abi": [
+			{
+				"type":"function",
+				"name":"foo",
+				"inputs":[
+					{
+						"name":"a",
+						"type":"uint256"
+					}
+				
+			}
+		]}`))
 }
