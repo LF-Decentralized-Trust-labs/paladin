@@ -142,8 +142,8 @@ func (r *registry) configureEventStream(ctx context.Context, dbTX persistence.DB
 	stream.Name = fmt.Sprintf("registry_%s_%s", r.name, streamHash)
 
 	r.eventStream, err = r.rm.blockIndexer.AddEventStream(ctx, dbTX, &blockindexer.InternalEventStream{
-		Definition: stream,
-		Handler:    r.handleEventBatch,
+		Definition:  stream,
+		HandlerDBTX: r.handleEventBatch,
 	})
 	return err
 }

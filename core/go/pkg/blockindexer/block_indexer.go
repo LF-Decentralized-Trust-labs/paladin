@@ -50,6 +50,10 @@ type BlockIndexer interface {
 	Start(...*InternalEventStream) error
 	Stop()
 	AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error)
+	RemoveEventStream(ctx context.Context, id uuid.UUID) error
+	QueryEventStreamDefinitions(ctx context.Context, dbTX persistence.DBTX, esType tktypes.Enum[EventStreamType], jq *query.QueryJSON) ([]*EventStream, error)
+	StartEventStream(ctx context.Context, id uuid.UUID) error
+	StopEventStream(ctx context.Context, id uuid.UUID) error
 	GetIndexedBlockByNumber(ctx context.Context, number uint64) (*pldapi.IndexedBlock, error)
 	GetIndexedTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*pldapi.IndexedTransaction, error)
 	GetIndexedTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce uint64) (*pldapi.IndexedTransaction, error)
@@ -149,7 +153,7 @@ func (bi *blockIndexer) Start(internalStreams ...*InternalEventStream) error {
 	// (so even on first startup they function as if they were there before the indexer loads)
 	for _, ies := range internalStreams {
 		switch ies.Type {
-		case IESTypeEventStream:
+		case IESTypeEventStreamDBTX:
 			if _, err := bi.upsertInternalEventStream(bi.parentCtxForReset, bi.persistence.NOTX(), ies); err != nil {
 				return err
 			}
@@ -161,23 +165,6 @@ func (bi *blockIndexer) Start(internalStreams ...*InternalEventStream) error {
 	bi.startOrReset()
 	bi.startEventStreams()
 	return nil
-}
-
-func (bi *blockIndexer) AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error) {
-	es, err := bi.upsertInternalEventStream(ctx, dbTX, stream)
-	if err != nil {
-		return nil, err
-	}
-
-	// Can be called before start as managers start before the block indexer
-	bi.stateLock.Lock()
-	started := bi.started
-	bi.stateLock.Unlock()
-
-	if started {
-		bi.startEventStream(es)
-	}
-	return es.definition, nil
 }
 
 func (bi *blockIndexer) startOrReset() {
@@ -239,7 +226,8 @@ func (bi *blockIndexer) Stop() {
 	if wasStarted {
 		bi.eventStreamsLock.Lock()
 		for _, es := range bi.eventStreams {
-			es.stop()
+			// no possibility of error if not updating DB
+			_ = es.stop(false)
 		}
 		bi.eventStreamsLock.Unlock()
 

@@ -77,7 +77,11 @@ type ReceiptReceiver interface {
 	DeliverReceiptBatch(ctx context.Context, batchID uint64, receipts []*pldapi.TransactionReceiptFull) error
 }
 
-type ReceiptReceiverCloser interface {
+type BlockchainEventReceiver interface {
+	DeliverBlockchainEventBatch(ctx context.Context, batchID uuid.UUID, events []*pldapi.EventWithData) error
+}
+
+type ReceiverCloser interface {
 	Close()
 }
 
@@ -118,7 +122,7 @@ type TXManager interface {
 	StartReceiptListener(ctx context.Context, name string) error
 	StopReceiptListener(ctx context.Context, name string) error
 	DeleteReceiptListener(ctx context.Context, name string) error
-	AddReceiptReceiver(ctx context.Context, name string, r ReceiptReceiver) (ReceiptReceiverCloser, error)
+	AddReceiptReceiver(ctx context.Context, name string, r ReceiptReceiver) (ReceiverCloser, error)
 
 	// These functions for use of other components
 

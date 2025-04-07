@@ -25,7 +25,7 @@ func TestPTXModule(t *testing.T) {
 	testRPCModule(t, func(c PaladinClient) RPCModule { return c.PTX() })
 }
 
-func TestPTXSubscribe(t *testing.T) {
+func TestPTXSubscribeReceipts(t *testing.T) {
 	ctx, c, _, done := newTestClientAndServerWebSockets(t)
 	defer done()
 
@@ -33,10 +33,26 @@ func TestPTXSubscribe(t *testing.T) {
 	require.Regexp(t, "PD020702", err)
 }
 
-func TestPTXSubscribeNotWS(t *testing.T) {
+func TestPTXSubscribeReceiptsNotWS(t *testing.T) {
 	ctx, c, _, done := newTestClientAndServerHTTP(t)
 	defer done()
 
 	_, err := c.PTX().SubscribeReceipts(ctx, "listener1")
+	require.Regexp(t, "PD020217", err)
+}
+
+func TestPTXSubscribeBlockchainEvents(t *testing.T) {
+	ctx, c, _, done := newTestClientAndServerWebSockets(t)
+	defer done()
+
+	_, err := c.PTX().SubscribeBlockchainEvents(ctx, "listener1")
+	require.Regexp(t, "PD020702", err)
+}
+
+func TestPTXSubscribeBlockchainEventsNotWS(t *testing.T) {
+	ctx, c, _, done := newTestClientAndServerHTTP(t)
+	defer done()
+
+	_, err := c.PTX().SubscribeBlockchainEvents(ctx, "listener1")
 	require.Regexp(t, "PD020217", err)
 }

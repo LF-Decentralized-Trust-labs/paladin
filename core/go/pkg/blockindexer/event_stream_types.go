@@ -44,12 +44,14 @@ var EventStreamDefaults = &EventStreamConfig{
 type EventStreamType string
 
 const (
-	EventStreamTypeInternal EventStreamType = "internal" // a core Paladin component, such as the state confirmation engine
+	EventStreamTypeInternal                   EventStreamType = "internal"                      // a core Paladin component, such as the state confirmation engine
+	EventStreamTypePTXBlockchainEventListener EventStreamType = "ptx-blockchain-event-listener" // an event stream that backs an external PTX blockchain event listener
 )
 
 func (est EventStreamType) Options() []string {
 	return []string{
 		string(EventStreamTypeInternal),
+		string(EventStreamTypePTXBlockchainEventListener),
 	}
 }
 func (est EventStreamType) Enum() tktypes.Enum[EventStreamType] {
@@ -65,6 +67,7 @@ type EventStream struct {
 	Config  EventStreamConfig             `json:"config"         gorm:"type:bytes;serializer:json"`
 	Sources EventSources                  `json:"sources"        gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
 	Format  tktypes.JSONFormatOptions     `json:"format"`
+	Started *bool                         `json:"started"`
 }
 
 type EventSources []EventStreamSource
@@ -121,13 +124,21 @@ type EventDeliveryBatch struct {
 
 type PreCommitHandler func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) error
 
-type InternalStreamCallback func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error
+type InternalStreamCallbackDBTX func(ctx context.Context, dbTX persistence.DBTX, batch *EventDeliveryBatch) error
+
+type InternalStreamCallbackNOTX func(ctx context.Context, batch *EventDeliveryBatch) error
 
 type IESType int
 
 const (
-	// An event stream with its own checkpoint, and goroutine with its own DB transactions for checkpoint update, that can fall behind the head if necessary
-	IESTypeEventStream IESType = iota
+	// An event stream with its own checkpoint, and goroutine with its own DB transactions for checkpoint update, that can fall behind the head if necessary.
+	// The event stream has a handler that is called with a DB transaction so must complete immediately.
+	IESTypeEventStreamDBTX IESType = iota
+
+	// An event stream with its own checkpoint, and goroutine with its own DB transactions for checkpoint update, that can fall behind the head if necessary.
+	// The event stream has a handler that is called without a DB transaction so can block waiting for an external response.
+	IESTypeEventStreamNOTX
+
 	// An in-line callback that is fired with the raw block information, WITHIN the database transaction the block indexer uses to commit that information.
 	// Slowdowns here slow down the whole block indexer, so this is for critical DB coordinated commit processing by other components only (receipt writing).
 	// Errors from this function rollback the DB transaction, and hence stall the block indexer.
@@ -138,6 +149,7 @@ const (
 type InternalEventStream struct {
 	Type             IESType
 	Definition       *EventStream
-	Handler          InternalStreamCallback
+	HandlerDBTX      InternalStreamCallbackDBTX
+	HandlerNOTX      InternalStreamCallbackNOTX
 	PreCommitHandler PreCommitHandler
 }

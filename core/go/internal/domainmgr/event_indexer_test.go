@@ -78,10 +78,10 @@ func TestEventIndexingWithDB(t *testing.T) {
 						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
 					Data: tktypes.RawJSON(`{
-						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
-						"instance": "` + contractAddr.String() + `",
-						"config": "0xfeedbeef"
-					}`),
+						 "txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
+						 "instance": "` + contractAddr.String() + `",
+						 "config": "0xfeedbeef"
+					 }`),
 				},
 			},
 		})
@@ -143,8 +143,8 @@ func TestEventIndexingBadEvent(t *testing.T) {
 					Address:           *td.d.registryAddress,
 					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
 					Data: tktypes.RawJSON(`{
-						 "config": "cannot parse this"
-					 }`),
+						  "config": "cannot parse this"
+					  }`),
 				},
 			},
 		})
@@ -185,10 +185,10 @@ func TestEventIndexingInsertError(t *testing.T) {
 						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
 					Data: tktypes.RawJSON(`{
-						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
-						"domain": "` + contractAddr.String() + `",
-						"data": "0xfeedbeef"
-					}`),
+						 "txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
+						 "domain": "` + contractAddr.String() + `",
+						 "data": "0xfeedbeef"
+					 }`),
 				},
 			},
 		})

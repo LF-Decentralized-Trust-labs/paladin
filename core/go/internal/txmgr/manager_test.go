@@ -25,7 +25,9 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/mocks/ethclientmocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
 	"github.com/stretchr/testify/require"
@@ -99,6 +101,8 @@ func newTestTransactionManager(t *testing.T, realDB bool, init ...func(conf *pld
 		}
 	}
 	componentMocks.On("Persistence").Return(p)
+	mc.blockIndexer.On("QueryEventStreamDefinitions", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return([]*blockindexer.EventStream{}, nil).Once()
 
 	for _, fn := range init {
 		fn(conf, mc)

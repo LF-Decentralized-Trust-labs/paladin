@@ -131,7 +131,7 @@ func (tm *txManager) receiptsInit() {
 func (tm *txManager) CreateReceiptListener(ctx context.Context, spec *pldapi.TransactionReceiptListener) error {
 
 	log.L(ctx).Infof("Creating receipt listener '%s'", spec.Name)
-	if err := tm.validateListenerSpec(ctx, spec); err != nil {
+	if err := tm.validateReceiptListenerSpec(ctx, spec); err != nil {
 		return err
 	}
 
@@ -160,7 +160,7 @@ func (tm *txManager) CreateReceiptListener(ctx context.Context, spec *pldapi.Tra
 	}
 
 	// Load the created listener now - we do not expect (or attempt to reconcile) a post-validation failure to load
-	l, err := tm.loadListener(ctx, dbSpec)
+	l, err := tm.loadReceiptListener(ctx, dbSpec)
 	if err == nil && *l.spec.Started {
 		l.start()
 	}
@@ -171,7 +171,7 @@ func (rr *registeredReceiptReceiver) Close() {
 	rr.l.removeReceiver(rr.id)
 }
 
-func (tm *txManager) AddReceiptReceiver(ctx context.Context, name string, r components.ReceiptReceiver) (components.ReceiptReceiverCloser, error) {
+func (tm *txManager) AddReceiptReceiver(ctx context.Context, name string, r components.ReceiptReceiver) (components.ReceiverCloser, error) {
 	tm.receiptListenerLock.Lock()
 	defer tm.receiptListenerLock.Unlock()
 
@@ -268,7 +268,7 @@ func (tm *txManager) QueryReceiptListeners(ctx context.Context, dbTX persistence
 		Filters:     receiptListenerFilters,
 		Query:       jq,
 		MapResult: func(pl *persistedReceiptListener) (*pldapi.TransactionReceiptListener, error) {
-			return tm.mapListener(ctx, pl)
+			return tm.mapReceiptListener(ctx, pl)
 		},
 	}
 	return qw.Run(ctx, dbTX)
@@ -310,7 +310,7 @@ func (tm *txManager) loadReceiptListeners() error {
 		}
 
 		for _, pl := range page {
-			if _, err := tm.loadListener(ctx, pl); err != nil {
+			if _, err := tm.loadReceiptListener(ctx, pl); err != nil {
 				return err
 			}
 		}
@@ -359,7 +359,7 @@ func (tm *txManager) stopReceiptListeners() {
 	}
 }
 
-func (tm *txManager) validateListenerSpec(ctx context.Context, spec *pldapi.TransactionReceiptListener) error {
+func (tm *txManager) validateReceiptListenerSpec(ctx context.Context, spec *pldapi.TransactionReceiptListener) error {
 	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, spec.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
 		return err
 	}
@@ -438,7 +438,7 @@ func (l *receiptListener) checkMatch(r *transactionReceipt) bool {
 	return matches
 }
 
-func (tm *txManager) mapListener(ctx context.Context, pl *persistedReceiptListener) (*pldapi.TransactionReceiptListener, error) {
+func (tm *txManager) mapReceiptListener(ctx context.Context, pl *persistedReceiptListener) (*pldapi.TransactionReceiptListener, error) {
 	spec := &pldapi.TransactionReceiptListener{
 		Name:    pl.Name,
 		Started: pl.Started,
@@ -450,15 +450,15 @@ func (tm *txManager) mapListener(ctx context.Context, pl *persistedReceiptListen
 	if err := json.Unmarshal(pl.Options, &spec.Options); err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrBadReceiptListenerOptions, pl.Name)
 	}
-	if err := tm.validateListenerSpec(ctx, spec); err != nil {
+	if err := tm.validateReceiptListenerSpec(ctx, spec); err != nil {
 		return nil, err
 	}
 	return spec, nil
 }
 
-func (tm *txManager) loadListener(ctx context.Context, pl *persistedReceiptListener) (*receiptListener, error) {
+func (tm *txManager) loadReceiptListener(ctx context.Context, pl *persistedReceiptListener) (*receiptListener, error) {
 
-	spec, err := tm.mapListener(ctx, pl)
+	spec, err := tm.mapReceiptListener(ctx, pl)
 	if err != nil {
 		return nil, err
 	}

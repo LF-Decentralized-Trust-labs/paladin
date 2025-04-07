@@ -226,6 +226,9 @@ var allTypes = []interface{}{
 			},
 		},
 	},
+	pldapi.BlockchainEventListener{},
+	pldapi.BlockchainEventListenerOptions{},
+	pldapi.BlockchainEventListenerSource{},
 }
 var allAPITypes = []pldclient.RPCModule{
 	pldclient.New().PTX(),
@@ -290,6 +293,7 @@ func (d *docGenerator) generateMarkdownPages(ctx context.Context, types, simpleT
 
 	// have to go round twice to ensure we cross-link correctly. First to add them to the map
 	for i, o := range types {
+		fmt.Println(getType(types[i]).Name())
 		pageTitle := getType(types[i]).Name()
 		pageName := strings.ToLower(pageTitle)
 		d.addPageToMap(reflect.TypeOf(o), pageName)

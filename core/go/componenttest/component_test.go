@@ -30,8 +30,6 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/componenttest/domains"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
@@ -50,33 +48,10 @@ func TestRunSimpleStorageEthTransaction(t *testing.T) {
 	ctx := context.Background()
 	logrus.SetLevel(logrus.DebugLevel)
 
-	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil, false)
-	cm := instance.cm
+	instance := newInstanceForComponentTesting(t, deployDomainRegistry(t), nil, nil, nil, true)
 	c := pldclient.Wrap(instance.client).ReceiptPollingInterval(250 * time.Millisecond)
 
 	build, err := solutils.LoadBuild(ctx, simpleStorageBuildJSON)
-	require.NoError(t, err)
-
-	eventStreamEvents := make(chan *pldapi.EventWithData, 2 /* all the events we exepct */)
-	_, err = cm.BlockIndexer().AddEventStream(ctx, cm.Persistence().NOTX(), &blockindexer.InternalEventStream{
-		Handler: func(ctx context.Context, tx persistence.DBTX, batch *blockindexer.EventDeliveryBatch) error {
-			// With SQLite we cannot hang in here with a DB TX - as there's only one per process.
-			for _, e := range batch.Events {
-				select {
-				case eventStreamEvents <- e:
-				default:
-					assert.Fail(t, "more than expected number of events received")
-				}
-			}
-			return nil
-		},
-		Definition: &blockindexer.EventStream{
-			Name: "unittest",
-			Sources: []blockindexer.EventStreamSource{{
-				ABI: abi.ABI{build.ABI.Events()["Changed"]},
-			}},
-		},
-	})
 	require.NoError(t, err)
 
 	simpleStorage := c.ForABI(ctx, build.ABI).Public().From("key1")
@@ -88,6 +63,58 @@ func TestRunSimpleStorageEthTransaction(t *testing.T) {
 		Send().Wait(5 * time.Second)
 	require.NoError(t, res.Error())
 	contractAddr := res.Receipt().ContractAddress
+
+	// set up the event listener
+	success, err := c.PTX().CreateBlockchainEventListener(ctx, &pldapi.BlockchainEventListener{
+		Name:    "listener1",
+		Started: confutil.P(false),
+		Sources: []pldapi.BlockchainEventListenerSource{{
+			ABI:     abi.ABI{build.ABI.Events()["Changed"]},
+			Address: contractAddr,
+		}},
+	})
+	require.NoError(t, err)
+	require.True(t, success)
+
+	wsClient, err := c.WebSocket(ctx, instance.wsConfig)
+	require.NoError(t, err)
+
+	sub, err := wsClient.PTX().SubscribeBlockchainEvents(ctx, "listener1")
+	require.NoError(t, err)
+
+	eventData := make(chan string)
+
+	go func() {
+		for {
+			subNotification, ok := <-sub.Notifications()
+			if ok {
+				var batch pldapi.TransactionEventBatch
+				_ = json.Unmarshal(subNotification.GetResult(), &batch)
+				for _, e := range batch.Events {
+					eventData <- e.Data.String()
+				}
+			}
+			err = subNotification.Ack(ctx)
+			require.NoError(t, err)
+		}
+	}()
+
+	// pause to make sure that if an event was going to be received, it would have been
+	ticker1 := time.NewTicker(10 * time.Millisecond)
+	defer ticker1.Stop()
+
+	select {
+	case <-eventData:
+		t.FailNow()
+	case <-ticker1.C:
+	}
+
+	success, err = c.PTX().StartBlockchainEventListener(ctx, "listener1")
+	require.NoError(t, err)
+	require.True(t, success)
+
+	data := <-eventData
+	assert.JSONEq(t, `{"x":"11223344"}`, data)
 
 	var getX1 tktypes.RawJSON
 	err = simpleStorage.Clone().
@@ -105,6 +132,9 @@ func TestRunSimpleStorageEthTransaction(t *testing.T) {
 		Send().Wait(5 * time.Second)
 	require.NoError(t, res.Error())
 
+	data = <-eventData
+	assert.JSONEq(t, `{"x":"99887766"}`, data)
+
 	var getX2 tktypes.RawJSON
 	err = simpleStorage.Clone().
 		Function("get").
@@ -114,12 +144,34 @@ func TestRunSimpleStorageEthTransaction(t *testing.T) {
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"x":"99887766"}`, getX2.Pretty())
 
-	// Expect our event listener to be queued up with two Changed events
-	event1 := <-eventStreamEvents
-	assert.JSONEq(t, `{"x":"11223344"}`, string(event1.Data))
-	event2 := <-eventStreamEvents
-	assert.JSONEq(t, `{"x":"99887766"}`, string(event2.Data))
+	// stop the event listener
+	success, err = c.PTX().StopBlockchainEventListener(ctx, "listener1")
+	require.NoError(t, err)
+	require.True(t, success)
 
+	res = simpleStorage.Clone().
+		Function("set").
+		To(contractAddr).
+		Inputs(`{"_x":1234}`).
+		Send().Wait(5 * time.Second)
+	require.NoError(t, res.Error())
+
+	// pause to make sure that if an event was going to be received, it would have been
+	ticker2 := time.NewTicker(10 * time.Millisecond)
+	defer ticker2.Stop()
+
+	select {
+	case <-eventData:
+		t.FailNow()
+	case <-ticker2.C:
+	}
+
+	success, err = c.PTX().StartBlockchainEventListener(ctx, "listener1")
+	require.NoError(t, err)
+	require.True(t, success)
+
+	data = <-eventData
+	assert.JSONEq(t, `{"x":"1234"}`, data)
 }
 
 func TestUpdatePublicTransaction(t *testing.T) {

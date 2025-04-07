@@ -171,8 +171,8 @@ func (d *domain) processDomainConfig(dbTX persistence.DBTX, confRes *prototk.Con
 
 	// Create the event stream
 	d.eventStream, err = d.dm.blockIndexer.AddEventStream(d.ctx, dbTX, &blockindexer.InternalEventStream{
-		Definition: stream,
-		Handler:    d.handleEventBatch,
+		Definition:  stream,
+		HandlerDBTX: d.handleEventBatch,
 	})
 	if err != nil {
 		return nil, err
