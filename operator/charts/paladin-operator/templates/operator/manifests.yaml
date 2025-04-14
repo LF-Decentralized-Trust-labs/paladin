@@ -1,0 +1,100 @@
+{{- if .Values.webhook.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ .Values.operator.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.operator.name }}
+    app.kubernetes.io/instance: {{ .Values.operator.name }}
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/created-by: {{ .Values.operator.name }}
+    app.kubernetes.io/part-of: paladin
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Values.operator.namespace }}/{{ .Values.operator.name }}
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ .Values.operator.name }}
+      namespace: {{ .Values.operator.namespace }}
+      path: /validate-core-paladin-io-v1alpha1-paladinregistration
+  failurePolicy: Fail
+  name: vpaladinregistration.kb.io
+  rules:
+  - apiGroups:
+    - core.paladin.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - paladinregistrations
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ .Values.operator.name }}
+      namespace: {{ .Values.operator.namespace }}
+      path: /validate-core-paladin-io-v1alpha1-paladinregistry
+  failurePolicy: Fail
+  name: vpaladinregistry.kb.io
+  rules:
+  - apiGroups:
+    - core.paladin.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - paladinregistries
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ .Values.operator.name }}
+      namespace: {{ .Values.operator.namespace }}
+      path: /validate-core-paladin-io-v1alpha1-smartcontractdeployment
+  failurePolicy: Fail
+  name: vsmartcontractdeployment.kb.io
+  rules:
+  - apiGroups:
+    - core.paladin.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - smartcontractdeployments
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ .Values.operator.name }}
+      namespace: {{ .Values.operator.namespace }}
+      path: /validate-core-paladin-io-v1alpha1-transactioninvoke
+  failurePolicy: Fail
+  name: vtransactioninvoke.kb.io
+  rules:
+  - apiGroups:
+    - core.paladin.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - transactioninvokes
+  sideEffects: None
+
+{{- end }}
