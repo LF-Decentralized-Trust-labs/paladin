@@ -19,7 +19,7 @@ import (
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/smt"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 const SMT_HEIGHT_UTXO = 64
@@ -41,10 +41,10 @@ func NewSmt(storage StatesStorage) (core.SparseMerkleTree, error) {
 	return mt, err
 }
 
-func MerkleTreeName(tokenName string, domainInstanceContract *tktypes.EthAddress) string {
+func MerkleTreeName(tokenName string, domainInstanceContract *pldtypes.EthAddress) string {
 	return "smt_" + tokenName + "_" + domainInstanceContract.String()
 }
 
-func MerkleTreeNameForLockedStates(tokenName string, domainInstanceContract *tktypes.EthAddress) string {
+func MerkleTreeNameForLockedStates(tokenName string, domainInstanceContract *pldtypes.EthAddress) string {
 	return "smtLocked_" + tokenName + "_" + domainInstanceContract.String()
 }

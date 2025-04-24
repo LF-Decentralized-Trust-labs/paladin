@@ -23,10 +23,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 )
@@ -47,10 +47,10 @@ type BaseTXUpdates struct {
 	InFlightStatus *InFlightStatus
 	SubStatus      *BaseTxSubStatus
 	GasPricing     *pldapi.PublicTxGasPricing
-	// GasLimit          *tktypes.HexUint64 // note this is required for some methods (eth_estimateGas)
-	TransactionHash   *tktypes.Bytes32
-	FirstSubmit       *tktypes.Timestamp
-	LastSubmit        *tktypes.Timestamp
+	// GasLimit          *pldtypes.HexUint64 // note this is required for some methods (eth_estimateGas)
+	TransactionHash   *pldtypes.Bytes32
+	FirstSubmit       *pldtypes.Timestamp
+	LastSubmit        *pldtypes.Timestamp
 	ErrorMessage      *string
 	NewSubmission     *DBPubTxnSubmission
 	FlushedSubmission *DBPubTxnSubmission
@@ -116,8 +116,8 @@ type TransactionHeaders struct {
 type BalanceManager interface {
 	TopUpAccount(ctx context.Context, addAccount *AddressAccount) (mtx *pldapi.PublicTx, err error)
 	IsAutoFuelingEnabled(ctx context.Context) bool
-	GetAddressBalance(ctx context.Context, address tktypes.EthAddress) (*AddressAccount, error)
-	NotifyAddressBalanceChanged(ctx context.Context, address tktypes.EthAddress)
+	GetAddressBalance(ctx context.Context, address pldtypes.EthAddress) (*AddressAccount, error)
+	NotifyAddressBalanceChanged(ctx context.Context, address pldtypes.EthAddress)
 }
 
 type AutoFuelTransactionHandler interface {
@@ -128,7 +128,7 @@ type AutoFuelTransactionHandler interface {
 // - record the total spent of a series of transaction emitted by this signing address
 // - provide an interface to top up the signing address when spent is higher than the balance
 type AddressAccount struct {
-	Address               tktypes.EthAddress
+	Address               pldtypes.EthAddress
 	Balance               *big.Int
 	SpentTransactionCount int
 	MinCost               *big.Int
@@ -254,18 +254,18 @@ const (
 )
 
 type InMemoryTxStateReadOnly interface {
-	GetCreatedTime() *tktypes.Timestamp
+	GetCreatedTime() *pldtypes.Timestamp
 	// get the transaction receipt from the in-memory state (note: the returned value should not be modified)
-	GetTransactionHash() *tktypes.Bytes32
+	GetTransactionHash() *pldtypes.Bytes32
 	GetPubTxnID() uint64
 	GetNonce() uint64
-	GetFrom() tktypes.EthAddress
-	GetTo() *tktypes.EthAddress
-	GetValue() *tktypes.HexUint256
+	GetFrom() pldtypes.EthAddress
+	GetTo() *pldtypes.EthAddress
+	GetValue() *pldtypes.HexUint256
 	BuildEthTX() *ethsigner.Transaction
 	GetGasPriceObject() *pldapi.PublicTxGasPricing
-	GetFirstSubmit() *tktypes.Timestamp
-	GetLastSubmitTime() *tktypes.Timestamp
+	GetFirstSubmit() *pldtypes.Timestamp
+	GetLastSubmitTime() *pldtypes.Timestamp
 	GetUnflushedSubmission() *DBPubTxnSubmission
 	GetInFlightStatus() InFlightStatus
 	GetSignerNonce() string
@@ -299,15 +299,15 @@ type StageOutput struct {
 }
 
 type SubmitOutputs struct {
-	TxHash            *tktypes.Bytes32
-	SubmissionTime    *tktypes.Timestamp
+	TxHash            *pldtypes.Bytes32
+	SubmissionTime    *pldtypes.Timestamp
 	SubmissionOutcome SubmissionOutcome
 	ErrorReason       string
 	Err               error
 }
 type SignOutputs struct {
 	SignedMessage []byte
-	TxHash        *tktypes.Bytes32
+	TxHash        *pldtypes.Bytes32
 	Err           error
 }
 
@@ -328,7 +328,7 @@ type PersistenceOutput struct {
 type InFlightStageActionTriggers interface {
 	TriggerRetrieveGasPrice(ctx context.Context) error
 	TriggerSignTx(ctx context.Context) error
-	TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedTxHash *tktypes.Bytes32) error
+	TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32) error
 	TriggerStatusUpdate(ctx context.Context) error
 }
 
@@ -366,7 +366,7 @@ func (ctx *RunningStageContext) SetNewPersistenceUpdateOutput() {
 }
 
 type StatusUpdater interface {
-	UpdateSubStatus(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info *fftypes.JSONAny, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error
+	UpdateSubStatus(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info *fftypes.JSONAny, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error
 }
 
 type RunningStageContextPersistenceOutput struct {
@@ -378,7 +378,7 @@ type RunningStageContextPersistenceOutput struct {
 }
 
 func (sOut *RunningStageContextPersistenceOutput) UpdateSubStatus(action BaseTxAction, info *fftypes.JSONAny, err *fftypes.JSONAny) {
-	actionOccurred := tktypes.TimestampNow()
+	actionOccurred := pldtypes.TimestampNow()
 	sOut.StatusUpdates = append(sOut.StatusUpdates, func(p StatusUpdater) error {
 		return p.UpdateSubStatus(sOut.Ctx, sOut.InMemoryTx, sOut.SubStatus, action, info, err, &actionOccurred)
 	})
@@ -394,7 +394,7 @@ type OrchestratorContext struct {
 // so it needs to be carried over to next stages
 type TransientPreviousStageOutputs struct {
 	SignedMessage   []byte // NB: if the value is nil when triggering submitTx , node signer will be used to sign the transaction instead, don't use this to judge whether a transaction can be submitted or not.
-	TransactionHash *tktypes.Bytes32
+	TransactionHash *pldtypes.Bytes32
 }
 
 type InFlightTransactionStateManager interface {
@@ -436,8 +436,8 @@ type InFlightTransactionStateGeneration interface {
 	AddStageOutputs(ctx context.Context, stageOutput *StageOutput)
 	ProcessStageOutputs(ctx context.Context, processFunction func(stageOutputs []*StageOutput) (unprocessedStageOutputs []*StageOutput))
 	AddPersistenceOutput(ctx context.Context, stage InFlightTxStage, persistenceTime time.Time, err error)
-	AddSubmitOutput(ctx context.Context, txHash *tktypes.Bytes32, submissionTime *tktypes.Timestamp, submissionOutcome SubmissionOutcome, errorReason ethclient.ErrorReason, err error)
-	AddSignOutput(ctx context.Context, signedMessage []byte, txHash *tktypes.Bytes32, err error)
+	AddSubmitOutput(ctx context.Context, txHash *pldtypes.Bytes32, submissionTime *pldtypes.Timestamp, submissionOutcome SubmissionOutcome, errorReason ethclient.ErrorReason, err error)
+	AddSignOutput(ctx context.Context, signedMessage []byte, txHash *pldtypes.Bytes32, err error)
 	AddGasPriceOutput(ctx context.Context, gasPriceObject *pldapi.PublicTxGasPricing, err error)
 	AddPanicOutput(ctx context.Context, stage InFlightTxStage)
 

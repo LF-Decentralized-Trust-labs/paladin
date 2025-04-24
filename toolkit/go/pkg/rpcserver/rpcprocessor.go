@@ -20,9 +20,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 )
 
 func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcclient.RPCRequest, wsc *webSocketConnection) (*rpcclient.RPCResponse, bool) {
@@ -30,7 +30,7 @@ func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcclient.RPCRequest
 		// While the JSON/RPC standard does not strictly require an ID (it strongly discourages use of a null ID),
 		// we choose to make an ID mandatory. We do not enforce the type - it can be a number, string, or even boolean.
 		// However, it cannot be null.
-		err := i18n.NewError(ctx, tkmsgs.MsgJSONRPCMissingRequestID)
+		err := i18n.NewError(ctx, pldmsgs.MsgJSONRPCMissingRequestID)
 		return rpcclient.NewRPCErrorResponse(err, rpcReq.ID, rpcclient.RPCCodeInvalidRequest), false
 	}
 
@@ -41,7 +41,7 @@ func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcclient.RPCRequest
 		mh = module.methods[rpcReq.Method]
 	}
 	if mh == nil {
-		err := i18n.NewError(ctx, tkmsgs.MsgJSONRPCUnsupportedMethod, rpcReq.Method)
+		err := i18n.NewError(ctx, pldmsgs.MsgJSONRPCUnsupportedMethod, rpcReq.Method)
 		return rpcclient.NewRPCErrorResponse(err, rpcReq.ID, rpcclient.RPCCodeInvalidRequest), false
 	}
 
@@ -50,7 +50,7 @@ func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcclient.RPCRequest
 		rpcRes = mh.handler.Handle(ctx, rpcReq)
 	} else {
 		if wsc == nil {
-			return rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, tkmsgs.MsgJSONRPCAysncNonWSConn, rpcReq.Method), rpcReq.ID, rpcclient.RPCCodeInvalidRequest), false
+			return rpcclient.NewRPCErrorResponse(i18n.NewError(ctx, pldmsgs.MsgJSONRPCAysncNonWSConn, rpcReq.Method), rpcReq.ID, rpcclient.RPCCodeInvalidRequest), false
 		}
 		if mh.methodType == rpcMethodTypeAsyncStart {
 			rpcRes = wsc.handleNewAsync(ctx, rpcReq, mh.async)

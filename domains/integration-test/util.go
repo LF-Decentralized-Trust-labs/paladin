@@ -30,11 +30,11 @@ import (
 	"github.com/kaleido-io/paladin/domains/noto/pkg/noto"
 	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -122,7 +122,7 @@ func deployContracts(ctx context.Context, t *testing.T, hdWalletSeed *testbed.UT
 		build := solutils.MustLoadBuild(contract)
 		var addr string
 		rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
-			deployer, build.ABI, build.Bytecode.String(), tktypes.RawJSON(`{}`))
+			deployer, build.ABI, build.Bytecode.String(), pldtypes.RawJSON(`{}`))
 		if rpcerr != nil {
 			assert.NoError(t, rpcerr)
 		}
@@ -140,12 +140,12 @@ func newNotoDomain(t *testing.T, config *nototypes.DomainConfig) (chan noto.Noto
 			waitForDomain <- domain
 			return domain
 		}),
-		RegistryAddress: tktypes.MustEthAddress(config.FactoryAddress),
+		RegistryAddress: pldtypes.MustEthAddress(config.FactoryAddress),
 	}
 	return waitForDomain, tbd
 }
 
-func newZetoDomain(t *testing.T, config *zetotypes.DomainFactoryConfig, factoryAddress *tktypes.EthAddress) (chan zeto.Zeto, *testbed.TestbedDomain) {
+func newZetoDomain(t *testing.T, config *zetotypes.DomainFactoryConfig, factoryAddress *pldtypes.EthAddress) (chan zeto.Zeto, *testbed.TestbedDomain) {
 	waitForDomain := make(chan zeto.Zeto, 1)
 	tbd := &testbed.TestbedDomain{
 		Config: mapConfig(t, config),
@@ -160,7 +160,7 @@ func newZetoDomain(t *testing.T, config *zetotypes.DomainFactoryConfig, factoryA
 	return waitForDomain, tbd
 }
 
-func findAvailableCoins[T any](t *testing.T, ctx context.Context, rpc rpcclient.Client, domainName, coinSchemaID, methodName string, address *tktypes.EthAddress, jq *query.QueryJSON, readiness ...func(coins []*T) bool) []*T {
+func findAvailableCoins[T any](t *testing.T, ctx context.Context, rpc rpcclient.Client, domainName, coinSchemaID, methodName string, address *pldtypes.EthAddress, jq *query.QueryJSON, readiness ...func(coins []*T) bool) []*T {
 	if jq == nil {
 		jq = query.NewQueryBuilder().Limit(100).Query()
 	}

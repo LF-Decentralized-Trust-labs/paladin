@@ -19,14 +19,14 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDetectsContractChangeAtBuildTime(t *testing.T) {
 
 	assert.PanicsWithValue(t, "contract signature has changed: event IdentityRegistered(address different)", func() {
-		mustLoadIdentityRegistryContractDetail(tktypes.JSONString(SolidityBuild{
+		mustLoadIdentityRegistryContractDetail(pldtypes.JSONString(SolidityBuild{
 			ABI: abi.ABI{
 				{
 					Type: abi.Event,
@@ -40,7 +40,7 @@ func TestDetectsContractChangeAtBuildTime(t *testing.T) {
 	})
 
 	assert.PanicsWithValue(t, "contract signature has changed: event PropertySet(address different)", func() {
-		mustLoadIdentityRegistryContractDetail(tktypes.JSONString(SolidityBuild{
+		mustLoadIdentityRegistryContractDetail(pldtypes.JSONString(SolidityBuild{
 			ABI: abi.ABI{
 				contractDetail.abi.Events()["IdentityRegistered"],
 				{

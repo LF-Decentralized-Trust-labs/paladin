@@ -25,14 +25,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -106,7 +106,7 @@ func TestPrivateTxManagerInvalidTransactionMissingDomain(t *testing.T) {
 	ctx := context.Background()
 
 	privateTxManager, mocks := NewPrivateTransactionMgrForPackageTesting(t, "node1")
-	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+	domainAddress := pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	mocks.domainMgr.On("GetSmartContractByAddress", mock.Anything, mock.Anything, *domainAddress).Return(mocks.domainSmartContract, nil)
 
 	err := privateTxManager.PostInit(mocks.allComponents)
@@ -139,7 +139,7 @@ func TestPrivateTxManagerInvalidTransactionMismatchedDomain(t *testing.T) {
 	ctx := context.Background()
 
 	privateTxManager, mocks := NewPrivateTransactionMgrForPackageTesting(t, "node1")
-	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+	domainAddress := pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	mocks.domainMgr.On("GetSmartContractByAddress", mock.Anything, mock.Anything, *domainAddress).Return(mocks.domainSmartContract, nil)
 	mocks.domainSmartContract.On("Address").Return(*domainAddress)
 
@@ -174,7 +174,7 @@ func TestPrivateTxManagerInvalidTransactionEmptyAddress(t *testing.T) {
 	ctx := context.Background()
 
 	privateTxManager, mocks := NewPrivateTransactionMgrForPackageTesting(t, "node1")
-	domainAddress := &tktypes.EthAddress{}
+	domainAddress := &pldtypes.EthAddress{}
 
 	err := privateTxManager.PostInit(mocks.allComponents)
 	require.NoError(t, err)
@@ -217,7 +217,7 @@ func TestPrivateTxManagerSimpleTransaction(t *testing.T) {
 	//Submit a transaction that gets assembled with an attestation plan for a local endorser to sign the transaction
 	ctx := context.Background()
 
-	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+	domainAddress := pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	privateTxManager, mocks := NewPrivateTransactionMgrForPackageTesting(t, "node1")
 	mocks.mockDomain(domainAddress)
 
@@ -273,9 +273,9 @@ func TestPrivateTxManagerSimpleTransaction(t *testing.T) {
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 			InputStates: []*components.FullState{
 				{
-					ID:     tktypes.RandBytes(32),
-					Schema: tktypes.RandBytes32(),
-					Data:   tktypes.JSONString("foo"),
+					ID:     pldtypes.RandBytes(32),
+					Schema: pldtypes.RandBytes32(),
+					Data:   pldtypes.JSONString("foo"),
 				},
 			},
 			AttestationPlan: []*prototk.AttestationRequest{
@@ -322,8 +322,8 @@ func TestPrivateTxManagerSimpleTransaction(t *testing.T) {
 	mocks.domainSmartContract.On("PrepareTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			cv, err := testABI[0].Inputs.ParseExternalData(map[string]any{
-				"inputs":  []any{tktypes.RandBytes32()},
-				"outputs": []any{tktypes.RandBytes32()},
+				"inputs":  []any{pldtypes.RandBytes32()},
+				"outputs": []any{pldtypes.RandBytes32()},
 				"data":    "0xfeedbeef",
 			})
 			require.NoError(t, err)
@@ -334,17 +334,17 @@ func TestPrivateTxManagerSimpleTransaction(t *testing.T) {
 				ABI: abi.ABI{testABI[0]},
 				TransactionBase: pldapi.TransactionBase{
 					To:              domainAddress,
-					Data:            tktypes.RawJSON(jsonData),
-					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(tktypes.HexUint64(100000))},
+					Data:            pldtypes.RawJSON(jsonData),
+					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(pldtypes.HexUint64(100000))},
 				},
 			}
 		},
 	)
 	testTransactionID := confutil.P(uuid.New())
 
-	signingAddr := tktypes.RandAddress()
+	signingAddr := pldtypes.RandAddress()
 	mocks.keyManager.On("ResolveEthAddressBatchNewDatabaseTX", mock.Anything, []string{"signer1"}).
-		Return([]*tktypes.EthAddress{signingAddr}, nil)
+		Return([]*pldtypes.EthAddress{signingAddr}, nil)
 
 	_ = mockWritePublicTxsOk(mocks)
 
@@ -402,7 +402,7 @@ func TestPrivateTxManagerSimplePreparedTransaction(t *testing.T) {
 	// package which really should be changed to be a mock to align with this testing strategy
 	ctx := context.Background()
 
-	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+	domainAddress := pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	privateTxManager, mocks := NewPrivateTransactionMgrForPackageTesting(t, "node1")
 	mocks.mockDomain(domainAddress)
 
@@ -454,9 +454,9 @@ func TestPrivateTxManagerSimplePreparedTransaction(t *testing.T) {
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 			InputStates: []*components.FullState{
 				{
-					ID:     tktypes.RandBytes(32),
-					Schema: tktypes.RandBytes32(),
-					Data:   tktypes.JSONString("foo"),
+					ID:     pldtypes.RandBytes(32),
+					Schema: pldtypes.RandBytes32(),
+					Data:   pldtypes.JSONString("foo"),
 				},
 			},
 			AttestationPlan: []*prototk.AttestationRequest{
@@ -503,8 +503,8 @@ func TestPrivateTxManagerSimplePreparedTransaction(t *testing.T) {
 	mocks.domainSmartContract.On("PrepareTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			cv, err := testABI[0].Inputs.ParseExternalData(map[string]any{
-				"inputs":  []any{tktypes.RandBytes32()},
-				"outputs": []any{tktypes.RandBytes32()},
+				"inputs":  []any{pldtypes.RandBytes32()},
+				"outputs": []any{pldtypes.RandBytes32()},
 				"data":    "0xfeedbeef",
 			})
 			require.NoError(t, err)
@@ -515,8 +515,8 @@ func TestPrivateTxManagerSimplePreparedTransaction(t *testing.T) {
 				ABI: abi.ABI{testABI[0]},
 				TransactionBase: pldapi.TransactionBase{
 					To:              domainAddress,
-					Data:            tktypes.RawJSON(jsonData),
-					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(tktypes.HexUint64(100000))},
+					Data:            pldtypes.RawJSON(jsonData),
+					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(pldtypes.HexUint64(100000))},
 				},
 			}
 		},
@@ -568,7 +568,7 @@ func TestPrivateTxManagerMultipleSignature(t *testing.T) {
 	//Submit a transaction that gets assembled with an attestation plan for 2 signers
 	ctx := context.Background()
 
-	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+	domainAddress := pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	privateTxManager, mocks := NewPrivateTransactionMgrForPackageTesting(t, "node1")
 	mocks.mockDomain(domainAddress)
 
@@ -634,9 +634,9 @@ func TestPrivateTxManagerMultipleSignature(t *testing.T) {
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 			InputStates: []*components.FullState{
 				{
-					ID:     tktypes.RandBytes(32),
-					Schema: tktypes.RandBytes32(),
-					Data:   tktypes.JSONString("foo"),
+					ID:     pldtypes.RandBytes(32),
+					Schema: pldtypes.RandBytes32(),
+					Data:   pldtypes.JSONString("foo"),
 				},
 			},
 			AttestationPlan: []*prototk.AttestationRequest{
@@ -725,8 +725,8 @@ func TestPrivateTxManagerMultipleSignature(t *testing.T) {
 	mocks.domainSmartContract.On("PrepareTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			cv, err := testABI[0].Inputs.ParseExternalData(map[string]any{
-				"inputs":  []any{tktypes.RandBytes32()},
-				"outputs": []any{tktypes.RandBytes32()},
+				"inputs":  []any{pldtypes.RandBytes32()},
+				"outputs": []any{pldtypes.RandBytes32()},
 				"data":    "0xfeedbeef",
 			})
 			require.NoError(t, err)
@@ -737,17 +737,17 @@ func TestPrivateTxManagerMultipleSignature(t *testing.T) {
 				ABI: abi.ABI{testABI[0]},
 				TransactionBase: pldapi.TransactionBase{
 					To:              domainAddress,
-					Data:            tktypes.RawJSON(jsonData),
-					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(tktypes.HexUint64(100000))},
+					Data:            pldtypes.RawJSON(jsonData),
+					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(pldtypes.HexUint64(100000))},
 				},
 			}
 		},
 	)
 	testTransactionID := confutil.P(uuid.New())
 
-	signingAddr := tktypes.RandAddress()
+	signingAddr := pldtypes.RandAddress()
 	mocks.keyManager.On("ResolveEthAddressBatchNewDatabaseTX", mock.Anything, []string{"signer1"}).
-		Return([]*tktypes.EthAddress{signingAddr}, nil)
+		Return([]*pldtypes.EthAddress{signingAddr}, nil)
 
 	_ = mockWritePublicTxsOk(mocks)
 
@@ -798,7 +798,7 @@ func TestPrivateTxManagerRemoteNotaryEndorser(t *testing.T) {
 	ctx := context.Background()
 	// A transaction that requires exactly one endorsement from a notary (as per noto) and therefore delegates coordination of the transaction to that node
 
-	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+	domainAddress := pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	localNodeName := "localNode"
 	remoteNodeName := "remoteNode"
 	privateTxManager, localNodeMocks := NewPrivateTransactionMgrForPackageTesting(t, localNodeName)
@@ -852,9 +852,9 @@ func TestPrivateTxManagerRemoteNotaryEndorser(t *testing.T) {
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 			InputStates: []*components.FullState{
 				{
-					ID:     tktypes.RandBytes(32),
-					Schema: tktypes.RandBytes32(),
-					Data:   tktypes.JSONString("foo"),
+					ID:     pldtypes.RandBytes(32),
+					Schema: pldtypes.RandBytes32(),
+					Data:   pldtypes.JSONString("foo"),
 				},
 			},
 			AttestationPlan: []*prototk.AttestationRequest{
@@ -911,8 +911,8 @@ func TestPrivateTxManagerRemoteNotaryEndorser(t *testing.T) {
 	remoteEngineMocks.domainSmartContract.On("PrepareTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			cv, err := testABI[0].Inputs.ParseExternalData(map[string]any{
-				"inputs":  []any{tktypes.RandBytes32()},
-				"outputs": []any{tktypes.RandBytes32()},
+				"inputs":  []any{pldtypes.RandBytes32()},
+				"outputs": []any{pldtypes.RandBytes32()},
 				"data":    "0xfeedbeef",
 			})
 			require.NoError(t, err)
@@ -923,8 +923,8 @@ func TestPrivateTxManagerRemoteNotaryEndorser(t *testing.T) {
 				ABI: abi.ABI{testABI[0]},
 				TransactionBase: pldapi.TransactionBase{
 					To:              domainAddress,
-					Data:            tktypes.RawJSON(jsonData),
-					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(tktypes.HexUint64(100000))},
+					Data:            pldtypes.RawJSON(jsonData),
+					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(pldtypes.HexUint64(100000))},
 				},
 			}
 		},
@@ -933,9 +933,9 @@ func TestPrivateTxManagerRemoteNotaryEndorser(t *testing.T) {
 
 	_ = mockWritePublicTxsOk(remoteEngineMocks)
 
-	signingAddr := tktypes.RandAddress()
+	signingAddr := pldtypes.RandAddress()
 	remoteEngineMocks.keyManager.On("ResolveEthAddressBatchNewDatabaseTX", mock.Anything, []string{"signer1"}).
-		Return([]*tktypes.EthAddress{signingAddr}, nil)
+		Return([]*pldtypes.EthAddress{signingAddr}, nil)
 
 	// Flush of domain context happens on the remote node (the notary)
 	dcFlushed := mockDCFlushWithWaiter(remoteEngineMocks)
@@ -984,7 +984,7 @@ func TestPrivateTxManagerRemoteNotaryEndorserRetry(t *testing.T) {
 	ctx := context.Background()
 	// A transaction that requires exactly one endorsement from a notary (as per noto) and therefore delegates coordination of the transaction to that node
 
-	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+	domainAddress := pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	localNodeName := "localNode"
 	remoteNodeName := "remoteNode"
 	privateTxManager, localNodeMocks := NewPrivateTransactionMgrForPackageTesting(t, localNodeName)
@@ -1037,9 +1037,9 @@ func TestPrivateTxManagerRemoteNotaryEndorserRetry(t *testing.T) {
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 			InputStates: []*components.FullState{
 				{
-					ID:     tktypes.RandBytes(32),
-					Schema: tktypes.RandBytes32(),
-					Data:   tktypes.JSONString("foo"),
+					ID:     pldtypes.RandBytes(32),
+					Schema: pldtypes.RandBytes32(),
+					Data:   pldtypes.JSONString("foo"),
 				},
 			},
 			AttestationPlan: []*prototk.AttestationRequest{
@@ -1104,8 +1104,8 @@ func TestPrivateTxManagerRemoteNotaryEndorserRetry(t *testing.T) {
 	remoteEngineMocks.domainSmartContract.On("PrepareTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			cv, err := testABI[0].Inputs.ParseExternalData(map[string]any{
-				"inputs":  []any{tktypes.RandBytes32()},
-				"outputs": []any{tktypes.RandBytes32()},
+				"inputs":  []any{pldtypes.RandBytes32()},
+				"outputs": []any{pldtypes.RandBytes32()},
 				"data":    "0xfeedbeef",
 			})
 			require.NoError(t, err)
@@ -1116,17 +1116,17 @@ func TestPrivateTxManagerRemoteNotaryEndorserRetry(t *testing.T) {
 				ABI: abi.ABI{testABI[0]},
 				TransactionBase: pldapi.TransactionBase{
 					To:              domainAddress,
-					Data:            tktypes.RawJSON(jsonData),
-					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(tktypes.HexUint64(100000))},
+					Data:            pldtypes.RawJSON(jsonData),
+					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(pldtypes.HexUint64(100000))},
 				},
 			}
 		},
 	)
 	testTransactionID := confutil.P(uuid.New())
 
-	signingAddr := tktypes.RandAddress()
+	signingAddr := pldtypes.RandAddress()
 	remoteEngineMocks.keyManager.On("ResolveEthAddressBatchNewDatabaseTX", mock.Anything, []string{"signer1"}).
-		Return([]*tktypes.EthAddress{signingAddr}, nil)
+		Return([]*pldtypes.EthAddress{signingAddr}, nil)
 
 	_ = mockWritePublicTxsOk(remoteEngineMocks)
 
@@ -1175,7 +1175,7 @@ func TestPrivateTxManagerEndorsementGroup(t *testing.T) {
 	// In this scenario there is only one active transaction and therefore no risk of contention so the transactions is coordinated
 	// and dispatched locally.  The only expected interaction with the remote nodes is to request endorsements and to distribute the new states
 
-	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+	domainAddress := pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	domainAddressString := domainAddress.String()
 
 	aliceNodeName := "aliceNode"
@@ -1234,9 +1234,9 @@ func TestPrivateTxManagerEndorsementGroup(t *testing.T) {
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 			InputStates: []*components.FullState{
 				{
-					ID:     tktypes.RandBytes(32),
-					Schema: tktypes.RandBytes32(),
-					Data:   tktypes.JSONString("foo"),
+					ID:     pldtypes.RandBytes(32),
+					Schema: pldtypes.RandBytes32(),
+					Data:   pldtypes.JSONString("foo"),
 				},
 			},
 			AttestationPlan: []*prototk.AttestationRequest{
@@ -1325,7 +1325,7 @@ func TestPrivateTxManagerEndorsementGroupDynamicCoordinator(t *testing.T) {
 	// beyond the range boundaries so that nodes switch coordinator roles
 	ctx := context.Background()
 
-	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+	domainAddress := pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	domainAddressString := domainAddress.String()
 
 	testTransactionID1 := confutil.P(uuid.New())
@@ -1393,9 +1393,9 @@ func TestPrivateTxManagerEndorsementGroupDynamicCoordinator(t *testing.T) {
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 			InputStates: []*components.FullState{
 				{
-					ID:     tktypes.RandBytes(32),
-					Schema: tktypes.RandBytes32(),
-					Data:   tktypes.JSONString("foo"),
+					ID:     pldtypes.RandBytes(32),
+					Schema: pldtypes.RandBytes32(),
+					Data:   pldtypes.JSONString("foo"),
 				},
 			},
 			AttestationPlan: []*prototk.AttestationRequest{
@@ -1539,7 +1539,7 @@ func TestPrivateTxManagerEndorsementGroupDynamicCoordinatorRangeBoundaryHandover
 	// and assert that transactions that are not yet passed the point of no return (i.e. are sequenced but not dispatched ) are transferred to, and eventually submitted by, the new coordinator
 	ctx := context.Background()
 
-	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+	domainAddress := pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	domainAddressString := domainAddress.String()
 
 	testTransactionID1 := confutil.P(uuid.New())
@@ -1610,9 +1610,9 @@ func TestPrivateTxManagerEndorsementGroupDynamicCoordinatorRangeBoundaryHandover
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 			InputStates: []*components.FullState{
 				{
-					ID:     tktypes.RandBytes(32),
-					Schema: tktypes.RandBytes32(),
-					Data:   tktypes.JSONString("foo"),
+					ID:     pldtypes.RandBytes(32),
+					Schema: pldtypes.RandBytes32(),
+					Data:   pldtypes.JSONString("foo"),
 				},
 			},
 			AttestationPlan: []*prototk.AttestationRequest{
@@ -1778,7 +1778,7 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 
 	ctx := context.Background()
 
-	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+	domainAddress := pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	domainAddressString := domainAddress.String()
 
 	aliceNodeName := "aliceNode"
@@ -1827,9 +1827,9 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 
 	states := []*components.FullState{
 		{
-			ID:     tktypes.RandBytes(32),
-			Schema: tktypes.RandBytes32(),
-			Data:   tktypes.JSONString("foo"),
+			ID:     pldtypes.RandBytes(32),
+			Schema: pldtypes.RandBytes32(),
+			Data:   pldtypes.JSONString("foo"),
 		},
 	}
 
@@ -1916,8 +1916,8 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	aliceEngineMocks.domainSmartContract.On("PrepareTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			cv, err := testABI[0].Inputs.ParseExternalData(map[string]any{
-				"inputs":  []any{tktypes.RandBytes32()},
-				"outputs": []any{tktypes.RandBytes32()},
+				"inputs":  []any{pldtypes.RandBytes32()},
+				"outputs": []any{pldtypes.RandBytes32()},
 				"data":    "0xfeedbeef",
 			})
 			require.NoError(t, err)
@@ -1928,8 +1928,8 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 				ABI: abi.ABI{testABI[0]},
 				TransactionBase: pldapi.TransactionBase{
 					To:              domainAddress,
-					Data:            tktypes.RawJSON(jsonData),
-					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(tktypes.HexUint64(100000))},
+					Data:            pldtypes.RawJSON(jsonData),
+					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(pldtypes.HexUint64(100000))},
 				},
 			}
 		},
@@ -1937,9 +1937,9 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 
 	_ = mockWritePublicTxsOk(aliceEngineMocks)
 
-	signingAddr := tktypes.RandAddress()
+	signingAddr := pldtypes.RandAddress()
 	aliceEngineMocks.keyManager.On("ResolveEthAddressBatchNewDatabaseTX", mock.Anything, []string{"signer1", "signer1"}).
-		Return([]*tktypes.EthAddress{signingAddr, signingAddr}, nil)
+		Return([]*pldtypes.EthAddress{signingAddr, signingAddr}, nil)
 
 	err := aliceEngine.Start()
 	require.NoError(t, err)
@@ -2001,7 +2001,7 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	attestationResult := prototk.AttestationResult{
 		Name:            "notary",
 		AttestationType: prototk.AttestationType_ENDORSE,
-		Payload:         tktypes.RandBytes(32),
+		Payload:         pldtypes.RandBytes(32),
 		Verifier: &prototk.ResolvedVerifier{
 			Lookup:       bob.identityLocator,
 			Verifier:     bob.verifier,
@@ -2118,7 +2118,7 @@ func TestPrivateTxManagerDeploy(t *testing.T) {
 		}
 	}).Return(nil)
 
-	domainRegistryAddress := tktypes.RandAddress()
+	domainRegistryAddress := pldtypes.RandAddress()
 
 	testConstructorABI := &abi.Entry{
 		Name:   "constructor",
@@ -2137,9 +2137,9 @@ func TestPrivateTxManagerDeploy(t *testing.T) {
 		tx.Signer = "signer1"
 	}).Return(nil)
 
-	signingAddr := tktypes.RandAddress()
+	signingAddr := pldtypes.RandAddress()
 	mocks.keyManager.On("ResolveEthAddressBatchNewDatabaseTX", mock.Anything, []string{"signer1"}).
-		Return([]*tktypes.EthAddress{signingAddr}, nil)
+		Return([]*pldtypes.EthAddress{signingAddr}, nil)
 
 	dispatched := mockWritePublicTxsOk(mocks)
 
@@ -2199,7 +2199,7 @@ func TestPrivateTxManagerDeployErrorInvalidSubmitMode(t *testing.T) {
 				TransactionBase: pldapi.TransactionBase{
 					Domain: "domain1",
 					From:   notary.identityLocator,
-					Data:   tktypes.JSONString(`{"inputs": ["0xfeedbeef"]}`),
+					Data:   pldtypes.JSONString(`{"inputs": ["0xfeedbeef"]}`),
 				},
 			},
 		},
@@ -2236,7 +2236,7 @@ func TestPrivateTxManagerDeployFailInit(t *testing.T) {
 				TransactionBase: pldapi.TransactionBase{
 					Domain: "domain1",
 					From:   "alice@node1",
-					Data:   tktypes.JSONString(`{"inputs": ["0xfeedbeef"]}`),
+					Data:   pldtypes.JSONString(`{"inputs": ["0xfeedbeef"]}`),
 				},
 			},
 		},
@@ -2267,7 +2267,7 @@ func TestPrivateTxManagerDeployFailPrepare(t *testing.T) {
 				TransactionBase: pldapi.TransactionBase{
 					Domain: "domain1",
 					From:   "alice@node1",
-					Data:   tktypes.JSONString(`{"inputs": ["0xfeedbeef"]}`),
+					Data:   pldtypes.JSONString(`{"inputs": ["0xfeedbeef"]}`),
 				},
 			},
 		},
@@ -2334,7 +2334,7 @@ func TestPrivateTxManagerFailSignerResolve(t *testing.T) {
 				TransactionBase: pldapi.TransactionBase{
 					Domain: "domain1",
 					From:   "alice@node1",
-					Data:   tktypes.JSONString(`{"inputs": ["0xfeedbeef"]}`),
+					Data:   pldtypes.JSONString(`{"inputs": ["0xfeedbeef"]}`),
 				},
 			},
 		},
@@ -2351,7 +2351,7 @@ func TestPrivateTxManagerFailSignerResolve(t *testing.T) {
 		}
 	}).Return(nil)
 
-	domainRegistryAddress := tktypes.RandAddress()
+	domainRegistryAddress := pldtypes.RandAddress()
 
 	testConstructorABI := &abi.Entry{
 		Name:   "constructor",
@@ -2422,7 +2422,7 @@ func TestPrivateTxManagerDeployFailNoInvokeOrDeploy(t *testing.T) {
 				TransactionBase: pldapi.TransactionBase{
 					Domain: "domain1",
 					From:   "alice@node1",
-					Data:   tktypes.JSONString(`{"inputs": ["0xfeedbeef"]}`),
+					Data:   pldtypes.JSONString(`{"inputs": ["0xfeedbeef"]}`),
 				},
 			},
 		},
@@ -2446,9 +2446,9 @@ func TestPrivateTxManagerDeployFailNoInvokeOrDeploy(t *testing.T) {
 		tx.Signer = "signer1"
 	}).Return(nil)
 
-	signingAddr := tktypes.RandAddress()
+	signingAddr := pldtypes.RandAddress()
 	mocks.keyManager.On("ResolveEthAddressBatchNewDatabaseTX", mock.Anything, []string{"signer1"}).
-		Return([]*tktypes.EthAddress{signingAddr}, nil)
+		Return([]*pldtypes.EthAddress{signingAddr}, nil)
 
 	reverted := make(chan []*components.ReceiptInput, 1)
 
@@ -2494,7 +2494,7 @@ func TestCallPrivateSmartContractOk(t *testing.T) {
 	resultCV, err := fnDef.Outputs.ParseJSON([]byte(`["thing"]`))
 	require.NoError(t, err)
 
-	bobAddr := tktypes.RandAddress()
+	bobAddr := pldtypes.RandAddress()
 	m.identityResolver.On("ResolveVerifier", mock.Anything, "bob@node1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS).
 		Return(bobAddr.String(), nil)
 	mPSC.On("InitCall", mock.Anything, mock.Anything).Return(
@@ -2513,7 +2513,7 @@ func TestCallPrivateSmartContractOk(t *testing.T) {
 		Transaction: &pldapi.Transaction{
 			TransactionBase: pldapi.TransactionBase{
 				To:   confutil.P(mPSC.Address()),
-				Data: tktypes.RawJSON(`{}`),
+				Data: pldtypes.RawJSON(`{}`),
 			},
 		},
 		Function: &components.ResolvedFunction{
@@ -2537,8 +2537,8 @@ func TestCallPrivateSmartContractBadContract(t *testing.T) {
 	_, err := ptx.CallPrivateSmartContract(ctx, &components.ResolvedTransaction{
 		Transaction: &pldapi.Transaction{
 			TransactionBase: pldapi.TransactionBase{
-				To:   tktypes.RandAddress(),
-				Data: tktypes.RawJSON(`{}`),
+				To:   pldtypes.RandAddress(),
+				Data: pldtypes.RawJSON(`{}`),
 			},
 		},
 	})
@@ -2561,7 +2561,7 @@ func TestCallPrivateSmartContractBadDomainName(t *testing.T) {
 			TransactionBase: pldapi.TransactionBase{
 				Domain: "does-not-match",
 				To:     confutil.P(mPSC.Address()),
-				Data:   tktypes.RawJSON(`{}`),
+				Data:   pldtypes.RawJSON(`{}`),
 			},
 		},
 		Function: &components.ResolvedFunction{
@@ -2587,7 +2587,7 @@ func TestCallPrivateSmartContractInitCallFail(t *testing.T) {
 		Transaction: &pldapi.Transaction{
 			TransactionBase: pldapi.TransactionBase{
 				To:   confutil.P(mPSC.Address()),
-				Data: tktypes.RawJSON(`{}`),
+				Data: pldtypes.RawJSON(`{}`),
 			},
 		},
 	})
@@ -2614,7 +2614,7 @@ func TestCallPrivateSmartContractResolveFail(t *testing.T) {
 		Transaction: &pldapi.Transaction{
 			TransactionBase: pldapi.TransactionBase{
 				To:   confutil.P(mPSC.Address()),
-				Data: tktypes.RawJSON(`{}`),
+				Data: pldtypes.RawJSON(`{}`),
 			},
 		},
 	})
@@ -2640,7 +2640,7 @@ func TestCallPrivateSmartContractExecCallFail(t *testing.T) {
 		Transaction: &pldapi.Transaction{
 			TransactionBase: pldapi.TransactionBase{
 				To:   confutil.P(mPSC.Address()),
-				Data: tktypes.RawJSON(`{}`),
+				Data: pldtypes.RawJSON(`{}`),
 			},
 		},
 	})
@@ -2670,7 +2670,7 @@ type dependencyMocks struct {
 	txManager           *componentmocks.TXManager
 }
 
-func (m *dependencyMocks) mockDomain(domainAddress *tktypes.EthAddress) {
+func (m *dependencyMocks) mockDomain(domainAddress *pldtypes.EthAddress) {
 	m.stateStore.On("NewDomainContext", mock.Anything, m.domain, *domainAddress, mock.Anything).Return(m.domainContext).Maybe()
 	m.domainMgr.On("GetSmartContractByAddress", mock.Anything, mock.Anything, *domainAddress).Maybe().Return(m.domainSmartContract, nil)
 	m.domain.On("Configuration").Return(&prototk.DomainConfig{}).Maybe()
@@ -2679,14 +2679,14 @@ func (m *dependencyMocks) mockDomain(domainAddress *tktypes.EthAddress) {
 // Some of the tests were getting quite verbose and was difficult to see the wood for the trees so moved a lot of the boilerplate into these utility functions
 //   - some of these utility functions have potential to become complex so may need to think about tests for the utility functions themselves but for now, the complexity is low enough to not warrant it
 
-func (m *dependencyMocks) mockForSubmitter(t *testing.T, transactionID *uuid.UUID, domainAddress *tktypes.EthAddress, expectedEndorsements map[string][]byte /*map of verifier to endorsement signature*/) chan struct{} {
+func (m *dependencyMocks) mockForSubmitter(t *testing.T, transactionID *uuid.UUID, domainAddress *pldtypes.EthAddress, expectedEndorsements map[string][]byte /*map of verifier to endorsement signature*/) chan struct{} {
 	signerName := "signer1"
-	signingAddr := tktypes.RandAddress()
+	signingAddr := pldtypes.RandAddress()
 	m.domainSmartContract.On("PrepareTransaction", mock.Anything, mock.Anything, mock.MatchedBy(privateTransactionMatcher(*transactionID))).Return(nil).Run(
 		func(args mock.Arguments) {
 			cv, err := testABI[0].Inputs.ParseExternalData(map[string]any{
-				"inputs":  []any{tktypes.RandBytes32()},
-				"outputs": []any{tktypes.RandBytes32()},
+				"inputs":  []any{pldtypes.RandBytes32()},
+				"outputs": []any{pldtypes.RandBytes32()},
 				"data":    "0xfeedbeef",
 			})
 			require.NoError(t, err)
@@ -2697,8 +2697,8 @@ func (m *dependencyMocks) mockForSubmitter(t *testing.T, transactionID *uuid.UUI
 				ABI: abi.ABI{testABI[0]},
 				TransactionBase: pldapi.TransactionBase{
 					To:              domainAddress,
-					Data:            tktypes.RawJSON(jsonData),
-					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(tktypes.HexUint64(100000))},
+					Data:            pldtypes.RawJSON(jsonData),
+					PublicTxOptions: pldapi.PublicTxOptions{Gas: confutil.P(pldtypes.HexUint64(100000))},
 				},
 			}
 			endorsed := make(map[string]bool)
@@ -2716,7 +2716,7 @@ func (m *dependencyMocks) mockForSubmitter(t *testing.T, transactionID *uuid.UUI
 	)
 
 	m.keyManager.On("ResolveEthAddressBatchNewDatabaseTX", mock.Anything, []string{"signer1"}).
-		Return([]*tktypes.EthAddress{signingAddr}, nil)
+		Return([]*pldtypes.EthAddress{signingAddr}, nil)
 
 	_ = mockWritePublicTxsOk(m)
 
@@ -3003,7 +3003,7 @@ func newPartyForTesting(ctx context.Context, name, node string, mocks *dependenc
 	party := identityForTesting{
 		identity:        name,
 		identityLocator: name + "@" + node,
-		verifier:        tktypes.RandAddress().String(),
+		verifier:        pldtypes.RandAddress().String(),
 		keyHandle:       name + "KeyHandle",
 		mocks:           mocks,
 	}
@@ -3054,7 +3054,7 @@ func timeTillDeadline(t *testing.T) time.Duration {
 }
 
 func mockDomainSmartContractAndCtx(t *testing.T, m *dependencyMocks) (*componentmocks.Domain, *componentmocks.DomainSmartContract) {
-	contractAddr := *tktypes.RandAddress()
+	contractAddr := *pldtypes.RandAddress()
 
 	mDomain := componentmocks.NewDomain(t)
 	mDomain.On("Name").Return("domain1").Maybe()

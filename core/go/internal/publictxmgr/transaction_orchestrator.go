@@ -26,10 +26,10 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
 )
 
 const (
@@ -115,9 +115,9 @@ type orchestrator struct {
 	transactionSubmissionRetry *retry.Retry
 
 	// each transaction orchestrator has its own go routine
-	orchestratorBirthTime       time.Time          // when transaction orchestrator is created
-	orchestratorPollingInterval time.Duration      // between how long the transaction orchestrator will do a poll and trigger none-event driven transaction process actions
-	signingAddress              tktypes.EthAddress // the signing address of the transaction managed by the current transaction orchestrator
+	orchestratorBirthTime       time.Time           // when transaction orchestrator is created
+	orchestratorPollingInterval time.Duration       // between how long the transaction orchestrator will do a poll and trigger none-event driven transaction process actions
+	signingAddress              pldtypes.EthAddress // the signing address of the transaction managed by the current transaction orchestrator
 
 	// balance check settings
 	hasZeroGasPrice                    bool
@@ -147,13 +147,15 @@ type orchestrator struct {
 	// updates
 	updates   []*transactionUpdate
 	updateMux sync.Mutex
+
+	timeLineLoggingMaxEntries int
 }
 
 const veryShortMinimum = 50 * time.Millisecond
 
 func NewOrchestrator(
 	ptm *pubTxManager,
-	signingAddress tktypes.EthAddress,
+	signingAddress pldtypes.EthAddress,
 	conf *pldconf.PublicTxManagerConfig,
 ) *orchestrator {
 	ctx := ptm.ctx
@@ -182,6 +184,7 @@ func NewOrchestrator(
 		stopProcess:                make(chan bool, 1),
 		ethClient:                  ptm.ethClient,
 		bIndexer:                   ptm.bIndexer,
+		timeLineLoggingMaxEntries:  conf.Orchestrator.TimeLineLoggingMaxEntries,
 	}
 
 	log.L(ctx).Debugf("NewOrchestrator for signing address %s created: %+v", newOrchestrator.signingAddress, newOrchestrator)
@@ -275,13 +278,13 @@ func (oc *orchestrator) initNextNonceFromDB(ctx context.Context) error {
 	}
 	nextNonce := *txns[0].Nonce + 1
 	oc.nextNonce = &nextNonce
-	log.L(ctx).Infof("Next nonce initialized from DB fro %s: %d", oc.signingAddress, nextNonce)
+	log.L(ctx).Infof("Next nonce initialized from DB from %s: %d", oc.signingAddress, nextNonce)
 	return nil
 }
 
 func (oc *orchestrator) allocateNonces(ctx context.Context, txns []*DBPublicTxn) error {
 
-	// Of the the transactions might have nonces already
+	// Some of the the transactions might have nonces already
 	toAlloc := make([]*DBPublicTxn, 0, len(txns))
 	for _, tx := range txns {
 		if tx.Nonce == nil {
@@ -376,6 +379,7 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 			oc.totalCompleted = oc.totalCompleted + 1
 			queueUpdated = true
 			log.L(ctx).Debugf("Orchestrator poll and process, marking %s as complete after: %s", p.stateManager.GetSignerNonce(), time.Since(p.stateManager.GetCreatedTime().Time()))
+			p.PrintTimeline()
 		} else {
 			log.L(ctx).Debugf("Orchestrator poll and process, continuing tx %s after: %s", p.stateManager.GetSignerNonce(), time.Since(p.stateManager.GetCreatedTime().Time()))
 			oc.inFlightTxs = append(oc.inFlightTxs, p)

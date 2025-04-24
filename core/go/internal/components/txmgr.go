@@ -21,9 +21,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 )
 
 type ReceiptType int
@@ -38,13 +38,13 @@ const (
 )
 
 type ReceiptInput struct {
-	Domain          string                  // set when the receipt is from a domain
-	ReceiptType     ReceiptType             // required
-	TransactionID   uuid.UUID               // required
-	OnChain         tktypes.OnChainLocation // OnChain.Type must be set for an on-chain transaction/event
-	ContractAddress *tktypes.EthAddress     // the contract address - deployments only
-	FailureMessage  string                  // set for RT_FailedWithMessage
-	RevertData      tktypes.HexBytes        // set for RT_FailedOnChainWithRevertData
+	Domain          string                   // set when the receipt is from a domain
+	ReceiptType     ReceiptType              // required
+	TransactionID   uuid.UUID                // required
+	OnChain         pldtypes.OnChainLocation // OnChain.Type must be set for an on-chain transaction/event
+	ContractAddress *pldtypes.EthAddress     // the contract address - deployments only
+	FailureMessage  string                   // set for RT_FailedWithMessage
+	RevertData      pldtypes.HexBytes        // set for RT_FailedOnChainWithRevertData
 }
 
 type TxCompletion struct {
@@ -68,16 +68,20 @@ type ValidatedTransaction struct {
 // A resolved function on the ABI
 type ResolvedFunction struct {
 	// ABI          abi.ABI          `json:"abi"`
-	ABIReference *tktypes.Bytes32 `json:"abiReference"`
-	Definition   *abi.Entry       `json:"definition"`
-	Signature    string           `json:"signature"`
+	ABIReference *pldtypes.Bytes32 `json:"abiReference"`
+	Definition   *abi.Entry        `json:"definition"`
+	Signature    string            `json:"signature"`
 }
 
 type ReceiptReceiver interface {
 	DeliverReceiptBatch(ctx context.Context, batchID uint64, receipts []*pldapi.TransactionReceiptFull) error
 }
 
-type ReceiptReceiverCloser interface {
+type BlockchainEventReceiver interface {
+	DeliverBlockchainEventBatch(ctx context.Context, batchID uuid.UUID, events []*pldapi.EventWithData) error
+}
+
+type ReceiverCloser interface {
 	Close()
 }
 
@@ -87,19 +91,19 @@ type TXManager interface {
 	// These are the general purpose functions exposed also as JSON/RPC APIs on the TX Manager
 
 	FinalizeTransactions(ctx context.Context, dbTX persistence.DBTX, info []*ReceiptInput) error // requires all transactions to be known
-	CalculateRevertError(ctx context.Context, dbTX persistence.DBTX, revertData tktypes.HexBytes) error
-	DecodeRevertError(ctx context.Context, dbTX persistence.DBTX, revertData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
-	DecodeCall(ctx context.Context, dbTX persistence.DBTX, callData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
-	DecodeEvent(ctx context.Context, dbTX persistence.DBTX, topics []tktypes.Bytes32, eventData tktypes.HexBytes, dataFormat tktypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
+	CalculateRevertError(ctx context.Context, dbTX persistence.DBTX, revertData pldtypes.HexBytes) error
+	DecodeRevertError(ctx context.Context, dbTX persistence.DBTX, revertData pldtypes.HexBytes, dataFormat pldtypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
+	DecodeCall(ctx context.Context, dbTX persistence.DBTX, callData pldtypes.HexBytes, dataFormat pldtypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
+	DecodeEvent(ctx context.Context, dbTX persistence.DBTX, topics []pldtypes.Bytes32, eventData pldtypes.HexBytes, dataFormat pldtypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error)
 	SendTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
-	ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*ResolvedFunction, *abi.ComponentValue, tktypes.RawJSON, error)
+	ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*ResolvedFunction, *abi.ComponentValue, pldtypes.RawJSON, error)
 	PrepareTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (*pldapi.Transaction, error)
 	GetResolvedTransactionByID(ctx context.Context, id uuid.UUID) (*ResolvedTransaction, error) // cache optimized
 	GetTransactionByIDFull(ctx context.Context, id uuid.UUID) (result *pldapi.TransactionFull, err error)
 	GetTransactionDependencies(ctx context.Context, id uuid.UUID) (*pldapi.TransactionDependencies, error)
-	GetPublicTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce tktypes.HexUint64) (*pldapi.PublicTxWithBinding, error)
-	GetPublicTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error)
+	GetPublicTransactionByNonce(ctx context.Context, from pldtypes.EthAddress, nonce pldtypes.HexUint64) (*pldapi.PublicTxWithBinding, error)
+	GetPublicTransactionByHash(ctx context.Context, hash pldtypes.Bytes32) (*pldapi.PublicTxWithBinding, error)
 	QueryTransactions(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*pldapi.Transaction, error)
 	QueryTransactionsResolved(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*ResolvedTransaction, error)
 	QueryTransactionsFull(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) (results []*pldapi.TransactionFull, err error)
@@ -118,10 +122,11 @@ type TXManager interface {
 	StartReceiptListener(ctx context.Context, name string) error
 	StopReceiptListener(ctx context.Context, name string) error
 	DeleteReceiptListener(ctx context.Context, name string) error
-	AddReceiptReceiver(ctx context.Context, name string, r ReceiptReceiver) (ReceiptReceiverCloser, error)
+	AddReceiptReceiver(ctx context.Context, name string, r ReceiptReceiver) (ReceiverCloser, error)
 
 	// These functions for use of other components
 
+	LoadBlockchainEventListeners() error
 	NotifyStatesDBChanged(ctx context.Context) // called by state manager after committing DB TXs writing new states that might fill in gaps
 	PrepareInternalPrivateTransaction(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (*ValidatedTransaction, error)
 	UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, dbTX persistence.DBTX, txis []*ValidatedTransaction) error

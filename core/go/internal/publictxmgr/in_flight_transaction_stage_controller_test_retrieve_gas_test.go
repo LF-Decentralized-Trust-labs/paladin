@@ -23,16 +23,16 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 )
 
 type mockStatusUpdater struct {
-	updateSubStatus func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info *fftypes.JSONAny, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error
+	updateSubStatus func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info *fftypes.JSONAny, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error
 }
 
-func (msu *mockStatusUpdater) UpdateSubStatus(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info *fftypes.JSONAny, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+func (msu *mockStatusUpdater) UpdateSubStatus(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info *fftypes.JSONAny, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 	return msu.updateSubStatus(ctx, imtx, subStatus, action, info, err, actionOccurred)
 }
 
@@ -42,7 +42,7 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}
@@ -63,7 +63,7 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	retrievedGasPrice := &pldapi.PublicTxGasPricing{
-		GasPrice: tktypes.Int64ToInt256(10),
+		GasPrice: pldtypes.Int64ToInt256(10),
 	}
 	// succeed retrieving gas price
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
@@ -147,13 +147,13 @@ func TestProduceLatestInFlightStageContextRetrieveGasFixedGasPricing(t *testing.
 	ctx, o, _, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1, func(tx *DBPublicTxn) {
-		tx.FixedGasPricing = tktypes.JSONString(pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Int64ToInt256(10),
+		tx.FixedGasPricing = pldtypes.JSONString(pldapi.PublicTxGasPricing{
+			GasPrice: pldtypes.Int64ToInt256(10),
 		})
 	})
 	it.testOnlyNoActionMode = true
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}
@@ -182,7 +182,7 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrements(t *testing.T) {
 	it.testOnlyNoActionMode = true
 	it.testOnlyNoEventMode = true
 	mSU := &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}
@@ -205,12 +205,12 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrements(t *testing.T) {
 
 	// Set old gas price in memory
 	mTS.InMemoryTxStateManager.(*inMemoryTxState).mtx.GasPricing = pldapi.PublicTxGasPricing{
-		GasPrice: tktypes.Int64ToInt256(20),
+		GasPrice: pldtypes.Int64ToInt256(20),
 	}
 
 	// We will retrieve the new price of 10
 	retrievedGasPrice := &pldapi.PublicTxGasPricing{
-		GasPrice: tktypes.Int64ToInt256(10),
+		GasPrice: pldtypes.Int64ToInt256(10),
 	}
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 
@@ -238,7 +238,7 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsReachedCap(t *tes
 	it.testOnlyNoEventMode = true
 	it.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mSU := &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}
@@ -261,13 +261,13 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsReachedCap(t *tes
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(20),
+			GasPrice: pldtypes.Uint64ToUint256(20),
 		},
 	})
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 	// when reached the max gas price cap
 	retrievedGasPrice := &pldapi.PublicTxGasPricing{
-		GasPrice: tktypes.Int64ToInt256(10),
+		GasPrice: pldtypes.Int64ToInt256(10),
 	}
 
 	it.gasPriceIncreaseMax = big.NewInt(26)
@@ -294,7 +294,7 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsRetrievedHigherPr
 	it.testOnlyNoEventMode = true
 	it.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mSU := &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}
@@ -319,11 +319,11 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsRetrievedHigherPr
 	// retrieved price is higher
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(20),
+			GasPrice: pldtypes.Uint64ToUint256(20),
 		},
 	})
 	higherRetrievedPrice := &pldapi.PublicTxGasPricing{
-		GasPrice: tktypes.Int64ToInt256(21),
+		GasPrice: pldtypes.Int64ToInt256(21),
 	}
 	it.gasPriceIncreaseMax = big.NewInt(26)
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
@@ -349,7 +349,7 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559HigherExis
 	it.testOnlyNoEventMode = true
 	it.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mSU := &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}
@@ -373,15 +373,15 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559HigherExis
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 	// EIP-1559 gas price
 	retrievedGasPriceEIP1559 := &pldapi.PublicTxGasPricing{
-		MaxFeePerGas:         tktypes.Int64ToInt256(10),
-		MaxPriorityFeePerGas: tktypes.Int64ToInt256(1),
+		MaxFeePerGas:         pldtypes.Int64ToInt256(10),
+		MaxPriorityFeePerGas: pldtypes.Int64ToInt256(1),
 	}
 	it.gasPriceIncreaseMax = nil
 	// the highest gas price used is higher than the retrieved gas price
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         tktypes.Uint64ToUint256(20),
-			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(1),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(20),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 	})
 
@@ -411,7 +411,7 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559MismatchFo
 	it.testOnlyNoEventMode = true
 	it.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mSU := &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}
@@ -433,14 +433,14 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559MismatchFo
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	retrievedGasPrice := &pldapi.PublicTxGasPricing{
-		GasPrice: tktypes.Int64ToInt256(10),
+		GasPrice: pldtypes.Int64ToInt256(10),
 	}
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 	// when the old format doesn't match the new format, return the new gas price
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         tktypes.Uint64ToUint256(20),
-			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(1),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(20),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 	})
 
@@ -468,7 +468,7 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559ReachedCap
 	it.testOnlyNoEventMode = true
 	it.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mSU := &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}
@@ -488,20 +488,20 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559ReachedCap
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	retrievedGasPrice := &pldapi.PublicTxGasPricing{
-		GasPrice: tktypes.Uint64ToUint256(10),
+		GasPrice: pldtypes.Uint64ToUint256(10),
 	}
 
 	retrievedGasPriceEIP1559 := &pldapi.PublicTxGasPricing{
-		MaxFeePerGas:         tktypes.Uint64ToUint256(10),
-		MaxPriorityFeePerGas: tktypes.Uint64ToUint256(1),
+		MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+		MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 	}
 	it.gasPriceClient = NewTestFixedPriceGasPriceClientEIP1559(t)
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 	// when the old format doesn't match the new format, return the new gas price
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         tktypes.Uint64ToUint256(20),
-			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(1),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(20),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 	})
 
@@ -526,8 +526,8 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559ReachedCap
 	// when reached the cap
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         tktypes.Uint64ToUint256(20),
-			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(1),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(20),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 	})
 
@@ -559,7 +559,7 @@ func TestProduceLatestInFlightStageContextRetrieveGasPanic(t *testing.T) {
 	it.testOnlyNoEventMode = true
 	it.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mSU := &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}

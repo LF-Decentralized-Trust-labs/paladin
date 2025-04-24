@@ -40,10 +40,10 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -98,6 +98,7 @@ func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...fu
 			SubmissionRetry: pldconf.RetryConfigWithMax{
 				MaxAttempts: confutil.P(1),
 			},
+			TimeLineLoggingMaxEntries: 10,
 		},
 		GasPrice: pldconf.GasPriceConfig{
 			FixedGasPrice: 0,
@@ -124,7 +125,7 @@ func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...fu
 								Keys: map[string]pldconf.StaticKeyEntryConfig{
 									"seed": {
 										Encoding: "hex",
-										Inline:   tktypes.RandBytes32().String(),
+										Inline:   pldtypes.RandBytes32().String(),
 									},
 								},
 							},
@@ -217,13 +218,13 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 
 	// Mock a gas price
 	chainID, _ := rand.Int(rand.Reader, big.NewInt(100000000000000))
-	m.ethClient.On("GasPrice", mock.Anything).Return(tktypes.MustParseHexUint256("1000000000000000"), nil)
+	m.ethClient.On("GasPrice", mock.Anything).Return(pldtypes.MustParseHexUint256("1000000000000000"), nil)
 	m.ethClient.On("ChainID").Return(chainID.Int64())
 
 	// Resolve the key ourselves for comparison
 	keyMapping, err := m.keyManager.ResolveKeyNewDatabaseTX(ctx, "signer1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
-	resolvedKey := tktypes.MustEthAddress(keyMapping.Verifier.Verifier)
+	resolvedKey := pldtypes.MustEthAddress(keyMapping.Verifier.Verifier)
 
 	// create some transactions that are successfully added
 	const transactionCount = 10
@@ -249,10 +250,10 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 
 	// gas estimate and nonce should be cached - so are once'd
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
-		Return(ethclient.EstimateGasResult{GasLimit: tktypes.HexUint64(10)}, nil)
+		Return(ethclient.EstimateGasResult{GasLimit: pldtypes.HexUint64(10)}, nil)
 	baseNonce := uint64(11223000)
 	m.ethClient.On("GetTransactionCount", mock.Anything, mock.Anything).
-		Return(confutil.P(tktypes.HexUint64(baseNonce)), nil).Once()
+		Return(confutil.P(pldtypes.HexUint64(baseNonce)), nil).Once()
 
 	// For the first one we do a one-off
 	singleTx, err := ptm.SingleTransactionSubmit(ctx, txs[0])
@@ -318,11 +319,11 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	calculatedConfirmations := make(chan *blockindexer.IndexedTransactionNotify, len(txIDs))
 	srtx := m.ethClient.On("SendRawTransaction", mock.Anything, mock.Anything)
 	srtx.Run(func(args mock.Arguments) {
-		signedMessage := args[1].(tktypes.HexBytes)
+		signedMessage := args[1].(pldtypes.HexBytes)
 
 		signer, ethTx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(signedMessage), m.ethClient.ChainID())
 		require.NoError(t, err)
-		assert.Equal(t, *resolvedKey, tktypes.EthAddress(*signer))
+		assert.Equal(t, *resolvedKey, pldtypes.EthAddress(*signer))
 
 		// We need to decode the TX to find the nonce
 		txHash := calculateTransactionHash(signedMessage)
@@ -332,7 +333,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 				BlockNumber:      11223344,
 				TransactionIndex: 10,
 				From:             resolvedKey,
-				To:               (*tktypes.EthAddress)(ethTx.To),
+				To:               (*pldtypes.EthAddress)(ethTx.To),
 				Nonce:            ethTx.Nonce.Uint64(),
 				Result:           pldapi.TXResult_SUCCESS.Enum(),
 			},
@@ -410,13 +411,13 @@ func fakeTxManagerInsert(t *testing.T, db *gorm.DB, txID uuid.UUID, fromStr stri
 	// Yes, there is a slight smell of un-partitioned DB responsibilities between components
 	// here. But the saving is critical path avoidance of one extra DB query for every block
 	// that is mined. So it's currently considered worth this limited quirk.
-	fakeABI := tktypes.RandBytes32()
+	fakeABI := pldtypes.RandBytes32()
 	err := db.Exec(`INSERT INTO "abis" ("hash","abi","created") VALUES (?, ?, ?)`,
-		fakeABI, `[]`, tktypes.TimestampNow()).
+		fakeABI, `[]`, pldtypes.TimestampNow()).
 		Error
 	require.NoError(t, err)
 	err = db.Exec(`INSERT INTO "transactions" ("id", "submit_mode", "created", "type", "abi_ref", "from") VALUES (?, ?, ?, ?, ?, ?)`,
-		txID, pldapi.SubmitModeAuto, tktypes.TimestampNow(), pldapi.TransactionTypePrivate.Enum(), fakeABI, fromStr).
+		txID, pldapi.SubmitModeAuto, pldtypes.TimestampNow(), pldapi.TransactionTypePrivate.Enum(), fakeABI, fromStr).
 		Error
 	require.NoError(t, err)
 }
@@ -431,14 +432,14 @@ func TestSubmitFailures(t *testing.T) {
 		Return(ethclient.EstimateGasResult{}, fmt.Errorf("GasEstimate error")).Once()
 	_, err := ptm.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
 		PublicTxInput: pldapi.PublicTxInput{
-			From: tktypes.RandAddress(),
+			From: pldtypes.RandAddress(),
 		},
 	})
 	assert.Regexp(t, "GasEstimate error", err)
 
 	// estimation failure - for revert
 	m.db.ExpectBegin()
-	sampleRevertData := tktypes.HexBytes("some data")
+	sampleRevertData := pldtypes.HexBytes("some data")
 	m.txManager.On("CalculateRevertError", mock.Anything, mock.Anything, sampleRevertData).Return(fmt.Errorf("mapped revert error"))
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
 		Return(ethclient.EstimateGasResult{
@@ -446,7 +447,7 @@ func TestSubmitFailures(t *testing.T) {
 		}, fmt.Errorf("execution reverted")).Once()
 	_, err = ptm.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
 		PublicTxInput: pldapi.PublicTxInput{
-			From: tktypes.RandAddress(),
+			From: pldtypes.RandAddress(),
 		},
 	})
 	assert.Regexp(t, "mapped revert error", err)
@@ -493,11 +494,11 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 	// create transaction succeeded
 	tx, err := ptm.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
 		PublicTxInput: pldapi.PublicTxInput{
-			From: tktypes.RandAddress(),
-			To:   tktypes.MustEthAddress(tktypes.RandHex(20)),
+			From: pldtypes.RandAddress(),
+			To:   pldtypes.MustEthAddress(pldtypes.RandHex(20)),
 			PublicTxOptions: pldapi.PublicTxOptions{
-				Gas:   confutil.P(tktypes.HexUint64(1223451)),
-				Value: tktypes.Uint64ToUint256(100),
+				Gas:   confutil.P(pldtypes.HexUint64(1223451)),
+				Value: pldtypes.Uint64ToUint256(100),
 			},
 		},
 	})
@@ -508,7 +509,6 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 }
 
 func TestEngineSuspendResumeRealDB(t *testing.T) {
-
 	ctx, ptm, m, done := newTestPublicTxManager(t, true, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Manager.Interval = confutil.P("50ms")
 		conf.Orchestrator.Interval = confutil.P("50ms")
@@ -520,24 +520,24 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 
 	keyMapping, err := m.keyManager.ResolveKeyNewDatabaseTX(ctx, "signer1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
-	resolvedKey := *tktypes.MustEthAddress(keyMapping.Verifier.Verifier)
+	resolvedKey := *pldtypes.MustEthAddress(keyMapping.Verifier.Verifier)
 
 	// Mock a gas price
 	chainID, _ := rand.Int(rand.Reader, big.NewInt(100000000000000))
 	m.ethClient.On("ChainID").Return(chainID.Int64())
-	m.ethClient.On("GasPrice", mock.Anything).Return(tktypes.MustParseHexUint256("1000000000000000"), nil)
+	m.ethClient.On("GasPrice", mock.Anything).Return(pldtypes.MustParseHexUint256("1000000000000000"), nil)
 
 	pubTx := &components.PublicTxSubmission{
 		PublicTxInput: pldapi.PublicTxInput{
 			From: &resolvedKey,
 			PublicTxOptions: pldapi.PublicTxOptions{
-				Gas: confutil.P(tktypes.HexUint64(1223451)),
+				Gas: confutil.P(pldtypes.HexUint64(1223451)),
 			},
 		},
 	}
 
 	// We can get the nonce
-	m.ethClient.On("GetTransactionCount", mock.Anything, mock.Anything).Return(confutil.P(tktypes.HexUint64(1122334455)), nil)
+	m.ethClient.On("GetTransactionCount", mock.Anything, mock.Anything).Return(confutil.P(pldtypes.HexUint64(1122334455)), nil)
 	// ... but attempting to get it onto the chain is going to block failing
 	m.ethClient.On("SendRawTransaction", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop")).Maybe()
 
@@ -598,12 +598,12 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 
 	keyMapping, err := m.keyManager.ResolveKeyNewDatabaseTX(ctx, "signer1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
-	resolvedKey := tktypes.MustEthAddress(keyMapping.Verifier.Verifier)
+	resolvedKey := pldtypes.MustEthAddress(keyMapping.Verifier.Verifier)
 
 	// Mock a gas price
 	chainID, _ := rand.Int(rand.Reader, big.NewInt(100000000000000))
 	m.ethClient.On("ChainID").Return(chainID.Int64())
-	m.ethClient.On("GasPrice", mock.Anything).Return(tktypes.MustParseHexUint256("1000000000000000"), nil)
+	m.ethClient.On("GasPrice", mock.Anything).Return(pldtypes.MustParseHexUint256("1000000000000000"), nil)
 
 	txID := uuid.New()
 	pubTxSub := &components.PublicTxSubmission{
@@ -613,21 +613,21 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 		PublicTxInput: pldapi.PublicTxInput{
 			From: resolvedKey,
 			PublicTxOptions: pldapi.PublicTxOptions{
-				Gas: confutil.P(tktypes.HexUint64(1223451)),
+				Gas: confutil.P(pldtypes.HexUint64(1223451)),
 			},
 		},
 	}
 
-	m.ethClient.On("GetTransactionCount", mock.Anything, mock.Anything).Return(confutil.P(tktypes.HexUint64(1122334455)), nil)
+	m.ethClient.On("GetTransactionCount", mock.Anything, mock.Anything).Return(confutil.P(pldtypes.HexUint64(1122334455)), nil)
 
 	confirmations := make(chan *blockindexer.IndexedTransactionNotify, 1)
 	srtx := m.ethClient.On("SendRawTransaction", mock.Anything, mock.Anything)
 	srtx.Run(func(args mock.Arguments) {
-		signedMessage := args[1].(tktypes.HexBytes)
+		signedMessage := args[1].(pldtypes.HexBytes)
 
 		signer, ethTx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(signedMessage), m.ethClient.ChainID())
 		require.NoError(t, err)
-		assert.Equal(t, *resolvedKey, tktypes.EthAddress(*signer))
+		assert.Equal(t, *resolvedKey, pldtypes.EthAddress(*signer))
 
 		if ethTx.GasLimit.Int64() == int64(2223451) {
 			// We need to decode the TX to find the nonce
@@ -638,7 +638,7 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 					BlockNumber:      11223344,
 					TransactionIndex: 10,
 					From:             resolvedKey,
-					To:               (*tktypes.EthAddress)(ethTx.To),
+					To:               (*pldtypes.EthAddress)(ethTx.To),
 					Nonce:            ethTx.Nonce.Uint64(),
 					Result:           pldapi.TXResult_SUCCESS.Enum(),
 				},
@@ -676,7 +676,7 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 	require.Error(t, err)
 
 	// gas estimate failure with revert data
-	sampleRevertData := tktypes.HexBytes("some data")
+	sampleRevertData := pldtypes.HexBytes("some data")
 	m.txManager.On("CalculateRevertError", mock.Anything, mock.Anything, sampleRevertData).Return(fmt.Errorf("mapped revert error"))
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
 		Return(ethclient.EstimateGasResult{
@@ -696,7 +696,7 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 	err = ptm.UpdateTransaction(ctx, txID, *pubTx.LocalID, resolvedKey, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			PublicTxOptions: pldapi.PublicTxOptions{
-				Gas: confutil.P(tktypes.HexUint64(2223451)),
+				Gas: confutil.P(pldtypes.HexUint64(2223451)),
 			},
 		},
 	}, nil, func(dbTX persistence.DBTX) error { return errors.New("db write failed") })
@@ -706,14 +706,14 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 	// update the transaction
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
 		Return(ethclient.EstimateGasResult{
-			GasLimit: tktypes.HexUint64(2223451),
+			GasLimit: pldtypes.HexUint64(2223451),
 		}, nil).Once()
 	err = ptm.UpdateTransaction(ctx, txID, *pubTx.LocalID, resolvedKey, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			From:     resolvedKey.String(),
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
+			To:       pldtypes.MustEthAddress(pldtypes.RandHex(20)),
 			Function: "set",
-			Data:     tktypes.RawJSON(`{"value": 46}`),
+			Data:     pldtypes.RawJSON(`{"value": 46}`),
 		},
 		ABI: abi.ABI{{Type: abi.Function, Name: "set", Inputs: abi.ParameterArray{{Type: "uint256", Name: "value"}}}},
 	}, nil, func(dbTX persistence.DBTX) error { return nil })
@@ -761,15 +761,15 @@ func TestGasEstimateFactor(t *testing.T) {
 	defer done()
 
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
-		Return(ethclient.EstimateGasResult{GasLimit: tktypes.MustParseHexUint64("0x62f8")}, nil)
+		Return(ethclient.EstimateGasResult{GasLimit: pldtypes.MustParseHexUint64("0x62f8")}, nil)
 
 	tx := &components.PublicTxSubmission{
 		PublicTxInput: pldapi.PublicTxInput{
-			From: tktypes.MustEthAddress("0x14655a513c68280d16f72304ebfd1ae1a2262d2d"),
+			From: pldtypes.MustEthAddress("0x14655a513c68280d16f72304ebfd1ae1a2262d2d"),
 			Data: []byte("[2]"),
 		},
 	}
 
 	require.NoError(t, ptm.ValidateTransaction(ctx, ptm.p.NOTX(), tx))
-	assert.Equal(t, tktypes.MustParseHexUint64("0xc5f0"), *tx.Gas)
+	assert.Equal(t, pldtypes.MustParseHexUint64("0xc5f0"), *tx.Gas)
 }

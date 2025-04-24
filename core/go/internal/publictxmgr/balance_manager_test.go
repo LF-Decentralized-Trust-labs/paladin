@@ -29,8 +29,8 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -41,7 +41,7 @@ func newTestBalanceManager(t *testing.T, autoFuel bool, cbs ...func(m *mocksAndT
 		if autoFuel {
 			conf.BalanceManager.AutoFueling.Source = confutil.P("autofueler")
 
-			autoFuelSourceAddr := tktypes.RandAddress()
+			autoFuelSourceAddr := pldtypes.RandAddress()
 
 			keyMapping := &pldapi.KeyMappingAndVerifier{
 				KeyMappingWithPath: &pldapi.KeyMappingWithPath{
@@ -98,7 +98,7 @@ func TestNotifyAddressBalanceChanged(t *testing.T) {
 	ctx, bm, _, _, done := newTestBalanceManager(t, false)
 	defer done()
 
-	exampleAddr := *tktypes.RandAddress()
+	exampleAddr := *pldtypes.RandAddress()
 	assert.Equal(t, false, bm.addressBalanceChangedMap[exampleAddr])
 	bm.NotifyAddressBalanceChanged(ctx, exampleAddr)
 	assert.Equal(t, true, bm.addressBalanceChangedMap[exampleAddr])
@@ -111,11 +111,11 @@ func TestGetAddressBalance(t *testing.T) {
 	const balanceOld = uint64(400)
 	const balanceNew = uint64(500)
 
-	exampleAddr := *tktypes.RandAddress()
+	exampleAddr := *pldtypes.RandAddress()
 
-	m.ethClient.On("GetBalance", mock.Anything, exampleAddr, "latest").Return(tktypes.Uint64ToUint256(balanceOld), nil).Once()
+	m.ethClient.On("GetBalance", mock.Anything, exampleAddr, "latest").Return(pldtypes.Uint64ToUint256(balanceOld), nil).Once()
 
-	m.ethClient.On("GetBalance", mock.Anything, exampleAddr, "latest").Return(tktypes.Uint64ToUint256(balanceNew), nil).Once()
+	m.ethClient.On("GetBalance", mock.Anything, exampleAddr, "latest").Return(pldtypes.Uint64ToUint256(balanceNew), nil).Once()
 
 	m.ethClient.On("GetBalance", mock.Anything, exampleAddr, "latest").Return(nil, errors.New("pop")).Once()
 
@@ -145,11 +145,11 @@ func TestAddressAccountSpend(t *testing.T) {
 	ctx, bm, _, m, done := newTestBalanceManager(t, true)
 	defer done()
 
-	exampleAddr := *tktypes.RandAddress()
+	exampleAddr := *pldtypes.RandAddress()
 
 	const balanceOld = uint64(400)
 
-	m.ethClient.On("GetBalance", mock.Anything, exampleAddr, "latest").Return(tktypes.Uint64ToUint256(balanceOld), nil).Once()
+	m.ethClient.On("GetBalance", mock.Anything, exampleAddr, "latest").Return(pldtypes.Uint64ToUint256(balanceOld), nil).Once()
 	addressAccount, err := bm.GetAddressBalance(ctx, exampleAddr)
 	require.NoError(t, err)
 	assert.NotNil(t, addressAccount)
@@ -264,10 +264,10 @@ func TestTopUpAddressNoOpScenarios(t *testing.T) {
 
 }
 
-func expectFuelingEqual(t *testing.T, fuelingTx *pldapi.PublicTx, amountToTransfer uint64, from, to tktypes.EthAddress) {
+func expectFuelingEqual(t *testing.T, fuelingTx *pldapi.PublicTx, amountToTransfer uint64, from, to pldtypes.EthAddress) {
 	assert.Equal(t, from, fuelingTx.From)
 	assert.Equal(t, to, *fuelingTx.To)
-	assert.Equal(t, *tktypes.Uint64ToUint256(amountToTransfer), *fuelingTx.Value)
+	assert.Equal(t, *pldtypes.Uint64ToUint256(amountToTransfer), *fuelingTx.Value)
 }
 
 func mockAutoFuelTransactionSubmit(m *mocksAndTestControl, bm *BalanceManagerWithInMemoryTracking, uncachedBalance bool) {
@@ -278,12 +278,12 @@ func mockAutoFuelTransactionSubmit(m *mocksAndTestControl, bm *BalanceManagerWit
 
 	if uncachedBalance {
 		// Mock the sufficient balance on the auto-fueling source address, and the nonce assignment
-		m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(tktypes.Uint64ToUint256(400), nil).Once()
+		m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(pldtypes.Uint64ToUint256(400), nil).Once()
 	}
 
 	// Gas estimate for the auto-fueling TX
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
-		Return(ethclient.EstimateGasResult{GasLimit: tktypes.HexUint64(10)}, nil).Once()
+		Return(ethclient.EstimateGasResult{GasLimit: pldtypes.HexUint64(10)}, nil).Once()
 }
 
 func TestTopUpWithNoAmountModificationWithMultipleFuelingTxs(t *testing.T) {
@@ -292,7 +292,7 @@ func TestTopUpWithNoAmountModificationWithMultipleFuelingTxs(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -336,7 +336,7 @@ func TestTopUpWithNoAmountModificationWithMultipleFuelingTxs(t *testing.T) {
 	// current transaction completed, replace with new transaction
 	expectedTopUpAmount2 := big.NewInt(50)
 	m.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{"from", `Completed__tx_hash`}).
-		AddRow(*bm.sourceAddress, tktypes.RandBytes32()))
+		AddRow(*bm.sourceAddress, pldtypes.RandBytes32()))
 
 	mockAutoFuelTransactionSubmit(m, bm, false)
 
@@ -356,10 +356,10 @@ func TestTopUpWithNoAmountModificationWithMultipleFuelingTxs(t *testing.T) {
 	}
 	expectedTopUpAmount3 := big.NewInt(50)
 	bm.NotifyAddressBalanceChanged(ctx, *bm.sourceAddress)
-	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(tktypes.Uint64ToUint256(50), nil).Once()
+	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(pldtypes.Uint64ToUint256(50), nil).Once()
 
 	m.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{"from", `Completed__tx_hash`}).
-		AddRow(*bm.sourceAddress, tktypes.RandBytes32()))
+		AddRow(*bm.sourceAddress, pldtypes.RandBytes32()))
 	m.db.ExpectBegin()
 
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
@@ -374,10 +374,10 @@ func TestTopUpWithNoAmountModificationWithMultipleFuelingTxs(t *testing.T) {
 	// also do a address balance re-lookup
 	m.db.ExpectQuery("SELECT.*public_txns").
 		WillReturnRows(sqlmock.NewRows([]string{"from", "to", "value"}).AddRow(
-			*bm.sourceAddress, testDestAddress, (*tktypes.HexUint256)(expectedTopUpAmount3),
+			*bm.sourceAddress, testDestAddress, (*pldtypes.HexUint256)(expectedTopUpAmount3),
 		))
 	m.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{"from", "to", "value", `Completed__tx_hash`}).
-		AddRow(*bm.sourceAddress, testDestAddress, (*tktypes.HexUint256)(expectedTopUpAmount3), nil /* incomplete */))
+		AddRow(*bm.sourceAddress, testDestAddress, (*pldtypes.HexUint256)(expectedTopUpAmount3), nil /* incomplete */))
 	fuelingTx3, err := bm.TopUpAccount(ctx, accountToTopUp3)
 	require.NoError(t, err)
 	expectFuelingEqual(t, fuelingTx3, expectedTopUpAmount3.Uint64(), *bm.sourceAddress, testDestAddress)
@@ -389,7 +389,7 @@ func TestTopUpSuccessTopUpMinAheadUseMin(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -423,7 +423,7 @@ func TestTopUpSuccessTopUpMinAheadUseMax(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -457,7 +457,7 @@ func TestTopUpSuccessTopUpMinAheadUseAvg(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -491,7 +491,7 @@ func TestTopUpSuccessUseMinDestBalance(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -521,7 +521,7 @@ func TestTopUpSuccessUseMaxDestBalance(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -551,7 +551,7 @@ func TestTopUpNoOpAlreadyAboveMaxDestBalance(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -575,7 +575,7 @@ func TestTopUpNoOpAmountBelowMinThreshold(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -599,7 +599,7 @@ func TestTopUpFailedDueToSourceBalanceBelowMin(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -613,7 +613,7 @@ func TestTopUpFailedDueToSourceBalanceBelowMin(t *testing.T) {
 	m.db.ExpectQuery("SELECT.*public_txns.*data IS NULL").WillReturnRows(sqlmock.NewRows([]string{}))
 
 	// Mock the sufficient balance on the auto-fueling source address, and the nonce assignment
-	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(tktypes.Uint64ToUint256(400), nil).Once()
+	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(pldtypes.Uint64ToUint256(400), nil).Once()
 
 	// set min source balance to 1000, which is way beyond 400
 	bm.minSourceBalance = big.NewInt(1000)
@@ -630,7 +630,7 @@ func TestTopUpFailedDueToSourceBalanceBelowRequestedAmount(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -644,7 +644,7 @@ func TestTopUpFailedDueToSourceBalanceBelowRequestedAmount(t *testing.T) {
 	m.db.ExpectQuery("SELECT.*public_txns.*data IS NULL").WillReturnRows(sqlmock.NewRows([]string{}))
 
 	// Mock the sufficient balance on the auto-fueling source address, and the nonce assignment
-	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(tktypes.Uint64ToUint256(400), nil).Once()
+	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(pldtypes.Uint64ToUint256(400), nil).Once()
 
 	fuelingTx, err := bm.TopUpAccount(ctx, accountToTopUp)
 	assert.Error(t, err)
@@ -666,7 +666,7 @@ func TestTopUpFailedDueToSourceBalanceBelowRequestedAmountConcurrencyTest(t *tes
 	}
 
 	// Mock the sufficient balance on the auto-fueling source address, and the nonce assignment
-	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(tktypes.Uint64ToUint256(400), nil).Once() // called once and then cached
+	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(pldtypes.Uint64ToUint256(400), nil).Once() // called once and then cached
 
 	var wg sync.WaitGroup
 	for i := 0; i < testConcurrency; i++ {
@@ -676,7 +676,7 @@ func TestTopUpFailedDueToSourceBalanceBelowRequestedAmountConcurrencyTest(t *tes
 			fuelingTx, err := bm.TopUpAccount(ctx, &AddressAccount{
 				Balance:               big.NewInt(100),
 				Spent:                 big.NewInt(2000),
-				Address:               *tktypes.RandAddress(),
+				Address:               *pldtypes.RandAddress(),
 				SpentTransactionCount: 2,
 				MinCost:               big.NewInt(500),
 				MaxCost:               big.NewInt(1500),
@@ -695,7 +695,7 @@ func TestTopUpFailedDueToUnableToGetPendingFuelingTransaction(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -720,7 +720,7 @@ func TestTopUpFailedDueToUnableToGetSourceAddressBalance(t *testing.T) {
 	})
 	defer done()
 
-	testDestAddress := *tktypes.RandAddress()
+	testDestAddress := *pldtypes.RandAddress()
 
 	accountToTopUp := &AddressAccount{
 		Balance:               big.NewInt(100),
@@ -734,7 +734,7 @@ func TestTopUpFailedDueToUnableToGetSourceAddressBalance(t *testing.T) {
 	m.db.ExpectQuery("SELECT.*public_txns.*data IS NULL").WillReturnRows(sqlmock.NewRows([]string{}))
 
 	// Mock the sufficient balance on the auto-fueling source address, and the nonce assignment
-	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(tktypes.Uint64ToUint256(0), fmt.Errorf("pop")).Once()
+	m.ethClient.On("GetBalance", mock.Anything, *bm.sourceAddress, "latest").Return(pldtypes.Uint64ToUint256(0), fmt.Errorf("pop")).Once()
 
 	fuelingTx, err := bm.TopUpAccount(ctx, accountToTopUp)
 	assert.Error(t, err)

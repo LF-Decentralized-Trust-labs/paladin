@@ -24,7 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -40,8 +40,8 @@ func testCancel(ctx context.Context) bool {
 
 func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
-	textTxHashByte32 := tktypes.MustParseBytes32(testTxHash)
-	textWrongTxHashByte32 := tktypes.MustParseBytes32(testWrongTxHash)
+	textTxHashByte32 := pldtypes.MustParseBytes32(testTxHash)
+	textWrongTxHashByte32 := pldtypes.MustParseBytes32(testWrongTxHash)
 
 	ctx, o, m, done := newTestOrchestrator(t, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Orchestrator.SubmissionRetry.MaxAttempts = confutil.P(1)
@@ -55,8 +55,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 	// successful send with tx hash returned
 	txSendMock := m.ethClient.On("SendRawTransaction", ctx, mock.Anything)
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(tktypes.HexBytes)
-		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(pldtypes.HexBytes)
+		assert.Equal(t, pldtypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(&textTxHashByte32, nil)
 	}).Once()
 
@@ -73,8 +73,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 	// successful send with tx hash missing
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(tktypes.HexBytes)
-		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(pldtypes.HexBytes)
+		assert.Equal(t, pldtypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, nil)
 	}).Once()
 
@@ -91,8 +91,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 	// error send due to tx hash mismatch
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(tktypes.HexBytes)
-		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(pldtypes.HexBytes)
+		assert.Equal(t, pldtypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(&textWrongTxHashByte32, nil)
 	}).Once()
 
@@ -109,8 +109,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 	// underpriced
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(tktypes.HexBytes)
-		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(pldtypes.HexBytes)
+		assert.Equal(t, pldtypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, fmt.Errorf("transaction underpriced"))
 	}).Once()
 
@@ -126,8 +126,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 	assert.Equal(t, testTxHash, txHash.String())
 	// reverted
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(tktypes.HexBytes)
-		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(pldtypes.HexBytes)
+		assert.Equal(t, pldtypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, fmt.Errorf("execution reverted"))
 	}).Once()
 
@@ -143,8 +143,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 	assert.Equal(t, testTxHash, txHash.String())
 	// known transaction
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(tktypes.HexBytes)
-		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(pldtypes.HexBytes)
+		assert.Equal(t, pldtypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, fmt.Errorf("known transaction"))
 	}).Once()
 
@@ -160,8 +160,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 	assert.Equal(t, testTxHash, txHash.String()) // able to use the calculated hash
 	// nonce too low
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(tktypes.HexBytes)
-		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(pldtypes.HexBytes)
+		assert.Equal(t, pldtypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, fmt.Errorf("nonce too low"))
 	}).Once()
 
@@ -178,8 +178,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 	// other error
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(tktypes.HexBytes)
-		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(pldtypes.HexBytes)
+		assert.Equal(t, pldtypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, fmt.Errorf("error submitting transaction"))
 	}).Once()
 
@@ -196,8 +196,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 
-	textTxHashByte32 := tktypes.MustParseBytes32(testTxHash)
-	textWrongTxHashByte32 := tktypes.MustParseBytes32(testWrongTxHash)
+	textTxHashByte32 := pldtypes.MustParseBytes32(testTxHash)
+	textWrongTxHashByte32 := pldtypes.MustParseBytes32(testWrongTxHash)
 
 	ctx, o, m, done := newTestOrchestrator(t, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Orchestrator.SubmissionRetry.MaxAttempts = confutil.P(2)

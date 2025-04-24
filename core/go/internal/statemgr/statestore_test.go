@@ -28,8 +28,8 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -104,10 +104,10 @@ func TestGetTransactionStatesUnavailable(t *testing.T) {
 	defer done()
 
 	txID := uuid.New()
-	stateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID2 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID3 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID4 := tktypes.HexBytes(tktypes.RandBytes(32))
+	stateID1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	stateID2 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	stateID3 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	stateID4 := pldtypes.HexBytes(pldtypes.RandBytes(32))
 
 	err := ss.WriteStateFinalizations(ctx, ss.p.NOTX(),
 		[]*pldapi.StateSpendRecord{
@@ -129,10 +129,10 @@ func TestGetTransactionStatesUnavailable(t *testing.T) {
 	require.Empty(t, txStates.Spent)
 	require.Empty(t, txStates.Read)
 	require.Empty(t, txStates.Confirmed)
-	require.Equal(t, []tktypes.HexBytes{stateID1}, txStates.Unavailable.Spent)
-	require.Equal(t, []tktypes.HexBytes{stateID2}, txStates.Unavailable.Read)
-	require.Equal(t, []tktypes.HexBytes{stateID3}, txStates.Unavailable.Confirmed)
-	require.Equal(t, []tktypes.HexBytes{stateID4}, txStates.Unavailable.Info)
+	require.Equal(t, []pldtypes.HexBytes{stateID1}, txStates.Unavailable.Spent)
+	require.Equal(t, []pldtypes.HexBytes{stateID2}, txStates.Unavailable.Read)
+	require.Equal(t, []pldtypes.HexBytes{stateID3}, txStates.Unavailable.Confirmed)
+	require.Equal(t, []pldtypes.HexBytes{stateID4}, txStates.Unavailable.Info)
 }
 
 func TestGetTransactionStatesFail(t *testing.T) {

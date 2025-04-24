@@ -22,18 +22,18 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/noto"
 	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,8 +63,8 @@ type pvpTestSuite struct {
 
 func (s *pvpTestSuite) SetupSuite() {
 	ctx := context.Background()
-	s.notoDomainName = "noto_" + tktypes.RandHex(8)
-	s.zetoDomainName = "zeto_" + tktypes.RandHex(8)
+	s.notoDomainName = "noto_" + pldtypes.RandHex(8)
+	s.zetoDomainName = "zeto_" + pldtypes.RandHex(8)
 	log.L(ctx).Infof("Noto domain = %s", s.notoDomainName)
 	log.L(ctx).Infof("Zeto domain = %s", s.zetoDomainName)
 
@@ -106,7 +106,7 @@ func extractLockInfo(noto noto.Noto, invokeResult *testbed.TransactionResult) (*
 				return nil, err
 			}
 			receiptInfo := &nototypes.ReceiptLockInfo{
-				LockID: tktypes.MustParseBytes32(lockInfo["lockId"].(string)),
+				LockID: pldtypes.MustParseBytes32(lockInfo["lockId"].(string)),
 			}
 			return receiptInfo, nil
 		}
@@ -140,8 +140,8 @@ func buildUnlock(ctx context.Context, notoDomain noto.Noto, abi abi.ABI, prepare
 		LockedInputs:  lockedInputs,
 		LockedOutputs: lockedOutputs,
 		Outputs:       unlockedOutputs,
-		Signature:     tktypes.HexBytes{},
-		Data:          tktypes.HexBytes{},
+		Signature:     pldtypes.HexBytes{},
+		Data:          pldtypes.HexBytes{},
 	}
 	unlockParamsJSON, err := json.Marshal(unlockParams)
 	if err != nil {
@@ -182,7 +182,7 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	atomFactory := helpers.InitAtom(t, tb, pld, s.atomFactoryAddress)
 
 	var tracker *helpers.NotoTrackerHelper
-	var trackerAddress *tktypes.EthAddress
+	var trackerAddress *pldtypes.EthAddress
 	if withHooks {
 		tracker = helpers.DeployTracker(ctx, t, tb, pld, notary)
 		trackerAddress = tracker.Address
@@ -204,11 +204,11 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	swap := helpers.DeploySwap(ctx, t, tb, pld, alice, &helpers.TradeRequestInput{
 		Holder1:       aliceKey.Verifier.Verifier,
 		TokenAddress1: notoGold.Address,
-		TokenValue1:   tktypes.Int64ToInt256(1),
+		TokenValue1:   pldtypes.Int64ToInt256(1),
 
 		Holder2:       bobKey.Verifier.Verifier,
 		TokenAddress2: notoSilver.Address,
-		TokenValue2:   tktypes.Int64ToInt256(10),
+		TokenValue2:   pldtypes.Int64ToInt256(10),
 	})
 
 	log.L(ctx).Infof("Prepare the transfers")
@@ -254,7 +254,7 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 		},
 		{
 			ContractAddress: swap.Address,
-			CallData:        tktypes.HexBytes(encodedExecute),
+			CallData:        pldtypes.HexBytes(encodedExecute),
 		},
 	})
 
@@ -318,7 +318,7 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 	tokenName := "Zeto_Anon"
 	contractAbi, ok := s.zetoContracts.DeployedContractAbis[tokenName]
 	require.True(t, ok, "Missing ABI for contract %s", tokenName)
-	var result tktypes.HexBytes
+	var result pldtypes.HexBytes
 	rpcerr := rpc.CallRPC(ctx, &result, "ptx_storeABI", contractAbi)
 	if rpcerr != nil {
 		require.NoError(t, rpcerr)
@@ -363,16 +363,16 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 	swap := helpers.DeploySwap(ctx, t, tb, pld, alice, &helpers.TradeRequestInput{
 		Holder1:       aliceKey.Verifier.Verifier,
 		TokenAddress1: noto.Address,
-		TokenValue1:   tktypes.Int64ToInt256(1),
+		TokenValue1:   pldtypes.Int64ToInt256(1),
 
 		Holder2:       bobKey.Verifier.Verifier,
 		TokenAddress2: zeto.Address,
-		TokenValue2:   tktypes.Int64ToInt256(1),
+		TokenValue2:   pldtypes.Int64ToInt256(1),
 	})
 
 	log.L(ctx).Infof("Prepare the Noto transfer")
 	notoLock := noto.Lock(ctx, &nototypes.LockParams{
-		Amount: tktypes.Int64ToInt256(1),
+		Amount: pldtypes.Int64ToInt256(1),
 	}).SignAndSend(alice).Wait()
 	notoLockResult := decodeTransactionResult(t, notoLock)
 
@@ -387,7 +387,7 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 		From:   alice,
 		Recipients: []*nototypes.UnlockRecipient{{
 			To:     bob,
-			Amount: tktypes.Int64ToInt256(1),
+			Amount: pldtypes.Int64ToInt256(1),
 		}},
 	}).SignAndSend(alice).Wait()
 	require.NotNil(t, notoPrepareUnlock)
@@ -397,7 +397,7 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 	require.NoError(t, err)
 
 	log.L(ctx).Infof("Prepare the Zeto transfer")
-	zeto.Lock(ctx, tktypes.MustEthAddress(bobKey.Verifier.Verifier), 1).SignAndSend(bob).Wait()
+	zeto.Lock(ctx, pldtypes.MustEthAddress(bobKey.Verifier.Verifier), 1).SignAndSend(bob).Wait()
 
 	jq := query.NewQueryBuilder().Limit(100).Equal("locked", true).Query()
 	lockedZetoCoins := findAvailableCoins(t, ctx, rpc, zetoDomain.Name(), zetoDomain.CoinSchemaID(), "pstate_queryContractStates", zeto.Address, jq, func(coins []*zetotypes.ZetoCoinState) bool {

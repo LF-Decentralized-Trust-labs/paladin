@@ -26,11 +26,11 @@ import (
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 )
@@ -116,7 +116,7 @@ func TestTransferInit(t *testing.T) {
 		Params: []*types.FungibleTransferParamEntry{
 			{
 				To:     "Alice",
-				Amount: tktypes.MustParseHexUint256("0x0a"),
+				Amount: pldtypes.MustParseHexUint256("0x0a"),
 			},
 		},
 		Transaction: &pb.TransactionSpecification{
@@ -160,7 +160,7 @@ func TestTransferAssemble(t *testing.T) {
 		Params: []*types.FungibleTransferParamEntry{
 			{
 				To:     "Alice",
-				Amount: tktypes.MustParseHexUint256("0x09"),
+				Amount: pldtypes.MustParseHexUint256("0x09"),
 			},
 		},
 		Transaction: txSpec,
@@ -330,7 +330,7 @@ func TestTransferPrepare(t *testing.T) {
 		Params: []*types.FungibleTransferParamEntry{
 			{
 				To:     "Alice",
-				Amount: tktypes.MustParseHexUint256("0x0a"),
+				Amount: pldtypes.MustParseHexUint256("0x0a"),
 			},
 		},
 		Transaction: txSpec,
@@ -445,13 +445,13 @@ func TestGenerateMerkleProofs(t *testing.T) {
 		},
 		callbacks: testCallbacks,
 	}
-	addr, err := tktypes.ParseEthAddress("0x1234567890123456789012345678901234567890")
+	addr, err := pldtypes.ParseEthAddress("0x1234567890123456789012345678901234567890")
 	assert.NoError(t, err)
 	inputCoins := []*types.ZetoCoin{
 		{
-			Salt:   tktypes.MustParseHexUint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
-			Owner:  tktypes.MustParseHexBytes("0x1234"),
-			Amount: tktypes.MustParseHexUint256("0x0f"),
+			Salt:   pldtypes.MustParseHexUint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			Owner:  pldtypes.MustParseHexBytes("0x1234"),
+			Amount: pldtypes.MustParseHexUint256("0x0f"),
 		},
 	}
 	ctx := context.Background()
@@ -471,11 +471,11 @@ func TestGenerateMerkleProofs(t *testing.T) {
 	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, "Zeto_Anon", queryContext, addr, inputCoins, false)
 	assert.EqualError(t, err, "PD210037: Failed load owner public key. PD210072: Invalid compressed public key length: 2")
 
-	inputCoins[0].Owner = tktypes.MustParseHexBytes("0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
+	inputCoins[0].Owner = pldtypes.MustParseHexBytes("0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
 	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, "Zeto_Anon", queryContext, addr, inputCoins, false)
 	assert.EqualError(t, err, "PD210054: Failed to create new leaf node. inputs values not inside Finite Field")
 
-	inputCoins[0].Salt = tktypes.MustParseHexUint256("0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec")
+	inputCoins[0].Salt = pldtypes.MustParseHexUint256("0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec")
 	calls := 0
 	testCallbacks.MockFindAvailableStates = func() (*pb.FindAvailableStatesResponse, error) {
 		defer func() { calls++ }()

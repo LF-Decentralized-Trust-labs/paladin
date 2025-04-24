@@ -33,9 +33,9 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -418,7 +418,7 @@ func TestAssembleTransaction(t *testing.T) {
 		},
 		TokenName: "testToken1",
 	}
-	req.Transaction.ContractInfo.ContractConfigJson = tktypes.JSONString(conf).Pretty()
+	req.Transaction.ContractInfo.ContractConfigJson = pldtypes.JSONString(conf).Pretty()
 	_, err = z.AssembleTransaction(context.Background(), req)
 	assert.NoError(t, err)
 }
@@ -446,7 +446,7 @@ func TestEndorseTransaction(t *testing.T) {
 		},
 		TokenName: "testToken1",
 	}
-	req.Transaction.ContractInfo.ContractConfigJson = tktypes.JSONString(conf).Pretty()
+	req.Transaction.ContractInfo.ContractConfigJson = pldtypes.JSONString(conf).Pretty()
 	_, err = z.EndorseTransaction(context.Background(), req)
 	assert.NoError(t, err)
 }
@@ -491,7 +491,7 @@ func TestPrepareTransaction(t *testing.T) {
 		},
 		TokenName: "testToken1",
 	}
-	req.Transaction.ContractInfo.ContractConfigJson = tktypes.JSONString(conf).Pretty()
+	req.Transaction.ContractInfo.ContractConfigJson = pldtypes.JSONString(conf).Pretty()
 	_, err = z.PrepareTransaction(context.Background(), req)
 	assert.NoError(t, err)
 }
@@ -539,7 +539,7 @@ func TestHandleEventBatch(t *testing.T) {
 	_, err := z.HandleEventBatch(ctx, req)
 	assert.ErrorContains(t, err, "PD210018")
 
-	req.ContractInfo.ContractConfigJson = tktypes.JSONString(map[string]interface{}{
+	req.ContractInfo.ContractConfigJson = pldtypes.JSONString(map[string]interface{}{
 		"circuitId": "anon_nullifier",
 		"tokenName": "Zeto_AnonNullifier",
 	}).Pretty()
@@ -693,15 +693,15 @@ func TestSign(t *testing.T) {
 	// Test with nullifiers
 	salt := crypto.NewSalt()
 	fakeCoin := types.ZetoCoin{
-		Salt:   (*tktypes.HexUint256)(salt),
-		Owner:  tktypes.MustParseHexBytes(alicePubKey),
-		Amount: tktypes.Int64ToInt256(12345),
+		Salt:   (*pldtypes.HexUint256)(salt),
+		Owner:  pldtypes.MustParseHexBytes(alicePubKey),
+		Amount: pldtypes.Int64ToInt256(12345),
 	}
 	req = &pb.SignRequest{
 		Algorithm:   z.getAlgoZetoSnarkBJJ(),
 		PayloadType: "domain:zeto:nullifier",
 		PrivateKey:  bytes,
-		Payload:     tktypes.JSONString(fakeCoin),
+		Payload:     pldtypes.JSONString(fakeCoin),
 	}
 	res, err = z.Sign(context.Background(), req)
 	assert.NoError(t, err)

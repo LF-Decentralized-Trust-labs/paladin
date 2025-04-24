@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,9 +41,9 @@ func TestReceiptTransfers(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, transfers, 0)
 
-	owner1 := tktypes.MustEthAddress("0xbb2b99dde4ca2d4c99f149d13cd55a9edada69eb")
-	owner2 := tktypes.MustEthAddress("0x3008ee73a70cd1cc57647c7d253a48defe86dd9b")
-	owner3 := tktypes.MustEthAddress("0xea82df8cb94b9fa1a0a711d75a7f7dfdec2ef53c")
+	owner1 := pldtypes.MustEthAddress("0xbb2b99dde4ca2d4c99f149d13cd55a9edada69eb")
+	owner2 := pldtypes.MustEthAddress("0x3008ee73a70cd1cc57647c7d253a48defe86dd9b")
+	owner3 := pldtypes.MustEthAddress("0xea82df8cb94b9fa1a0a711d75a7f7dfdec2ef53c")
 
 	// Simple mint
 	transfers, err = n.receiptTransfers(ctx, &prototk.BuildReceiptRequest{
@@ -61,7 +61,7 @@ func TestReceiptTransfers(t *testing.T) {
 	assert.ElementsMatch(t, []*types.ReceiptTransfer{{
 		From:   nil,
 		To:     owner1,
-		Amount: tktypes.Int64ToInt256(1),
+		Amount: pldtypes.Int64ToInt256(1),
 	}}, transfers)
 
 	// Simple burn
@@ -80,7 +80,7 @@ func TestReceiptTransfers(t *testing.T) {
 	assert.ElementsMatch(t, []*types.ReceiptTransfer{{
 		From:   owner1,
 		To:     nil,
-		Amount: tktypes.Int64ToInt256(1),
+		Amount: pldtypes.Int64ToInt256(1),
 	}}, transfers)
 
 	// Burn with returned remainder
@@ -106,7 +106,7 @@ func TestReceiptTransfers(t *testing.T) {
 	assert.ElementsMatch(t, []*types.ReceiptTransfer{{
 		From:   owner1,
 		To:     nil,
-		Amount: tktypes.Int64ToInt256(2),
+		Amount: pldtypes.Int64ToInt256(2),
 	}}, transfers)
 
 	// Simple transfer
@@ -132,7 +132,7 @@ func TestReceiptTransfers(t *testing.T) {
 	assert.ElementsMatch(t, []*types.ReceiptTransfer{{
 		From:   owner1,
 		To:     owner2,
-		Amount: tktypes.Int64ToInt256(1),
+		Amount: pldtypes.Int64ToInt256(1),
 	}}, transfers)
 
 	// Unlock to multiple recipients, with locked remainder
@@ -179,10 +179,10 @@ func TestReceiptTransfers(t *testing.T) {
 	assert.ElementsMatch(t, []*types.ReceiptTransfer{{
 		From:   owner1,
 		To:     owner2,
-		Amount: tktypes.Int64ToInt256(1),
+		Amount: pldtypes.Int64ToInt256(1),
 	}, {
 		From:   owner1,
 		To:     owner3,
-		Amount: tktypes.Int64ToInt256(2),
+		Amount: pldtypes.Int64ToInt256(2),
 	}}, transfers)
 }

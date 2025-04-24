@@ -21,24 +21,24 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 )
 
 const testTransactionData string = "0x7369676e6564206d657373616765"
 
 func NewTestInMemoryTxState(t *testing.T) InMemoryTxStateManager {
-	oldTime := tktypes.TimestampNow()
-	oldFrom := tktypes.MustEthAddress("0x4e598f6e918321dd47c86e7a077b4ab0e7414846")
-	oldTxHash := tktypes.RandBytes32()
-	oldTo := tktypes.MustEthAddress("0x6cee73cf4d5b0ac66ce2d1c0617bec4bedd09f39")
-	oldNonce := tktypes.HexUint64(1)
-	oldGasLimit := tktypes.HexUint64(2000)
-	oldValue := tktypes.Uint64ToUint256(200)
-	oldGasPrice := tktypes.Uint64ToUint256(10)
+	oldTime := pldtypes.TimestampNow()
+	oldFrom := pldtypes.MustEthAddress("0x4e598f6e918321dd47c86e7a077b4ab0e7414846")
+	oldTxHash := pldtypes.RandBytes32()
+	oldTo := pldtypes.MustEthAddress("0x6cee73cf4d5b0ac66ce2d1c0617bec4bedd09f39")
+	oldNonce := pldtypes.HexUint64(1)
+	oldGasLimit := pldtypes.HexUint64(2000)
+	oldValue := pldtypes.Uint64ToUint256(200)
+	oldGasPrice := pldtypes.Uint64ToUint256(10)
 	oldErrorMessage := "old message"
-	oldTransactionData := tktypes.MustParseHexBytes(testTransactionData)
+	oldTransactionData := pldtypes.MustParseHexBytes(testTransactionData)
 	testManagedTx := &DBPublicTxn{
 		Created: oldTime,
 		From:    *oldFrom,
@@ -64,16 +64,16 @@ func NewTestInMemoryTxState(t *testing.T) InMemoryTxStateManager {
 }
 
 func TestSettersAndGetters(t *testing.T) {
-	oldTime := tktypes.TimestampNow()
-	oldFrom := tktypes.MustEthAddress("0xb3d9cf8e163bbc840195a97e81f8a34e295b8f39")
-	oldTxHash := tktypes.Bytes32Keccak([]byte("0x00000"))
-	oldTo := tktypes.MustEthAddress("0x1f9090aae28b8a3dceadf281b0f12828e676c326")
-	oldNonce := tktypes.HexUint64(1)
-	oldGasLimit := tktypes.HexUint64(2000)
-	oldValue := tktypes.Uint64ToUint256(200)
-	oldGasPrice := tktypes.Uint64ToUint256(10)
+	oldTime := pldtypes.TimestampNow()
+	oldFrom := pldtypes.MustEthAddress("0xb3d9cf8e163bbc840195a97e81f8a34e295b8f39")
+	oldTxHash := pldtypes.Bytes32Keccak([]byte("0x00000"))
+	oldTo := pldtypes.MustEthAddress("0x1f9090aae28b8a3dceadf281b0f12828e676c326")
+	oldNonce := pldtypes.HexUint64(1)
+	oldGasLimit := pldtypes.HexUint64(2000)
+	oldValue := pldtypes.Uint64ToUint256(200)
+	oldGasPrice := pldtypes.Uint64ToUint256(10)
 	oldErrorMessage := "old message"
-	oldTransactionData := tktypes.MustParseHexBytes(testTransactionData)
+	oldTransactionData := pldtypes.MustParseHexBytes(testTransactionData)
 
 	testManagedTx := &DBPublicTxn{
 		Created: oldTime,
@@ -82,7 +82,7 @@ func TestSettersAndGetters(t *testing.T) {
 		Nonce:   (*uint64)(&oldNonce),
 		Gas:     uint64(oldGasLimit),
 		Value:   oldValue,
-		Data:    tktypes.HexBytes(oldTransactionData),
+		Data:    pldtypes.HexBytes(oldTransactionData),
 	}
 
 	imts := NewInMemoryTxStateManager(context.Background(), testManagedTx)
@@ -123,9 +123,9 @@ func TestSettersAndGetters(t *testing.T) {
 
 	// mark the transaction complete
 	confirmReceived := InFlightStatusConfirmReceived
-	newTime := confutil.P(tktypes.TimestampNow())
-	newTxHash := tktypes.Bytes32Keccak([]byte("0x000031"))
-	newGasPrice := tktypes.Uint64ToUint256(111)
+	newTime := confutil.P(pldtypes.TimestampNow())
+	newTxHash := pldtypes.Bytes32Keccak([]byte("0x000031"))
+	newGasPrice := pldtypes.Uint64ToUint256(111)
 	newErrorMessage := "new message"
 
 	imts.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
@@ -159,8 +159,8 @@ func TestSettersAndGetters(t *testing.T) {
 	assert.Equal(t, oldValue, inMemoryTx.mtx.ptx.Value)
 	assert.Equal(t, oldTransactionData, inMemoryTx.mtx.ptx.Data)
 
-	maxPriorityFeePerGas := tktypes.Uint64ToUint256(2)
-	maxFeePerGas := tktypes.Uint64ToUint256(123)
+	maxPriorityFeePerGas := pldtypes.Uint64ToUint256(2)
+	maxFeePerGas := pldtypes.Uint64ToUint256(123)
 
 	// test switch gas price format
 	imts.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{

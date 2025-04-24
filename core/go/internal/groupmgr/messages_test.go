@@ -25,8 +25,8 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -48,7 +48,7 @@ func TestSendMessageNoTopic(t *testing.T) {
 
 	_, err := gm.SendMessage(ctx, gm.p.NOTX(), &pldapi.PrivacyGroupMessageInput{
 		Domain: "domain1",
-		Data:   tktypes.JSONString("some data"),
+		Data:   pldtypes.JSONString("some data"),
 		Group:  groupIDs[0],
 	})
 	require.Regexp(t, "PD012515", err)
@@ -60,8 +60,8 @@ func TestSendMessageNoGroup(t *testing.T) {
 
 	_, err := gm.SendMessage(ctx, gm.p.NOTX(), &pldapi.PrivacyGroupMessageInput{
 		Domain: "domain1",
-		Data:   tktypes.JSONString("some data"),
-		Group:  tktypes.RandBytes(32),
+		Data:   pldtypes.JSONString("some data"),
+		Group:  pldtypes.RandBytes(32),
 		Topic:  "topic1",
 	})
 	require.Regexp(t, "PD012502", err)
@@ -75,8 +75,8 @@ func TestSendMessageGroupFail(t *testing.T) {
 
 	_, err := gm.SendMessage(ctx, gm.p.NOTX(), &pldapi.PrivacyGroupMessageInput{
 		Domain: "domain1",
-		Data:   tktypes.JSONString("some data"),
-		Group:  tktypes.RandBytes(32),
+		Data:   pldtypes.JSONString("some data"),
+		Group:  pldtypes.RandBytes(32),
 		Topic:  "topic1",
 	})
 	require.Regexp(t, "pop", err)
@@ -103,7 +103,7 @@ func TestReceiveMessageInvalid(t *testing.T) {
 			ID: badID,
 			PrivacyGroupMessageInput: pldapi.PrivacyGroupMessageInput{
 				Domain: "domain1",
-				Data:   tktypes.JSONString("some data"),
+				Data:   pldtypes.JSONString("some data"),
 				Topic:  "topic1",
 				Group:  groupIDs[0],
 			},
@@ -117,15 +117,15 @@ func TestSendMessageWriteFail(t *testing.T) {
 	ctx, gm, mc, done := newTestGroupManager(t, false, &pldconf.GroupManagerConfig{}, mockEmptyMessageListeners)
 	defer done()
 
-	schemaID := tktypes.RandBytes32()
-	groupID := tktypes.RandBytes(32)
+	schemaID := pldtypes.RandBytes32()
+	groupID := pldtypes.RandBytes(32)
 	mockDBPrivacyGroup(mc, schemaID, groupID, nil)
 
 	mc.db.Mock.ExpectExec("INSERT.*pgroup_msgs").WillReturnError(fmt.Errorf("pop"))
 
 	_, err := gm.SendMessage(ctx, gm.p.NOTX(), &pldapi.PrivacyGroupMessageInput{
 		Domain: "domain1",
-		Data:   tktypes.JSONString("some data"),
+		Data:   pldtypes.JSONString("some data"),
 		Group:  groupID,
 		Topic:  "topic1",
 	})
@@ -136,15 +136,15 @@ func TestSendMessageBadMembers(t *testing.T) {
 	ctx, gm, mc, done := newTestGroupManager(t, false, &pldconf.GroupManagerConfig{}, mockEmptyMessageListeners)
 	defer done()
 
-	schemaID := tktypes.RandBytes32()
-	groupID := tktypes.RandBytes(32)
+	schemaID := pldtypes.RandBytes32()
+	groupID := pldtypes.RandBytes(32)
 	mockDBPrivacyGroup(mc, schemaID, groupID, nil, "!!!! badness")
 
 	mc.db.Mock.ExpectQuery("INSERT.*pgroup_msgs").WillReturnRows(sqlmock.NewRows([]string{}))
 
 	_, err := gm.SendMessage(ctx, gm.p.NOTX(), &pldapi.PrivacyGroupMessageInput{
 		Domain: "domain1",
-		Data:   tktypes.JSONString("some data"),
+		Data:   pldtypes.JSONString("some data"),
 		Group:  groupID,
 		Topic:  "topic1",
 	})
@@ -161,8 +161,8 @@ func TestSendMessageSendMessageFail(t *testing.T) {
 
 	mc.db.Mock.ExpectBegin()
 
-	schemaID := tktypes.RandBytes32()
-	groupID := tktypes.RandBytes(32)
+	schemaID := pldtypes.RandBytes32()
+	groupID := pldtypes.RandBytes(32)
 	mockDBPrivacyGroup(mc, schemaID, groupID, nil, "me@node1", "me@node2")
 
 	mc.db.Mock.ExpectQuery("INSERT.*pgroup_msgs").WillReturnRows(sqlmock.NewRows([]string{}))
@@ -171,7 +171,7 @@ func TestSendMessageSendMessageFail(t *testing.T) {
 	err := gm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		_, err := gm.SendMessage(ctx, dbTX, &pldapi.PrivacyGroupMessageInput{
 			Domain: "domain1",
-			Data:   tktypes.JSONString("some data"),
+			Data:   pldtypes.JSONString("some data"),
 			Group:  groupID,
 			Topic:  "topic1",
 		})
@@ -192,14 +192,14 @@ func TestReceiveMessagesGroupNotFound(t *testing.T) {
 	err := gm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		results, err := gm.ReceiveMessages(ctx, dbTX, []*pldapi.PrivacyGroupMessage{
 			{
-				Sent:     tktypes.TimestampNow(),
-				Received: tktypes.TimestampNow(),
+				Sent:     pldtypes.TimestampNow(),
+				Received: pldtypes.TimestampNow(),
 				Node:     "node2",
 				ID:       badID,
 				PrivacyGroupMessageInput: pldapi.PrivacyGroupMessageInput{
 					Domain: "domain1",
-					Data:   tktypes.JSONString("some data"),
-					Group:  tktypes.RandBytes(32),
+					Data:   pldtypes.JSONString("some data"),
+					Group:  pldtypes.RandBytes(32),
 					Topic:  "topic1",
 				},
 			},
@@ -222,14 +222,14 @@ func TestReceiveMessagesFailFindGroup(t *testing.T) {
 	err := gm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		_, err := gm.ReceiveMessages(ctx, dbTX, []*pldapi.PrivacyGroupMessage{
 			{
-				Sent:     tktypes.TimestampNow(),
-				Received: tktypes.TimestampNow(),
+				Sent:     pldtypes.TimestampNow(),
+				Received: pldtypes.TimestampNow(),
 				Node:     "node2",
 				ID:       badID,
 				PrivacyGroupMessageInput: pldapi.PrivacyGroupMessageInput{
 					Domain: "domain1",
-					Data:   tktypes.JSONString("some data"),
-					Group:  tktypes.RandBytes(32),
+					Data:   pldtypes.JSONString("some data"),
+					Group:  pldtypes.RandBytes(32),
 					Topic:  "topic1",
 				},
 			},
@@ -244,8 +244,8 @@ func TestReceiveMessagesFailInsert(t *testing.T) {
 	defer done()
 
 	mc.db.Mock.ExpectBegin()
-	schemaID := tktypes.RandBytes32()
-	groupID := tktypes.RandBytes(32)
+	schemaID := pldtypes.RandBytes32()
+	groupID := pldtypes.RandBytes(32)
 	mockDBPrivacyGroup(mc, schemaID, groupID, nil, "me@node1", "me@node2")
 	mc.db.Mock.ExpectQuery("INSERT.*pgroup_msgs").WillReturnError(fmt.Errorf("pop"))
 	mc.db.Mock.ExpectRollback()
@@ -253,14 +253,14 @@ func TestReceiveMessagesFailInsert(t *testing.T) {
 	err := gm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		accepted, err := gm.ReceiveMessages(ctx, dbTX, []*pldapi.PrivacyGroupMessage{
 			{
-				Sent:     tktypes.TimestampNow(),
-				Received: tktypes.TimestampNow(),
+				Sent:     pldtypes.TimestampNow(),
+				Received: pldtypes.TimestampNow(),
 				Node:     "node2",
 				ID:       uuid.New(),
 				PrivacyGroupMessageInput: pldapi.PrivacyGroupMessageInput{
 					Domain: "domain1",
-					Data:   tktypes.JSONString("some data"),
-					Group:  tktypes.RandBytes(32),
+					Data:   pldtypes.JSONString("some data"),
+					Group:  pldtypes.RandBytes(32),
 					Topic:  "topic1",
 				},
 			},

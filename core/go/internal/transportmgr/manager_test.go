@@ -27,10 +27,10 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
 	"github.com/sirupsen/logrus"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -127,7 +127,7 @@ func TestConfiguredTransports(t *testing.T) {
 		Transports: map[string]*pldconf.TransportConfig{
 			"test1": {
 				Plugin: pldconf.PluginConfig{
-					Type:    string(tktypes.LibraryTypeCShared),
+					Type:    string(pldtypes.LibraryTypeCShared),
 					Library: "some/where",
 				},
 			},
@@ -137,7 +137,7 @@ func TestConfiguredTransports(t *testing.T) {
 
 	assert.Equal(t, map[string]*pldconf.PluginConfig{
 		"test1": {
-			Type:    string(tktypes.LibraryTypeCShared),
+			Type:    string(pldtypes.LibraryTypeCShared),
 			Library: "some/where",
 		},
 	}, dm.ConfiguredTransports())

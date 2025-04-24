@@ -27,9 +27,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/onsi/ginkgo/v2" //nolint:golint,revive
 )
 
@@ -156,8 +156,8 @@ type TestDeployer struct {
 
 func (td *TestDeployer) DeploySmartContractDeploymentBytecode(ctx context.Context, buildJSON string, params any) (receipt *pldapi.TransactionReceipt, err error) {
 	type buildDefinition struct {
-		Bytecode tktypes.HexBytes `json:"bytecode"`
-		ABI      abi.ABI          `json:"abi"`
+		Bytecode pldtypes.HexBytes `json:"bytecode"`
+		ABI      abi.ABI           `json:"abi"`
 	}
 	var build buildDefinition
 	if err := json.Unmarshal([]byte(buildJSON), &build); err != nil {

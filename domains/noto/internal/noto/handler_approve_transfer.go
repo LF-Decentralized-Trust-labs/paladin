@@ -19,15 +19,15 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
@@ -101,7 +101,7 @@ func (h *approveHandler) decodeStates(states []*pldapi.StateEncoded) []*prototk.
 		result[i] = &prototk.EndorsableState{
 			Id:            state.ID.String(),
 			SchemaId:      state.Schema.String(),
-			StateDataJson: tktypes.RawJSON(state.Data).String(),
+			StateDataJson: pldtypes.RawJSON(state.Data).String(),
 		}
 	}
 	return result
@@ -157,7 +157,7 @@ func (h *approveHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedT
 	}
 	params := &NotoApproveTransferParams{
 		Delegate:  inParams.Delegate,
-		TXHash:    tktypes.Bytes32(transferHash),
+		TXHash:    pldtypes.Bytes32(transferHash),
 		Signature: sender.Payload,
 		Data:      data,
 	}
@@ -189,7 +189,7 @@ func (h *approveHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransac
 		Delegate: inParams.Delegate,
 		Data:     inParams.Data,
 		Prepared: PreparedTransaction{
-			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
+			ContractAddress: (*pldtypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
 		},
 	}

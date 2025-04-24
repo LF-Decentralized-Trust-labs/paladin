@@ -39,8 +39,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 var _ = Describe("SmartContractDeployment Controller", func() {
@@ -159,7 +159,7 @@ func TestSmartContractDeploymentReconcile_Success(t *testing.T) {
 			succeededFlag:     true,
 			receiptValue: &pldapi.TransactionReceipt{
 				TransactionReceiptData: pldapi.TransactionReceiptData{
-					ContractAddress: tktypes.MustEthAddress("0x3078616263646566313233343536373839300000"),
+					ContractAddress: pldtypes.MustEthAddress("0x3078616263646566313233343536373839300000"),
 				},
 			},
 		}

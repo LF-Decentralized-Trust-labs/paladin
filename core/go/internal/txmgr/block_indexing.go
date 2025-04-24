@@ -18,12 +18,12 @@ package txmgr
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 func (tm *txManager) blockIndexerPreCommit(
@@ -93,8 +93,8 @@ func (tm *txManager) blockIndexerPreCommit(
 func (tm *txManager) mapBlockchainReceipt(pubTx *components.PublicTxMatch) *components.ReceiptInput {
 	receipt := &components.ReceiptInput{
 		TransactionID: pubTx.TransactionID,
-		OnChain: tktypes.OnChainLocation{
-			Type:             tktypes.OnChainTransaction,
+		OnChain: pldtypes.OnChainLocation{
+			Type:             pldtypes.OnChainTransaction,
 			TransactionHash:  pubTx.Hash,
 			BlockNumber:      pubTx.BlockNumber,
 			TransactionIndex: pubTx.TransactionIndex,

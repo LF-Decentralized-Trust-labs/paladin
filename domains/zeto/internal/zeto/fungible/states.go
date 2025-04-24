@@ -22,18 +22,18 @@ import (
 	"math/rand/v2"
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 var MAX_INPUT_COUNT = 10
@@ -145,8 +145,8 @@ func prepareOutputsForTransfer(ctx context.Context, useNullifiers bool, params [
 		salt := crypto.NewSalt()
 		compressedKeyStr := zetosigner.EncodeBabyJubJubPublicKey(recipientKey)
 		newCoin := &types.ZetoCoin{
-			Salt:   (*tktypes.HexUint256)(salt),
-			Owner:  tktypes.MustParseHexBytes(compressedKeyStr),
+			Salt:   (*pldtypes.HexUint256)(salt),
+			Owner:  pldtypes.MustParseHexBytes(compressedKeyStr),
 			Amount: param.Amount,
 			Locked: isLocked,
 		}

@@ -1,12 +1,14 @@
 module github.com/kaleido-io/paladin/perf
 
-go 1.22.5
+go 1.23.0
+
+toolchain go1.23.7
 
 require (
 	github.com/go-resty/resty/v2 v2.14.0
 	github.com/hyperledger/firefly-common v1.4.14
 	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/client_model v0.6.1
@@ -19,9 +21,8 @@ require (
 
 require (
 	github.com/hyperledger/firefly-signer v1.1.19 // indirect
+	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
-	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
 require (
@@ -67,19 +68,21 @@ require (
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2 // indirect
 	gitlab.com/hfuss/mux-prometheus v0.0.5 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sync v0.10.0
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/term v0.27.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/sync v0.11.0
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-replace github.com/kaleido-io/paladin/toolkit => ../toolkit/go
+replace github.com/kaleido-io/paladin/common/go => ../common/go
+
+replace github.com/kaleido-io/paladin/sdk/go => ../sdk/go
 
 replace github.com/kaleido-io/paladin/config => ../config

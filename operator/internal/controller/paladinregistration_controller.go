@@ -33,9 +33,9 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 )
 
 var registryABI = abi.ABI{
@@ -237,7 +237,7 @@ func (r *PaladinRegistrationReconciler) updateStatusAndRequeue(ctx context.Conte
 	return ctrl.Result{RequeueAfter: 50 * time.Millisecond}, nil // Run again immediately to submit
 }
 
-func (r *PaladinRegistrationReconciler) getRegistryAddress(ctx context.Context, reg *corev1alpha1.PaladinRegistration) (*tktypes.EthAddress, error) {
+func (r *PaladinRegistrationReconciler) getRegistryAddress(ctx context.Context, reg *corev1alpha1.PaladinRegistration) (*pldtypes.EthAddress, error) {
 
 	// Get the registry CR for the address
 	var registry corev1alpha1.PaladinRegistry
@@ -252,11 +252,11 @@ func (r *PaladinRegistrationReconciler) getRegistryAddress(ctx context.Context, 
 		return nil, nil
 	}
 
-	return tktypes.ParseEthAddress(registry.Status.ContractAddress)
+	return pldtypes.ParseEthAddress(registry.Status.ContractAddress)
 
 }
 
-func (r *PaladinRegistrationReconciler) buildRegistrationTX(ctx context.Context, reg *corev1alpha1.PaladinRegistration, registryAddr *tktypes.EthAddress) (bool, *pldapi.TransactionInput, error) {
+func (r *PaladinRegistrationReconciler) buildRegistrationTX(ctx context.Context, reg *corev1alpha1.PaladinRegistration, registryAddr *pldtypes.EthAddress) (bool, *pldapi.TransactionInput, error) {
 
 	// We ask the node its name, so we know what to register it as
 	targetNodeRPC, err := getPaladinRPC(ctx, r.Client, reg.Spec.Node, reg.Namespace, "10s")
@@ -275,7 +275,7 @@ func (r *PaladinRegistrationReconciler) buildRegistrationTX(ctx context.Context,
 	}
 
 	registration := map[string]any{
-		"parentIdentityHash": tktypes.Bytes32{}, // zero for root
+		"parentIdentityHash": pldtypes.Bytes32{}, // zero for root
 		"name":               nodeName,
 		"owner":              addr,
 	}
@@ -286,7 +286,7 @@ func (r *PaladinRegistrationReconciler) buildRegistrationTX(ctx context.Context,
 			To:       registryAddr,
 			Function: registryABI.Functions()["registerIdentity"].String(),
 			From:     reg.Spec.RegistryAdminKey, // registry admin registers the root entry for the node
-			Data:     tktypes.JSONString(registration),
+			Data:     pldtypes.JSONString(registration),
 		},
 		ABI: registryABI,
 	}
@@ -294,7 +294,7 @@ func (r *PaladinRegistrationReconciler) buildRegistrationTX(ctx context.Context,
 	return true, tx, nil
 }
 
-func (r *PaladinRegistrationReconciler) buildTransportTX(ctx context.Context, reg *corev1alpha1.PaladinRegistration, registryAddr *tktypes.EthAddress, transportName string) (bool, *pldapi.TransactionInput, error) {
+func (r *PaladinRegistrationReconciler) buildTransportTX(ctx context.Context, reg *corev1alpha1.PaladinRegistration, registryAddr *pldtypes.EthAddress, transportName string) (bool, *pldapi.TransactionInput, error) {
 
 	// Get the details from the node
 	regNodeRPC, err := getPaladinRPC(ctx, r.Client, reg.Spec.Node, reg.Namespace, "30s")
@@ -343,7 +343,7 @@ func (r *PaladinRegistrationReconciler) buildTransportTX(ctx context.Context, re
 			To:       registryAddr,
 			Function: registryABI.Functions()["setIdentityProperty"].String(),
 			From:     reg.Spec.NodeKey, // node registers the transports
-			Data:     tktypes.JSONString(property),
+			Data:     pldtypes.JSONString(property),
 		},
 		ABI: registryABI,
 	}

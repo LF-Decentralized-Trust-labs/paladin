@@ -291,7 +291,7 @@ func (m *MockKeyManager) ResolveEthAddress(ctx context.Context, key string) (str
 // 		},
 // 	}
 
-// 	registryAddr := &tktypes.EthAddress{}
+// 	registryAddr := &pldtypes.EthAddress{}
 // 	registryAddr.UnmarshalJSON([]byte(`"0x0000000000000000000000000000000000000001"`))
 
 // 	// paladinRPC := &MockPaladinRPC{
@@ -325,7 +325,7 @@ func (m *MockKeyManager) ResolveEthAddress(ctx context.Context, key string) (str
 // 		},
 // 	}
 
-// 	registryAddr := &tktypes.EthAddress{}
+// 	registryAddr := &pldtypes.EthAddress{}
 // 	registryAddr.UnmarshalJSON([]byte(`"0x1234567890abcdef"`))
 
 // 	paladinRPC := &MockPaladinRPC{

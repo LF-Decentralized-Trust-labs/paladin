@@ -23,8 +23,8 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/mocks/publictxmocks"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -82,7 +82,7 @@ func TestStateVersionTransactionFromRetrieveGasPriceToTracking(t *testing.T) {
 	assert.Nil(t, version.GetStageTriggerError(ctx))
 
 	var nilBytes []byte
-	var nilHash *tktypes.Bytes32
+	var nilHash *pldtypes.Bytes32
 	// scenario A: no signer configured, do submission
 	mockActionTriggers.On("TriggerSubmitTx", mock.Anything, nilBytes, nilHash).Return(nil).Once()
 
@@ -95,7 +95,7 @@ func TestStateVersionTransactionFromRetrieveGasPriceToTracking(t *testing.T) {
 	assert.Nil(t, version.GetStageTriggerError(ctx))
 	// persist the signed data as transient output
 	testSignedData := []byte("test signed data")
-	testHash := confutil.P(tktypes.RandBytes32())
+	testHash := confutil.P(pldtypes.RandBytes32())
 	version.SetTransientPreviousStageOutputs(&TransientPreviousStageOutputs{
 		SignedMessage:   testSignedData,
 		TransactionHash: testHash,
@@ -156,7 +156,7 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 	go func() {
 		for i := 0; i < expectedNumberOfSubmitSuccessOutput; i++ {
 			go func() {
-				version.AddSubmitOutput(ctx, confutil.P(tktypes.Bytes32Keccak([]byte("0x000031"))), confutil.P(tktypes.TimestampNow()), SubmissionOutcomeAlreadyKnown, "", nil)
+				version.AddSubmitOutput(ctx, confutil.P(pldtypes.Bytes32Keccak([]byte("0x000031"))), confutil.P(pldtypes.TimestampNow()), SubmissionOutcomeAlreadyKnown, "", nil)
 				countChanel <- true
 			}()
 		}
@@ -165,7 +165,7 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 	go func() {
 		for i := 0; i < expectedNumberOfSubmitErrorOutput; i++ {
 			go func() {
-				version.AddSubmitOutput(ctx, nil, confutil.P(tktypes.TimestampNow()), SubmissionOutcomeFailedRequiresRetry, "error", fmt.Errorf("error"))
+				version.AddSubmitOutput(ctx, nil, confutil.P(pldtypes.TimestampNow()), SubmissionOutcomeFailedRequiresRetry, "error", fmt.Errorf("error"))
 				countChanel <- true
 			}()
 		}
@@ -174,7 +174,7 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 	go func() {
 		for i := 0; i < expectedNumberOfSignSuccessOutput; i++ {
 			go func() {
-				version.AddSignOutput(ctx, []byte("data"), confutil.P(tktypes.RandBytes32()), nil)
+				version.AddSignOutput(ctx, []byte("data"), confutil.P(pldtypes.RandBytes32()), nil)
 				countChanel <- true
 			}()
 		}
@@ -191,7 +191,7 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 		for i := 0; i < expectedNumberOfGasPriceSuccessOutput; i++ {
 			go func() {
 				version.AddGasPriceOutput(ctx, &pldapi.PublicTxGasPricing{
-					GasPrice: tktypes.Int64ToInt256(100),
+					GasPrice: pldtypes.Int64ToInt256(100),
 				}, nil)
 				countChanel <- true
 			}()
@@ -322,7 +322,7 @@ func TestStateManagerTxPersistenceManagementUpdateErrors(t *testing.T) {
 	rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{
 		NewSubmission: &DBPubTxnSubmission{
 			from:            "0x12345",
-			TransactionHash: tktypes.RandBytes32(),
+			TransactionHash: pldtypes.RandBytes32(),
 		},
 	}
 

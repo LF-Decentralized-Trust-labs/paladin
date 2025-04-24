@@ -9,8 +9,8 @@ import (
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -22,7 +22,7 @@ func TestDepositValidateParams(t *testing.T) {
 	config := &types.DomainInstanceConfig{}
 	v, err := h.ValidateParams(ctx, config, "{\"amount\":100}")
 	require.NoError(t, err)
-	require.Equal(t, "0x64", v.(*tktypes.HexUint256).String())
+	require.Equal(t, "0x64", v.(*pldtypes.HexUint256).String())
 
 	_, err = h.ValidateParams(ctx, config, "bad json")
 	require.ErrorContains(t, err, "PD210105: Failed to decode the deposit call.")
@@ -71,7 +71,7 @@ func TestDepositAssemble(t *testing.T) {
 		},
 	}
 	tx := &types.ParsedTransaction{
-		Params:      tktypes.MustParseHexUint256("100"),
+		Params:      pldtypes.MustParseHexUint256("100"),
 		Transaction: txSpec,
 		DomainConfig: &types.DomainInstanceConfig{
 			TokenName: "tokenContract1",
@@ -130,7 +130,7 @@ func TestDepositPrepare(t *testing.T) {
 		From:          "Bob",
 	}
 	tx := &types.ParsedTransaction{
-		Params:      tktypes.MustParseHexUint256("100"),
+		Params:      pldtypes.MustParseHexUint256("100"),
 		Transaction: txSpec,
 		DomainConfig: &types.DomainInstanceConfig{
 			TokenName: constants.TOKEN_ANON_ENC,

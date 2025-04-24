@@ -17,9 +17,9 @@ package plugintk
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"google.golang.org/grpc"
 	pb "google.golang.org/protobuf/proto"
 )
@@ -139,7 +139,7 @@ func (th *transportHandler) RequestToPlugin(ctx context.Context, iReq PluginMess
 		resMsg.DeactivatePeerRes, err = th.api.DeactivatePeer(ctx, input.DeactivatePeer)
 		res.ResponseFromTransport = resMsg
 	default:
-		err = i18n.NewError(ctx, tkmsgs.MsgPluginUnsupportedRequest, input)
+		err = i18n.NewError(ctx, pldmsgs.MsgPluginUnsupportedRequest, input)
 	}
 	return th.Wrap(res), err
 }

@@ -25,9 +25,9 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,10 +49,10 @@ func TestLock(t *testing.T) {
 	require.NoError(t, err)
 
 	inputCoin := &types.NotoCoinState{
-		ID: tktypes.RandBytes32(),
+		ID: pldtypes.RandBytes32(),
 		Data: types.NotoCoin{
-			Owner:  (*tktypes.EthAddress)(&senderKey.Address),
-			Amount: tktypes.Int64ToInt256(100),
+			Owner:  (*pldtypes.EthAddress)(&senderKey.Address),
+			Amount: pldtypes.Int64ToInt256(100),
 		},
 	}
 	mockCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
@@ -139,7 +139,7 @@ func TestLock(t *testing.T) {
 	require.NoError(t, err)
 	signature, err := senderKey.SignDirect(encodedLock)
 	require.NoError(t, err)
-	signatureBytes := tktypes.HexBytes(signature.CompactRSV())
+	signatureBytes := pldtypes.HexBytes(signature.CompactRSV())
 
 	inputStates := []*prototk.EndorsableState{
 		{
@@ -232,7 +232,7 @@ func TestLock(t *testing.T) {
 		NotaryMode:   types.NotaryModeHooks.Enum(),
 		Options: types.NotoOptions{
 			Hooks: &types.NotoHooksOptions{
-				PublicAddress:     tktypes.MustEthAddress(hookAddress),
+				PublicAddress:     pldtypes.MustEthAddress(hookAddress),
 				DevUsePublicHooks: true,
 			},
 		},
@@ -269,5 +269,5 @@ func TestLock(t *testing.T) {
 			"contractAddress": "%s",
 			"encodedCall": "%s"
 		}
-	}`, senderKey.Address, lockInfo.LockID, senderKey.Address, contractAddress, tktypes.HexBytes(encodedCall)), prepareRes.Transaction.ParamsJson)
+	}`, senderKey.Address, lockInfo.LockID, senderKey.Address, contractAddress, pldtypes.HexBytes(encodedCall)), prepareRes.Transaction.ParamsJson)
 }

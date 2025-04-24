@@ -29,9 +29,9 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -66,7 +66,7 @@ func newTestMessageReceiver(err error) *testMessageReceiver {
 	}
 }
 
-func createTestGroups(t *testing.T, ctx context.Context, mc *mockComponents, gm *groupManager, groups ...*pldapi.PrivacyGroupInput) []tktypes.HexBytes {
+func createTestGroups(t *testing.T, ctx context.Context, mc *mockComponents, gm *groupManager, groups ...*pldapi.PrivacyGroupInput) []pldtypes.HexBytes {
 
 	// Validate the init gets the correct data
 	mc.domain.On("ConfigurePrivacyGroup", mock.Anything, mock.Anything).Return(map[string]string{"conf1": "value1"}, nil)
@@ -88,7 +88,7 @@ func createTestGroups(t *testing.T, ctx context.Context, mc *mockComponents, gm 
 		return rm.MessageType.V() == pldapi.RMTPrivacyGroup
 	})).Return(nil)
 
-	ids := make([]tktypes.HexBytes, len(groups))
+	ids := make([]pldtypes.HexBytes, len(groups))
 	err := gm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
 		for i, g := range groups {
 			g, err := gm.CreateGroup(ctx, dbTX, g)
@@ -158,7 +158,7 @@ func TestE2EMessageListenerDelivery(t *testing.T) {
 				Domain: "domain1",
 				Group:  groupIDs[i%2],
 				Topic:  topics[i%len(topics)],
-				Data:   tktypes.JSONString("some data"),
+				Data:   pldtypes.JSONString("some data"),
 			})
 			require.NoError(t, err)
 			msgIDs[i] = *msgID
@@ -199,16 +199,16 @@ func TestE2EMessageListenerDelivery(t *testing.T) {
 	// Receive a remote message
 	goodRemoteMsg := &pldapi.PrivacyGroupMessage{
 		LocalSequence: 999999, /* will be overridden */
-		Sent:          tktypes.MustParseTimeString("2021-05-15T19:49:04.123Z"),
-		Received:      tktypes.MustParseTimeString("2021-05-15T19:49:04.123Z"), /* will be overridden */
-		Node:          "ignored",                                               /* will be overridden */
+		Sent:          pldtypes.MustParseTimeString("2021-05-15T19:49:04.123Z"),
+		Received:      pldtypes.MustParseTimeString("2021-05-15T19:49:04.123Z"), /* will be overridden */
+		Node:          "ignored",                                                /* will be overridden */
 		ID:            uuid.New(),
 		PrivacyGroupMessageInput: pldapi.PrivacyGroupMessageInput{
 			CorrelationID: confutil.P(uuid.New()),
 			Domain:        "domain1",
 			Group:         groupIDs[0],
 			Topic:         "my/topic",
-			Data:          tktypes.JSONString("some data"),
+			Data:          pldtypes.JSONString("some data"),
 		},
 	}
 	err = gm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
@@ -416,10 +416,10 @@ func TestDeleteMessageListenerFail(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = gm.loadListener(ctx, &persistedMessageListener{Name: "test1", Filters: tktypes.RawJSON(`{"topic":"(((bad listener"}`), Options: tktypes.RawJSON(`{}`)})
+	_, err = gm.loadListener(ctx, &persistedMessageListener{Name: "test1", Filters: pldtypes.RawJSON(`{"topic":"(((bad listener"}`), Options: pldtypes.RawJSON(`{}`)})
 	assert.Regexp(t, "PD012509", err)
 
-	_, err = gm.loadListener(ctx, &persistedMessageListener{Name: "test1", Filters: tktypes.RawJSON(`{}`), Options: tktypes.RawJSON(`{}`)})
+	_, err = gm.loadListener(ctx, &persistedMessageListener{Name: "test1", Filters: pldtypes.RawJSON(`{}`), Options: pldtypes.RawJSON(`{}`)})
 	assert.Regexp(t, "PD012512", err)
 
 	err = gm.DeleteMessageListener(ctx, "test1")
@@ -431,13 +431,13 @@ func TestCreateListenerBadOptions(t *testing.T) {
 	defer done()
 
 	_, err := gm.loadListener(ctx, &persistedMessageListener{
-		Filters: tktypes.RawJSON(`{ !badness`),
+		Filters: pldtypes.RawJSON(`{ !badness`),
 	})
 	assert.Regexp(t, "PD012510", err)
 
 	_, err = gm.loadListener(ctx, &persistedMessageListener{
-		Filters: tktypes.RawJSON(`{}`),
-		Options: tktypes.RawJSON(`{ !badness`),
+		Filters: pldtypes.RawJSON(`{}`),
+		Options: pldtypes.RawJSON(`{ !badness`),
 	})
 	assert.Regexp(t, "PD012511", err)
 
@@ -514,7 +514,7 @@ func mockMessages(count int, mc *mockComponents) {
 		rows = rows.AddRow(
 			int64(1000),
 			uuid.New(),
-			tktypes.JSONString(fmt.Sprintf("message %d", i)),
+			pldtypes.JSONString(fmt.Sprintf("message %d", i)),
 		)
 	}
 	mc.db.Mock.ExpectQuery("SELECT.*pgroup_msgs").WillReturnRows(rows)
@@ -726,7 +726,7 @@ func TestLoadCheckpoint(t *testing.T) {
 	mdb.ExpectQuery("SELECT.*message_listener_checkpoints").WillReturnRows(sqlmock.NewRows([]string{
 		"listener", "sequence", "time",
 	}).AddRow(
-		"listener1", int64(400), tktypes.TimestampNow(),
+		"listener1", int64(400), pldtypes.TimestampNow(),
 	))
 	err = l.loadCheckpoint()
 	require.NoError(t, err)

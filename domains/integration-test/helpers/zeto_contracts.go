@@ -25,14 +25,14 @@ import (
 	"github.com/go-resty/resty/v2"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
@@ -45,9 +45,9 @@ type ZetoDomainConfig struct {
 }
 
 type ZetoDomainContracts struct {
-	FactoryAddress       *tktypes.EthAddress
+	FactoryAddress       *pldtypes.EthAddress
 	factoryAbi           abi.ABI
-	deployedContracts    map[string]*tktypes.EthAddress
+	deployedContracts    map[string]*pldtypes.EthAddress
 	DeployedContractAbis map[string]abi.ABI
 	cloneableContracts   map[string]cloneableContract
 }
@@ -210,8 +210,8 @@ func findCloneableContracts(config *ZetoDomainConfig) map[string]cloneableContra
 	return cloneableContracts
 }
 
-func deployImplementations(ctx context.Context, rpc rpcclient.Client, deployer string, contracts []zetoDomainContract) (map[string]*tktypes.EthAddress, map[string]abi.ABI, error) {
-	deployedContracts := make(map[string]*tktypes.EthAddress)
+func deployImplementations(ctx context.Context, rpc rpcclient.Client, deployer string, contracts []zetoDomainContract) (map[string]*pldtypes.EthAddress, map[string]abi.ABI, error) {
+	deployedContracts := make(map[string]*pldtypes.EthAddress)
 	deployedContractAbis := make(map[string]abi.ABI)
 	for _, contract := range contracts {
 		addr, abi, err := deployContract(ctx, rpc, deployer, &contract, deployedContracts)
@@ -226,7 +226,7 @@ func deployImplementations(ctx context.Context, rpc rpcclient.Client, deployer s
 	return deployedContracts, deployedContractAbis, nil
 }
 
-func deployContract(ctx context.Context, rpc rpcclient.Client, deployer string, contract *zetoDomainContract, deployedContracts map[string]*tktypes.EthAddress) (*tktypes.EthAddress, abi.ABI, error) {
+func deployContract(ctx context.Context, rpc rpcclient.Client, deployer string, contract *zetoDomainContract, deployedContracts map[string]*pldtypes.EthAddress) (*pldtypes.EthAddress, abi.ABI, error) {
 	if contract.AbiAndBytecode.Path == "" {
 		return nil, nil, fmt.Errorf("no path or JSON specified for the abi and bytecode for contract %s", contract.Name)
 	}
@@ -242,7 +242,7 @@ func deployContract(ctx context.Context, rpc rpcclient.Client, deployer string, 
 	return addr, build.ABI, nil
 }
 
-func getContractSpec(contract *zetoDomainContract, deployedContracts map[string]*tktypes.EthAddress) (*solutils.SolidityBuild, error) {
+func getContractSpec(contract *zetoDomainContract, deployedContracts map[string]*pldtypes.EthAddress) (*solutils.SolidityBuild, error) {
 	bytes, err := os.ReadFile(contract.AbiAndBytecode.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read abi+bytecode file %s. %s", contract.AbiAndBytecode.Path, err)
@@ -251,13 +251,13 @@ func getContractSpec(contract *zetoDomainContract, deployedContracts map[string]
 	return build, nil
 }
 
-func deployBytecode(ctx context.Context, rpc rpcclient.Client, deployer string, build *solutils.SolidityBuild) (*tktypes.EthAddress, error) {
+func deployBytecode(ctx context.Context, rpc rpcclient.Client, deployer string, build *solutils.SolidityBuild) (*pldtypes.EthAddress, error) {
 	var addr string
-	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode", deployer, build.ABI, build.Bytecode.String(), tktypes.RawJSON(`{}`))
+	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode", deployer, build.ABI, build.Bytecode.String(), pldtypes.RawJSON(`{}`))
 	if rpcerr != nil {
 		return nil, rpcerr
 	}
-	return tktypes.MustEthAddress(addr), nil
+	return pldtypes.MustEthAddress(addr), nil
 }
 
 func configureFactoryContract(ctx context.Context, tb testbed.Testbed, deployer string, domainContracts *ZetoDomainContracts) error {
@@ -274,7 +274,7 @@ func configureFactoryContract(ctx context.Context, tb testbed.Testbed, deployer 
 	return nil
 }
 
-func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainContracts, abiFunc *abi.Entry, deployer string, addr *tktypes.EthAddress, tb testbed.Testbed) error {
+func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainContracts, abiFunc *abi.Entry, deployer string, addr *pldtypes.EthAddress, tb testbed.Testbed) error {
 	if name == "" {
 		return fmt.Errorf("no name specified for implementation")
 	}
@@ -364,7 +364,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 			Type:     pldapi.TransactionTypePublic.Enum(),
 			From:     deployer,
 			To:       addr,
-			Data:     tktypes.JSONString(params),
+			Data:     pldtypes.JSONString(params),
 			Function: abiFunc.String(),
 		},
 		ABI: abi.ABI{abiFunc},

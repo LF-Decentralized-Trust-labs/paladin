@@ -33,10 +33,10 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
@@ -82,7 +82,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 							verifier, err := rpc[src].PTX().ResolveVerifier(ctx, fmt.Sprintf("test@%s", dest),
 								algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 							if err == nil {
-								addr, err := tktypes.ParseEthAddress(verifier)
+								addr, err := pldtypes.ParseEthAddress(verifier)
 								Expect(err).To(BeNil())
 								Expect(addr).ToNot(BeNil())
 							}
@@ -94,11 +94,11 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 		})
 
 		penteGroupStars := nototypes.PentePrivateGroup{
-			Salt:    tktypes.RandBytes32(),                                // unique salt must be shared privately to retain anonymity
+			Salt:    pldtypes.RandBytes32(),                               // unique salt must be shared privately to retain anonymity
 			Members: []string{"tara@node1", "hoshi@node2", "seren@node3"}, // these will be salted to establish the endorsement key identifiers
 		}
 
-		var penteContract *tktypes.EthAddress
+		var penteContract *pldtypes.EthAddress
 		It("deploys a pente privacy group across all three nodes", func() {
 
 			const ENDORSEMENT_TYPE__GROUP_SCOPED_IDENTITIES = "group_scoped_identities"
@@ -147,7 +147,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 			erc20DeployID = deploy.ID()
 		})
 
-		var erc20StarsAddr *tktypes.EthAddress
+		var erc20StarsAddr *pldtypes.EthAddress
 		It("requests the receipt from pente to get the contract address", func() {
 
 			domainReceiptJSON, err := rpc["node1"].PTX().GetDomainReceipt(ctx, "pente", erc20DeployID)
@@ -160,15 +160,15 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 
 		})
 
-		getEthAddress := func(identity, node string) tktypes.EthAddress {
+		getEthAddress := func(identity, node string) pldtypes.EthAddress {
 			addr, err := rpc[node].PTX().ResolveVerifier(ctx, fmt.Sprintf("%s@%s", identity, node), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 			Expect(err).To(BeNil())
-			return *tktypes.MustEthAddress(addr)
+			return *pldtypes.MustEthAddress(addr)
 		}
-		getERC20Balance := func(identity, node string) *tktypes.HexUint256 {
+		getERC20Balance := func(identity, node string) *pldtypes.HexUint256 {
 			addr := getEthAddress(identity, node)
 			type ercBalanceOf struct {
-				Param0 *tktypes.HexUint256 `json:"0"`
+				Param0 *pldtypes.HexUint256 `json:"0"`
 			}
 			var result ercBalanceOf
 			err := rpc[node].ForABI(ctx, erc20PrivateABI).

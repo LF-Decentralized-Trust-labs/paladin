@@ -25,9 +25,9 @@ import (
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 )
@@ -89,7 +89,7 @@ func TestLocktInit(t *testing.T) {
 	ctx := context.Background()
 	tx := &types.ParsedTransaction{
 		Params: &types.LockParams{
-			Delegate: tktypes.RandAddress(),
+			Delegate: pldtypes.RandAddress(),
 		},
 		Transaction: &prototk.TransactionSpecification{
 			From: "Alice",
@@ -140,8 +140,8 @@ func TestLockAssemble(t *testing.T) {
 
 	tx := &types.ParsedTransaction{
 		Params: &types.LockParams{
-			Amount:   tktypes.Uint64ToUint256(100),
-			Delegate: tktypes.RandAddress(),
+			Amount:   pldtypes.Uint64ToUint256(100),
+			Delegate: pldtypes.RandAddress(),
 		},
 		DomainConfig: config,
 		Transaction: &prototk.TransactionSpecification{
@@ -209,7 +209,7 @@ func TestLockPrepare(t *testing.T) {
 	ctx := context.Background()
 	tx := &types.ParsedTransaction{
 		Params: &types.LockParams{
-			Delegate: tktypes.RandAddress(),
+			Delegate: pldtypes.RandAddress(),
 		},
 		DomainConfig: &types.DomainInstanceConfig{
 			TokenName: "test1",
@@ -286,7 +286,7 @@ func TestLockPrepare(t *testing.T) {
 
 	tx.DomainConfig.TokenName = "Zeto_Anon"
 	tx.Params = &types.LockParams{
-		Delegate: tktypes.RandAddress(),
+		Delegate: pldtypes.RandAddress(),
 	}
 	req.AttestationResult[0].Payload = payload
 	_, err = h.Prepare(ctx, tx, req)

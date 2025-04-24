@@ -2,7 +2,7 @@
 ARG JAVA_VERSION=21.0.4+7
 ARG NODE_VERSION=20.17.0
 ARG PROTO_VERSION=28.2
-ARG GO_VERSION=1.22.7
+ARG GO_VERSION=1.23.7
 ARG GO_MIGRATE_VERSION=4.18.2
 ARG GRADLE_VERSION=8.5
 ARG WASMER_VERSION=4.3.7
@@ -99,6 +99,8 @@ RUN gradle --no-daemon --parallel :buildSrc:jar
 # Copy in a set of thing before the first gradle command that are less likely to change
 COPY solidity solidity
 COPY config config
+COPY common/go common/go
+COPY sdk/go sdk/go
 COPY toolkit/proto toolkit/proto
 COPY toolkit toolkit
 COPY go.work.sum ./

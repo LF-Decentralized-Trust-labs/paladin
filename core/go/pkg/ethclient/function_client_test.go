@@ -24,9 +24,9 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -140,16 +140,16 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 	var testABI ABIClient
 	var key1 string
 	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
-		eth_getTransactionCount: func(ctx context.Context, a tktypes.EthAddress, block string) (tktypes.HexUint64, error) {
+		eth_getTransactionCount: func(ctx context.Context, a pldtypes.EthAddress, block string) (pldtypes.HexUint64, error) {
 			assert.Equal(t, key1, a.String())
 			assert.Equal(t, "latest", block)
 			return 10, nil
 		},
-		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (tktypes.HexUint64, error) {
+		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (pldtypes.HexUint64, error) {
 			assert.False(t, gasLimit)
 			return 100000, nil
 		},
-		eth_sendRawTransaction: func(ctx context.Context, rawTX tktypes.HexBytes) (tktypes.HexBytes, error) {
+		eth_sendRawTransaction: func(ctx context.Context, rawTX pldtypes.HexBytes) (pldtypes.HexBytes, error) {
 			addr, tx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(rawTX), 12345)
 			require.NoError(t, err)
 			assert.Equal(t, key1, addr.String())
@@ -162,7 +162,7 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 
 			cv, err := testABI.ABI().Functions()["newWidget"].DecodeCallData(tx.Data)
 			require.NoError(t, err)
-			jsonData, err := tktypes.StandardABISerializer().SerializeJSON(cv)
+			jsonData, err := pldtypes.StandardABISerializer().SerializeJSON(cv)
 			require.NoError(t, err)
 			assert.JSONEq(t, `{
 				"widget": {
@@ -227,7 +227,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 	var key1 string
 	var err error
 	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, tx ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
+		eth_call: func(ctx context.Context, tx ethsigner.Transaction, s string) (pldtypes.HexBytes, error) {
 			if withBlock {
 				assert.Equal(t, "0x3039", s)
 			} else if withBlockRef {
@@ -236,14 +236,14 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 				assert.Equal(t, "latest", s)
 			}
 			if withFrom {
-				assert.Equal(t, tktypes.JSONString(key1), tktypes.RawJSON(tx.From))
+				assert.Equal(t, pldtypes.JSONString(key1), pldtypes.RawJSON(tx.From))
 			} else {
 				assert.Nil(t, tx.From)
 			}
 			cv, err := testABI.ABI().Functions()["getWidgets"].DecodeCallData(tx.Data)
 			require.NoError(t, err)
 			require.NoError(t, err)
-			jsonData, err := tktypes.StandardABISerializer().SerializeJSON(cv)
+			jsonData, err := pldtypes.StandardABISerializer().SerializeJSON(cv)
 			require.NoError(t, err)
 			assert.JSONEq(t, `{
 				"sku":      "1122334455"
@@ -418,7 +418,7 @@ func TestABIFunctionShortcutsOK(t *testing.T) {
 
 func TestCallFunctionFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (pldtypes.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
@@ -433,7 +433,7 @@ func TestCallFunctionFail(t *testing.T) {
 
 func TestCallFunctionNoResolveEmptyResult(t *testing.T) {
 	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (pldtypes.HexBytes, error) {
 			return nil, nil
 		},
 	})
@@ -451,7 +451,7 @@ func TestCallFunctionNoResolveEmptyResult(t *testing.T) {
 
 func TestCallFunctionNoResolveBadAddr(t *testing.T) {
 	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (pldtypes.HexBytes, error) {
 			return nil, nil
 		},
 	})
@@ -468,7 +468,7 @@ func TestCallFunctionNoResolveBadAddr(t *testing.T) {
 
 func TestSignAndSendMissingFrom(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (pldtypes.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
@@ -534,7 +534,7 @@ func TestBuildCallData(t *testing.T) {
 
 	req := newWidget.R(ctx).To(to)
 
-	err = req.Input(tktypes.RawJSON(`{
+	err = req.Input(pldtypes.RawJSON(`{
 		"widget": {
 			"id":       "0xfd33700f0511abb60ff31a8a533854db90b0a32a",
 			"sku":      "1122334455",
@@ -580,15 +580,15 @@ func TestInvokeConstructor(t *testing.T) {
 	var testABI ABIClient
 	var key1 string
 	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
-		eth_getTransactionCount: func(ctx context.Context, a tktypes.EthAddress, block string) (tktypes.HexUint64, error) {
+		eth_getTransactionCount: func(ctx context.Context, a pldtypes.EthAddress, block string) (pldtypes.HexUint64, error) {
 			assert.Equal(t, key1, a.String())
 			assert.Equal(t, "latest", block)
 			return 10, nil
 		},
-		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (tktypes.HexUint64, error) {
+		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (pldtypes.HexUint64, error) {
 			return 100000, nil
 		},
-		eth_sendRawTransaction: func(ctx context.Context, rawTX tktypes.HexBytes) (tktypes.HexBytes, error) {
+		eth_sendRawTransaction: func(ctx context.Context, rawTX pldtypes.HexBytes) (pldtypes.HexBytes, error) {
 			addr, tx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(rawTX), 12345)
 			require.NoError(t, err)
 			assert.Equal(t, key1, addr.String())
@@ -597,7 +597,7 @@ func TestInvokeConstructor(t *testing.T) {
 
 			cv, err := testABI.ABI().Constructor().Inputs.DecodeABIData(tx.Data, len(fakeBytecode))
 			require.NoError(t, err)
-			jsonData, err := tktypes.StandardABISerializer().SerializeJSON(cv)
+			jsonData, err := pldtypes.StandardABISerializer().SerializeJSON(cv)
 			require.NoError(t, err)
 			assert.JSONEq(t, `{
 				"supplier": "0xfb75836dc4130a9462fafd8fe96c8ee376e2f32e"
@@ -633,7 +633,7 @@ func TestInvokeNewWidgetCustomError(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
-		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (tktypes.HexUint64, error) {
+		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (pldtypes.HexUint64, error) {
 			return 0, fmt.Errorf("pop")
 		},
 		eth_callErr: func(ctx context.Context, req *rpcclient.RPCRequest) *rpcclient.RPCResponse {
@@ -643,7 +643,7 @@ func TestInvokeNewWidgetCustomError(t *testing.T) {
 				Error: &rpcclient.RPCError{
 					Code:    int64(rpcclient.RPCCodeInternalError),
 					Message: "reverted",
-					Data:    tktypes.JSONString(tktypes.HexBytes(errData)),
+					Data:    pldtypes.JSONString(pldtypes.HexBytes(errData)),
 				},
 			}
 		},
@@ -675,10 +675,10 @@ func TestInvokeNewWidgetCustomError(t *testing.T) {
 
 func TestNewWSOk(t *testing.T) {
 
-	expected := tktypes.RandBytes32()
+	expected := pldtypes.RandBytes32()
 	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
-		eth_sendRawTransaction: func(ctx context.Context, rawTX tktypes.HexBytes) (tktypes.HexBytes, error) {
-			return tktypes.HexBytes(expected[:]), nil
+		eth_sendRawTransaction: func(ctx context.Context, rawTX pldtypes.HexBytes) (pldtypes.HexBytes, error) {
+			return pldtypes.HexBytes(expected[:]), nil
 		},
 	})
 

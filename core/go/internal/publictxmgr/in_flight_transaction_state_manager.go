@@ -19,7 +19,7 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 )
 
 type inFlightTransactionState struct {

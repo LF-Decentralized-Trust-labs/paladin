@@ -17,9 +17,9 @@ package plugintk
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"google.golang.org/protobuf/encoding/protojson"
 	pb "google.golang.org/protobuf/proto"
 )
@@ -87,14 +87,14 @@ func responseToPluginAs[M, ResType, T any](ctx context.Context, msg PluginMessag
 	res := msg.ResponseToPlugin()
 	iRes, ok := res.(*ResType)
 	if !ok {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgPluginUnexpectedResponse, iRes, new(ResType))
+		return nil, i18n.NewError(ctx, pldmsgs.MsgPluginUnexpectedResponse, iRes, new(ResType))
 	}
 	return unwrap(iRes), nil
 }
 
 func callPluginImpl[IN, OUT any](ctx context.Context, in *IN, fn func(context.Context, *IN) (*OUT, error)) (*OUT, error) {
 	if fn == nil {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgPluginUnimplementedRequest, new(IN))
+		return nil, i18n.NewError(ctx, pldmsgs.MsgPluginUnimplementedRequest, new(IN))
 	}
 	return fn(ctx, in)
 }

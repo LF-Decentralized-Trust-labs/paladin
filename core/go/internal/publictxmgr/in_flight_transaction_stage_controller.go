@@ -25,14 +25,13 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"github.com/sirupsen/logrus"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type InFlightStatus int
@@ -60,10 +59,9 @@ type inFlightTransactionStageController struct {
 
 	// a reference to the transaction orchestrator
 	*orchestrator
-	txInflightTime         time.Time
-	txInDBTime             time.Time
-	txTimeline             []PointOfTime
-	timeLineLoggingEnabled bool
+	txInflightTime time.Time
+	txInDBTime     time.Time
+	txTimeline     []PointOfTime
 
 	// this transaction mutex is used for transaction inflight stage context control
 	transactionMux sync.Mutex
@@ -122,18 +120,20 @@ func NewInFlightTransactionStageController(
 	oc *orchestrator,
 	ptx *DBPublicTxn,
 ) *inFlightTransactionStageController {
+	var txTimeline []PointOfTime
+	if oc.timeLineLoggingMaxEntries > 0 {
+		txTimeline = make([]PointOfTime, 0, oc.timeLineLoggingMaxEntries)
+		txTimeline = append(txTimeline, PointOfTime{
+			name:      "wait_in_db",
+			timestamp: ptx.Created.Time(),
+		})
+	}
 
 	ift := &inFlightTransactionStageController{
 		orchestrator:   oc,
 		txInflightTime: time.Now(),
 		txInDBTime:     ptx.Created.Time(),
-		txTimeline: []PointOfTime{
-			{
-				name:      "wait_in_db",
-				timestamp: ptx.Created.Time(),
-			},
-		},
-		timeLineLoggingEnabled: logrus.IsLevelEnabled(logrus.DebugLevel),
+		txTimeline:     txTimeline,
 	}
 
 	ift.MarkTime("wait_in_inflight_queue")
@@ -149,27 +149,23 @@ func (it *inFlightTransactionStageController) UpdateTransaction(ctx context.Cont
 }
 
 func (it *inFlightTransactionStageController) MarkTime(eventName string) {
-	if it.timeLineLoggingEnabled {
+	if it.timeLineLoggingMaxEntries > 0 {
 		it.txTimeline[len(it.txTimeline)-1].tillNextEvent = time.Since(it.txTimeline[len(it.txTimeline)-1].timestamp)
+		if len(it.txTimeline) == it.timeLineLoggingMaxEntries {
+			// the array is full, we need to print the timeline and reset it
+			it.PrintTimeline()
+			it.txTimeline = make([]PointOfTime, 0, it.timeLineLoggingMaxEntries)
+		}
 		it.txTimeline = append(it.txTimeline, PointOfTime{
 			name:      eventName,
 			timestamp: time.Now(),
 		})
 	}
 }
-func (it *inFlightTransactionStageController) MarkHistoricalTime(eventName string, t time.Time) {
-	if it.timeLineLoggingEnabled {
-		it.txTimeline[len(it.txTimeline)-1].tillNextEvent = t.Sub(it.txTimeline[len(it.txTimeline)-1].timestamp)
-		it.txTimeline = append(it.txTimeline, PointOfTime{
-			name:      eventName,
-			timestamp: t,
-		})
-	}
-}
 
 func (it *inFlightTransactionStageController) PrintTimeline() string {
 	ptString := ""
-	if it.timeLineLoggingEnabled {
+	if it.timeLineLoggingMaxEntries > 0 {
 		for index, tl := range it.txTimeline {
 			if index == len(it.txTimeline)-1 {
 				tl.tillNextEvent = time.Since(tl.timestamp)
@@ -393,7 +389,7 @@ func (it *inFlightTransactionStageController) processSigningStageOutput(ctx cont
 			rsc.StageOutputsToBePersisted.TxUpdates.NewSubmission = &DBPubTxnSubmission{
 				from:            rsc.InMemoryTx.GetFrom().String(),
 				PublicTxnID:     rsc.InMemoryTx.GetPubTxnID(),
-				Created:         tktypes.TimestampNow(),
+				Created:         pldtypes.TimestampNow(),
 				TransactionHash: *rsc.StageOutput.SignOutput.TxHash,
 				GasPricing:      gasPriceJSON,
 			}
@@ -438,15 +434,17 @@ func (it *inFlightTransactionStageController) processSubmittingStageOutput(ctx c
 			// TODO: this should be set from the signing stage- it doesn't tell us anything about whether this is a resubmission or not
 			if rsc.InMemoryTx.GetTransactionHash() != nil {
 				// did a re-submission, no matter the result, update the last warn time to avoid another retry
-				rsc.StageOutputsToBePersisted.TxUpdates.LastSubmit = confutil.P(tktypes.TimestampNow())
+				rsc.StageOutputsToBePersisted.TxUpdates.LastSubmit = confutil.P(pldtypes.TimestampNow())
 			}
 		} else {
+			if rsc.StageOutputsToBePersisted.TxUpdates == nil {
+				rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{}
+			}
+			rsc.StageOutputsToBePersisted.TxUpdates.LastSubmit = stageOutput.SubmitOutput.SubmissionTime
+
 			if stageOutput.SubmitOutput.SubmissionOutcome == SubmissionOutcomeSubmittedNew {
 				// new transaction submitted successfully
 				rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSubmitTransaction, fftypes.JSONAnyPtr(fmt.Sprintf(`{"hash":"%s"}`, stageOutput.SubmitOutput.TxHash)), nil)
-				rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{
-					LastSubmit: stageOutput.SubmitOutput.SubmissionTime,
-				}
 				log.L(ctx).Debugf("Transaction submitted for tx %s (hash=%s)", rsc.InMemoryTx.GetSignerNonce(), rsc.InMemoryTx.GetTransactionHash())
 			} else if stageOutput.SubmitOutput.SubmissionOutcome == SubmissionOutcomeNonceTooLow {
 				log.L(ctx).Debugf("Nonce too low for tx %s (hash=%s)", rsc.InMemoryTx.GetSignerNonce(), rsc.InMemoryTx.GetTransactionHash())
@@ -455,22 +453,16 @@ func (it *inFlightTransactionStageController) processSubmittingStageOutput(ctx c
 				// nothing to add for persistence, go to the tracking stage
 				log.L(ctx).Debugf("Transaction already known for tx %s (hash=%s)", rsc.InMemoryTx.GetSignerNonce(), rsc.InMemoryTx.GetTransactionHash())
 			}
+
 			// did the first submit
 			if rsc.InMemoryTx.GetFirstSubmit() == nil {
 				log.L(ctx).Debugf("Recorded the first submission for transaction %s", rsc.InMemoryTx.GetSignerNonce())
-				if rsc.StageOutputsToBePersisted.TxUpdates == nil {
-					rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{}
-				}
 				rsc.StageOutputsToBePersisted.TxUpdates.FirstSubmit = stageOutput.SubmitOutput.SubmissionTime
 			}
 
 			if rsc.InMemoryTx.GetTransactionHash() == nil {
-				if rsc.StageOutputsToBePersisted.TxUpdates == nil {
-					rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{}
-				}
 				log.L(ctx).Debugf("Recorded the tx hash %s for transaction %s", rsc.StageOutput.SubmitOutput.TxHash, rsc.InMemoryTx.GetSignerNonce())
 				rsc.StageOutputsToBePersisted.TxUpdates.TransactionHash = rsc.StageOutput.SubmitOutput.TxHash
-				rsc.StageOutputsToBePersisted.TxUpdates.LastSubmit = stageOutput.SubmitOutput.SubmissionTime
 			}
 		}
 
@@ -569,7 +561,7 @@ func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.C
 			newGasPrice.Set(it.gasPriceIncreaseMax)
 		}
 		newGpo = &pldapi.PublicTxGasPricing{
-			GasPrice:             (*tktypes.HexUint256)(newGasPrice),
+			GasPrice:             (*pldtypes.HexUint256)(newGasPrice),
 			MaxFeePerGas:         existingGpo.MaxFeePerGas,         // copy over unchanged (although expected to be unset)
 			MaxPriorityFeePerGas: existingGpo.MaxPriorityFeePerGas, //   "
 		}
@@ -585,7 +577,7 @@ func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.C
 		}
 		newGpo = &pldapi.PublicTxGasPricing{
 			GasPrice:             existingGpo.GasPrice, // copy over unchanged (although expected to be unset)
-			MaxFeePerGas:         (*tktypes.HexUint256)(newMaxFeePerGas),
+			MaxFeePerGas:         (*pldtypes.HexUint256)(newMaxFeePerGas),
 			MaxPriorityFeePerGas: existingGpo.MaxPriorityFeePerGas,
 		}
 	}
@@ -667,7 +659,7 @@ func (it *inFlightTransactionStageController) TriggerSignTx(ctx context.Context)
 	return nil
 }
 
-func (it *inFlightTransactionStageController) TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedHash *tktypes.Bytes32) error {
+func (it *inFlightTransactionStageController) TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedHash *pldtypes.Bytes32) error {
 	generation := it.stateManager.GetCurrentGeneration(ctx)
 	signerNonce := it.stateManager.GetSignerNonce()
 	lastSubmitTime := it.stateManager.GetLastSubmitTime()

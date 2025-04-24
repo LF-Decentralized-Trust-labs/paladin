@@ -24,7 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -54,7 +54,7 @@ func TestRunBatchFinalizeOperations(t *testing.T) {
 
 	testRevertReason := "test error"
 	testTxnID := uuid.New()
-	testContractAddress := tktypes.RandAddress()
+	testContractAddress := pldtypes.RandAddress()
 	testSyncPointOperations := []*syncPointOperation{
 		{
 			domainContext:   dc,
@@ -101,8 +101,8 @@ func TestRunBatchFinalizeOperationsMixedContractAddresses(t *testing.T) {
 	testTxnID1 := uuid.New()
 	testTxnID2a := uuid.New()
 	testTxnID2b := uuid.New()
-	testContractAddress1 := tktypes.RandAddress()
-	testContractAddress2 := tktypes.RandAddress()
+	testContractAddress1 := pldtypes.RandAddress()
+	testContractAddress2 := pldtypes.RandAddress()
 	testSyncPointOperations := []*syncPointOperation{
 		{
 			domainContext:   dc,

@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,7 +33,7 @@ func TestGetSchemaNotFoundNil(t *testing.T) {
 
 	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{}))
 
-	s, err := ss.GetSchemaByID(ctx, ss.p.NOTX(), "domain1", tktypes.Bytes32Keccak(([]byte)("test")), false)
+	s, err := ss.GetSchemaByID(ctx, ss.p.NOTX(), "domain1", pldtypes.Bytes32Keccak(([]byte)("test")), false)
 	require.NoError(t, err)
 	assert.Nil(t, s)
 }
@@ -45,7 +45,7 @@ func mockGetSchemaOK(mdb sqlmock.Sqlmock) {
 		"domain",
 		"definition",
 	}).AddRow(
-		tktypes.RandBytes32(),
+		pldtypes.RandBytes32(),
 		pldapi.SchemaTypeABI.Enum(),
 		"domain1",
 		`{
@@ -62,7 +62,7 @@ func TestGetSchemaK(t *testing.T) {
 
 	mockGetSchemaOK(mdb)
 
-	s, err := ss.GetSchemaByID(ctx, ss.p.NOTX(), "domain1", tktypes.Bytes32Keccak(([]byte)("test")), false)
+	s, err := ss.GetSchemaByID(ctx, ss.p.NOTX(), "domain1", pldtypes.Bytes32Keccak(([]byte)("test")), false)
 	require.NoError(t, err)
 	assert.NotNil(t, s)
 }
@@ -73,7 +73,7 @@ func TestGetSchemaNotFoundError(t *testing.T) {
 
 	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{}))
 
-	_, err := ss.GetSchemaByID(ctx, ss.p.NOTX(), "domain1", tktypes.Bytes32Keccak(([]byte)("test")), true)
+	_, err := ss.GetSchemaByID(ctx, ss.p.NOTX(), "domain1", pldtypes.Bytes32Keccak(([]byte)("test")), true)
 	assert.Regexp(t, "PD010106", err)
 }
 
@@ -81,7 +81,7 @@ func TestGetSchemaInvalidType(t *testing.T) {
 	ctx, ss, _, _, done := newDBMockStateManager(t)
 	defer done()
 
-	_, err := ss.restoreSchema(ctx, &pldapi.Schema{Type: tktypes.Enum[pldapi.SchemaType]("wrong")})
+	_, err := ss.restoreSchema(ctx, &pldapi.Schema{Type: pldtypes.Enum[pldapi.SchemaType]("wrong")})
 	assert.Regexp(t, "PD010103.*wrong", err)
 }
 
@@ -99,7 +99,7 @@ func TestListSchemasGetFullSchemaFail(t *testing.T) {
 	ctx, ss, mdb, _, done := newDBMockStateManager(t)
 	defer done()
 
-	id := tktypes.Bytes32Keccak(([]byte)("test"))
+	id := pldtypes.Bytes32Keccak(([]byte)("test"))
 	mdb.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(
 		id.String(),
 	))

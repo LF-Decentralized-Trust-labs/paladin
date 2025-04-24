@@ -23,10 +23,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type ABIFunctionClient interface {
@@ -47,8 +47,8 @@ type ABIClient interface {
 	ABI() abi.ABI
 	Function(ctx context.Context, nameOrFullSig string) (_ ABIFunctionClient, err error)
 	MustFunction(nameOrFullSig string) ABIFunctionClient
-	Constructor(ctx context.Context, bytecode tktypes.HexBytes) (_ ABIFunctionClient, err error)
-	MustConstructor(bytecode tktypes.HexBytes) ABIFunctionClient
+	Constructor(ctx context.Context, bytecode pldtypes.HexBytes) (_ ABIFunctionClient, err error)
+	MustConstructor(bytecode pldtypes.HexBytes) ABIFunctionClient
 }
 
 type ABIFunctionRequestBuilder interface {
@@ -72,8 +72,8 @@ type ABIFunctionRequestBuilder interface {
 	Call() (err error)                       // calls and processes the result back into the output struct supplied in the builder
 	CallResult() (res CallResult, err error) // returns the detailed result - parsing the response against the ABI, but not re-marshaling it into your object
 	EstimateGas() (res EstimateGasResult, err error)
-	RawTransaction() (rawTX tktypes.HexBytes, err error)
-	SignAndSend() (txHash *tktypes.Bytes32, err error)
+	RawTransaction() (rawTX pldtypes.HexBytes, err error)
+	SignAndSend() (txHash *pldtypes.Bytes32, err error)
 }
 
 type BlockRef string
@@ -94,7 +94,7 @@ type abiClient struct {
 
 type abiFunctionClient struct {
 	ec          *ethClient
-	bytecode    tktypes.HexBytes
+	bytecode    pldtypes.HexBytes
 	signature   string
 	selector    []byte
 	abi         abi.ABI
@@ -182,7 +182,7 @@ func (ec *ethClient) ABIFunction(ctx context.Context, functionABI *abi.Entry) (f
 	return fc, err
 }
 
-func (abic *abiClient) Constructor(ctx context.Context, bytecode tktypes.HexBytes) (ABIFunctionClient, error) {
+func (abic *abiClient) Constructor(ctx context.Context, bytecode pldtypes.HexBytes) (ABIFunctionClient, error) {
 	ac := &abiFunctionClient{ec: abic.ec, bytecode: bytecode, abi: abic.abi}
 	functionABI := abic.abi.Constructor()
 	if functionABI == nil {
@@ -196,7 +196,7 @@ func (abic *abiClient) Constructor(ctx context.Context, bytecode tktypes.HexByte
 	return ac.functionCommon(ctx, functionABI)
 }
 
-func (ec *ethClient) ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode tktypes.HexBytes) (fc ABIFunctionClient, err error) {
+func (ec *ethClient) ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode pldtypes.HexBytes) (fc ABIFunctionClient, err error) {
 	a, err := ec.ABI(ctx, abi.ABI{constructorABI})
 	if err == nil {
 		fc, err = a.Constructor(ctx, bytecode)
@@ -229,7 +229,7 @@ func (abic *abiClient) MustFunction(nameOrFullSig string) ABIFunctionClient {
 	return ac
 }
 
-func (abic *abiClient) MustConstructor(bytecode tktypes.HexBytes) ABIFunctionClient {
+func (abic *abiClient) MustConstructor(bytecode pldtypes.HexBytes) ABIFunctionClient {
 	ac, err := abic.Constructor(context.Background(), bytecode)
 	if err != nil {
 		panic(err)
@@ -337,7 +337,7 @@ func (ac *abiFunctionRequestBuilder) BuildCallData() (err error) {
 			err = json.Unmarshal([]byte(input), &inputUntyped)
 		case []byte:
 			err = json.Unmarshal(input, &inputUntyped)
-		case tktypes.RawJSON:
+		case pldtypes.RawJSON:
 			err = json.Unmarshal(input, &inputUntyped)
 		case *abi.ComponentValue:
 			cv = input
@@ -420,7 +420,7 @@ func (ac *abiFunctionRequestBuilder) EstimateGas() (res EstimateGasResult, err e
 	return ac.ec.EstimateGas(ac.ctx, ac.fromStr, &ac.tx, ac.callOps()...)
 }
 
-func (ac *abiFunctionRequestBuilder) RawTransaction() (rawTX tktypes.HexBytes, err error) {
+func (ac *abiFunctionRequestBuilder) RawTransaction() (rawTX pldtypes.HexBytes, err error) {
 	err = ac.validateTo()
 	if err == nil && ac.tx.Data == nil {
 		err = ac.BuildCallData()
@@ -434,7 +434,7 @@ func (ac *abiFunctionRequestBuilder) RawTransaction() (rawTX tktypes.HexBytes, e
 	return ac.ec.BuildRawTransaction(ac.ctx, ac.txVersion, *ac.fromStr, &ac.tx, ac.callOps()...)
 }
 
-func (ac *abiFunctionRequestBuilder) SignAndSend() (txHash *tktypes.Bytes32, err error) {
+func (ac *abiFunctionRequestBuilder) SignAndSend() (txHash *pldtypes.Bytes32, err error) {
 	rawTX, err := ac.RawTransaction()
 	if err != nil {
 		return nil, err

@@ -23,8 +23,8 @@ import (
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -70,7 +70,7 @@ func TestMintInit(t *testing.T) {
 		Params: []*types.FungibleTransferParamEntry{
 			{
 				To:     "Alice",
-				Amount: tktypes.MustParseHexUint256("0x0a"),
+				Amount: pldtypes.MustParseHexUint256("0x0a"),
 			},
 		},
 	}
@@ -97,7 +97,7 @@ func TestMintAssemble(t *testing.T) {
 		Params: []*types.FungibleTransferParamEntry{
 			{
 				To:     "Alice",
-				Amount: tktypes.MustParseHexUint256("0x0a"),
+				Amount: pldtypes.MustParseHexUint256("0x0a"),
 			},
 		},
 		Transaction: &prototk.TransactionSpecification{
@@ -130,11 +130,11 @@ func TestMintAssemble(t *testing.T) {
 	pubKey := privKey.Public()
 	compressedKey := pubKey.Compress()
 	req.ResolvedVerifiers[0].Verifier = compressedKey.String()
-	tx.Params.([]*types.FungibleTransferParamEntry)[0].Amount = tktypes.MustParseHexUint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+	tx.Params.([]*types.FungibleTransferParamEntry)[0].Amount = pldtypes.MustParseHexUint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 	_, err = h.Assemble(ctx, tx, req)
 	assert.EqualError(t, err, "PD210038: Failed to create new state. inputs values not inside Finite Field")
 
-	tx.Params.([]*types.FungibleTransferParamEntry)[0].Amount = tktypes.MustParseHexUint256("0x0f")
+	tx.Params.([]*types.FungibleTransferParamEntry)[0].Amount = pldtypes.MustParseHexUint256("0x0f")
 	res, err := h.Assemble(ctx, tx, req)
 	assert.NoError(t, err)
 	assert.Equal(t, prototk.AssembleTransactionResponse_OK, res.AssemblyResult)
@@ -165,7 +165,7 @@ func TestMintPrepare(t *testing.T) {
 		Params: []*types.FungibleTransferParamEntry{
 			{
 				To:     "Alice",
-				Amount: tktypes.MustParseHexUint256("0x0a"),
+				Amount: pldtypes.MustParseHexUint256("0x0a"),
 			},
 		},
 		Transaction: txSpec,

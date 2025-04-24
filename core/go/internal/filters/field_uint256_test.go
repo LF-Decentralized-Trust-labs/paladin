@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,28 +29,28 @@ func TestUint256Field(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := Uint256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`!json`))
+	_, err := Uint256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = Uint256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`[]`))
+	_, err = Uint256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`[]`))
 	assert.Regexp(t, "FF22091", err)
 
-	vBigPos, err := Uint256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
+	vBigPos, err := Uint256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
 	require.NoError(t, err)
 	assert.Equal(t, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", vBigPos)
 	assert.Len(t, vBigPos, 64)
 
-	vZero, err := Uint256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`0`))
+	vZero, err := Uint256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`0`))
 	require.NoError(t, err)
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", vZero)
 	assert.Len(t, vZero, 64)
 
-	vSmallPos, err := Uint256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`12345`))
+	vSmallPos, err := Uint256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`12345`))
 	require.NoError(t, err)
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000003039", vSmallPos)
 	assert.Len(t, vSmallPos, 64)
 
-	nv, err := Uint256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
+	nv, err := Uint256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`null`))
 	require.NoError(t, err)
 	assert.Nil(t, nv)
 

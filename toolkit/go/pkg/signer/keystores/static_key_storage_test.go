@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,7 +51,7 @@ func newTestStaticStore(t *testing.T, keys map[string]pldconf.StaticKeyEntryConf
 
 func TestStaticStoreFileFileWithTrim(t *testing.T) {
 
-	keyData := tktypes.RandHex(32)
+	keyData := pldtypes.RandHex(32)
 	keyFile := path.Join(t.TempDir(), "my.key")
 	err := os.WriteFile(keyFile, []byte(keyData+"\n"), 0644)
 	require.NoError(t, err)
@@ -72,7 +72,7 @@ func TestStaticStoreFileFileWithTrim(t *testing.T) {
 
 func TestStaticStoreHexLoadFile(t *testing.T) {
 
-	keyData := tktypes.RandHex(32)
+	keyData := pldtypes.RandHex(32)
 	keyFile := path.Join(t.TempDir(), "my.key")
 	err := os.WriteFile(keyFile, []byte(keyData), 0644)
 	require.NoError(t, err)
@@ -95,7 +95,7 @@ func TestStaticStoreHexLoadFile(t *testing.T) {
 
 func TestStaticStoreBase64InConf(t *testing.T) {
 
-	keyData, err := hex.DecodeString(tktypes.RandHex(32))
+	keyData, err := hex.DecodeString(pldtypes.RandHex(32))
 	require.NoError(t, err)
 	b64KeyData := base64.StdEncoding.EncodeToString(keyData)
 

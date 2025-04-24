@@ -18,8 +18,8 @@ package publictxmgr
 import (
 	"testing"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,8 +32,8 @@ func TestTXStageControllerUpdate(t *testing.T) {
 
 	it.UpdateTransaction(ctx, &DBPublicTxn{
 		Gas: 1000,
-		FixedGasPricing: tktypes.JSONString(pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(10),
+		FixedGasPricing: pldtypes.JSONString(pldapi.PublicTxGasPricing{
+			GasPrice: pldtypes.Uint64ToUint256(10),
 		}),
 	})
 

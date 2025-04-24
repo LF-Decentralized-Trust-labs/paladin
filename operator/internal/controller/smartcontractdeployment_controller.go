@@ -34,9 +34,9 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 )
 
 // SmartContractDeploymentReconciler reconciles a SmartContractDeployment object
@@ -137,9 +137,9 @@ func (r *SmartContractDeploymentReconciler) updateStatusAndRequeue(ctx context.C
 }
 
 func (r *SmartContractDeploymentReconciler) buildDeployTransaction(ctx context.Context, scd *corev1alpha1.SmartContractDeployment) (bool, *pldapi.TransactionInput, error) {
-	var data tktypes.RawJSON
+	var data pldtypes.RawJSON
 	if scd.Spec.ParamsJSON == "" {
-		data = tktypes.RawJSON(scd.Spec.ParamsJSON)
+		data = pldtypes.RawJSON(scd.Spec.ParamsJSON)
 	}
 	build := solutils.SolidityBuildWithLinks{
 		Bytecode: scd.Spec.Bytecode,
@@ -163,7 +163,7 @@ func (r *SmartContractDeploymentReconciler) buildDeployTransaction(ctx context.C
 
 	return true, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
-			Type:   tktypes.Enum[pldapi.TransactionType](scd.Spec.TxType),
+			Type:   pldtypes.Enum[pldapi.TransactionType](scd.Spec.TxType),
 			Domain: scd.Spec.Domain,
 			From:   scd.Spec.From,
 			Data:   data,
@@ -173,10 +173,10 @@ func (r *SmartContractDeploymentReconciler) buildDeployTransaction(ctx context.C
 	}, nil
 }
 
-func (r *SmartContractDeploymentReconciler) buildLinkReferences(scd *corev1alpha1.SmartContractDeployment) (map[string]*tktypes.EthAddress, error) {
+func (r *SmartContractDeploymentReconciler) buildLinkReferences(scd *corev1alpha1.SmartContractDeployment) (map[string]*pldtypes.EthAddress, error) {
 
 	var crMap map[string]any
-	linkedAddresses := map[string]*tktypes.EthAddress{}
+	linkedAddresses := map[string]*pldtypes.EthAddress{}
 
 	for libName, addrTemplateStr := range scd.Spec.LinkedContracts {
 
@@ -200,7 +200,7 @@ func (r *SmartContractDeploymentReconciler) buildLinkReferences(scd *corev1alpha
 			return nil, fmt.Errorf("go template failed for linked contract %s: %s", libName, err)
 		}
 
-		addr, err := tktypes.ParseEthAddress(addrBuff.String())
+		addr, err := pldtypes.ParseEthAddress(addrBuff.String())
 		if err != nil {
 			return nil, fmt.Errorf("invalid address '%s' for resolved library %s: %s", addrBuff, libName, err)
 		}

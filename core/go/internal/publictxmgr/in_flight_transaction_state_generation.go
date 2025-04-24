@@ -20,12 +20,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type inFlightTransactionStateGeneration struct {
@@ -170,7 +170,7 @@ func (v *inFlightTransactionStateGeneration) StartNewStageContext(ctx context.Co
 	case InFlightTxStageSubmitting:
 		log.L(ctx).Tracef("Transaction with ID %s, triggering submission, signed message not nil: %t", rsc.InMemoryTx.GetSignerNonce(), v.TransientPreviousStageOutputs != nil && v.TransientPreviousStageOutputs.SignedMessage != nil)
 		var signedMessage []byte
-		var calculatedTxHash *tktypes.Bytes32
+		var calculatedTxHash *pldtypes.Bytes32
 		if v.TransientPreviousStageOutputs != nil {
 			signedMessage = v.TransientPreviousStageOutputs.SignedMessage
 			calculatedTxHash = v.TransientPreviousStageOutputs.TransactionHash
@@ -207,7 +207,7 @@ func (v *inFlightTransactionStateGeneration) AddPersistenceOutput(ctx context.Co
 	log.L(ctx).Debugf("%s AddPersistenceOutput took %s to write the result", v.GetSignerNonce(), time.Since(start))
 }
 
-func (v *inFlightTransactionStateGeneration) AddSubmitOutput(ctx context.Context, txHash *tktypes.Bytes32, submissionTime *tktypes.Timestamp, submissionOutcome SubmissionOutcome, errorReason ethclient.ErrorReason, err error) {
+func (v *inFlightTransactionStateGeneration) AddSubmitOutput(ctx context.Context, txHash *pldtypes.Bytes32, submissionTime *pldtypes.Timestamp, submissionOutcome SubmissionOutcome, errorReason ethclient.ErrorReason, err error) {
 	start := time.Now()
 	log.L(ctx).Debugf("%s Setting submit output, submissionOutcome: %s, errReason: %s, err %+v", v.GetSignerNonce(), submissionOutcome, errorReason, err)
 	v.AddStageOutputs(ctx, &StageOutput{
@@ -238,7 +238,7 @@ func (v *inFlightTransactionStateGeneration) AddStageOutputs(ctx context.Context
 	v.bufferedStageOutputs = append(v.bufferedStageOutputs, stageOutput)
 }
 
-func (v *inFlightTransactionStateGeneration) AddSignOutput(ctx context.Context, signedMessage []byte, txHash *tktypes.Bytes32, err error) {
+func (v *inFlightTransactionStateGeneration) AddSignOutput(ctx context.Context, signedMessage []byte, txHash *pldtypes.Bytes32, err error) {
 	start := time.Now()
 	log.L(ctx).Debugf("%s Setting signed message, hash %s, signed message not nil %t, err %+v", v.GetSignerNonce(), txHash, signedMessage != nil, err)
 	v.AddStageOutputs(ctx, &StageOutput{

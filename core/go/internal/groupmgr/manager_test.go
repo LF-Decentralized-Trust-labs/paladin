@@ -29,9 +29,9 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/sirupsen/logrus"
 
 	"github.com/stretchr/testify/assert"
@@ -259,11 +259,11 @@ func TestPrivacyGroupDomainInitFail(t *testing.T) {
 		func(mc *mockComponents, conf *pldconf.GroupManagerConfig) {
 			mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return(nil, nil)
 			ms := componentmocks.NewSchema(t)
-			ms.On("ID").Return(tktypes.RandBytes32())
+			ms.On("ID").Return(pldtypes.RandBytes32())
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
 				Return([]*pldapi.State{
 					{StateBase: pldapi.StateBase{
-						ID: tktypes.RandBytes(32),
+						ID: pldtypes.RandBytes(32),
 					}},
 				}, nil)
 			mc.stateManager.On("EnsureABISchemas", mock.Anything, mock.Anything, "domain1", mock.Anything).
@@ -292,7 +292,7 @@ func TestPrivacyGroupWriteStateFail(t *testing.T) {
 			mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return(nil, nil)
 			mc.domain.On("ConfigurePrivacyGroup", mock.Anything, mock.Anything).Return(map[string]string{}, nil)
 			ms := componentmocks.NewSchema(t)
-			ms.On("ID").Return(tktypes.RandBytes32())
+			ms.On("ID").Return(pldtypes.RandBytes32())
 			mc.stateManager.On("EnsureABISchemas", mock.Anything, mock.Anything, "domain1", mock.Anything).
 				Return([]components.Schema{ms}, nil)
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
@@ -343,14 +343,14 @@ func mockReadyToSendTransaction(t *testing.T) func(mc *mockComponents, conf *pld
 				},
 			}, nil)
 		ms := componentmocks.NewSchema(t)
-		ms.On("ID").Return(tktypes.RandBytes32())
+		ms.On("ID").Return(pldtypes.RandBytes32())
 		ms.On("Signature").Return("").Maybe()
 		mc.stateManager.On("EnsureABISchemas", mock.Anything, mock.Anything, "domain1", mock.Anything).
 			Return([]components.Schema{ms}, nil)
 		mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
 			Return([]*pldapi.State{
 				{StateBase: pldapi.StateBase{
-					ID: tktypes.RandBytes(32),
+					ID: pldtypes.RandBytes(32),
 				}},
 			}, nil)
 	}
@@ -466,7 +466,7 @@ func TestQueryGroupsEnrichMembersFail(t *testing.T) {
 		"id",
 	}).AddRow(
 		"domain1",
-		tktypes.RandBytes(32),
+		pldtypes.RandBytes(32),
 	))
 	mc.db.Mock.ExpectQuery("SELECT.*privacy_group_members").WillReturnError(fmt.Errorf("pop"))
 
@@ -481,7 +481,7 @@ func TestGetGroupByIDFailDB(t *testing.T) {
 
 	mc.db.Mock.ExpectQuery("SELECT.*privacy_groups").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := gm.GetGroupByID(ctx, gm.p.NOTX(), "domain1", tktypes.RandBytes(32))
+	_, err := gm.GetGroupByID(ctx, gm.p.NOTX(), "domain1", pldtypes.RandBytes(32))
 	assert.Regexp(t, "pop", err)
 }
 
@@ -492,11 +492,11 @@ func TestGetGroupByAddressFailDB(t *testing.T) {
 
 	mc.db.Mock.ExpectQuery("SELECT.*privacy_groups").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := gm.GetGroupByAddress(ctx, gm.p.NOTX(), tktypes.RandAddress())
+	_, err := gm.GetGroupByAddress(ctx, gm.p.NOTX(), pldtypes.RandAddress())
 	assert.Regexp(t, "pop", err)
 }
 
-func mockDBPrivacyGroup(mc *mockComponents, schemaID tktypes.Bytes32, stateID tktypes.HexBytes, contractAddr *tktypes.EthAddress, members ...string) {
+func mockDBPrivacyGroup(mc *mockComponents, schemaID pldtypes.Bytes32, stateID pldtypes.HexBytes, contractAddr *pldtypes.EthAddress, members ...string) {
 	mc.db.Mock.ExpectQuery("SELECT.*privacy_groups").WillReturnRows(sqlmock.NewRows([]string{
 		"domain",
 		"id",
@@ -546,7 +546,7 @@ func TestSendTransactionGroupNotFound(t *testing.T) {
 
 	_, err := gm.SendTransaction(ctx, gm.p.NOTX(), &pldapi.PrivacyGroupEVMTXInput{
 		Domain: "domain1",
-		Group:  tktypes.RandBytes(32),
+		Group:  pldtypes.RandBytes(32),
 	})
 	require.Regexp(t, "PD012502", err)
 
@@ -561,7 +561,7 @@ func TestSendTransactionGroupFailQuery(t *testing.T) {
 
 	_, err := gm.SendTransaction(ctx, gm.p.NOTX(), &pldapi.PrivacyGroupEVMTXInput{
 		Domain: "domain1",
-		Group:  tktypes.RandBytes(32),
+		Group:  pldtypes.RandBytes(32),
 	})
 	require.Regexp(t, "pop", err)
 
@@ -572,8 +572,8 @@ func TestSendTransactionGroupNotReady(t *testing.T) {
 	ctx, gm, mc, done := newTestGroupManager(t, false, &pldconf.GroupManagerConfig{}, mockEmptyMessageListeners)
 	defer done()
 
-	schemaID := tktypes.RandBytes32()
-	groupID := tktypes.RandBytes(32)
+	schemaID := pldtypes.RandBytes32()
+	groupID := pldtypes.RandBytes(32)
 	mockDBPrivacyGroup(mc, schemaID, groupID, nil)
 
 	_, err := gm.SendTransaction(ctx, gm.p.NOTX(), &pldapi.PrivacyGroupEVMTXInput{
@@ -589,9 +589,9 @@ func TestSendTransactionGroupGetContractFail(t *testing.T) {
 	ctx, gm, mc, done := newTestGroupManager(t, false, &pldconf.GroupManagerConfig{}, mockEmptyMessageListeners)
 	defer done()
 
-	schemaID := tktypes.RandBytes32()
-	groupID := tktypes.RandBytes(32)
-	contractAddr := tktypes.RandAddress()
+	schemaID := pldtypes.RandBytes32()
+	groupID := pldtypes.RandBytes(32)
+	contractAddr := pldtypes.RandAddress()
 	mockDBPrivacyGroup(mc, schemaID, groupID, contractAddr)
 
 	mc.domainManager.On("GetSmartContractByAddress", mock.Anything, mock.Anything, *contractAddr).Return(nil, fmt.Errorf("pop"))
@@ -610,9 +610,9 @@ func TestSendTransactionSendPreparedTx(t *testing.T) {
 	ctx, gm, mc, done := newTestGroupManager(t, false, &pldconf.GroupManagerConfig{}, mockEmptyMessageListeners)
 	defer done()
 
-	schemaID := tktypes.RandBytes32()
-	groupID := tktypes.RandBytes(32)
-	contractAddr := tktypes.RandAddress()
+	schemaID := pldtypes.RandBytes32()
+	groupID := pldtypes.RandBytes(32)
+	contractAddr := pldtypes.RandAddress()
 	mockDBPrivacyGroup(mc, schemaID, groupID, contractAddr)
 
 	psc := componentmocks.NewDomainSmartContract(t)
@@ -632,15 +632,15 @@ func TestSendTransactionSendPreparedTx(t *testing.T) {
 func newValidPGState() *pldapi.State {
 	return &pldapi.State{
 		StateBase: pldapi.StateBase{
-			ID:         tktypes.RandBytes(32),
-			Schema:     tktypes.RandBytes32(),
+			ID:         pldtypes.RandBytes(32),
+			Schema:     pldtypes.RandBytes32(),
 			DomainName: "domain1",
-			Data: tktypes.JSONString(&pldapi.PrivacyGroupGenesisState{
+			Data: pldtypes.JSONString(&pldapi.PrivacyGroupGenesisState{
 				Name:          "pg1",
 				Members:       []string{"me@node1", "you@node2"},
 				Properties:    pldapi.NewKeyValueStringProperties(map[string]string{"prop1": "value1"}),
 				Configuration: pldapi.NewKeyValueStringProperties(map[string]string{"conf2": "value2"}),
-				GenesisSalt:   tktypes.RandBytes32(),
+				GenesisSalt:   pldtypes.RandBytes32(),
 			}),
 		},
 	}
@@ -737,13 +737,13 @@ func TestStoreReceivedGroupFailValidationNoMembers(t *testing.T) {
 	txID := uuid.New()
 	state := &pldapi.State{
 		StateBase: pldapi.StateBase{
-			ID:         tktypes.RandBytes(32),
-			Schema:     tktypes.RandBytes32(),
+			ID:         pldtypes.RandBytes(32),
+			Schema:     pldtypes.RandBytes32(),
 			DomainName: "domain1",
-			Data: tktypes.JSONString(&pldapi.PrivacyGroupGenesisState{
+			Data: pldtypes.JSONString(&pldapi.PrivacyGroupGenesisState{
 				Name:        "pg1",
 				Members:     []string{ /* empty */ },
-				GenesisSalt: tktypes.RandBytes32(),
+				GenesisSalt: pldtypes.RandBytes32(),
 			}),
 		},
 	}
@@ -768,10 +768,10 @@ func TestStoreReceivedGroupFailValidationNoSalt(t *testing.T) {
 	txID := uuid.New()
 	state := &pldapi.State{
 		StateBase: pldapi.StateBase{
-			ID:         tktypes.RandBytes(32),
-			Schema:     tktypes.RandBytes32(),
+			ID:         pldtypes.RandBytes(32),
+			Schema:     pldtypes.RandBytes32(),
 			DomainName: "domain1",
-			Data: tktypes.JSONString(&pldapi.PrivacyGroupGenesisState{
+			Data: pldtypes.JSONString(&pldapi.PrivacyGroupGenesisState{
 				Name:    "pg1",
 				Members: []string{"me@node1"},
 			}),
@@ -798,13 +798,13 @@ func TestStoreReceivedGroupFailValidationBadName(t *testing.T) {
 	txID := uuid.New()
 	state := &pldapi.State{
 		StateBase: pldapi.StateBase{
-			ID:         tktypes.RandBytes(32),
-			Schema:     tktypes.RandBytes32(),
+			ID:         pldtypes.RandBytes(32),
+			Schema:     pldtypes.RandBytes32(),
 			DomainName: "domain1",
-			Data: tktypes.JSONString(&pldapi.PrivacyGroupGenesisState{
+			Data: pldtypes.JSONString(&pldapi.PrivacyGroupGenesisState{
 				Name:        "      ",
 				Members:     []string{"me@node1"},
-				GenesisSalt: tktypes.RandBytes32(),
+				GenesisSalt: pldtypes.RandBytes32(),
 			}),
 		},
 	}

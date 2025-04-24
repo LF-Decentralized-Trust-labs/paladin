@@ -23,9 +23,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,7 +80,7 @@ func newTestHDWalletKeyManager(t *testing.T) (*simpleKeyManager, func()) {
 				Keys: map[string]pldconf.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "hex",
-						Inline:   tktypes.RandHex(32),
+						Inline:   pldtypes.RandHex(32),
 					},
 				},
 			},
@@ -113,7 +113,7 @@ func TestSimpleKeyManagerPassThoroughInMemSigner(t *testing.T) {
 				Keys: map[string]pldconf.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "hex",
-						Inline:   tktypes.RandHex(32),
+						Inline:   pldtypes.RandHex(32),
 					},
 				},
 			},

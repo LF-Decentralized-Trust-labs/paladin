@@ -21,8 +21,8 @@ import (
 	"net/http/pprof"
 
 	"github.com/gorilla/mux"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 type DebugServer interface {

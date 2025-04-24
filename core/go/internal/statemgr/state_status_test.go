@@ -26,9 +26,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,11 +58,11 @@ const widgetABI = `{
 	]
 }`
 
-func genWidget(t *testing.T, schemaID tktypes.Bytes32, txID *uuid.UUID, withoutSalt string) *components.StateUpsert {
+func genWidget(t *testing.T, schemaID pldtypes.Bytes32, txID *uuid.UUID, withoutSalt string) *components.StateUpsert {
 	var ij map[string]interface{}
 	err := json.Unmarshal([]byte(withoutSalt), &ij)
 	require.NoError(t, err)
-	ij["salt"] = tktypes.RandHex(32)
+	ij["salt"] = pldtypes.RandHex(32)
 	withSalt, err := json.Marshal(ij)
 	require.NoError(t, err)
 	return &components.StateUpsert{
@@ -72,7 +72,7 @@ func genWidget(t *testing.T, schemaID tktypes.Bytes32, txID *uuid.UUID, withoutS
 	}
 }
 
-func makeWidgets(t *testing.T, ctx context.Context, ss *stateManager, domainName string, contractAddress *tktypes.EthAddress, schemaID tktypes.Bytes32, withoutSalt []string) []*pldapi.State {
+func makeWidgets(t *testing.T, ctx context.Context, ss *stateManager, domainName string, contractAddress *pldtypes.EthAddress, schemaID pldtypes.Bytes32, withoutSalt []string) []*pldapi.State {
 	states := make([]*pldapi.State, len(withoutSalt))
 	for i, w := range withoutSalt {
 		withSalt := genWidget(t, schemaID, nil, w)
@@ -102,11 +102,11 @@ func syncFlushContext(t *testing.T, dc components.DomainContext) {
 	require.NoError(t, err)
 }
 
-func newTestDomainContext(t *testing.T, ctx context.Context, ss *stateManager, name string, customHashFunction bool) (*tktypes.EthAddress, *domainContext) {
+func newTestDomainContext(t *testing.T, ctx context.Context, ss *stateManager, name string, customHashFunction bool) (*pldtypes.EthAddress, *domainContext) {
 	md := componentmocks.NewDomain(t)
 	md.On("Name").Return(name)
 	md.On("CustomHashFunction").Return(customHashFunction)
-	contractAddress := tktypes.RandAddress()
+	contractAddress := pldtypes.RandAddress()
 	dc := ss.NewDomainContext(ctx, md, *contractAddress)
 	return contractAddress, dc.(*domainContext)
 }

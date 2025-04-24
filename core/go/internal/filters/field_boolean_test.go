@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,25 +31,25 @@ func TestBooleanField(t *testing.T) {
 
 	assert.Equal(t, "test", BooleanField("test").SQLColumn())
 
-	_, err := BooleanField("test").SQLValue(ctx, (tktypes.RawJSON)(`!json`))
+	_, err := BooleanField("test").SQLValue(ctx, (pldtypes.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = BooleanField("test").SQLValue(ctx, (tktypes.RawJSON)(`[]`))
+	_, err = BooleanField("test").SQLValue(ctx, (pldtypes.RawJSON)(`[]`))
 	assert.Regexp(t, "PD010704", err)
 
-	nv, err := BooleanField("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
+	nv, err := BooleanField("test").SQLValue(ctx, (pldtypes.RawJSON)(`null`))
 	require.NoError(t, err)
 	assert.Nil(t, nv)
 
-	v, err := BooleanField("test").SQLValue(ctx, (tktypes.RawJSON)(`true`))
+	v, err := BooleanField("test").SQLValue(ctx, (pldtypes.RawJSON)(`true`))
 	assert.NoError(t, err)
 	assert.True(t, v.(bool))
 
-	v, err = BooleanField("test").SQLValue(ctx, (tktypes.RawJSON)(`"true"`))
+	v, err = BooleanField("test").SQLValue(ctx, (pldtypes.RawJSON)(`"true"`))
 	assert.NoError(t, err)
 	assert.True(t, v.(bool))
 
-	v, err = BooleanField("test").SQLValue(ctx, (tktypes.RawJSON)(`"false"`))
+	v, err = BooleanField("test").SQLValue(ctx, (pldtypes.RawJSON)(`"false"`))
 	assert.NoError(t, err)
 	assert.False(t, v.(bool))
 

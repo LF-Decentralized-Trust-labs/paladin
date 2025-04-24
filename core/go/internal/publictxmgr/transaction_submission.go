@@ -20,34 +20,34 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"golang.org/x/crypto/sha3"
 )
 
-func calculateTransactionHash(rawTxnData []byte) *tktypes.Bytes32 {
+func calculateTransactionHash(rawTxnData []byte) *pldtypes.Bytes32 {
 	if rawTxnData == nil {
 		return nil
 	}
 	msgHash := sha3.NewLegacyKeccak256()
 	msgHash.Write(rawTxnData)
-	hashBytes := tktypes.MustParseBytes32(hex.EncodeToString(msgHash.Sum(nil)))
+	hashBytes := pldtypes.MustParseBytes32(hex.EncodeToString(msgHash.Sum(nil)))
 	return &hashBytes
 }
 
-func (it *inFlightTransactionStageController) submitTX(ctx context.Context, signedMessage []byte, calculatedTxHash *tktypes.Bytes32, signerNonce string, lastSubmitTime *tktypes.Timestamp, cancelled func(context.Context) bool) (*tktypes.Bytes32, *tktypes.Timestamp, ethclient.ErrorReason, SubmissionOutcome, error) {
-	var txHash *tktypes.Bytes32
+func (it *inFlightTransactionStageController) submitTX(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32, signerNonce string, lastSubmitTime *pldtypes.Timestamp, cancelled func(context.Context) bool) (*pldtypes.Bytes32, *pldtypes.Timestamp, ethclient.ErrorReason, SubmissionOutcome, error) {
+	var txHash *pldtypes.Bytes32
 	sendStart := time.Now()
 	if calculatedTxHash == nil {
 		return nil, nil, ethclient.ErrorReasonInvalidInputs, SubmissionOutcomeFailedRequiresRetry, i18n.NewError(ctx, msgs.MsgInvalidStateMissingTXHash)
 	}
 	log.L(ctx).Debugf("Sending raw transaction %s (lastSubmit=%s), Hash=%s", signerNonce, lastSubmitTime, calculatedTxHash)
 
-	submissionTime := confutil.P(tktypes.TimestampNow())
+	submissionTime := confutil.P(pldtypes.TimestampNow())
 	var submissionErrorReason ethclient.ErrorReason // TODO: fix reason parsing
 	var submissionOutcome SubmissionOutcome
 	var submissionError error
@@ -56,7 +56,7 @@ func (it *inFlightTransactionStageController) submitTX(ctx context.Context, sign
 		if cancelled(ctx) {
 			return false, nil
 		}
-		txHash, submissionError = it.ethClient.SendRawTransaction(ctx, tktypes.HexBytes(signedMessage))
+		txHash, submissionError = it.ethClient.SendRawTransaction(ctx, pldtypes.HexBytes(signedMessage))
 		if submissionError == nil {
 			submissionOutcome = SubmissionOutcomeFailedRequiresRetry
 			it.thMetrics.RecordOperationMetrics(ctx, string(InFlightTxOperationTransactionSend), string(GenericStatusSuccess), time.Since(sendStart).Seconds())

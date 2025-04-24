@@ -24,19 +24,19 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm/clause"
 )
 
@@ -116,9 +116,9 @@ func (r *registry) configureEventStream(ctx context.Context, dbTX persistence.DB
 
 	for i, es := range r.config.EventSources {
 
-		var contractAddr *tktypes.EthAddress
+		var contractAddr *pldtypes.EthAddress
 		if es.ContractAddress != "" {
-			contractAddr, err = tktypes.ParseEthAddress(es.ContractAddress)
+			contractAddr, err = pldtypes.ParseEthAddress(es.ContractAddress)
 			if err != nil {
 				return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEventSource, i)
 			}
@@ -142,8 +142,8 @@ func (r *registry) configureEventStream(ctx context.Context, dbTX persistence.DB
 	stream.Name = fmt.Sprintf("registry_%s_%s", r.name, streamHash)
 
 	r.eventStream, err = r.rm.blockIndexer.AddEventStream(ctx, dbTX, &blockindexer.InternalEventStream{
-		Definition: stream,
-		Handler:    r.handleEventBatch,
+		Definition:  stream,
+		HandlerDBTX: r.handleEventBatch,
 	})
 	return err
 }
@@ -206,23 +206,23 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX persistence.D
 		// The ID must be parsable as Hex bytes - this could be a 16 byte UUID formatted as plain hex,
 		// or it could (more likely) be a hash of the parent_id and the name of the entry meaning
 		// it is unique within the whole registry scope.
-		entryID, err := tktypes.ParseHexBytes(ctx, protoEntry.Id)
+		entryID, err := pldtypes.ParseHexBytes(ctx, protoEntry.Id)
 		if err != nil || len(entryID) == 0 {
 			return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryID, protoEntry.Id)
 		}
 
-		var parentID tktypes.HexBytes
+		var parentID pldtypes.HexBytes
 		if protoEntry.ParentId != "" {
-			parentID, err = tktypes.ParseHexBytes(ctx, protoEntry.ParentId)
+			parentID, err = pldtypes.ParseHexBytes(ctx, protoEntry.ParentId)
 			if err != nil || len(parentID) == 0 {
 				return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidParentID, protoEntry.ParentId)
 			}
 		}
 
-		// Names must meet the criteria that is set out in tktypes.PrivateIdentryLocator for use
+		// Names must meet the criteria that is set out in pldtypes.PrivateIdentryLocator for use
 		// as a node name. That is not to say this is the only use of entries, but applying this
 		// common rule to all entry names ensures we meet the criteria of node names.
-		if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, protoEntry.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+		if err := pldtypes.ValidateSafeCharsStartEndAlphaNum(ctx, protoEntry.Name, pldtypes.DefaultNameMaxLen, "name"); err != nil {
 			return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryName, protoEntry.Name)
 		}
 
@@ -234,7 +234,7 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX persistence.D
 			Active:   protoEntry.Active,
 		}
 		if protoEntry.Location != nil {
-			txHash, _ := tktypes.ParseBytes32(protoEntry.Location.TransactionHash)
+			txHash, _ := pldtypes.ParseBytes32(protoEntry.Location.TransactionHash)
 			dbe.TransactionHash = &txHash
 			dbe.BlockNumber = &protoEntry.Location.BlockNumber
 			dbe.TransactionIndex = &protoEntry.Location.LogIndex
@@ -247,7 +247,7 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX persistence.D
 	for i, protoProp := range protoProps {
 
 		// DB will check for relationship to entry, but we need to parse the ID consistently into bytes
-		entryID, err := tktypes.ParseHexBytes(ctx, protoProp.EntryId)
+		entryID, err := pldtypes.ParseHexBytes(ctx, protoProp.EntryId)
 		if err != nil || len(entryID) == 0 {
 			return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryID, protoProp.EntryId)
 		}
@@ -263,7 +263,7 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX persistence.D
 		// these properties from our ".id", ".created", ".updated" properties.
 		// Note as above it is the registry plugin's responsibility to handle cases where a
 		// value that does not conform is published to it (by logging and discarding it etc.)
-		if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, nameToCheck, tktypes.DefaultNameMaxLen, "name"); err != nil {
+		if err := pldtypes.ValidateSafeCharsStartEndAlphaNum(ctx, nameToCheck, pldtypes.DefaultNameMaxLen, "name"); err != nil {
 			return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidPropertyName, protoProp.Name)
 		}
 
@@ -275,7 +275,7 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX persistence.D
 			Value:    protoProp.Value,
 		}
 		if protoProp.Location != nil {
-			txHash, _ := tktypes.ParseBytes32(protoProp.Location.TransactionHash)
+			txHash, _ := pldtypes.ParseBytes32(protoProp.Location.TransactionHash)
 			dbp.TransactionHash = &txHash
 			dbp.BlockNumber = &protoProp.Location.BlockNumber
 			dbp.TransactionIndex = &protoProp.Location.LogIndex
@@ -451,7 +451,7 @@ func (r *registry) QueryEntries(ctx context.Context, dbTX persistence.DBTX, fAct
 
 }
 
-func (r *registry) GetEntryProperties(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, entryIDs ...tktypes.HexBytes) ([]*pldapi.RegistryProperty, error) {
+func (r *registry) GetEntryProperties(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, entryIDs ...pldtypes.HexBytes) ([]*pldapi.RegistryProperty, error) {
 
 	var dbProps []*DBProperty
 	q := dbTX.DB().WithContext(ctx).
@@ -501,7 +501,7 @@ func (r *registry) GetEntryProperties(ctx context.Context, dbTX persistence.DBTX
 
 }
 
-func filteredPropsMap(entryProps []*pldapi.RegistryProperty, entryID tktypes.HexBytes) map[string]string {
+func filteredPropsMap(entryProps []*pldapi.RegistryProperty, entryID pldtypes.HexBytes) map[string]string {
 	props := make(map[string]string)
 	for _, p := range entryProps {
 		if p.EntryID.Equals(entryID) {
@@ -518,7 +518,7 @@ func (r *registry) QueryEntriesWithProps(ctx context.Context, dbTX persistence.D
 		return nil, err
 	}
 
-	entryIDs := make([]tktypes.HexBytes, len(entries))
+	entryIDs := make([]pldtypes.HexBytes, len(entries))
 	for i, e := range entries {
 		entryIDs[i] = e.ID
 	}

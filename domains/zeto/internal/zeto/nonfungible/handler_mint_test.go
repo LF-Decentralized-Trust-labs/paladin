@@ -10,8 +10,8 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +31,7 @@ func TestMintHandler_Prepare(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		encodeFunc   func(context.Context, *pb.TransactionSpecification) (tktypes.HexBytes, error)
+		encodeFunc   func(context.Context, *pb.TransactionSpecification) (pldtypes.HexBytes, error)
 		outputStates []*pb.EndorsableState
 		expectErr    bool
 		errContains  string
@@ -75,7 +75,7 @@ func TestMintHandler_Prepare(t *testing.T) {
 					StateDataJson: `{"owner":"0x638e6824da3eb00687eefdeefb17dc646ba9f00fae6020f1b6d640487b07fdac","salt":"3949625438621963838695705020414673764457825239260453211443343787973144679466","tokenID":"12889917038846740459390665944266706251653790785225711651704434901540173766845","uri":"https://example.com/token/name2"}`,
 				},
 			},
-			encodeFunc: func(context.Context, *pb.TransactionSpecification) (tktypes.HexBytes, error) {
+			encodeFunc: func(context.Context, *pb.TransactionSpecification) (pldtypes.HexBytes, error) {
 				return nil, assert.AnError
 			},
 			expectErr:   true,
@@ -318,7 +318,7 @@ func TestValidateMintParams(t *testing.T) {
 				{
 					To:      "",
 					URI:     "https://example.com",
-					TokenID: (*tktypes.HexUint256)(big.NewInt(0)), // zero is acceptable
+					TokenID: (*pldtypes.HexUint256)(big.NewInt(0)), // zero is acceptable
 				},
 			},
 			expectErr: true,
@@ -329,7 +329,7 @@ func TestValidateMintParams(t *testing.T) {
 				{
 					To:      "recipient",
 					URI:     "https://example.com",
-					TokenID: (*tktypes.HexUint256)(big.NewInt(123)), // non-zero tokenID is not allowed for mint
+					TokenID: (*pldtypes.HexUint256)(big.NewInt(123)), // non-zero tokenID is not allowed for mint
 				},
 			},
 			expectErr: true,
@@ -340,7 +340,7 @@ func TestValidateMintParams(t *testing.T) {
 				{
 					To:      "recipient",
 					URI:     "",
-					TokenID: (*tktypes.HexUint256)(big.NewInt(0)), // zero tokenID is acceptable
+					TokenID: (*pldtypes.HexUint256)(big.NewInt(0)), // zero tokenID is acceptable
 				},
 			},
 			expectErr: true,
@@ -351,7 +351,7 @@ func TestValidateMintParams(t *testing.T) {
 				{
 					To:      "recipient",
 					URI:     "https://example.com",
-					TokenID: (*tktypes.HexUint256)(big.NewInt(0)),
+					TokenID: (*pldtypes.HexUint256)(big.NewInt(0)),
 				},
 			},
 			expectErr: false,

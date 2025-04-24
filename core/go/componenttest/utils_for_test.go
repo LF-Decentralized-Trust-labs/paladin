@@ -36,17 +36,18 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/componenttest/domains"
 	"github.com/kaleido-io/paladin/core/internal/componentmgr"
 	"github.com/kaleido-io/paladin/core/internal/plugins"
+	"github.com/kaleido-io/paladin/core/pkg/config"
 	"github.com/kaleido-io/paladin/registries/static/pkg/static"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/transports/grpc/pkg/grpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -62,7 +63,7 @@ func transactionReceiptCondition(t *testing.T, ctx context.Context, txID uuid.UU
 		err := rpcClient.CallRPC(ctx, &txFull, "ptx_getTransactionFull", txID)
 		require.NoError(t, err)
 		require.False(t, (txFull.Receipt != nil && txFull.Receipt.Success == false), "Have transaction receipt but not successful")
-		return txFull.Receipt != nil && (!isDeploy || (txFull.Receipt.ContractAddress != nil && *txFull.Receipt.ContractAddress != tktypes.EthAddress{}))
+		return txFull.Receipt != nil && (!isDeploy || (txFull.Receipt.ContractAddress != nil && *txFull.Receipt.ContractAddress != pldtypes.EthAddress{}))
 	}
 }
 
@@ -113,7 +114,7 @@ type componentTestInstance struct {
 	wsConfig               *pldconf.WSClientConfig
 }
 
-func deployDomainRegistry(t *testing.T) *tktypes.EthAddress {
+func deployDomainRegistry(t *testing.T) *pldtypes.EthAddress {
 	// We need an engine so that we can deploy the base ledger contract for the domain
 	//Actually, we only need a bare bones engine that is capable of deploying the base ledger contracts
 	// could make do with assembling some core components like key manager, eth client factory, block indexer, persistence and any other dependencies they pull in
@@ -166,7 +167,7 @@ func newNodeConfiguration(t *testing.T, nodeName string) *nodeConfiguration {
 	}
 }
 
-func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes.EthAddress, binding *nodeConfiguration, peerNodes []*nodeConfiguration, domainConfig interface{}, enableWS bool) *componentTestInstance {
+func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtypes.EthAddress, binding *nodeConfiguration, peerNodes []*nodeConfiguration, domainConfig interface{}, enableWS bool) *componentTestInstance {
 	if binding == nil {
 		binding = newNodeConfiguration(t, "default")
 	}
@@ -202,7 +203,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 		i.conf.DomainManagerConfig.Domains["domain1"] = &pldconf.DomainConfig{
 			AllowSigning: true,
 			Plugin: pldconf.PluginConfig{
-				Type:    string(tktypes.LibraryTypeCShared),
+				Type:    string(pldtypes.LibraryTypeCShared),
 				Library: "loaded/via/unit/test/loader",
 			},
 			Config:          map[string]any{"submitMode": domainConfig.SubmitMode},
@@ -217,7 +218,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 		i.conf.DomainManagerConfig.Domains["simpleStorageDomain"] = &pldconf.DomainConfig{
 			AllowSigning: true,
 			Plugin: pldconf.PluginConfig{
-				Type:    string(tktypes.LibraryTypeCShared),
+				Type:    string(pldtypes.LibraryTypeCShared),
 				Library: "loaded/via/unit/test/loader",
 			},
 			Config: map[string]any{
@@ -233,7 +234,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 	i.conf.Transports = map[string]*pldconf.TransportConfig{
 		"grpc": {
 			Plugin: pldconf.PluginConfig{
-				Type:    string(tktypes.LibraryTypeCShared),
+				Type:    string(pldtypes.LibraryTypeCShared),
 				Library: "loaded/via/unit/test/loader",
 			},
 			Config: map[string]any{
@@ -253,8 +254,8 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 	nodesConfig := make(map[string]*static.StaticEntry)
 	for _, peerNode := range peerNodes {
 		nodesConfig[peerNode.name] = &static.StaticEntry{
-			Properties: map[string]tktypes.RawJSON{
-				"transport.grpc": tktypes.JSONString(
+			Properties: map[string]pldtypes.RawJSON{
+				"transport.grpc": pldtypes.JSONString(
 					grpc.PublishedTransportDetails{
 						Endpoint: fmt.Sprintf("dns:///%s:%d", peerNode.address, peerNode.port),
 						Issuers:  peerNode.cert,
@@ -267,7 +268,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 	i.conf.Registries = map[string]*pldconf.RegistryConfig{
 		"registry1": {
 			Plugin: pldconf.PluginConfig{
-				Type:    string(tktypes.LibraryTypeCShared),
+				Type:    string(pldtypes.LibraryTypeCShared),
 				Library: "loaded/via/unit/test/loader",
 			},
 			Config: map[string]any{
@@ -322,7 +323,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 	i.client = client
 
 	i.resolveEthereumAddress = func(identity string) string {
-		idPart, err := tktypes.PrivateIdentityLocator(identity).Identity(context.Background())
+		idPart, err := pldtypes.PrivateIdentityLocator(identity).Identity(context.Background())
 		require.NoError(t, err)
 		addr, err := i.cm.KeyManager().ResolveEthAddressNewDatabaseTX(i.ctx, idPart)
 		require.NoError(t, err)
@@ -364,7 +365,7 @@ func testConfig(t *testing.T, enableWS bool) (pldconf.PaladinConfig, pldconf.WSC
 	ctx := context.Background()
 
 	var conf *pldconf.PaladinConfig
-	err := pldconf.ReadAndParseYAMLFile(ctx, "../test/config/sqlite.memory.config.yaml", &conf)
+	err := config.ReadAndParseYAMLFile(ctx, "../test/config/sqlite.memory.config.yaml", &conf)
 	assert.NoError(t, err)
 
 	// For running in this unit test the dirs are different to the sample config
@@ -398,7 +399,7 @@ func testConfig(t *testing.T, enableWS bool) (pldconf.PaladinConfig, pldconf.WSC
 
 	conf.Wallets[0].Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
 		Encoding: "hex",
-		Inline:   tktypes.RandHex(32),
+		Inline:   pldtypes.RandHex(32),
 	}
 
 	conf.Log = pldconf.LogConfig{
@@ -468,11 +469,11 @@ type partyForTesting struct {
 	instance              *componentTestInstance
 	nodeConfig            *nodeConfiguration
 	peers                 []*nodeConfiguration
-	domainRegistryAddress *tktypes.EthAddress
+	domainRegistryAddress *pldtypes.EthAddress
 	client                rpcclient.Client //TODO swap out for pldclient.PaladinClient
 }
 
-func newPartyForTesting(t *testing.T, name string, domainRegistryAddress *tktypes.EthAddress) *partyForTesting {
+func newPartyForTesting(t *testing.T, name string, domainRegistryAddress *pldtypes.EthAddress) *partyForTesting {
 	nodeName := name + "Node"
 	party := &partyForTesting{
 		peers:                 make([]*nodeConfiguration, 0),
@@ -495,7 +496,7 @@ func (p *partyForTesting) start(t *testing.T, domainConfig interface{}) {
 
 }
 
-func (p *partyForTesting) deploySimpleDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.ConstructorParameters) *tktypes.EthAddress {
+func (p *partyForTesting) deploySimpleDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.ConstructorParameters) *pldtypes.EthAddress {
 
 	var dplyTxID uuid.UUID
 
@@ -505,7 +506,7 @@ func (p *partyForTesting) deploySimpleDomainInstanceContract(t *testing.T, endor
 			Type:   pldapi.TransactionTypePrivate.Enum(),
 			Domain: "domain1",
 			From:   p.identity,
-			Data:   tktypes.JSONString(constructorParameters),
+			Data:   pldtypes.JSONString(constructorParameters),
 		},
 	})
 	require.NoError(t, err)
@@ -525,7 +526,7 @@ func (p *partyForTesting) deploySimpleDomainInstanceContract(t *testing.T, endor
 	return dplyTxFull.Receipt.ContractAddress
 }
 
-func (p *partyForTesting) deploySimpleStorageDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.SimpleStorageConstructorParameters) *tktypes.EthAddress {
+func (p *partyForTesting) deploySimpleStorageDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.SimpleStorageConstructorParameters) *pldtypes.EthAddress {
 
 	var dplyTxID uuid.UUID
 
@@ -535,7 +536,7 @@ func (p *partyForTesting) deploySimpleStorageDomainInstanceContract(t *testing.T
 			Type:   pldapi.TransactionTypePrivate.Enum(),
 			Domain: "simpleStorageDomain",
 			From:   p.identity,
-			Data:   tktypes.JSONString(constructorParameters),
+			Data:   pldtypes.JSONString(constructorParameters),
 		},
 	})
 	require.NoError(t, err)

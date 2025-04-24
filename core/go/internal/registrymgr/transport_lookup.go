@@ -20,16 +20,16 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 )
 
 type transportLookup struct {
@@ -81,7 +81,7 @@ func (tl *transportLookup) getNodeTransports(ctx context.Context, dbTX persisten
 	}
 
 	// Resolve all the items in the hierarchy to find the leaf
-	var lookupParentID tktypes.HexBytes
+	var lookupParentID pldtypes.HexBytes
 	var entry *pldapi.RegistryEntryWithProperties
 	for _, entryName := range hierarchy {
 		q := query.NewQueryBuilder().Equal(".name", entryName).Limit(1)

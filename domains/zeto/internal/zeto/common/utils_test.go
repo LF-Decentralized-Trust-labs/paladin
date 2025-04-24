@@ -10,8 +10,8 @@ import (
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,9 +25,9 @@ func TestIsNullifiersToken(t *testing.T) {
 
 // HexUint256To32ByteHexString
 func TestHexUint256To32ByteHexString(t *testing.T) {
-	// Create a big.Int and cast it to *tktypes.HexUint256.
+	// Create a big.Int and cast it to *pldtypes.HexUint256.
 	x := big.NewInt(7890)
-	hexUint := (*tktypes.HexUint256)(x)
+	hexUint := (*pldtypes.HexUint256)(x)
 	result := HexUint256To32ByteHexString(hexUint)
 	expected := hex.EncodeToString(x.FillBytes(make([]byte, 32)))
 	assert.Equal(t, expected, result)
@@ -77,7 +77,7 @@ func TestEncodeProof(t *testing.T) {
 func TestEncodeTransactionData(t *testing.T) {
 	tests := map[string]struct {
 		transactionId string
-		expected      tktypes.HexBytes
+		expected      pldtypes.HexBytes
 		expectError   bool
 	}{
 		"valid": {

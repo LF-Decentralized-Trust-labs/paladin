@@ -28,12 +28,12 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -62,7 +62,7 @@ func newTestRPCServer(t *testing.T, ctx context.Context, gm *groupManager) rpccl
 
 func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 
-	contractAddr := tktypes.RandAddress()
+	contractAddr := pldtypes.RandAddress()
 	ctx, gm, _, done := newTestGroupManager(t, true, &pldconf.GroupManagerConfig{}, func(mc *mockComponents, conf *pldconf.GroupManagerConfig) {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").
 			Return([]*components.RegistryNodeTransportEntry{ /* contents not checked */ }, nil)
@@ -123,7 +123,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 				TransactionBase: pldapi.TransactionBase{
 					Type: pldapi.TransactionTypePrivate.Enum(),
 					From: `my.key`,
-					Data: tktypes.RawJSON(`{"wrapped":"transaction"}`),
+					Data: pldtypes.RawJSON(`{"wrapped":"transaction"}`),
 				},
 			}, nil)
 		})
@@ -142,9 +142,9 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 		mwpgt2.Run(func(args mock.Arguments) {
 			mwpgt2.Return(&pldapi.TransactionInput{
 				TransactionBase: pldapi.TransactionBase{
-					To:   tktypes.RandAddress(),
+					To:   pldtypes.RandAddress(),
 					Type: pldapi.TransactionTypePrivate.Enum(),
-					Data: tktypes.RawJSON(`{"wrapped":"call"}`),
+					Data: pldtypes.RawJSON(`{"wrapped":"call"}`),
 				},
 			}, nil)
 		})
@@ -156,8 +156,8 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 				assert.Empty(t, tx.From)
 				assert.NotNil(t, tx.To)
 				assert.JSONEq(t, `{"wrapped":"call"}`, tx.Data.Pretty())
-				res := args[2].(*tktypes.RawJSON)
-				*res = tktypes.RawJSON(`{"call":"result"}`)
+				res := args[2].(*pldtypes.RawJSON)
+				*res = pldtypes.RawJSON(`{"call":"result"}`)
 			}).Once()
 
 		// Validate we also get a send reliable for the message
@@ -178,7 +178,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 		TransactionOptions: &pldapi.PrivacyGroupTXOptions{
 			IdempotencyKey: "tx_1",
 			PublicTxOptions: pldapi.PublicTxOptions{
-				Gas: confutil.P(tktypes.HexUint64(12345)),
+				Gas: confutil.P(pldtypes.HexUint64(12345)),
 			},
 		},
 	})
@@ -199,7 +199,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 	err = gm.p.DB().Exec(`INSERT INTO transaction_receipts ("transaction", domain, indexed, success, contract_address) VALUES ( ?, ?, ?, ?, ? )`,
 		groups[0].GenesisTransaction,
 		groups[0].Domain,
-		tktypes.TimestampNow(),
+		pldtypes.TimestampNow(),
 		true,
 		contractAddr,
 	).Error
@@ -239,10 +239,10 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 			From:     "my.key",
 			To:       nil, // simulate is a deploy inside the privacy group
 			Function: &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{{Type: "string", Name: "input1"}}},
-			Gas:      confutil.P(tktypes.HexUint64(12345)),
-			Value:    tktypes.Int64ToInt256(123456789),
-			Input:    tktypes.RawJSON(`{"input1": "value1"}`),
-			Bytecode: tktypes.MustParseHexBytes(`0xfeedbeef`),
+			Gas:      confutil.P(pldtypes.HexUint64(12345)),
+			Value:    pldtypes.Int64ToInt256(123456789),
+			Input:    pldtypes.RawJSON(`{"input1": "value1"}`),
+			Bytecode: pldtypes.MustParseHexBytes(`0xfeedbeef`),
 		},
 	})
 	require.NoError(t, err)
@@ -253,7 +253,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 		Domain: "domain1",
 		Group:  group.ID,
 		PrivacyGroupEVMTX: pldapi.PrivacyGroupEVMTX{
-			To:       tktypes.RandAddress(),
+			To:       pldtypes.RandAddress(),
 			Function: &abi.Entry{Type: abi.Function, Name: "getThing"},
 		},
 	})
@@ -265,7 +265,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 	msgID, err := pgroupRPC.SendMessage(ctx, &pldapi.PrivacyGroupMessageInput{
 		Domain:        "domain1",
 		Group:         groupID,
-		Data:          tktypes.JSONString("some data"),
+		Data:          pldtypes.JSONString("some data"),
 		Topic:         "my/topic",
 		CorrelationID: &cid,
 	})

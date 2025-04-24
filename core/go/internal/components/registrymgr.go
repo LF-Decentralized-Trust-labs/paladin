@@ -22,10 +22,10 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // Special mapped type of record used by the transport plugin to route to nodes.
@@ -54,5 +54,5 @@ type RegistryManager interface {
 type Registry interface {
 	QueryEntries(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, jq *query.QueryJSON) ([]*pldapi.RegistryEntry, error)
 	QueryEntriesWithProps(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, jq *query.QueryJSON) ([]*pldapi.RegistryEntryWithProperties, error)
-	GetEntryProperties(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, entityIDs ...tktypes.HexBytes) ([]*pldapi.RegistryProperty, error)
+	GetEntryProperties(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, entityIDs ...pldtypes.HexBytes) ([]*pldapi.RegistryProperty, error)
 }

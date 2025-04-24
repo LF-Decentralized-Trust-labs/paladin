@@ -29,9 +29,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -158,8 +158,8 @@ func TestUpsertSchemaAndStates(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, schemas, 1)
 	schemaID := schemas[0].ID()
-	fakeHash1 := tktypes.HexBytes(tktypes.RandBytes(32))
-	fakeHash2 := tktypes.HexBytes(tktypes.RandBytes(32))
+	fakeHash1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	fakeHash2 := pldtypes.HexBytes(pldtypes.RandBytes(32))
 
 	_, dc := newTestDomainContext(t, ctx, ss, "domain1", true)
 	defer dc.Close()
@@ -167,14 +167,14 @@ func TestUpsertSchemaAndStates(t *testing.T) {
 	upsert1 := &components.StateUpsert{
 		ID:     fakeHash1,
 		Schema: schemaID,
-		Data:   tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, tktypes.RandHex(32))),
+		Data:   pldtypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, pldtypes.RandHex(32))),
 	}
 	states, err := dc.UpsertStates(ss.p.NOTX(),
 		upsert1,
 		&components.StateUpsert{
 			ID:     fakeHash2,
 			Schema: schemaID,
-			Data:   tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, tktypes.RandHex(32))),
+			Data:   pldtypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, pldtypes.RandHex(32))),
 		},
 	)
 	require.NoError(t, err)
@@ -207,7 +207,7 @@ func TestStateLockErrorsTransaction(t *testing.T) {
 	_, err = dc.UpsertStates(ss.p.NOTX(),
 		&components.StateUpsert{
 			Schema:    schemas[0].ID(),
-			Data:      tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, tktypes.RandHex(32))),
+			Data:      pldtypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, pldtypes.RandHex(32))),
 			CreatedBy: &zeroTxn,
 		},
 	)
@@ -219,7 +219,7 @@ func TestStateLockErrorsTransaction(t *testing.T) {
 	require.Regexp(t, "PD010124", err) // zero/missing txn
 
 	err = dc.AddStateLocks(&pldapi.StateLock{
-		Type: tktypes.Enum[pldapi.StateLockType]("wrong"),
+		Type: pldtypes.Enum[pldapi.StateLockType]("wrong"),
 	})
 	require.Regexp(t, "PD020003", err) // bad type
 
@@ -232,7 +232,7 @@ func TestStateLockErrorsTransaction(t *testing.T) {
 
 	err = dc.AddStateLocks(&pldapi.StateLock{
 		Type:        pldapi.StateLockTypeCreate.Enum(),
-		StateID:     tktypes.RandBytes(32),
+		StateID:     pldtypes.RandBytes(32),
 		Transaction: txn1,
 	})
 	require.Regexp(t, "PD010118", err) // create lock for state not in context
@@ -262,10 +262,10 @@ func TestStateContextMintSpendMint(t *testing.T) {
 
 	// Store some states
 	tx1states, err := dc.UpsertStates(ss.p.NOTX(),
-		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID1},
-		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 10,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID1},
-		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 75,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID1},
-		&components.StateUpsert{Schema: infoSchema, Data: tktypes.RawJSON(fmt.Sprintf(`{"info": "some info", "salt": "%s"}`, tktypes.RandHex(32)))},
+		&components.StateUpsert{Schema: schemaID, Data: pldtypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, pldtypes.RandHex(32))), CreatedBy: &transactionID1},
+		&components.StateUpsert{Schema: schemaID, Data: pldtypes.RawJSON(fmt.Sprintf(`{"amount": 10,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, pldtypes.RandHex(32))), CreatedBy: &transactionID1},
+		&components.StateUpsert{Schema: schemaID, Data: pldtypes.RawJSON(fmt.Sprintf(`{"amount": 75,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, pldtypes.RandHex(32))), CreatedBy: &transactionID1},
+		&components.StateUpsert{Schema: infoSchema, Data: pldtypes.RawJSON(fmt.Sprintf(`{"info": "some info", "salt": "%s"}`, pldtypes.RandHex(32)))},
 	)
 	require.NoError(t, err)
 	assert.Len(t, tx1states, 4)
@@ -317,8 +317,8 @@ func TestStateContextMintSpendMint(t *testing.T) {
 
 	// Do a quick check on upsert semantics with un-flushed updates, to make sure the unflushed list doesn't dup
 	tx3states, err := dc.UpsertStates(ss.p.NOTX(),
-		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 35, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID3},
-		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 50, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID3},
+		&components.StateUpsert{Schema: schemaID, Data: pldtypes.RawJSON(fmt.Sprintf(`{"amount": 35, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, pldtypes.RandHex(32))), CreatedBy: &transactionID3},
+		&components.StateUpsert{Schema: schemaID, Data: pldtypes.RawJSON(fmt.Sprintf(`{"amount": 50, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, pldtypes.RandHex(32))), CreatedBy: &transactionID3},
 	)
 	require.NoError(t, err)
 	assert.Len(t, tx3states, 2)
@@ -359,8 +359,8 @@ func TestStateContextMintSpendMint(t *testing.T) {
 	)
 	require.NoError(t, err)
 	tx4states, err := dc.UpsertStates(ss.p.NOTX(),
-		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID4},
-		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 30, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID4},
+		&components.StateUpsert{Schema: schemaID, Data: pldtypes.RawJSON(fmt.Sprintf(`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, pldtypes.RandHex(32))), CreatedBy: &transactionID4},
+		&components.StateUpsert{Schema: schemaID, Data: pldtypes.RawJSON(fmt.Sprintf(`{"amount": 30, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, pldtypes.RandHex(32))), CreatedBy: &transactionID4},
 	)
 	require.NoError(t, err)
 	assert.Len(t, tx4states, 2)
@@ -434,33 +434,33 @@ func TestStateContextMintSpendMint(t *testing.T) {
 
 	// Check the post-commit lookups for each set
 	checkPostCommit(t, ss, transactionID1, // transaction one
-		[]tktypes.HexBytes{},
-		[]tktypes.HexBytes{},
-		[]tktypes.HexBytes{tx1states[0].ID, tx1states[2].ID, tx1states[2].ID}, // mints these three ...
-		[]tktypes.HexBytes{tx1states[3].ID},                                   // and has this info
+		[]pldtypes.HexBytes{},
+		[]pldtypes.HexBytes{},
+		[]pldtypes.HexBytes{tx1states[0].ID, tx1states[2].ID, tx1states[2].ID}, // mints these three ...
+		[]pldtypes.HexBytes{tx1states[3].ID},                                   // and has this info
 	)
 	checkPostCommit(t, ss, transactionID2, // transaction one
-		[]tktypes.HexBytes{},
-		[]tktypes.HexBytes{tx1states[1].ID}, // just reads this one
-		[]tktypes.HexBytes{},
-		[]tktypes.HexBytes{},
+		[]pldtypes.HexBytes{},
+		[]pldtypes.HexBytes{tx1states[1].ID}, // just reads this one
+		[]pldtypes.HexBytes{},
+		[]pldtypes.HexBytes{},
 	)
 	checkPostCommit(t, ss, transactionID3, // transaction three
-		[]tktypes.HexBytes{tx1states[1].ID, tx1states[2].ID}, // spends these two ..
-		[]tktypes.HexBytes{},
-		[]tktypes.HexBytes{tx3states[0].ID, tx3states[1].ID}, // and mints these two
-		[]tktypes.HexBytes{},
+		[]pldtypes.HexBytes{tx1states[1].ID, tx1states[2].ID}, // spends these two ..
+		[]pldtypes.HexBytes{},
+		[]pldtypes.HexBytes{tx3states[0].ID, tx3states[1].ID}, // and mints these two
+		[]pldtypes.HexBytes{},
 	)
 	checkPostCommit(t, ss, transactionID4, // transaction four,
-		[]tktypes.HexBytes{tx3states[1].ID},                  // spends this one ...
-		[]tktypes.HexBytes{tx1states[0].ID},                  // reads this one ...
-		[]tktypes.HexBytes{tx4states[0].ID, tx4states[1].ID}, // and mints these two
-		[]tktypes.HexBytes{},
+		[]pldtypes.HexBytes{tx3states[1].ID},                  // spends this one ...
+		[]pldtypes.HexBytes{tx1states[0].ID},                  // reads this one ...
+		[]pldtypes.HexBytes{tx4states[0].ID, tx4states[1].ID}, // and mints these two
+		[]pldtypes.HexBytes{},
 	)
 
 }
 
-func checkPostCommit(t *testing.T, ss *stateManager, txID uuid.UUID, expectedSpent, expectedRead, expectedConfirmed, expectedInfo []tktypes.HexBytes) {
+func checkPostCommit(t *testing.T, ss *stateManager, txID uuid.UUID, expectedSpent, expectedRead, expectedConfirmed, expectedInfo []pldtypes.HexBytes) {
 
 	txStates, err := ss.GetTransactionStates(ss.bgCtx, ss.p.NOTX(), txID)
 	require.NoError(t, err)
@@ -512,12 +512,12 @@ func TestStateContextMintSpendWithNullifier(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, schemas, 1)
 	schemaID := schemas[0].ID()
-	stateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID2 := tktypes.HexBytes(tktypes.RandBytes(32))
-	nullifier1 := tktypes.HexBytes(tktypes.RandBytes(32))
-	nullifier2 := tktypes.HexBytes(tktypes.RandBytes(32))
-	data1 := tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32)))
-	data2 := tktypes.RawJSON(fmt.Sprintf(`{"amount": 10,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32)))
+	stateID1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	stateID2 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	nullifier1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	nullifier2 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	data1 := pldtypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, pldtypes.RandHex(32)))
+	data2 := pldtypes.RawJSON(fmt.Sprintf(`{"amount": 10,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, pldtypes.RandHex(32)))
 
 	_, dc := newTestDomainContext(t, ctx, ss, "domain1", true)
 	defer dc.Close()
@@ -660,7 +660,7 @@ func TestDomainContextFlushErrorCapture(t *testing.T) {
 	_, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
 	defer dc.Close()
 
-	data1 := fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))
+	data1 := fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, pldtypes.RandHex(32))
 	tx1 := uuid.New()
 	_, err = dc.UpsertStates(ss.p.NOTX(), genWidget(t, schemas[0].ID(), &tx1, data1))
 	require.NoError(t, err)
@@ -752,9 +752,9 @@ func TestDCMergeUnFlushedWhileFlushing(t *testing.T) {
 	contractAddress, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
 	defer dc.Close()
 
-	s1, err := schema.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s1, err := schema.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 	tx1 := uuid.New()
 	_, err = dc.UpsertStates(ss.p.NOTX(), &components.StateUpsert{ID: s1.ID, Schema: schema.ID(), Data: s1.Data, CreatedBy: &tx1})
@@ -778,7 +778,7 @@ func TestDCMergeUnFlushedWhileFlushing(t *testing.T) {
 	assert.Len(t, states, 0)
 
 	// But we can have an unflushed nullifier
-	err = dc.UpsertNullifiers(&components.NullifierUpsert{ID: tktypes.RandBytes(32), State: s1.ID})
+	err = dc.UpsertNullifiers(&components.NullifierUpsert{ID: pldtypes.RandBytes(32), State: s1.ID})
 	require.NoError(t, err)
 
 	// Fake a flush transition
@@ -809,13 +809,13 @@ func TestDSIMergeUnFlushedMultipleSchemas(t *testing.T) {
 	contractAddress, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
 	defer dc.Close()
 
-	s1, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s1, err := schema1.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
-	s2, err := schema2.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s2, err := schema2.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"tokenUri": "%s", "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32), tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32), pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 
 	dc.creatingStates[s1.ID.String()] = s1
@@ -841,15 +841,15 @@ func TestDSIMergeUnFlushedBadDBRecord(t *testing.T) {
 	contractAddress, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
 	defer dc.Close()
 
-	s1, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s1, err := schema1.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 
 	dc.creatingStates[s1.ID.String()] = s1
 
 	_, err = dc.mergeUnFlushedApplyLocks(schema1, []*pldapi.State{
-		{StateBase: pldapi.StateBase{ID: tktypes.RandBytes(32), Data: tktypes.RawJSON("wrong")}},
+		{StateBase: pldapi.StateBase{ID: pldtypes.RandBytes(32), Data: pldtypes.RawJSON("wrong")}},
 	}, query.NewQueryBuilder().Sort(".created").Query(), true, false)
 	assert.Regexp(t, "PD010116", err)
 
@@ -868,18 +868,18 @@ func TestDCMergeUnFlushedWhileFlushingDedup(t *testing.T) {
 	defer dc.Close()
 
 	// Add a first state that will be included in the query
-	s1, err := schema.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s1, err := schema.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 10, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 	tx1 := uuid.New()
 	_, err = dc.UpsertStates(ss.p.NOTX(), &components.StateUpsert{ID: s1.ID, Schema: schema.ID(), Data: s1.Data, CreatedBy: &tx1})
 	require.NoError(t, err)
 
 	// We add a second state, that will be excluded from the query due to a spending lock
-	s2, err := schema.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s2, err := schema.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 	_, err = dc.UpsertStates(ss.p.NOTX(), &components.StateUpsert{ID: s2.ID, Schema: schema.ID(), Data: s2.Data, CreatedBy: &tx1})
 	require.NoError(t, err)
@@ -921,9 +921,9 @@ func TestDCMergeUnFlushedEvalError(t *testing.T) {
 	contractAddress, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
 	defer dc.Close()
 
-	s1, err := schema.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s1, err := schema.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 	tx1 := uuid.New()
 	_, err = dc.UpsertStates(ss.p.NOTX(), &components.StateUpsert{ID: s1.ID, Schema: schema.ID(), Data: s1.Data, CreatedBy: &tx1})
@@ -947,11 +947,11 @@ func TestDCMergedInMemoryMatchesRecoverLabelsFail(t *testing.T) {
 	contractAddress, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
 	defer dc.Close()
 
-	s1, err := schema.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s1, err := schema.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
-	s1.Data = tktypes.RawJSON(`! wrong `)
+	s1.Data = pldtypes.RawJSON(`! wrong `)
 
 	// Insert broken state into our unflushed state list
 	dc.flushing = dc.newPendingStateWrites()
@@ -976,9 +976,9 @@ func TestDCMergedInMemoryMatchesSortFail(t *testing.T) {
 	contractAddress, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
 	defer dc.Close()
 
-	s1, err := schema.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s1, err := schema.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 
 	// Insert state into our unflushed state list
@@ -1013,7 +1013,7 @@ func TestDCFindBadQueryAndInsertBadValue(t *testing.T) {
 	assert.Regexp(t, "PD010700", err)
 
 	_, err = dc.UpsertStates(ss.p.NOTX(), &components.StateUpsert{
-		Schema: schemaID, Data: tktypes.RawJSON(`"wrong"`),
+		Schema: schemaID, Data: pldtypes.RawJSON(`"wrong"`),
 	})
 	assert.Regexp(t, "FF22038", err)
 
@@ -1030,8 +1030,8 @@ func TestDCUpsertStatesFailSchemaLookup(t *testing.T) {
 	defer dc.Close()
 
 	_, err := dc.UpsertStates(ss.p.NOTX(), &components.StateUpsert{
-		ID:     tktypes.RandBytes(32),
-		Schema: tktypes.Bytes32(tktypes.RandBytes(32)),
+		ID:     pldtypes.RandBytes(32),
+		Schema: pldtypes.Bytes32(pldtypes.RandBytes(32)),
 	})
 	assert.Regexp(t, "pop", err)
 
@@ -1045,13 +1045,13 @@ func TestDCResetWithMixedTxns(t *testing.T) {
 	_, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
 	defer dc.Close()
 
-	state1 := tktypes.HexBytes("state1")
+	state1 := pldtypes.HexBytes("state1")
 	transactionID1 := uuid.New()
 	err := dc.AddStateLocks(
 		&pldapi.StateLock{StateID: state1, Type: pldapi.StateLockTypeRead.Enum(), Transaction: transactionID1})
 	require.NoError(t, err)
 
-	state2 := tktypes.HexBytes("state2")
+	state2 := pldtypes.HexBytes("state2")
 	transactionID2 := uuid.New()
 	err = dc.AddStateLocks(
 		&pldapi.StateLock{StateID: state2, Type: pldapi.StateLockTypeSpend.Enum(), Transaction: transactionID2})
@@ -1079,24 +1079,24 @@ func TestCheckEvalGTTimestamp(t *testing.T) {
 
 	ls := filters.PassthroughValueSet{}
 
-	stateID := tktypes.MustParseHexBytes("2eaf4727b7c7e9b3728b1344ac38ea6d8698603dc3b41d9458d7c011c20ce672")
+	stateID := pldtypes.MustParseHexBytes("2eaf4727b7c7e9b3728b1344ac38ea6d8698603dc3b41d9458d7c011c20ce672")
 
 	// create time is equal - no match
-	created := tktypes.TimestampFromUnix(1726545933211347000)
+	created := pldtypes.TimestampFromUnix(1726545933211347000)
 	addStateBaseLabels(ls, stateID, created)
 	match, err := filters.EvalQuery(ctx, jq, labelSet, ls)
 	assert.NoError(t, err)
 	assert.False(t, match)
 
 	// create time is greater - match
-	created = tktypes.TimestampFromUnix(1726545933211347001)
+	created = pldtypes.TimestampFromUnix(1726545933211347001)
 	addStateBaseLabels(ls, stateID, created)
 	match, err = filters.EvalQuery(ctx, jq, labelSet, ls)
 	assert.NoError(t, err)
 	assert.True(t, match)
 
 	// create time is less - no match
-	created = tktypes.TimestampFromUnix(1726545933211346999)
+	created = pldtypes.TimestampFromUnix(1726545933211346999)
 	addStateBaseLabels(ls, stateID, created)
 	match, err = filters.EvalQuery(ctx, jq, labelSet, ls)
 	assert.NoError(t, err)
@@ -1120,14 +1120,14 @@ func TestExportSnapshot(t *testing.T) {
 	contractAddress, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
 	defer dc.Close()
 
-	s1, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s1, err := schema1.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 
-	s2, err := schema2.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s2, err := schema2.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"tokenUri": "%s", "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32), tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32), pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 
 	transactionID1 := uuid.New()
@@ -1191,26 +1191,26 @@ func TestImportSnapshot(t *testing.T) {
 	contractAddress, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
 	defer dc.Close()
 
-	s1, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s1, err := schema1.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 
-	s2, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s2, err := schema1.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 
-	s3ID := tktypes.RandHex(32)
+	s3ID := pldtypes.RandHex(32)
 
-	s4, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s4, err := schema1.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 
-	s5, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+	s5, err := schema1.ProcessState(ctx, contractAddress, pldtypes.RawJSON(fmt.Sprintf(
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
-		tktypes.RandHex(32))), nil, dc.customHashFunction)
+		pldtypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 
 	transactionID1 := uuid.New()
@@ -1277,7 +1277,7 @@ func TestImportSnapshot(t *testing.T) {
 				"type":"spend"
 			}
 		],
-		"states": `+tktypes.JSONString(stateUpserts).Pretty()+`
+		"states": `+pldtypes.JSONString(stateUpserts).Pretty()+`
 	}`,
 		s1.ID.String(), transactionID1.String(),
 		s2.ID.String(), transactionID2.String(),
@@ -1307,8 +1307,8 @@ func TestImportSnapshotBadStates(t *testing.T) {
 	err := dc.ImportSnapshot([]byte(`{
 		"states": [
 			{
-				"id": "` + tktypes.RandHex(32) + `",
-				"schema": "` + tktypes.RandHex(32) + `",
+				"id": "` + pldtypes.RandHex(32) + `",
+				"schema": "` + pldtypes.RandHex(32) + `",
 				"data": {}
 			}
 		]
@@ -1345,6 +1345,6 @@ func TestGetStatesByIDFail(t *testing.T) {
 
 	db.ExpectQuery("SELECT.*schemas").WillReturnError(fmt.Errorf("pop"))
 
-	_, _, err := dc.GetStatesByID(dc.ss.p.NOTX(), tktypes.Bytes32(tktypes.RandBytes(32)), []string{tktypes.RandHex(32)})
+	_, _, err := dc.GetStatesByID(dc.ss.p.NOTX(), pldtypes.Bytes32(pldtypes.RandBytes(32)), []string{pldtypes.RandHex(32)})
 	assert.Regexp(t, "pop", err)
 }

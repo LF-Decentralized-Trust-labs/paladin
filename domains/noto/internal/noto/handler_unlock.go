@@ -20,14 +20,14 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
@@ -65,7 +65,7 @@ func (h *unlockCommon) checkAllowed(ctx context.Context, tx *types.ParsedTransac
 	}
 
 	localNodeName, _ := h.noto.Callbacks.LocalNodeName(ctx, &prototk.LocalNodeNameRequest{})
-	fromQualified, err := tktypes.PrivateIdentityLocator(from).FullyQualified(ctx, localNodeName.Name)
+	fromQualified, err := pldtypes.PrivateIdentityLocator(from).FullyQualified(ctx, localNodeName.Name)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTrans
 		}, nil
 }
 
-func (h *unlockCommon) assembleUnlockOutputs(ctx context.Context, tx *types.ParsedTransaction, params *types.UnlockParams, req *prototk.AssembleTransactionRequest, from *tktypes.EthAddress, remainder *big.Int) (*preparedOutputs, *preparedLockedOutputs, error) {
+func (h *unlockCommon) assembleUnlockOutputs(ctx context.Context, tx *types.ParsedTransaction, params *types.UnlockParams, req *prototk.AssembleTransactionRequest, from *pldtypes.EthAddress, remainder *big.Int) (*preparedOutputs, *preparedLockedOutputs, error) {
 	notary := tx.DomainConfig.NotaryLookup
 
 	unlockedOutputs := &preparedOutputs{}
@@ -166,7 +166,7 @@ func (h *unlockCommon) assembleUnlockOutputs(ctx context.Context, tx *types.Pars
 	lockedOutputs := &preparedLockedOutputs{}
 	if remainder.Cmp(big.NewInt(0)) == 1 {
 		var err error
-		lockedOutputs, err = h.noto.prepareLockedOutputs(params.LockID, from, (*tktypes.HexUint256)(remainder), []string{notary, params.From})
+		lockedOutputs, err = h.noto.prepareLockedOutputs(params.LockID, from, (*pldtypes.HexUint256)(remainder), []string{notary, params.From})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -341,7 +341,7 @@ func (h *unlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransact
 		Recipients: unlock,
 		Data:       inParams.Data,
 		Prepared: PreparedTransaction{
-			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
+			ContractAddress: (*pldtypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
 		},
 	}

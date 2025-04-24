@@ -25,9 +25,9 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,8 +77,8 @@ func TestGetTransactionByIDFullPublicHistoryFail(t *testing.T) {
 
 func TestGetTransactionByIDFullPublicHistory(t *testing.T) {
 	txID := uuid.New()
-	to1 := tktypes.RandAddress()
-	to2 := tktypes.RandAddress()
+	to1 := pldtypes.RandAddress()
+	to2 := pldtypes.RandAddress()
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
@@ -152,7 +152,7 @@ func TestResolveABIReferencesAndCacheFail(t *testing.T) {
 	_, err := txm.resolveABIReferencesAndCache(ctx, txm.p.NOTX(), []*components.ResolvedTransaction{
 		{Transaction: &pldapi.Transaction{
 			TransactionBase: pldapi.TransactionBase{
-				ABIReference: confutil.P((tktypes.Bytes32)(tktypes.RandBytes(32))),
+				ABIReference: confutil.P((pldtypes.Bytes32)(pldtypes.RandBytes(32))),
 			},
 		}},
 	})
@@ -160,7 +160,7 @@ func TestResolveABIReferencesAndCacheFail(t *testing.T) {
 }
 
 func TestResolveABIReferencesAndCacheBadFunc(t *testing.T) {
-	var abiHash = (tktypes.Bytes32)(tktypes.RandBytes(32))
+	var abiHash = (pldtypes.Bytes32)(pldtypes.RandBytes(32))
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
@@ -175,7 +175,7 @@ func TestResolveABIReferencesAndCacheBadFunc(t *testing.T) {
 			ID: confutil.P(uuid.New()),
 			TransactionBase: pldapi.TransactionBase{
 				Function:     "doStuff()",
-				To:           tktypes.RandAddress(),
+				To:           pldtypes.RandAddress(),
 				ABIReference: confutil.P(abiHash),
 			},
 		}},

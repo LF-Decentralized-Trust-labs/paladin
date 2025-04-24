@@ -21,15 +21,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/flushwriter"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 const (
@@ -66,7 +66,7 @@ type stateAndAck struct {
 
 type receivedPrivacyGroup struct {
 	msgID        uuid.UUID
-	id           tktypes.HexBytes
+	id           pldtypes.HexBytes
 	node         string
 	domain       string
 	genesisTx    uuid.UUID
@@ -339,7 +339,7 @@ func buildAck(msgID uuid.UUID, errString string) *prototk.PaladinMsg {
 		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
 		MessageType:   msgType,
 		CorrelationId: &cid,
-		Payload:       tktypes.JSONString(&ackInfo{Error: errString}),
+		Payload:       pldtypes.JSONString(&ackInfo{Error: errString}),
 	}
 }
 
@@ -355,7 +355,7 @@ func (tm *transportManager) parseReceivedAckNack(ctx context.Context, msg *compo
 	}
 	ackNackToWrite := &pldapi.ReliableMessageAck{
 		MessageID: *msg.CorrelationID,
-		Time:      tktypes.TimestampNow(),
+		Time:      pldtypes.TimestampNow(),
 	}
 	if msg.MessageType == RMHMessageTypeNack {
 		if info.Error == "" {
@@ -375,7 +375,7 @@ func (tm *transportManager) buildStateDistributionMsg(ctx context.Context, dbTX 
 	}
 
 	// Get the state - distinguishing between not found, vs. a retryable error
-	states, err := tm.stateManager.GetStatesByID(ctx, dbTX, sd.Domain, parsed.ContractAddress, []tktypes.HexBytes{parsed.ID}, false, false)
+	states, err := tm.stateManager.GetStatesByID(ctx, dbTX, sd.Domain, parsed.ContractAddress, []pldtypes.HexBytes{parsed.ID}, false, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -390,7 +390,7 @@ func (tm *transportManager) buildStateDistributionMsg(ctx context.Context, dbTX 
 		MessageId:   rm.ID.String(),
 		Component:   prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
 		MessageType: RMHMessageTypeStateDistribution,
-		Payload:     tktypes.JSONString(sd),
+		Payload:     pldtypes.JSONString(sd),
 	}, nil, nil
 }
 
@@ -426,7 +426,7 @@ func (tm *transportManager) buildPrivacyGroupDistributionMsg(ctx context.Context
 	domainName := pgd.GenesisState.Domain
 
 	// Get the state - distinguishing between not found, vs. a retryable error
-	states, err := tm.stateManager.GetStatesByID(ctx, dbTX, domainName, nil, []tktypes.HexBytes{parsed.ID}, false, false)
+	states, err := tm.stateManager.GetStatesByID(ctx, dbTX, domainName, nil, []pldtypes.HexBytes{parsed.ID}, false, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -441,7 +441,7 @@ func (tm *transportManager) buildPrivacyGroupDistributionMsg(ctx context.Context
 		MessageId:   rm.ID.String(),
 		Component:   prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
 		MessageType: RMHMessageTypePrivacyGroup,
-		Payload: tktypes.JSONString(components.PrivacyGroupGenesis{
+		Payload: pldtypes.JSONString(components.PrivacyGroupGenesis{
 			GenesisTransaction: pgd.GenesisTransaction,
 			GenesisState:       pgd.GenesisState,
 		}),
@@ -488,16 +488,16 @@ func (tm *transportManager) buildPrivacyGroupMessageMsg(ctx context.Context, dbT
 		MessageId:   rm.ID.String(),
 		Component:   prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
 		MessageType: RMHMessageTypePrivacyGroupMessage,
-		Payload:     tktypes.JSONString(msg),
+		Payload:     pldtypes.JSONString(msg),
 	}, nil, nil
 }
 
 func parsePrivacyGroupDistribution(ctx context.Context, msgID uuid.UUID, data []byte, node string) (receivedPG *receivedPrivacyGroup, err error) {
 	var pgInfo components.PrivacyGroupGenesis
 	err = json.Unmarshal(data, &pgInfo)
-	var id tktypes.HexBytes
+	var id pldtypes.HexBytes
 	if err == nil {
-		id, err = tktypes.ParseHexBytes(ctx, pgInfo.GenesisState.StateID)
+		id, err = pldtypes.ParseHexBytes(ctx, pgInfo.GenesisState.StateID)
 	}
 	if err == nil {
 		receivedPG = &receivedPrivacyGroup{
@@ -518,12 +518,12 @@ func parsePrivacyGroupDistribution(ctx context.Context, msgID uuid.UUID, data []
 func parseState(ctx context.Context, sd *components.StateDistributionWithData) (parsed *components.StateUpsertOutsideContext, err error) {
 	parsed = &components.StateUpsertOutsideContext{}
 	parsed.Data = sd.StateData
-	parsed.ID, err = tktypes.ParseHexBytes(ctx, sd.StateID)
+	parsed.ID, err = pldtypes.ParseHexBytes(ctx, sd.StateID)
 	if err == nil {
-		parsed.SchemaID, err = tktypes.ParseBytes32(sd.SchemaID)
+		parsed.SchemaID, err = pldtypes.ParseBytes32(sd.SchemaID)
 	}
 	if err == nil && sd.ContractAddress != "" {
-		parsed.ContractAddress, err = tktypes.ParseEthAddress(sd.ContractAddress)
+		parsed.ContractAddress, err = pldtypes.ParseEthAddress(sd.ContractAddress)
 	}
 	if err != nil {
 		return nil, err

@@ -23,14 +23,14 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 var EIP712DomainName = "noto"
@@ -208,7 +208,7 @@ type preparedLockedOutputs struct {
 	states []*prototk.NewState
 }
 
-func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owner *tktypes.EthAddress, amount *tktypes.HexUint256) (inputs *preparedInputs, revert bool, err error) {
+func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owner *pldtypes.EthAddress, amount *pldtypes.HexUint256) (inputs *preparedInputs, revert bool, err error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*prototk.StateRef{}
@@ -256,7 +256,7 @@ func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owne
 	}
 }
 
-func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string, lockID tktypes.Bytes32, owner *tktypes.EthAddress, amount *big.Int) (inputs *preparedLockedInputs, revert bool, err error) {
+func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string, lockID pldtypes.Bytes32, owner *pldtypes.EthAddress, amount *big.Int) (inputs *preparedLockedInputs, revert bool, err error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*prototk.StateRef{}
@@ -306,11 +306,11 @@ func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string
 	}
 }
 
-func (n *Noto) prepareOutputs(ownerAddress *tktypes.EthAddress, amount *tktypes.HexUint256, distributionList []string) (*preparedOutputs, error) {
+func (n *Noto) prepareOutputs(ownerAddress *pldtypes.EthAddress, amount *pldtypes.HexUint256, distributionList []string) (*preparedOutputs, error) {
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &types.NotoCoin{
-		Salt:   tktypes.RandBytes32(),
+		Salt:   pldtypes.RandBytes32(),
 		Owner:  ownerAddress,
 		Amount: amount,
 	}
@@ -321,11 +321,11 @@ func (n *Noto) prepareOutputs(ownerAddress *tktypes.EthAddress, amount *tktypes.
 	}, err
 }
 
-func (n *Noto) prepareLockedOutputs(id tktypes.Bytes32, ownerAddress *tktypes.EthAddress, amount *tktypes.HexUint256, distributionList []string) (*preparedLockedOutputs, error) {
+func (n *Noto) prepareLockedOutputs(id pldtypes.Bytes32, ownerAddress *pldtypes.EthAddress, amount *pldtypes.HexUint256, distributionList []string) (*preparedLockedOutputs, error) {
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &types.NotoLockedCoin{
-		Salt:   tktypes.RandBytes32(),
+		Salt:   pldtypes.RandBytes32(),
 		LockID: id,
 		Owner:  ownerAddress,
 		Amount: amount,
@@ -337,21 +337,21 @@ func (n *Noto) prepareLockedOutputs(id tktypes.Bytes32, ownerAddress *tktypes.Et
 	}, err
 }
 
-func (n *Noto) prepareInfo(data tktypes.HexBytes, distributionList []string) ([]*prototk.NewState, error) {
+func (n *Noto) prepareInfo(data pldtypes.HexBytes, distributionList []string) ([]*prototk.NewState, error) {
 	newData := &types.TransactionData{
-		Salt: tktypes.RandHex(32),
+		Salt: pldtypes.RandHex(32),
 		Data: data,
 	}
 	newState, err := n.makeNewInfoState(newData, distributionList)
 	return []*prototk.NewState{newState}, err
 }
 
-func (n *Noto) prepareLockInfo(lockID tktypes.Bytes32, owner, delegate *tktypes.EthAddress, distributionList []string) (*prototk.NewState, error) {
+func (n *Noto) prepareLockInfo(lockID pldtypes.Bytes32, owner, delegate *pldtypes.EthAddress, distributionList []string) (*prototk.NewState, error) {
 	if delegate == nil {
-		delegate = &tktypes.EthAddress{}
+		delegate = &pldtypes.EthAddress{}
 	}
 	newData := &types.NotoLockInfo{
-		Salt:     tktypes.RandBytes32(),
+		Salt:     pldtypes.RandBytes32(),
 		LockID:   lockID,
 		Owner:    owner,
 		Delegate: delegate,
@@ -469,7 +469,7 @@ func (n *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Ad
 	})
 }
 
-func (n *Noto) encodeTransferMasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*pldapi.StateEncoded, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
+func (n *Noto) encodeTransferMasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*pldapi.StateEncoded, data pldtypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
 		Types:       NotoTransferMaskedTypeSet,
 		PrimaryType: "Transfer",
@@ -508,11 +508,11 @@ func (n *Noto) encodeUnlock(ctx context.Context, contract *ethtypes.Address0xHex
 	})
 }
 
-func (n *Noto) unlockHashFromStates(ctx context.Context, contract *ethtypes.Address0xHex, lockedInputs, lockedOutputs, outputs []*prototk.EndorsableState, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
+func (n *Noto) unlockHashFromStates(ctx context.Context, contract *ethtypes.Address0xHex, lockedInputs, lockedOutputs, outputs []*prototk.EndorsableState, data pldtypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
 	return n.unlockHashFromIDs(ctx, contract, endorsableStateIDs(lockedInputs), endorsableStateIDs(lockedOutputs), endorsableStateIDs(outputs), data)
 }
 
-func (n *Noto) unlockHashFromIDs(ctx context.Context, contract *ethtypes.Address0xHex, lockedInputs, lockedOutputs, outputs []string, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
+func (n *Noto) unlockHashFromIDs(ctx context.Context, contract *ethtypes.Address0xHex, lockedInputs, lockedOutputs, outputs []string, data pldtypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
 		Types:       NotoUnlockMaskedTypeSet,
 		PrimaryType: "Unlock",
@@ -526,7 +526,7 @@ func (n *Noto) unlockHashFromIDs(ctx context.Context, contract *ethtypes.Address
 	})
 }
 
-func (n *Noto) encodeDelegateLock(ctx context.Context, contract *ethtypes.Address0xHex, lockID tktypes.Bytes32, delegate *tktypes.EthAddress, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
+func (n *Noto) encodeDelegateLock(ctx context.Context, contract *ethtypes.Address0xHex, lockID pldtypes.Bytes32, delegate *pldtypes.EthAddress, data pldtypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
 		Types:       NotoDelegateLockTypeSet,
 		PrimaryType: "DelegateLock",

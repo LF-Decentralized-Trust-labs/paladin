@@ -21,8 +21,8 @@ import (
 
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,11 +38,11 @@ func newTestStateDistributionBuilder(t *testing.T, tx *components.PrivateTransac
 }
 
 func TestStateDistributionBuilderAllSenderNoNullifiers(t *testing.T) {
-	schema1ID := tktypes.RandBytes32()
-	state1ID := tktypes.HexBytes(tktypes.RandBytes(32))
-	schema2ID := tktypes.RandBytes32()
-	state2ID := tktypes.HexBytes(tktypes.RandBytes(32))
-	contractAddr := *tktypes.RandAddress()
+	schema1ID := pldtypes.RandBytes32()
+	state1ID := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	schema2ID := pldtypes.RandBytes32()
+	state2ID := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	contractAddr := *pldtypes.RandAddress()
 	ctx, sd := newTestStateDistributionBuilder(t, &components.PrivateTransaction{
 		Domain:  "domain1",
 		Address: contractAddr,
@@ -56,7 +56,7 @@ func TestStateDistributionBuilderAllSenderNoNullifiers(t *testing.T) {
 				{
 					ID:     state1ID,
 					Schema: schema1ID,
-					Data:   tktypes.RawJSON(`{"state":"1"}`),
+					Data:   pldtypes.RawJSON(`{"state":"1"}`),
 				},
 			},
 			OutputStatesPotential: []*prototk.NewState{
@@ -66,7 +66,7 @@ func TestStateDistributionBuilderAllSenderNoNullifiers(t *testing.T) {
 				{
 					ID:     state2ID,
 					Schema: schema2ID,
-					Data:   tktypes.RawJSON(`{"state":"2"}`),
+					Data:   pldtypes.RawJSON(`{"state":"2"}`),
 				},
 			},
 			InfoStatesPotential: []*prototk.NewState{
@@ -96,10 +96,10 @@ func TestStateDistributionBuilderAllSenderNoNullifiers(t *testing.T) {
 }
 
 func TestStateDistributionWithNullifiersAllRemote(t *testing.T) {
-	schema1ID := tktypes.RandBytes32()
-	state1ID := tktypes.HexBytes(tktypes.RandBytes(32))
-	state2ID := tktypes.HexBytes(tktypes.RandBytes(32))
-	contractAddr := *tktypes.RandAddress()
+	schema1ID := pldtypes.RandBytes32()
+	state1ID := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	state2ID := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	contractAddr := *pldtypes.RandAddress()
 	ctx, sd := newTestStateDistributionBuilder(t, &components.PrivateTransaction{
 		Domain:  "domain1",
 		Address: contractAddr,
@@ -113,12 +113,12 @@ func TestStateDistributionWithNullifiersAllRemote(t *testing.T) {
 				{
 					ID:     state1ID,
 					Schema: schema1ID,
-					Data:   tktypes.RawJSON(`{"coin":"with change back to bob"}`),
+					Data:   pldtypes.RawJSON(`{"coin":"with change back to bob"}`),
 				},
 				{
 					ID:     state2ID,
 					Schema: schema1ID,
-					Data:   tktypes.RawJSON(`{"coin":"with value for sally"}`),
+					Data:   pldtypes.RawJSON(`{"coin":"with value for sally"}`),
 				},
 			},
 			OutputStatesPotential: []*prototk.NewState{
@@ -228,9 +228,9 @@ func TestStateDistributionInvalidAssembly(t *testing.T) {
 
 func TestStateDistributionInvalidNullifiers(t *testing.T) {
 
-	schema1ID := tktypes.RandBytes32()
-	state1ID := tktypes.HexBytes(tktypes.RandBytes(32))
-	contractAddr := *tktypes.RandAddress()
+	schema1ID := pldtypes.RandBytes32()
+	state1ID := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	contractAddr := *pldtypes.RandAddress()
 	ctx, sd := newTestStateDistributionBuilder(t, &components.PrivateTransaction{
 		Domain:  "domain1",
 		Address: contractAddr,
@@ -244,7 +244,7 @@ func TestStateDistributionInvalidNullifiers(t *testing.T) {
 				{
 					ID:     state1ID,
 					Schema: schema1ID,
-					Data:   tktypes.RawJSON(`{"some":"coin"}`),
+					Data:   pldtypes.RawJSON(`{"some":"coin"}`),
 				},
 			},
 			OutputStatesPotential: []*prototk.NewState{
@@ -270,9 +270,9 @@ func TestStateDistributionInvalidNullifiers(t *testing.T) {
 
 func TestStateDistributionInfoStateNoNodeName(t *testing.T) {
 
-	schema1ID := tktypes.RandBytes32()
-	state1ID := tktypes.HexBytes(tktypes.RandBytes(32))
-	contractAddr := *tktypes.RandAddress()
+	schema1ID := pldtypes.RandBytes32()
+	state1ID := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	contractAddr := *pldtypes.RandAddress()
 	ctx, sd := newTestStateDistributionBuilder(t, &components.PrivateTransaction{
 		Domain:  "domain1",
 		Address: contractAddr,
@@ -286,7 +286,7 @@ func TestStateDistributionInfoStateNoNodeName(t *testing.T) {
 				{
 					ID:     state1ID,
 					Schema: schema1ID,
-					Data:   tktypes.RawJSON(`{"some":"coin"}`),
+					Data:   pldtypes.RawJSON(`{"some":"coin"}`),
 				},
 			},
 			InfoStatesPotential: []*prototk.NewState{

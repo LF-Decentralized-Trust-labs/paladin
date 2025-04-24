@@ -17,14 +17,14 @@ package types
 
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type NotoDomainReceipt struct {
 	States    ReceiptStates      `json:"states"`
 	Transfers []*ReceiptTransfer `json:"transfers,omitempty"`
 	LockInfo  *ReceiptLockInfo   `json:"lockInfo,omitempty"`
-	Data      tktypes.HexBytes   `json:"data,omitempty"`
+	Data      pldtypes.HexBytes  `json:"data,omitempty"`
 }
 
 type ReceiptStates struct {
@@ -39,34 +39,34 @@ type ReceiptStates struct {
 }
 
 type ReceiptLockInfo struct {
-	LockID       tktypes.Bytes32     `json:"lockId"`
-	Delegate     *tktypes.EthAddress `json:"delegate,omitempty"`     // only set for delegateLock
-	UnlockParams *UnlockPublicParams `json:"unlockParams,omitempty"` // only set for prepareUnlock
-	UnlockCall   tktypes.HexBytes    `json:"unlockCall,omitempty"`   // only set for prepareUnlock
+	LockID       pldtypes.Bytes32     `json:"lockId"`
+	Delegate     *pldtypes.EthAddress `json:"delegate,omitempty"`     // only set for delegateLock
+	UnlockParams *UnlockPublicParams  `json:"unlockParams,omitempty"` // only set for prepareUnlock
+	UnlockCall   pldtypes.HexBytes    `json:"unlockCall,omitempty"`   // only set for prepareUnlock
 }
 
 type ReceiptState struct {
-	ID   tktypes.HexBytes `json:"id"`
-	Data tktypes.RawJSON  `json:"data"`
+	ID   pldtypes.HexBytes `json:"id"`
+	Data pldtypes.RawJSON  `json:"data"`
 }
 
 type ReceiptTransfer struct {
-	From   *tktypes.EthAddress `json:"from,omitempty"`
-	To     *tktypes.EthAddress `json:"to,omitempty"`
-	Amount *tktypes.HexUint256 `json:"amount"`
+	From   *pldtypes.EthAddress `json:"from,omitempty"`
+	To     *pldtypes.EthAddress `json:"to,omitempty"`
+	Amount *pldtypes.HexUint256 `json:"amount"`
 }
 
 type NotoCoinState struct {
-	ID              tktypes.Bytes32    `json:"id"`
-	Created         tktypes.Timestamp  `json:"created"`
-	ContractAddress tktypes.EthAddress `json:"contractAddress"`
-	Data            NotoCoin           `json:"data"`
+	ID              pldtypes.Bytes32    `json:"id"`
+	Created         pldtypes.Timestamp  `json:"created"`
+	ContractAddress pldtypes.EthAddress `json:"contractAddress"`
+	Data            NotoCoin            `json:"data"`
 }
 
 type NotoCoin struct {
-	Salt   tktypes.Bytes32     `json:"salt"`
-	Owner  *tktypes.EthAddress `json:"owner"`
-	Amount *tktypes.HexUint256 `json:"amount"`
+	Salt   pldtypes.Bytes32     `json:"salt"`
+	Owner  *pldtypes.EthAddress `json:"owner"`
+	Amount *pldtypes.HexUint256 `json:"amount"`
 }
 
 var NotoCoinABI = &abi.Parameter{
@@ -81,17 +81,17 @@ var NotoCoinABI = &abi.Parameter{
 }
 
 type NotoLockedCoinState struct {
-	ID              tktypes.Bytes32    `json:"id"`
-	Created         tktypes.Timestamp  `json:"created"`
-	ContractAddress tktypes.EthAddress `json:"contractAddress"`
-	Data            NotoLockedCoin     `json:"data"`
+	ID              pldtypes.Bytes32    `json:"id"`
+	Created         pldtypes.Timestamp  `json:"created"`
+	ContractAddress pldtypes.EthAddress `json:"contractAddress"`
+	Data            NotoLockedCoin      `json:"data"`
 }
 
 type NotoLockedCoin struct {
-	Salt   tktypes.Bytes32     `json:"salt"`
-	LockID tktypes.Bytes32     `json:"lockId"`
-	Owner  *tktypes.EthAddress `json:"owner"`
-	Amount *tktypes.HexUint256 `json:"amount"`
+	Salt   pldtypes.Bytes32     `json:"salt"`
+	LockID pldtypes.Bytes32     `json:"lockId"`
+	Owner  *pldtypes.EthAddress `json:"owner"`
+	Amount *pldtypes.HexUint256 `json:"amount"`
 }
 
 var NotoLockedCoinABI = &abi.Parameter{
@@ -107,10 +107,10 @@ var NotoLockedCoinABI = &abi.Parameter{
 }
 
 type NotoLockInfo struct {
-	Salt     tktypes.Bytes32     `json:"salt"`
-	LockID   tktypes.Bytes32     `json:"lockId"`
-	Owner    *tktypes.EthAddress `json:"owner"`
-	Delegate *tktypes.EthAddress `json:"delegate"`
+	Salt     pldtypes.Bytes32     `json:"salt"`
+	LockID   pldtypes.Bytes32     `json:"lockId"`
+	Owner    *pldtypes.EthAddress `json:"owner"`
+	Delegate *pldtypes.EthAddress `json:"delegate"`
 }
 
 var NotoLockInfoABI = &abi.Parameter{
@@ -126,8 +126,8 @@ var NotoLockInfoABI = &abi.Parameter{
 }
 
 type TransactionData struct {
-	Salt string           `json:"salt"`
-	Data tktypes.HexBytes `json:"data"`
+	Salt string            `json:"salt"`
+	Data pldtypes.HexBytes `json:"data"`
 }
 
 var TransactionDataABI = &abi.Parameter{

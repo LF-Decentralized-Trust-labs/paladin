@@ -22,7 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 // a transaction finalization operation is an update to the transaction managers tables
@@ -35,7 +35,7 @@ type finalizeOperation struct {
 }
 
 // QueueTransactionFinalize
-func (s *syncPoints) QueueTransactionFinalize(ctx context.Context, domain string, contractAddress tktypes.EthAddress, transactionID uuid.UUID, failureMessage string, onCommit func(context.Context), onRollback func(context.Context, error)) {
+func (s *syncPoints) QueueTransactionFinalize(ctx context.Context, domain string, contractAddress pldtypes.EthAddress, transactionID uuid.UUID, failureMessage string, onCommit func(context.Context), onRollback func(context.Context, error)) {
 
 	op := s.writer.Queue(ctx, &syncPointOperation{
 		domainContext:   nil, // finalize does not depend on the flushing of any states

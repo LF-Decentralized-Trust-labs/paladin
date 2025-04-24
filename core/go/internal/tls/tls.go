@@ -25,10 +25,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 type TLSType string
@@ -67,21 +67,21 @@ func BuildTLSConfig(ctx context.Context, config *pldconf.TLSConfig, tlsType TLST
 		if err == nil {
 			ok := rootCAs.AppendCertsFromPEM(caBytes)
 			if !ok {
-				err = i18n.NewError(ctx, tkmsgs.MsgTLSInvalidCAFile)
+				err = i18n.NewError(ctx, pldmsgs.MsgTLSInvalidCAFile)
 			}
 		}
 	case config.CA != "":
 		rootCAs = x509.NewCertPool()
 		ok := rootCAs.AppendCertsFromPEM([]byte(config.CA))
 		if !ok {
-			err = i18n.NewError(ctx, tkmsgs.MsgTLSInvalidCAFile)
+			err = i18n.NewError(ctx, pldmsgs.MsgTLSInvalidCAFile)
 		}
 	default:
 		rootCAs, err = x509.SystemCertPool()
 	}
 
 	if err != nil {
-		return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTLSConfigFailed)
+		return nil, i18n.WrapError(ctx, err, pldmsgs.MsgTLSConfigFailed)
 	}
 
 	tlsConfig.RootCAs = rootCAs
@@ -91,13 +91,13 @@ func BuildTLSConfig(ctx context.Context, config *pldconf.TLSConfig, tlsType TLST
 		// Read the key pair to create certificate
 		cert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTLSInvalidKeyPairFiles)
+			return nil, i18n.WrapError(ctx, err, pldmsgs.MsgTLSInvalidKeyPairFiles)
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	} else if config.Cert != "" && config.Key != "" {
 		cert, err := tls.X509KeyPair([]byte(config.Cert), []byte(config.Key))
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTLSInvalidKeyPairFiles)
+			return nil, i18n.WrapError(ctx, err, pldmsgs.MsgTLSInvalidKeyPairFiles)
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
@@ -169,25 +169,25 @@ func buildDNValidator(ctx context.Context, requiredDNAttributes map[string]strin
 	for attr, validatorString := range requiredDNAttributes {
 		attr = strings.ToUpper(attr)
 		if _, knownAttr := SubjectDNKnownAttributes[attr]; !knownAttr {
-			return nil, i18n.NewError(ctx, tkmsgs.MsgTLSInvalidTLSDnMatcherAttr, attr)
+			return nil, i18n.NewError(ctx, pldmsgs.MsgTLSInvalidTLSDnMatcherAttr, attr)
 		}
 		// Ensure full string match with all regexp
 		validatorString = "^" + strings.TrimSuffix(strings.TrimPrefix(validatorString, "^"), "$") + "$"
 		validator, err := regexp.Compile(validatorString)
 		if err != nil {
-			return nil, i18n.NewError(ctx, tkmsgs.MsgTLSInvalidTLSDnMatcherRegexp, validatorString, attr, err)
+			return nil, i18n.NewError(ctx, pldmsgs.MsgTLSInvalidTLSDnMatcherRegexp, validatorString, attr, err)
 		}
 		validators[attr] = validator
 	}
 	return func(_ [][]byte, verifiedChains [][]*x509.Certificate) error {
 		if len(verifiedChains) == 0 {
 			log.L(ctx).Errorf("Failed TLS DN check: Nil cert chain")
-			return i18n.NewError(ctx, tkmsgs.MsgTLSInvalidTLSDnChain)
+			return i18n.NewError(ctx, pldmsgs.MsgTLSInvalidTLSDnChain)
 		}
 		for iChain, chain := range verifiedChains {
 			if len(chain) == 0 {
 				log.L(ctx).Errorf("Failed TLS DN check: Empty cert chain %d", iChain)
-				return i18n.NewError(ctx, tkmsgs.MsgTLSInvalidTLSDnChain)
+				return i18n.NewError(ctx, pldmsgs.MsgTLSInvalidTLSDnChain)
 			}
 			// We get a chain of one or more certificates, leaf first.
 			// Only check the leaf.
@@ -201,7 +201,7 @@ func buildDNValidator(ctx context.Context, requiredDNAttributes map[string]strin
 				}
 				if !matched {
 					log.L(ctx).Errorf("Failed TLS DN check: Does not match %s =~ /%s/", attr, validator.String())
-					return i18n.NewError(ctx, tkmsgs.MsgTLSInvalidTLSDnMismatch)
+					return i18n.NewError(ctx, pldmsgs.MsgTLSInvalidTLSDnMismatch)
 				}
 			}
 		}

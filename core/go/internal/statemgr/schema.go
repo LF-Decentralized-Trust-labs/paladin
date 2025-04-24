@@ -20,15 +20,15 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"gorm.io/gorm/clause"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type labelType int
@@ -50,14 +50,14 @@ type schemaLabelInfo struct {
 }
 
 type idOnly struct {
-	ID tktypes.HexBytes `gorm:"primaryKey"`
+	ID pldtypes.HexBytes `gorm:"primaryKey"`
 }
 
 type labelInfoAccess interface {
 	labelInfo() []*schemaLabelInfo
 }
 
-func schemaCacheKey(domainName string, id tktypes.Bytes32) string {
+func schemaCacheKey(domainName string, id pldtypes.Bytes32) string {
 	return domainName + "/" + id.String()
 }
 
@@ -76,7 +76,7 @@ func (ss *stateManager) persistSchemas(ctx context.Context, dbTX persistence.DBT
 		Error
 }
 
-func (ss *stateManager) GetSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (*pldapi.Schema, error) {
+func (ss *stateManager) GetSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID pldtypes.Bytes32, failNotFound bool) (*pldapi.Schema, error) {
 	s, err := ss.getSchemaByID(ctx, dbTX, domainName, schemaID, failNotFound)
 	if err != nil || s == nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (ss *stateManager) GetSchemaByID(ctx context.Context, dbTX persistence.DBTX
 	return s.Persisted(), nil
 }
 
-func (ss *stateManager) getSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (components.Schema, error) {
+func (ss *stateManager) getSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID pldtypes.Bytes32, failNotFound bool) (components.Schema, error) {
 
 	cacheKey := schemaCacheKey(domainName, schemaID)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)
@@ -137,7 +137,7 @@ func (ss *stateManager) ListSchemas(ctx context.Context, dbTX persistence.DBTX, 
 	}
 	results = make([]components.Schema, len(ids))
 	for i, id := range ids {
-		if results[i], err = ss.getSchemaByID(ctx, dbTX, domainName, tktypes.Bytes32(id.ID), true); err != nil {
+		if results[i], err = ss.getSchemaByID(ctx, dbTX, domainName, pldtypes.Bytes32(id.ID), true); err != nil {
 			return nil, err
 		}
 	}

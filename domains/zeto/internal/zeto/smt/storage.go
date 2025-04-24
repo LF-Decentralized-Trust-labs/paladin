@@ -21,13 +21,13 @@ import (
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/node"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type StatesStorage interface {
@@ -279,27 +279,27 @@ func (s *statesStorage) Close() {
 func (s *statesStorage) makeNewStateFromTreeNode(ctx context.Context, n *smtNode) (*prototk.NewConfirmedState, error) {
 	node := n.node
 	// we clone the node so that the value properties are not saved
-	refBytes, err := tktypes.ParseBytes32(node.Ref().Hex())
+	refBytes, err := pldtypes.ParseBytes32(node.Ref().Hex())
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorParseNodeRef, err)
 	}
 	newNode := &types.MerkleTreeNode{
 		RefKey: refBytes,
-		Type:   tktypes.HexBytes([]byte{node.Type().ToByte()}),
+		Type:   pldtypes.HexBytes([]byte{node.Type().ToByte()}),
 	}
 	if node.Type() == core.NodeTypeBranch {
-		leftBytes, err1 := tktypes.ParseBytes32(node.LeftChild().Hex())
+		leftBytes, err1 := pldtypes.ParseBytes32(node.LeftChild().Hex())
 		if err1 != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorParseNodeRef, err1)
 		}
-		rightBytes, err2 := tktypes.ParseBytes32(node.RightChild().Hex())
+		rightBytes, err2 := pldtypes.ParseBytes32(node.RightChild().Hex())
 		if err2 != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorParseNodeRef, err2)
 		}
 		newNode.LeftChild = leftBytes
 		newNode.RightChild = rightBytes
 	} else if node.Type() == core.NodeTypeLeaf {
-		idxBytes, err := tktypes.ParseBytes32(node.Index().Hex())
+		idxBytes, err := pldtypes.ParseBytes32(node.Index().Hex())
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorParseNodeRef, err)
 		}
@@ -322,7 +322,7 @@ func (s *statesStorage) makeNewStateFromTreeNode(ctx context.Context, n *smtNode
 
 func (s *statesStorage) makeNewStateFromRootNode(ctx context.Context, rootNode *smtRootNode) (*prototk.NewConfirmedState, error) {
 	root := rootNode.root
-	bytes, err := tktypes.ParseBytes32(root.Hex())
+	bytes, err := pldtypes.ParseBytes32(root.Hex())
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorParseRootNodeIdx, err)
 	}

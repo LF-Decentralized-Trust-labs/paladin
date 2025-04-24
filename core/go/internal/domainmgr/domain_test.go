@@ -30,12 +30,12 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -145,15 +145,15 @@ const fakeDownstreamPrivateABI = `{
 }`
 
 type fakeState struct {
-	Salt   tktypes.Bytes32      `json:"salt"`
-	Owner  tktypes.EthAddress   `json:"owner"`
+	Salt   pldtypes.Bytes32     `json:"salt"`
+	Owner  pldtypes.EthAddress  `json:"owner"`
 	Amount *ethtypes.HexInteger `json:"amount"`
 }
 
 type fakeExecute struct {
-	Inputs  []tktypes.HexBytes `json:"inputs"`
-	Outputs []tktypes.HexBytes `json:"outputs"`
-	Data    tktypes.HexBytes   `json:"data"`
+	Inputs  []pldtypes.HexBytes `json:"inputs"`
+	Outputs []pldtypes.HexBytes `json:"outputs"`
+	Data    pldtypes.HexBytes   `json:"data"`
 }
 
 type testPlugin struct {
@@ -170,7 +170,7 @@ type testDomainContext struct {
 	d               *domain
 	tp              *testPlugin
 	c               *inFlightDomainRequest
-	contractAddress tktypes.EthAddress
+	contractAddress pldtypes.EthAddress
 }
 
 func (tp *testPlugin) Initialized() {
@@ -191,7 +191,7 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 		Domains: map[string]*pldconf.DomainConfig{
 			"test1": {
 				Config:          map[string]any{"some": "conf"},
-				RegistryAddress: tktypes.RandHex(20),
+				RegistryAddress: pldtypes.RandHex(20),
 				DefaultGasLimit: confutil.P(uint64(100000)),
 				Init:            pldconf.DomainInitConfig{},
 			},
@@ -219,7 +219,7 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 
 	var c *inFlightDomainRequest
 	var mdc *componentmocks.DomainContext
-	addr := *tktypes.RandAddress()
+	addr := *pldtypes.RandAddress()
 	if realDB {
 		dCtx := dm.stateStore.NewDomainContext(ctx, tp.d, addr)
 		c = tp.d.newInFlightDomainRequest(dm.persistence.NOTX(), dCtx, true /* readonly unless modified by test */)
@@ -299,7 +299,7 @@ func TestDomainInitStates(t *testing.T) {
 
 func mockUpsertABIOk(mc *mockComponents) {
 	mc.txManager.On("UpsertABI", mock.Anything, mock.Anything, mock.Anything).Return(&pldapi.StoredABI{
-		Hash: tktypes.RandBytes32(),
+		Hash: pldtypes.RandBytes32(),
 	}, nil)
 }
 
@@ -434,7 +434,7 @@ func TestDomainConfigureFail(t *testing.T) {
 		Domains: map[string]*pldconf.DomainConfig{
 			"test1": {
 				Config:          map[string]any{"some": "config"},
-				RegistryAddress: tktypes.RandHex(20),
+				RegistryAddress: pldtypes.RandHex(20),
 			},
 		},
 	})
@@ -510,7 +510,7 @@ func TestDomainFindAvailableStatesFail(t *testing.T) {
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
 
-	schemaID := tktypes.RandBytes32()
+	schemaID := pldtypes.RandBytes32()
 	td.mdc.On("FindAvailableStates", mock.Anything, schemaID, mock.Anything).Return(nil, nil, fmt.Errorf("pop"))
 
 	assert.Nil(t, td.d.initError.Load())
@@ -524,8 +524,8 @@ func TestDomainFindAvailableStatesFail(t *testing.T) {
 
 func storeTestState(t *testing.T, td *testDomainContext, txID uuid.UUID, amount *ethtypes.HexInteger) *fakeState {
 	state := &fakeState{
-		Salt:   tktypes.RandBytes32(),
-		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
+		Salt:   pldtypes.RandBytes32(),
+		Owner:  pldtypes.EthAddress(pldtypes.RandBytes(20)),
 		Amount: amount,
 	}
 	stateJSON, err := json.Marshal(state)
@@ -533,7 +533,7 @@ func storeTestState(t *testing.T, td *testDomainContext, txID uuid.UUID, amount 
 
 	// Call the real statestore
 	_, err = td.c.dCtx.UpsertStates(td.c.dbTX, &components.StateUpsert{
-		Schema:    tktypes.MustParseBytes32(td.tp.stateSchemas[0].Id),
+		Schema:    pldtypes.MustParseBytes32(td.tp.stateSchemas[0].Id),
 		Data:      stateJSON,
 		CreatedBy: &txID,
 	})
@@ -568,7 +568,7 @@ func TestDomainFindAvailableStatesOK(t *testing.T) {
 		SchemaId:          td.tp.stateSchemas[0].Id,
 		QueryJson: `{
 		  "eq": [
-		    { "field": "owner", "value": "` + tktypes.EthAddress(tktypes.RandBytes(20)).String() + `" }
+		    { "field": "owner", "value": "` + pldtypes.EthAddress(pldtypes.RandBytes(20)).String() + `" }
 		  ]
 		}`,
 	})
@@ -619,7 +619,7 @@ func TestDomainInitDeployOK(t *testing.T) {
 	domain := td.d
 	tx := &components.PrivateContractDeploy{
 		ID: txID,
-		Inputs: tktypes.RawJSON(`{
+		Inputs: pldtypes.RawJSON(`{
 		  "notary": "notary1",
 		  "name": "token1",
 		  "symbol": "TKN1"
@@ -659,7 +659,7 @@ func TestDomainInitDeployError(t *testing.T) {
 	domain := td.d
 	tx := &components.PrivateContractDeploy{
 		ID: txID,
-		Inputs: tktypes.RawJSON(`{
+		Inputs: pldtypes.RawJSON(`{
 		  "notary": "notary1",
 		  "name": "token1",
 		  "symbol": "TKN1"
@@ -674,14 +674,14 @@ func goodTXForDeploy() *components.PrivateContractDeploy {
 	txID := uuid.New()
 	return &components.PrivateContractDeploy{
 		ID:                       uuid.New(),
-		Inputs:                   tktypes.RawJSON(`{}`),
-		TransactionSpecification: &prototk.DeployTransactionSpecification{TransactionId: tktypes.Bytes32UUIDFirst16(txID).String()},
+		Inputs:                   pldtypes.RawJSON(`{}`),
+		TransactionSpecification: &prototk.DeployTransactionSpecification{TransactionId: pldtypes.Bytes32UUIDFirst16(txID).String()},
 		Verifiers: []*prototk.ResolvedVerifier{
 			{
 				Algorithm:    algorithms.ECDSA_SECP256K1,
 				VerifierType: verifiers.ETH_ADDRESS,
 				Lookup:       "notary",
-				Verifier:     tktypes.EthAddress(tktypes.RandBytes(20)).String(),
+				Verifier:     pldtypes.EthAddress(pldtypes.RandBytes(20)).String(),
 			},
 		},
 	}
@@ -1083,7 +1083,7 @@ func TestGetStatesFailCases(t *testing.T) {
 	})
 	require.ErrorContains(t, err, "PD011641")
 
-	schemaID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schemaID := pldtypes.Bytes32(pldtypes.RandBytes(32))
 	td.mdc.On("GetStatesByID", mock.Anything, schemaID, []string{"id1"}).Return(nil, nil, fmt.Errorf("pop"))
 
 	_, err = td.d.GetStatesByID(td.ctx, &prototk.GetStatesByIDRequest{
@@ -1108,8 +1108,8 @@ func TestDomainValidateStateHashesOK(t *testing.T) {
 	defer done()
 	assert.Nil(t, td.d.initError.Load())
 
-	stateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID2 := tktypes.HexBytes(tktypes.RandBytes(32))
+	stateID1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	stateID2 := pldtypes.HexBytes(pldtypes.RandBytes(32))
 
 	td.tp.Functions.ValidateStateHashes = func(ctx context.Context, vshr *prototk.ValidateStateHashesRequest) (*prototk.ValidateStateHashesResponse, error) {
 		assert.Equal(t, stateID1.String(), vshr.States[0].Id)
@@ -1122,14 +1122,14 @@ func TestDomainValidateStateHashesOK(t *testing.T) {
 	// no-op
 	validatedIDs, err := td.d.ValidateStateHashes(td.ctx, []*components.FullState{})
 	require.NoError(t, err)
-	assert.Equal(t, []tktypes.HexBytes{}, validatedIDs)
+	assert.Equal(t, []pldtypes.HexBytes{}, validatedIDs)
 
 	// Success
 	validatedIDs, err = td.d.ValidateStateHashes(td.ctx, []*components.FullState{
 		{ID: stateID1}, {ID: nil /* mocking domain calculation */},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, []tktypes.HexBytes{stateID1, stateID2}, validatedIDs)
+	assert.Equal(t, []pldtypes.HexBytes{stateID1, stateID2}, validatedIDs)
 }
 
 func TestDomainValidateStateHashesFail(t *testing.T) {
@@ -1137,7 +1137,7 @@ func TestDomainValidateStateHashesFail(t *testing.T) {
 	defer done()
 	assert.Nil(t, td.d.initError.Load())
 
-	stateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
+	stateID1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
 
 	td.tp.Functions.ValidateStateHashes = func(ctx context.Context, vshr *prototk.ValidateStateHashesRequest) (*prototk.ValidateStateHashesResponse, error) {
 		return nil, fmt.Errorf("pop")
@@ -1152,7 +1152,7 @@ func TestDomainValidateStateHashesWrongLen(t *testing.T) {
 	defer done()
 	assert.Nil(t, td.d.initError.Load())
 
-	stateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
+	stateID1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
 
 	td.tp.Functions.ValidateStateHashes = func(ctx context.Context, vshr *prototk.ValidateStateHashesRequest) (*prototk.ValidateStateHashesResponse, error) {
 		return &prototk.ValidateStateHashesResponse{
@@ -1169,8 +1169,8 @@ func TestDomainValidateStateHashesMisMatch(t *testing.T) {
 	defer done()
 	assert.Nil(t, td.d.initError.Load())
 
-	stateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID2 := tktypes.HexBytes(tktypes.RandBytes(32))
+	stateID1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	stateID2 := pldtypes.HexBytes(pldtypes.RandBytes(32))
 
 	td.tp.Functions.ValidateStateHashes = func(ctx context.Context, vshr *prototk.ValidateStateHashesRequest) (*prototk.ValidateStateHashesResponse, error) {
 		return &prototk.ValidateStateHashesResponse{
@@ -1187,7 +1187,7 @@ func TestDomainValidateStateHashesBadHex(t *testing.T) {
 	defer done()
 	assert.Nil(t, td.d.initError.Load())
 
-	stateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
+	stateID1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
 
 	td.tp.Functions.ValidateStateHashes = func(ctx context.Context, vshr *prototk.ValidateStateHashesRequest) (*prototk.ValidateStateHashesResponse, error) {
 		return &prototk.ValidateStateHashesResponse{
@@ -1202,10 +1202,10 @@ func TestDomainValidateStateHashesBadHex(t *testing.T) {
 func TestGetDomainReceiptAllAvailable(t *testing.T) {
 	txID := uuid.New()
 
-	stateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID2 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID3 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID4 := tktypes.HexBytes(tktypes.RandBytes(32))
+	stateID1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	stateID2 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	stateID3 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	stateID4 := pldtypes.HexBytes(pldtypes.RandBytes(32))
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
 		mc.stateStore.On("GetTransactionStates", mock.Anything, mock.Anything, txID).
@@ -1244,15 +1244,15 @@ func TestGetDomainReceiptAllAvailable(t *testing.T) {
 func TestGetDomainReceiptIncomplete(t *testing.T) {
 	txID := uuid.New()
 
-	stateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
-	stateID2 := tktypes.HexBytes(tktypes.RandBytes(32))
+	stateID1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
+	stateID2 := pldtypes.HexBytes(pldtypes.RandBytes(32))
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
 		mc.stateStore.On("GetTransactionStates", mock.Anything, mock.Anything, txID).
 			Return(&pldapi.TransactionStates{
 				Spent: []*pldapi.StateBase{{ID: stateID1}},
 				Unavailable: &pldapi.UnavailableStates{
-					Confirmed: []tktypes.HexBytes{stateID2},
+					Confirmed: []pldtypes.HexBytes{stateID2},
 				},
 			}, nil)
 	})
@@ -1277,7 +1277,7 @@ func TestGetDomainReceiptIncomplete(t *testing.T) {
 func TestGetDomainReceiptFail(t *testing.T) {
 	txID := uuid.New()
 
-	stateID1 := tktypes.HexBytes(tktypes.RandBytes(32))
+	stateID1 := pldtypes.HexBytes(pldtypes.RandBytes(32))
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
 		mc.stateStore.On("GetTransactionStates", mock.Anything, mock.Anything, txID).
@@ -1386,10 +1386,10 @@ func TestDomainInitPrivacyGroupOk(t *testing.T) {
 	defer done()
 	assert.Nil(t, td.d.initError.Load())
 
-	pgID := tktypes.RandBytes(32)
+	pgID := pldtypes.RandBytes(32)
 	pgGenesis := &pldapi.PrivacyGroupGenesisState{
 		Name:        "pg1",
-		GenesisSalt: tktypes.RandBytes32(),
+		GenesisSalt: pldtypes.RandBytes32(),
 		Members:     []string{"me@node1", "you@node2"},
 		Properties: pldapi.KeyValueStringProperties{
 			{Key: "prop1", Value: "value1"},
@@ -1400,7 +1400,7 @@ func TestDomainInitPrivacyGroupOk(t *testing.T) {
 	}
 
 	functionABI := &abi.Entry{Type: abi.Function, Name: "initPrivacyGroup"}
-	addr := tktypes.RandAddress()
+	addr := pldtypes.RandAddress()
 	td.tp.Functions.InitPrivacyGroup = func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
 		require.Equal(t, "pg1", ipgr.PrivacyGroup.Name)
 		require.Equal(t, pgGenesis.GenesisSalt.String(), ipgr.PrivacyGroup.GenesisSalt)
@@ -1413,7 +1413,7 @@ func TestDomainInitPrivacyGroupOk(t *testing.T) {
 				ContractAddress: confutil.P(addr.String()),          // less likely than deploy
 				RequiredSigner:  confutil.P("some.signer"),          // less likely than rndom assignment
 				ParamsJson:      `{"tx": "input"}`,
-				FunctionAbiJson: tktypes.JSONString(functionABI).Pretty(),
+				FunctionAbiJson: pldtypes.JSONString(functionABI).Pretty(),
 			},
 		}, nil
 	}
@@ -1426,7 +1426,7 @@ func TestDomainInitPrivacyGroupOk(t *testing.T) {
 			From:   "some.signer",
 			To:     addr,
 			Type:   pldapi.TransactionTypePublic.Enum(),
-			Data:   tktypes.RawJSON(`{"tx": "input"}`),
+			Data:   pldtypes.RawJSON(`{"tx": "input"}`),
 			Domain: "test1",
 		},
 		ABI: abi.ABI{functionABI},
@@ -1443,7 +1443,7 @@ func TestDomainInitPrivacyGroupError(t *testing.T) {
 	}
 
 	domain := td.d
-	_, err := domain.InitPrivacyGroup(td.ctx, tktypes.RandBytes(32), &pldapi.PrivacyGroupGenesisState{})
+	_, err := domain.InitPrivacyGroup(td.ctx, pldtypes.RandBytes(32), &pldapi.PrivacyGroupGenesisState{})
 	assert.Regexp(t, "pop", err)
 
 }
@@ -1460,7 +1460,7 @@ func TestDomainInitPrivacyGroupBadResFunctionABI(t *testing.T) {
 	}
 
 	domain := td.d
-	_, err := domain.InitPrivacyGroup(td.ctx, tktypes.RandBytes(32), &pldapi.PrivacyGroupGenesisState{})
+	_, err := domain.InitPrivacyGroup(td.ctx, pldtypes.RandBytes(32), &pldapi.PrivacyGroupGenesisState{})
 	assert.Regexp(t, "PD011607", err)
 
 }
@@ -1473,14 +1473,14 @@ func TestDomainInitPrivacyGroupBadResFromAddr(t *testing.T) {
 	td.tp.Functions.InitPrivacyGroup = func(ctx context.Context, ipgr *prototk.InitPrivacyGroupRequest) (*prototk.InitPrivacyGroupResponse, error) {
 		return &prototk.InitPrivacyGroupResponse{
 			Transaction: &prototk.PreparedTransaction{
-				FunctionAbiJson: tktypes.JSONString(&abi.Entry{Type: abi.Function, Name: "initPrivacyGroup"}).Pretty(),
+				FunctionAbiJson: pldtypes.JSONString(&abi.Entry{Type: abi.Function, Name: "initPrivacyGroup"}).Pretty(),
 				ContractAddress: confutil.P("wrong"),
 			},
 		}, nil
 	}
 
 	domain := td.d
-	_, err := domain.InitPrivacyGroup(td.ctx, tktypes.RandBytes(32), &pldapi.PrivacyGroupGenesisState{})
+	_, err := domain.InitPrivacyGroup(td.ctx, pldtypes.RandBytes(32), &pldapi.PrivacyGroupGenesisState{})
 	assert.Regexp(t, "bad address", err)
 
 }

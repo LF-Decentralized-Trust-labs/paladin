@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -325,7 +325,7 @@ func TestTrackTransactionAndRequeue_Success(t *testing.T) {
 	// Mock paladinRPC
 	paladinRPC := &mockRPCClient{
 		callRPCFunc: func(ctx context.Context, result interface{}, method string, args ...interface{}) rpcclient.ErrorRPC {
-			tx := tktypes.NewBytes32FromSlice([]byte("0xabc123"))
+			tx := pldtypes.NewBytes32FromSlice([]byte("0xabc123"))
 			if method == "ptx_getTransactionReceipt" {
 				receipt := &pldapi.TransactionReceipt{
 					TransactionReceiptData: pldapi.TransactionReceiptData{
@@ -333,7 +333,7 @@ func TestTrackTransactionAndRequeue_Success(t *testing.T) {
 						TransactionReceiptDataOnchain: &pldapi.TransactionReceiptDataOnchain{
 							TransactionHash: &tx,
 						},
-						ContractAddress: tktypes.MustEthAddress("0x3078616263646566313233343536373839300000"),
+						ContractAddress: pldtypes.MustEthAddress("0x3078616263646566313233343536373839300000"),
 						FailureMessage:  "",
 					},
 				}
@@ -366,7 +366,7 @@ func TestTrackTransactionAndRequeue_Failure(t *testing.T) {
 	paladinRPC := &mockRPCClient{
 		callRPCFunc: func(ctx context.Context, result interface{}, method string, args ...interface{}) rpcclient.ErrorRPC {
 			if method == "ptx_getTransactionReceipt" {
-				tx := tktypes.NewBytes32FromSlice([]byte("0xabc123"))
+				tx := pldtypes.NewBytes32FromSlice([]byte("0xabc123"))
 				receipt := &pldapi.TransactionReceipt{
 					TransactionReceiptData: pldapi.TransactionReceiptData{
 						Success: false,

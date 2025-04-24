@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +26,7 @@ func TestValidateAmountParam(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		amount      *tktypes.HexUint256
+		amount      *pldtypes.HexUint256
 		index       int
 		expectErr   bool
 		errContains string
@@ -40,21 +40,21 @@ func TestValidateAmountParam(t *testing.T) {
 		},
 		{
 			name:        "zero amount",
-			amount:      (*tktypes.HexUint256)(big.NewInt(0)),
+			amount:      (*pldtypes.HexUint256)(big.NewInt(0)),
 			index:       1,
 			expectErr:   true,
 			errContains: "PD210027:", // MsgParamAmountInRange
 		},
 		{
 			name:        "negative amount",
-			amount:      (*tktypes.HexUint256)(big.NewInt(-100)),
+			amount:      (*pldtypes.HexUint256)(big.NewInt(-100)),
 			index:       2,
 			expectErr:   true,
 			errContains: "PD210027", // MsgParamAmountInRange
 		},
 		{
 			name:      "positive amount",
-			amount:    (*tktypes.HexUint256)(big.NewInt(100)),
+			amount:    (*pldtypes.HexUint256)(big.NewInt(100)),
 			index:     3,
 			expectErr: false,
 		},
@@ -99,7 +99,7 @@ func TestValidateTransferParams(t *testing.T) {
 		{
 			name: "missing recipient",
 			params: []*types.FungibleTransferParamEntry{
-				{To: "", Amount: (*tktypes.HexUint256)(big.NewInt(100))},
+				{To: "", Amount: (*pldtypes.HexUint256)(big.NewInt(100))},
 			},
 			expectErr:   true,
 			errContains: "PD210025", // MsgNoParamTo
@@ -115,7 +115,7 @@ func TestValidateTransferParams(t *testing.T) {
 		{
 			name: "invalid amount - zero",
 			params: []*types.FungibleTransferParamEntry{
-				{To: "recipient1", Amount: (*tktypes.HexUint256)(big.NewInt(0))},
+				{To: "recipient1", Amount: (*pldtypes.HexUint256)(big.NewInt(0))},
 			},
 			expectErr:   true,
 			errContains: "PD210027", // MsgParamAmountInRange
@@ -123,7 +123,7 @@ func TestValidateTransferParams(t *testing.T) {
 		{
 			name: "invalid amount - negative",
 			params: []*types.FungibleTransferParamEntry{
-				{To: "recipient1", Amount: (*tktypes.HexUint256)(big.NewInt(-500))},
+				{To: "recipient1", Amount: (*pldtypes.HexUint256)(big.NewInt(-500))},
 			},
 			expectErr:   true,
 			errContains: "PD210027", // MsgParamAmountInRange
@@ -131,8 +131,8 @@ func TestValidateTransferParams(t *testing.T) {
 		{
 			name: "total amount exceeds max limit",
 			params: []*types.FungibleTransferParamEntry{
-				{To: "recipient1", Amount: (*tktypes.HexUint256)(big.NewInt(6000))},
-				{To: "recipient2", Amount: (*tktypes.HexUint256)(big.NewInt(5000))}, // total 11000 > MAX_TRANSFER_AMOUNT
+				{To: "recipient1", Amount: (*pldtypes.HexUint256)(big.NewInt(6000))},
+				{To: "recipient2", Amount: (*pldtypes.HexUint256)(big.NewInt(5000))}, // total 11000 > MAX_TRANSFER_AMOUNT
 			},
 			expectErr:   true,
 			errContains: "PD210107", // MsgParamTotalAmountInRange
@@ -140,16 +140,16 @@ func TestValidateTransferParams(t *testing.T) {
 		{
 			name: "valid single transfer",
 			params: []*types.FungibleTransferParamEntry{
-				{To: "recipient1", Amount: (*tktypes.HexUint256)(big.NewInt(500))},
+				{To: "recipient1", Amount: (*pldtypes.HexUint256)(big.NewInt(500))},
 			},
 			expectErr: false,
 		},
 		{
 			name: "valid multiple transfers within limit",
 			params: []*types.FungibleTransferParamEntry{
-				{To: "recipient1", Amount: (*tktypes.HexUint256)(big.NewInt(3000))},
-				{To: "recipient2", Amount: (*tktypes.HexUint256)(big.NewInt(4000))},
-				{To: "recipient3", Amount: (*tktypes.HexUint256)(big.NewInt(2000))}, // total 9000 < MAX_TRANSFER_AMOUNT
+				{To: "recipient1", Amount: (*pldtypes.HexUint256)(big.NewInt(3000))},
+				{To: "recipient2", Amount: (*pldtypes.HexUint256)(big.NewInt(4000))},
+				{To: "recipient3", Amount: (*pldtypes.HexUint256)(big.NewInt(2000))}, // total 9000 < MAX_TRANSFER_AMOUNT
 			},
 			expectErr: false,
 		},

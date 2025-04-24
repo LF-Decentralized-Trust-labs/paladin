@@ -29,8 +29,8 @@ import (
 	"strings"
 
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/yaml"
@@ -134,7 +134,7 @@ func (m *ContractMap) process(name string, b *ContractMapBuild) error {
 
 	linkReferencesJSON := ""
 	if len(build.LinkReferences) > 0 {
-		linkReferencesJSON = tktypes.JSONString(build.LinkReferences).Pretty()
+		linkReferencesJSON = pldtypes.JSONString(build.LinkReferences).Pretty()
 		libCount := 0
 		for _, libsInFile := range build.LinkReferences {
 			for range libsInFile {
@@ -170,8 +170,8 @@ func (m *ContractMap) process(name string, b *ContractMapBuild) error {
 			Node:                        "node1",
 			TxType:                      "public",
 			From:                        fmt.Sprintf("%s.operator", firstNameSegment),
-			ParamsJSON:                  tktypes.JSONString(b.Params).Pretty(),
-			ABIJSON:                     tktypes.JSONString(build.ABI).Pretty(),
+			ParamsJSON:                  pldtypes.JSONString(b.Params).Pretty(),
+			ABIJSON:                     pldtypes.JSONString(build.ABI).Pretty(),
 			Bytecode:                    build.Bytecode,
 			LinkReferencesJSON:          linkReferencesJSON,
 			RequiredContractDeployments: requiredBuilds,

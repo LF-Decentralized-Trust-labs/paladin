@@ -18,12 +18,12 @@ package privatetxnmgr
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func newStateDistributionBuilder(c components.AllComponents, tx *components.PrivateTransaction) *stateDistributionBuilder {
@@ -60,7 +60,7 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 
 	remainingNullifiers := instruction.NullifierSpecs
 	for _, recipient := range instruction.DistributionList {
-		nodeName, err := tktypes.PrivateIdentityLocator(recipient).Node(ctx, false)
+		nodeName, err := pldtypes.PrivateIdentityLocator(recipient).Node(ctx, false)
 		if err != nil {
 			return i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrDistributionNotFullyQualified, recipient)
 		}
@@ -131,7 +131,7 @@ func (sd *stateDistributionBuilder) Build(ctx context.Context) (sds *components.
 
 	// This code depends on the fact we ensure this gets fully qualified as the transaction comes into the system,
 	// on the sending node. So as the transaction flows around everyone knows who the originating node is.
-	sd.SenderNode, err = tktypes.PrivateIdentityLocator(tx.PreAssembly.TransactionSpecification.From).Node(ctx, false)
+	sd.SenderNode, err = pldtypes.PrivateIdentityLocator(tx.PreAssembly.TransactionSpecification.From).Node(ctx, false)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrFromNotResolvedDistroTime)
 	}

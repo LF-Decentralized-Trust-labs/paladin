@@ -4,14 +4,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -50,7 +50,7 @@ func (s *nonFungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, is
 	}
 	zeto.Mint(ctx, []string{controllerName, controllerName}, uris).SignAndSend(controllerName, true).Wait()
 
-	var controllerAddr tktypes.Bytes32
+	var controllerAddr pldtypes.Bytes32
 	rpcerr := s.rpc.CallRPC(ctx, &controllerAddr, "ptx_resolveVerifier", controllerName, zetosignerapi.AlgoDomainZetoSnarkBJJ(s.domainName), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
 	require.Nil(t, rpcerr)
 
@@ -75,7 +75,7 @@ func (s *nonFungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, is
 	zeto.Transfer(ctx, recipient1Name, controllerNFTs[0].Data.TokenID).SignAndSend(controllerName, true).Wait()
 
 	// get recipient1 address
-	var recipient1Addr tktypes.Bytes32
+	var recipient1Addr pldtypes.Bytes32
 	rpcerr = s.rpc.CallRPC(ctx, &recipient1Addr, "ptx_resolveVerifier", recipient1Name, zetosignerapi.AlgoDomainZetoSnarkBJJ(s.domainName), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
 	require.Nil(t, rpcerr)
 
@@ -109,7 +109,7 @@ func (s *nonFungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, is
 	zeto.Transfer(ctx, recipient2Name, recipient1NFTs[0].Data.TokenID).SignAndSend(recipient1Name, true).Wait()
 
 	// get recipient2 address
-	var recipient2Addr tktypes.Bytes32
+	var recipient2Addr pldtypes.Bytes32
 	rpcerr = s.rpc.CallRPC(ctx, &recipient2Addr, "ptx_resolveVerifier", recipient2Name, zetosignerapi.AlgoDomainZetoSnarkBJJ(s.domainName), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
 	require.Nil(t, rpcerr)
 
@@ -130,7 +130,7 @@ func (s *nonFungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, is
 	require.Len(t, recipient1NFTs, 0)
 }
 
-func findAvailableNFTs(t *testing.T, ctx context.Context, rpc rpcclient.Client, domainName, domainSchemaId string, address *tktypes.EthAddress, jq *query.QueryJSON, useNullifiers bool, owner *tktypes.Bytes32) []*types.ZetoNFTState {
+func findAvailableNFTs(t *testing.T, ctx context.Context, rpc rpcclient.Client, domainName, domainSchemaId string, address *pldtypes.EthAddress, jq *query.QueryJSON, useNullifiers bool, owner *pldtypes.Bytes32) []*types.ZetoNFTState {
 	methodName := "pstate_queryContractStates"
 	if useNullifiers {
 		methodName = "pstate_queryContractNullifiers"
@@ -142,7 +142,7 @@ func findAvailableNFTs(t *testing.T, ctx context.Context, rpc rpcclient.Client, 
 	return nfts
 }
 
-func filterNFTs(nfts []*types.ZetoNFTState, owner *tktypes.Bytes32) []*types.ZetoNFTState {
+func filterNFTs(nfts []*types.ZetoNFTState, owner *pldtypes.Bytes32) []*types.ZetoNFTState {
 	// Filter out the tokens that are not owned by the owner
 	if owner != nil {
 		var filteredNfts []*types.ZetoNFTState

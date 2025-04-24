@@ -21,13 +21,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"gorm.io/gorm/clause"
 )
 
@@ -66,7 +66,7 @@ func (km *keyManager) newKeyResolver(dbTX persistence.DBTX, registerCBs bool) co
 	kr := &keyResolver{
 		km:            km,
 		dbTX:          dbTX,
-		id:            tktypes.ShortID(),
+		id:            pldtypes.ShortID(),
 		rootPath:      &resolvedDBPath{},
 		resolvedPaths: make(map[string]*resolvedDBPath),
 		done:          make(chan struct{}),
@@ -234,7 +234,7 @@ func (kr *keyResolver) resolveKey(ctx context.Context, identifier, algorithm, ve
 	defer kr.l.Unlock()
 
 	// Identifier must be a valid
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, identifier, tktypes.DefaultNameMaxLen, "identifier"); err != nil {
+	if err := pldtypes.ValidateSafeCharsStartEndAlphaNum(ctx, identifier, pldtypes.DefaultNameMaxLen, "identifier"); err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgKeyManagerInvalidIdentifier, identifier)
 	}
 

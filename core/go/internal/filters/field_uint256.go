@@ -22,7 +22,7 @@ import (
 	"math/big"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type Uint256Field string
@@ -35,7 +35,7 @@ func (sf Uint256Field) SupportsLIKE() bool {
 	return false
 }
 
-func (sf Uint256Field) SQLValue(ctx context.Context, jsonValue tktypes.RawJSON) (driver.Value, error) {
+func (sf Uint256Field) SQLValue(ctx context.Context, jsonValue pldtypes.RawJSON) (driver.Value, error) {
 	if jsonValue.IsNil() {
 		return nil, nil
 	}
@@ -47,6 +47,6 @@ func (sf Uint256Field) SQLValue(ctx context.Context, jsonValue tktypes.RawJSON) 
 }
 
 func Uint256ToFilterString(ctx context.Context, bi *big.Int) string {
-	zeroPaddedUint256 := tktypes.PadHexBigUint(bi, make([]byte, 64))
+	zeroPaddedUint256 := pldtypes.PadHexBigUint(bi, make([]byte, 64))
 	return (string)(zeroPaddedUint256)
 }

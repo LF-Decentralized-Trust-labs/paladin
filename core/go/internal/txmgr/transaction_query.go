@@ -19,14 +19,14 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"gorm.io/gorm"
 )
 
@@ -245,7 +245,7 @@ func (tm *txManager) mergePublicTransactions(ctx context.Context, dbTX persisten
 }
 
 func (tm *txManager) resolveABIReferencesAndCache(ctx context.Context, dbTX persistence.DBTX, txs []*components.ResolvedTransaction) (_ []*components.ResolvedTransaction, err error) {
-	abis := make(map[tktypes.Bytes32]*pldapi.StoredABI, len(txs))
+	abis := make(map[pldtypes.Bytes32]*pldapi.StoredABI, len(txs))
 	for _, tx := range txs {
 		a := abis[*tx.Transaction.ABIReference]
 		if a == nil {
@@ -339,7 +339,7 @@ func (tm *txManager) queryPublicTransactions(ctx context.Context, jq *query.Quer
 	return tm.publicTxMgr.QueryPublicTxWithBindings(ctx, tm.p.NOTX(), jq)
 }
 
-func (tm *txManager) GetPublicTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce tktypes.HexUint64) (*pldapi.PublicTxWithBinding, error) {
+func (tm *txManager) GetPublicTransactionByNonce(ctx context.Context, from pldtypes.EthAddress, nonce pldtypes.HexUint64) (*pldapi.PublicTxWithBinding, error) {
 	prs, err := tm.publicTxMgr.QueryPublicTxWithBindings(ctx, tm.p.NOTX(),
 		query.NewQueryBuilder().Limit(1).
 			Equal("from", from).
@@ -351,6 +351,6 @@ func (tm *txManager) GetPublicTransactionByNonce(ctx context.Context, from tktyp
 	return prs[0], nil
 }
 
-func (tm *txManager) GetPublicTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error) {
+func (tm *txManager) GetPublicTransactionByHash(ctx context.Context, hash pldtypes.Bytes32) (*pldapi.PublicTxWithBinding, error) {
 	return tm.publicTxMgr.GetPublicTransactionForHash(ctx, tm.p.NOTX(), hash)
 }

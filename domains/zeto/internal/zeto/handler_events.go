@@ -7,14 +7,14 @@ import (
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/node"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func (z *Zeto) handleMintEvent(ctx context.Context, smtTree *merkleTreeSpec, ev *prototk.OnChainEvent, tokenName string, res *prototk.HandleEventBatchResponse) error {
@@ -107,9 +107,9 @@ func (z *Zeto) handleWithdrawEvent(ctx context.Context, smtTree *merkleTreeSpec,
 			Location:      ev.Location,
 		})
 		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txID, withdraw.Inputs)...)
-		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, []tktypes.HexUint256{withdraw.Output})...)
+		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, []pldtypes.HexUint256{withdraw.Output})...)
 		if common.IsNullifiersToken(tokenName) {
-			err := z.updateMerkleTree(ctx, smtTree.tree, smtTree.storage, txID, []tktypes.HexUint256{withdraw.Output})
+			err := z.updateMerkleTree(ctx, smtTree.tree, smtTree.storage, txID, []pldtypes.HexUint256{withdraw.Output})
 			if err != nil {
 				return i18n.NewError(ctx, msgs.MsgErrorUpdateSMT, "UTXOWithdraw", err)
 			}
@@ -151,7 +151,7 @@ func (z *Zeto) handleLockedEvent(ctx context.Context, smtTree *merkleTreeSpec, s
 	return nil
 }
 
-func (z *Zeto) updateMerkleTree(ctx context.Context, tree core.SparseMerkleTree, storage smt.StatesStorage, txID tktypes.HexBytes, outputs []tktypes.HexUint256) error {
+func (z *Zeto) updateMerkleTree(ctx context.Context, tree core.SparseMerkleTree, storage smt.StatesStorage, txID pldtypes.HexBytes, outputs []pldtypes.HexUint256) error {
 	storage.SetTransactionId(txID.HexString0xPrefix())
 	for _, out := range outputs {
 		if out.NilOrZero() {
@@ -165,7 +165,7 @@ func (z *Zeto) updateMerkleTree(ctx context.Context, tree core.SparseMerkleTree,
 	return nil
 }
 
-func (z *Zeto) addOutputToMerkleTree(ctx context.Context, tree core.SparseMerkleTree, output tktypes.HexUint256) error {
+func (z *Zeto) addOutputToMerkleTree(ctx context.Context, tree core.SparseMerkleTree, output pldtypes.HexUint256) error {
 	idx, err := node.NewNodeIndexFromBigInt(output.Int())
 	if err != nil {
 		return i18n.NewError(ctx, msgs.MsgErrorNewNodeIndex, output.String(), err)
@@ -182,7 +182,7 @@ func (z *Zeto) addOutputToMerkleTree(ctx context.Context, tree core.SparseMerkle
 	return nil
 }
 
-func parseStatesFromEvent(txID tktypes.HexBytes, states []tktypes.HexUint256) []*prototk.StateUpdate {
+func parseStatesFromEvent(txID pldtypes.HexBytes, states []pldtypes.HexUint256) []*prototk.StateUpdate {
 	refs := make([]*prototk.StateUpdate, len(states))
 	for i, state := range states {
 		refs[i] = &prototk.StateUpdate{
@@ -200,7 +200,7 @@ func formatErrors(errors []string) string {
 	}
 	return msg
 }
-func decodeTransactionData(data tktypes.HexBytes) (txID tktypes.HexBytes) {
+func decodeTransactionData(data pldtypes.HexBytes) (txID pldtypes.HexBytes) {
 	if len(data) < 4 {
 		return nil
 	}

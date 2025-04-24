@@ -23,9 +23,9 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -38,14 +38,14 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(10),
+			GasPrice: pldtypes.Uint64ToUint256(10),
 		},
 	})
 
@@ -63,7 +63,7 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	signedMsg := []byte(testTransactionData)
-	txHash := tktypes.MustParseBytes32(testTxHash)
+	txHash := pldtypes.MustParseBytes32(testTxHash)
 	// succeed signing
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
 	// test panic error that doesn't belong to the current stage gets ignored
@@ -156,14 +156,14 @@ func TestProduceLatestInFlightStageContextSigningPanic(t *testing.T) {
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(10),
+			GasPrice: pldtypes.Uint64ToUint256(10),
 		},
 	})
 
@@ -201,14 +201,14 @@ func TestProduceLatestInFlightStageContextTriggerSign(t *testing.T) {
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
 	mTS.statusUpdater = &mockStatusUpdater{
-		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
 	}
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Uint64ToUint256(10),
+			GasPrice: pldtypes.Uint64ToUint256(10),
 		},
 	})
 	it.testOnlyNoActionMode = false

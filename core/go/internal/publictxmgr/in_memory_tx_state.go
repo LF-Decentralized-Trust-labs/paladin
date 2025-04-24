@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type managedTx struct {
@@ -37,9 +37,9 @@ type managedTx struct {
 	// In-memory state that we update as we process the transaction in an active orchestrator
 	InFlightStatus  InFlightStatus            // moves to pending/confirmed to cause the inflight to exit
 	GasPricing      pldapi.PublicTxGasPricing // the most recently used gas pricing information
-	TransactionHash *tktypes.Bytes32          // the most recently submitted transaction hash (not guaranteed to be the one mined)
-	FirstSubmit     *tktypes.Timestamp        // the time this runtime instance first did a submit JSON/RPC call (for success or failure)
-	LastSubmit      *tktypes.Timestamp        // the last time runtime instance first did a submit JSON/RPC call (for success or failure)
+	TransactionHash *pldtypes.Bytes32         // the most recently submitted transaction hash (not guaranteed to be the one mined)
+	FirstSubmit     *pldtypes.Timestamp       // the time this runtime instance first did a submit JSON/RPC call (for success or failure)
+	LastSubmit      *pldtypes.Timestamp       // the last time runtime instance first did a submit JSON/RPC call (for success or failure)
 }
 
 type inMemoryTxState struct {
@@ -154,11 +154,11 @@ func (imtxs *inMemoryTxState) GetSignerNonce() string {
 	return fmt.Sprintf("%s:%s", imtxs.mtx.ptx.From, nonceStr)
 }
 
-func (imtxs *inMemoryTxState) GetCreatedTime() *tktypes.Timestamp {
+func (imtxs *inMemoryTxState) GetCreatedTime() *pldtypes.Timestamp {
 	return &imtxs.mtx.ptx.Created
 }
 
-func (imtxs *inMemoryTxState) GetTransactionHash() *tktypes.Bytes32 {
+func (imtxs *inMemoryTxState) GetTransactionHash() *pldtypes.Bytes32 {
 	return imtxs.mtx.TransactionHash
 }
 
@@ -170,16 +170,16 @@ func (imtxs *inMemoryTxState) GetNonce() uint64 {
 	return *imtxs.mtx.ptx.Nonce
 }
 
-func (imtxs *inMemoryTxState) GetFrom() tktypes.EthAddress {
+func (imtxs *inMemoryTxState) GetFrom() pldtypes.EthAddress {
 	return imtxs.mtx.ptx.From
 }
 
-func (imtxs *inMemoryTxState) GetTo() *tktypes.EthAddress {
+func (imtxs *inMemoryTxState) GetTo() *pldtypes.EthAddress {
 
 	return imtxs.mtx.ptx.To
 }
 
-func (imtxs *inMemoryTxState) GetValue() *tktypes.HexUint256 {
+func (imtxs *inMemoryTxState) GetValue() *pldtypes.HexUint256 {
 	return imtxs.mtx.ptx.Value
 }
 
@@ -192,14 +192,14 @@ func (imtxs *inMemoryTxState) BuildEthTX() *ethsigner.Transaction {
 		ptx.To,
 		ptx.Data,
 		&pldapi.PublicTxOptions{
-			Gas:                (*tktypes.HexUint64)(&ptx.Gas), // fixed in persisted TX
+			Gas:                (*pldtypes.HexUint64)(&ptx.Gas), // fixed in persisted TX
 			Value:              ptx.Value,
 			PublicTxGasPricing: imtxs.mtx.GasPricing, // variable and calculated in memory
 		},
 	)
 }
 
-func (imtxs *inMemoryTxState) GetFirstSubmit() *tktypes.Timestamp {
+func (imtxs *inMemoryTxState) GetFirstSubmit() *pldtypes.Timestamp {
 	return imtxs.mtx.FirstSubmit
 }
 
@@ -211,7 +211,7 @@ func (imtxs *inMemoryTxState) GetGasPriceObject() *pldapi.PublicTxGasPricing {
 	return nil
 }
 
-func (imtxs *inMemoryTxState) GetLastSubmitTime() *tktypes.Timestamp {
+func (imtxs *inMemoryTxState) GetLastSubmitTime() *pldtypes.Timestamp {
 	return imtxs.mtx.LastSubmit
 }
 

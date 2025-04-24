@@ -23,6 +23,7 @@ import (
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
@@ -30,11 +31,10 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -110,7 +110,7 @@ func (h *withdrawHandler) Init(ctx context.Context, tx *types.ParsedTransaction,
 }
 
 func (h *withdrawHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	amount := tx.Params.(*tktypes.HexUint256)
+	amount := tx.Params.(*pldtypes.HexUint256)
 
 	resolvedSender := domain.FindVerifier(tx.Transaction.From, h.getAlgoZetoSnarkBJJ(), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X, req.ResolvedVerifiers)
 	if resolvedSender == nil {
@@ -123,12 +123,12 @@ func (h *withdrawHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxInputs, err)
 	}
 
-	outputCoin, outputState, err := h.prepareOutput(ctx, tktypes.MustParseHexUint256(remainder.Text(10)), resolvedSender)
+	outputCoin, outputState, err := h.prepareOutput(ctx, pldtypes.MustParseHexUint256(remainder.Text(10)), resolvedSender)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxOutputs, err)
 	}
 
-	contractAddress, err := tktypes.ParseEthAddress(req.Transaction.ContractInfo.ContractAddress)
+	contractAddress, err := pldtypes.ParseEthAddress(req.Transaction.ContractInfo.ContractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
 	}
@@ -206,7 +206,7 @@ func (h *withdrawHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorEncodeTxData, err)
 	}
-	amount := tktypes.MustParseHexUint256(*req.DomainData)
+	amount := pldtypes.MustParseHexUint256(*req.DomainData)
 	params := map[string]any{
 		"amount": amount.Int().Text(10),
 		"inputs": inputs,
@@ -238,12 +238,12 @@ func (h *withdrawHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	}, nil
 }
 
-func (h *withdrawHandler) prepareInputs(ctx context.Context, useNullifiers bool, stateQueryContext, senderKey string, amount *tktypes.HexUint256) ([]*types.ZetoCoin, []*pb.StateRef, *big.Int, *big.Int, error) {
+func (h *withdrawHandler) prepareInputs(ctx context.Context, useNullifiers bool, stateQueryContext, senderKey string, amount *pldtypes.HexUint256) ([]*types.ZetoCoin, []*pb.StateRef, *big.Int, *big.Int, error) {
 	expectedTotal := amount.Int()
 	return buildInputsForExpectedTotal(ctx, h.callbacks, h.stateSchemas.CoinSchema, useNullifiers, stateQueryContext, senderKey, expectedTotal, false)
 }
 
-func (h *withdrawHandler) prepareOutput(ctx context.Context, amount *tktypes.HexUint256, resolvedRecipient *pb.ResolvedVerifier) (*types.ZetoCoin, *pb.NewState, error) {
+func (h *withdrawHandler) prepareOutput(ctx context.Context, amount *pldtypes.HexUint256, resolvedRecipient *pb.ResolvedVerifier) (*types.ZetoCoin, *pb.NewState, error) {
 	recipientKey, err := common.LoadBabyJubKey([]byte(resolvedRecipient.Verifier))
 	if err != nil {
 		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorLoadOwnerPubKey, err)
@@ -252,8 +252,8 @@ func (h *withdrawHandler) prepareOutput(ctx context.Context, amount *tktypes.Hex
 	salt := crypto.NewSalt()
 	compressedKeyStr := zetosigner.EncodeBabyJubJubPublicKey(recipientKey)
 	newCoin := &types.ZetoCoin{
-		Salt:   (*tktypes.HexUint256)(salt),
-		Owner:  tktypes.MustParseHexBytes(compressedKeyStr),
+		Salt:   (*pldtypes.HexUint256)(salt),
+		Owner:  pldtypes.MustParseHexBytes(compressedKeyStr),
 		Amount: amount,
 	}
 
@@ -264,7 +264,7 @@ func (h *withdrawHandler) prepareOutput(ctx context.Context, amount *tktypes.Hex
 	return newCoin, newState, nil
 }
 
-func (h *withdrawHandler) formatProvingRequest(ctx context.Context, inputCoins []*types.ZetoCoin, outputCoin *types.ZetoCoin, circuit *zetosignerapi.Circuit, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
+func (h *withdrawHandler) formatProvingRequest(ctx context.Context, inputCoins []*types.ZetoCoin, outputCoin *types.ZetoCoin, circuit *zetosignerapi.Circuit, tokenName, stateQueryContext string, contractAddress *pldtypes.EthAddress) ([]byte, error) {
 	inputSize := common.GetInputSize(len(inputCoins))
 	inputCommitments := make([]string, inputSize)
 	inputValueInts := make([]uint64, inputSize)

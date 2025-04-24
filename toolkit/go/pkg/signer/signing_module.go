@@ -21,13 +21,13 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signer/keystores"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signer/signers"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 // SigningModule provides functions for the signerapi request/reply functions from the signerapil interface defined
@@ -113,7 +113,7 @@ func NewSigningModule[C signerapi.ExtensibleConfig](ctx context.Context, conf C,
 	keyStoreType := strings.ToLower(ksConf.Type)
 	ksf := keyStoreImplementations[keyStoreType]
 	if ksf == nil {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningUnsupportedKeyStoreType, ksConf.Type)
+		return nil, i18n.NewError(ctx, pldmsgs.MsgSigningUnsupportedKeyStoreType, ksConf.Type)
 	}
 	sm.keyStore, err = ksf.NewKeyStore(ctx, conf)
 	if err != nil {
@@ -126,7 +126,7 @@ func NewSigningModule[C signerapi.ExtensibleConfig](ctx context.Context, conf C,
 		var supportsSigning bool
 		sm.keyStoreSigner, supportsSigning = sm.keyStore.(signerapi.KeyStoreSigner)
 		if !supportsSigning {
-			return nil, i18n.NewError(ctx, tkmsgs.MsgSigningKeyStoreNoInStoreSingingSupport, ksConf.Type)
+			return nil, i18n.NewError(ctx, pldmsgs.MsgSigningKeyStoreNoInStoreSingingSupport, ksConf.Type)
 		}
 	}
 
@@ -136,13 +136,13 @@ func NewSigningModule[C signerapi.ExtensibleConfig](ctx context.Context, conf C,
 	case pldconf.KeyDerivationTypeBIP32:
 		// This is fundamentally incompatible with a request to disable loading key materials into memory
 		if ksConf.KeyStoreSigning {
-			return nil, i18n.NewError(ctx, tkmsgs.MsgSigningHierarchicalRequiresLoading)
+			return nil, i18n.NewError(ctx, pldmsgs.MsgSigningHierarchicalRequiresLoading)
 		}
 		if err := sm.initHDWallet(ctx, kdConf); err != nil {
 			return nil, err
 		}
 	default:
-		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningUnsupportedKeyDerivationType, kdConf.Type)
+		return nil, i18n.NewError(ctx, pldmsgs.MsgSigningUnsupportedKeyDerivationType, kdConf.Type)
 	}
 
 	// Settings that disable behaviors, whether technically supported by the key store or not
@@ -160,7 +160,7 @@ func (sm *signingModule[C]) getSignerForAlgorithm(ctx context.Context, algorithm
 	signer := sm.signingImplementations[lookupPrefix]
 	if signer == nil {
 		// No signer registered for this algorithm prefix
-		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningUnsupportedAlgoForInMemorySigning, algorithm)
+		return nil, i18n.NewError(ctx, pldmsgs.MsgSigningUnsupportedAlgoForInMemorySigning, algorithm)
 	}
 	return signer, nil
 }
@@ -181,7 +181,7 @@ func (sm *signingModule[C]) newKeyForAlgorithms(ctx context.Context, requiredIde
 		}
 	}
 	if keyLen <= 0 {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningMustSpecifyAlgorithms)
+		return nil, i18n.NewError(ctx, pldmsgs.MsgSigningMustSpecifyAlgorithms)
 	}
 	// Generate random bytes for the size
 	buff := make([]byte, keyLen)
@@ -206,7 +206,7 @@ func (sm *signingModule[C]) signInMemory(ctx context.Context, algorithm, payload
 func (sm *signingModule[C]) Resolve(ctx context.Context, req *signerapi.ResolveKeyRequest) (res *signerapi.ResolveKeyResponse, err error) {
 
 	if len(req.Name) == 0 {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningKeyCannotBeEmpty)
+		return nil, i18n.NewError(ctx, pldmsgs.MsgSigningKeyCannotBeEmpty)
 	}
 
 	// If we are delegating resolution to the keystore (hence all our in memory signers are disabled)
@@ -271,7 +271,7 @@ func (sm *signingModule[C]) Sign(ctx context.Context, req *signerapi.SignRequest
 func (sm *signingModule[C]) List(ctx context.Context, req *signerapi.ListKeysRequest) (res *signerapi.ListKeysResponse, err error) {
 	listableStore, isListable := sm.keyStore.(signerapi.KeyStoreListable)
 	if !isListable || sm.disableKeyListing {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningKeyListingNotSupported)
+		return nil, i18n.NewError(ctx, pldmsgs.MsgSigningKeyListingNotSupported)
 	}
 	return listableStore.ListKeys(ctx, req)
 }

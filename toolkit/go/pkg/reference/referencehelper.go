@@ -24,8 +24,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 )
 
 func getIncludeFile(ctx context.Context, outputPath, name string) ([]byte, error) {
@@ -35,7 +35,7 @@ func getIncludeFile(ctx context.Context, outputPath, name string) ([]byte, error
 		return nil, err
 	}
 	if _, err := os.Stat(filename); err != nil {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgReferenceMarkdownMissing, filename)
+		return nil, i18n.NewError(ctx, pldmsgs.MsgReferenceMarkdownMissing, filename)
 	}
 	return []byte(fmt.Sprintf("{%% include-markdown \"./_includes/%s_description.md\" %%}\n\n", name)), nil
 }
@@ -47,7 +47,7 @@ func shouldFilter(t reflect.Type) bool {
 }
 
 func isEnum(f reflect.Type) bool {
-	return f.PkgPath() == "github.com/kaleido-io/paladin/toolkit/pkg/tktypes" && strings.HasPrefix(f.Name(), "Enum[")
+	return f.PkgPath() == "github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes" && strings.HasPrefix(f.Name(), "Enum[")
 }
 
 func generateEnumList(f reflect.Type) string {

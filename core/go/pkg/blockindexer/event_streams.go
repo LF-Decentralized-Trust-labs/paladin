@@ -22,14 +22,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"gorm.io/gorm/clause"
 )
 
@@ -39,12 +41,14 @@ type eventStream struct {
 	bi             *blockIndexer
 	definition     *EventStream
 	signatures     map[string]bool
-	signatureList  []tktypes.Bytes32
+	signatureList  []pldtypes.Bytes32
 	batchSize      int
 	batchTimeout   time.Duration
 	blocks         chan *eventStreamBlock
 	dispatch       chan *eventDispatch
-	handler        InternalStreamCallback
+	useNOTXHandler bool
+	handlerDBTX    InternalStreamCallbackDBTX
+	handlerNOTX    InternalStreamCallbackNOTX
 	serializer     *abi.Serializer
 	detectorDone   chan struct{}
 	dispatcherDone chan struct{}
@@ -86,9 +90,29 @@ func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
 	}
 
 	for _, esDefinition := range eventStreams {
-		bi.initEventStream(ctx, esDefinition, nil /* no handler at this point */)
+		bi.initEventStream(ctx, esDefinition)
 	}
 	return nil
+}
+
+func (bi *blockIndexer) AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error) {
+	es, err := bi.upsertInternalEventStream(ctx, dbTX, stream)
+	if err != nil {
+		return nil, err
+	}
+
+	// Can be called before start as managers start before the block indexer
+	bi.stateLock.Lock()
+	blockIndexerStarted := bi.started
+	bi.stateLock.Unlock()
+
+	es.definition.Started = confutil.P(es.definition.Started == nil || *es.definition.Started)
+
+	if blockIndexerStarted && *es.definition.Started {
+		// no possibility of error if not updating DB
+		_ = bi.startEventStream(es, false)
+	}
+	return es.definition, nil
 }
 
 func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX persistence.DBTX, ies *InternalEventStream) (*eventStream, error) {
@@ -99,11 +123,12 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 		def = &EventStream{}
 	}
 
-	// This will need to open up when we have more externally consumable event streams
-	def.Type = EventStreamTypeInternal.Enum()
+	if def.Type == "" {
+		def.Type = EventStreamTypeInternal.Enum()
+	}
 
 	// Validate the name
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+	if err := pldtypes.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, pldtypes.DefaultNameMaxLen, "name"); err != nil {
 		return nil, err
 	}
 
@@ -127,7 +152,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 			return nil, i18n.NewError(ctx, msgs.MsgBlockIndexerESSourceError)
 		}
 		for i := range existing[0].Sources {
-			if err := tktypes.ABIsMustMatch(ctx, existing[0].Sources[i].ABI, def.Sources[i].ABI,
+			if err := pldtypes.ABIsMustMatch(ctx, existing[0].Sources[i].ABI, def.Sources[i].ABI,
 				abi.Event, // we only need to compare on the events
 			); err != nil {
 				return nil, err
@@ -163,18 +188,35 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 		}
 	}
 
-	// We call init here
-	// TODO: Full stop/start lifecycle
-	es := bi.initEventStream(ctx, def, ies.Handler)
-
-	return es, nil
+	if ies.Type == IESTypeEventStreamDBTX {
+		return bi.initEventStreamDBTX(ctx, def, ies.HandlerDBTX), nil
+	}
+	return bi.initEventStreamNOTX(ctx, def, ies.HandlerNOTX), nil
 }
 
-// Note that the event stream must be stopped when this is called
-func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventStream, handler InternalStreamCallback) *eventStream {
+func (bi *blockIndexer) initEventStreamNOTX(ctx context.Context, definition *EventStream, handlerNOTX InternalStreamCallbackNOTX) *eventStream {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
 
+	es := bi.initEventStream(ctx, definition)
+	es.useNOTXHandler = true
+	es.handlerNOTX = handlerNOTX
+
+	return es
+}
+
+func (bi *blockIndexer) initEventStreamDBTX(ctx context.Context, definition *EventStream, handlerDBTX InternalStreamCallbackDBTX) *eventStream {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+
+	es := bi.initEventStream(ctx, definition)
+	es.handlerDBTX = handlerDBTX
+
+	return es
+}
+
+// Note that the event stream must be stopped when this is called
+func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventStream) *eventStream {
 	es := bi.eventStreams[definition.ID]
 	batchSize := confutil.IntMin(definition.Config.BatchSize, 1, *EventStreamDefaults.BatchSize)
 	if es != nil {
@@ -196,9 +238,6 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	es.batchSize = batchSize
 	es.batchTimeout = confutil.DurationMin(definition.Config.BatchTimeout, 0, *EventStreamDefaults.BatchTimeout)
 
-	// Note the handler will be nil when this is first called on startup before we've been passed handlers.
-	es.handler = handler
-
 	// Calculate all the signatures we require
 	for _, source := range definition.Sources {
 		solStrings := []string{}
@@ -209,7 +248,7 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 
 		for _, abiEntry := range source.ABI {
 			if abiEntry.Type == abi.Event {
-				sig := tktypes.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
+				sig := pldtypes.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
 				sigStr := sig.String()
 				if _, dup := es.signatures[sigStr]; !dup {
 					es.signatures[sigStr] = true
@@ -227,6 +266,65 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	return es
 }
 
+func (bi *blockIndexer) RemoveEventStream(ctx context.Context, id uuid.UUID) error {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+
+	es := bi.eventStreams[id]
+	if es == nil {
+		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, id)
+	}
+
+	err := bi.persistence.NOTX().DB().
+		WithContext(ctx).
+		Table("event_streams").
+		Where("id = ?", id).
+		Delete(&EventStream{}).
+		Error
+	if err != nil {
+		log.L(ctx).Errorf("Failed to delete event stream %s: %s", id, err)
+		return err
+	}
+	// no possibility of error if not updating DB
+	_ = es.stop(false)
+	delete(bi.eventStreams, id)
+	delete(bi.eventStreamsHeadSet, id)
+	return nil
+}
+
+func (bi *blockIndexer) QueryEventStreamDefinitions(ctx context.Context, dbTX persistence.DBTX, esType pldtypes.Enum[EventStreamType], jq *query.QueryJSON) ([]*EventStream, error) {
+	if jq == nil || jq.Limit == nil || *jq.Limit == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgBlockIndexerLimitRequired)
+	}
+	q := dbTX.DB().
+		Table("event_streams").
+		WithContext(ctx).
+		Where("type = ?", esType)
+
+	q = filters.BuildGORM(ctx, jq, q, EventStreamFilters)
+
+	var results []*EventStream
+	err := q.Find(&results).Error
+	return results, err
+}
+
+func (bi *blockIndexer) StartEventStream(ctx context.Context, id uuid.UUID) error {
+	if bi.eventStreams[id] == nil {
+		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, id)
+	}
+	return bi.startEventStream(bi.eventStreams[id], true)
+}
+
+func (bi *blockIndexer) StopEventStream(ctx context.Context, id uuid.UUID) error {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+
+	if bi.eventStreams[id] == nil {
+		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, id)
+	}
+	return bi.eventStreams[id].stop(true)
+}
+
 func (bi *blockIndexer) getStreamList() []*eventStream {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
@@ -239,37 +337,67 @@ func (bi *blockIndexer) getStreamList() []*eventStream {
 
 func (bi *blockIndexer) startEventStreams() {
 	for _, es := range bi.getStreamList() {
-		es.start()
+		if es.definition.Started == nil || *es.definition.Started {
+			// no possibility of error if not updating DB
+			_ = es.start(false)
+		}
 	}
 }
 
-func (bi *blockIndexer) startEventStream(es *eventStream) {
+func (bi *blockIndexer) startEventStream(es *eventStream, updateDB bool) error {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
-	es.start()
+	return es.start(updateDB)
 }
 
-func (es *eventStream) start() {
-	if es.handler != nil && es.detectorDone == nil && es.dispatcherDone == nil {
+func (es *eventStream) start(updateDB bool) error {
+	if (es.handlerDBTX != nil || es.handlerNOTX != nil) && es.detectorDone == nil && es.dispatcherDone == nil {
 		es.ctx, es.cancelCtx = context.WithCancel(log.WithLogField(es.bi.parentCtxForReset, "eventstream", es.definition.ID.String()))
 		log.L(es.ctx).Infof("Starting event stream %s [%s]", es.definition.Name, es.definition.ID)
+		if updateDB {
+			err := es.bi.persistence.NOTX().DB().
+				WithContext(es.ctx).
+				Table("event_streams").
+				Where("id = ?", es.definition.ID).
+				Update("started", true).
+				Error
+			if err != nil {
+				return err
+			}
+		}
 		es.detectorDone = make(chan struct{})
 		es.dispatcherDone = make(chan struct{})
 		go es.detector()
 		go es.dispatcher()
 	}
+	return nil
 }
 
-func (es *eventStream) stop() {
+func (es *eventStream) stop(updateDB bool) error {
+	if updateDB {
+		err := es.bi.persistence.NOTX().DB().
+			WithContext(es.ctx).
+			Table("event_streams").
+			Where("id = ?", es.definition.ID).
+			Update("started", false).
+			Error
+		if err != nil {
+			return err
+		}
+	}
 	if es.cancelCtx != nil {
 		es.cancelCtx()
+		es.cancelCtx = nil
 	}
 	if es.detectorDone != nil {
 		<-es.detectorDone
+		es.detectorDone = nil
 	}
 	if es.dispatcherDone != nil {
 		<-es.dispatcherDone
+		es.dispatcherDone = nil
 	}
+	return nil
 }
 
 func (es *eventStream) readDBCheckpoint() (int64, error) {
@@ -486,34 +614,41 @@ func (es *eventStream) dispatcher() {
 	}
 }
 
-func (es *eventStream) runBatch(batch *eventBatch) error {
+func (es *eventStream) updateCheckpoint(ctx context.Context, dbTX persistence.DBTX, blockNumber int64) error {
+	return dbTX.DB().
+		WithContext(ctx).
+		Table("event_stream_checkpoints").
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "stream"}},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"block_number",
+			}),
+		}).
+		Create(&EventStreamCheckpoint{
+			Stream:      es.definition.ID,
+			BlockNumber: blockNumber,
+		}).
+		Error
+}
 
-	// We start a database transaction, run the callback function
+func (es *eventStream) runBatch(batch *eventBatch) error {
 	return es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
-		err = es.bi.persistence.Transaction(es.ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
-			err = es.handler(ctx, dbTX, &batch.EventDeliveryBatch)
-			if err != nil {
-				return err
+		if es.useNOTXHandler {
+			err = es.handlerNOTX(es.ctx, &batch.EventDeliveryBatch)
+			if err == nil {
+				err = es.updateCheckpoint(es.ctx, es.bi.persistence.NOTX(), int64(batch.checkpointAfterBatch))
 			}
-			// commit the checkpoint
-			return dbTX.DB().
-				WithContext(ctx).
-				Table("event_stream_checkpoints").
-				Clauses(clause.OnConflict{
-					Columns: []clause.Column{{Name: "stream"}},
-					DoUpdates: clause.AssignmentColumns([]string{
-						"block_number",
-					}),
-				}).
-				Create(&EventStreamCheckpoint{
-					Stream:      es.definition.ID,
-					BlockNumber: int64(batch.checkpointAfterBatch),
-				}).
-				Error
+			return true, err
+		}
+		err = es.bi.persistence.Transaction(es.ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
+			err = es.handlerDBTX(ctx, dbTX, &batch.EventDeliveryBatch)
+			if err == nil {
+				err = es.updateCheckpoint(ctx, dbTX, int64(batch.checkpointAfterBatch))
+			}
+			return err
 		})
 		return true, err
 	})
-
 }
 
 func (es *eventStream) processCatchupEventPage(lastCatchupEvent *pldapi.IndexedEvent, checkpointBlock int64, catchUpToBlockNumber int64) (caughtUp bool, lastEvent *pldapi.IndexedEvent, err error) {
@@ -579,7 +714,7 @@ func (es *eventStream) processCatchupEventPage(lastCatchupEvent *pldapi.IndexedE
 	enrichments := make(chan error)
 	for txStr, _events := range byTxID {
 		events := _events // not safe to pass loop pointer
-		tx := tktypes.MustParseBytes32(txStr)
+		tx := pldtypes.MustParseBytes32(txStr)
 		for _, _source := range es.definition.Sources {
 			source := _source // not safe to pass loop pointer
 			go func() {

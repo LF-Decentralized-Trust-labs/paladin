@@ -22,7 +22,7 @@ import (
 
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 )
 
 func (s *Sequencer) evaluationLoop() {

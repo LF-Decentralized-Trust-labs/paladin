@@ -26,21 +26,21 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
@@ -63,7 +63,7 @@ const (
 type transactionUpdate struct {
 	newPtx  *DBPublicTxn
 	pubTXID uint64
-	from    *tktypes.EthAddress
+	from    *pldtypes.EthAddress
 }
 
 // Public Tx Engine:
@@ -91,8 +91,8 @@ type pubTxManager struct {
 	submissionWriter *submissionWriter
 
 	// a map of signing addresses and transaction engines
-	inFlightOrchestrators       map[tktypes.EthAddress]*orchestrator
-	signingAddressesPausedUntil map[tktypes.EthAddress]time.Time
+	inFlightOrchestrators       map[pldtypes.EthAddress]*orchestrator
+	signingAddressesPausedUntil map[pldtypes.EthAddress]time.Time
 	inFlightOrchestratorMux     sync.Mutex
 	inFlightOrchestratorStale   chan bool
 
@@ -148,7 +148,7 @@ func NewPublicTransactionManager(ctx context.Context, conf *pldconf.PublicTxMana
 		conf:                        conf,
 		gasPriceClient:              gasPriceClient,
 		inFlightOrchestratorStale:   make(chan bool, 1),
-		signingAddressesPausedUntil: make(map[tktypes.EthAddress]time.Time),
+		signingAddressesPausedUntil: make(map[pldtypes.EthAddress]time.Time),
 		maxInflight:                 confutil.IntMin(conf.Manager.MaxInFlightOrchestrators, 1, *pldconf.PublicTxManagerDefaults.Manager.MaxInFlightOrchestrators),
 		orchestratorSwapTimeout:     confutil.DurationMin(conf.Manager.OrchestratorSwapTimeout, 0, *pldconf.PublicTxManagerDefaults.Manager.OrchestratorSwapTimeout),
 		orchestratorStaleTimeout:    confutil.DurationMin(conf.Manager.OrchestratorStaleTimeout, 0, *pldconf.PublicTxManagerDefaults.Manager.OrchestratorStaleTimeout),
@@ -219,14 +219,14 @@ func (ptm *pubTxManager) Stop() {
 }
 
 func buildEthTX(
-	from tktypes.EthAddress,
+	from pldtypes.EthAddress,
 	nonce *uint64,
-	to *tktypes.EthAddress,
-	data tktypes.HexBytes,
+	to *pldtypes.EthAddress,
+	data pldtypes.HexBytes,
 	options *pldapi.PublicTxOptions,
 ) *ethsigner.Transaction {
 	ethTx := &ethsigner.Transaction{
-		From:                 json.RawMessage(tktypes.JSONString(from)),
+		From:                 json.RawMessage(pldtypes.JSONString(from)),
 		To:                   to.Address0xHex(),
 		GasPrice:             (*ethtypes.HexInteger)(options.GasPrice),
 		MaxPriorityFeePerGas: (*ethtypes.HexInteger)(options.MaxPriorityFeePerGas),
@@ -291,7 +291,7 @@ func (ptm *pubTxManager) ValidateTransaction(ctx context.Context, dbTX persisten
 			}
 			return err
 		}
-		factoredGasLimit := tktypes.HexUint64((float64)(gasEstimateResult.GasLimit) * ptm.gasEstimateFactor)
+		factoredGasLimit := pldtypes.HexUint64((float64)(gasEstimateResult.GasLimit) * ptm.gasEstimateFactor)
 		txi.Gas = &factoredGasLimit
 		log.L(ctx).Tracef("HandleNewTx <%s> using the estimated gas limit %s multiplied by the gas estimate factor %.f (=%s) for transaction: %+v", txType, gasEstimateResult.GasLimit, ptm.gasEstimateFactor, factoredGasLimit, txi)
 	} else {
@@ -312,7 +312,7 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 			Gas:             txi.Gas.Uint64(),
 			Value:           txi.Value,
 			Data:            txi.Data,
-			FixedGasPricing: tktypes.JSONString(txi.PublicTxGasPricing),
+			FixedGasPricing: pldtypes.JSONString(txi.PublicTxGasPricing),
 		}
 	}
 	// All the nonce processing to this point should have ensured we do not have a conflict on nonces.
@@ -347,7 +347,7 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 	}
 	if err == nil {
 		pubTxns = make([]*pldapi.PublicTx, len(persistedTransactions))
-		toNotify := make(map[tktypes.EthAddress]bool)
+		toNotify := make(map[pldtypes.EthAddress]bool)
 		for i, ptx := range persistedTransactions {
 			pubTxns[i] = mapPersistedTransaction(ptx)
 			toNotify[ptx.From] = true
@@ -358,7 +358,7 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 	return pubTxns, err
 }
 
-func (ptm *pubTxManager) writeUpdatedTransaction(ctx context.Context, dbTX persistence.DBTX, pubTXID uint64, from tktypes.EthAddress, newPtx *DBPublicTxn) error {
+func (ptm *pubTxManager) writeUpdatedTransaction(ctx context.Context, dbTX persistence.DBTX, pubTXID uint64, from pldtypes.EthAddress, newPtx *DBPublicTxn) error {
 	err := dbTX.DB().
 		WithContext(ctx).
 		Table("public_txns").
@@ -367,7 +367,7 @@ func (ptm *pubTxManager) writeUpdatedTransaction(ctx context.Context, dbTX persi
 		Error
 
 	if err == nil {
-		toNotify := map[tktypes.EthAddress]bool{
+		toNotify := map[pldtypes.EthAddress]bool{
 			from: true,
 		}
 		dbTX.AddPostCommit(ptm.postCommitNewTransactions(toNotify))
@@ -375,7 +375,7 @@ func (ptm *pubTxManager) writeUpdatedTransaction(ctx context.Context, dbTX persi
 	return err
 }
 
-func (ptm *pubTxManager) postCommitNewTransactions(toNotify map[tktypes.EthAddress]bool) func(ctx context.Context) {
+func (ptm *pubTxManager) postCommitNewTransactions(toNotify map[pldtypes.EthAddress]bool) func(ctx context.Context) {
 	return func(ctx context.Context) {
 		// Mark any active orchestrators stale
 		inactive := false
@@ -396,7 +396,7 @@ func (ptm *pubTxManager) postCommitNewTransactions(toNotify map[tktypes.EthAddre
 	}
 }
 
-func recoverGasPriceOptions(gpoJSON tktypes.RawJSON) (ptgp pldapi.PublicTxGasPricing) {
+func recoverGasPriceOptions(gpoJSON pldtypes.RawJSON) (ptgp pldapi.PublicTxGasPricing) {
 	if gpoJSON != nil {
 		_ = json.Unmarshal(gpoJSON, &ptgp)
 	}
@@ -489,7 +489,7 @@ func (ptm *pubTxManager) CheckTransactionCompleted(ctx context.Context, pubTxnID
 }
 
 // the return does NOT include submissions (only the top level TX data)
-func (ptm *pubTxManager) GetPendingFuelingTransaction(ctx context.Context, sourceAddress tktypes.EthAddress, destinationAddress tktypes.EthAddress) (*pldapi.PublicTx, error) {
+func (ptm *pubTxManager) GetPendingFuelingTransaction(ctx context.Context, sourceAddress pldtypes.EthAddress, destinationAddress pldtypes.EthAddress) (*pldapi.PublicTx, error) {
 	var ptxs []*DBPublicTxn
 	err := ptm.p.DB().
 		WithContext(ctx).
@@ -553,10 +553,10 @@ func mapPersistedTransaction(ptx *DBPublicTxn) *pldapi.PublicTx {
 		From:    ptx.From,
 		Created: ptx.Created,
 		To:      ptx.To,
-		Nonce:   (*tktypes.HexUint64)(ptx.Nonce),
+		Nonce:   (*pldtypes.HexUint64)(ptx.Nonce),
 		Data:    ptx.Data,
 		PublicTxOptions: pldapi.PublicTxOptions{
-			Gas:                (*tktypes.HexUint64)(&ptx.Gas),
+			Gas:                (*pldtypes.HexUint64)(&ptx.Gas),
 			Value:              ptx.Value,
 			PublicTxGasPricing: recoverGasPriceOptions(ptx.FixedGasPricing),
 		},
@@ -578,7 +578,7 @@ func mapPersistedTransaction(ptx *DBPublicTxn) *pldapi.PublicTx {
 func mapPersistedSubmissionData(pSub *DBPubTxnSubmission) *pldapi.PublicTxSubmissionData {
 	return &pldapi.PublicTxSubmissionData{
 		Time:               pSub.Created,
-		TransactionHash:    tktypes.Bytes32(pSub.TransactionHash),
+		TransactionHash:    pldtypes.Bytes32(pSub.TransactionHash),
 		PublicTxGasPricing: recoverGasPriceOptions(pSub.GasPricing),
 	}
 }
@@ -595,21 +595,21 @@ func (ptm *pubTxManager) getTransactionSubmissions(ctx context.Context, dbTX per
 	return ptxs, err
 }
 
-func (ptm *pubTxManager) SuspendTransaction(ctx context.Context, from tktypes.EthAddress, nonce uint64) error {
+func (ptm *pubTxManager) SuspendTransaction(ctx context.Context, from pldtypes.EthAddress, nonce uint64) error {
 	if err := ptm.dispatchAction(ctx, from, nonce, ActionSuspend); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (ptm *pubTxManager) ResumeTransaction(ctx context.Context, from tktypes.EthAddress, nonce uint64) error {
+func (ptm *pubTxManager) ResumeTransaction(ctx context.Context, from pldtypes.EthAddress, nonce uint64) error {
 	if err := ptm.dispatchAction(ctx, from, nonce, ActionResume); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (ptm *pubTxManager) UpdateTransaction(ctx context.Context, id uuid.UUID, pubTXID uint64, from *tktypes.EthAddress, tx *pldapi.TransactionInput, publicTxData []byte, txmgrDBUpdate func(dbTX persistence.DBTX) error) error {
+func (ptm *pubTxManager) UpdateTransaction(ctx context.Context, id uuid.UUID, pubTXID uint64, from *pldtypes.EthAddress, tx *pldapi.TransactionInput, publicTxData []byte, txmgrDBUpdate func(dbTX persistence.DBTX) error) error {
 	ptxs := []*DBPublicTxn{}
 	err := ptm.p.DB().
 		WithContext(ctx).
@@ -660,7 +660,7 @@ func (ptm *pubTxManager) UpdateTransaction(ctx context.Context, id uuid.UUID, pu
 		Gas:             tx.Gas.Uint64(),
 		Value:           tx.Value,
 		Data:            publicTxData,
-		FixedGasPricing: tktypes.JSONString(tx.PublicTxOptions.PublicTxGasPricing),
+		FixedGasPricing: pldtypes.JSONString(tx.PublicTxOptions.PublicTxGasPricing),
 	}
 
 	ptm.updateMux.Lock()
@@ -685,7 +685,7 @@ func (ptm *pubTxManager) UpdateTransaction(ctx context.Context, id uuid.UUID, pu
 	return err
 }
 
-func (ptm *pubTxManager) UpdateSubStatus(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info *fftypes.JSONAny, err *fftypes.JSONAny, actionOccurred *tktypes.Timestamp) error {
+func (ptm *pubTxManager) UpdateSubStatus(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info *fftypes.JSONAny, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error {
 	// TODO: Choose after testing the right way to treat these records - if text is right or not
 	if err == nil {
 		ptm.addActivityRecord(imtx.GetPubTxnID(),
@@ -728,7 +728,7 @@ func (ptm *pubTxManager) addActivityRecord(pubTxnID uint64, msg string) {
 	txr.lock.Lock()
 	defer txr.lock.Unlock()
 	record := &pldapi.TransactionActivityRecord{
-		Time:    tktypes.TimestampNow(),
+		Time:    pldtypes.TimestampNow(),
 		Message: msg,
 	}
 	copyLen := len(txr.records)
@@ -753,7 +753,7 @@ func (ptm *pubTxManager) getActivityRecords(pubTxID uint64) []pldapi.Transaction
 	return []pldapi.TransactionActivityRecord{}
 }
 
-func (ptm *pubTxManager) GetPublicTransactionForHash(ctx context.Context, dbTX persistence.DBTX, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error) {
+func (ptm *pubTxManager) GetPublicTransactionForHash(ctx context.Context, dbTX persistence.DBTX, hash pldtypes.Bytes32) (*pldapi.PublicTxWithBinding, error) {
 	var publicTxnIDs []uint64
 	var txns []*pldapi.PublicTxWithBinding
 	err := dbTX.DB().
@@ -780,7 +780,7 @@ func (ptm *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, d
 	// Do a DB query in the TX to reverse lookup the TX details we need to match/update the completed status
 	// and return the list that matched (which is very possibly none as we only track transactions submitted
 	// via our node to the network).
-	txHashes := make([]tktypes.Bytes32, len(itxs))
+	txHashes := make([]pldtypes.Bytes32, len(itxs))
 	for i, itx := range itxs {
 		txHashes[i] = itx.Hash
 	}

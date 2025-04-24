@@ -28,10 +28,10 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 )
 
 type Writeable[R any] interface {
@@ -119,7 +119,7 @@ func NewWriter[T Writeable[R], R any](
 	batchTimeout := confutil.DurationMin(conf.BatchTimeout, 0, *defaults.BatchTimeout)
 	w := &writer[T, R]{
 		p:            p,
-		writerId:     tktypes.ShortID(), // so logs distinguish these writers from any others
+		writerId:     pldtypes.ShortID(), // so logs distinguish these writers from any others
 		handler:      handler,
 		workerCount:  workerCount,
 		batchTimeout: batchTimeout,
@@ -164,7 +164,7 @@ func (op *op[T, R]) Flushed() <-chan Result[R] {
 
 func (w *writer[T, R]) queue(ctx context.Context, value T, flush bool) *op[T, R] {
 	op := &op[T, R]{
-		id:       tktypes.ShortID(),
+		id:       pldtypes.ShortID(),
 		writeKey: value.WriteKey(),
 		value:    value,
 		flush:    flush,

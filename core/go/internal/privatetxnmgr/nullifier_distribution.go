@@ -18,12 +18,12 @@ package privatetxnmgr
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 func (p *privateTxManager) BuildNullifier(ctx context.Context, kr components.KeyResolver, s *components.StateDistributionWithData) (*components.NullifierUpsert, error) {
@@ -32,7 +32,7 @@ func (p *privateTxManager) BuildNullifier(ctx context.Context, kr components.Key
 		s.StateID, p.nodeName, *s.NullifierAlgorithm, *s.NullifierVerifierType, *s.NullifierPayloadType)
 
 	// We require a fully qualified identifier for the local node in this function
-	identifier, node, err := tktypes.PrivateIdentityLocator(s.IdentityLocator).Validate(ctx, "", false)
+	identifier, node, err := pldtypes.PrivateIdentityLocator(s.IdentityLocator).Validate(ctx, "", false)
 	if err != nil || node != p.nodeName {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgStateDistributorNullifierNotLocal)
 	}
@@ -48,7 +48,7 @@ func (p *privateTxManager) BuildNullifier(ctx context.Context, kr components.Key
 	}
 	return &components.NullifierUpsert{
 		ID:    nulliferBytes,
-		State: tktypes.MustParseHexBytes(s.StateID),
+		State: pldtypes.MustParseHexBytes(s.StateID),
 	}, nil
 }
 

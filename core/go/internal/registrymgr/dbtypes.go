@@ -16,21 +16,21 @@
 package registrymgr
 
 import (
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type DBEntry struct {
-	Registry         string            `gorm:"column:registry;primaryKey"`
-	ID               tktypes.HexBytes  `gorm:"column:id;primaryKey"`
-	Name             string            `gorm:"column:name"`
-	Created          tktypes.Timestamp `gorm:"column:created;autoCreateTime:nano"`
-	Updated          tktypes.Timestamp `gorm:"column:updated;autoUpdateTime:nano"`
-	Active           bool              `gorm:"column:active"`
-	ParentID         tktypes.HexBytes  `gorm:"column:parent_id"`
-	TransactionHash  *tktypes.Bytes32  `gorm:"column:tx_hash"`
-	BlockNumber      *int64            `gorm:"column:block_number"`
-	TransactionIndex *int64            `gorm:"column:tx_index"`
-	LogIndex         *int64            `gorm:"column:log_index"`
+	Registry         string             `gorm:"column:registry;primaryKey"`
+	ID               pldtypes.HexBytes  `gorm:"column:id;primaryKey"`
+	Name             string             `gorm:"column:name"`
+	Created          pldtypes.Timestamp `gorm:"column:created;autoCreateTime:nano"`
+	Updated          pldtypes.Timestamp `gorm:"column:updated;autoUpdateTime:nano"`
+	Active           bool               `gorm:"column:active"`
+	ParentID         pldtypes.HexBytes  `gorm:"column:parent_id"`
+	TransactionHash  *pldtypes.Bytes32  `gorm:"column:tx_hash"`
+	BlockNumber      *int64             `gorm:"column:block_number"`
+	TransactionIndex *int64             `gorm:"column:tx_index"`
+	LogIndex         *int64             `gorm:"column:log_index"`
 }
 
 func (dbe DBEntry) TableName() string {
@@ -38,17 +38,17 @@ func (dbe DBEntry) TableName() string {
 }
 
 type DBProperty struct {
-	Registry         string            `gorm:"column:registry;primaryKey"`
-	EntryID          tktypes.HexBytes  `gorm:"column:entry_id;primaryKey"`
-	Name             string            `gorm:"column:name;primaryKey"`
-	Created          tktypes.Timestamp `gorm:"column:created;autoCreateTime:nano"`
-	Updated          tktypes.Timestamp `gorm:"column:updated;autoUpdateTime:nano"`
-	Active           bool              `gorm:"column:active"`
-	Value            string            `gorm:"column:value"`
-	TransactionHash  *tktypes.Bytes32  `gorm:"column:tx_hash"`
-	BlockNumber      *int64            `gorm:"column:block_number"`
-	TransactionIndex *int64            `gorm:"column:tx_index"`
-	LogIndex         *int64            `gorm:"column:log_index"`
+	Registry         string             `gorm:"column:registry;primaryKey"`
+	EntryID          pldtypes.HexBytes  `gorm:"column:entry_id;primaryKey"`
+	Name             string             `gorm:"column:name;primaryKey"`
+	Created          pldtypes.Timestamp `gorm:"column:created;autoCreateTime:nano"`
+	Updated          pldtypes.Timestamp `gorm:"column:updated;autoUpdateTime:nano"`
+	Active           bool               `gorm:"column:active"`
+	Value            string             `gorm:"column:value"`
+	TransactionHash  *pldtypes.Bytes32  `gorm:"column:tx_hash"`
+	BlockNumber      *int64             `gorm:"column:block_number"`
+	TransactionIndex *int64             `gorm:"column:tx_index"`
+	LogIndex         *int64             `gorm:"column:log_index"`
 }
 
 func (dbe DBProperty) TableName() string {

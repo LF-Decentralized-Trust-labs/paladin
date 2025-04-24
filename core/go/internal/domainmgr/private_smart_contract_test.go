@@ -27,17 +27,17 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/keymanager"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -53,7 +53,7 @@ func TestPrivateSmartContractQueryFail(t *testing.T) {
 	})
 	defer done()
 
-	_, err := td.dm.GetSmartContractByAddress(td.ctx, td.c.dbTX, tktypes.EthAddress(tktypes.RandBytes(20)))
+	_, err := td.dm.GetSmartContractByAddress(td.ctx, td.c.dbTX, pldtypes.EthAddress(pldtypes.RandBytes(20)))
 	assert.Regexp(t, "pop", err)
 
 }
@@ -67,7 +67,7 @@ func TestPrivateSmartContractQueryNoResult(t *testing.T) {
 	})
 	defer done()
 
-	_, err := td.dm.GetSmartContractByAddress(td.ctx, td.c.dbTX, tktypes.EthAddress(tktypes.RandBytes(20)))
+	_, err := td.dm.GetSmartContractByAddress(td.ctx, td.c.dbTX, pldtypes.EthAddress(pldtypes.RandBytes(20)))
 	assert.Regexp(t, "PD011609", err)
 
 }
@@ -88,7 +88,7 @@ func goodPSC(t *testing.T, td *testDomainContext) *domainContract {
 	loadResult, psc, err := d.initSmartContract(d.ctx, &PrivateSmartContract{
 		DeployTX:        uuid.New(),
 		RegistryAddress: *d.RegistryAddress(),
-		Address:         tktypes.EthAddress(tktypes.RandBytes(20)),
+		Address:         pldtypes.EthAddress(pldtypes.RandBytes(20)),
 		ConfigBytes:     []byte{0xfe, 0xed, 0xbe, 0xef},
 	})
 	require.NoError(t, err)
@@ -105,7 +105,7 @@ func goodPrivateTXWithInputs(psc *domainContract) *components.ResolvedTransactio
 				Domain: psc.d.name,
 				From:   "txSigner",
 				To:     &psc.info.Address,
-				Data: tktypes.RawJSON(`{
+				Data: pldtypes.RawJSON(`{
 				   "from": "sender",
 				   "to": "receiver",
 				   "amount": "123000000000000000000"
@@ -130,7 +130,7 @@ func doDomainInitTransactionOK(t *testing.T, td *testDomainContext, resFn ...fun
 	localTx := goodPrivateTXWithInputs(psc)
 
 	td.tp.Functions.InitTransaction = func(ctx context.Context, itr *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
-		assert.Equal(t, tktypes.Bytes32UUIDFirst16(*localTx.Transaction.ID).String(), itr.Transaction.TransactionId)
+		assert.Equal(t, pldtypes.Bytes32UUIDFirst16(*localTx.Transaction.ID).String(), itr.Transaction.TransactionId)
 		assert.Equal(t, int64(12345), itr.Transaction.BaseBlock)
 		res := &prototk.InitTransactionResponse{
 			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
@@ -212,7 +212,7 @@ func doDomainInitAssembleTransactionOK(t *testing.T, td *testDomainContext) (*do
 }
 
 func mockBlockHeight(mc *mockComponents) {
-	mc.blockIndexer.On("GetConfirmedBlockHeight", mock.Anything).Return(tktypes.HexUint64(12345), nil)
+	mc.blockIndexer.On("GetConfirmedBlockHeight", mock.Anything).Return(pldtypes.HexUint64(12345), nil)
 }
 
 func TestDomainInitTransactionOK(t *testing.T) {
@@ -375,7 +375,7 @@ func initRealKeyManagerForTest(t *testing.T) (components.KeyManager, func(mc *mo
 							Keys: map[string]pldconf.StaticKeyEntryConfig{
 								"seed": {
 									Encoding: "hex",
-									Inline:   tktypes.RandHex(32),
+									Inline:   pldtypes.RandHex(32),
 								},
 							},
 						},
@@ -591,7 +591,7 @@ func TestDomainInitTransactionMissingInput(t *testing.T) {
 
 func TestDomainInitTransactionConfirmedBlockFail(t *testing.T) {
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
-		mc.blockIndexer.On("GetConfirmedBlockHeight", mock.Anything).Return(tktypes.HexUint64(0), fmt.Errorf("pop"))
+		mc.blockIndexer.On("GetConfirmedBlockHeight", mock.Anything).Return(pldtypes.HexUint64(0), fmt.Errorf("pop"))
 	})
 	defer done()
 	assert.Nil(t, td.d.initError.Load())
@@ -634,7 +634,7 @@ func TestDomainInitTransactionBadInputs(t *testing.T) {
 
 	psc := goodPSC(t, td)
 	localTx := goodPrivateTXWithInputs(psc)
-	localTx.Transaction.Data = tktypes.RawJSON(`{"missing": "parameters}`)
+	localTx.Transaction.Data = pldtypes.RawJSON(`{"missing": "parameters}`)
 
 	ptx := &components.PrivateTransaction{
 		ID: *localTx.Transaction.ID,
@@ -659,14 +659,14 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	state4 := storeTestState(t, td, ptx.ID, ethtypes.NewHexInteger64(4444444))
 
 	state5 := &fakeState{
-		Salt:   tktypes.RandBytes32(),
-		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
+		Salt:   pldtypes.RandBytes32(),
+		Owner:  pldtypes.EthAddress(pldtypes.RandBytes(20)),
 		Amount: ethtypes.NewHexInteger64(5555555),
 	}
 
 	state6 := &fakeState{
-		Salt:   tktypes.RandBytes32(),
-		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
+		Salt:   pldtypes.RandBytes32(),
+		Owner:  pldtypes.EthAddress(pldtypes.RandBytes(20)),
 		Amount: ethtypes.NewHexInteger64(6666666),
 	}
 
@@ -798,7 +798,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 
 	// Run an endorsement
 	endorsementRequest := ptx.PostAssembly.AttestationPlan[0]
-	endorserAddr := tktypes.EthAddress(tktypes.RandBytes(20))
+	endorserAddr := pldtypes.EthAddress(pldtypes.RandBytes(20))
 	endorser := &prototk.ResolvedVerifier{
 		Lookup:       "endorser1",
 		Algorithm:    algorithms.ECDSA_SECP256K1,
@@ -866,7 +866,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	}
 
 	// Pass in a random signer - which will be overridden in this case
-	ptx.Signer = tktypes.RandAddress().String()
+	ptx.Signer = pldtypes.RandAddress().String()
 
 	// And now prepare
 	err = psc.PrepareTransaction(dCtx, td.c.dbTX, ptx)
@@ -1010,7 +1010,7 @@ func TestDomainWritePotentialStatesBadSchema(t *testing.T) {
 
 func TestDomainWritePotentialStatesFail(t *testing.T) {
 	schema := componentmocks.NewSchema(t)
-	schemaID := tktypes.RandBytes32()
+	schemaID := pldtypes.RandBytes32()
 	schema.On("ID").Return(schemaID)
 	schema.On("Signature").Return("schema1_signature")
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(schema), mockBlockHeight)
@@ -1028,7 +1028,7 @@ func TestDomainWritePotentialStatesFail(t *testing.T) {
 
 func TestDomainWritePotentialStatesBadID(t *testing.T) {
 	schema := componentmocks.NewSchema(t)
-	schemaID := tktypes.RandBytes32()
+	schemaID := pldtypes.RandBytes32()
 	schema.On("ID").Return(schemaID)
 	schema.On("Signature").Return("schema1_signature")
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(schema), mockBlockHeight)
@@ -1109,7 +1109,7 @@ func TestPrepareTransactionPrivateResult(t *testing.T) {
 	psc, tx := doDomainInitAssembleTransactionOK(t, td)
 	tx.Signer = "signer1"
 
-	contractAddr := tktypes.RandAddress()
+	contractAddr := pldtypes.RandAddress()
 	td.dm.contractCache.Set(*contractAddr, psc)
 
 	td.tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
@@ -1131,7 +1131,7 @@ func TestPrepareTransactionPrivateResult(t *testing.T) {
 		Function:       "doTheNextThing(string)",
 		From:           tx.Signer,
 		To:             contractAddr,
-		Data:           tktypes.RawJSON(`{"thing": "something else"}`),
+		Data:           pldtypes.RawJSON(`{"thing": "something else"}`),
 		Domain:         psc.Domain().Name(),
 	}, tx.PreparedPrivateTransaction.TransactionBase)
 }
@@ -1167,7 +1167,7 @@ func TestPrepareTransactionUnknownContract(t *testing.T) {
 	psc, tx := doDomainInitAssembleTransactionOK(t, td)
 	tx.Signer = "signer1"
 
-	contractAddr := tktypes.RandAddress()
+	contractAddr := pldtypes.RandAddress()
 
 	td.tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
@@ -1193,7 +1193,7 @@ func TestLoadStatesBadSchema(t *testing.T) {
 
 	_, err := psc.loadStatesFromContext(td.mdc, td.c.dbTX, []*prototk.StateRef{
 		{
-			Id:       tktypes.RandHex(32),
+			Id:       pldtypes.RandHex(32),
 			SchemaId: "wrong",
 		},
 	})
@@ -1211,8 +1211,8 @@ func TestLoadStatesError(t *testing.T) {
 
 	_, err := psc.loadStatesFromContext(td.mdc, td.c.dbTX, []*prototk.StateRef{
 		{
-			Id:       tktypes.RandHex(32),
-			SchemaId: tktypes.RandHex(32),
+			Id:       pldtypes.RandHex(32),
+			SchemaId: pldtypes.RandHex(32),
 		},
 	})
 	assert.Regexp(t, "pop", err)
@@ -1229,8 +1229,8 @@ func TestLoadStatesNotFound(t *testing.T) {
 
 	_, err := psc.loadStatesFromContext(td.mdc, td.c.dbTX, []*prototk.StateRef{
 		{
-			Id:       tktypes.RandHex(32),
-			SchemaId: tktypes.RandHex(32),
+			Id:       pldtypes.RandHex(32),
+			SchemaId: pldtypes.RandHex(32),
 		},
 	})
 	assert.Regexp(t, "PD011615", err)
@@ -1270,7 +1270,7 @@ func goodPrivateCallWithInputsAndOutputs(psc *domainContract) *components.Resolv
 				Domain: psc.d.name,
 				From:   "me",
 				To:     &psc.info.Address,
-				Data: tktypes.RawJSON(`{
+				Data: pldtypes.RawJSON(`{
 					"address": "0xf2C41ae275A9acE65e1Fb78B97270a61D86Aa0Ed"
 				}`),
 			},
@@ -1333,7 +1333,7 @@ func TestInitCallBadInput(t *testing.T) {
 			TransactionBase: pldapi.TransactionBase{
 				Domain: psc.d.name,
 				To:     &psc.info.Address,
-				Data: tktypes.RawJSON(`{
+				Data: pldtypes.RawJSON(`{
 					"wrong": "0xf2C41ae275A9acE65e1Fb78B97270a61D86Aa0Ed"
 				}`),
 			},
@@ -1416,7 +1416,7 @@ func TestExecCallBadInput(t *testing.T) {
 			TransactionBase: pldapi.TransactionBase{
 				Domain: psc.d.name,
 				To:     &psc.info.Address,
-				Data: tktypes.RawJSON(`{
+				Data: pldtypes.RawJSON(`{
 					"wrong": "0xf2C41ae275A9acE65e1Fb78B97270a61D86Aa0Ed"
 				}`)},
 		},
@@ -1492,7 +1492,7 @@ func TestExecCallFail(t *testing.T) {
 }
 
 func TestGetPSCInvalidConfig(t *testing.T) {
-	addr := tktypes.RandAddress()
+	addr := pldtypes.RandAddress()
 	var mc *mockComponents
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(_mc *mockComponents) {
 		mc = _mc
@@ -1521,7 +1521,7 @@ func TestGetPSCInvalidConfig(t *testing.T) {
 }
 
 func TestGetPSCUnknownDomain(t *testing.T) {
-	addr := tktypes.RandAddress()
+	addr := pldtypes.RandAddress()
 	var mc *mockComponents
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(_mc *mockComponents) {
 		mc = _mc
@@ -1531,7 +1531,7 @@ func TestGetPSCUnknownDomain(t *testing.T) {
 
 	mc.db.ExpectQuery("SELECT.*private_smart_contracts").
 		WillReturnRows(sqlmock.NewRows([]string{"address", "domain_address"}).
-			AddRow(addr.String(), tktypes.RandAddress().String()))
+			AddRow(addr.String(), pldtypes.RandAddress().String()))
 
 	td.tp.Functions.InitContract = func(ctx context.Context, icr *prototk.InitContractRequest) (*prototk.InitContractResponse, error) {
 		return &prototk.InitContractResponse{
@@ -1550,7 +1550,7 @@ func TestGetPSCUnknownDomain(t *testing.T) {
 }
 
 func TestGetPSCInitError(t *testing.T) {
-	addr := tktypes.RandAddress()
+	addr := pldtypes.RandAddress()
 	var mc *mockComponents
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(_mc *mockComponents) {
 		mc = _mc
@@ -1571,14 +1571,14 @@ func TestGetPSCInitError(t *testing.T) {
 	assert.Nil(t, psc)
 }
 
-func goodWrapPGTxCall(psc *domainContract, salt tktypes.Bytes32) (*pldapi.TransactionInput, error) {
+func goodWrapPGTxCall(psc *domainContract, salt pldtypes.Bytes32) (*pldapi.TransactionInput, error) {
 	tx := &pldapi.PrivacyGroupEVMTX{
 		From:  "from.addr",
 		To:    confutil.P(psc.Address()),
-		Gas:   confutil.P(tktypes.HexUint64(12345)),
-		Value: tktypes.Uint64ToUint256(10000000000),
-		Input: tktypes.JSONString(map[string]any{
-			"who":   tktypes.MustEthAddress("0x09ec006415815b28538d5b9b2d3c0b5d7f43e7f6"),
+		Gas:   confutil.P(pldtypes.HexUint64(12345)),
+		Value: pldtypes.Uint64ToUint256(10000000000),
+		Input: pldtypes.JSONString(map[string]any{
+			"who":   pldtypes.MustEthAddress("0x09ec006415815b28538d5b9b2d3c0b5d7f43e7f6"),
 			"thing": "stuff",
 		}),
 		Function: &abi.Entry{
@@ -1608,18 +1608,18 @@ func TestWrapPGTxOk(t *testing.T) {
 		var fnDef abi.Entry
 		err := json.Unmarshal([]byte(*wpgtr.Transaction.FunctionAbiJson), &fnDef)
 		require.NoError(t, err)
-		paramsJson := tktypes.JSONString(map[string]any{
+		paramsJson := pldtypes.JSONString(map[string]any{
 			"pgName":            wpgtr.PrivacyGroup.Name,
 			"gas":               wpgtr.Transaction.Gas,
 			"value":             wpgtr.Transaction.Value,
-			"wrappedParamsJSON": tktypes.RawJSON(*wpgtr.Transaction.InputJson),
+			"wrappedParamsJSON": pldtypes.RawJSON(*wpgtr.Transaction.InputJson),
 		}).Pretty()
 		return &prototk.WrapPrivacyGroupEVMTXResponse{
 			Transaction: &prototk.PreparedTransaction{
 				ContractAddress: confutil.P(psc.Address().String()),
 				Type:            prototk.PreparedTransaction_PRIVATE,
 				RequiredSigner:  confutil.P("pgroup.signer"),
-				FunctionAbiJson: tktypes.JSONString(&abi.Entry{
+				FunctionAbiJson: pldtypes.JSONString(&abi.Entry{
 					Type: abi.Function,
 					Name: "wrappedDoThing",
 					Inputs: abi.ParameterArray{
@@ -1634,7 +1634,7 @@ func TestWrapPGTxOk(t *testing.T) {
 		}, nil
 	}
 
-	salt := tktypes.RandBytes32()
+	salt := pldtypes.RandBytes32()
 	tx, err := goodWrapPGTxCall(psc, salt)
 	require.NoError(t, err)
 
@@ -1677,7 +1677,7 @@ func TestWrapPGTxOk(t *testing.T) {
 			],
 			"outputs": null
 		}]
-	}`, psc.Address()), tktypes.JSONString(tx).Pretty())
+	}`, psc.Address()), pldtypes.JSONString(tx).Pretty())
 }
 
 func TestWrapPGFail(t *testing.T) {
@@ -1691,7 +1691,7 @@ func TestWrapPGFail(t *testing.T) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	_, err := goodWrapPGTxCall(psc, pldtypes.RandBytes32())
 	require.Regexp(t, "pop", err)
 }
 
@@ -1710,7 +1710,7 @@ func TestWrapPGBadTxType(t *testing.T) {
 		}, nil
 	}
 
-	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	_, err := goodWrapPGTxCall(psc, pldtypes.RandBytes32())
 	require.Regexp(t, "PD011665", err)
 }
 
@@ -1730,7 +1730,7 @@ func TestWrapPGBadToAddr(t *testing.T) {
 		}, nil
 	}
 
-	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	_, err := goodWrapPGTxCall(psc, pldtypes.RandBytes32())
 	require.Regexp(t, "bad address", err)
 }
 
@@ -1745,12 +1745,12 @@ func TestWrapPGWrongToAddr(t *testing.T) {
 		return &prototk.WrapPrivacyGroupEVMTXResponse{
 			Transaction: &prototk.PreparedTransaction{
 				Type:            prototk.PreparedTransaction_PRIVATE,
-				ContractAddress: confutil.P(tktypes.RandAddress().String()),
+				ContractAddress: confutil.P(pldtypes.RandAddress().String()),
 			},
 		}, nil
 	}
 
-	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	_, err := goodWrapPGTxCall(psc, pldtypes.RandBytes32())
 	require.Regexp(t, "PD011666", err)
 }
 
@@ -1769,6 +1769,6 @@ func TestWrapPGBadData(t *testing.T) {
 		}, nil
 	}
 
-	_, err := goodWrapPGTxCall(psc, tktypes.RandBytes32())
+	_, err := goodWrapPGTxCall(psc, pldtypes.RandBytes32())
 	require.Regexp(t, "PD011612", err)
 }
