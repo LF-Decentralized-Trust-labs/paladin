@@ -1461,3 +1461,46 @@ func TestBlockIndexerManyEventsWaitForTransactionSuccess(t *testing.T) {
 	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[0].Number)
 	assert.Equal(t, txHash, tx.Hash)
 }
+
+func TestBlockIndexerManyTXsWaitForTransactionSuccess(t *testing.T) {
+	ctx, bi, mRPC, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	// 20000 transactions in a block
+	blocks, receipts := testBlockWithManyTXAndEvents(t, 20000, 0)
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+
+	txHash := pldtypes.Bytes32(receipts[blocks[0].Hash.String()][1].TransactionHash)
+	gotTX := make(chan struct{})
+	go func() {
+		defer close(gotTX)
+		tx, err := bi.WaitForTransactionSuccess(ctx, txHash, nil)
+		require.NoError(t, err)
+		assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[0].Number)
+		assert.Equal(t, txHash, tx.Hash)
+	}()
+
+	// Wait for initial query to fail
+	for bi.txWaiters.InFlightCount() == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
+
+	bi.startOrReset() // do not start block listener
+
+	for i := 0; i < len(blocks); i++ {
+		notifiedBlocks := <-utBatchNotify
+		assert.Len(t, notifiedBlocks, 1) // We should get one block per batch
+		checkIndexedBlockEqual(t, blocks[i], notifiedBlocks[0])
+	}
+
+	<-gotTX
+
+	tx, err := bi.WaitForTransactionAnyResult(ctx, txHash)
+	require.NoError(t, err)
+	assert.Equal(t, pldapi.TXResult_SUCCESS, tx.Result.V())
+	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[0].Number)
+	assert.Equal(t, txHash, tx.Hash)
+}
