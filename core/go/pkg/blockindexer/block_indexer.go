@@ -551,6 +551,14 @@ func (bi *blockIndexer) logToIndexedEvent(l *LogJSONRPC) *pldapi.IndexedEvent {
 	}
 }
 
+func (bi *blockIndexer) blockInfoToIndexedBlock(block *BlockInfoJSONRPC) *pldapi.IndexedBlock {
+	return &pldapi.IndexedBlock{
+		Timestamp: pldtypes.Timestamp(block.Timestamp),
+		Number:    int64(block.Number),
+		Hash:      pldtypes.NewBytes32FromSlice(block.Hash),
+	}
+}
+
 func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch) {
 
 	var blocks []*pldapi.IndexedBlock
@@ -561,11 +569,7 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 
 	for i, block := range batch.blocks {
 		newHighestBlock = int64(block.Number)
-		blocks = append(blocks, &pldapi.IndexedBlock{
-			Timestamp: pldtypes.Timestamp(block.Timestamp),
-			Number:    int64(block.Number),
-			Hash:      pldtypes.NewBytes32FromSlice(block.Hash),
-		})
+		blocks = append(blocks, bi.blockInfoToIndexedBlock(block))
 		for txIndex, r := range batch.receipts[i] {
 			result := pldapi.TXResult_FAILURE.Enum()
 			if r.Status.BigInt().Int64() == 1 {
@@ -650,7 +654,7 @@ func (bi *blockIndexer) notifyEventStreams(ctx context.Context, batch *blockWrit
 	for _, es := range bi.eventStreams {
 		for iBlk, blk := range batch.blocks {
 			blockNotification := &eventStreamBlock{
-				blockNumber: blk.Number.Uint64(),
+				block: blk,
 			}
 			for _, r := range batch.receipts[iBlk] {
 				for _, l := range r.Logs {
@@ -669,7 +673,7 @@ func (bi *blockIndexer) notifyEventStreams(ctx context.Context, batch *blockWrit
 			select {
 			case es.blocks <- blockNotification:
 				log.L(ctx).Debugf("dispatched block %d (%d signature matched events) to ES %s",
-					blockNotification.blockNumber, len(blockNotification.events), es.definition.ID)
+					blockNotification.block.Number, len(blockNotification.events), es.definition.ID)
 			default:
 			}
 		}

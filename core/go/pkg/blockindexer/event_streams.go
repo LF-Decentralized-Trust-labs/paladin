@@ -76,8 +76,8 @@ type eventDispatch struct {
 // or simply update their checkpoint. They might fall behind and need to to query the
 // database to catch up.
 type eventStreamBlock struct {
-	blockNumber uint64
-	events      []*LogJSONRPC // only the ones that match signatures we've registered an interest in due to our ABI
+	block  *BlockInfoJSONRPC
+	events []*LogJSONRPC // only the ones that match signatures we've registered an interest in due to our ABI
 }
 
 func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
@@ -511,7 +511,7 @@ func (es *eventStream) detector() {
 		es.catchup.Store(false)
 		select {
 		case block := <-es.blocks:
-			checkpointBlock = confutil.P(int64(block.blockNumber))
+			checkpointBlock = confutil.P(int64(block.block.Number))
 			es.processNotifiedBlock(block, true)
 		case <-es.ctx.Done():
 			log.L(es.ctx).Debugf("exiting")
@@ -538,13 +538,13 @@ func (es *eventStream) detector() {
 		if startupBlock == nil && catchUpToBlock == nil {
 			select {
 			case block := <-es.blocks:
-				if int64(block.blockNumber) <= *checkpointBlock {
-					log.L(es.ctx).Debugf("notified of block %d at or behind checkpoint %d", block.blockNumber, checkpointBlock)
+				if int64(block.block.Number) <= *checkpointBlock {
+					log.L(es.ctx).Debugf("notified of block %d at or behind checkpoint %d", block.block.Number, checkpointBlock)
 					continue
 				}
-				if block.blockNumber == uint64(*checkpointBlock+1) {
+				if block.block.Number == ethtypes.HexUint64(*checkpointBlock+1) {
 					// Happy place
-					checkpointBlock = confutil.P(int64(block.blockNumber))
+					checkpointBlock = confutil.P(int64(block.block.Number))
 					es.processNotifiedBlock(block, true)
 				} else {
 					// Entering catchup - defer processing of this block until catchup complete,
@@ -562,7 +562,7 @@ func (es *eventStream) detector() {
 			if startupBlock != nil {
 				catchUpToBlockNumber = *startupBlock + 1
 			} else {
-				catchUpToBlockNumber = int64(catchUpToBlock.blockNumber)
+				catchUpToBlockNumber = int64(catchUpToBlock.block.Number)
 			}
 			var caughtUp bool
 			caughtUp, lastCatchupEvent, err = es.processCatchupEventPage(lastCatchupEvent, *checkpointBlock, catchUpToBlockNumber)
@@ -576,7 +576,7 @@ func (es *eventStream) detector() {
 				if startupBlock == nil {
 					// Process the deferred notified block, and back to normal operation
 					es.processNotifiedBlock(catchUpToBlock, true)
-					checkpointBlock = confutil.P(int64(catchUpToBlock.blockNumber))
+					checkpointBlock = confutil.P(int64(catchUpToBlock.block.Number))
 					catchUpToBlock = nil
 				} else {
 					// We've now started
@@ -590,8 +590,10 @@ func (es *eventStream) detector() {
 
 func (es *eventStream) processNotifiedBlock(block *eventStreamBlock, fullBlock bool) {
 	for i, l := range block.events {
+		indexedEvent := es.bi.logToIndexedEvent(l)
+		indexedEvent.Block = es.bi.blockInfoToIndexedBlock(block.block)
 		event := &pldapi.EventWithData{
-			IndexedEvent: es.bi.logToIndexedEvent(l),
+			IndexedEvent: indexedEvent,
 		}
 		// Only dispatch events that were completed by the validation against our ABI
 		for _, source := range es.definition.Sources {
@@ -732,18 +734,19 @@ func (es *eventStream) processCatchupEventPage(lastCatchupEvent *pldapi.IndexedE
 		db := es.bi.persistence.DB()
 		q := db.
 			Table("indexed_events").
-			Where("signature IN (?)", es.signatureList).
-			Where("block_number < ?", catchUpToBlockNumber)
+			Joins("Block").
+			Where("indexed_events.signature IN (?)", es.signatureList).
+			Where("indexed_events.block_number < ?", catchUpToBlockNumber)
 		if lastCatchupEvent == nil {
-			q = q.Where("block_number > ?", checkpointBlock)
+			q = q.Where("indexed_events.block_number > ?", checkpointBlock)
 		} else {
-			q = q.Where("block_number > ? OR (block_number = ? AND (transaction_index > ? OR (transaction_index = ? AND log_index > ?)))",
+			q = q.Where("indexed_events.block_number > ? OR (indexed_events.block_number = ? AND (indexed_events.transaction_index > ? OR (indexed_events.transaction_index = ? AND indexed_events.log_index > ?)))",
 				lastCatchupEvent.BlockNumber, lastCatchupEvent.BlockNumber,
 				lastCatchupEvent.TransactionIndex, lastCatchupEvent.TransactionIndex,
 				lastCatchupEvent.LogIndex,
 			)
 		}
-		return true, q.Order("block_number").Order("transaction_index").Order("log_index").
+		return true, q.Order("indexed_events.block_number").Order("indexed_events.transaction_index").Order("indexed_events.log_index").
 			Limit(pageSize).
 			Find(&page).
 			Error

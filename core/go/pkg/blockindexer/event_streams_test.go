@@ -840,11 +840,17 @@ func testReturnToCatchupAfterStart(t *testing.T, headBlock int64) {
 	}()
 
 	// This will be ignored as behind our head
-	es.blocks <- &eventStreamBlock{blockNumber: 5}
+	es.blocks <- &eventStreamBlock{
+		block: &BlockInfoJSONRPC{
+			Number: 5,
+		},
+	}
 
 	// notify block ten
 	es.blocks <- &eventStreamBlock{
-		blockNumber: 10,
+		block: &BlockInfoJSONRPC{
+			Number: 10,
+		},
 		events: []*LogJSONRPC{
 			{
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix(pldtypes.RandHex(32)),
@@ -922,7 +928,9 @@ func TestStartFromLatest(t *testing.T) {
 	}()
 
 	es.blocks <- &eventStreamBlock{
-		blockNumber: 5,
+		block: &BlockInfoJSONRPC{
+			Number: 5,
+		},
 		events: []*LogJSONRPC{
 			{
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix(pldtypes.RandHex(32)),
