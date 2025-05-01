@@ -99,6 +99,10 @@ func NewSQLProvider(ctx context.Context, p SQLDBProvider, conf *pldconf.SQLDBCon
 			return nil, err
 		}
 	}
+
+	// If supported by the dialect, use the ANY clause for IN statements to avoid parameter limits
+	// This is a PostgreSQL specific feature
+	UseAny(gp.gdb)
 	return gp, nil
 }
 
@@ -200,7 +204,6 @@ func (gp *provider) Transaction(parentCtx context.Context, fn func(ctx context.C
 	// Run the database transaction itself
 	err = gp.gdb.Transaction(func(gormTX *gorm.DB) error {
 		tx.gdb = gormTX.WithContext(tx.txCtx)
-		UseAny(tx.gdb)
 		innerErr := fn(tx.txCtx, tx)
 		for _, fn := range tx.preCommits {
 			if innerErr == nil {
