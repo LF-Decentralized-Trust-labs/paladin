@@ -32,6 +32,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/publictxmgr/metrics"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/lib/pq"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
@@ -757,7 +758,7 @@ func (ptm *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, d
 		Table("public_txn_bindings").
 		Select(`"transaction"`, `"tx_type"`, `"Submission"."pub_txn_id"`, `"Submission"."tx_hash"`).
 		Joins("Submission").
-		Where(`"Submission"."tx_hash" IN (?)`, txHashes).
+		Where(`"Submission"."tx_hash" = ANY (?)`, pq.Array(txHashes)).
 		Find(&lookups).
 		Error
 	if err != nil {
