@@ -258,7 +258,8 @@ func UseAny(db *gorm.DB) {
 
 			if expr, ok := expr.(clause.Expr); ok {
 				strExpr := expr.SQL
-				if strings.Contains(strExpr, " IN ") {
+				// Does not support NOT IN
+				if strings.Contains(strExpr, " IN ") && !strings.Contains(strExpr, " NOT ") {
 					where.Exprs[i] = ANY{Expr: &expr}
 				}
 			}
