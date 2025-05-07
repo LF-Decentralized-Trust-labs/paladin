@@ -574,6 +574,15 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX persistence
 	bypassFromCheck := submitMode == pldapi.SubmitModePrepare || /* no checking on from for prepare */
 		(submitMode == pldapi.SubmitModeCall && tx.From == "") /* call is allowed no sender */
 	if !bypassFromCheck {
+		if _, err := pldtypes.ParseEthAddress(tx.From); err == nil {
+			// Doing the reverse lookup here means that we can persist the identity on the transaction. It does mean that the
+			// identity will later be resolved back to the verifier but this should just be a cache read
+			mapping, err := tm.keyManager.ReverseKeyLookup(ctx, dbTX, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, tx.From)
+			if err != nil {
+				return nil, err
+			}
+			tx.From = mapping.Identifier
+		}
 
 		identifier, node, err := pldtypes.PrivateIdentityLocator(tx.From).Validate(ctx, tm.localNodeName, false)
 		if err != nil || node != tm.localNodeName {

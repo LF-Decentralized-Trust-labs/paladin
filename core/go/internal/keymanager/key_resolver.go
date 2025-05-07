@@ -233,8 +233,15 @@ func (kr *keyResolver) resolveKey(ctx context.Context, identifier, algorithm, ve
 	kr.l.Lock()
 	defer kr.l.Unlock()
 
-	// Identifier must be a valid
-	if err := pldtypes.ValidateSafeCharsStartEndAlphaNum(ctx, identifier, pldtypes.DefaultNameMaxLen, "identifier"); err != nil {
+	// Identifier must be valid and not an eth address
+	err = pldtypes.ValidateSafeCharsStartEndAlphaNum(ctx, identifier, pldtypes.DefaultNameMaxLen, "identifier")
+	if err == nil {
+		_, parseError := pldtypes.ParseEthAddress(identifier)
+		if parseError == nil {
+			err = i18n.NewError(ctx, msgs.MsgKeyManagerIdentifierEthAddress, identifier)
+		}
+	}
+	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgKeyManagerInvalidIdentifier, identifier)
 	}
 

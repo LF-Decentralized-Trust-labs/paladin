@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/require"
@@ -146,6 +147,22 @@ func TestResolveKeyIdentifierLookupFail(t *testing.T) {
 	})
 	require.Regexp(t, "pop", err)
 
+}
+
+func TestResolveKeyIdentiferEthAddress(t *testing.T) {
+	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
+		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
+	})
+	defer done()
+
+	mc.db.ExpectBegin()
+
+	err := km.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		kr := km.KeyResolverForDBTX(dbTX).(*keyResolver)
+		_, err := kr.ResolveKey(ctx, pldtypes.RandAddress().String(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+		return err
+	})
+	require.Regexp(t, "PD010515", err)
 }
 
 func TestGetStoredVerifierFail(t *testing.T) {
