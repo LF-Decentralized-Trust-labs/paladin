@@ -267,7 +267,6 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 	err = wsc.Send(ctx, req)
 	require.NoError(t, err)
 
-	subIDChan := make(chan string)
 	unSubChan := make(chan bool)
 	sentNack := false
 	messages := make(chan *pldapi.PrivacyGroupMessage)
@@ -291,7 +290,10 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 
 				switch rpcID {
 				case subReqID: // Subscribe reply
-					subIDChan <- rpcPayload.Result.StringValue()
+					subIDStr := rpcPayload.Result.StringValue()
+					_, err = uuid.Parse(subIDStr)
+					require.NoError(t, err)
+					subID.Store(&subIDStr)
 					for subID.Load() == nil { // wait for subID to be set
 						time.Sleep(10 * time.Millisecond)
 					}
@@ -337,15 +339,10 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	subIDStr := <-subIDChan
-	_, err = uuid.Parse(subIDStr)
-	require.NoError(t, err)
-	subID.Store(&subIDStr)
-
 	// We get it on redelivery
 	<-messages
 
-	reqID, req := rpcTestRequest("pgroup_unsubscribe", subIDStr)
+	reqID, req := rpcTestRequest("pgroup_unsubscribe", *subID.Load())
 	unSubReqID.Store(reqID)
 	err = wsc.Send(ctx, req)
 	require.NoError(t, err)
