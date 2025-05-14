@@ -151,6 +151,7 @@ var (
 	MsgKeyManagerIdentifierPathNotFound     = pde("PD010512", "Identifier path segment '%s' not found in database")
 	MsgKeyManagerExistingIdentifierNotFound = pde("PD010513", "Identifier '%s' not found in database")
 	MsgKeyManagerMissingDatabaseTxn         = pde("PD010514", "Missing database transaction context")
+	MsgKeyManagerIdentifierEthAddress       = pde("PD010515", "Identifier cannot be an Ethereum address")
 
 	// Comms bus PD0106XX
 	MsgDestinationNotFound     = pde("PD010600", "Destination not found: %s")

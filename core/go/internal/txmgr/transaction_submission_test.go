@@ -201,6 +201,35 @@ func TestSubmitBadFromAddr(t *testing.T) {
 	assert.Regexp(t, "bad address", err)
 }
 
+func TestSubmitUnknownAddr(t *testing.T) {
+	addr := pldtypes.RandAddress().String()
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.keyManager.On("ReverseKeyLookup", mock.Anything, mock.Anything, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, addr).Return(nil, fmt.Errorf("unknown address"))
+			mc.db.ExpectBegin()
+			mc.db.ExpectExec("INSERT.*abis").WillReturnResult(driver.ResultNoRows)
+			mc.db.ExpectExec("INSERT.*abi_entries").WillReturnResult(driver.ResultNoRows)
+		})
+	defer done()
+
+	exampleABI := abi.ABI{{Type: abi.Function, Name: "doIt"}}
+	callData, err := exampleABI[0].EncodeCallDataJSON([]byte(`[]`))
+	require.NoError(t, err)
+
+	_, err = txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			Type:     pldapi.TransactionTypePublic.Enum(),
+			Function: exampleABI[0].FunctionSelectorBytes().String(),
+			From:     addr,
+			To:       pldtypes.RandAddress(),
+			Data:     pldtypes.JSONString(pldtypes.HexBytes(callData)),
+		},
+		ABI: exampleABI,
+	})
+	assert.Regexp(t, "unknown address", err)
+}
+
 func TestResolveFunctionHexInputOK(t *testing.T) {
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
@@ -280,6 +309,42 @@ func TestResolveFunctionPlainNameOK(t *testing.T) {
 		TransactionBase: pldapi.TransactionBase{
 			Type:     pldapi.TransactionTypePublic.Enum(),
 			From:     "sender1",
+			Function: "doIt",
+			To:       pldtypes.MustEthAddress(pldtypes.RandHex(20)),
+			Data:     pldtypes.JSONString(pldtypes.HexBytes(callData)),
+		},
+		ABI: exampleABI,
+	})
+	assert.NoError(t, err)
+}
+
+func TestSubmitEthAddrOK(t *testing.T) {
+	addr := pldtypes.RandAddress()
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		mockInsertABIAndTransactionOK(true),
+		mockSubmitPublicTxOk(t, addr),
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mapping := &pldapi.KeyMappingAndVerifier{
+				KeyMappingWithPath: &pldapi.KeyMappingWithPath{
+					KeyMapping: &pldapi.KeyMapping{
+						Identifier: "sender1",
+					},
+				},
+			}
+			mc.keyManager.On("ReverseKeyLookup", mock.Anything, mock.Anything, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, addr.String()).Return(mapping, nil)
+		},
+	)
+	defer done()
+
+	exampleABI := abi.ABI{{Type: abi.Function, Name: "doIt"}}
+	callData, err := exampleABI[0].EncodeCallDataJSON([]byte(`[]`))
+	require.NoError(t, err)
+
+	_, err = txm.sendTransactionNewDBTX(ctx, &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			Type:     pldapi.TransactionTypePublic.Enum(),
+			From:     addr.String(),
 			Function: "doIt",
 			To:       pldtypes.MustEthAddress(pldtypes.RandHex(20)),
 			Data:     pldtypes.JSONString(pldtypes.HexBytes(callData)),
