@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -48,8 +49,20 @@ type transactionReconcileInterface interface {
 	getReceipt() *pldapi.TransactionReceipt
 }
 
+type rpcCache struct {
+	clients map[string]pldclient.PaladinClient
+	mux     sync.RWMutex
+}
+
+func NewRPCCache() *rpcCache {
+	return &rpcCache{
+		clients: make(map[string]pldclient.PaladinClient),
+	}
+}
+
 type transactionReconcile struct {
 	client.Client
+	rpcCache             *rpcCache
 	idempotencyKeyPrefix string
 	nodeName             string
 	namespace            string
@@ -59,11 +72,12 @@ type transactionReconcile struct {
 	statusChanged        bool
 	succeeded            bool
 	failed               bool
-	getPaladinRPCFunc    func(ctx context.Context, c client.Client, nodeName string, namespace string, timeout string) (pldclient.PaladinClient, error)
+	getPaladinRPCFunc    func(context.Context, client.Client, *rpcCache, string, string, string) (pldclient.PaladinClient, error)
 	timeout              string
 }
 
 func newTransactionReconcile(c client.Client,
+	rpcCache *rpcCache,
 	idempotencyKeyPrefix,
 	nodeName, namespace string,
 	pStatus *corev1alpha1.TransactionSubmission,
@@ -78,6 +92,7 @@ func newTransactionReconcile(c client.Client,
 		txFactory:            txFactory,
 		pStatus:              pStatus,
 		timeout:              timeout,
+		rpcCache:             rpcCache,
 	}
 }
 func (r *transactionReconcile) isStatusChanged() bool                  { return r.statusChanged }
@@ -108,8 +123,8 @@ func (r *transactionReconcile) reconcile(ctx context.Context) error {
 	if r.getPaladinRPCFunc == nil {
 		r.getPaladinRPCFunc = getPaladinRPC
 	}
-	// Check availability of the Paladin node and deploy
-	paladinRPC, err := getPaladinRPC(ctx, r.Client, r.nodeName, r.namespace, r.timeout)
+
+	paladinRPC, err := r.getPaladinRPCFunc(ctx, r.Client, r.rpcCache, r.nodeName, r.namespace, r.timeout)
 	if err != nil || paladinRPC == nil {
 		return err
 	}
@@ -192,7 +207,7 @@ func (r *transactionReconcile) trackTransactionAndRequeue(ctx context.Context, p
 
 var getPaladinURLEndpointFunc = getPaladinURLEndpoint
 
-func getPaladinRPC(ctx context.Context, c client.Client, nodeName, namespace string, timeout string) (pldclient.PaladinClient, error) {
+func getPaladinRPC(ctx context.Context, c client.Client, cache *rpcCache, nodeName, namespace string, timeout string) (pldclient.PaladinClient, error) {
 
 	log := log.FromContext(ctx)
 	pName := generatePaladinName(nodeName)
@@ -215,9 +230,40 @@ func getPaladinRPC(ctx context.Context, c client.Client, nodeName, namespace str
 	if err != nil {
 		return nil, err
 	}
-	return pldclient.New().HTTP(ctx, &pldconf.HTTPClientConfig{
+
+	// Adding the timeout to the cache key to ensure that different timeouts are cached separately
+	// This is important because the timeout is used in the HTTP client config
+	// and different timeouts may require different configurations.
+	key := fmt.Sprintf("%s-%s", url, timeout)
+
+	// Check if the client is already in the cache
+	// Use a read lock to avoid blocking other goroutines
+	cache.mux.RLock()
+	if client, ok := cache.clients[key]; ok && client != nil {
+		cache.mux.RUnlock()
+		return client, nil
+	}
+	cache.mux.RUnlock()
+
+	// If not, create a new client and store it in the cache
+	cache.mux.Lock()
+	defer cache.mux.Unlock()
+
+	// Check again in the cache after acquiring the lock
+	// This is to ensure that another goroutine didn't create the client while we were waiting for the lock
+	if client, ok := cache.clients[key]; ok && client != nil {
+		return client, nil
+	}
+
+	client, err := pldclient.New().HTTP(ctx, &pldconf.HTTPClientConfig{
 		URL:               url,
 		ConnectionTimeout: confutil.P(timeout),
 		RequestTimeout:    confutil.P(timeout),
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	cache.clients[key] = client
+	return client, nil
 }

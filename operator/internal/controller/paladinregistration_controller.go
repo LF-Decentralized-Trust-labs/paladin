@@ -64,7 +64,8 @@ var registryABI = abi.ABI{
 // PaladinRegistrationReconciler reconciles a PaladinRegistration object
 type PaladinRegistrationReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	RPCCache *rpcCache
 }
 
 // allows generic functions by giving a mapping between the types and interfaces for the CR
@@ -96,13 +97,13 @@ func (r *PaladinRegistrationReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	} else if registryAddr == nil {
 		log.Info("waiting for registry address", "registry", reg.Name)
-		log.Info(fmt.Sprintf("'%s' A steps wait", req.Name))
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil // we're waiting
 	}
 	publishCount := 0
 
 	// First reconcile until we've submitting the registration tx
 	regTx := newTransactionReconcile(r.Client,
+		r.RPCCache,
 		"reg."+reg.Name,
 		reg.Spec.RegistryAdminNode /* for the root entry */, reg.Namespace,
 		&reg.Status.RegistrationTx,
@@ -132,6 +133,7 @@ func (r *PaladinRegistrationReconciler) Reconcile(ctx context.Context, req ctrl.
 	for _, transportName := range reg.Spec.Transports {
 		transportPublishStatus := reg.Status.PublishTxs[transportName]
 		regTx := newTransactionReconcile(r.Client,
+			r.RPCCache,
 			"reg."+reg.Name+"."+transportName,
 			reg.Spec.Node /* the node owns their transports */, reg.Namespace,
 			&transportPublishStatus,
@@ -259,7 +261,7 @@ func (r *PaladinRegistrationReconciler) getRegistryAddress(ctx context.Context, 
 func (r *PaladinRegistrationReconciler) buildRegistrationTX(ctx context.Context, reg *corev1alpha1.PaladinRegistration, registryAddr *pldtypes.EthAddress) (bool, *pldapi.TransactionInput, error) {
 
 	// We ask the node its name, so we know what to register it as
-	targetNodeRPC, err := getPaladinRPC(ctx, r.Client, reg.Spec.Node, reg.Namespace, "10s")
+	targetNodeRPC, err := getPaladinRPC(ctx, r.Client, r.RPCCache, reg.Spec.Node, reg.Namespace, "10s")
 	if err != nil || targetNodeRPC == nil {
 		return false, nil, err // not ready, or error
 	}
@@ -297,7 +299,7 @@ func (r *PaladinRegistrationReconciler) buildRegistrationTX(ctx context.Context,
 func (r *PaladinRegistrationReconciler) buildTransportTX(ctx context.Context, reg *corev1alpha1.PaladinRegistration, registryAddr *pldtypes.EthAddress, transportName string) (bool, *pldapi.TransactionInput, error) {
 
 	// Get the details from the node
-	regNodeRPC, err := getPaladinRPC(ctx, r.Client, reg.Spec.Node, reg.Namespace, "30s")
+	regNodeRPC, err := getPaladinRPC(ctx, r.Client, r.RPCCache, reg.Spec.Node, reg.Namespace, "30s")
 	if err != nil || regNodeRPC == nil {
 		return false, nil, err // not ready, or error
 	}

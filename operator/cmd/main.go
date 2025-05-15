@@ -127,10 +127,12 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+	rpcCache := controller.NewRPCCache()
 
 	if err = (&controller.PaladinReconciler{
-		Client:  mgr.GetClient(),
-		Scheme:  mgr.GetScheme(),
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+
 		Changes: controller.NewInFlight(30 * time.Second),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Paladin")
@@ -138,6 +140,7 @@ func main() {
 	}
 	if err = (controller.NewSmartContractDeploymentReconciler(
 		mgr.GetClient(),
+		rpcCache,
 		mgr.GetScheme(),
 	)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SmartContractDeployment")
@@ -172,15 +175,17 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controller.PaladinRegistrationReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		RPCCache: rpcCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PaladinRegistration")
 		os.Exit(1)
 	}
 	if err = (&controller.TransactionInvokeReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		RPCCache: rpcCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TransactionInvoke")
 		os.Exit(1)

@@ -44,11 +44,12 @@ import (
 // TransactionInvokeReconciler reconciles a TransactionInvoke object
 type TransactionInvokeReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	RPCCache *rpcCache
 
 	// Injected dependencies for testing
-	checkDepsFunc               func(ctx context.Context, c client.Client, namespace string, requiredContractDeployments []string, pStatus *corev1alpha1.ContactDependenciesStatus) (bool, bool, error)
-	newTransactionReconcileFunc func(c client.Client, idempotencyKeyPrefix string, nodeName string, namespace string, pStatus *corev1alpha1.TransactionSubmission, timeout string, txFactory func() (bool, *pldapi.TransactionInput, error)) transactionReconcileInterface
+	checkDepsFunc               func(context.Context, client.Client, string, []string, *corev1alpha1.ContactDependenciesStatus) (bool, bool, error)
+	newTransactionReconcileFunc func(client.Client, *rpcCache, string, string, string, *corev1alpha1.TransactionSubmission, string, func() (bool, *pldapi.TransactionInput, error)) transactionReconcileInterface
 }
 
 // allows generic functions by giving a mapping between the types and interfaces for the CR
@@ -83,7 +84,7 @@ func (r *TransactionInvokeReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 	depsChanged, ready, err := r.checkDepsFunc(ctx, r.Client, txi.Namespace, txi.Spec.ContractDeploymentDeps, &txi.Status.ContactDependenciesStatus)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	} else if depsChanged {
 		return r.updateStatusAndRequeue(ctx, &txi)
 	} else if !ready {
@@ -95,6 +96,7 @@ func (r *TransactionInvokeReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		r.newTransactionReconcileFunc = newTransactionReconcile
 	}
 	txReconcile := r.newTransactionReconcileFunc(r.Client,
+		r.RPCCache,
 		"txinvoke."+txi.Name,
 		txi.Spec.Node, txi.Namespace,
 		&txi.Status.TransactionSubmission,

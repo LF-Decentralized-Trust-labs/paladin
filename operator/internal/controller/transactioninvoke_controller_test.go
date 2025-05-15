@@ -161,7 +161,7 @@ func TestTransactionInvokeReconcile_Success(t *testing.T) {
 	}
 
 	// Mock transaction reconcile
-	reconciler.newTransactionReconcileFunc = func(c client.Client, idempotencyKeyPrefix string, nodeName string, namespace string, pStatus *corev1alpha1.TransactionSubmission, timeout string, txFactory func() (bool, *pldapi.TransactionInput, error)) transactionReconcileInterface {
+	reconciler.newTransactionReconcileFunc = func(c client.Client, r *rpcCache, idempotencyKeyPrefix string, nodeName string, namespace string, pStatus *corev1alpha1.TransactionSubmission, timeout string, txFactory func() (bool, *pldapi.TransactionInput, error)) transactionReconcileInterface {
 		return &mockTransactionReconcile{
 			pStatus:           pStatus,
 			statusChangedFlag: true,
