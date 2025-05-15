@@ -29,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldresty"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/sirupsen/logrus"
 )
@@ -43,7 +44,7 @@ const (
 
 // NewRPCClient Constructor
 func NewHTTPClient(ctx context.Context, conf *pldconf.HTTPClientConfig) (Client, error) {
-	rc, err := ParseHTTPConfig(ctx, conf)
+	rc, err := pldresty.New(ctx, conf)
 	if err != nil {
 		return nil, err
 	}

@@ -52,20 +52,6 @@ func TestWSConfigBadTLS(t *testing.T) {
 	assert.Regexp(t, "PD020401", err)
 }
 
-func TestHTTPonfigOK(t *testing.T) {
-	ctx := context.Background()
-	r, err := ParseHTTPConfig(ctx, &pldconf.HTTPClientConfig{URL: "http://localhost:8545"})
-	require.NoError(t, err)
-	assert.Equal(t, "http://localhost:8545", r.BaseURL)
-}
-
-func TestHTTPConfigTLSOK(t *testing.T) {
-	ctx := context.Background()
-	r, err := ParseHTTPConfig(ctx, &pldconf.HTTPClientConfig{URL: "https://localhost:8545"})
-	require.NoError(t, err)
-	assert.Equal(t, "https://localhost:8545", r.BaseURL)
-}
-
 func TestHTTPConfigBadURL(t *testing.T) {
 	ctx := context.Background()
 	_, err := NewHTTPClient(ctx, &pldconf.HTTPClientConfig{URL: "wss://localhost:8545"})

@@ -20,9 +20,6 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/go-resty/resty/v2"
-	"github.com/hyperledger/firefly-common/pkg/ffresty"
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
@@ -57,30 +54,4 @@ func ParseWSConfig(ctx context.Context, config *pldconf.WSClientConfig) (*wsclie
 		TLSClientConfig:        tlsConfig,
 		InitialConnectAttempts: confutil.IntMin(config.InitialConnectAttempts, 0, *pldconf.DefaultWSConfig.InitialConnectAttempts),
 	}, nil
-}
-
-func ParseHTTPConfig(ctx context.Context, config *pldconf.HTTPClientConfig) (*resty.Client, error) {
-	u, err := url.Parse(config.URL)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		return nil, i18n.WrapError(ctx, err, pldmsgs.MsgRPCClientInvalidHTTPURL, u)
-	}
-	if u.Scheme == "https" {
-		config.TLS.Enabled = true
-	}
-	tlsConfig, err := tlsconf.BuildTLSConfig(ctx, &config.TLS, tlsconf.ClientType)
-	if err != nil {
-		return nil, err
-	}
-	restyConf := ffresty.Config{
-		URL: u.String(),
-		HTTPConfig: ffresty.HTTPConfig{
-			HTTPHeaders:           config.HTTPHeaders,
-			AuthUsername:          config.Auth.Username,
-			AuthPassword:          config.Auth.Password,
-			TLSClientConfig:       tlsConfig,
-			HTTPRequestTimeout:    fftypes.FFDuration(confutil.DurationMin(config.RequestTimeout, 0, *pldconf.DefaultHTTPConfig.RequestTimeout)),
-			HTTPConnectionTimeout: fftypes.FFDuration(confutil.DurationMin(config.ConnectionTimeout, 0, *pldconf.DefaultHTTPConfig.ConnectionTimeout)),
-		},
-	}
-	return ffresty.NewWithConfig(ctx, restyConf), nil
 }
