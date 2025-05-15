@@ -690,6 +690,6 @@ func TestNewWSOk(t *testing.T) {
 
 	done()
 	_, err = ecf.NewWS()
-	require.Regexp(t, "FF00148", err)
+	require.Regexp(t, "PD021103", err)
 
 }

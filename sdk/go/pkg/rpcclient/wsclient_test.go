@@ -24,16 +24,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/wsclient"
+	"github.com/kaleido-io/paladin/config/pkg/confutil"
+	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/wsclient"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func generateConfig() *wsclient.WSConfig {
-	return &wsclient.WSConfig{}
-}
 
 func newTestWSRPC(t *testing.T) (context.Context, *wsRPCClient, chan string, chan string, func()) {
 	logrus.SetLevel(logrus.TraceLevel)
@@ -43,21 +41,29 @@ func newTestWSRPC(t *testing.T) (context.Context, *wsRPCClient, chan string, cha
 	})
 
 	// Init clean config
-	wsConfig := generateConfig()
+	wsConfig := &pldconf.WSClientConfig{}
 
-	wsConfig.HTTPURL = url
-	wsConfig.WSKeyPath = "/test"
-	wsConfig.HeartbeatInterval = 50 * time.Millisecond
-	wsConfig.InitialConnectAttempts = 2
-	wsConfig.DisableReconnect = true
+	wsConfig.URL = url + "/test"
+	wsConfig.HeartbeatInterval = confutil.P("50ms")
+	wsConfig.InitialConnectAttempts = confutil.P(2)
 
-	rc := WrapWSConfig(wsConfig)
 	ctx, cancelCtx := context.WithCancel(context.Background())
+	rc, err := NewWSClient(ctx, wsConfig)
+	require.NoError(t, err)
 	return ctx, rc.(*wsRPCClient), toServer, fromServer, func() {
 		close()
 		rc.Close()
 		cancelCtx()
 	}
+}
+
+func TestNewWSClientBadURL(t *testing.T) {
+	// Init clean config
+	wsConfig := &pldconf.WSClientConfig{}
+	wsConfig.URL = "!!!!:::"
+
+	_, err := NewWSClient(context.Background(), wsConfig)
+	assert.Regexp(t, "PD021100", err)
 }
 
 func TestWSRPCConnect(t *testing.T) {
@@ -70,23 +76,24 @@ func TestWSRPCConnect(t *testing.T) {
 
 func TestWSRPCConfError(t *testing.T) {
 	// Init clean config
-	wsConfig := generateConfig()
-	wsConfig.HTTPURL = "!!!!:::"
+	wsConfig := &pldconf.WSClientConfig{}
+	wsConfig.URL = "!!!!:::"
 
 	wsRPCClient := WrapWSConfig(wsConfig)
 
 	err := wsRPCClient.Connect(context.Background())
-	assert.Regexp(t, "FF00149", err)
+	assert.Regexp(t, "PD021100", err)
 }
 
 func TestWSRPCConnectError(t *testing.T) {
 	// Init clean config
-	wsConfig := generateConfig()
+	wsConfig := &pldconf.WSClientConfig{}
+	wsConfig.URL = "ws://test"
 
 	wsRPCClient := WrapWSConfig(wsConfig)
 
 	err := wsRPCClient.Connect(context.Background())
-	assert.Regexp(t, "FF00148", err)
+	assert.Regexp(t, "PD021103", err)
 }
 
 func TestWSRPCSubscribe(t *testing.T) {
@@ -379,8 +386,6 @@ func TestHandleReonnnectOK(t *testing.T) {
 	err = rc.client.Connect()
 	assert.NoError(t, err)
 
-	rc.wsConf.DisableReconnect = false
-
 	go rc.receiveLoop(ctx)
 
 	s, errChl := rc.addConfiguredSub(ctx, EthSubscribeConfig(), []interface{}{"newHeads"})
@@ -411,8 +416,6 @@ func TestHandleReonnnectFail(t *testing.T) {
 	var err error
 	rc.client, err = wsclient.New(ctx, &rc.wsConf, nil, nil /* so we can invoke it directly */)
 	assert.NoError(t, err)
-
-	rc.wsConf.DisableReconnect = false
 
 	_, _ = rc.addConfiguredSub(ctx, EthSubscribeConfig(), []interface{}{
 		map[bool]bool{false: true}, // cannot be serialized
@@ -452,8 +455,6 @@ func TestHandleAckNack(t *testing.T) {
 
 	err = rc.client.Connect()
 	assert.NoError(t, err)
-
-	rc.wsConf.DisableReconnect = false
 
 	go rc.receiveLoop(ctx)
 

@@ -177,7 +177,7 @@ func TestMTLSClientWithServer(t *testing.T) {
 	privateKeyFile, _ := os.CreateTemp("", "key.pem")
 	defer os.Remove(privateKeyFile.Name())
 	privateKeyBlock := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privateKeyBytes}
-	pem.Encode(privateKeyFile, privateKeyBlock)
+	_ = pem.Encode(privateKeyFile, privateKeyBlock)
 	serialNumber, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	x509Template := &x509.Certificate{
 		SerialNumber: serialNumber,
@@ -194,11 +194,11 @@ func TestMTLSClientWithServer(t *testing.T) {
 	assert.NoError(t, err)
 	publicKeyFile, _ := os.CreateTemp("", "cert.pem")
 	defer os.Remove(publicKeyFile.Name())
-	pem.Encode(publicKeyFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	_ = pem.Encode(publicKeyFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 
 	http.HandleFunc("/hello", func(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(200)
-		json.NewEncoder(res).Encode(map[string]interface{}{"hello": "world"})
+		_ = json.NewEncoder(res).Encode(map[string]interface{}{"hello": "world"})
 	})
 
 	// Create a CA certificate pool and add cert.pem to it
@@ -214,7 +214,6 @@ func TestMTLSClientWithServer(t *testing.T) {
 		ClientCAs:  caCertPool,
 		ClientAuth: tls.RequireAndVerifyClientCert,
 	}
-	tlsConfig.BuildNameToCertificate()
 
 	// Create a Server instance to listen on port 8443 with the TLS config
 	server := &http.Server{
@@ -224,13 +223,11 @@ func TestMTLSClientWithServer(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 	go func() {
-		select {
-		case <-ctx.Done():
-			shutdownContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			if err := server.Shutdown(shutdownContext); err != nil {
-				return
-			}
+		<-ctx.Done()
+		shutdownContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownContext); err != nil {
+			return
 		}
 	}()
 
@@ -241,7 +238,9 @@ func TestMTLSClientWithServer(t *testing.T) {
 
 	defer ln.Close()
 
-	go server.ServeTLS(ln, publicKeyFile.Name(), privateKeyFile.Name())
+	go func() {
+		_ = server.ServeTLS(ln, publicKeyFile.Name(), privateKeyFile.Name())
+	}()
 
 	// Use pldresty to test the mTLS client as well
 	c, err := New(ctx, &pldconf.HTTPClientConfig{

@@ -26,12 +26,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/wsclient"
+	"github.com/go-resty/resty/v2"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/wsclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -170,6 +171,10 @@ func newTestClientAndServerWebSockets(t *testing.T, methods ...testRPCMethod) (c
 	}
 }
 
+func TestWrapRestyClient(t *testing.T) {
+	WrapRestyClient(resty.New())
+}
+
 func TestHTTPBadConfig(t *testing.T) {
 	_, err := New().HTTP(context.Background(), &pldconf.HTTPClientConfig{})
 	require.Regexp(t, "PD020501", err)
@@ -177,7 +182,7 @@ func TestHTTPBadConfig(t *testing.T) {
 
 func TestWSBadConfig(t *testing.T) {
 	_, err := New().WebSocket(context.Background(), &pldconf.WSClientConfig{})
-	require.Regexp(t, "PD020500", err)
+	require.Regexp(t, "PD021100", err)
 }
 
 func TestInfoNotFoundNil(t *testing.T) {

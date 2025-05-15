@@ -151,4 +151,11 @@ var (
 	// SolUtils module PD0210XX
 	MsgSolBuildParseFailed = pde("PD021000", "Invalid link hash at position %d in bytecode. Fully qualified lib name: %s. Placeholder: %s. Lib name hash prefix: %s")
 	MsgSolBuildMissingLink = pde("PD021001", "The solidity build is unlinked and requires an address for '%s'")
+
+	// WSClient module PD0211XX
+	MsgWSClientInvalidWebSocketURL = pde("PD021100", "Invalid WebSocket URL: %s")
+	MsgWSClientSendTimedOut        = pde("PD021101", "Websocket send timed out")
+	MsgWSClientClosing             = pde("PD021102", "Websocket closing")
+	MsgWSClientConnectFailed       = pde("PD021103", "Websocket connect failed")
+	MsgWSClientHeartbeatTimeout    = pde("PD021104", "Websocket heartbeat timed out after %.2fms", 500)
 )

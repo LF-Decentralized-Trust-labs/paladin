@@ -42,9 +42,8 @@ type retryCtxKey struct{}
 type hostCtxKey struct{}
 
 type retryCtx struct {
-	id       string
-	start    time.Time
-	attempts uint
+	id    string
+	start time.Time
 }
 
 // OnAfterResponse when using SetDoNotParseResponse(true) for streaming binary replies,
