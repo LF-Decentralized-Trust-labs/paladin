@@ -6,7 +6,6 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: zeto-anon-enc
 spec:
-  node: node1
   from: zeto.operator
   txType: public
   toTemplate: '{{ index .status.resolvedContractAddresses "zeto-factory" }}'

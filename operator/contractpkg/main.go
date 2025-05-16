@@ -167,7 +167,6 @@ func (m *ContractMap) process(name string, b *ContractMapBuild) error {
 			},
 		},
 		Spec: corev1alpha1.SmartContractDeploymentSpec{
-			Node:                        "node1",
 			TxType:                      "public",
 			From:                        fmt.Sprintf("%s.operator", firstNameSegment),
 			ParamsJSON:                  pldtypes.JSONString(b.Params).Pretty(),

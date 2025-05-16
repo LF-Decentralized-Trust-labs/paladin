@@ -94,13 +94,24 @@ func (r *SmartContractDeploymentReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
+	// Get paladin node name
+	paladinNode := scd.Spec.Node
+	if paladinNode == "" {
+		paladinNodes := corev1alpha1.PaladinList{}
+		if err := r.Client.List(ctx, &paladinNodes, client.InNamespace(scd.Namespace)); err != nil || len(paladinNodes.Items) == 0 {
+			return ctrl.Result{}, fmt.Errorf("paladin nodes not found")
+		}
+		paladinNode = paladinNodes.Items[0].Name
+	}
+
 	// Use injected dependency for transaction reconcile
 	if r.newTransactionReconcileFunc == nil {
 		r.newTransactionReconcileFunc = newTransactionReconcile
 	}
+
 	txReconcile := r.newTransactionReconcileFunc(r.Client,
 		"scdeploy."+scd.Name,
-		scd.Spec.Node, scd.Namespace,
+		paladinNode, scd.Namespace,
 		&scd.Status.TransactionSubmission,
 		"10s",
 		func() (bool, *pldapi.TransactionInput, error) { return r.buildDeployTransaction(ctx, &scd) },
@@ -226,7 +237,7 @@ func (r *SmartContractDeploymentReconciler) reconcilePaladin(ctx context.Context
 
 	if err := r.Client.List(ctx, scds, client.InNamespace(paladin.Namespace)); err == nil {
 		for _, scd := range scds.Items {
-			if scd.Spec.Node == paladin.Name {
+			if scd.Spec.Node == "" || scd.Spec.Node == paladin.Name {
 				reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(&scd)})
 			}
 		}
