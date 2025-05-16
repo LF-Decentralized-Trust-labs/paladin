@@ -5,6 +5,9 @@
 # - none (or left empty): Only the operator will be installed.
 mode: devnet
 
+# Number of Paladin and besu nodes to deploy. This setting is only relevant when mode is set to "devnet".
+nodeCount: 3
+
 # Default values for paladin-operator
 operator:
   name: paladin-operator
@@ -90,20 +93,25 @@ prometheus:
     enabled: false  # Enable if you need the push gateway
 
 paladin:
+  nodeNamePrefix: node
   image:
     repository: ghcr.io/lf-decentralized-trust-labs/paladin
     tag: main
     pullPolicy: Always
   labels:
     app: paladin
+  baseNodePort: 31548
   
 besu:
+  nodeNamePrefix: node
   image:
     repository: hyperledger/besu
     tag: latest
     pullPolicy: Always
   labels:
     app: besu
+  baseNodePort: 31545
+  
 postgres: # the postgres container runs as a sidecar to the paladin container
   image:
     repository: postgres

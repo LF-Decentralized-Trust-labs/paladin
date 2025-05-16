@@ -93,8 +93,9 @@ spec:
                   See https://docs.soliditylang.org/en/latest/using-the-compiler.html#library-linking for detail
                 type: object
               node:
-                description: The node to use to deploy - reference to a PaladinNode
-                  CR
+                description: |-
+                  The node to use to deploy - reference to a PaladinNode CR, if not set the Operator will choose
+                  a node from the PaladinNode CRs.
                 type: string
               paramsJSON:
                 description: JSON parameter data (array, object, or empty if no params)
@@ -118,7 +119,6 @@ spec:
             - abiJSON
             - bytecode
             - from
-            - node
             - txType
             type: object
           status:

@@ -1,5 +1,7 @@
 CLUSTER_NAME ?= paladin
 NAMESPACE ?= default
+NODE_COUNT ?= 3
+MODE ?= devnet
 
 OPERATOR_IMAGE_NAME ?= paladin-operator
 OPERATOR_IMAGE_TAG ?= test
@@ -208,6 +210,7 @@ helm-install-dependencies: ## Install operator using Helm.
 helm-install: helm-install-dependencies ## Install operator using Helm.
 	$(HELM) upgrade --install ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} \
 		-n ${NAMESPACE} --create-namespace \
+		--set nodeCount=${NODE_COUNT} \
 		--set operator.namespace=${NAMESPACE} \
 		--set operator.image.repository=${OPERATOR_IMAGE_NAME} \
 		--set operator.image.pullPolicy=IfNotPresent \
