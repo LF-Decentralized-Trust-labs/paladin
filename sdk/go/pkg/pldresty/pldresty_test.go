@@ -27,6 +27,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -40,6 +41,7 @@ import (
 
 	"github.com/jarcoal/httpmock"
 	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
+	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,6 +54,9 @@ func TestRequestOK(t *testing.T) {
 		Auth: pldconf.HTTPBasicAuthConfig{
 			Username: "user",
 			Password: "pass",
+		},
+		Retry: pldconf.HTTPRetryConfig{
+			Enabled: true,
 		},
 	})
 	require.Nil(t, err)
@@ -111,6 +116,70 @@ func TestRequestOKForGzip(t *testing.T) {
 
 	assert.Equal(t, 1, httpmock.GetTotalCallCount())
 }
+
+func TestRequestRetry(t *testing.T) {
+	ctx := context.Background()
+	c, err := New(ctx, &pldconf.HTTPClientConfig{
+		URL: "http://localhost:12345",
+		Retry: pldconf.HTTPRetryConfig{
+			Enabled:      true,
+			InitialDelay: confutil.P("1ns"),
+		},
+	})
+	require.Nil(t, err)
+
+	httpmock.ActivateNonDefault(c.GetClient())
+	defer httpmock.DeactivateAndReset()
+
+	httpmock.RegisterResponder("GET", "http://localhost:12345/test",
+		httpmock.NewStringResponder(500, `{"message": "pop"}`))
+
+	resp, err := c.R().Get("/test")
+	require.NoError(t, err)
+	assert.Equal(t, 500, resp.StatusCode())
+	assert.Equal(t, 6, httpmock.GetTotalCallCount())
+}
+
+func TestRequestRetryErrorStatusCodeRegex(t *testing.T) {
+	ctx := context.Background()
+	c, err := New(ctx, &pldconf.HTTPClientConfig{
+		URL: "http://localhost:12345",
+		Retry: pldconf.HTTPRetryConfig{
+			Enabled:          true,
+			InitialDelay:     confutil.P("1ns"),
+			ErrorStatusCodes: "(?:429|503)",
+		},
+	})
+	require.Nil(t, err)
+
+	httpmock.ActivateNonDefault(c.GetClient())
+	defer httpmock.DeactivateAndReset()
+
+	httpmock.RegisterResponder("GET", "http://localhost:12345/test",
+		httpmock.NewStringResponder(500, `{"message": "pop"}`))
+
+	httpmock.RegisterResponder("GET", "http://localhost:12345/test2",
+		httpmock.NewStringResponder(429, `{"message": "pop"}`))
+
+	httpmock.RegisterResponder("GET", "http://localhost:12345/test3",
+		httpmock.NewErrorResponder(errors.New("not http response")))
+
+	resp, err := c.R().Get("/test")
+	require.NoError(t, err)
+	assert.Equal(t, 500, resp.StatusCode())
+	assert.Equal(t, 1, httpmock.GetTotalCallCount())
+
+	resp, err = c.R().Get("/test2")
+	require.NoError(t, err)
+	assert.Equal(t, 429, resp.StatusCode())
+	assert.Equal(t, 7, httpmock.GetTotalCallCount())
+
+	resp, err = c.R().Get("/test3")
+	require.Error(t, err)
+	assert.Equal(t, 0, resp.StatusCode())
+	assert.Equal(t, 13, httpmock.GetTotalCallCount())
+}
+
 func TestLongResponse(t *testing.T) {
 	ctx := context.Background()
 	c, err := New(ctx, &pldconf.HTTPClientConfig{

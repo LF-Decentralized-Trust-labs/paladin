@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -42,8 +43,9 @@ type retryCtxKey struct{}
 type hostCtxKey struct{}
 
 type retryCtx struct {
-	id    string
-	start time.Time
+	id       string
+	start    time.Time
+	attempts uint
 }
 
 // OnAfterResponse when using SetDoNotParseResponse(true) for streaming binary replies,
@@ -77,12 +79,6 @@ func New(ctx context.Context, conf *pldconf.HTTPClientConfig) (client *resty.Cli
 			KeepAlive: time.Duration(confutil.DurationMin(conf.ConnectionTimeout, 0, *pldconf.DefaultHTTPConfig.ConnectionTimeout)),
 		}).DialContext,
 		ForceAttemptHTTP2: true,
-		// MaxIdleConns:          ffrestyConfig.HTTPMaxIdleConns,
-		// MaxConnsPerHost:       ffrestyConfig.HTTPMaxConnsPerHost,
-		// MaxIdleConnsPerHost:   ffrestyConfig.HTTPMaxConnsPerHost,
-		// IdleConnTimeout:       time.Duration(ffrestyConfig.HTTPIdleConnTimeout),
-		// TLSHandshakeTimeout:   time.Duration(ffrestyConfig.HTTPTLSHandshakeTimeout),
-		// ExpectContinueTimeout: time.Duration(ffrestyConfig.HTTPExpectContinueTimeout),
 	}
 
 	u, err := url.Parse(conf.URL)
@@ -155,8 +151,41 @@ func New(ctx context.Context, conf *pldconf.HTTPClientConfig) (client *resty.Cli
 			client.SetHeader(k, vs)
 		}
 	}
+
 	if conf.Auth.Username != "" && conf.Auth.Password != "" {
 		client.SetHeader("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", conf.Auth.Username, conf.Auth.Password)))))
+	}
+
+	if conf.Retry.Enabled {
+		var retryStatusCodeRegex *regexp.Regexp
+		if conf.Retry.ErrorStatusCodes != "" {
+			retryStatusCodeRegex = regexp.MustCompile(conf.Retry.ErrorStatusCodes)
+		}
+
+		retryCount := confutil.IntMin(conf.Retry.Count, 0, *pldconf.DefaultHTTPConfig.Retry.Count)
+		minTimeout := time.Duration(confutil.DurationMin(conf.Retry.InitialDelay, 0, *pldconf.DefaultHTTPConfig.Retry.InitialDelay))
+		maxTimeout := time.Duration(confutil.DurationMin(conf.Retry.MaximumDelay, 0, *pldconf.DefaultHTTPConfig.Retry.MaximumDelay))
+
+		client.
+			SetRetryCount(retryCount).
+			SetRetryWaitTime(minTimeout).
+			SetRetryMaxWaitTime(maxTimeout).
+			AddRetryCondition(func(r *resty.Response, err error) bool {
+				if r == nil || r.IsSuccess() {
+					return false
+				}
+
+				if r.StatusCode() > 0 && retryStatusCodeRegex != nil && !retryStatusCodeRegex.MatchString(r.Status()) {
+					// the error status code doesn't match the retry status code regex, stop retry
+					return false
+				}
+
+				rCtx := r.Request.Context()
+				rc := rCtx.Value(retryCtxKey{}).(*retryCtx)
+				rc.attempts++
+				log.L(rCtx).Infof("retry %d/%d (min=%dms/max=%dms) status=%d", rc.attempts, retryCount, minTimeout.Milliseconds(), maxTimeout.Milliseconds(), r.StatusCode())
+				return true
+			})
 	}
 
 	return client, nil
