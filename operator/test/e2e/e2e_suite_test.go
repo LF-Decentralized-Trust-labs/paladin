@@ -26,7 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var paladinPrefix = "worker"
+var paladinPrefix = "node"
 
 // Run e2e tests using the Ginkgo runner.
 func TestE2E(t *testing.T) {
