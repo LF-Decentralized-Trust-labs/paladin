@@ -110,7 +110,7 @@ await newBondTracker(issuerCustodianGroup, bondIssuer, {
 ```
 
 The [private bond tracker](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/private/BondTracker.sol)
-is an ERC-20 token, and implements the [INotoHooks](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/private/interfaces/INotoHooks.sol) interface.
+is an ERC-20 token, and implements the [INotoHooks](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/interfaces/INotoHooks.sol) interface.
 
 Noto supports using a Pente private smart contract to define "hooks" which are executed inline with every mint/transfer.
 This provides a flexible (and EVM-native) means of writing custom policies that are enforced by the notary. In this case,

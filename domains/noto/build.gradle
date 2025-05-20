@@ -61,9 +61,9 @@ task copyInternalSolidity(type: Copy) {
     from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/domains/interfaces/INoto.sol/INoto.json'
         include 'contracts/domains/interfaces/INotoErrors.sol/INotoErrors.json'
+        include 'contracts/domains/interfaces/INotoHooks.sol/INotoHooks.json'
         include 'contracts/domains/noto/NotoFactory.sol/NotoFactory.json'
         include 'contracts/domains/noto/Noto.sol/Noto.json'
-        include 'contracts/private/interfaces/INotoHooks.sol/INotoHooks.json'
     }
 
     // Flatten all paths into the destination folder

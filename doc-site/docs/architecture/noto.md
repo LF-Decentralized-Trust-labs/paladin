@@ -264,7 +264,7 @@ Inputs:
 
 ## Public ABI
 
-The public ABI of Noto is implemented in Solidity by [Noto.sol](../../solidity/contracts/domains/noto/Noto.sol),
+The public ABI of Noto is implemented in Solidity by [Noto.sol](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/noto/Noto.sol),
 and can be accessed by calling `ptx_sendTransaction` with `"type": "public"`. However, it is not often required
 to invoke the public ABI directly.
 
@@ -519,9 +519,9 @@ In addition, the following restrictions will always be enforced, and cannot be d
 ### Notary mode: hooks
 
 When a Noto contract is constructed with notary mode `hooks`, the address of a private Pente contract implementing
-[INotoHooks](../../../solidity/contracts/private/interfaces/INotoHooks.sol) must be provided. This contract may be
-deployed into a privacy group only visible to the notary, or into a group that includes other parties for
-observability.
+[INotoHooks](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/interfaces/INotoHooks.sol)
+must be provided. This contract may be deployed into a privacy group only visible to the notary, or into a group
+that includes other parties for observability.
 
 The relevant hook will be invoked for each Noto operation, allowing the contract to determine if the operation is
 allowed, and to trigger any additional custom policies and side-effects. Hooks can even be used to track Noto token

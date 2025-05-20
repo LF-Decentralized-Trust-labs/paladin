@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import {INotoHooks} from "./interfaces/INotoHooks.sol";
+import {INotoHooks} from "../domains/interfaces/INotoHooks.sol";
 
 /**
  * Helpers for tracking locked amounts from Noto hooks contracts.

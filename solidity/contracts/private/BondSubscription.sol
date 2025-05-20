@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IPenteExternalCall} from "./interfaces/IPenteExternalCall.sol";
+import {IPenteExternalCall} from "../domains/interfaces/IPenteExternalCall.sol";
 import {Atom, AtomFactory} from "../shared/Atom.sol";
 
 /**

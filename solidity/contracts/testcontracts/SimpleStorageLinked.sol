@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.0;
 
-import "../private/interfaces/IPenteExternalCall.sol";
-import "./SimpleStorage.sol";
+import {IPenteExternalCall} from "../domains/interfaces/IPenteExternalCall.sol";
+import {SimpleStorage} from "./SimpleStorage.sol";
 
 /// @title Tests that PenteExternalCall can propagate all set() calls to another linked contract
 contract SimpleStorageLinked is IPenteExternalCall {

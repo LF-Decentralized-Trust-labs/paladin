@@ -87,7 +87,7 @@
                              (e.type().equals("event") && (e.name().equals("PenteApproved") || e.name().equals("PenteTransition")))
              ).toList());
              var externalCallABI = JsonABI.fromJSONResourceEntry(getClass().getClassLoader(),
-                     "contracts/private/interfaces/IPenteExternalCall.sol/IPenteExternalCall.json",
+                     "contracts/domains/interfaces/IPenteExternalCall.sol/IPenteExternalCall.json",
                      "abi");
              externalCallEventABI = externalCallABI.getABIEntry("event", "PenteExternalCall");
          } catch (Exception t) {

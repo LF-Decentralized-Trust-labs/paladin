@@ -41,7 +41,7 @@ jar {
         include 'contracts/domains/pente/PenteFactory.sol/PenteFactory.json'
         include 'contracts/domains/pente/PentePrivacyGroup.sol/PentePrivacyGroup.json'
         include 'contracts/domains/interfaces/IPente.sol/IPente.json'
-        include 'contracts/private/interfaces/IPenteExternalCall.sol/IPenteExternalCall.json'
+        include 'contracts/domains/interfaces/IPenteExternalCall.sol/IPenteExternalCall.json'
     }
 
     from sourceSets.main.output
