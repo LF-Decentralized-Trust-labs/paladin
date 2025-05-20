@@ -6,6 +6,12 @@ import * as zetoPublicJSON from "./abis/Zeto_Anon.json";
 
 const POLL_TIMEOUT_MS = 10000;
 
+// Algorithm/verifier types specific to Zeto
+export const algorithmZetoSnarkBJJ = (domainName: string) =>
+  `domain:${domainName}:snark:babyjubjub`;
+export const IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X =
+  "iden3_pubkey_babyjubjub_compressed_0x";
+
 export interface ZetoOptions {
   pollTimeout?: number;
 }
