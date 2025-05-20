@@ -71,9 +71,8 @@ spec:
                 description: The name or full signature of the function to invoke
                 type: string
               node:
-                description: |-
-                  The node to use to deploy - reference to a PaladinNode CR, if not set the Operator will choose
-                  a node from the PaladinNode CRs.
+                description: The node to use to deploy - reference to a PaladinNode
+                  CR
                 type: string
               paramsJSONTemplate:
                 description: |-

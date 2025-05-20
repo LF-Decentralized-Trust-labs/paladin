@@ -167,6 +167,7 @@ func (m *ContractMap) process(name string, b *ContractMapBuild) error {
 			},
 		},
 		Spec: corev1alpha1.SmartContractDeploymentSpec{
+			Node:                        "node1",
 			TxType:                      "public",
 			From:                        fmt.Sprintf("%s.operator", firstNameSegment),
 			ParamsJSON:                  pldtypes.JSONString(b.Params).Pretty(),
@@ -201,7 +202,7 @@ func template() error {
 	// Step 1: Create the destination directory if it doesn't exist
 	err := os.MkdirAll(destDir, 0755)
 	if err != nil {
-		return fmt.Errorf("Error creating directory %s: %v", destDir, err)
+		return fmt.Errorf("error creating directory %s: %v", destDir, err)
 	}
 
 	// Step 2: Copy files from source patterns to the destination directory
@@ -214,14 +215,14 @@ func template() error {
 		pattern = filepath.Join(srcDir, pattern)
 		files, err := filepath.Glob(pattern)
 		if err != nil {
-			return fmt.Errorf("Error finding files with pattern %s: %v", pattern, err)
+			return fmt.Errorf("error finding files with pattern %s: %v", pattern, err)
 		}
 
 		for _, srcFile := range files {
 			dstFile := filepath.Join(destDir, filepath.Base(srcFile))
 			err := copyFile(srcFile, dstFile)
 			if err != nil {
-				return fmt.Errorf("Error copying file from %s to %s: %v", srcFile, dstFile, err)
+				return fmt.Errorf("error copying file from %s to %s: %v", srcFile, dstFile, err)
 			}
 		}
 	}
@@ -229,11 +230,11 @@ func template() error {
 	// Step 3: Process all .yaml files in the destination directory
 	files, err := filepath.Glob(filepath.Join(destDir, "*.yaml"))
 	if err != nil {
-		return fmt.Errorf("Error finding files: %v", err)
+		return fmt.Errorf("error finding files: %v", err)
 	}
 
 	if len(files) == 0 {
-		return fmt.Errorf("No '.yaml' files found in the directory")
+		return fmt.Errorf("no '.yaml' files found in the directory")
 	}
 
 	// Compile the regular expression pattern
@@ -244,11 +245,14 @@ func template() error {
 		// Read the file content
 		content, err := os.ReadFile(file)
 		if err != nil {
-			return fmt.Errorf("Error reading file %s: %v", file, err)
+			return fmt.Errorf("error reading file %s: %v", file, err)
 		}
 
 		// Perform the regex replacement
 		newContent := pattern.ReplaceAllString(string(content), "{{ `{{${1}}}` }}")
+
+		// Replace the node name prefix
+		newContent = strings.ReplaceAll(newContent, "node1", "{{ .Values.paladin.nodeNamePrefix }}1")
 
 		// Add conditional wrapper around the content
 		vScopes := scopes(file)
@@ -275,7 +279,7 @@ func template() error {
 		// Write the modified content back to the same file
 		err = os.WriteFile(file, []byte(newContent), fs.FileMode(0644))
 		if err != nil {
-			return fmt.Errorf("Error writing file %s: %v", file, err)
+			return fmt.Errorf("error writing file %s: %v", file, err)
 		}
 
 		// Print a message indicating the file has been processed
@@ -294,7 +298,7 @@ func generateArtifacts() error {
 	// Create the output directory if it doesn't exist
 	err := os.MkdirAll(outDir, 0755)
 	if err != nil {
-		return fmt.Errorf("Error creating directory %s: %v", outDir, err)
+		return fmt.Errorf("error creating directory %s: %v", outDir, err)
 	}
 
 	// For each scope, combine the YAML files
@@ -303,7 +307,7 @@ func generateArtifacts() error {
 		// Collect all files that match the scope
 		files, err := filepath.Glob(filepath.Join(srcDir, "*.yaml"))
 		if err != nil {
-			return fmt.Errorf("Error finding YAML files in %s: %v", srcDir, err)
+			return fmt.Errorf("error finding YAML files in %s: %v", srcDir, err)
 		}
 
 		for _, file := range files {
@@ -312,7 +316,7 @@ func generateArtifacts() error {
 			if fileBelongsToScope(filename, scopeName) {
 				content, err := os.ReadFile(file)
 				if err != nil {
-					return fmt.Errorf("Error reading file %s: %v", file, err)
+					return fmt.Errorf("error reading file %s: %v", file, err)
 				}
 				// Add a YAML document separator if needed
 				if len(combinedContent) > 0 {
@@ -327,7 +331,7 @@ func generateArtifacts() error {
 			outFile := filepath.Join(outDir, fmt.Sprintf("%s.yaml", scopeName))
 			err = os.WriteFile(outFile, []byte(combinedContent), 0644)
 			if err != nil {
-				return fmt.Errorf("Error writing combined YAML file %s: %v", outFile, err)
+				return fmt.Errorf("error writing combined YAML file %s: %v", outFile, err)
 			}
 			fmt.Printf("Combined YAML for scope '%s' written to %s\n", scopeName, outFile)
 		} else {
@@ -338,7 +342,7 @@ func generateArtifacts() error {
 	// Create a .tar.gz archive for all YAML files in the source directory
 	err = createTarGz(srcDir, filepath.Join(outDir, "artifacts.tar.gz"))
 	if err != nil {
-		return fmt.Errorf("Error creating tar.gz archive: %v", err)
+		return fmt.Errorf("error creating tar.gz archive: %v", err)
 	}
 
 	fmt.Printf("Tar.gz archive created at %s\n", filepath.Join(outDir, "artifacts.tar.gz"))
@@ -350,7 +354,7 @@ func createTarGz(srcDir, destFile string) error {
 	// Create the output file
 	outFile, err := os.Create(destFile)
 	if err != nil {
-		return fmt.Errorf("Error creating tar.gz file %s: %v", destFile, err)
+		return fmt.Errorf("error creating tar.gz file %s: %v", destFile, err)
 	}
 	defer outFile.Close()
 
@@ -377,7 +381,7 @@ func createTarGz(srcDir, destFile string) error {
 		if filepath.Ext(path) == ".yaml" {
 			file, err := os.Open(path)
 			if err != nil {
-				return fmt.Errorf("Error opening file %s: %v", path, err)
+				return fmt.Errorf("error opening file %s: %v", path, err)
 			}
 			defer file.Close()
 
@@ -389,19 +393,19 @@ func createTarGz(srcDir, destFile string) error {
 				ModTime: info.ModTime(),
 			}
 			if err := tw.WriteHeader(header); err != nil {
-				return fmt.Errorf("Error writing tar header for file %s: %v", path, err)
+				return fmt.Errorf("error writing tar header for file %s: %v", path, err)
 			}
 
 			// Copy the file content to the tar writer
 			_, err = io.Copy(tw, file)
 			if err != nil {
-				return fmt.Errorf("Error writing file %s to tar: %v", path, err)
+				return fmt.Errorf("error writing file %s to tar: %v", path, err)
 			}
 		}
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("Error walking the directory %s: %v", srcDir, err)
+		return fmt.Errorf("error walking the directory %s: %v", srcDir, err)
 	}
 
 	return nil
@@ -433,27 +437,27 @@ func copyFile(src, dst string) error {
 	// Open the source file
 	srcFile, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("Error opening source file %s: %w", src, err)
+		return fmt.Errorf("error opening source file %s: %w", src, err)
 	}
 	defer srcFile.Close()
 
 	// Create the destination file
 	dstFile, err := os.Create(dst)
 	if err != nil {
-		return fmt.Errorf("Error creating destination file %s: %w", dst, err)
+		return fmt.Errorf("error creating destination file %s: %w", dst, err)
 	}
 	defer dstFile.Close()
 
 	// Copy the content from source to destination
 	_, err = io.Copy(dstFile, srcFile)
 	if err != nil {
-		return fmt.Errorf("Error copying from %s to %s: %w", src, dst, err)
+		return fmt.Errorf("error copying from %s to %s: %w", src, dst, err)
 	}
 
 	// Flush and close the files
 	err = dstFile.Sync()
 	if err != nil {
-		return fmt.Errorf("Error syncing destination file %s: %w", dst, err)
+		return fmt.Errorf("error syncing destination file %s: %w", dst, err)
 	}
 
 	return nil

@@ -354,9 +354,9 @@ task verifyBesu(dependsOn: verifyOperator) {
     doLast {
         println 'Waiting for besu statefulSet to become ready...'
 
-        verifyResourceCreated(namespace,  'statefulset', 'besu-evm1', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'besu-evm2', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'besu-evm3', "1", 120)
+        verifyResourceCreated(namespace, 'statefulset', 'besu-node1', "1", 120)
+        verifyResourceCreated(namespace, 'statefulset', 'besu-node2', "1", 120)
+        verifyResourceCreated(namespace, 'statefulset', 'besu-node3', "1", 120)
     }
 }
 
@@ -365,9 +365,9 @@ task verifyPaladin(dependsOn: verifyBesu) {
     doLast {
         println 'Waiting for paladin statefulSet to become ready...'
 
-        verifyResourceCreated(namespace, 'statefulset', 'paladin-worker1', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'paladin-worker2', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'paladin-worker3', "1", 120)
+        verifyResourceCreated(namespace, 'statefulset', 'paladin-node1', "1", 120)
+        verifyResourceCreated(namespace, 'statefulset', 'paladin-node2', "1", 120)
+        verifyResourceCreated(namespace, 'statefulset', 'paladin-node3', "1", 120)
     }
 }
 

@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -142,13 +141,6 @@ func (r *PaladinRegistrationReconciler) Reconcile(ctx context.Context, req ctrl.
 		)
 		err := regTx.reconcile(ctx)
 		if err != nil {
-			if strings.Contains(err.Error(), "context deadline exceeded") {
-				// r.restartSS(ctx, &reg)
-				log.Info(fmt.Sprintf("'%s' E steps ERROR CONTEXT", req.Name))
-			} else {
-				log.Info(fmt.Sprintf("'%s' E steps ERROR", req.Name))
-			}
-			// log.Info(err, "Failed to reconcile transport transaction", "transport", transportName)
 			requeueAfter = 100 * time.Millisecond // retry
 			continue
 		} else if regTx.isStatusChanged() {

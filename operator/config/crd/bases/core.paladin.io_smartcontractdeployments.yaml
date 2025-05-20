@@ -94,7 +94,7 @@ spec:
                 type: object
               node:
                 description: |-
-                  The node to use to deploy - reference to a PaladinNode CR, if not set the Operator will choose
+                  description: The node to use to deploy - reference to a PaladinNode CR
                   a node from the PaladinNode CRs.
                 type: string
               paramsJSON:

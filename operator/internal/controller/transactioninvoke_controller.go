@@ -90,23 +90,13 @@ func (r *TransactionInvokeReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// Get paladin node name
-	paladinNode := txi.Spec.Node
-	if paladinNode == "" {
-		paladinNodes := corev1alpha1.PaladinList{}
-		if err := r.Client.List(ctx, &paladinNodes, client.InNamespace(txi.Namespace)); err != nil || len(paladinNodes.Items) == 0 {
-			return ctrl.Result{}, fmt.Errorf("paladin nodes not found")
-		}
-		paladinNode = paladinNodes.Items[0].Name
-	}
-
 	// Use injected dependency for transaction reconcile
 	if r.newTransactionReconcileFunc == nil {
 		r.newTransactionReconcileFunc = newTransactionReconcile
 	}
 	txReconcile := r.newTransactionReconcileFunc(r.Client,
 		"txinvoke."+txi.Name,
-		paladinNode, txi.Namespace,
+		txi.Spec.Node, txi.Namespace,
 		&txi.Status.TransactionSubmission,
 		"5s",
 		func() (bool, *pldapi.TransactionInput, error) { return r.buildDeployTransaction(&txi) },
@@ -253,7 +243,7 @@ func (r *TransactionInvokeReconciler) reconcilePaladin(ctx context.Context, obj 
 
 	if err := r.Client.List(ctx, tis, client.InNamespace(paladin.Namespace)); err == nil {
 		for _, ti := range tis.Items {
-			if ti.Spec.Node == "" || ti.Spec.Node == paladin.Name {
+			if ti.Spec.Node == paladin.Name {
 				reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(&ti)})
 			}
 		}

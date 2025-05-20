@@ -35,9 +35,7 @@ type TransactionInvokeSpec struct {
 	// of test infrastructure.
 	ContractDeploymentDeps []string `json:"requiredContractDeployments,omitempty"`
 
-	// The node to use to deploy - reference to a PaladinNode CR, if not set the Operator will choose
-	// a node from the PaladinNode CRs.
-	// +optional
+	// The node to use to deploy - reference to a PaladinNode CR
 	Node string `json:"node,omitempty"`
 	// +kubebuilder:validation:Enum=public;private
 	// +kubebuilder:default=public
