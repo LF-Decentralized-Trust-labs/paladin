@@ -69,6 +69,11 @@ func newTestServer(t *testing.T, rpcHandler testRPCHander) (context.Context, *rp
 	}
 }
 
+func TestNewHTTPClientError(t *testing.T) {
+	_, err := NewHTTPClient(context.Background(), &pldconf.HTTPClientConfig{})
+	require.Error(t, err)
+}
+
 func TestSyncRequestOK(t *testing.T) {
 
 	rpcRequestBytes := []byte(`{

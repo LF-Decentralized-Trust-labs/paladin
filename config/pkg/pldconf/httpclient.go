@@ -25,11 +25,20 @@ type HTTPBasicAuthConfig struct {
 	Password string `json:"password"`
 }
 
+type HTTPRetryConfig struct {
+	Enabled          bool    `json:"enabled"`
+	Count            *int    `json:"count,omitempty"`
+	InitialDelay     *string `json:"initialDelay,omitempty"`
+	MaximumDelay     *string `json:"maximumDelay,omitempty"`
+	ErrorStatusCodes string  `json:"errorStatusCodes,omitempty"` // a regex string to match against the status codes which should be retried
+}
+
 type HTTPClientConfig struct {
 	URL               string                 `json:"url"`
 	HTTPHeaders       map[string]interface{} `json:"httpHeaders"`
 	Auth              HTTPBasicAuthConfig    `json:"auth"`
 	TLS               TLSConfig              `json:"tls"`
+	Retry             HTTPRetryConfig        `json:"retry,omitempty"`
 	RequestTimeout    *string                `json:"requestTimeout,omitempty"`
 	ConnectionTimeout *string                `json:"connectionTimeout,omitempty"`
 }
@@ -37,4 +46,10 @@ type HTTPClientConfig struct {
 var DefaultHTTPConfig = &HTTPClientConfig{
 	ConnectionTimeout: confutil.P("30s"),
 	RequestTimeout:    confutil.P("30s"),
+	Retry: HTTPRetryConfig{
+		Enabled:      false,
+		Count:        confutil.P(5),
+		InitialDelay: confutil.P("250ms"),
+		MaximumDelay: confutil.P("30s"),
+	},
 }

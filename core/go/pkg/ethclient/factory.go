@@ -19,7 +19,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -59,7 +58,7 @@ type ethClientFactory struct {
 
 	sharedWSClient *ethClient
 
-	wsConf *wsclient.WSConfig
+	wsConf *pldconf.WSClientConfig
 
 	chainID int64
 }
@@ -107,10 +106,12 @@ func newEthClientFactory(bgCtx context.Context, keymgr KeyManager, conf *pldconf
 			conf.WS.URL = "ws" + noHTTPPrefix
 		}
 	}
-	ecf.wsConf, err = rpcclient.ParseWSConfig(bgCtx, &conf.WS)
+	err = rpcclient.ValidateWSClientConfig(bgCtx, &conf.WS)
 	if err != nil {
 		return nil, err
 	}
+	ecf.wsConf = &conf.WS
+
 	return ecf, nil
 }
 

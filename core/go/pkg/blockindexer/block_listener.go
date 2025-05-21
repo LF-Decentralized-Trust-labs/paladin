@@ -56,10 +56,6 @@ type blockListener struct {
 }
 
 func newBlockListener(ctx context.Context, conf *pldconf.BlockIndexerConfig, wsConfig *pldconf.WSClientConfig) (bl *blockListener, err error) {
-	wscConf, err := rpcclient.ParseWSConfig(ctx, wsConfig)
-	if err != nil {
-		return nil, err
-	}
 	chainHeadCacheLen := confutil.IntMin(conf.ChainHeadCacheLen, 1, *pldconf.BlockIndexerDefaults.ChainHeadCacheLen)
 	bl = &blockListener{
 		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
@@ -70,8 +66,11 @@ func newBlockListener(ctx context.Context, conf *pldconf.BlockIndexerConfig, wsC
 		canonicalChain:             list.New(),
 		unstableHeadLength:         chainHeadCacheLen,
 		retry:                      retry.NewRetryIndefinite(&conf.Retry),
-		wsConn:                     rpcclient.WrapWSConfig(wscConf),
 		newBlocks:                  make(chan *BlockInfoJSONRPC, chainHeadCacheLen),
+	}
+	bl.wsConn, err = rpcclient.NewWSClient(ctx, wsConfig)
+	if err != nil {
+		return nil, err
 	}
 	return bl, nil
 }

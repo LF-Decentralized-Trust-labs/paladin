@@ -20,6 +20,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
@@ -127,6 +128,10 @@ func Wrap(rpc rpcclient.Client) PaladinClient {
 		Client:                 rpc,
 		receiptPollingInterval: DefaultReceiptPollingInterval,
 	}
+}
+
+func WrapRestyClient(rc *resty.Client) PaladinClient {
+	return Wrap(rpcclient.WrapRestyClient(rc))
 }
 
 func New() PaladinClient {

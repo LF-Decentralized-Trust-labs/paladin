@@ -24,18 +24,27 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/wsclient"
 	"github.com/sirupsen/logrus"
 )
 
-func WrapWSConfig(wsConf *wsclient.WSConfig) WSClient {
+func NewWSClient(ctx context.Context, conf *pldconf.WSClientConfig) (WSClient, error) {
+	err := ValidateWSClientConfig(ctx, conf)
+	if err != nil {
+		return nil, err
+	}
+
+	return WrapWSConfig(conf), nil
+}
+
+func WrapWSConfig(conf *pldconf.WSClientConfig) WSClient {
 	return &wsRPCClient{
-		wsConf:              *wsConf,
+		wsConf:              *conf,
 		calls:               make(map[string]chan *RPCResponse),
 		configuredSubs:      make(map[uuid.UUID]*sub),
 		pendingSubsByReqID:  make(map[string]*sub),
@@ -44,12 +53,9 @@ func WrapWSConfig(wsConf *wsclient.WSConfig) WSClient {
 	}
 }
 
-func NewWSClient(ctx context.Context, conf *pldconf.WSClientConfig) (WSClient, error) {
-	wsc, err := ParseWSConfig(ctx, conf)
-	if err != nil {
-		return nil, err
-	}
-	return WrapWSConfig(wsc), nil
+func ValidateWSClientConfig(ctx context.Context, conf *pldconf.WSClientConfig) error {
+	_, _, err := wsclient.ValidateConfig(ctx, conf)
+	return err
 }
 
 type Subscription interface {
@@ -92,7 +98,7 @@ func (n *rpcSubscriptionNotification) GetResult() pldtypes.RawJSON {
 
 type wsRPCClient struct {
 	mux                 sync.Mutex
-	wsConf              wsclient.WSConfig
+	wsConf              pldconf.WSClientConfig
 	client              wsclient.WSClient
 	requestCounter      int64
 	connected           chan struct{}
@@ -148,23 +154,22 @@ func (rc *wsRPCClient) Close() {
 }
 
 func (rc *wsRPCClient) handleReconnect(ctx context.Context, w wsclient.WSClient) error {
-	if !rc.wsConf.DisableReconnect {
-		calls, subs := rc.clearActiveReturnConfiguredSubs()
-		for rpcID, c := range calls {
-			rc.deliverCallResponse(c, &RPCResponse{
-				ID:    pldtypes.RawJSON(`"` + rpcID + `"`),
-				Error: NewRPCError(ctx, RPCCodeInternalError, pldmsgs.MsgRPCClientWebSocketReconnected),
-			})
-		}
-		for _, s := range subs {
-			log.L(ctx).Infof("Resubscribing %s after WebSocket reconnect", s.localID)
-			_, rpcErr := s.sendSubscribe(ctx)
-			if rpcErr != nil {
-				log.L(ctx).Errorf("Failed to send resubscribe: %s", rpcErr)
-				return rpcErr
-			}
+	calls, subs := rc.clearActiveReturnConfiguredSubs()
+	for rpcID, c := range calls {
+		rc.deliverCallResponse(c, &RPCResponse{
+			ID:    pldtypes.RawJSON(`"` + rpcID + `"`),
+			Error: NewRPCError(ctx, RPCCodeInternalError, pldmsgs.MsgRPCClientWebSocketReconnected),
+		})
+	}
+	for _, s := range subs {
+		log.L(ctx).Infof("Resubscribing %s after WebSocket reconnect", s.localID)
+		_, rpcErr := s.sendSubscribe(ctx)
+		if rpcErr != nil {
+			log.L(ctx).Errorf("Failed to send resubscribe: %s", rpcErr)
+			return rpcErr
 		}
 	}
+
 	if rc.connected != nil {
 		close(rc.connected)
 		rc.connected = nil
