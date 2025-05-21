@@ -1,4 +1,4 @@
-{{- if eq .Values.mode "devnet" }}
+{{- if (eq .Values.mode "devnet") }}
 
 apiVersion: core.paladin.io/v1alpha1
 kind: BesuGenesis

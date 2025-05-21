@@ -37,10 +37,10 @@ import (
 )
 
 // file names that are basenet specific
-var basenet = []string{"issuer", "paladindomain", "paladinregistry", "smartcontractdeployment", "transactioninvoke"}
+var basenet = []string{"issuer", "smartcontractdeployment", "transactioninvoke"}
 
 // file names that are devnet specific
-var devnet = []string{"besu_node", "paladin_node", "genesis", "paladinregistration"}
+var devnet = []string{"paladindomain", "paladinregistry"}
 
 var scope = map[string][]string{
 	"basenet": basenet,
@@ -207,11 +207,15 @@ func template() error {
 
 	// Step 2: Copy files from source patterns to the destination directory
 	sourcePatterns := []string{
-		"core_v1*",
-		"cert*",
+		"*issuer*",
+		"*paladindomain*",
+		"*paladinregistry*",
+		"*smartcontractdeployment*",
+		"*transactioninvoke*",
 	}
 
 	for _, pattern := range sourcePatterns {
+
 		pattern = filepath.Join(srcDir, pattern)
 		files, err := filepath.Glob(pattern)
 		if err != nil {
@@ -219,6 +223,7 @@ func template() error {
 		}
 
 		for _, srcFile := range files {
+
 			dstFile := filepath.Join(destDir, filepath.Base(srcFile))
 			err := copyFile(srcFile, dstFile)
 			if err != nil {
@@ -248,8 +253,37 @@ func template() error {
 			return fmt.Errorf("error reading file %s: %v", file, err)
 		}
 
-		// Perform the regex replacement
-		newContent := pattern.ReplaceAllString(string(content), "{{ `{{${1}}}` }}")
+		newContent := string(content)
+
+		//  if paladinDomain, add more templating
+		if strings.Contains(file, "paladindomain") {
+
+			var domain corev1alpha1.PaladinDomain
+			if err := yaml.Unmarshal(content, &domain); err != nil {
+				return fmt.Errorf("error unmarshalling content: %v", err)
+			}
+			n := fmt.Sprintf(".Values.smartContractsReferences.%sFactory", domain.Name)
+			domain.Spec.RegistryAddress = fmt.Sprintf("{{ %s.address }}", n)
+			domain.Spec.SmartContractDeployment = fmt.Sprintf("{{ %s.deployment }}", n)
+			if content, err = yaml.Marshal(domain); err != nil {
+				return fmt.Errorf("error marshalling content: %v", err)
+			}
+			newContent = string(content)
+		} else if strings.Contains(file, "paladinregistry") {
+			var registry corev1alpha1.PaladinRegistry
+			if err := yaml.Unmarshal(content, &registry); err != nil {
+				return fmt.Errorf("error unmarshalling content: %v", err)
+			}
+			registry.Spec.EVM.ContractAddress = "{{ .Values.smartContractsReferences.registry.address }}"
+			registry.Spec.EVM.SmartContractDeployment = "{{ .Values.smartContractsReferences.registry.deployment }}"
+			if content, err = yaml.Marshal(registry); err != nil {
+				return fmt.Errorf("error marshalling content: %v", err)
+			}
+			newContent = string(content)
+		} else {
+			// Perform the regex replacement
+			newContent = pattern.ReplaceAllString(newContent, "{{ `{{${1}}}` }}")
+		}
 
 		// Replace the node name prefix
 		newContent = strings.ReplaceAll(newContent, "node1", "{{ .Values.paladin.nodeNamePrefix }}1")
@@ -276,8 +310,10 @@ func template() error {
 			newContent = fmt.Sprintf("{{- if %s }}\n\n%s\n{{- end }}", condition, newContent)
 		}
 
+		bContent := []byte(newContent)
+
 		// Write the modified content back to the same file
-		err = os.WriteFile(file, []byte(newContent), fs.FileMode(0644))
+		err = os.WriteFile(file, bContent, fs.FileMode(0644))
 		if err != nil {
 			return fmt.Errorf("error writing file %s: %v", file, err)
 		}
@@ -474,7 +510,7 @@ func usageMessage() string {
 func main() {
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, fmt.Errorf(usageMessage()))
+		fmt.Fprintln(os.Stderr, usageMessage())
 		os.Exit(1)
 	}
 	if f, ok := cmd[os.Args[1]]; ok {
@@ -484,6 +520,6 @@ func main() {
 		}
 		return
 	}
-	fmt.Fprintln(os.Stderr, fmt.Errorf(usageMessage()))
+	fmt.Fprintln(os.Stderr, usageMessage())
 	os.Exit(1)
 }
