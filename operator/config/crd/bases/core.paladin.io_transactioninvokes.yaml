@@ -115,6 +115,7 @@ spec:
             - abiJSON
             - from
             - function
+            - node
             - txType
             type: object
           status:

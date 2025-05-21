@@ -27,9 +27,8 @@ type SmartContractDeploymentSpec struct {
 	// to be linked before deployment.
 	RequiredContractDeployments []string `json:"requiredContractDeployments,omitempty"`
 
-	// description: The node to use to deploy - reference to a PaladinNode CR
-	// a node from the PaladinNode CRs.
-	Node string `json:"node,omitempty"`
+	// The node to use to deploy - reference to a PaladinNode CR
+	Node string `json:"node"`
 	// +kubebuilder:validation:Enum=public;private
 	// +kubebuilder:default=public
 	// Type of transaction to submit to Paladin

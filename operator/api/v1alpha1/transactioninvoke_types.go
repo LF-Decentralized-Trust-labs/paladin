@@ -36,7 +36,7 @@ type TransactionInvokeSpec struct {
 	ContractDeploymentDeps []string `json:"requiredContractDeployments,omitempty"`
 
 	// The node to use to deploy - reference to a PaladinNode CR
-	Node string `json:"node,omitempty"`
+	Node string `json:"node"`
 	// +kubebuilder:validation:Enum=public;private
 	// +kubebuilder:default=public
 	// Type of transaction to submit to Paladin
