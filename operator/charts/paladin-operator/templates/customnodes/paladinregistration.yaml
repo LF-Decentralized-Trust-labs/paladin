@@ -1,0 +1,20 @@
+{{- if eq .Values.mode "customnet" }}
+{{- range .Values.paladinNodes }}
+{{- $name := .name }}
+---
+apiVersion: core.paladin.io/v1alpha1
+kind: PaladinRegistration
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  registry: evm-registry
+  registryAdminNode: {{ (index $.Values.paladinNodes 0).name }} # home of the root key
+  registryAdminKey: registry.operator
+  node: {{ $name }}
+  nodeAdminKey: registry.{{ $name }}
+  transports:
+    - grpc
+{{- end }}
+{{- end }}

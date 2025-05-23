@@ -1,9 +1,5 @@
 {{- if (eq .Values.mode "devnet") }}
 
-{{- if gt (.Values.nodeCount | int) 10 }}
-{{- fail "nodeCount cannot be greater than 10" }}
-{{- end }}
-
 {{- $basePort := .Values.besu.baseNodePort }}
 {{- $prefix := .Values.besu.nodeNamePrefix }}
 

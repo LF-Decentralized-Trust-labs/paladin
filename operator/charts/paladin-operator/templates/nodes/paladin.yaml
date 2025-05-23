@@ -4,10 +4,6 @@
 {{- $besuPrefix := .Values.besu.nodeNamePrefix }}
 {{- $basePort := .Values.paladin.baseNodePort }}
 
-{{- if gt (.Values.nodeCount | int) 10 }}
-{{- fail "nodeCount cannot be greater than 10" }}
-{{- end }}
-
 {{- range $i, $ := until (.Values.nodeCount | int) }}
 {{- $name := printf "%s%d" $prefix (add $i 1) }}
 {{- $besuName := printf "%s%d" $besuPrefix (add $i 1) }}

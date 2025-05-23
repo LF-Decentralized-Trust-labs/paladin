@@ -4,7 +4,7 @@ apiVersion: core.paladin.io/v1alpha1
 kind: BesuGenesis
 metadata:
   labels:
-    app.kubernetes.io/name: operator-go
+    app.kubernetes.io/name: testnet
     app.kubernetes.io/managed-by: kustomize
   name: testnet
 spec:

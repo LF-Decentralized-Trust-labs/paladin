@@ -43,8 +43,9 @@ var basenet = []string{"issuer", "smartcontractdeployment", "transactioninvoke"}
 var devnet = []string{"paladindomain", "paladinregistry"}
 
 var scope = map[string][]string{
-	"basenet": basenet,
-	"devnet":  append(devnet, basenet...),
+	"basenet":   basenet,
+	"devnet":    append(devnet, basenet...),
+	"customnet": append(devnet, basenet...),
 }
 
 type ContractMap map[string]*ContractMapBuild
@@ -286,7 +287,7 @@ func template() error {
 		}
 
 		// Replace the node name prefix
-		newContent = strings.ReplaceAll(newContent, "node1", "{{ .Values.paladin.nodeNamePrefix }}1")
+		newContent = strings.ReplaceAll(newContent, "node1", "\"{{- if eq .Values.mode \"customnet\" }}{{ (index .Values.paladinNodes 0).name }}{{- else }}{{ .Values.paladin.nodeNamePrefix }}1{{- end }}\"")
 
 		// Add conditional wrapper around the content
 		vScopes := scopes(file)
