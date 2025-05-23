@@ -1,0 +1,116 @@
+# values.yaml
+
+# Installation mode
+# Options:
+# - customnet: Installs a custom Paladin network with related Domains and Smart Contracts CRs.
+mode: customnet
+
+# List of Paladin nodes to install
+paladinNodes:
+
+  # Example Paladin node
+  - name: "bank"  # Unique node identifier within the Paladin network
+
+    # ======== Base Ledger Endpoint Configuration ========
+    baseLedgerEndpoint:
+
+      # Choose only ONE type below: "local" or "endpoint"
+
+      # Option 1: Local Besu node
+      # Uncomment the following lines if using a local Besu node
+      # type: local
+      # local:
+      #   nodeName: node1  # Name of the local Besu node
+
+      # Option 2: Remote blockchain endpoint
+      # Uncomment and fill the details if connecting to an external blockchain endpoint
+      # type: endpoint
+      # endpoint:
+      #   jsonrpc: "https://chain-json-rpc-endpoint"  # External blockchain JSON-RPC endpoint
+      #   ws: "wss://chain-json-ws-endpoint"          # External blockchain WebSocket endpoint
+      #   auth:
+      #     enabled: false
+      #     secretName: "node1-auth"  # Kubernetes Secret containing auth credentials (if required)
+
+        # If authentication is required, provide a Kubernetes Secret:
+        # apiVersion: v1
+        # kind: Secret
+        # metadata:
+        #   name: node1-auth
+        #   namespace: paladin
+        # data:
+        #   username: <base64-encoded-username>
+        #   password: <base64-encoded-password>
+        # type: Opaque
+
+    # ======== Domains ========
+    # List of domain names this node participates in. Must match labels on domain CRs.
+    domains:
+      - noto
+      - zeto
+      - pente
+
+    # ======== Registries ========
+    # Registry names this node interacts with. Must match labels on registry CRs.
+    registries:
+      - evm-reg
+
+    # ======== Transports ========
+    transports:
+      - name: grpc
+        plugin:
+          type: c-shared
+          library: /app/transports/libgrpc.so
+        config:
+          port: 9000
+          address: 0.0.0.0
+          externalHostname: ""  # External hostname if accessible outside cluster; leave empty if not required
+        ports:
+          transportGrpc:
+            port: 9000
+            targetPort: 9000
+        tls:
+          secretName: paladin-mtls  # Kubernetes Secret for TLS
+          certName: paladin-mtls    # Certificate name within the Secret
+
+    # ======== Service ========
+    service:
+      type: NodePort  # Options: NodePort | ClusterIP | LoadBalancer
+      ports:
+        rpcHttp:
+          port: 8548
+          nodePort: 31548
+        rpcWs:
+          port: 8549
+          nodePort: 31549
+
+    # ======== Database ========
+    database:
+      mode: sidecarPostgres  # Options: sidecarPostgres | embeddedSQLite
+      migrationMode: auto    # Options: auto | manual
+
+    # ======== Secret Backed Signers ========
+    secretBackedSigners:
+
+      # Scenario 1 (default): Auto-generate an HD wallet seed phrase
+      # Operator generates and stores the seed phrase in the specified secret
+      - name: signer-auto-wallet
+        secret: node1.keys  # Name of the secret (should not already exist)
+        type: autoHDWallet
+        keySelector: .*     # Select all keys
+
+      # Scenario 2: Pre-configured HD wallet
+      # Uncomment and configure if using an existing seed phrase
+      # - name: signer-pre-configured
+      #   secret: node1.keys  # Existing secret containing keys.yaml with seed phrase
+      #   type: preConfigured
+      #   keySelector: .*      # Select all keys
+
+    # ======== Additional Config ========
+    # Inline Paladin configuration; CR fields take precedence if duplicated
+    config: |
+      log:
+        level: debug  # Log levels: debug, info, warn, error
+      publicTxManager:
+        gasLimit:
+          gasEstimateFactor: 2.0

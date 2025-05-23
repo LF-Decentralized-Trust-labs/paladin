@@ -26,6 +26,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var paladinPrefix = "node"
+
 // Run e2e tests using the Ginkgo runner.
 func TestE2E(t *testing.T) {
 	log.SetLevel("warn")
