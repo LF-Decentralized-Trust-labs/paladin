@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract Atom is Initializable {
+    using Address for address;
+
     uint256 private _operationCount;
     Operation[] private _operations;
     bool public cancelled;
@@ -39,17 +42,7 @@ contract Atom is Initializable {
     }
 
     function _executeOperation(Operation storage op) internal {
-        (bool success, bytes memory result) = op.contractAddress.call(
-            op.callData
-        );
-        if (!success) {
-            assembly {
-                // Forward the revert reason
-                let size := mload(result)
-                let ptr := add(result, 32)
-                revert(ptr, size)
-            }
-        }
+        op.contractAddress.functionCall(op.callData);
     }
 
     function getOperationCount() public view returns (uint256) {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -15,6 +16,8 @@ import {IPente} from "../interfaces/IPente.sol";
 ///      - TODO: Spending privacy group / account states on accounts in other other privacy groups atomically
 ///
 contract PentePrivacyGroup is IPente, UUPSUpgradeable, EIP712Upgradeable {
+    using Address for address;
+
     string private constant TRANSITION_TYPE =
         "Transition(bytes32[] inputs,bytes32[] reads,bytes32[] outputs,bytes32[] info,ExternalCall[] externalCalls)";
     string private constant EXTERNALCALL_TYPE =
@@ -157,7 +160,6 @@ contract PentePrivacyGroup is IPente, UUPSUpgradeable, EIP712Upgradeable {
         States calldata states,
         ExternalCall[] calldata externalCalls
     ) internal {
-
         // On-chain enforcement of TXID uniqueness
         if (_txids[txId] != false) {
             revert PenteDuplicateTransaction(txId);
@@ -293,14 +295,6 @@ contract PentePrivacyGroup is IPente, UUPSUpgradeable, EIP712Upgradeable {
         if (!_externalCallsEnabled) {
             revert PenteExternalCallsDisabled();
         }
-        (bool success, bytes memory result) = contractAddress.call(encodedCall);
-        if (!success) {
-            assembly {
-                // Forward the revert reason
-                let size := mload(result)
-                let ptr := add(result, 32)
-                revert(ptr, size)
-            }
-        }
+        contractAddress.functionCall(encodedCall);
     }
 }

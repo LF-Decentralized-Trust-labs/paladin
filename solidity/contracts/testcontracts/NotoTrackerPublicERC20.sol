@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {INotoHooks} from "../domains/interfaces/INotoHooks.sol";
 
@@ -11,6 +12,8 @@ import {INotoHooks} from "../domains/interfaces/INotoHooks.sol";
  * TODO: remove when all functionality is tested using Pente instead of base ledger.
  */
 contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
+    using Address for address;
+
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
 
     function onMint(
@@ -107,16 +110,6 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
     }
 
     function _executeOperation(PreparedTransaction memory op) internal {
-        (bool success, bytes memory result) = op.contractAddress.call(
-            op.encodedCall
-        );
-        if (!success) {
-            assembly {
-                // Forward the revert reason
-                let size := mload(result)
-                let ptr := add(result, 32)
-                revert(ptr, size)
-            }
-        }
+        op.contractAddress.functionCall(op.encodedCall);
     }
 }
