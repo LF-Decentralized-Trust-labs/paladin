@@ -20,10 +20,11 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 )
 
 // DomainFactoryConfig is the configuration for a Zeto domain
@@ -39,31 +40,26 @@ type DomainConfigContracts struct {
 }
 
 type DomainContract struct {
-	Name      string `yaml:"name"`
-	CircuitId string `yaml:"circuitId"`
+	Name     string                  `yaml:"name"`
+	Circuits *zetosignerapi.Circuits `yaml:"circuits"`
 }
 
-// func (d *DomainFactoryConfig) GetContractAbi(ctx context.Context, tokenName string) (abi.ABI, error) {
-// 	for _, contract := range d.DomainContracts.Implementations {
-// 		if contract.Name == tokenName {
-// 			var contractAbi abi.ABI
-// 			err := json.Unmarshal([]byte(contract.Abi), &contractAbi)
-// 			if err != nil {
-// 				return nil, err
-// 			}
-// 			return contractAbi, nil
-// 		}
-// 	}
-// 	return nil, i18n.NewError(ctx, msgs.MsgContractNotFound, tokenName)
-// }
-
-func (d *DomainFactoryConfig) GetCircuitId(ctx context.Context, tokenName string) (string, error) {
+func (d *DomainFactoryConfig) GetCircuits(ctx context.Context, tokenName string) (*zetosignerapi.Circuits, error) {
 	for _, contract := range d.DomainContracts.Implementations {
 		if contract.Name == tokenName {
-			return contract.CircuitId, nil
+			return contract.Circuits, nil
 		}
 	}
-	return "", i18n.NewError(ctx, msgs.MsgContractNotFound, tokenName)
+	return nil, i18n.NewError(ctx, msgs.MsgContractNotFound, tokenName)
+}
+
+func (d *DomainFactoryConfig) GetCircuit(ctx context.Context, tokenName, method string) (*zetosignerapi.Circuit, error) {
+	for _, contract := range d.DomainContracts.Implementations {
+		if contract.Name == tokenName {
+			return (*contract.Circuits)[method], nil
+		}
+	}
+	return nil, i18n.NewError(ctx, msgs.MsgContractNotFound, tokenName)
 }
 
 // DomainInstanceConfig is the domain instance config, which are
@@ -72,19 +68,41 @@ func (d *DomainFactoryConfig) GetCircuitId(ctx context.Context, tokenName string
 // node to fully initialize the domain instance, based on only
 // on-chain information.
 type DomainInstanceConfig struct {
-	TokenName string `json:"tokenName"`
-	CircuitId string `json:"circuitId"`
+	TokenName string                  `json:"tokenName"`
+	Circuits  *zetosignerapi.Circuits `json:"circuits"`
 }
 
 // DomainInstanceConfigABI is the ABI for the DomainInstanceConfig,
 // used to encode and decode the on-chain data for the domain config
 var DomainInstanceConfigABI = &abi.ParameterArray{
-	{Type: "string", Name: "tokenName"},
-	{Type: "string", Name: "circuitId"},
+	{
+		Type: "string",
+		Name: "tokenName",
+	},
+	{
+		Type: "tuple",
+		Name: "circuits",
+		Components: []*abi.Parameter{
+			{Type: "tuple", Name: "deposit", Components: []*abi.Parameter{{Type: "string", Name: "name"}, {Type: "string", Name: "type"}, {Type: "bool", Name: "usesEncryption"}, {Type: "bool", Name: "usesNullifiers"}}},
+			{Type: "tuple", Name: "withdraw", Components: []*abi.Parameter{{Type: "string", Name: "name"}, {Type: "string", Name: "type"}, {Type: "bool", Name: "usesEncryption"}, {Type: "bool", Name: "usesNullifiers"}}},
+			{Type: "tuple", Name: "transfer", Components: []*abi.Parameter{{Type: "string", Name: "name"}, {Type: "string", Name: "type"}, {Type: "bool", Name: "usesEncryption"}, {Type: "bool", Name: "usesNullifiers"}}},
+			{Type: "tuple", Name: "transferLocked", Components: []*abi.Parameter{{Type: "string", Name: "name"}, {Type: "string", Name: "type"}, {Type: "bool", Name: "usesEncryption"}, {Type: "bool", Name: "usesNullifiers"}}},
+		},
+	},
 }
 
 // marks the version of the Zeto transaction data schema
-var ZetoTransactionData_V0 = ethtypes.MustNewHexBytes0xPrefix("0x00010000")
+var ZetoTransactionDataID_V0 = ethtypes.MustNewHexBytes0xPrefix("0x00010000")
+
+type ZetoTransactionData_V0 struct {
+	TransactionID pldtypes.Bytes32   `json:"transactionId"`
+	InfoStates    []pldtypes.Bytes32 `json:"infoStates"`
+}
+
+var ZetoTransactionDataABI_V0 = &abi.ParameterArray{
+	{Name: "transactionId", Type: "bytes32"},
+	{Name: "infoStates", Type: "bytes32[]"},
+}
 
 type DomainHandler = domain.DomainHandler[DomainInstanceConfig]
 type ParsedTransaction = domain.ParsedTransaction[DomainInstanceConfig]

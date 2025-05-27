@@ -27,8 +27,8 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -133,9 +133,9 @@ func mockKeyResolver(t *testing.T, mc *mockComponents) *componentmocks.KeyResolv
 	return kr
 }
 
-func mockDomainContractResolve(t *testing.T, domainName string, contractAddrs ...tktypes.EthAddress) func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+func mockDomainContractResolve(t *testing.T, domainName string, contractAddrs ...pldtypes.EthAddress) func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
 	return func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mgsc := mc.domainManager.On("GetSmartContractByAddress", mock.Anything, mock.Anything, mock.MatchedBy(func(a tktypes.EthAddress) bool {
+		mgsc := mc.domainManager.On("GetSmartContractByAddress", mock.Anything, mock.Anything, mock.MatchedBy(func(a pldtypes.EthAddress) bool {
 			if len(contractAddrs) == 0 {
 				return true
 			}
@@ -151,7 +151,7 @@ func mockDomainContractResolve(t *testing.T, domainName string, contractAddrs ..
 			mdmn := componentmocks.NewDomain(t)
 			mdmn.On("Name").Return(domainName)
 			mpsc.On("Domain").Return(mdmn)
-			mpsc.On("Address").Return(args[2].(tktypes.EthAddress)).Maybe()
+			mpsc.On("Address").Return(args[2].(pldtypes.EthAddress)).Maybe()
 			mgsc.Return(mpsc, nil)
 		})
 	}
@@ -173,8 +173,8 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 			From:     "me",
 			Type:     pldapi.TransactionTypePrivate.Enum(),
 			Function: "doIt",
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:       pldtypes.MustEthAddress(pldtypes.RandHex(20)),
+			Data:     pldtypes.JSONString(pldtypes.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -197,7 +197,7 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 		"id":"%s",
 		"sequence":%d,
 		"failureMessage":"PD012214: Unable to decode revert data (no revert data available)"
-	}`, txID, receipt.Sequence), string(tktypes.JSONString(receipt)))
+	}`, txID, receipt.Sequence), string(pldtypes.JSONString(receipt)))
 
 }
 
@@ -226,8 +226,8 @@ func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 			Type:     pldapi.TransactionTypePrivate.Enum(),
 			Domain:   "domain1",
 			Function: "doIt",
-			To:       tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Data:     tktypes.JSONString(tktypes.HexBytes(callData)),
+			To:       pldtypes.MustEthAddress(pldtypes.RandHex(20)),
+			Data:     pldtypes.JSONString(pldtypes.HexBytes(callData)),
 		},
 		ABI: exampleABI,
 	})
@@ -239,13 +239,13 @@ func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 				TransactionID: *txID,
 				Domain:        "domain1",
 				ReceiptType:   components.RT_Success,
-				OnChain: tktypes.OnChainLocation{
-					Type:             tktypes.OnChainEvent,
-					TransactionHash:  tktypes.MustParseBytes32("d0561b310b77e47bc16fb3c40d48b72255b1748efeecf7452373dfce8045af30"),
+				OnChain: pldtypes.OnChainLocation{
+					Type:             pldtypes.OnChainEvent,
+					TransactionHash:  pldtypes.MustParseBytes32("d0561b310b77e47bc16fb3c40d48b72255b1748efeecf7452373dfce8045af30"),
 					BlockNumber:      12345,
 					TransactionIndex: 10,
 					LogIndex:         5,
-					Source:           tktypes.MustEthAddress("0x3f9f796ff55589dd2358c458f185bbed357c0b6e"),
+					Source:           pldtypes.MustEthAddress("0x3f9f796ff55589dd2358c458f185bbed357c0b6e"),
 				},
 			},
 		})
@@ -268,7 +268,7 @@ func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 		"transactionIndex":10,
 		"states": {"none": true},
 		"domainReceiptError": "not available"
-	}`, txID, receipt.Sequence), tktypes.JSONString(receipt).Pretty())
+	}`, txID, receipt.Sequence), pldtypes.JSONString(receipt).Pretty())
 
 }
 
@@ -357,7 +357,7 @@ func TestGetDomainReceiptFail(t *testing.T) {
 }
 
 func TestDecodeRevertErrorBadSerializer(t *testing.T) {
-	revertReasonTooSmallHex := tktypes.MustParseHexBytes("0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001d5468652073746f7265642076616c756520697320746f6f20736d616c6c000000")
+	revertReasonTooSmallHex := pldtypes.MustParseHexBytes("0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001d5468652073746f7265642076616c756520697320746f6f20736d616c6c000000")
 
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
@@ -394,11 +394,11 @@ func TestDecodeCall(t *testing.T) {
 	require.Equal(t, `set(uint256)`, string(decoded.Signature))
 
 	invalidCall := append(sampleABI.Functions()["set"].FunctionSelectorBytes(), []byte{0x00}...)
-	_, err = txm.DecodeCall(ctx, txm.p.NOTX(), tktypes.HexBytes(invalidCall), "")
+	_, err = txm.DecodeCall(ctx, txm.p.NOTX(), pldtypes.HexBytes(invalidCall), "")
 	assert.Regexp(t, "PD012227.*1 matched function selector", err)
 
 	short := []byte{0xfe, 0xed}
-	_, err = txm.DecodeCall(ctx, txm.p.NOTX(), tktypes.HexBytes(short), "")
+	_, err = txm.DecodeCall(ctx, txm.p.NOTX(), pldtypes.HexBytes(short), "")
 	assert.Regexp(t, "PD012226", err)
 
 	_, err = txm.DecodeCall(ctx, txm.p.NOTX(), validCall, "wrong")
@@ -420,25 +420,25 @@ func TestDecodeEvent(t *testing.T) {
 	_, err := txm.storeABINewDBTX(ctx, sampleABI)
 	require.NoError(t, err)
 
-	validTopic0 := tktypes.Bytes32(sampleABI.Events()["Updated"].SignatureHashBytes())
+	validTopic0 := pldtypes.Bytes32(sampleABI.Events()["Updated"].SignatureHashBytes())
 	validTopic1, err := (&abi.ParameterArray{{Type: "uint256"}}).EncodeABIDataJSON([]byte(`["12345"]`))
 	require.NoError(t, err)
 
-	decoded, err := txm.DecodeEvent(ctx, txm.p.NOTX(), []tktypes.Bytes32{validTopic0, tktypes.Bytes32(validTopic1)}, []byte{}, "")
+	decoded, err := txm.DecodeEvent(ctx, txm.p.NOTX(), []pldtypes.Bytes32{validTopic0, pldtypes.Bytes32(validTopic1)}, []byte{}, "")
 	assert.NoError(t, err)
 	require.JSONEq(t, `{"newValue": "12345"}`, string(decoded.Data))
 	require.Equal(t, `Updated(uint256)`, string(decoded.Signature))
 
-	_, err = txm.DecodeEvent(ctx, txm.p.NOTX(), []tktypes.Bytes32{validTopic0 /* missing 2nd topic*/}, []byte{}, "")
+	_, err = txm.DecodeEvent(ctx, txm.p.NOTX(), []pldtypes.Bytes32{validTopic0 /* missing 2nd topic*/}, []byte{}, "")
 	assert.Regexp(t, "PD012229.*1 matched signature", err)
 
-	_, err = txm.DecodeEvent(ctx, txm.p.NOTX(), []tktypes.Bytes32{tktypes.RandBytes32() /* unknown topic */}, []byte{}, "")
+	_, err = txm.DecodeEvent(ctx, txm.p.NOTX(), []pldtypes.Bytes32{pldtypes.RandBytes32() /* unknown topic */}, []byte{}, "")
 	assert.Regexp(t, "PD012229", err)
 
-	_, err = txm.DecodeEvent(ctx, txm.p.NOTX(), []tktypes.Bytes32{ /* no topics */ }, []byte{}, "")
+	_, err = txm.DecodeEvent(ctx, txm.p.NOTX(), []pldtypes.Bytes32{ /* no topics */ }, []byte{}, "")
 	assert.Regexp(t, "PD012226", err)
 
-	_, err = txm.DecodeEvent(ctx, txm.p.NOTX(), []tktypes.Bytes32{validTopic0, tktypes.Bytes32(validTopic1)}, []byte{}, "wrong")
+	_, err = txm.DecodeEvent(ctx, txm.p.NOTX(), []pldtypes.Bytes32{validTopic0, pldtypes.Bytes32(validTopic1)}, []byte{}, "wrong")
 	assert.Regexp(t, "PD020015", err)
 
 }

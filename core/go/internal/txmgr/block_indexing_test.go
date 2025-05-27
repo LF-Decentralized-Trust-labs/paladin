@@ -29,8 +29,8 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -39,13 +39,13 @@ import (
 func newTestConfirm(revertReason ...[]byte) *blockindexer.IndexedTransactionNotify {
 	txi := &blockindexer.IndexedTransactionNotify{
 		IndexedTransaction: pldapi.IndexedTransaction{
-			Hash:             tktypes.RandBytes32(),
+			Hash:             pldtypes.RandBytes32(),
 			BlockNumber:      12345,
 			TransactionIndex: 0,
-			From:             tktypes.MustEthAddress(tktypes.RandHex(20)),
+			From:             pldtypes.MustEthAddress(pldtypes.RandHex(20)),
 			Nonce:            1000,
 			To:               nil,
-			ContractAddress:  tktypes.MustEthAddress(tktypes.RandHex(20)),
+			ContractAddress:  pldtypes.MustEthAddress(pldtypes.RandHex(20)),
 			Result:           pldapi.TXResult_SUCCESS.Enum(),
 		},
 	}
@@ -70,7 +70,7 @@ func TestPublicConfirmWithErrorDecodeRealDB(t *testing.T) {
 
 	ctx, txm, done := newTestTransactionManager(t, true,
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-			mockResolveKey(t, mc, "sender1", tktypes.RandAddress())
+			mockResolveKey(t, mc, "sender1", pldtypes.RandAddress())
 
 			mc.publicTxMgr.On("ValidateTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			mc.publicTxMgr.On("WriteNewTransactions", mock.Anything, mock.Anything, mock.Anything).Return(
@@ -108,7 +108,7 @@ func TestPublicConfirmWithErrorDecodeRealDB(t *testing.T) {
 				Type:         pldapi.TransactionTypePublic.Enum(),
 				ABIReference: abiRef,
 				From:         "sender1",
-				To:           tktypes.MustEthAddress(tktypes.RandHex(20)),
+				To:           pldtypes.MustEthAddress(pldtypes.RandHex(20)),
 			},
 		})
 		require.NoError(t, err)
@@ -139,7 +139,7 @@ func TestPublicConfirmMatch(t *testing.T) {
 
 	txi := newTestConfirm()
 	txID := uuid.New()
-	txi.ContractAddress = tktypes.RandAddress()
+	txi.ContractAddress = pldtypes.RandAddress()
 
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,

@@ -19,13 +19,13 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error) {
@@ -167,7 +167,7 @@ func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext 
 		return i18n.NewError(ctx, msgs.MsgMissingStateData, unlock.Outputs)
 	}
 
-	var lockID tktypes.Bytes32
+	var lockID pldtypes.Bytes32
 	for _, state := range inputStates {
 		coin, err := n.unmarshalLockedCoin(state.DataJson)
 		if err != nil {
@@ -221,7 +221,7 @@ func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext 
 	return err
 }
 
-func (n *Noto) parseStatesFromEvent(txID tktypes.Bytes32, states []tktypes.Bytes32) []*prototk.StateUpdate {
+func (n *Noto) parseStatesFromEvent(txID pldtypes.Bytes32, states []pldtypes.Bytes32) []*prototk.StateUpdate {
 	refs := make([]*prototk.StateUpdate, len(states))
 	for i, state := range states {
 		refs[i] = &prototk.StateUpdate{

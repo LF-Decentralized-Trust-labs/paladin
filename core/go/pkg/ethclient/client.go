@@ -29,16 +29,16 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"golang.org/x/crypto/sha3"
 )
@@ -48,14 +48,14 @@ type EthClient interface {
 	Close()
 	ChainID() int64
 
-	GasPrice(ctx context.Context) (gasPrice *tktypes.HexUint256, err error)
-	GetBalance(ctx context.Context, address tktypes.EthAddress, block string) (balance *tktypes.HexUint256, err error)
+	GasPrice(ctx context.Context) (gasPrice *pldtypes.HexUint256, err error)
+	GetBalance(ctx context.Context, address pldtypes.EthAddress, block string) (balance *pldtypes.HexUint256, err error)
 	GetTransactionReceipt(ctx context.Context, txHash string) (*TransactionReceiptResponse, error)
 
 	EstimateGasNoResolve(ctx context.Context, tx *ethsigner.Transaction, opts ...CallOption) (res EstimateGasResult, err error)
 	CallContractNoResolve(ctx context.Context, tx *ethsigner.Transaction, block string, opts ...CallOption) (res CallResult, err error)
-	GetTransactionCount(ctx context.Context, fromAddr tktypes.EthAddress) (transactionCount *tktypes.HexUint64, err error)
-	SendRawTransaction(ctx context.Context, rawTX tktypes.HexBytes) (*tktypes.Bytes32, error)
+	GetTransactionCount(ctx context.Context, fromAddr pldtypes.EthAddress) (transactionCount *pldtypes.HexUint64, err error)
+	SendRawTransaction(ctx context.Context, rawTX pldtypes.HexBytes) (*pldtypes.Bytes32, error)
 }
 
 // Higher level client interface to the base Ethereum ledger for TX submission.
@@ -66,13 +66,13 @@ type EthClientWithKeyManager interface {
 	ABI(ctx context.Context, a abi.ABI) (ABIClient, error)
 	ABIJSON(ctx context.Context, abiJson []byte) (ABIClient, error)
 	ABIFunction(ctx context.Context, functionABI *abi.Entry) (_ ABIFunctionClient, err error)
-	ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode tktypes.HexBytes) (_ ABIFunctionClient, err error)
+	ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode pldtypes.HexBytes) (_ ABIFunctionClient, err error)
 	MustABIJSON(abiJson []byte) ABIClient
 
 	// Below are raw functions that the ABI() above provides wrappers for
 	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string, opts ...CallOption) (res CallResult, err error)
 	EstimateGas(ctx context.Context, from *string, tx *ethsigner.Transaction, opts ...CallOption) (res EstimateGasResult, err error)
-	BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction, opts ...CallOption) (tktypes.HexBytes, error)
+	BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction, opts ...CallOption) (pldtypes.HexBytes, error)
 }
 
 // Call options affect the behavior of gas estimate and call functions, such as by allowing you to supply
@@ -111,15 +111,15 @@ func WithSerializer(serializer *abi.Serializer) CallOption {
 }
 
 type EstimateGasResult struct {
-	GasLimit   tktypes.HexUint64
-	RevertData tktypes.HexBytes
+	GasLimit   pldtypes.HexUint64
+	RevertData pldtypes.HexBytes
 }
 
 type CallResult struct {
 	serializer    *abi.Serializer
-	Data          tktypes.HexBytes
+	Data          pldtypes.HexBytes
 	DecodedResult *abi.ComponentValue
-	RevertData    tktypes.HexBytes
+	RevertData    pldtypes.HexBytes
 }
 
 // Convenience func that bypasses errors and uses the serializer provided
@@ -127,7 +127,7 @@ func (cr CallResult) JSON() (s string) {
 	if cr.DecodedResult != nil {
 		serializer := cr.serializer
 		if serializer == nil {
-			serializer = tktypes.StandardABISerializer()
+			serializer = pldtypes.StandardABISerializer()
 		}
 		b, _ := serializer.SerializeJSON(cr.DecodedResult)
 		if b != nil {
@@ -202,17 +202,17 @@ func (ec *ethClient) setupChainID(ctx context.Context) error {
 	return nil
 }
 
-func (ec *ethClient) resolveFrom(ctx context.Context, from *string, tx *ethsigner.Transaction) (string, *tktypes.EthAddress, error) {
+func (ec *ethClient) resolveFrom(ctx context.Context, from *string, tx *ethsigner.Transaction) (string, *pldtypes.EthAddress, error) {
 	if from != nil && *from != "" {
-		var fromAddr *tktypes.EthAddress
+		var fromAddr *pldtypes.EthAddress
 		keyHandle, fromVerifier, err := ec.keymgr.ResolveKey(ctx, *from, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 		if err == nil {
-			fromAddr, err = tktypes.ParseEthAddress(fromVerifier)
+			fromAddr, err = pldtypes.ParseEthAddress(fromVerifier)
 		}
 		if err != nil {
 			return "", nil, err
 		}
-		tx.From = json.RawMessage(tktypes.JSONString(fromAddr))
+		tx.From = json.RawMessage(pldtypes.JSONString(fromAddr))
 		return keyHandle, fromAddr, nil
 	}
 	return "", nil, nil
@@ -220,11 +220,11 @@ func (ec *ethClient) resolveFrom(ctx context.Context, from *string, tx *ethsigne
 
 func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string, opts ...CallOption) (res CallResult, err error) {
 	if ec.keymgr == nil && from != nil && *from != "" {
-		ethAddr, err := tktypes.ParseEthAddress(*from)
+		ethAddr, err := pldtypes.ParseEthAddress(*from)
 		if err != nil {
 			return res, err
 		}
-		tx.From = json.RawMessage(tktypes.JSONString(ethAddr))
+		tx.From = json.RawMessage(pldtypes.JSONString(ethAddr))
 	} else {
 		if _, _, err := ec.resolveFrom(ctx, from, tx); err != nil {
 			return res, err
@@ -258,7 +258,7 @@ func (ec *ethClient) CallContractNoResolve(ctx context.Context, tx *ethsigner.Tr
 			if len(res.RevertData) > 0 {
 				errString, _ := errABI.ErrorStringCtx(ctx, res.RevertData)
 				if errString == "" {
-					errString = tktypes.HexBytes(res.RevertData).String()
+					errString = pldtypes.HexBytes(res.RevertData).String()
 				}
 				return res, i18n.NewError(ctx, msgs.MsgEthClientCallReverted, errString)
 			}
@@ -275,8 +275,8 @@ func (ec *ethClient) CallContractNoResolve(ctx context.Context, tx *ethsigner.Tr
 
 }
 
-func (ec *ethClient) GetBalance(ctx context.Context, address tktypes.EthAddress, block string) (*tktypes.HexUint256, error) {
-	var addressBalance tktypes.HexUint256
+func (ec *ethClient) GetBalance(ctx context.Context, address pldtypes.EthAddress, block string) (*pldtypes.HexUint256, error) {
+	var addressBalance pldtypes.HexUint256
 
 	if rpcErr := ec.rpc.CallRPC(ctx, &addressBalance, "eth_getBalance", address, block); rpcErr != nil {
 		log.L(ctx).Errorf("eth_getBalance failed: %+v", rpcErr)
@@ -285,10 +285,10 @@ func (ec *ethClient) GetBalance(ctx context.Context, address tktypes.EthAddress,
 	return &addressBalance, nil
 }
 
-func (ec *ethClient) GasPrice(ctx context.Context) (*tktypes.HexUint256, error) {
+func (ec *ethClient) GasPrice(ctx context.Context) (*pldtypes.HexUint256, error) {
 	// currently only support London style gas price
 	// For EIP1559, will need to add support for `eth_maxPriorityFeePerGas`
-	var gasPrice tktypes.HexUint256
+	var gasPrice pldtypes.HexUint256
 
 	if rpcErr := ec.rpc.CallRPC(ctx, &gasPrice, "eth_gasPrice"); rpcErr != nil {
 		log.L(ctx).Errorf("eth_gasPrice failed: %+v", rpcErr)
@@ -371,8 +371,8 @@ func (ec *ethClient) EstimateGasNoResolve(ctx context.Context, tx *ethsigner.Tra
 	return res, nil
 }
 
-func (ec *ethClient) GetTransactionCount(ctx context.Context, fromAddr tktypes.EthAddress) (*tktypes.HexUint64, error) {
-	var transactionCount tktypes.HexUint64
+func (ec *ethClient) GetTransactionCount(ctx context.Context, fromAddr pldtypes.EthAddress) (*pldtypes.HexUint64, error) {
+	var transactionCount pldtypes.HexUint64
 	if rpcErr := ec.rpc.CallRPC(ctx, &transactionCount, "eth_getTransactionCount", fromAddr, "latest"); rpcErr != nil {
 		log.L(ctx).Errorf("eth_getTransactionCount(%s) failed: %+v", fromAddr, rpcErr)
 		return nil, rpcErr
@@ -380,7 +380,7 @@ func (ec *ethClient) GetTransactionCount(ctx context.Context, fromAddr tktypes.E
 	return &transactionCount, nil
 }
 
-func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction, opts ...CallOption) (tktypes.HexBytes, error) {
+func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction, opts ...CallOption) (pldtypes.HexBytes, error) {
 	keyHandle, fromAddr, err := ec.resolveFrom(ctx, &from, tx)
 	if err != nil {
 		return nil, err
@@ -426,7 +426,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 		Algorithm:   algorithms.ECDSA_SECP256K1,
 		PayloadType: signpayloads.OPAQUE_TO_RSV,
 		KeyHandle:   keyHandle,
-		Payload:     tktypes.HexBytes(hash.Sum(nil)),
+		Payload:     pldtypes.HexBytes(hash.Sum(nil)),
 	})
 	var sig *secp256k1.SignatureData
 	if err == nil {
@@ -450,16 +450,17 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	return rawTX, nil
 }
 
-func (ec *ethClient) SendRawTransaction(ctx context.Context, rawTX tktypes.HexBytes) (*tktypes.Bytes32, error) {
+func (ec *ethClient) SendRawTransaction(ctx context.Context, rawTX pldtypes.HexBytes) (*pldtypes.Bytes32, error) {
 
 	// Submit
-	var txHash tktypes.Bytes32
-	if rpcErr := ec.rpc.CallRPC(ctx, &txHash, "eth_sendRawTransaction", tktypes.HexBytes(rawTX)); rpcErr != nil {
+	var txHash pldtypes.Bytes32
+	if rpcErr := ec.rpc.CallRPC(ctx, &txHash, "eth_sendRawTransaction", pldtypes.HexBytes(rawTX)); rpcErr != nil {
 		addr, decodedTX, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(rawTX), ec.chainID)
 		if err != nil {
 			log.L(ctx).Errorf("Invalid transaction build during signing: %s", err)
 		} else {
-			log.L(ctx).Errorf("Rejected TX (from=%s): %+v", addr, logJSON(decodedTX.Transaction))
+			log.L(ctx).Errorf("Rejected TX (from=%s, nonce=%+v)", addr, decodedTX.Nonce)
+			log.L(ctx).Tracef("Rejected TX (from=%s): %+v", addr, logJSON(decodedTX.Transaction))
 		}
 		return nil, fmt.Errorf("eth_sendRawTransaction failed: %+v", rpcErr)
 	}

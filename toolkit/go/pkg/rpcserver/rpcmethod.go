@@ -20,10 +20,10 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 )
 
 // RPCHandler should not be implemented directly - use RPCMethod0 ... RPCMethod5 to implement your function
@@ -144,12 +144,12 @@ func RPCMethod5[R any, P0 any, P1 any, P2 any, P3 any, P4 any](impl func(ctx con
 
 func parseParams(ctx context.Context, req *rpcclient.RPCRequest, params ...interface{}) (rpcclient.RPCCode, error) {
 	if len(req.Params) != len(params) {
-		return rpcclient.RPCCodeInvalidRequest, i18n.NewError(ctx, tkmsgs.MsgJSONRPCIncorrectParamCount, req.Method, len(params), len(req.Params))
+		return rpcclient.RPCCodeInvalidRequest, i18n.NewError(ctx, pldmsgs.MsgJSONRPCIncorrectParamCount, req.Method, len(params), len(req.Params))
 	}
 	for i := range params {
 		b := req.Params[i].Bytes()
 		if err := json.Unmarshal(b, &params[i]); err != nil {
-			return rpcclient.RPCCodeInvalidRequest, i18n.NewError(ctx, tkmsgs.MsgJSONRPCInvalidParam, req.Method, i, err)
+			return rpcclient.RPCCodeInvalidRequest, i18n.NewError(ctx, pldmsgs.MsgJSONRPCInvalidParam, req.Method, i, err)
 		}
 	}
 	return 0, nil
@@ -159,12 +159,12 @@ func mapResponse(ctx context.Context, req *rpcclient.RPCRequest, result interfac
 	if err == nil {
 		b, marshalErr := json.Marshal(result)
 		if marshalErr != nil {
-			err = i18n.NewError(ctx, tkmsgs.MsgJSONRPCResultSerialization, req.Method, marshalErr)
+			err = i18n.NewError(ctx, pldmsgs.MsgJSONRPCResultSerialization, req.Method, marshalErr)
 		} else {
 			return &rpcclient.RPCResponse{
 				JSONRpc: "2.0",
 				ID:      req.ID,
-				Result:  tktypes.RawJSON(b),
+				Result:  pldtypes.RawJSON(b),
 			}
 		}
 	}

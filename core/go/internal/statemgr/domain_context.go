@@ -23,16 +23,16 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 )
 
 type domainContext struct {
@@ -42,7 +42,7 @@ type domainContext struct {
 	ss                 *stateManager
 	domainName         string
 	customHashFunction bool
-	contractAddress    tktypes.EthAddress
+	contractAddress    pldtypes.EthAddress
 	stateLock          sync.Mutex
 	unFlushed          *pendingStateWrites
 	flushing           *pendingStateWrites
@@ -60,7 +60,7 @@ type domainContext struct {
 }
 
 // Very important that callers Close domain contexts they open
-func (ss *stateManager) NewDomainContext(ctx context.Context, domain components.Domain, contractAddress tktypes.EthAddress) components.DomainContext {
+func (ss *stateManager) NewDomainContext(ctx context.Context, domain components.Domain, contractAddress pldtypes.EthAddress) components.DomainContext {
 	id := uuid.New()
 	log.L(ctx).Debugf("Domain context %s for domain %s contract %s closed", id, domain.Name(), contractAddress)
 
@@ -109,7 +109,7 @@ func (dc *domainContext) Ctx() context.Context {
 	return dc.Context
 }
 
-func (dc *domainContext) getUnFlushedSpends() (spending []tktypes.HexBytes, nullifiers []*pldapi.StateNullifier, nullifierIDs []tktypes.HexBytes, err error) {
+func (dc *domainContext) getUnFlushedSpends() (spending []pldtypes.HexBytes, nullifiers []*pldapi.StateNullifier, nullifierIDs []pldtypes.HexBytes, err error) {
 	// Take lock and check flush state
 	dc.stateLock.Lock()
 	defer dc.stateLock.Unlock()
@@ -126,7 +126,7 @@ func (dc *domainContext) getUnFlushedSpends() (spending []tktypes.HexBytes, null
 	if dc.flushing != nil {
 		nullifiers = append(nullifiers, dc.flushing.stateNullifiers...)
 	}
-	nullifierIDs = make([]tktypes.HexBytes, len(nullifiers))
+	nullifierIDs = make([]pldtypes.HexBytes, len(nullifiers))
 	for i, nullifier := range nullifiers {
 		nullifierIDs[i] = nullifier.ID
 	}
@@ -260,7 +260,7 @@ func (dc *domainContext) mergeInMemoryMatches(schema components.Schema, states [
 
 }
 
-func (dc *domainContext) GetStatesByID(dbTX persistence.DBTX, schemaID tktypes.Bytes32, ids []string) (components.Schema, []*pldapi.State, error) {
+func (dc *domainContext) GetStatesByID(dbTX persistence.DBTX, schemaID pldtypes.Bytes32, ids []string) (components.Schema, []*pldapi.State, error) {
 	idsAny := make([]any, len(ids))
 	for i, id := range ids {
 		idsAny[i] = id
@@ -282,7 +282,7 @@ func (dc *domainContext) GetStatesByID(dbTX persistence.DBTX, schemaID tktypes.B
 	return schema, matches, err
 }
 
-func (dc *domainContext) FindAvailableStates(dbTX persistence.DBTX, schemaID tktypes.Bytes32, query *query.QueryJSON) (components.Schema, []*pldapi.State, error) {
+func (dc *domainContext) FindAvailableStates(dbTX persistence.DBTX, schemaID pldtypes.Bytes32, query *query.QueryJSON) (components.Schema, []*pldapi.State, error) {
 	log.L(dc.Context).Debug("domainContext:FindAvailableStates")
 	// Build a list of spending states
 	spending, _, _, err := dc.getUnFlushedSpends()
@@ -307,14 +307,14 @@ func (dc *domainContext) FindAvailableStates(dbTX persistence.DBTX, schemaID tkt
 	return schema, states, err
 }
 
-func (dc *domainContext) FindAvailableNullifiers(dbTX persistence.DBTX, schemaID tktypes.Bytes32, query *query.QueryJSON) (components.Schema, []*pldapi.State, error) {
+func (dc *domainContext) FindAvailableNullifiers(dbTX persistence.DBTX, schemaID pldtypes.Bytes32, query *query.QueryJSON) (components.Schema, []*pldapi.State, error) {
 
 	// Build a list of unflushed and spending nullifiers
 	spending, nullifiers, nullifierIDs, err := dc.getUnFlushedSpends()
 	if err != nil {
 		return nil, nil, err
 	}
-	statesWithNullifiers := make([]tktypes.HexBytes, len(nullifiers))
+	statesWithNullifiers := make([]pldtypes.HexBytes, len(nullifiers))
 	for i, n := range nullifiers {
 		statesWithNullifiers[i] = n.State
 	}
@@ -630,9 +630,9 @@ type exportSnapshot struct {
 
 // pldapi.StateLocks do not include the stateID in the serialized JSON so we need to define a new struct to include it
 type exportableStateLock struct {
-	State       tktypes.HexBytes                   `json:"stateId"`
-	Transaction uuid.UUID                          `json:"transaction"`
-	Type        tktypes.Enum[pldapi.StateLockType] `json:"type"`
+	State       pldtypes.HexBytes                   `json:"stateId"`
+	Transaction uuid.UUID                           `json:"transaction"`
+	Type        pldtypes.Enum[pldapi.StateLockType] `json:"type"`
 }
 
 // Return a snapshot of all currently known state locks as serialized JSON

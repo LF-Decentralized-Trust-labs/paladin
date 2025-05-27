@@ -6,38 +6,15 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// IsFungibleNullifiersCircuit
-func TestIsFungibleNullifiersCircuit(t *testing.T) {
-	assert.True(t, IsFungibleNullifiersCircuit(constants.CIRCUIT_ANON_NULLIFIER))
-	assert.True(t, IsFungibleNullifiersCircuit(constants.CIRCUIT_ANON_NULLIFIER_BATCH))
-	assert.True(t, IsFungibleNullifiersCircuit(constants.CIRCUIT_WITHDRAW_NULLIFIER))
-	assert.True(t, IsFungibleNullifiersCircuit(constants.CIRCUIT_WITHDRAW_NULLIFIER_BATCH))
-	assert.False(t, IsFungibleNullifiersCircuit("other"))
-}
-
-// IsNonFungibleNullifiersCircuit
-func TestIsNonFungibleNullifiersCircuit(t *testing.T) {
-	assert.True(t, IsNonFungibleNullifiersCircuit(constants.CIRCUIT_NF_ANON_NULLIFIER))
-	assert.False(t, IsNonFungibleNullifiersCircuit("other"))
-}
-
-// IsNonFungibleCircuit
-func TestIsNonFungibleCircuit(t *testing.T) {
-	assert.True(t, IsNonFungibleCircuit(constants.CIRCUIT_NF_ANON))
-	assert.True(t, IsNonFungibleCircuit(constants.CIRCUIT_NF_ANON_NULLIFIER))
-	assert.False(t, IsNonFungibleCircuit("other"))
-}
 
 // IsNullifiersToken
 func TestIsNullifiersToken(t *testing.T) {
@@ -48,9 +25,9 @@ func TestIsNullifiersToken(t *testing.T) {
 
 // HexUint256To32ByteHexString
 func TestHexUint256To32ByteHexString(t *testing.T) {
-	// Create a big.Int and cast it to *tktypes.HexUint256.
+	// Create a big.Int and cast it to *pldtypes.HexUint256.
 	x := big.NewInt(7890)
-	hexUint := (*tktypes.HexUint256)(x)
+	hexUint := (*pldtypes.HexUint256)(x)
 	result := HexUint256To32ByteHexString(hexUint)
 	expected := hex.EncodeToString(x.FillBytes(make([]byte, 32)))
 	assert.Equal(t, expected, result)
@@ -99,24 +76,19 @@ func TestEncodeProof(t *testing.T) {
 // TestEncodeTransactionData uses a table-driven approach to test both valid and invalid scenarios.
 func TestEncodeTransactionData(t *testing.T) {
 	tests := map[string]struct {
-		transactionId   string
-		transactionData ethtypes.HexBytes0xPrefix
-		expected        tktypes.HexBytes
-		expectError     bool
+		transactionId string
+		expected      string
+		expectError   bool
 	}{
 		"valid": {
-			transactionId:   "0x1234",
-			transactionData: ethtypes.HexBytes0xPrefix{0xab, 0xcd},
-			// Expected: transactionData appended with the parsed TransactionId.
-			// "0x1234" → []byte{0x12, 0x34} so the expected result is {0xab, 0xcd, 0x12, 0x34}
-			expected:    []byte{0xab, 0xcd, 0x12, 0x34},
-			expectError: false,
+			transactionId: "0x8572b34655888710ea27adbda526c5789576b7072cb0494dab3c8c7891549934",
+			expected:      "0x000100008572b34655888710ea27adbda526c5789576b7072cb0494dab3c8c789154993400000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000",
+			expectError:   false,
 		},
 		"invalid TransactionId": {
-			transactionId:   "invalid",
-			transactionData: ethtypes.HexBytes0xPrefix{0xab, 0xcd},
-			expected:        nil,
-			expectError:     true,
+			transactionId: "invalid",
+			expected:      "",
+			expectError:   true,
 		},
 	}
 
@@ -126,16 +98,39 @@ func TestEncodeTransactionData(t *testing.T) {
 			txn := &prototk.TransactionSpecification{
 				TransactionId: tc.transactionId,
 			}
-			result, err := EncodeTransactionData(ctx, txn, tc.transactionData)
+			result, err := EncodeTransactionData(ctx, txn, nil)
 			if tc.expectError {
 				assert.Error(t, err, "expected an error when transactionId is invalid")
 				assert.Nil(t, result)
 			} else {
 				assert.NoError(t, err, "expected no error for valid transactionId")
-				assert.Equal(t, tc.expected, result, "result should equal the expected concatenation")
+				assert.Equal(t, tc.expected, result.String(), "result should equal the expected concatenation")
 			}
 		})
 	}
+}
+
+func TestEncodeTransactionData_InvalidTransactionId(t *testing.T) {
+	ctx := context.Background()
+	txn := &prototk.TransactionSpecification{
+		TransactionId: "invalid",
+	}
+	result, err := EncodeTransactionData(ctx, txn, nil)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+}
+
+func TestEncodeTransactionData_InvalidInfoStateId(t *testing.T) {
+	ctx := context.Background()
+	txn := &prototk.TransactionSpecification{
+		TransactionId: "0x8572b34655888710ea27adbda526c5789576b7072cb0494dab3c8c7891549934",
+	}
+	infoStates := []*prototk.EndorsableState{
+		{Id: "invalid"},
+	}
+	result, err := EncodeTransactionData(ctx, txn, infoStates)
+	assert.Error(t, err)
+	assert.Nil(t, result)
 }
 
 func TestLoadBabyJubKey(t *testing.T) {

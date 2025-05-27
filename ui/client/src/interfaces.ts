@@ -32,8 +32,8 @@ export interface ITransaction {
 }
 
 export interface IEnrichedTransaction extends ITransaction {
-  receipts: ITransactionReceipt[]
-  paladinTransactions: IPaladinTransaction[]
+  receipts: ITransactionReceipt[];
+  paladinTransactions: IPaladinTransaction[];
 }
 
 export interface IEvent {
@@ -125,67 +125,86 @@ export interface IABIDecodedEntry {
   summary?: string; // errors only
 }
 
-export type ABIUploadResponse = string
+export type ABIUploadResponse = string;
 
 export interface ITransportPeer {
-  name: string
+  name: string;
   stats: {
-    sentMsgs: number
-    receivedMsgs: number
-    sentBytes: number
-    receivedBytes: number
-    lastSend: string
-    lastReceive: string
-    reliableHighestSent: number
-    reliableAckBase: number
-  }
-  activated: string
-  outboundTransport: string
+    sentMsgs: number;
+    receivedMsgs: number;
+    sentBytes: number;
+    receivedBytes: number;
+    lastSend: string;
+    lastReceive: string;
+    reliableHighestSent: number;
+    reliableAckBase: number;
+  };
+  activated: string;
+  outboundTransport: string;
   outbound: {
-    endpoint: string
-  }
+    endpoint: string;
+  };
 }
 
 export interface IVerifier {
-  verifier: string
-  type: string
-  algorithm: string
+  verifier: string;
+  type: string;
+  algorithm: string;
 }
 
 export interface IKeyEntry {
-  isKey: boolean
-  hasChildren: boolean
-  path: string
-  index: number
-  type: string
-  verifiers: IVerifier[] | null
-  wallet: string
-  keyHandle: string
+  isKey: boolean;
+  hasChildren: boolean;
+  path: string;
+  index: number;
+  type: string;
+  verifiers: IVerifier[] | null;
+  wallet: string;
+  keyHandle: string;
 }
 
 export interface IKeyMappingAndVerifier {
-  identifier: string
-  keyHandle: string
+  identifier: string;
+  keyHandle: string;
   path: {
-    index: number
-    name: string
-  }[]
-  verifier: IVerifier
-  wallet: string
+    index: number;
+    name: string;
+  }[];
+  verifier: IVerifier;
+  wallet: string;
 }
 
 export interface IFilterField {
-  label: string
-  name: string
-  type: 'string' | 'number' | 'boolean'
-  isUUID?: boolean
-  isHexValue?: boolean
-  emun?: string[]
+  label: string;
+  name: string;
+  type: 'string' | 'number' | 'boolean';
+  isUUID?: boolean;
+  isHexValue?: boolean;
+  emun?: string[];
 }
 
 export interface IFilter {
-  field: IFilterField,
-  operator: string
-  value: string
-  caseSensitive?: boolean
+  field: IFilterField;
+  operator: string;
+  value: string;
+  caseSensitive?: boolean;
+}
+
+export enum TransactionType {
+  PUBLIC = 'public',
+  PRIVATE = 'private',
+}
+
+export interface ITransactionInput {
+  type: TransactionType;
+  domain?: string;
+  function?: string;
+  from: string;
+  to?: string;
+  data: {
+    [key: string]: any;
+  };
+  abiReference?: string;
+  abi?: any;
+  bytecode?: string;
 }

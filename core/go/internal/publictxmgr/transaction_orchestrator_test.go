@@ -6,7 +6,7 @@
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * Unless required by applicaptm law or agreed to in writing, software distributed under the License is distributed on
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
  *
@@ -27,23 +27,23 @@ import (
 
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 func newTestOrchestrator(t *testing.T, cbs ...func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig)) (context.Context, *orchestrator, *mocksAndTestControl, func()) {
-	ctx, ble, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+	ctx, ptm, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		mocks.disableManagerStart = true // we don't want the manager running - this gives us a fake nonce manager too
 		for _, cb := range cbs {
 			cb(mocks, conf)
 		}
 	})
 
-	signingAddress := tktypes.EthAddress(tktypes.RandBytes(20))
-	o := NewOrchestrator(ble, signingAddress, ble.conf)
+	signingAddress := pldtypes.EthAddress(pldtypes.RandBytes(20))
+	o := NewOrchestrator(ptm, signingAddress, ptm.conf)
 
 	return ctx, o, m, done
 
@@ -54,7 +54,7 @@ func newInflightTransaction(o *orchestrator, nonce uint64, txMods ...func(tx *DB
 		From:    o.signingAddress,
 		Nonce:   &nonce,
 		Gas:     2000,
-		Created: tktypes.TimestampNow(),
+		Created: pldtypes.TimestampNow(),
 	}
 	for _, txMod := range txMods {
 		txMod(tx)
@@ -86,7 +86,7 @@ func TestNewOrchestratorLoadsSecondTxAndQueuesBalanceCheck(t *testing.T) {
 	m.db.ExpectQuery("SELECT.*public_submissions").WillReturnRows(sqlmock.NewRows([]string{}))
 
 	addressBalanceChecked := make(chan bool)
-	m.ethClient.On("GetBalance", mock.Anything, o.signingAddress, "latest").Return(tktypes.Uint64ToUint256(100), nil).Run(func(args mock.Arguments) {
+	m.ethClient.On("GetBalance", mock.Anything, o.signingAddress, "latest").Return(pldtypes.Uint64ToUint256(100), nil).Run(func(args mock.Arguments) {
 		close(addressBalanceChecked)
 	}).Once()
 	oDone, _ := o.Start(ctx)
@@ -163,7 +163,7 @@ func TestNewOrchestratorPollingRemoveCompleted(t *testing.T) {
 
 func TestOrchestratorTriggerTopUp(t *testing.T) {
 
-	autoFuelingSourceAddr := *tktypes.RandAddress()
+	autoFuelingSourceAddr := *pldtypes.RandAddress()
 	ctx, o, m, done := newTestOrchestrator(t, func(m *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Orchestrator.MaxInFlight = confutil.P(1) // just one inflight - which we inject in
 		conf.GasPrice.FixedGasPrice = 1
@@ -191,7 +191,7 @@ func TestOrchestratorTriggerTopUp(t *testing.T) {
 	})
 	txState.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: tktypes.Int64ToInt256(1000),
+			GasPrice: pldtypes.Int64ToInt256(1000),
 		},
 	})
 
@@ -210,13 +210,13 @@ func TestOrchestratorTriggerTopUp(t *testing.T) {
 	m.db.ExpectCommit()
 
 	// Mock the insufficient balance on the account that's submitting
-	m.ethClient.On("GetBalance", mock.Anything, o.signingAddress, "latest").Return(tktypes.Uint64ToUint256(0), nil)
+	m.ethClient.On("GetBalance", mock.Anything, o.signingAddress, "latest").Return(pldtypes.Uint64ToUint256(0), nil)
 
 	// Mock the sufficient balance on the auto-fueling source address, and the nonce assignment
-	m.ethClient.On("GetBalance", mock.Anything, autoFuelingSourceAddr, "latest").Return(tktypes.Uint64ToUint256(100*1000), nil)
+	m.ethClient.On("GetBalance", mock.Anything, autoFuelingSourceAddr, "latest").Return(pldtypes.Uint64ToUint256(100*1000), nil)
 	// Gas estimate for the auto-fueling TX
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
-		Return(ethclient.EstimateGasResult{GasLimit: tktypes.HexUint64(10)}, nil)
+		Return(ethclient.EstimateGasResult{GasLimit: pldtypes.HexUint64(10)}, nil)
 
 	oDone, err := o.Start(ctx)
 	require.NoError(t, err)

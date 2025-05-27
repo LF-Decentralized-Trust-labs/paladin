@@ -18,10 +18,9 @@ package signer
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -37,30 +36,22 @@ func decodeProvingRequest(ctx context.Context, payload []byte) (*pb.ProvingReque
 		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorProvingReqCommonNil)
 	}
 
-	if common.IsEncryptionCircuit(inputs.CircuitId) {
+	if inputs.Circuit.UsesEncryption {
 		encExtras := pb.ProvingRequestExtras_Encryption{
 			EncryptionNonce: "",
 		}
 		if len(inputs.Extras) > 0 {
 			err := proto.Unmarshal(inputs.Extras, &encExtras)
 			if err != nil {
-				return nil, nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalProvingReqExtras, inputs.CircuitId, err)
+				return nil, nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalProvingReqExtras, inputs.Circuit.Name, err)
 			}
 		}
 		return &inputs, &encExtras, nil
-	} else if common.IsNonFungibleNullifiersCircuit(inputs.CircuitId) {
-		nullifierExtras := pb.ProvingRequestExtras_Nullifiers{}
-		err := proto.Unmarshal(inputs.Extras, &nullifierExtras)
-		if err != nil {
-			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalProvingReqExtras, inputs.CircuitId, err)
-		}
-		return &inputs, &nullifierExtras, nil
-
-	} else if common.IsFungibleNullifiersCircuit(inputs.CircuitId) { // check if it is a nullifier circuit only after checking non-fungible circuit (to avoid parsing non-fungible + nullifier circuit)
+	} else if inputs.Circuit.UsesNullifiers {
 		var nullifierExtras pb.ProvingRequestExtras_Nullifiers
 		err := proto.Unmarshal(inputs.Extras, &nullifierExtras)
 		if err != nil {
-			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalProvingReqExtras, inputs.CircuitId, err)
+			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalProvingReqExtras, inputs.Circuit.Name, err)
 		}
 		return &inputs, &nullifierExtras, nil
 	}

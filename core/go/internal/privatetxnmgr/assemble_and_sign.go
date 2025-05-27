@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // assemble a transaction that we are not coordinating, using the provided state locks
@@ -153,7 +153,7 @@ func (s *Sequencer) assembleAndSign(ctx context.Context, transactionID uuid.UUID
 	for _, attRequest := range transaction.PostAssembly.AttestationPlan {
 		if attRequest.AttestationType == prototk.AttestationType_SIGN {
 			for _, partyName := range attRequest.Parties {
-				unqualifiedLookup, signerNode, err := tktypes.PrivateIdentityLocator(partyName).Validate(ctx, s.nodeName, true)
+				unqualifiedLookup, signerNode, err := pldtypes.PrivateIdentityLocator(partyName).Validate(ctx, s.nodeName, true)
 				if err != nil {
 					log.L(ctx).Errorf("Failed to validate identity locator for signing party %s: %s", partyName, err)
 					return nil, err

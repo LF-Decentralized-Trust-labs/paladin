@@ -23,10 +23,10 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,7 +41,7 @@ var encodedConfig = func(data *types.NotoConfigData_V0) []byte {
 		"notaryAddress": "0x138baffcdcc3543aad1afd81c71d2182cdf9c8cd",
 		"variant": "0x0000000000000000000000000000000000000000000000000000000000000000",
 		"data": "%s"
-	}`, tktypes.HexBytes(dataJSON).String())))
+	}`, pldtypes.HexBytes(dataJSON).String())))
 	if err != nil {
 		panic(err)
 	}
@@ -134,7 +134,7 @@ func TestNotoDomainDeployDefaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "tx1", deployParams["transactionId"])
 	assert.Equal(t, "0x6e2430d15301a7ee28ceaaee0dff9781f8f82f71", deployParams["notaryAddress"])
-	deployData := tktypes.MustParseHexBytes(deployParams["data"].(string))
+	deployData := pldtypes.MustParseHexBytes(deployParams["data"].(string))
 	assert.JSONEq(t, `{
 		"notaryLookup": "notary@node1",
 		"notaryMode": "0x0",
@@ -197,7 +197,7 @@ func TestNotoDomainDeployBasicConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "tx1", deployParams["transactionId"])
 	assert.Equal(t, "0x6e2430d15301a7ee28ceaaee0dff9781f8f82f71", deployParams["notaryAddress"])
-	deployData := tktypes.MustParseHexBytes(deployParams["data"].(string))
+	deployData := pldtypes.MustParseHexBytes(deployParams["data"].(string))
 	assert.JSONEq(t, `{
 		"notaryLookup": "notary@node1",
 		"notaryMode": "0x0",
@@ -220,7 +220,7 @@ func TestNotoDomainDeployHooksConfig(t *testing.T) {
 	n := &Noto{Callbacks: mockCallbacks}
 	ctx := context.Background()
 
-	groupSalt := tktypes.RandBytes32()
+	groupSalt := pldtypes.RandBytes32()
 	deployTransaction := &prototk.DeployTransactionSpecification{
 		TransactionId: "tx1",
 		ConstructorParamsJson: fmt.Sprintf(`{
@@ -264,7 +264,7 @@ func TestNotoDomainDeployHooksConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "tx1", deployParams["transactionId"])
 	assert.Equal(t, "0x0a8cb8c4cf5aea4ea2ed3b3777ccddd3e0eb9bc5", deployParams["notaryAddress"])
-	deployData := tktypes.MustParseHexBytes(deployParams["data"].(string))
+	deployData := pldtypes.MustParseHexBytes(deployParams["data"].(string))
 	assert.JSONEq(t, fmt.Sprintf(`{
 		"notaryLookup": "notary@node1",
 		"notaryMode": "0x1",
@@ -449,7 +449,7 @@ func TestPrepareDeployUnqualifiedNotary(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "0x6e2430d15301a7ee28ceaaee0dff9781f8f82f71", deployParams["notaryAddress"])
 	var deployData map[string]any
-	err = json.Unmarshal(tktypes.MustParseHexBytes(deployParams["data"].(string)), &deployData)
+	err = json.Unmarshal(pldtypes.MustParseHexBytes(deployParams["data"].(string)), &deployData)
 	require.NoError(t, err)
 	assert.Equal(t, "notary@node1", deployData["notaryLookup"])
 }
@@ -515,7 +515,7 @@ func TestInitContractBadConfig(t *testing.T) {
 func TestInitContractBadNotary(t *testing.T) {
 	n := &Noto{Callbacks: mockCallbacks}
 	_, err := n.InitContract(context.Background(), &prototk.InitContractRequest{
-		ContractAddress: tktypes.RandAddress().String(),
+		ContractAddress: pldtypes.RandAddress().String(),
 		ContractConfig:  encodedConfig(&types.NotoConfigData_V0{NotaryLookup: "notary@bad@notgood"}),
 	})
 	require.ErrorContains(t, err, "PD020006")
@@ -577,7 +577,7 @@ func TestInitTransactionBadParams(t *testing.T) {
 		Transaction: &prototk.TransactionSpecification{
 			ContractInfo: &prototk.ContractInfo{
 				ContractConfigJson: `{"notaryLookup":"notary"}`,
-				ContractAddress:    tktypes.RandAddress().String(),
+				ContractAddress:    pldtypes.RandAddress().String(),
 			},
 			FunctionAbiJson:    `{"name": "transfer"}`,
 			FunctionParamsJson: "!!wrong",
@@ -592,7 +592,7 @@ func TestInitTransactionMissingTo(t *testing.T) {
 		Transaction: &prototk.TransactionSpecification{
 			ContractInfo: &prototk.ContractInfo{
 				ContractConfigJson: `{"notaryLookup":"notary"}`,
-				ContractAddress:    tktypes.RandAddress().String(),
+				ContractAddress:    pldtypes.RandAddress().String(),
 			},
 			FunctionAbiJson:    `{"name": "transfer"}`,
 			FunctionParamsJson: "{}",
@@ -607,7 +607,7 @@ func TestInitTransactionMissingAmount(t *testing.T) {
 		Transaction: &prototk.TransactionSpecification{
 			ContractInfo: &prototk.ContractInfo{
 				ContractConfigJson: `{"notaryLookup":"notary"}`,
-				ContractAddress:    tktypes.RandAddress().String(),
+				ContractAddress:    pldtypes.RandAddress().String(),
 			},
 			FunctionAbiJson:    `{"name": "transfer"}`,
 			FunctionParamsJson: `{"to": "recipient"}`,
@@ -622,7 +622,7 @@ func TestInitTransactionBadSignature(t *testing.T) {
 		Transaction: &prototk.TransactionSpecification{
 			ContractInfo: &prototk.ContractInfo{
 				ContractConfigJson: `{"notaryLookup":"notary"}`,
-				ContractAddress:    tktypes.RandAddress().String(),
+				ContractAddress:    pldtypes.RandAddress().String(),
 			},
 			FunctionAbiJson:    `{"name": "transfer"}`,
 			FunctionParamsJson: `{"to": "recipient", "amount": 1}`,

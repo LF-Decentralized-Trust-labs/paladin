@@ -29,9 +29,9 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -56,7 +56,7 @@ func TestEventIndexingWithDB(t *testing.T) {
 	dm := td.dm
 
 	deployTX := uuid.New()
-	contractAddr := tktypes.EthAddress(tktypes.RandBytes(20))
+	contractAddr := pldtypes.EthAddress(pldtypes.RandBytes(20))
 
 	// Index an event indicating deployment of a new smart contract instance
 	var batchTxs txCompletionsOrdered
@@ -69,19 +69,19 @@ func TestEventIndexingWithDB(t *testing.T) {
 			Events: []*pldapi.EventWithData{
 				{
 					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
-					Address:           (tktypes.EthAddress)(*tp.d.RegistryAddress()),
+					Address:           (pldtypes.EthAddress)(*tp.d.RegistryAddress()),
 					IndexedEvent: &pldapi.IndexedEvent{
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
-						TransactionHash:  tktypes.NewBytes32FromSlice(tktypes.RandBytes(32)),
+						TransactionHash:  pldtypes.NewBytes32FromSlice(pldtypes.RandBytes(32)),
 						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
-					Data: tktypes.RawJSON(`{
-						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
-						"instance": "` + contractAddr.String() + `",
-						"config": "0xfeedbeef"
-					}`),
+					Data: pldtypes.RawJSON(`{
+						 "txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
+						 "instance": "` + contractAddr.String() + `",
+						 "config": "0xfeedbeef"
+					 }`),
 				},
 			},
 		})
@@ -142,9 +142,9 @@ func TestEventIndexingBadEvent(t *testing.T) {
 				{
 					Address:           *td.d.registryAddress,
 					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
-					Data: tktypes.RawJSON(`{
-						 "config": "cannot parse this"
-					 }`),
+					Data: pldtypes.RawJSON(`{
+						  "config": "cannot parse this"
+					  }`),
 				},
 			},
 		})
@@ -166,7 +166,7 @@ func TestEventIndexingInsertError(t *testing.T) {
 	})
 	defer done()
 
-	contractAddr := tktypes.EthAddress(tktypes.RandBytes(20))
+	contractAddr := pldtypes.EthAddress(pldtypes.RandBytes(20))
 	deployTX := uuid.New()
 	err := td.dm.persistence.Transaction(td.ctx, func(ctx context.Context, tx persistence.DBTX) error {
 		_, _, err := td.dm.registrationIndexer(td.ctx, tx, &blockindexer.EventDeliveryBatch{
@@ -181,14 +181,14 @@ func TestEventIndexingInsertError(t *testing.T) {
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
-						TransactionHash:  tktypes.NewBytes32FromSlice(tktypes.RandBytes(32)),
+						TransactionHash:  pldtypes.NewBytes32FromSlice(pldtypes.RandBytes(32)),
 						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
-					Data: tktypes.RawJSON(`{
-						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
-						"domain": "` + contractAddr.String() + `",
-						"data": "0xfeedbeef"
-					}`),
+					Data: pldtypes.RawJSON(`{
+						 "txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
+						 "domain": "` + contractAddr.String() + `",
+						 "data": "0xfeedbeef"
+					 }`),
 				},
 			},
 		})
@@ -201,26 +201,26 @@ func TestEventIndexingInsertError(t *testing.T) {
 func TestHandleEventBatch(t *testing.T) {
 	batchID := uuid.New()
 	txID := uuid.New()
-	txIDBytes32 := tktypes.Bytes32UUIDFirst16(txID)
-	contract1 := tktypes.RandAddress()
-	contract2 := tktypes.RandAddress()
-	stateSpent := tktypes.RandHex(32)
-	stateRead := tktypes.RandHex(32)
-	stateConfirmed := tktypes.RandHex(32)
-	stateInfo := tktypes.RandHex(32)
-	fakeHash1 := tktypes.RandHex(32)
-	fakeSchema := tktypes.RandBytes32()
+	txIDBytes32 := pldtypes.Bytes32UUIDFirst16(txID)
+	contract1 := pldtypes.RandAddress()
+	contract2 := pldtypes.RandAddress()
+	stateSpent := pldtypes.RandHex(32)
+	stateRead := pldtypes.RandHex(32)
+	stateConfirmed := pldtypes.RandHex(32)
+	stateInfo := pldtypes.RandHex(32)
+	fakeHash1 := pldtypes.RandHex(32)
+	fakeSchema := pldtypes.RandBytes32()
 	event1 := &pldapi.EventWithData{
 		Address: *contract1,
 		IndexedEvent: &pldapi.IndexedEvent{
 			BlockNumber:      1000,
 			TransactionIndex: 20,
 			LogIndex:         30,
-			TransactionHash:  tktypes.MustParseBytes32(tktypes.RandHex(32)),
-			Signature:        tktypes.MustParseBytes32(tktypes.RandHex(32)),
+			TransactionHash:  pldtypes.MustParseBytes32(pldtypes.RandHex(32)),
+			Signature:        pldtypes.MustParseBytes32(pldtypes.RandHex(32)),
 		},
 		SoliditySignature: "some event signature 1",
-		Data:              tktypes.RawJSON(`{"result": "success"}`),
+		Data:              pldtypes.RawJSON(`{"result": "success"}`),
 	}
 	event2 := &pldapi.EventWithData{
 		Address: *contract2,
@@ -228,30 +228,30 @@ func TestHandleEventBatch(t *testing.T) {
 			BlockNumber:      2000,
 			TransactionIndex: 30,
 			LogIndex:         40,
-			TransactionHash:  tktypes.MustParseBytes32(tktypes.RandHex(32)),
-			Signature:        tktypes.MustParseBytes32(tktypes.RandHex(32)),
+			TransactionHash:  pldtypes.MustParseBytes32(pldtypes.RandHex(32)),
+			Signature:        pldtypes.MustParseBytes32(pldtypes.RandHex(32)),
 		},
 		SoliditySignature: "some event signature 2",
-		Data:              tktypes.RawJSON(`{"result": "success"}`),
+		Data:              pldtypes.RawJSON(`{"result": "success"}`),
 	}
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
 
 		mc.stateStore.On("WriteStateFinalizations", mock.Anything, mock.Anything, []*pldapi.StateSpendRecord{
-			{DomainName: "test1", State: tktypes.MustParseHexBytes(stateSpent), Transaction: txID}, // the SpentStates StateUpdate
+			{DomainName: "test1", State: pldtypes.MustParseHexBytes(stateSpent), Transaction: txID}, // the SpentStates StateUpdate
 		}, []*pldapi.StateReadRecord{
-			{DomainName: "test1", State: tktypes.MustParseHexBytes(stateRead), Transaction: txID}, // the ReadStates StateUpdate
+			{DomainName: "test1", State: pldtypes.MustParseHexBytes(stateRead), Transaction: txID}, // the ReadStates StateUpdate
 		}, []*pldapi.StateConfirmRecord{
-			{DomainName: "test1", State: tktypes.MustParseHexBytes(stateConfirmed), Transaction: txID}, // the ConfirmedStates StateUpdate
-			{DomainName: "test1", State: tktypes.MustParseHexBytes(fakeHash1), Transaction: txID},      // the implicit confirm from the NewConfirmedState
+			{DomainName: "test1", State: pldtypes.MustParseHexBytes(stateConfirmed), Transaction: txID}, // the ConfirmedStates StateUpdate
+			{DomainName: "test1", State: pldtypes.MustParseHexBytes(fakeHash1), Transaction: txID},      // the implicit confirm from the NewConfirmedState
 		}, []*pldapi.StateInfoRecord{
-			{DomainName: "test1", State: tktypes.MustParseHexBytes(stateInfo), Transaction: txID}, // the InfoStates StateUpdate
+			{DomainName: "test1", State: pldtypes.MustParseHexBytes(stateInfo), Transaction: txID}, // the InfoStates StateUpdate
 		}).Return(nil, nil)
 
 		mc.stateStore.On("WritePreVerifiedStates", mock.Anything, mock.Anything, "test1", []*components.StateUpsertOutsideContext{
 			{
-				ID:              tktypes.MustParseHexBytes(fakeHash1),
-				Data:            tktypes.RawJSON(`{"color": "blue"}`),
+				ID:              pldtypes.MustParseHexBytes(fakeHash1),
+				Data:            pldtypes.RawJSON(`{"color": "blue"}`),
 				ContractAddress: contract2,
 				SchemaID:        fakeSchema,
 			},
@@ -263,7 +263,7 @@ func TestHandleEventBatch(t *testing.T) {
 			r := receipts[0]
 			expectedEvent := event2
 			assert.Equal(t, txID, r.TransactionID)
-			assert.Equal(t, tktypes.OnChainEvent, r.OnChain.Type)
+			assert.Equal(t, pldtypes.OnChainEvent, r.OnChain.Type)
 			assert.Equal(t, expectedEvent.TransactionHash.String(), r.OnChain.TransactionHash.String())
 			assert.Equal(t, expectedEvent.BlockNumber, r.OnChain.BlockNumber)
 			assert.Equal(t, expectedEvent.TransactionIndex, r.OnChain.TransactionIndex)
@@ -388,11 +388,11 @@ func TestHandleEventBatchFinalizeFail(t *testing.T) {
 						BlockNumber:      1000,
 						TransactionIndex: 20,
 						LogIndex:         30,
-						TransactionHash:  tktypes.MustParseBytes32(tktypes.RandHex(32)),
+						TransactionHash:  pldtypes.MustParseBytes32(pldtypes.RandHex(32)),
 						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
 					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
-					Data:              tktypes.RawJSON(`{"result": "success"}`),
+					Data:              pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -412,16 +412,16 @@ func TestHandleEventIgnoreUnknownDomain(t *testing.T) {
 			BatchID: batchID,
 			Events: []*pldapi.EventWithData{
 				{
-					Address: *tktypes.RandAddress(),
+					Address: *pldtypes.RandAddress(),
 					IndexedEvent: &pldapi.IndexedEvent{
 						BlockNumber:      1000,
 						TransactionIndex: 20,
 						LogIndex:         30,
-						TransactionHash:  tktypes.MustParseBytes32(tktypes.RandHex(32)),
+						TransactionHash:  pldtypes.MustParseBytes32(pldtypes.RandHex(32)),
 						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
 					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
-					Data:              tktypes.RawJSON(`{"result": "success"}`),
+					Data:              pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -432,7 +432,7 @@ func TestHandleEventIgnoreUnknownDomain(t *testing.T) {
 
 func TestHandleEventBatchContractLookupFail(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
+	contract1 := pldtypes.RandAddress()
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -449,7 +449,7 @@ func TestHandleEventBatchContractLookupFail(t *testing.T) {
 			Events: []*pldapi.EventWithData{
 				{
 					Address: *contract1,
-					Data:    tktypes.RawJSON(`{"result": "success"}`),
+					Data:    pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -470,7 +470,7 @@ func TestHandleEventBatchRegistrationError(t *testing.T) {
 	mp.Mock.ExpectExec("INSERT.*private_smart_contracts").WillReturnError(fmt.Errorf("pop"))
 
 	registrationData := &event_PaladinRegisterSmartContract_V0{
-		TXId: tktypes.RandBytes32(),
+		TXId: pldtypes.RandBytes32(),
 	}
 	registrationDataJSON, err := json.Marshal(registrationData)
 	require.NoError(t, err)
@@ -493,7 +493,7 @@ func TestHandleEventBatchRegistrationError(t *testing.T) {
 
 func TestHandleEventBatchDomainError(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
+	contract1 := pldtypes.RandAddress()
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -520,7 +520,7 @@ func TestHandleEventBatchDomainError(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -530,8 +530,8 @@ func TestHandleEventBatchDomainError(t *testing.T) {
 
 func TestHandleEventBatchSpentBadTransactionID(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
-	stateSpent := tktypes.RandHex(32)
+	contract1 := pldtypes.RandAddress()
+	stateSpent := pldtypes.RandHex(32)
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -565,7 +565,7 @@ func TestHandleEventBatchSpentBadTransactionID(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -575,8 +575,8 @@ func TestHandleEventBatchSpentBadTransactionID(t *testing.T) {
 
 func TestHandleEventBatchReadBadTransactionID(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
-	stateSpent := tktypes.RandHex(32)
+	contract1 := pldtypes.RandAddress()
+	stateSpent := pldtypes.RandHex(32)
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -610,7 +610,7 @@ func TestHandleEventBatchReadBadTransactionID(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -620,8 +620,8 @@ func TestHandleEventBatchReadBadTransactionID(t *testing.T) {
 
 func TestHandleEventBatchConfirmBadTransactionID(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
-	stateSpent := tktypes.RandHex(32)
+	contract1 := pldtypes.RandAddress()
+	stateSpent := pldtypes.RandHex(32)
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -655,7 +655,7 @@ func TestHandleEventBatchConfirmBadTransactionID(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -665,8 +665,8 @@ func TestHandleEventBatchConfirmBadTransactionID(t *testing.T) {
 
 func TestHandleEventBatchInfoBadTransactionID(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
-	stateSpent := tktypes.RandHex(32)
+	contract1 := pldtypes.RandAddress()
+	stateSpent := pldtypes.RandHex(32)
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -700,7 +700,7 @@ func TestHandleEventBatchInfoBadTransactionID(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -710,7 +710,7 @@ func TestHandleEventBatchInfoBadTransactionID(t *testing.T) {
 
 func TestHandleEventBatchSpentBadSchemaID(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
+	contract1 := pldtypes.RandAddress()
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -728,7 +728,7 @@ func TestHandleEventBatchSpentBadSchemaID(t *testing.T) {
 			SpentStates: []*prototk.StateUpdate{
 				{
 					Id:            "bad",
-					TransactionId: tktypes.RandHex(32),
+					TransactionId: pldtypes.RandHex(32),
 				},
 			},
 		}, nil
@@ -744,7 +744,7 @@ func TestHandleEventBatchSpentBadSchemaID(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -754,7 +754,7 @@ func TestHandleEventBatchSpentBadSchemaID(t *testing.T) {
 
 func TestHandleEventBatchReadBadSchemaID(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
+	contract1 := pldtypes.RandAddress()
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -772,7 +772,7 @@ func TestHandleEventBatchReadBadSchemaID(t *testing.T) {
 			ReadStates: []*prototk.StateUpdate{
 				{
 					Id:            "bad",
-					TransactionId: tktypes.RandHex(32),
+					TransactionId: pldtypes.RandHex(32),
 				},
 			},
 		}, nil
@@ -788,7 +788,7 @@ func TestHandleEventBatchReadBadSchemaID(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -798,7 +798,7 @@ func TestHandleEventBatchReadBadSchemaID(t *testing.T) {
 
 func TestHandleEventBatchConfirmBadSchemaID(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
+	contract1 := pldtypes.RandAddress()
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -816,7 +816,7 @@ func TestHandleEventBatchConfirmBadSchemaID(t *testing.T) {
 			ConfirmedStates: []*prototk.StateUpdate{
 				{
 					Id:            "bad",
-					TransactionId: tktypes.RandHex(32),
+					TransactionId: pldtypes.RandHex(32),
 				},
 			},
 		}, nil
@@ -832,7 +832,7 @@ func TestHandleEventBatchConfirmBadSchemaID(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -842,7 +842,7 @@ func TestHandleEventBatchConfirmBadSchemaID(t *testing.T) {
 
 func TestHandleEventBatchNewBadTransactionID(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
+	contract1 := pldtypes.RandAddress()
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -875,7 +875,7 @@ func TestHandleEventBatchNewBadTransactionID(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -885,7 +885,7 @@ func TestHandleEventBatchNewBadTransactionID(t *testing.T) {
 
 func TestHandleEventBatchNewBadSchemaID(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
+	contract1 := pldtypes.RandAddress()
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -903,7 +903,7 @@ func TestHandleEventBatchNewBadSchemaID(t *testing.T) {
 			NewStates: []*prototk.NewConfirmedState{
 				{
 					SchemaId:      "badnotgood",
-					TransactionId: tktypes.RandHex(32),
+					TransactionId: pldtypes.RandHex(32),
 				},
 			},
 		}, nil
@@ -919,7 +919,7 @@ func TestHandleEventBatchNewBadSchemaID(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -929,7 +929,7 @@ func TestHandleEventBatchNewBadSchemaID(t *testing.T) {
 
 func TestHandleEventBatchNewBadStateID(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
+	contract1 := pldtypes.RandAddress()
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -963,7 +963,7 @@ func TestHandleEventBatchNewBadStateID(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -973,7 +973,7 @@ func TestHandleEventBatchNewBadStateID(t *testing.T) {
 
 func TestHandleEventBatchBadTransactionID(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
+	contract1 := pldtypes.RandAddress()
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -1008,7 +1008,7 @@ func TestHandleEventBatchBadTransactionID(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -1019,9 +1019,9 @@ func TestHandleEventBatchBadTransactionID(t *testing.T) {
 func TestHandleEventBatchMarkConfirmedFail(t *testing.T) {
 	batchID := uuid.New()
 	txID := uuid.New()
-	txIDBytes32 := tktypes.Bytes32UUIDFirst16(txID)
-	contract1 := tktypes.RandAddress()
-	stateConfirmed := tktypes.RandHex(32)
+	txIDBytes32 := pldtypes.Bytes32UUIDFirst16(txID)
+	contract1 := pldtypes.RandAddress()
+	stateConfirmed := pldtypes.RandHex(32)
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
 		mc.stateStore.On("WriteStateFinalizations", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -1058,7 +1058,7 @@ func TestHandleEventBatchMarkConfirmedFail(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -1068,7 +1068,7 @@ func TestHandleEventBatchMarkConfirmedFail(t *testing.T) {
 
 func TestHandleEventBatchUpsertStateFail(t *testing.T) {
 	batchID := uuid.New()
-	contract1 := tktypes.RandAddress()
+	contract1 := pldtypes.RandAddress()
 
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
 		mc.stateStore.On("WritePreVerifiedStates", mock.Anything, mock.Anything, "test1", mock.Anything).Return(nil, fmt.Errorf("pop"))
@@ -1087,9 +1087,9 @@ func TestHandleEventBatchUpsertStateFail(t *testing.T) {
 		return &prototk.HandleEventBatchResponse{
 			NewStates: []*prototk.NewConfirmedState{
 				{
-					SchemaId:      tktypes.RandHex(32),
+					SchemaId:      pldtypes.RandHex(32),
 					StateDataJson: `{"color": "blue"}`,
-					TransactionId: tktypes.RandHex(32),
+					TransactionId: pldtypes.RandHex(32),
 				},
 			},
 		}, nil
@@ -1105,7 +1105,7 @@ func TestHandleEventBatchUpsertStateFail(t *testing.T) {
 				{
 					Address:      *td.d.registryAddress,
 					IndexedEvent: &pldapi.IndexedEvent{},
-					Data:         tktypes.RawJSON(`{"result": "success"}`),
+					Data:         pldtypes.RawJSON(`{"result": "success"}`),
 				},
 			},
 		})
@@ -1114,16 +1114,16 @@ func TestHandleEventBatchUpsertStateFail(t *testing.T) {
 }
 
 func TestReceiptSorting(t *testing.T) {
-	// Note the detail of the sorting code is in tktypes.OnChainLocation
+	// Note the detail of the sorting code is in pldtypes.OnChainLocation
 	receiptList := txCompletionsOrdered{
-		{ReceiptInput: components.ReceiptInput{OnChain: tktypes.OnChainLocation{Type: tktypes.OnChainEvent, BlockNumber: 1100}}},
-		{ReceiptInput: components.ReceiptInput{OnChain: tktypes.OnChainLocation{ /* not onchain */ }}},
-		{ReceiptInput: components.ReceiptInput{OnChain: tktypes.OnChainLocation{Type: tktypes.OnChainEvent, BlockNumber: 1000}}},
+		{ReceiptInput: components.ReceiptInput{OnChain: pldtypes.OnChainLocation{Type: pldtypes.OnChainEvent, BlockNumber: 1100}}},
+		{ReceiptInput: components.ReceiptInput{OnChain: pldtypes.OnChainLocation{ /* not onchain */ }}},
+		{ReceiptInput: components.ReceiptInput{OnChain: pldtypes.OnChainLocation{Type: pldtypes.OnChainEvent, BlockNumber: 1000}}},
 	}
 	sort.Sort(receiptList)
 	assert.Equal(t, txCompletionsOrdered{
-		{ReceiptInput: components.ReceiptInput{OnChain: tktypes.OnChainLocation{Type: tktypes.NotOnChain}}},
-		{ReceiptInput: components.ReceiptInput{OnChain: tktypes.OnChainLocation{Type: tktypes.OnChainEvent, BlockNumber: 1000}}},
-		{ReceiptInput: components.ReceiptInput{OnChain: tktypes.OnChainLocation{Type: tktypes.OnChainEvent, BlockNumber: 1100}}},
+		{ReceiptInput: components.ReceiptInput{OnChain: pldtypes.OnChainLocation{Type: pldtypes.NotOnChain}}},
+		{ReceiptInput: components.ReceiptInput{OnChain: pldtypes.OnChainLocation{Type: pldtypes.OnChainEvent, BlockNumber: 1000}}},
+		{ReceiptInput: components.ReceiptInput{OnChain: pldtypes.OnChainLocation{Type: pldtypes.OnChainEvent, BlockNumber: 1100}}},
 	}, receiptList)
 }

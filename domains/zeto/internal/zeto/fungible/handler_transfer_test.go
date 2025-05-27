@@ -21,15 +21,16 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 )
@@ -115,7 +116,7 @@ func TestTransferInit(t *testing.T) {
 		Params: []*types.FungibleTransferParamEntry{
 			{
 				To:     "Alice",
-				Amount: tktypes.MustParseHexUint256("0x0a"),
+				Amount: pldtypes.MustParseHexUint256("0x0a"),
 			},
 		},
 		Transaction: &pb.TransactionSpecification{
@@ -135,15 +136,20 @@ func TestTransferAssemble(t *testing.T) {
 	h := transferHandler{
 		baseHandler: baseHandler{
 			name: "test1",
-		},
-		coinSchema: &pb.StateSchema{
-			Id: "coin",
-		},
-		merkleTreeRootSchema: &pb.StateSchema{
-			Id: "merkle_tree_root",
-		},
-		merkleTreeNodeSchema: &pb.StateSchema{
-			Id: "merkle_tree_node",
+			stateSchemas: &common.StateSchemas{
+				CoinSchema: &pb.StateSchema{
+					Id: "coin",
+				},
+				MerkleTreeRootSchema: &pb.StateSchema{
+					Id: "merkle_tree_root",
+				},
+				MerkleTreeNodeSchema: &pb.StateSchema{
+					Id: "merkle_tree_node",
+				},
+				DataSchema: &prototk.StateSchema{
+					Id: "data",
+				},
+			},
 		},
 	}
 	ctx := context.Background()
@@ -157,15 +163,20 @@ func TestTransferAssemble(t *testing.T) {
 		Params: []*types.FungibleTransferParamEntry{
 			{
 				To:     "Alice",
-				Amount: tktypes.MustParseHexUint256("0x09"),
+				Amount: pldtypes.MustParseHexUint256("0x09"),
 			},
 		},
 		Transaction: txSpec,
 		DomainConfig: &types.DomainInstanceConfig{
 			TokenName: "tokenContract1",
-			CircuitId: "circuit1",
+			Circuits: &zetosignerapi.Circuits{
+				"deposit":  &zetosignerapi.Circuit{Name: "circuit-deposit"},
+				"transfer": &zetosignerapi.Circuit{Name: "circuit-transfer"},
+			},
 		},
 	}
+
+	// Missing verifier for sender
 	req := &pb.AssembleTransactionRequest{
 		ResolvedVerifiers: []*pb.ResolvedVerifier{
 			{
@@ -180,6 +191,7 @@ func TestTransferAssemble(t *testing.T) {
 	_, err := h.Assemble(ctx, tx, req)
 	assert.EqualError(t, err, "PD210036: Failed to resolve verifier: Bob")
 
+	// Error querying states
 	req.ResolvedVerifiers = append(req.ResolvedVerifiers, &pb.ResolvedVerifier{
 		Lookup:       "Bob",
 		Verifier:     "0x1234567890123456789012345678901234567890",
@@ -210,18 +222,36 @@ func TestTransferAssemble(t *testing.T) {
 			return nil, errors.New("test error")
 		}
 	}
-	req.ResolvedVerifiers[1].Verifier = "0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025"
+
+	// Malformed verifier key
 	_, err = h.Assemble(ctx, tx, req)
 	assert.EqualError(t, err, "PD210040: Failed to prepare transaction outputs. PD210037: Failed load owner public key. expected 32 bytes in hex string, got 20")
 
 	calls = 0
+	req.ResolvedVerifiers[0].Verifier = "0x19d2ee6b9770a4f8d7c3b7906bc7595684509166fa42d718d1d880b62bcb7922"
+	req.ResolvedVerifiers[1].Verifier = "0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025"
+
+	// Missing verifier for receiver
 	req.ResolvedVerifiers[0].Lookup = "Bob"
 	_, err = h.Assemble(ctx, tx, req)
 	assert.EqualError(t, err, "PD210040: Failed to prepare transaction outputs. PD210036: Failed to resolve verifier: Alice")
+	req.ResolvedVerifiers[0].Lookup = "Alice"
 
-	req.ResolvedVerifiers[0].Verifier = "0x19d2ee6b9770a4f8d7c3b7906bc7595684509166fa42d718d1d880b62bcb7922"
+	// Initially find a state, but error when looking for more states
 	_, err = h.Assemble(ctx, tx, req)
 	assert.EqualError(t, err, "PD210039: Failed to prepare transaction inputs. PD210032: Failed to query the state store for available coins. test error")
+
+	testCallbacks.MockFindAvailableStates = func() (*pb.FindAvailableStatesResponse, error) {
+		return &pb.FindAvailableStatesResponse{
+			States: []*pb.StoredState{},
+		}, nil
+	}
+
+	// No states found
+	res, err := h.Assemble(ctx, tx, req)
+	assert.NoError(t, err)
+	assert.Equal(t, prototk.AssembleTransactionResponse_REVERT, res.AssemblyResult)
+	assert.Equal(t, "PD210033: Insufficient funds (available=0)", *res.RevertReason)
 
 	testCallbacks.MockFindAvailableStates = func() (*pb.FindAvailableStatesResponse, error) {
 		return &pb.FindAvailableStatesResponse{
@@ -232,8 +262,9 @@ func TestTransferAssemble(t *testing.T) {
 			},
 		}, nil
 	}
-	req.ResolvedVerifiers[0].Lookup = "Alice"
-	res, err := h.Assemble(ctx, tx, req)
+
+	// Successful assembly with 1 input state
+	res, err = h.Assemble(ctx, tx, req)
 	assert.NoError(t, err)
 	assert.Len(t, res.AssembledTransaction.InputStates, 1)
 	assert.Len(t, res.AssembledTransaction.OutputStates, 2) // one for the receiver Alice, one for self as change
@@ -267,13 +298,15 @@ func TestTransferAssemble(t *testing.T) {
 			},
 		}, nil
 	}
+
+	// Successful assembly with 3 input states
 	res, err = h.Assemble(ctx, tx, req)
 	assert.NoError(t, err)
 	assert.Len(t, res.AssembledTransaction.InputStates, 3)
 	assert.Len(t, res.AssembledTransaction.OutputStates, 2) // one for the receiver Alice, one for self as change
 
 	tx.DomainConfig.TokenName = constants.TOKEN_ANON_NULLIFIER
-	tx.DomainConfig.CircuitId = constants.CIRCUIT_ANON_NULLIFIER
+	(*tx.DomainConfig.Circuits)["transfer"] = &zetosignerapi.Circuit{Name: "anon_nullifier_transfer", Type: "transfer"}
 	called := 0
 	testCallbacks.MockFindAvailableStates = func() (*pb.FindAvailableStatesResponse, error) {
 		var dataJson string
@@ -324,12 +357,15 @@ func TestTransferPrepare(t *testing.T) {
 		Params: []*types.FungibleTransferParamEntry{
 			{
 				To:     "Alice",
-				Amount: tktypes.MustParseHexUint256("0x0a"),
+				Amount: pldtypes.MustParseHexUint256("0x0a"),
 			},
 		},
 		Transaction: txSpec,
 		DomainConfig: &types.DomainInstanceConfig{
 			TokenName: constants.TOKEN_ANON_ENC,
+			Circuits: &zetosignerapi.Circuits{
+				"deposit": &zetosignerapi.Circuit{Name: "circuit-deposit"},
+			},
 		},
 	}
 	req := &pb.PrepareTransactionRequest{
@@ -399,10 +435,10 @@ func TestTransferPrepare(t *testing.T) {
 
 	res, err := h.Prepare(ctx, tx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, "{\"data\":\"0x000100001234567890123456789012345678901234567890123456789012345678901234\",\"ecdhPublicKey\":[\"\"],\"encryptedValues\":[\"0x1234567890\",\"0x1234567890\"],\"encryptionNonce\":\"0x1234567890\",\"inputs\":[\"0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f\",\"0\"],\"outputs\":[\"0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f\",\"0\"],\"proof\":{\"pA\":[\"0x1234567890\",\"0x1234567890\"],\"pB\":[[\"0x1234567890\",\"0x1234567890\"],[\"0x1234567890\",\"0x1234567890\"]],\"pC\":[\"0x1234567890\",\"0x1234567890\"]}}", res.Transaction.ParamsJson)
+	assert.Equal(t, "{\"data\":\"0x00010000123456789012345678901234567890123456789012345678901234567890123400000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000\",\"ecdhPublicKey\":[\"\"],\"encryptedValues\":[\"0x1234567890\",\"0x1234567890\"],\"encryptionNonce\":\"0x1234567890\",\"inputs\":[\"0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f\",\"0\"],\"outputs\":[\"0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f\",\"0\"],\"proof\":{\"pA\":[\"0x1234567890\",\"0x1234567890\"],\"pB\":[[\"0x1234567890\",\"0x1234567890\"],[\"0x1234567890\",\"0x1234567890\"]],\"pC\":[\"0x1234567890\",\"0x1234567890\"]}}", res.Transaction.ParamsJson)
 
 	tx.DomainConfig.TokenName = constants.TOKEN_ANON_NULLIFIER
-	tx.DomainConfig.CircuitId = constants.CIRCUIT_ANON_NULLIFIER
+	(*tx.DomainConfig.Circuits)["transfer"] = &zetosignerapi.Circuit{Name: "anon_nullifier_transfer", Type: "transfer", UsesNullifiers: true}
 	proofReq.PublicInputs["nullifiers"] = "0x1234567890,0x1234567890"
 	proofReq.PublicInputs["root"] = "0x1234567890"
 	payload, err = proto.Marshal(&proofReq)
@@ -410,7 +446,7 @@ func TestTransferPrepare(t *testing.T) {
 	req.AttestationResult[0].Payload = payload
 	res, err = h.Prepare(ctx, tx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, "{\"data\":\"0x000100001234567890123456789012345678901234567890123456789012345678901234\",\"nullifiers\":[\"0x1234567890\",\"0x1234567890\"],\"outputs\":[\"0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f\",\"0\"],\"proof\":{\"pA\":[\"0x1234567890\",\"0x1234567890\"],\"pB\":[[\"0x1234567890\",\"0x1234567890\"],[\"0x1234567890\",\"0x1234567890\"]],\"pC\":[\"0x1234567890\",\"0x1234567890\"]},\"root\":\"0x1234567890\"}", res.Transaction.ParamsJson)
+	assert.Equal(t, "{\"data\":\"0x00010000123456789012345678901234567890123456789012345678901234567890123400000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000\",\"nullifiers\":[\"0x1234567890\",\"0x1234567890\"],\"outputs\":[\"0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f\",\"0\"],\"proof\":{\"pA\":[\"0x1234567890\",\"0x1234567890\"],\"pB\":[[\"0x1234567890\",\"0x1234567890\"],[\"0x1234567890\",\"0x1234567890\"]],\"pC\":[\"0x1234567890\",\"0x1234567890\"]},\"root\":\"0x1234567890\"}", res.Transaction.ParamsJson)
 }
 
 func TestGenerateMerkleProofs(t *testing.T) {
@@ -422,30 +458,32 @@ func TestGenerateMerkleProofs(t *testing.T) {
 	h := transferHandler{
 		baseHandler: baseHandler{
 			name: "test1",
+			stateSchemas: &common.StateSchemas{
+				CoinSchema: &pb.StateSchema{
+					Id: "coin",
+				},
+				MerkleTreeRootSchema: &pb.StateSchema{
+					Id: "merkle_tree_root",
+				},
+				MerkleTreeNodeSchema: &pb.StateSchema{
+					Id: "merkle_tree_node",
+				},
+			},
 		},
 		callbacks: testCallbacks,
-		coinSchema: &pb.StateSchema{
-			Id: "coin",
-		},
-		merkleTreeRootSchema: &pb.StateSchema{
-			Id: "merkle_tree_root",
-		},
-		merkleTreeNodeSchema: &pb.StateSchema{
-			Id: "merkle_tree_node",
-		},
 	}
-	addr, err := tktypes.ParseEthAddress("0x1234567890123456789012345678901234567890")
+	addr, err := pldtypes.ParseEthAddress("0x1234567890123456789012345678901234567890")
 	assert.NoError(t, err)
 	inputCoins := []*types.ZetoCoin{
 		{
-			Salt:   tktypes.MustParseHexUint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
-			Owner:  tktypes.MustParseHexBytes("0x1234"),
-			Amount: tktypes.MustParseHexUint256("0x0f"),
+			Salt:   pldtypes.MustParseHexUint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			Owner:  pldtypes.MustParseHexBytes("0x1234"),
+			Amount: pldtypes.MustParseHexUint256("0x0f"),
 		},
 	}
 	ctx := context.Background()
 	queryContext := "queryContext"
-	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.merkleTreeRootSchema, h.merkleTreeNodeSchema, constants.TOKEN_ANON, queryContext, addr, inputCoins)
+	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, "Zeto_Anon", queryContext, addr, inputCoins, false)
 	assert.EqualError(t, err, "PD210019: Failed to create Merkle tree for smt_Zeto_Anon_0x1234567890123456789012345678901234567890: PD210065: Failed to find available states for the merkle tree. test error")
 
 	testCallbacks.MockFindAvailableStates = func() (*pb.FindAvailableStatesResponse, error) {
@@ -457,14 +495,14 @@ func TestGenerateMerkleProofs(t *testing.T) {
 			},
 		}, nil
 	}
-	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.merkleTreeRootSchema, h.merkleTreeNodeSchema, constants.TOKEN_ANON, queryContext, addr, inputCoins)
+	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, "Zeto_Anon", queryContext, addr, inputCoins, false)
 	assert.EqualError(t, err, "PD210037: Failed load owner public key. PD210072: Invalid compressed public key length: 2")
 
-	inputCoins[0].Owner = tktypes.MustParseHexBytes("0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
-	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.merkleTreeRootSchema, h.merkleTreeNodeSchema, constants.TOKEN_ANON, queryContext, addr, inputCoins)
+	inputCoins[0].Owner = pldtypes.MustParseHexBytes("0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
+	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, "Zeto_Anon", queryContext, addr, inputCoins, false)
 	assert.EqualError(t, err, "PD210054: Failed to create new leaf node. inputs values not inside Finite Field")
 
-	inputCoins[0].Salt = tktypes.MustParseHexUint256("0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec")
+	inputCoins[0].Salt = pldtypes.MustParseHexUint256("0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec")
 	calls := 0
 	testCallbacks.MockFindAvailableStates = func() (*pb.FindAvailableStatesResponse, error) {
 		defer func() { calls++ }()
@@ -482,7 +520,7 @@ func TestGenerateMerkleProofs(t *testing.T) {
 			}, nil
 		}
 	}
-	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.merkleTreeRootSchema, h.merkleTreeNodeSchema, constants.TOKEN_ANON, queryContext, addr, inputCoins)
+	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, "Zeto_Anon", queryContext, addr, inputCoins, false)
 	assert.EqualError(t, err, "PD210055: Failed to query the smt DB for leaf node (ref=789c99b9a2196addb3ac11567135877e8b86bc9b5f7725808a79757fd36b2a2a). key not found")
 
 	testCallbacks.MockFindAvailableStates = func() (*pb.FindAvailableStatesResponse, error) {
@@ -505,7 +543,7 @@ func TestGenerateMerkleProofs(t *testing.T) {
 			}, nil
 		}
 	}
-	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.merkleTreeRootSchema, h.merkleTreeNodeSchema, constants.TOKEN_ANON, queryContext, addr, inputCoins)
+	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, "Zeto_Anon", queryContext, addr, inputCoins, false)
 	assert.EqualError(t, err, "PD210057: Coin (ref=789c99b9a2196addb3ac11567135877e8b86bc9b5f7725808a79757fd36b2a2a) found in the merkle tree but the persisted hash 26e3879b46b15a4ddbaca5d96af1bd2743f67f13f0bb85c40782950a2a700138 (index=3801702a0a958207c485bbf0137ff64327bdf16ad9a5acdb4d5ab1469b87e326) did not match the expected hash 0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f (index=5f5d5e50a650a20986d496e6645ea31770758d924796f0dfc5ac2ad234b03e30)")
 
 	testCallbacks.MockFindAvailableStates = func() (*pb.FindAvailableStatesResponse, error) {
@@ -528,7 +566,7 @@ func TestGenerateMerkleProofs(t *testing.T) {
 			}, nil
 		}
 	}
-	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.merkleTreeRootSchema, h.merkleTreeNodeSchema, constants.TOKEN_ANON, queryContext, addr, inputCoins)
+	_, _, err = generateMerkleProofs(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, "Zeto_Anon", queryContext, addr, inputCoins, false)
 	assert.NoError(t, err)
 }
 

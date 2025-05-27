@@ -14,41 +14,60 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { IFilter } from "./interfaces";
+import { IFilter } from './interfaces';
 
 export const formatJSONWhenApplicable = (value: any) => {
   if (typeof value === 'object') {
     try {
       return JSON.stringify(value, null, 2);
-    } catch (err) { }
+    } catch (err) {}
   }
   return String(value);
 };
 
 export const translateFilters = (filters: IFilter[]) => {
-
   let result: any = {};
 
   for (const filter of filters) {
-
     let entry: any = {
       field: filter.field.name,
       value: filter.value,
     };
 
-    if(filter.caseSensitive === false) {
+    if (filter.caseSensitive === false) {
       entry.caseInsensitive = true;
     }
 
     let operator = filter.operator;
 
     switch (operator) {
-      case 'contains': operator = 'like'; entry.value = `%${entry.value}%`; break;
-      case 'startsWith': operator = 'like'; entry.value = `${entry.value}%`; break;
-      case 'endsWith': operator = 'like'; entry.value = `%${entry.value}`; break;
-      case 'doesNotContain': operator = 'like'; entry.not = true; entry.value = `%${entry.value}%`; break;
-      case 'doesNotStartWith': operator = 'like'; entry.not = true; entry.value = `${entry.value}%`; break;
-      case 'doesNotEndWith': operator = 'like'; entry.not = true; entry.value = `%${entry.value}`; break;
+      case 'contains':
+        operator = 'like';
+        entry.value = `%${entry.value}%`;
+        break;
+      case 'startsWith':
+        operator = 'like';
+        entry.value = `${entry.value}%`;
+        break;
+      case 'endsWith':
+        operator = 'like';
+        entry.value = `%${entry.value}`;
+        break;
+      case 'doesNotContain':
+        operator = 'like';
+        entry.not = true;
+        entry.value = `%${entry.value}%`;
+        break;
+      case 'doesNotStartWith':
+        operator = 'like';
+        entry.not = true;
+        entry.value = `${entry.value}%`;
+        break;
+      case 'doesNotEndWith':
+        operator = 'like';
+        entry.not = true;
+        entry.value = `%${entry.value}`;
+        break;
     }
 
     let group = result[operator] ?? [];
@@ -57,8 +76,29 @@ export const translateFilters = (filters: IFilter[]) => {
   }
 
   return result;
-
 };
 
-export const isValidUUID = (uuid: string) => 
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(uuid);
+export const isValidUUID = (uuid: string) =>
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(
+    uuid
+  );
+
+export const encodeHex = (str: string) =>
+  '0x' +
+  [...new TextEncoder().encode(str)]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+
+// Infer the base path from the current URL
+// Assume that the base path is the part of the URL up to the "/ui" segment
+export const getBasePath = () => {
+  const pathname = window.location.pathname;
+  const pathSegments = pathname.split('/');
+  for (let i = 0; i < pathSegments.length; i++) {
+    if (pathSegments[i] === 'ui') {
+      // pathSegments[0] is the empty string, so we need to avoid ending up with //something
+      return ('/' + pathSegments.slice(0, i).join('/')).replace(/^\/\/+/, '/');
+    }
+  }
+  return '/';
+};

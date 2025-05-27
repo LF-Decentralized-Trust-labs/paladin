@@ -25,16 +25,17 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/componentmgr"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/plugins"
+	"github.com/kaleido-io/paladin/core/pkg/config"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func HDWalletSeedScopedToTest() *UTInitFunction {
-	seed := tktypes.RandHex(32)
+	seed := pldtypes.RandHex(32)
 	return &UTInitFunction{
 		ModifyConfig: func(conf *pldconf.PaladinConfig) {
 			conf.Wallets[0].Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
@@ -60,7 +61,7 @@ type Testbed interface {
 type TestbedDomain struct {
 	Config          map[string]any
 	Plugin          plugintk.Plugin
-	RegistryAddress *tktypes.EthAddress
+	RegistryAddress *pldtypes.EthAddress
 	AllowSigning    bool
 }
 
@@ -167,7 +168,7 @@ func (tb *testbed) HandlePaladinMsg(context.Context, *components.ReceivedMessage
 func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*UTInitFunction) (url string, conf *pldconf.PaladinConfig, done func(), err error) {
 	ctx := context.Background()
 
-	if err = pldconf.ReadAndParseYAMLFile(ctx, configFile, &conf); err != nil {
+	if err = config.ReadAndParseYAMLFile(ctx, configFile, &conf); err != nil {
 		return "", nil, nil, err
 	}
 
@@ -181,7 +182,7 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 	for name, domain := range domains {
 		conf.DomainManagerConfig.Domains[name] = &pldconf.DomainConfig{
 			Plugin: pldconf.PluginConfig{
-				Type:    string(tktypes.LibraryTypeCShared),
+				Type:    string(pldtypes.LibraryTypeCShared),
 				Library: "loaded/via/unit/test/loader",
 			},
 			Config:          domain.Config,

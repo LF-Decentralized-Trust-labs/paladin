@@ -27,7 +27,16 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"testing"
+	"time"
+
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var _ = Describe("PaladinDomain Controller", func() {
@@ -86,3 +95,320 @@ var _ = Describe("PaladinDomain Controller", func() {
 		})
 	})
 })
+
+func setupPaladinDomainTestReconciler(objs ...runtime.Object) (*PaladinDomainReconciler, error) {
+	scheme := runtime.NewScheme()
+	err := corev1alpha1.AddToScheme(scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithRuntimeObjects(objs...).
+		WithStatusSubresource(&corev1alpha1.PaladinDomain{}).
+		Build()
+
+	r := &PaladinDomainReconciler{
+		Client: client,
+		Scheme: scheme,
+	}
+
+	return r, nil
+}
+func TestPaladinDomainReconcile_NewResource(t *testing.T) {
+
+	domain := &corev1alpha1.PaladinDomain{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-domain",
+			Namespace: "default",
+		},
+		Spec: corev1alpha1.PaladinDomainSpec{
+			RegistryAddress: "0x1234567890abcdef",
+			Plugin: corev1alpha1.PluginConfig{
+				Type:    "c-shared",
+				Library: "libexample",
+			},
+			ConfigJSON:   "{}",
+			AllowSigning: true,
+		},
+	}
+
+	r, err := setupPaladinDomainTestReconciler(domain)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "test-domain",
+			Namespace: "default",
+		},
+	}
+
+	result, err := r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{Requeue: false, RequeueAfter: 50 * time.Millisecond}, result)
+
+	// Fetch the updated domain
+	updatedDomain := &corev1alpha1.PaladinDomain{}
+	err = r.Get(ctx, req.NamespacedName, updatedDomain)
+	require.NoError(t, err)
+	assert.Equal(t, corev1alpha1.DomainStatusPending, updatedDomain.Status.Status)
+}
+
+func TestPaladinDomainReconcile_WithRegistryAddress(t *testing.T) {
+	domain := &corev1alpha1.PaladinDomain{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-domain",
+			Namespace: "default",
+		},
+		Spec: corev1alpha1.PaladinDomainSpec{
+			RegistryAddress: "0x1234567890abcdef",
+			Plugin: corev1alpha1.PluginConfig{
+				Type:    "c-shared",
+				Library: "libexample",
+			},
+			ConfigJSON:   "{}",
+			AllowSigning: true,
+		},
+		Status: corev1alpha1.PaladinDomainStatus{
+			Status: "",
+		},
+	}
+
+	r, err := setupPaladinDomainTestReconciler(domain)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "test-domain",
+			Namespace: "default",
+		},
+	}
+
+	// First reconcile: set status to Pending
+	result, err := r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, ctrl.Result{Requeue: false, RequeueAfter: 50 * time.Millisecond}, result)
+
+	// Fetch the updated domain
+	updatedDomain := &corev1alpha1.PaladinDomain{}
+	err = r.Get(ctx, req.NamespacedName, updatedDomain)
+	require.NoError(t, err)
+	assert.Equal(t, corev1alpha1.DomainStatusPending, updatedDomain.Status.Status)
+
+	// Second reconcile: set status to Available
+	result, err = r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{Requeue: false, RequeueAfter: 50 * time.Millisecond}, result)
+
+	// Fetch the updated domain
+	err = r.Get(ctx, req.NamespacedName, updatedDomain)
+	require.NoError(t, err)
+	assert.Equal(t, corev1alpha1.DomainStatusAvailable, updatedDomain.Status.Status)
+	assert.Equal(t, "0x1234567890abcdef", updatedDomain.Status.RegistryAddress)
+}
+func TestUpdateStatusAndRequeue(t *testing.T) {
+	domain := &corev1alpha1.PaladinDomain{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-domain",
+			Namespace: "default",
+		},
+		Status: corev1alpha1.PaladinDomainStatus{
+			Status: corev1alpha1.DomainStatusPending,
+		},
+	}
+
+	r, err := setupPaladinDomainTestReconciler(domain)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Update status
+	domain.Status.Status = corev1alpha1.DomainStatusAvailable
+	result, err := r.updateStatusAndRequeue(ctx, domain)
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{Requeue: false, RequeueAfter: 50 * time.Millisecond}, result)
+
+	// Fetch the updated domain
+	updatedDomain := &corev1alpha1.PaladinDomain{}
+	err = r.Get(ctx, types.NamespacedName{
+		Name:      "test-domain",
+		Namespace: "default",
+	}, updatedDomain)
+	require.NoError(t, err)
+	assert.Equal(t, corev1alpha1.DomainStatusAvailable, updatedDomain.Status.Status)
+}
+func TestTrackContractDeploymentAndRequeue_PendingDeployment(t *testing.T) {
+	domain := &corev1alpha1.PaladinDomain{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-domain",
+			Namespace: "default",
+		},
+		Spec: corev1alpha1.PaladinDomainSpec{
+			SmartContractDeployment: "test-scd",
+			Plugin: corev1alpha1.PluginConfig{
+				Type:    "c-shared",
+				Library: "libexample",
+			},
+			ConfigJSON:   "{}",
+			AllowSigning: true,
+		},
+		Status: corev1alpha1.PaladinDomainStatus{
+			Status: corev1alpha1.DomainStatusPending,
+		},
+	}
+
+	scd := &corev1alpha1.SmartContractDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-scd",
+			Namespace: "default",
+		},
+		Status: corev1alpha1.SmartContractDeploymentStatus{
+			ContractAddress: "",
+		},
+	}
+
+	r, err := setupPaladinDomainTestReconciler(domain, scd)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	result, err := r.trackContractDeploymentAndRequeue(ctx, domain)
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 1 * time.Second}, result)
+}
+
+func TestTrackContractDeploymentAndRequeue_SuccessfulDeployment(t *testing.T) {
+	domain := &corev1alpha1.PaladinDomain{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-domain",
+			Namespace: "default",
+		},
+		Spec: corev1alpha1.PaladinDomainSpec{
+			SmartContractDeployment: "test-scd",
+			Plugin: corev1alpha1.PluginConfig{
+				Type:    "c-shared",
+				Library: "libexample",
+			},
+			ConfigJSON:   "{}",
+			AllowSigning: true,
+		},
+		Status: corev1alpha1.PaladinDomainStatus{
+			Status: corev1alpha1.DomainStatusPending,
+		},
+	}
+
+	scd := &corev1alpha1.SmartContractDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-scd",
+			Namespace: "default",
+		},
+		Status: corev1alpha1.SmartContractDeploymentStatus{
+			ContractAddress: "0xabcdef1234567890",
+		},
+	}
+
+	r, err := setupPaladinDomainTestReconciler(domain, scd)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	result, err := r.trackContractDeploymentAndRequeue(ctx, domain)
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{Requeue: false, RequeueAfter: 50 * time.Millisecond}, result)
+
+	// Fetch the updated domain
+	updatedDomain := &corev1alpha1.PaladinDomain{}
+	err = r.Get(ctx, types.NamespacedName{
+		Name:      "test-domain",
+		Namespace: "default",
+	}, updatedDomain)
+	require.NoError(t, err)
+	assert.Equal(t, corev1alpha1.DomainStatusAvailable, updatedDomain.Status.Status)
+	assert.Equal(t, "0xabcdef1234567890", updatedDomain.Status.RegistryAddress)
+}
+func TestPaladinDomainReconcile_MissingFields(t *testing.T) {
+	domain := &corev1alpha1.PaladinDomain{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-domain",
+			Namespace: "default",
+		},
+		Spec: corev1alpha1.PaladinDomainSpec{
+			Plugin: corev1alpha1.PluginConfig{
+				Type:    "c-shared",
+				Library: "libexample",
+			},
+			ConfigJSON:   "{}",
+			AllowSigning: true,
+		},
+	}
+
+	r, err := setupPaladinDomainTestReconciler(domain)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "test-domain",
+			Namespace: "default",
+		},
+	}
+
+	// First reconcile: set status to Pending
+	result, err := r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{Requeue: false, RequeueAfter: 50 * time.Millisecond}, result)
+
+	// Second reconcile: should return error due to missing fields
+	_, err = r.Reconcile(ctx, req)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing registryAddress or smartContractDeployment")
+}
+func TestPaladinDomainReconcile_DeletedResource(t *testing.T) {
+	r, err := setupPaladinDomainTestReconciler()
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "non-existent-domain",
+			Namespace: "default",
+		},
+	}
+
+	// Reconcile should return without error
+	result, err := r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+}
+func TestTrackContractDeploymentAndRequeue_SCDNotFound(t *testing.T) {
+	domain := &corev1alpha1.PaladinDomain{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-domain",
+			Namespace: "default",
+		},
+		Spec: corev1alpha1.PaladinDomainSpec{
+			SmartContractDeployment: "missing-scd",
+			Plugin: corev1alpha1.PluginConfig{
+				Type:    "c-shared",
+				Library: "libexample",
+			},
+			ConfigJSON:   "{}",
+			AllowSigning: true,
+		},
+		Status: corev1alpha1.PaladinDomainStatus{
+			Status: corev1alpha1.DomainStatusPending,
+		},
+	}
+
+	r, err := setupPaladinDomainTestReconciler(domain)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	result, err := r.trackContractDeploymentAndRequeue(ctx, domain)
+	require.NoError(t, err)
+	assert.Equal(t, ctrl.Result{RequeueAfter: 1 * time.Second}, result)
+}

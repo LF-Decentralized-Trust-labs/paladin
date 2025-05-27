@@ -19,29 +19,29 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"gorm.io/gorm/clause"
 )
 
 type persistedMessage struct {
-	LocalSeq uint64            `gorm:"column:local_seq;autoIncrement;primaryKey"`
-	Domain   string            `gorm:"column:domain"`
-	Group    tktypes.HexBytes  `gorm:"column:group"`
-	Node     string            `gorm:"column:node"`
-	Sent     tktypes.Timestamp `gorm:"column:sent"`
-	Received tktypes.Timestamp `gorm:"column:received"`
-	ID       uuid.UUID         `gorm:"column:id"`
-	CID      *uuid.UUID        `gorm:"column:cid"`
-	Topic    string            `gorm:"column:topic"`
-	Data     tktypes.RawJSON   `gorm:"column:data"`
+	LocalSeq uint64             `gorm:"column:local_seq;autoIncrement;primaryKey"`
+	Domain   string             `gorm:"column:domain"`
+	Group    pldtypes.HexBytes  `gorm:"column:group"`
+	Node     string             `gorm:"column:node"`
+	Sent     pldtypes.Timestamp `gorm:"column:sent"`
+	Received pldtypes.Timestamp `gorm:"column:received"`
+	ID       uuid.UUID          `gorm:"column:id"`
+	CID      *uuid.UUID         `gorm:"column:cid"`
+	Topic    string             `gorm:"column:topic"`
+	Data     pldtypes.RawJSON   `gorm:"column:data"`
 }
 
 func (persistedMessage) TableName() string {
@@ -87,7 +87,7 @@ func (gm *groupManager) SendMessage(ctx context.Context, dbTX persistence.DBTX, 
 	}
 
 	// Build and insert the message
-	now := tktypes.TimestampNow()
+	now := pldtypes.TimestampNow()
 	msgID := uuid.New()
 	pMsg := &persistedMessage{
 		Domain:   msg.Domain,
@@ -120,7 +120,7 @@ func (gm *groupManager) SendMessage(ctx context.Context, dbTX persistence.DBTX, 
 		msgs = append(msgs, &pldapi.ReliableMessage{
 			Node:        node,
 			MessageType: pldapi.RMTPrivacyGroupMessage.Enum(),
-			Metadata: tktypes.JSONString(&components.PrivacyGroupMessageDistribution{
+			Metadata: pldtypes.JSONString(&components.PrivacyGroupMessageDistribution{
 				Domain: msg.Domain,
 				Group:  msg.Group,
 				ID:     msgID,
@@ -144,7 +144,7 @@ func (gm *groupManager) SendMessage(ctx context.Context, dbTX persistence.DBTX, 
 func (gm *groupManager) ReceiveMessages(ctx context.Context, dbTX persistence.DBTX, messages []*pldapi.PrivacyGroupMessage) (results map[uuid.UUID]error, err error) {
 
 	results = make(map[uuid.UUID]error)
-	now := tktypes.TimestampNow()
+	now := pldtypes.TimestampNow()
 	pMsgs := make([]*persistedMessage, 0, len(messages))
 	validatedGroups := make(map[string]*pldapi.PrivacyGroup)
 	for _, msg := range messages {

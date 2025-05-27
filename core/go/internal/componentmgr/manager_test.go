@@ -35,9 +35,9 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -85,7 +85,7 @@ func TestInitOK(t *testing.T) {
 								Keys: map[string]pldconf.StaticKeyEntryConfig{
 									"seed": {
 										Encoding: "hex",
-										Inline:   tktypes.RandHex(32),
+										Inline:   pldtypes.RandHex(32),
 									},
 								},
 							},
@@ -201,6 +201,7 @@ func TestStartOK(t *testing.T) {
 	mockTxManager := componentmocks.NewTXManager(t)
 	mockTxManager.On("Start").Return(nil)
 	mockTxManager.On("Stop").Return()
+	mockTxManager.On("LoadBlockchainEventListeners").Return(nil)
 
 	mockGroupManager := componentmocks.NewGroupManager(t)
 	mockGroupManager.On("Start").Return(nil)

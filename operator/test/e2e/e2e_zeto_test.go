@@ -30,13 +30,17 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
+
+//go:embed abis/zeto/Zeto_Anon.json
+var zetoAnonBuildJSON []byte
 
 const tokenType = "Zeto_Anon"
 const isNullifier = false
@@ -92,7 +96,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 							verifier, err := rpc[src].PTX().ResolveVerifier(ctx, fmt.Sprintf("test@%s", dest),
 								algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 							if err == nil {
-								addr, err := tktypes.ParseEthAddress(verifier)
+								addr, err := pldtypes.ParseEthAddress(verifier)
 								Expect(err).To(BeNil())
 								Expect(addr).ToNot(BeNil())
 							}
@@ -103,7 +107,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 			}
 		})
 
-		var zetoContract *tktypes.EthAddress
+		var zetoContract *pldtypes.EthAddress
 		operator := "zeto.operator@node1"
 		It("deploys a zeto", func() {
 			deploy := rpc["node1"].ForABI(ctx, abi.ABI{zetoConstructorABI}).
@@ -122,13 +126,13 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 			testLog("Zeto (%s) contract %s deployed by TX %s", tokenType, zetoContract, deploy.ID())
 		})
 
-		var zetoCoinSchemaID *tktypes.Bytes32
+		var zetoCoinSchemaID *pldtypes.Bytes32
 		It("gets the coin schema", func() {
 			var schemas []*pldapi.Schema
 			err := rpc["node1"].CallRPC(ctx, &schemas, "pstate_listSchemas", "zeto")
 			Expect(err).To(BeNil())
 			for _, s := range schemas {
-				if s.Signature == "type=ZetoCoin(uint256 salt,bytes32 owner,uint256 amount),labels=[owner,amount]" {
+				if s.Signature == "type=ZetoCoin(uint256 salt,bytes32 owner,uint256 amount,bool locked),labels=[owner,locked]" {
 					zetoCoinSchemaID = &s.ID
 				}
 			}
@@ -136,7 +140,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 		})
 
 		logWallet := func(identity, node string) {
-			var addr tktypes.HexBytes
+			var addr pldtypes.HexBytes
 			err := rpc[node].CallRPC(ctx, &addr, "ptx_resolveVerifier", identity, "domain:zeto:snark:babyjubjub", "iden3_pubkey_babyjubjub_compressed_0x")
 			Expect(err).To(BeNil())
 			method := "pstate_queryContractStates"
@@ -158,36 +162,41 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 		}
 
 		It("mints some zetos to bob on node1", func() {
-			for _, amount := range []*tktypes.HexUint256{
-				with10Decimals(15),
-				with10Decimals(25), // 40
-				with10Decimals(30), // 70
-				with10Decimals(42), // 112
-			} {
-				txn := rpc["node1"].ForABI(ctx, zetotypes.ZetoFungibleABI).
-					Private().
-					Domain("zeto").
-					Function("mint").
-					To(zetoContract).
-					From(operator).
-					Inputs(&zetotypes.FungibleMintParams{
-						Mints: []*zetotypes.FungibleTransferParamEntry{
-							{
-								To:     "bob@node1",
-								Amount: amount,
-							},
+			txn := rpc["node1"].ForABI(ctx, zetotypes.ZetoFungibleABI).
+				Private().
+				Domain("zeto").
+				Function("mint").
+				To(zetoContract).
+				From(operator).
+				Inputs(&zetotypes.FungibleMintParams{
+					Mints: []*zetotypes.FungibleTransferParamEntry{
+						{
+							To:     "bob@node1",
+							Amount: with10Decimals(15),
 						},
-					}).
-					Send().
-					Wait(5 * time.Second)
-				testLog("Zeto mint transaction %s", txn.ID())
-				Expect(txn.Error()).To(BeNil())
-				logWallet("bob", "node1")
-			}
+						{
+							To:     "bob@node1",
+							Amount: with10Decimals(25),
+						},
+						{
+							To:     "bob@node1",
+							Amount: with10Decimals(30),
+						},
+						{
+							To:     "bob@node1",
+							Amount: with10Decimals(42),
+						},
+					},
+				}).
+				Send().
+				Wait(5 * time.Second)
+			testLog("Zeto mint transaction %s", txn.ID())
+			Expect(txn.Error()).To(BeNil())
+			logWallet("bob", "node1")
 		})
 
 		It("sends some zetos to sally on node2", func() {
-			for _, amount := range []*tktypes.HexUint256{
+			for _, amount := range []*pldtypes.HexUint256{
 				with10Decimals(33), // 79
 				with10Decimals(66), // 13
 			} {
@@ -238,5 +247,65 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 			testLog("done testing zeto in isolation")
 		})
 
+		It("Bob on node1 locks some zetos and designate sally as the delegate", func() {
+			sallyEthAddr := getEthAddress(ctx, rpc["node2"], "sally", "node2")
+
+			txn := rpc["node1"].ForABI(ctx, zetotypes.ZetoFungibleABI).
+				Private().
+				Domain("zeto").
+				Function("lock").
+				To(zetoContract).
+				From("bob@node1").
+				Inputs(&zetotypes.LockParams{
+					Amount:   with10Decimals(10),
+					Delegate: &sallyEthAddr,
+				}).
+				Send().
+				Wait(5 * time.Second)
+			testLog("Zeto lock transaction %s", txn.ID())
+			Expect(txn.Error()).To(BeNil())
+			logWallet("bob", "node1")
+
+			var coins []*zetotypes.ZetoCoinState
+			err := rpc["node1"].CallRPC(ctx, &coins, "pstate_queryContractStates", "zeto", zetoContract, zetoCoinSchemaID,
+				query.NewQueryBuilder().Equal("locked", true).Limit(1).Query(),
+				"available")
+			Expect(err).To(BeNil())
+			Expect(coins).To(HaveLen(1))
+
+			// Bob must generate a proof for Sally to use to perform the transfer
+			result := rpc["node1"].ForABI(ctx, zetotypes.ZetoFungibleABI).
+				Private().
+				Domain("zeto").
+				Function("transferLocked").
+				To(zetoContract).
+				From("bob@node1").
+				Inputs(&zetotypes.FungibleTransferLockedParams{
+					LockedInputs: []*pldtypes.HexUint256{&coins[0].ID},
+					Delegate:     "sally@node2",
+					Transfers: []*zetotypes.FungibleTransferParamEntry{
+						{
+							To:     "fred@node3",
+							Amount: with10Decimals(10),
+						},
+					},
+				}).
+				Prepare().
+				Wait(5 * time.Second)
+			Expect(result.Error()).To(BeNil())
+
+			// Sally as the delegate can use the proof to transfer the locked funds
+			zetoAnonSpec := solutils.MustLoadBuild(zetoAnonBuildJSON)
+			result1 := rpc["node2"].ForABI(ctx, zetoAnonSpec.ABI).
+				Public().
+				Function("transferLocked").
+				To(zetoContract).
+				From("sally@node2").
+				Inputs(result.PreparedTransaction().Transaction.Data).
+				Send().
+				Wait(5 * time.Second)
+			Expect(result1.Error()).To(BeNil())
+			testLog("Zeto transferLocked transaction %s", txn.ID())
+		})
 	})
 })

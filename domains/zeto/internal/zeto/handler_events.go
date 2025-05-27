@@ -7,31 +7,41 @@ import (
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/node"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-func (z *Zeto) handleMintEvent(ctx context.Context, tree core.SparseMerkleTree, storage smt.StatesStorage, ev *prototk.OnChainEvent, tokenName string, res *prototk.HandleEventBatchResponse) error {
+func (z *Zeto) recordTransactionInfo(ev *prototk.OnChainEvent, txData *types.ZetoTransactionData_V0, res *prototk.HandleEventBatchResponse) {
+	res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
+		TransactionId: txData.TransactionID.String(),
+		Location:      ev.Location,
+	})
+	for _, state := range txData.InfoStates {
+		res.InfoStates = append(res.InfoStates, &prototk.StateUpdate{
+			Id:            state.String(),
+			TransactionId: txData.TransactionID.String(),
+		})
+	}
+}
+
+func (z *Zeto) handleMintEvent(ctx context.Context, smtTree *merkleTreeSpec, ev *prototk.OnChainEvent, tokenName string, res *prototk.HandleEventBatchResponse) error {
 	var mint MintEvent
 	if err := json.Unmarshal([]byte(ev.DataJson), &mint); err == nil {
-		txID := decodeTransactionData(mint.Data)
-		if txID == nil {
+		txData, err := decodeTransactionData(ctx, mint.Data)
+		if err != nil || txData == nil {
 			log.L(ctx).Errorf("Failed to decode transaction data for mint event: %s. Skip to the next event", mint.Data)
 			return nil
 		}
-		res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
-			TransactionId: txID.String(),
-			Location:      ev.Location,
-		})
-		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, mint.Outputs)...)
+		z.recordTransactionInfo(ev, txData, res)
+		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txData.TransactionID, mint.Outputs)...)
 		if common.IsNullifiersToken(tokenName) {
-			err := z.updateMerkleTree(ctx, tree, storage, txID, mint.Outputs)
+			err := z.updateMerkleTree(ctx, smtTree.tree, smtTree.storage, txData.TransactionID, mint.Outputs)
 			if err != nil {
 				return i18n.NewError(ctx, msgs.MsgErrorUpdateSMT, "UTXOMint", err)
 			}
@@ -42,22 +52,19 @@ func (z *Zeto) handleMintEvent(ctx context.Context, tree core.SparseMerkleTree, 
 	return nil
 }
 
-func (z *Zeto) handleTransferEvent(ctx context.Context, tree core.SparseMerkleTree, storage smt.StatesStorage, ev *prototk.OnChainEvent, tokenName string, res *prototk.HandleEventBatchResponse) error {
+func (z *Zeto) handleTransferEvent(ctx context.Context, smtTree *merkleTreeSpec, ev *prototk.OnChainEvent, tokenName string, res *prototk.HandleEventBatchResponse) error {
 	var transfer TransferEvent
 	if err := json.Unmarshal([]byte(ev.DataJson), &transfer); err == nil {
-		txID := decodeTransactionData(transfer.Data)
-		if txID == nil {
+		txData, err := decodeTransactionData(ctx, transfer.Data)
+		if err != nil || txData == nil {
 			log.L(ctx).Errorf("Failed to decode transaction data for transfer event: %s. Skip to the next event", transfer.Data)
 			return nil
 		}
-		res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
-			TransactionId: txID.String(),
-			Location:      ev.Location,
-		})
-		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txID, transfer.Inputs)...)
-		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, transfer.Outputs)...)
+		z.recordTransactionInfo(ev, txData, res)
+		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txData.TransactionID, transfer.Inputs)...)
+		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txData.TransactionID, transfer.Outputs)...)
 		if common.IsNullifiersToken(tokenName) {
-			err := z.updateMerkleTree(ctx, tree, storage, txID, transfer.Outputs)
+			err := z.updateMerkleTree(ctx, smtTree.tree, smtTree.storage, txData.TransactionID, transfer.Outputs)
 			if err != nil {
 				return i18n.NewError(ctx, msgs.MsgErrorUpdateSMT, "UTXOTransfer", err)
 			}
@@ -68,22 +75,19 @@ func (z *Zeto) handleTransferEvent(ctx context.Context, tree core.SparseMerkleTr
 	return nil
 }
 
-func (z *Zeto) handleTransferWithEncryptionEvent(ctx context.Context, tree core.SparseMerkleTree, storage smt.StatesStorage, ev *prototk.OnChainEvent, tokenName string, res *prototk.HandleEventBatchResponse) error {
+func (z *Zeto) handleTransferWithEncryptionEvent(ctx context.Context, smtTree *merkleTreeSpec, ev *prototk.OnChainEvent, tokenName string, res *prototk.HandleEventBatchResponse) error {
 	var transfer TransferWithEncryptedValuesEvent
 	if err := json.Unmarshal([]byte(ev.DataJson), &transfer); err == nil {
-		txID := decodeTransactionData(transfer.Data)
-		if txID == nil {
+		txData, err := decodeTransactionData(ctx, transfer.Data)
+		if err != nil || txData == nil {
 			log.L(ctx).Errorf("Failed to decode transaction data for transfer event: %s. Skip to the next event", transfer.Data)
 			return nil
 		}
-		res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
-			TransactionId: txID.String(),
-			Location:      ev.Location,
-		})
-		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txID, transfer.Inputs)...)
-		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, transfer.Outputs)...)
+		z.recordTransactionInfo(ev, txData, res)
+		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txData.TransactionID, transfer.Inputs)...)
+		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txData.TransactionID, transfer.Outputs)...)
 		if common.IsNullifiersToken(tokenName) {
-			err := z.updateMerkleTree(ctx, tree, storage, txID, transfer.Outputs)
+			err := z.updateMerkleTree(ctx, smtTree.tree, smtTree.storage, txData.TransactionID, transfer.Outputs)
 			if err != nil {
 				return i18n.NewError(ctx, msgs.MsgErrorUpdateSMT, "UTXOTransferWithEncryptedValues", err)
 			}
@@ -94,22 +98,19 @@ func (z *Zeto) handleTransferWithEncryptionEvent(ctx context.Context, tree core.
 	return nil
 }
 
-func (z *Zeto) handleWithdrawEvent(ctx context.Context, tree core.SparseMerkleTree, storage smt.StatesStorage, ev *prototk.OnChainEvent, tokenName string, res *prototk.HandleEventBatchResponse) error {
+func (z *Zeto) handleWithdrawEvent(ctx context.Context, smtTree *merkleTreeSpec, ev *prototk.OnChainEvent, tokenName string, res *prototk.HandleEventBatchResponse) error {
 	var withdraw WithdrawEvent
 	if err := json.Unmarshal([]byte(ev.DataJson), &withdraw); err == nil {
-		txID := decodeTransactionData(withdraw.Data)
-		if txID == nil {
+		txData, err := decodeTransactionData(ctx, withdraw.Data)
+		if err != nil || txData == nil {
 			log.L(ctx).Errorf("Failed to decode transaction data for withdraw event: %s. Skip to the next event", withdraw.Data)
 			return nil
 		}
-		res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
-			TransactionId: txID.String(),
-			Location:      ev.Location,
-		})
-		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txID, withdraw.Inputs)...)
-		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, []tktypes.HexUint256{withdraw.Output})...)
+		z.recordTransactionInfo(ev, txData, res)
+		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txData.TransactionID, withdraw.Inputs)...)
+		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txData.TransactionID, []pldtypes.HexUint256{withdraw.Output})...)
 		if common.IsNullifiersToken(tokenName) {
-			err := z.updateMerkleTree(ctx, tree, storage, txID, []tktypes.HexUint256{withdraw.Output})
+			err := z.updateMerkleTree(ctx, smtTree.tree, smtTree.storage, txData.TransactionID, []pldtypes.HexUint256{withdraw.Output})
 			if err != nil {
 				return i18n.NewError(ctx, msgs.MsgErrorUpdateSMT, "UTXOWithdraw", err)
 			}
@@ -120,25 +121,35 @@ func (z *Zeto) handleWithdrawEvent(ctx context.Context, tree core.SparseMerkleTr
 	return nil
 }
 
-func (z *Zeto) handleLockedEvent(ctx context.Context, ev *prototk.OnChainEvent, res *prototk.HandleEventBatchResponse) error {
+func (z *Zeto) handleLockedEvent(ctx context.Context, smtTree *merkleTreeSpec, smtTreeForLocked *merkleTreeSpec, ev *prototk.OnChainEvent, tokenName string, res *prototk.HandleEventBatchResponse) error {
 	var lock LockedEvent
 	if err := json.Unmarshal([]byte(ev.DataJson), &lock); err == nil {
-		txID := decodeTransactionData(lock.Data)
-		if txID == nil {
+		txData, err := decodeTransactionData(ctx, lock.Data)
+		if err != nil || txData == nil {
 			log.L(ctx).Errorf("Failed to decode transaction data for lock event: %s. Skip to the next event", lock.Data)
 			return nil
 		}
-		res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
-			TransactionId: txID.String(),
-			Location:      ev.Location,
-		})
+		z.recordTransactionInfo(ev, txData, res)
+		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txData.TransactionID, lock.Inputs)...)
+		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txData.TransactionID, lock.Outputs)...)
+		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txData.TransactionID, lock.LockedOutputs)...)
+		if common.IsNullifiersToken(tokenName) {
+			err := z.updateMerkleTree(ctx, smtTree.tree, smtTree.storage, txData.TransactionID, lock.Outputs)
+			if err != nil {
+				return i18n.NewError(ctx, msgs.MsgErrorUpdateSMT, "UTXOsLocked", err)
+			}
+			err = z.updateMerkleTree(ctx, smtTreeForLocked.tree, smtTreeForLocked.storage, txData.TransactionID, lock.LockedOutputs)
+			if err != nil {
+				return i18n.NewError(ctx, msgs.MsgErrorUpdateSMT, "UTXOsLocked", err)
+			}
+		}
 	} else {
 		log.L(ctx).Errorf("Failed to unmarshal lock event: %s", err)
 	}
 	return nil
 }
 
-func (z *Zeto) updateMerkleTree(ctx context.Context, tree core.SparseMerkleTree, storage smt.StatesStorage, txID tktypes.HexBytes, outputs []tktypes.HexUint256) error {
+func (z *Zeto) updateMerkleTree(ctx context.Context, tree core.SparseMerkleTree, storage smt.StatesStorage, txID pldtypes.Bytes32, outputs []pldtypes.HexUint256) error {
 	storage.SetTransactionId(txID.HexString0xPrefix())
 	for _, out := range outputs {
 		if out.NilOrZero() {
@@ -152,7 +163,7 @@ func (z *Zeto) updateMerkleTree(ctx context.Context, tree core.SparseMerkleTree,
 	return nil
 }
 
-func (z *Zeto) addOutputToMerkleTree(ctx context.Context, tree core.SparseMerkleTree, output tktypes.HexUint256) error {
+func (z *Zeto) addOutputToMerkleTree(ctx context.Context, tree core.SparseMerkleTree, output pldtypes.HexUint256) error {
 	idx, err := node.NewNodeIndexFromBigInt(output.Int())
 	if err != nil {
 		return i18n.NewError(ctx, msgs.MsgErrorNewNodeIndex, output.String(), err)
@@ -169,7 +180,7 @@ func (z *Zeto) addOutputToMerkleTree(ctx context.Context, tree core.SparseMerkle
 	return nil
 }
 
-func parseStatesFromEvent(txID tktypes.HexBytes, states []tktypes.HexUint256) []*prototk.StateUpdate {
+func parseStatesFromEvent(txID pldtypes.Bytes32, states []pldtypes.HexUint256) []*prototk.StateUpdate {
 	refs := make([]*prototk.StateUpdate, len(states))
 	for i, state := range states {
 		refs[i] = &prototk.StateUpdate{
@@ -187,13 +198,27 @@ func formatErrors(errors []string) string {
 	}
 	return msg
 }
-func decodeTransactionData(data tktypes.HexBytes) (txID tktypes.HexBytes) {
+
+func decodeTransactionData(ctx context.Context, data pldtypes.HexBytes) (*types.ZetoTransactionData_V0, error) {
 	if len(data) < 4 {
-		return nil
+		return nil, nil
 	}
 	dataPrefix := data[0:4]
-	if dataPrefix.String() != types.ZetoTransactionData_V0.String() {
-		return nil
+	if dataPrefix.String() != types.ZetoTransactionDataID_V0.String() {
+		return nil, nil
 	}
-	return data[4:]
+
+	var dataValues types.ZetoTransactionData_V0
+	dataDecoded, err := types.ZetoTransactionDataABI_V0.DecodeABIDataCtx(ctx, data, 4)
+	if err == nil {
+		var dataJSON []byte
+		dataJSON, err = dataDecoded.JSON()
+		if err == nil {
+			err = json.Unmarshal(dataJSON, &dataValues)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &dataValues, nil
 }

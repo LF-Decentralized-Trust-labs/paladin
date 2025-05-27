@@ -18,13 +18,13 @@ package zeto
 import (
 	"testing"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetAllZetoEventAbis(t *testing.T) {
 	events := getAllZetoEventAbis()
-	assert.Equal(t, 5, len(events))
+	assert.Equal(t, 6, len(events))
 }
 
 func TestBuildEvents(t *testing.T) {

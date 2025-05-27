@@ -23,22 +23,22 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/grpc"
 )
 
-func MapLibraryTypeToProto(t tktypes.Enum[tktypes.LibraryType]) (prototk.PluginLoad_LibType, error) {
-	return tktypes.MapEnum(t, map[tktypes.LibraryType]prototk.PluginLoad_LibType{
-		tktypes.LibraryTypeCShared: prototk.PluginLoad_C_SHARED,
-		tktypes.LibraryTypeJar:     prototk.PluginLoad_JAR,
+func MapLibraryTypeToProto(t pldtypes.Enum[pldtypes.LibraryType]) (prototk.PluginLoad_LibType, error) {
+	return pldtypes.MapEnum(t, map[pldtypes.LibraryType]prototk.PluginLoad_LibType{
+		pldtypes.LibraryTypeCShared: prototk.PluginLoad_C_SHARED,
+		pldtypes.LibraryTypeJar:     prototk.PluginLoad_JAR,
 	})
 }
 
@@ -254,7 +254,7 @@ func (pm *pluginManager) WaitForInit(ctx context.Context) error {
 }
 
 func (pm *pluginManager) newReqContext() context.Context {
-	return log.WithLogField(pm.bgCtx, "plugin_reqid", tktypes.ShortID())
+	return log.WithLogField(pm.bgCtx, "plugin_reqid", pldtypes.ShortID())
 }
 
 func (pm *pluginManager) InitLoader(req *prototk.PluginLoaderInit, stream prototk.PluginController_InitLoaderServer) error {
@@ -295,7 +295,7 @@ func initPlugin[CB any](ctx context.Context, pm *pluginManager, pluginMap map[uu
 	pm.mux.Lock()
 	defer pm.mux.Unlock()
 	plugin := &plugin[CB]{pc: pm, id: uuid.New(), name: name}
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+	if err := pldtypes.ValidateSafeCharsStartEndAlphaNum(ctx, name, pldtypes.DefaultNameMaxLen, "name"); err != nil {
 		return err
 	}
 	plugin.def = &prototk.PluginLoad{
@@ -307,7 +307,7 @@ func initPlugin[CB any](ctx context.Context, pm *pluginManager, pluginMap map[uu
 		LibLocation: conf.Library,
 		Class:       conf.Class,
 	}
-	pluginType, err := tktypes.LibraryType(conf.Type).Enum().Validate()
+	pluginType, err := pldtypes.LibraryType(conf.Type).Enum().Validate()
 	if err == nil {
 		plugin.def.LibType, err = MapLibraryTypeToProto(pluginType.Enum())
 		pluginMap[plugin.id] = plugin

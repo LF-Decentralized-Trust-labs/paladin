@@ -5,5 +5,7 @@ go 1.22.5
 // for the build in a cached container
 use (
 	./config
+	./common/go
+	./sdk/go
 	./toolkit/go
 )

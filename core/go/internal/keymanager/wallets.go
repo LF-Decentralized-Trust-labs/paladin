@@ -19,15 +19,15 @@ import (
 	"context"
 	"regexp"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type wallet struct {
@@ -42,7 +42,7 @@ func (km *keyManager) newWallet(ctx context.Context, walletConf *pldconf.WalletC
 		name: walletConf.Name,
 	}
 
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, w.name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+	if err := pldtypes.ValidateSafeCharsStartEndAlphaNum(ctx, w.name, pldtypes.DefaultNameMaxLen, "name"); err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgKeyManagerInvalidConfig, w.name)
 	}
 

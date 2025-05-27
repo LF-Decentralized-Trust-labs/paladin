@@ -19,8 +19,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 // role of transaction engine:
@@ -42,47 +42,48 @@ import (
 // 4. provides shared functionalities for optimization
 //    - handles gas price information which is not signer specific
 
-func (ble *pubTxManager) engineLoop() {
-	defer close(ble.engineLoopDone)
-	ctx := log.WithLogField(ble.ctx, "role", "engine-loop")
-	log.L(ctx).Infof("Engine started polling on interval %s", ble.enginePollingInterval)
+func (ptm *pubTxManager) engineLoop() {
+	defer close(ptm.engineLoopDone)
+	ctx := log.WithLogField(ptm.ctx, "role", "engine-loop")
+	log.L(ctx).Infof("Engine started polling on interval %s", ptm.enginePollingInterval)
 
-	ticker := time.NewTicker(ble.enginePollingInterval)
+	ticker := time.NewTicker(ptm.enginePollingInterval)
 	for {
 		// Wait to be notified, or timeout to run
 		select {
 		case <-ticker.C:
-		case <-ble.inFlightOrchestratorStale:
+		case <-ptm.inFlightOrchestratorStale:
 		case <-ctx.Done():
 			ticker.Stop()
 			log.L(ctx).Infof("Engine poller exiting")
 			return
 		}
 
-		polled, total := ble.poll(ctx)
+		ptm.handleUpdates()
+		polled, total := ptm.poll(ctx)
 		log.L(ctx).Debugf("Engine polling complete: %d transaction orchestrators were created, there are %d transaction orchestrators in flight", polled, total)
 	}
 }
 
-func (pte *pubTxManager) getOrchestratorCount() int {
-	pte.inFlightOrchestratorMux.Lock()
-	defer pte.inFlightOrchestratorMux.Unlock()
-	return len(pte.inFlightOrchestrators)
+func (ptm *pubTxManager) getOrchestratorCount() int {
+	ptm.inFlightOrchestratorMux.Lock()
+	defer ptm.inFlightOrchestratorMux.Unlock()
+	return len(ptm.inFlightOrchestrators)
 }
 
-func (pte *pubTxManager) getOrchestratorForAddress(signer tktypes.EthAddress) *orchestrator {
-	pte.inFlightOrchestratorMux.Lock()
-	defer pte.inFlightOrchestratorMux.Unlock()
-	return pte.inFlightOrchestrators[signer]
+func (ptm *pubTxManager) getOrchestratorForAddress(signer pldtypes.EthAddress) *orchestrator {
+	ptm.inFlightOrchestratorMux.Lock()
+	defer ptm.inFlightOrchestratorMux.Unlock()
+	return ptm.inFlightOrchestrators[signer]
 }
 
-func (ble *pubTxManager) flushStaleOrchestratorsGetCount(ctx context.Context) (inFlightSigningAddresses []tktypes.EthAddress, stateCounts map[string]int, totalAfterFlush int) {
-	ble.inFlightOrchestratorMux.Lock()
-	defer ble.inFlightOrchestratorMux.Unlock()
+func (ptm *pubTxManager) flushStaleOrchestratorsGetCount(ctx context.Context) (inFlightSigningAddresses []pldtypes.EthAddress, stateCounts map[string]int, totalAfterFlush int) {
+	ptm.inFlightOrchestratorMux.Lock()
+	defer ptm.inFlightOrchestratorMux.Unlock()
 
-	oldInFlight := ble.inFlightOrchestrators
-	ble.inFlightOrchestrators = make(map[tktypes.EthAddress]*orchestrator)
-	inFlightSigningAddresses = make([]tktypes.EthAddress, 0, len(oldInFlight))
+	oldInFlight := ptm.inFlightOrchestrators
+	ptm.inFlightOrchestrators = make(map[pldtypes.EthAddress]*orchestrator)
+	inFlightSigningAddresses = make([]pldtypes.EthAddress, 0, len(oldInFlight))
 
 	stateCounts = make(map[string]int)
 	for _, sName := range AllOrchestratorStates {
@@ -93,14 +94,14 @@ func (ble *pubTxManager) flushStaleOrchestratorsGetCount(ctx context.Context) (i
 	// Run through copying across from the old InFlight list to the new one, those that aren't ready to be deleted
 	for signingAddress, oc := range oldInFlight {
 		log.L(ctx).Debugf("Engine checking orchestrator for %s: state: %s, state duration: %s, number of transactions: %d", oc.signingAddress, oc.state, time.Since(oc.stateEntryTime), len(oc.inFlightTxs))
-		if oc.state == OrchestratorStateIdle && time.Since(oc.stateEntryTime) > ble.orchestratorIdleTimeout ||
-			oc.state == OrchestratorStateStale && time.Since(oc.stateEntryTime) > ble.orchestratorStaleTimeout {
+		if oc.state == OrchestratorStateIdle && time.Since(oc.stateEntryTime) > ptm.orchestratorIdleTimeout ||
+			oc.state == OrchestratorStateStale && time.Since(oc.stateEntryTime) > ptm.orchestratorStaleTimeout {
 			// tell transaction orchestrator to stop, there is a chance we later found new transaction for this address, but we got to make a call at some point
 			// so it's here. The transaction orchestrator won't be removed immediately as the state update is async
 			oc.Stop()
 		}
 		if oc.state != OrchestratorStateStopped {
-			ble.inFlightOrchestrators[signingAddress] = oc
+			ptm.inFlightOrchestrators[signingAddress] = oc
 			oc.MarkInFlightTxStale()
 			stateCounts[string(oc.state)] = stateCounts[string(oc.state)] + 1
 			inFlightSigningAddresses = append(inFlightSigningAddresses, signingAddress)
@@ -109,23 +110,23 @@ func (ble *pubTxManager) flushStaleOrchestratorsGetCount(ctx context.Context) (i
 		}
 	}
 
-	totalAfterFlush = len(ble.inFlightOrchestrators)
+	totalAfterFlush = len(ptm.inFlightOrchestrators)
 	return inFlightSigningAddresses, stateCounts, totalAfterFlush
 }
 
-func (ble *pubTxManager) poll(ctx context.Context) (polled int, total int) {
+func (ptm *pubTxManager) poll(ctx context.Context) (polled int, total int) {
 	pollStart := time.Now()
 
 	// Perform locked processing to determine if there are spaces to fill
-	inFlightSigningAddresses, stateCounts, totalBeforePoll := ble.flushStaleOrchestratorsGetCount(ctx)
+	inFlightSigningAddresses, stateCounts, totalBeforePoll := ptm.flushStaleOrchestratorsGetCount(ctx)
 
 	// check and poll new signers from the persistence if there are more transaction orchestrators slots
-	spaces := ble.maxInflight - totalBeforePoll
+	spaces := ptm.maxInflight - totalBeforePoll
 	if spaces > 0 {
 
 		// Run through the paused orchestrators for fairness control
 		// Note not controlled by mutex, as only modified on this routine.
-		for signingAddress, pausedUntil := range ble.signingAddressesPausedUntil {
+		for signingAddress, pausedUntil := range ptm.signingAddressesPausedUntil {
 			if time.Now().Before(pausedUntil) {
 				log.L(ctx).Debugf("Engine excluded orchestrator for signing address %s from polling as it's paused util %s", signingAddress, pausedUntil.String())
 				stateCounts[string(OrchestratorStatePaused)] = stateCounts[string(OrchestratorStatePaused)] + 1
@@ -135,7 +136,7 @@ func (ble *pubTxManager) poll(ctx context.Context) (polled int, total int) {
 
 		var additionalNonInFlightSigners []*txFromOnly
 		// We retry the get from persistence indefinitely (until the context cancels)
-		err := ble.retry.Do(ctx, func(attempt int) (retry bool, err error) {
+		err := ptm.retry.Do(ctx, func(attempt int) (retry bool, err error) {
 			// (raw SQL as couldn't convince gORM to build this)
 			const dbQueryBase = `SELECT DISTINCT t."from" FROM "public_txns" AS t ` +
 				`LEFT JOIN "public_completions" AS c ON t."pub_txn_id" = c."pub_txn_id" ` +
@@ -143,11 +144,11 @@ func (ble *pubTxManager) poll(ctx context.Context) (polled int, total int) {
 
 			const dbQueryNothingInFlight = dbQueryBase + ` LIMIT ?`
 			if len(inFlightSigningAddresses) == 0 {
-				return true, ble.p.DB().Raw(dbQueryNothingInFlight, spaces).Scan(&additionalNonInFlightSigners).Error
+				return true, ptm.p.DB().Raw(dbQueryNothingInFlight, spaces).Scan(&additionalNonInFlightSigners).Error
 			}
 
 			const dbQueryInFlight = dbQueryBase + ` AND t."from" NOT IN (?) LIMIT ?`
-			return true, ble.p.DB().Raw(dbQueryInFlight, inFlightSigningAddresses, spaces).Scan(&additionalNonInFlightSigners).Error
+			return true, ptm.p.DB().Raw(dbQueryInFlight, inFlightSigningAddresses, spaces).Scan(&additionalNonInFlightSigners).Error
 		})
 		if err != nil {
 			log.L(ctx).Infof("Engine polling context cancelled while retrying")
@@ -157,52 +158,69 @@ func (ble *pubTxManager) poll(ctx context.Context) (polled int, total int) {
 		log.L(ctx).Debugf("Engine polled %d items to fill in %d empty slots.", len(additionalNonInFlightSigners), spaces)
 
 		// (Re)obtain the lock to add the additional ones
-		ble.inFlightOrchestratorMux.Lock()
-		defer ble.inFlightOrchestratorMux.Unlock()
+		ptm.inFlightOrchestratorMux.Lock()
+		defer ptm.inFlightOrchestratorMux.Unlock()
 
 		for _, r := range additionalNonInFlightSigners {
-			if _, exist := ble.inFlightOrchestrators[r.From]; !exist {
-				oc := NewOrchestrator(ble, r.From, ble.conf)
-				ble.inFlightOrchestrators[r.From] = oc
+			if _, exist := ptm.inFlightOrchestrators[r.From]; !exist {
+				oc := NewOrchestrator(ptm, r.From, ptm.conf)
+				ptm.inFlightOrchestrators[r.From] = oc
 				stateCounts[string(oc.state)] = stateCounts[string(oc.state)] + 1
-				_, _ = oc.Start(ble.ctx)
+				_, _ = oc.Start(ptm.ctx)
 				log.L(ctx).Infof("Engine added orchestrator for signing address %s", r.From)
 			}
 		}
-		total = len(ble.inFlightOrchestrators)
+		total = len(ptm.inFlightOrchestrators)
 		if total > 0 {
 			polled = total - totalBeforePoll
 		}
 	} else {
 
 		// (Re)obtain the lock to do fairness control
-		ble.inFlightOrchestratorMux.Lock()
-		defer ble.inFlightOrchestratorMux.Unlock()
+		ptm.inFlightOrchestratorMux.Lock()
+		defer ptm.inFlightOrchestratorMux.Unlock()
 
 		// the in-flight orchestrator pool is full, do the fairness control
 
 		// TODO: don't stop more than required number of slots
 
 		// Run through the existing running orchestrators and stop the ones that exceeded the max process timeout
-		for signingAddress, oc := range ble.inFlightOrchestrators {
-			if time.Since(oc.orchestratorBirthTime) > ble.orchestratorSwapTimeout {
+		for signingAddress, oc := range ptm.inFlightOrchestrators {
+			if time.Since(oc.orchestratorBirthTime) > ptm.orchestratorSwapTimeout {
 				log.L(ctx).Infof("Engine pause, attempt to stop orchestrator for signing address %s", signingAddress)
 				oc.Stop()
-				ble.signingAddressesPausedUntil[signingAddress] = time.Now().Add(ble.orchestratorSwapTimeout)
+				ptm.signingAddressesPausedUntil[signingAddress] = time.Now().Add(ptm.orchestratorSwapTimeout)
 			}
 		}
 	}
-	ble.thMetrics.RecordInFlightOrchestratorPoolMetrics(ctx, stateCounts, ble.maxInflight-len(ble.inFlightOrchestrators))
+	ptm.thMetrics.RecordInFlightOrchestratorPoolMetrics(ctx, stateCounts, ptm.maxInflight-len(ptm.inFlightOrchestrators))
 	log.L(ctx).Debugf("Engine poll loop took %s", time.Since(pollStart))
 	return polled, total
 }
 
-func (ble *pubTxManager) MarkInFlightOrchestratorsStale() {
+func (ptm *pubTxManager) handleUpdates() {
+	ptm.updateMux.Lock()
+	updates := ptm.updates
+	ptm.updates = nil
+	ptm.updateMux.Unlock()
+
+	ptm.inFlightOrchestratorMux.Lock()
+	defer ptm.inFlightOrchestratorMux.Unlock()
+
+	for _, update := range updates {
+		inFlightOrchestrator, orchestratorInFlight := ptm.inFlightOrchestrators[*update.from]
+		if orchestratorInFlight {
+			inFlightOrchestrator.dispatchUpdate(update)
+		}
+	}
+}
+
+func (ptm *pubTxManager) MarkInFlightOrchestratorsStale() {
 	// try to send an item in `InFlightStale` channel, which has a buffer of 1
 	// to trigger a polling event to update the in flight transaction orchestrators
 	// if it already has an item in the channel, this function does nothing
 	select {
-	case ble.inFlightOrchestratorStale <- true:
+	case ptm.inFlightOrchestratorStale <- true:
 	default:
 	}
 }

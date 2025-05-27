@@ -29,27 +29,27 @@ func TestProduceLatestInFlightStageContextTriggerStageError(t *testing.T) {
 	defer done()
 	it, _ := newInflightTransaction(o, 1)
 
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 
-	inFlightStageManager := it.stateManager.(*inFlightTransactionState)
-	inFlightStageManager.stageTriggerError = fmt.Errorf("trigger stage error")
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
+	currentGeneration.stageTriggerError = fmt.Errorf("trigger stage error")
 
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
-	assert.NotEqual(t, rsc, it.stateManager.GetRunningStageContext(ctx))
-	assert.Nil(t, inFlightStageManager.stageTriggerError) // check stage trigger error has been reset
+	assert.NotEqual(t, rsc, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetStageTriggerError(ctx)) // check stage trigger error has been reset
 }
 
 func TestProduceLatestInFlightStageContextStatusChange(t *testing.T) {
@@ -58,23 +58,21 @@ func TestProduceLatestInFlightStageContextStatusChange(t *testing.T) {
 	it, ifts := newInflightTransaction(o, 1)
 
 	// trigger status change
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	suspended := InFlightStatusSuspending
 	it.newStatus = &suspended
-	iftxms := it.stateManager.(*inFlightTransactionState)
-	iftxms.runningStageContext = NewRunningStageContext(ctx, InFlightTxStageStatusUpdate, BaseTxSubStatusReceived, iftxms)
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
+	currentGeneration.runningStageContext = NewRunningStageContext(ctx, InFlightTxStageStatusUpdate, BaseTxSubStatusReceived, it.stateManager)
 
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	assert.Equal(t, InFlightTxStageStatusUpdate, rsc.Stage)
 
-	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
-
 	// persisting error waiting for persistence retry timeout
 	it.persistenceRetryTimeout = 5 * time.Second
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddPersistenceOutput(ctx, InFlightTxStageStatusUpdate, time.Now().Add(it.persistenceRetryTimeout*2), fmt.Errorf("persist gas price error"))
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageStatusUpdate, time.Now().Add(it.persistenceRetryTimeout*2), fmt.Errorf("persist gas price error"))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
@@ -82,8 +80,8 @@ func TestProduceLatestInFlightStageContextStatusChange(t *testing.T) {
 	assert.Empty(t, *tOut)
 	// persisting error retrying
 	it.persistenceRetryTimeout = 0
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddPersistenceOutput(ctx, InFlightTxStageStatusUpdate, time.Now(), fmt.Errorf("persist gas price error"))
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageStatusUpdate, time.Now(), fmt.Errorf("persist gas price error"))
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
@@ -95,8 +93,8 @@ func TestProduceLatestInFlightStageContextStatusChange(t *testing.T) {
 	ifts.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		InFlightStatus: &suspended,
 	})
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddPersistenceOutput(ctx, InFlightTxStageStatusUpdate, time.Now(), nil)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageStatusUpdate, time.Now(), nil)
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
@@ -104,7 +102,7 @@ func TestProduceLatestInFlightStageContextStatusChange(t *testing.T) {
 	assert.Empty(t, *tOut)
 	assert.Nil(t, it.newStatus)
 	// switched running stage context
-	assert.NotEqual(t, rsc, it.stateManager.GetRunningStageContext(ctx))
+	assert.NotEqual(t, rsc, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 }
 
 func TestProduceLatestInFlightStageContextTriggerStatusUpdate(t *testing.T) {
@@ -114,15 +112,15 @@ func TestProduceLatestInFlightStageContextTriggerStatusUpdate(t *testing.T) {
 	it.testOnlyNoActionMode = false
 	it.testOnlyNoEventMode = false
 	// trigger signing
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	err := it.TriggerStatusUpdate(ctx)
 	require.NoError(t, err)
-	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
-	for len(inFlightStageMananger.bufferedStageOutputs) == 0 {
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
+	for len(currentGeneration.bufferedStageOutputs) == 0 {
 		// wait for event
 	}
-	assert.Len(t, inFlightStageMananger.bufferedStageOutputs, 1)
-	assert.Nil(t, inFlightStageMananger.bufferedStageOutputs[0].PersistenceOutput) // panicked
+	assert.Len(t, currentGeneration.bufferedStageOutputs, 1)
+	assert.Nil(t, currentGeneration.bufferedStageOutputs[0].PersistenceOutput) // panicked
 }
 
 func TestProduceLatestInFlightStageContextStatusUpdatePanic(t *testing.T) {
@@ -131,7 +129,7 @@ func TestProduceLatestInFlightStageContextStatusUpdatePanic(t *testing.T) {
 	it, _ := newInflightTransaction(o, 1)
 
 	// trigger status change
-	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
+	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	suspend := InFlightStatusSuspending
 	it.newStatus = &suspend
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
@@ -140,23 +138,23 @@ func TestProduceLatestInFlightStageContextStatusUpdatePanic(t *testing.T) {
 	})
 	assert.Empty(t, *tOut)
 
-	assert.NotNil(t, it.stateManager.GetRunningStageContext(ctx))
-	rsc := it.stateManager.GetRunningStageContext(ctx)
+	assert.NotNil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 
 	assert.Equal(t, InFlightTxStageStatusUpdate, rsc.Stage)
 
-	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 
 	// unexpected error
-	rsc = it.stateManager.GetRunningStageContext(ctx)
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
-	it.stateManager.AddPanicOutput(ctx, InFlightTxStageStatusUpdate)
+	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+	it.stateManager.GetCurrentGeneration(ctx).AddPanicOutput(ctx, InFlightTxStageStatusUpdate)
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.NotEmpty(t, *tOut)
 	assert.Regexp(t, "PD011919", tOut.Error)
-	assert.NotEqual(t, rsc, it.stateManager.GetRunningStageContext(ctx))
-	inFlightStageMananger.bufferedStageOutputs = make([]*StageOutput, 0)
+	assert.NotEqual(t, rsc, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
 }

@@ -32,8 +32,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 const utDBPrefix = "paladin_ut_"

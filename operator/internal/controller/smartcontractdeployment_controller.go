@@ -34,15 +34,27 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 )
 
 // SmartContractDeploymentReconciler reconciles a SmartContractDeployment object
 type SmartContractDeploymentReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	checkDepsFunc               func(ctx context.Context, c client.Client, namespace string, requiredContractDeployments []string, pStatus *corev1alpha1.ContactDependenciesStatus) (bool, bool, error)
+	newTransactionReconcileFunc func(c client.Client, idempotencyKeyPrefix string, nodeName string, namespace string, pStatus *corev1alpha1.TransactionSubmission, timeout string, txFactory func() (bool, *pldapi.TransactionInput, error)) transactionReconcileInterface
+}
+
+func NewSmartContractDeploymentReconciler(c client.Client, scheme *runtime.Scheme) *SmartContractDeploymentReconciler {
+	return &SmartContractDeploymentReconciler{
+		Client:                      c,
+		Scheme:                      scheme,
+		checkDepsFunc:               checkSmartContractDeps,
+		newTransactionReconcileFunc: newTransactionReconcile,
+	}
 }
 
 // allows generic functions by giving a mapping between the types and interfaces for the CR
@@ -69,8 +81,11 @@ func (r *SmartContractDeploymentReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{}, err
 	}
 
-	// Check all our deps are resolved
-	depsChanged, ready, err := checkSmartContractDeps(ctx, r.Client, scd.Namespace, scd.Spec.RequiredContractDeployments, &scd.Status.ContactDependenciesStatus)
+	// Use injected dependency for checking smart contract dependencies
+	if r.checkDepsFunc == nil {
+		r.checkDepsFunc = checkSmartContractDeps
+	}
+	depsChanged, ready, err := r.checkDepsFunc(ctx, r.Client, scd.Namespace, scd.Spec.RequiredContractDeployments, &scd.Status.ContactDependenciesStatus)
 	if err != nil {
 		return ctrl.Result{}, err
 	} else if depsChanged {
@@ -79,8 +94,11 @@ func (r *SmartContractDeploymentReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// Reconcile the deployment transaction
-	txReconcile := newTransactionReconcile(r.Client,
+	// Use injected dependency for transaction reconcile
+	if r.newTransactionReconcileFunc == nil {
+		r.newTransactionReconcileFunc = newTransactionReconcile
+	}
+	txReconcile := r.newTransactionReconcileFunc(r.Client,
 		"scdeploy."+scd.Name,
 		scd.Spec.Node, scd.Namespace,
 		&scd.Status.TransactionSubmission,
@@ -89,21 +107,21 @@ func (r *SmartContractDeploymentReconciler) Reconcile(ctx context.Context, req c
 	)
 	err = txReconcile.reconcile(ctx)
 	if err != nil {
-		// There's nothing to notify us when the world changes other than polling, so we keep re-tryingat
+		// There's nothing to notify us when the world changes other than polling, so we keep re-trying at
 		// a fixed rate (matching the readiness probe period of Paladin) to avoid any exponential backoff
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	} else if txReconcile.statusChanged {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
+	} else if txReconcile.isStatusChanged() {
 		// Common TX reconciler does everything for us apart from grab the receipt
 		if scd.Status.TransactionStatus == corev1alpha1.TransactionStatusSuccess && scd.Status.ContractAddress == "" {
-			if txReconcile.receipt.ContractAddress == nil {
+			if txReconcile.getReceipt() == nil || txReconcile.getReceipt().ContractAddress == nil {
 				scd.Status.TransactionStatus = corev1alpha1.TransactionStatusFailed
 				scd.Status.FailureMessage = "transaction did not result in contract deployment"
 			} else {
-				scd.Status.ContractAddress = txReconcile.receipt.ContractAddress.String()
+				scd.Status.ContractAddress = txReconcile.getReceipt().ContractAddress.String()
 			}
 		}
 		return r.updateStatusAndRequeue(ctx, &scd)
-	} else if !txReconcile.failed && !txReconcile.succeeded {
+	} else if !txReconcile.isFailed() && !txReconcile.isSucceeded() {
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 	// Nothing left to do - we succeeded or failed
@@ -119,9 +137,9 @@ func (r *SmartContractDeploymentReconciler) updateStatusAndRequeue(ctx context.C
 }
 
 func (r *SmartContractDeploymentReconciler) buildDeployTransaction(ctx context.Context, scd *corev1alpha1.SmartContractDeployment) (bool, *pldapi.TransactionInput, error) {
-	var data tktypes.RawJSON
+	var data pldtypes.RawJSON
 	if scd.Spec.ParamsJSON == "" {
-		data = tktypes.RawJSON(scd.Spec.ParamsJSON)
+		data = pldtypes.RawJSON(scd.Spec.ParamsJSON)
 	}
 	build := solutils.SolidityBuildWithLinks{
 		Bytecode: scd.Spec.Bytecode,
@@ -145,7 +163,7 @@ func (r *SmartContractDeploymentReconciler) buildDeployTransaction(ctx context.C
 
 	return true, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
-			Type:   tktypes.Enum[pldapi.TransactionType](scd.Spec.TxType),
+			Type:   pldtypes.Enum[pldapi.TransactionType](scd.Spec.TxType),
 			Domain: scd.Spec.Domain,
 			From:   scd.Spec.From,
 			Data:   data,
@@ -155,10 +173,10 @@ func (r *SmartContractDeploymentReconciler) buildDeployTransaction(ctx context.C
 	}, nil
 }
 
-func (r *SmartContractDeploymentReconciler) buildLinkReferences(scd *corev1alpha1.SmartContractDeployment) (map[string]*tktypes.EthAddress, error) {
+func (r *SmartContractDeploymentReconciler) buildLinkReferences(scd *corev1alpha1.SmartContractDeployment) (map[string]*pldtypes.EthAddress, error) {
 
 	var crMap map[string]any
-	linkedAddresses := map[string]*tktypes.EthAddress{}
+	linkedAddresses := map[string]*pldtypes.EthAddress{}
 
 	for libName, addrTemplateStr := range scd.Spec.LinkedContracts {
 
@@ -182,7 +200,7 @@ func (r *SmartContractDeploymentReconciler) buildLinkReferences(scd *corev1alpha
 			return nil, fmt.Errorf("go template failed for linked contract %s: %s", libName, err)
 		}
 
-		addr, err := tktypes.ParseEthAddress(addrBuff.String())
+		addr, err := pldtypes.ParseEthAddress(addrBuff.String())
 		if err != nil {
 			return nil, fmt.Errorf("invalid address '%s' for resolved library %s: %s", addrBuff, libName, err)
 		}

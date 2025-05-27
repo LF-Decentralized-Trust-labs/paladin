@@ -25,10 +25,11 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTransactionByIDFullFail(t *testing.T) {
@@ -44,18 +45,64 @@ func TestGetTransactionByIDFullFail(t *testing.T) {
 }
 
 func TestGetTransactionByIDFullPublicFail(t *testing.T) {
+	txID := uuid.New()
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-			mc.db.ExpectQuery("SELECT.*transactions").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.New()))
+			mc.db.ExpectQuery("SELECT.*transactions").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(txID))
 			mc.db.ExpectQuery("SELECT.*transaction_deps").WillReturnRows(sqlmock.NewRows([]string{}))
+			mc.db.ExpectQuery("SELECT.*transaction_history").WillReturnRows(sqlmock.NewRows([]string{"id", "tx_id"}).AddRow(uuid.New(), txID))
 		}, mockQueryPublicTxForTransactions(func(ids []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*pldapi.PublicTx, error) {
 			return nil, fmt.Errorf("pop")
 		}))
 	defer done()
 
+	_, err := txm.GetTransactionByIDFull(ctx, txID)
+	assert.Regexp(t, "pop", err)
+}
+
+func TestGetTransactionByIDFullPublicHistoryFail(t *testing.T) {
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*transactions").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.New()))
+			mc.db.ExpectQuery("SELECT.*transaction_deps").WillReturnRows(sqlmock.NewRows([]string{}))
+			mc.db.ExpectQuery("SELECT.*transaction_history").WillReturnError(fmt.Errorf("pop"))
+		})
+	defer done()
+
 	_, err := txm.GetTransactionByIDFull(ctx, uuid.New())
 	assert.Regexp(t, "pop", err)
+}
+
+func TestGetTransactionByIDFullPublicHistory(t *testing.T) {
+	txID := uuid.New()
+	to1 := pldtypes.RandAddress()
+	to2 := pldtypes.RandAddress()
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectQuery("SELECT.*transactions").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(txID))
+			mc.db.ExpectQuery("SELECT.*transaction_deps").WillReturnRows(sqlmock.NewRows([]string{}))
+			rows := sqlmock.NewRows([]string{"id", "tx_id", "to"}).
+				AddRow(uuid.New(), txID, to1).
+				AddRow(uuid.New(), txID, to2)
+			mc.db.ExpectQuery("SELECT.*transaction_history").WillReturnRows(rows)
+		}, mockQueryPublicTxForTransactions(func(ids []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*pldapi.PublicTx, error) {
+			pubTX := map[uuid.UUID][]*pldapi.PublicTx{
+				txID: {{
+					To: to2,
+				}},
+			}
+			return pubTX, nil
+		}))
+	defer done()
+
+	tx, err := txm.GetTransactionByIDFull(ctx, txID)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(tx.History))
+	assert.Equal(t, to1, tx.History[0].To)
+	assert.Equal(t, to2, tx.History[1].To)
 }
 
 func TestGetTransactionByIDFail(t *testing.T) {
@@ -105,7 +152,7 @@ func TestResolveABIReferencesAndCacheFail(t *testing.T) {
 	_, err := txm.resolveABIReferencesAndCache(ctx, txm.p.NOTX(), []*components.ResolvedTransaction{
 		{Transaction: &pldapi.Transaction{
 			TransactionBase: pldapi.TransactionBase{
-				ABIReference: confutil.P((tktypes.Bytes32)(tktypes.RandBytes(32))),
+				ABIReference: confutil.P((pldtypes.Bytes32)(pldtypes.RandBytes(32))),
 			},
 		}},
 	})
@@ -113,7 +160,7 @@ func TestResolveABIReferencesAndCacheFail(t *testing.T) {
 }
 
 func TestResolveABIReferencesAndCacheBadFunc(t *testing.T) {
-	var abiHash = (tktypes.Bytes32)(tktypes.RandBytes(32))
+	var abiHash = (pldtypes.Bytes32)(pldtypes.RandBytes(32))
 	ctx, txm, done := newTestTransactionManager(t, false,
 		mockEmptyReceiptListeners,
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
@@ -128,7 +175,7 @@ func TestResolveABIReferencesAndCacheBadFunc(t *testing.T) {
 			ID: confutil.P(uuid.New()),
 			TransactionBase: pldapi.TransactionBase{
 				Function:     "doStuff()",
-				To:           tktypes.RandAddress(),
+				To:           pldtypes.RandAddress(),
 				ABIReference: confutil.P(abiHash),
 			},
 		}},

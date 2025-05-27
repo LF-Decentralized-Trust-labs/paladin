@@ -21,14 +21,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,9 +36,7 @@ import (
 )
 
 var (
-	notaryName     = "notary@node1"
-	recipient1Name = "recipient1@node1"
-	recipient2Name = "recipient2@node1"
+	notaryName = "notary@node1"
 )
 
 func TestNotoSuite(t *testing.T) {
@@ -54,7 +52,7 @@ type notoTestSuite struct {
 
 func (s *notoTestSuite) SetupSuite() {
 	ctx := context.Background()
-	s.domainName = "noto_" + tktypes.RandHex(8)
+	s.domainName = "noto_" + pldtypes.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", s.domainName)
 
 	s.hdWalletSeed = testbed.HDWalletSeedScopedToTest()
@@ -111,14 +109,14 @@ func (s *notoTestSuite) TestNoto() {
 			Function: "mint",
 			Data: toJSON(t, &types.MintParams{
 				To:     notaryName,
-				Amount: tktypes.Int64ToInt256(100),
+				Amount: pldtypes.Int64ToInt256(100),
 			}),
 		},
 		ABI: types.NotoABI,
 	}, true)
 	require.NoError(t, rpcerr)
 
-	coins := findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
+	coins := findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.Len(t, coins, 1)
 	assert.Equal(t, int64(100), coins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, notaryKey.Verifier.Verifier, coins[0].Data.Owner.String())
@@ -131,7 +129,7 @@ func (s *notoTestSuite) TestNoto() {
 			Function: "mint",
 			Data: toJSON(t, &types.MintParams{
 				To:     recipient1Name,
-				Amount: tktypes.Int64ToInt256(100),
+				Amount: pldtypes.Int64ToInt256(100),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -139,7 +137,7 @@ func (s *notoTestSuite) TestNoto() {
 	require.NotNil(t, rpcerr)
 	assert.ErrorContains(t, rpcerr, "PD200009")
 
-	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
+	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.Len(t, coins, 1)
 
 	log.L(ctx).Infof("Transfer 150 from notary (should fail)")
@@ -150,7 +148,7 @@ func (s *notoTestSuite) TestNoto() {
 			Function: "transfer",
 			Data: toJSON(t, &types.TransferParams{
 				To:     recipient1Name,
-				Amount: tktypes.Int64ToInt256(150),
+				Amount: pldtypes.Int64ToInt256(150),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -158,7 +156,7 @@ func (s *notoTestSuite) TestNoto() {
 	require.NotNil(t, rpcerr)
 	assert.ErrorContains(t, rpcerr, "assemble result was REVERT")
 
-	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
+	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.Len(t, coins, 1)
 
 	log.L(ctx).Infof("Transfer 50 from notary to recipient1")
@@ -169,14 +167,14 @@ func (s *notoTestSuite) TestNoto() {
 			Function: "transfer",
 			Data: toJSON(t, &types.TransferParams{
 				To:     recipient1Name,
-				Amount: tktypes.Int64ToInt256(50),
+				Amount: pldtypes.Int64ToInt256(50),
 			}),
 		},
 		ABI: types.NotoABI,
 	}, true)
 	require.NoError(t, rpcerr)
 
-	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
+	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.NoError(t, err)
 	require.Len(t, coins, 2)
 
@@ -193,14 +191,14 @@ func (s *notoTestSuite) TestNoto() {
 			Function: "transfer",
 			Data: toJSON(t, &types.TransferParams{
 				To:     recipient2Name,
-				Amount: tktypes.Int64ToInt256(50),
+				Amount: pldtypes.Int64ToInt256(50),
 			}),
 		},
 		ABI: types.NotoABI,
 	}, true)
 	require.NoError(t, rpcerr)
 
-	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
+	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.NoError(t, err)
 	require.Len(t, coins, 2)
 
@@ -216,14 +214,14 @@ func (s *notoTestSuite) TestNoto() {
 			To:       noto.Address,
 			Function: "burn",
 			Data: toJSON(t, &types.BurnParams{
-				Amount: tktypes.Int64ToInt256(25),
+				Amount: pldtypes.Int64ToInt256(25),
 			}),
 		},
 		ABI: types.NotoABI,
 	}, true)
 	require.NoError(t, rpcerr)
 
-	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
+	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.NoError(t, err)
 	require.Len(t, coins, 2)
 
@@ -262,7 +260,7 @@ func (s *notoTestSuite) TestNotoApprove() {
 			Function: "mint",
 			Data: toJSON(t, &types.MintParams{
 				To:     notaryName,
-				Amount: tktypes.Int64ToInt256(100),
+				Amount: pldtypes.Int64ToInt256(100),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -278,7 +276,7 @@ func (s *notoTestSuite) TestNotoApprove() {
 			Function: "transfer",
 			Data: toJSON(t, &types.TransferParams{
 				To:     recipient1Name,
-				Amount: tktypes.Int64ToInt256(50),
+				Amount: pldtypes.Int64ToInt256(50),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -297,8 +295,8 @@ func (s *notoTestSuite) TestNotoApprove() {
 			Data: toJSON(t, &types.ApproveParams{
 				Inputs:   prepared.InputStates,
 				Outputs:  prepared.OutputStates,
-				Data:     tktypes.MustParseHexBytes(transferParams["data"].(string)),
-				Delegate: tktypes.MustEthAddress(recipient1Key.Verifier.Verifier),
+				Data:     pldtypes.MustParseHexBytes(transferParams["data"].(string)),
+				Delegate: pldtypes.MustEthAddress(recipient1Key.Verifier.Verifier),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -313,7 +311,7 @@ func (s *notoTestSuite) TestNotoApprove() {
 			Function: "transferWithApproval",
 			From:     recipient1Name,
 			To:       noto.Address,
-			Data:     tktypes.JSONString(transferParams),
+			Data:     pldtypes.JSONString(transferParams),
 		},
 		ABI: notoBuild.ABI,
 	})
@@ -355,14 +353,14 @@ func (s *notoTestSuite) TestNotoLock() {
 			Function: "mint",
 			Data: toJSON(t, &types.MintParams{
 				To:     recipient1Name,
-				Amount: tktypes.Int64ToInt256(100),
+				Amount: pldtypes.Int64ToInt256(100),
 			}),
 		},
 		ABI: types.NotoABI,
 	}, true)
 	require.NoError(t, rpcerr)
 
-	coins := findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
+	coins := findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.Len(t, coins, 1)
 	assert.Equal(t, int64(100), coins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient1Key.Verifier.Verifier, coins[0].Data.Owner.String())
@@ -374,7 +372,7 @@ func (s *notoTestSuite) TestNotoLock() {
 			To:       noto.Address,
 			Function: "lock",
 			Data: toJSON(t, &types.LockParams{
-				Amount: tktypes.Int64ToInt256(50),
+				Amount: pldtypes.Int64ToInt256(50),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -386,11 +384,11 @@ func (s *notoTestSuite) TestNotoLock() {
 	require.NotNil(t, lockInfo)
 	require.NotEmpty(t, lockInfo.LockID)
 
-	lockedCoins := findAvailableCoins[types.NotoLockedCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), noto.Address, nil)
+	lockedCoins := findAvailableCoins[types.NotoLockedCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.Len(t, lockedCoins, 1)
 	assert.Equal(t, int64(50), lockedCoins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient1Key.Verifier.Verifier, lockedCoins[0].Data.Owner.String())
-	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
+	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.Len(t, coins, 1)
 	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient1Key.Verifier.Verifier, coins[0].Data.Owner.String())
@@ -403,18 +401,18 @@ func (s *notoTestSuite) TestNotoLock() {
 			Function: "transfer",
 			Data: toJSON(t, &types.TransferParams{
 				To:     recipient2Name,
-				Amount: tktypes.Int64ToInt256(50),
+				Amount: pldtypes.Int64ToInt256(50),
 			}),
 		},
 		ABI: types.NotoABI,
 	}, true)
 	require.NoError(t, rpcerr)
 
-	lockedCoins = findAvailableCoins[types.NotoLockedCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), noto.Address, nil)
+	lockedCoins = findAvailableCoins[types.NotoLockedCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.Len(t, lockedCoins, 1)
 	assert.Equal(t, int64(50), lockedCoins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient1Key.Verifier.Verifier, lockedCoins[0].Data.Owner.String())
-	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
+	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.Len(t, coins, 1)
 	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[0].Data.Owner.String())
@@ -430,9 +428,9 @@ func (s *notoTestSuite) TestNotoLock() {
 				From:   recipient1Name,
 				Recipients: []*types.UnlockRecipient{{
 					To:     recipient2Name,
-					Amount: tktypes.Int64ToInt256(50),
+					Amount: pldtypes.Int64ToInt256(50),
 				}},
-				Data: tktypes.HexBytes{},
+				Data: pldtypes.HexBytes{},
 			}),
 		},
 		ABI: types.NotoABI,
@@ -451,7 +449,7 @@ func (s *notoTestSuite) TestNotoLock() {
 			Data: toJSON(t, &types.DelegateLockParams{
 				LockID:   lockInfo.LockID,
 				Unlock:   unlockParams,
-				Delegate: tktypes.MustEthAddress(recipient2Key.Verifier.Verifier),
+				Delegate: pldtypes.MustEthAddress(recipient2Key.Verifier.Verifier),
 			}),
 		},
 		ABI: types.NotoABI,
@@ -470,10 +468,10 @@ func (s *notoTestSuite) TestNotoLock() {
 		Wait(3 * time.Second)
 	require.NoError(t, tx.Error())
 
-	findAvailableCoins(t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), noto.Address, nil, func(coins []*types.NotoLockedCoinState) bool {
+	findAvailableCoins(t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), "pstate_queryContractStates", noto.Address, nil, func(coins []*types.NotoLockedCoinState) bool {
 		return len(coins) == 0
 	})
-	coins = findAvailableCoins(t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil, func(coins []*types.NotoCoinState) bool {
+	coins = findAvailableCoins(t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil, func(coins []*types.NotoCoinState) bool {
 		return len(coins) == 2
 	})
 	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())

@@ -20,17 +20,17 @@ import (
 	"encoding/json"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 var mintABI = &abi.Entry{
 	Type: abi.Function,
-	Name: "mint",
+	Name: types.METHOD_MINT,
 	Inputs: abi.ParameterArray{
 		{Name: "utxos", Type: "uint256[]"},
 		{Name: "data", Type: "bytes"},
@@ -137,7 +137,7 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 		outputs[i] = hash.String()
 	}
 
-	data, err := encodeTransactionDataFunc(ctx, req.Transaction, types.ZetoTransactionData_V0)
+	data, err := encodeTransactionDataFunc(ctx, req.Transaction, req.InfoStates)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorEncodeTxData, err)
 	}

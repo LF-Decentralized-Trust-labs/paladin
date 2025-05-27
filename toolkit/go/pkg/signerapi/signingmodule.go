@@ -16,7 +16,7 @@
 package signerapi
 
 import (
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type ResolveKeyRequest struct {
@@ -55,12 +55,12 @@ type SignRequest struct {
 	PayloadType string `json:"payloadType,omitempty"`
 
 	// the input payload to process according to the algorithm
-	Payload tktypes.HexBytes `json:"payload,omitempty"`
+	Payload pldtypes.HexBytes `json:"payload,omitempty"`
 }
 
 type SignResponse struct {
 	// an set of bytes appropriate to the Paladin signing algorithm spec used
-	Payload tktypes.HexBytes `json:"payload,omitempty"`
+	Payload pldtypes.HexBytes `json:"payload,omitempty"`
 }
 
 type ListKeysRequest struct {
@@ -110,18 +110,18 @@ type ListKeyPathSegment struct {
 }
 
 type PublicKeyIdentifierType struct {
-	// The curve on which the key material has been generated (for predefined constants refer to the toolkit/go/pkg/algorithms package)
+	// The curve on which the key material has been generated (for predefined constants refer to the toolkit/pkg/algorithms package)
 	Algorithm string `json:"algorithm,omitempty"`
 
-	// The representation to which the public key material is encoded (for predefined constants refer to the toolkit/go/pkg/verifiers package)
+	// The representation to which the public key material is encoded (for predefined constants refer to the toolkit/pkg/verifiers package)
 	VerifierType string `json:"verifierType,omitempty"`
 }
 
 type PublicKeyIdentifier struct {
-	// The curve on which the key material has been generated (for predefined constants refer to the toolkit/go/pkg/algorithms package)
+	// The curve on which the key material has been generated (for predefined constants refer to the toolkit/pkg/algorithms package)
 	Algorithm string `json:"algorithm,omitempty"`
 
-	// The representation to which the public key material is encoded (for predefined constants refer to the toolkit/go/pkg/verifiers package)
+	// The representation to which the public key material is encoded (for predefined constants refer to the toolkit/pkg/verifiers package)
 	VerifierType string `json:"verifierType,omitempty"`
 
 	// The public key encoded in the form of the Verifier type (for example, a 0x address)

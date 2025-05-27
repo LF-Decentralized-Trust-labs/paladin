@@ -20,35 +20,35 @@ import (
 	"fmt"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type SolidityBuild struct {
-	ABI      abi.ABI          `json:"abi"`
-	Bytecode tktypes.HexBytes `json:"bytecode"`
+	ABI      abi.ABI           `json:"abi"`
+	Bytecode pldtypes.HexBytes `json:"bytecode"`
 }
 
 type identityRegistryContractDefinition struct {
 	abi                         abi.ABI
-	identityRegisteredSignature tktypes.Bytes32
-	propertySetSignature        tktypes.Bytes32
+	identityRegisteredSignature pldtypes.Bytes32
+	propertySetSignature        pldtypes.Bytes32
 }
 
 const identityRegisteredEventSolSig = "event IdentityRegistered(bytes32 parentIdentityHash, bytes32 identityHash, string name, address owner)"
 
 type IdentityRegisteredEvent struct {
-	ParentIdentityHash tktypes.Bytes32    `json:"parentIdentityHash"`
-	IdentityHash       tktypes.Bytes32    `json:"identityHash"`
-	Name               string             `json:"name"`
-	Owner              tktypes.EthAddress `json:"owner"`
+	ParentIdentityHash pldtypes.Bytes32    `json:"parentIdentityHash"`
+	IdentityHash       pldtypes.Bytes32    `json:"identityHash"`
+	Name               string              `json:"name"`
+	Owner              pldtypes.EthAddress `json:"owner"`
 }
 
 const propertySetEventSolSig = "event PropertySet(bytes32 identityHash, string name, string value)"
 
 type PropertySetEvent struct {
-	IdentityHash tktypes.Bytes32 `json:"identityHash"`
-	Name         string          `json:"name"`
-	Value        string          `json:"value"`
+	IdentityHash pldtypes.Bytes32 `json:"identityHash"`
+	Name         string           `json:"name"`
+	Value        string           `json:"value"`
 }
 
 func mustLoadIdentityRegistryContractDetail(buildOutput []byte) *identityRegistryContractDefinition {
@@ -72,7 +72,7 @@ func mustLoadIdentityRegistryContractDetail(buildOutput []byte) *identityRegistr
 
 	return &identityRegistryContractDefinition{
 		abi:                         build.ABI,
-		identityRegisteredSignature: tktypes.Bytes32(identityRegisteredEvent.SignatureHashBytes()),
-		propertySetSignature:        tktypes.Bytes32(propertySetEvent.SignatureHashBytes()),
+		identityRegisteredSignature: pldtypes.Bytes32(identityRegisteredEvent.SignatureHashBytes()),
+		propertySetSignature:        pldtypes.Bytes32(propertySetEvent.SignatureHashBytes()),
 	}
 }

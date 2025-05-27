@@ -18,18 +18,22 @@ package blockindexer
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"gorm.io/gorm/clause"
 )
 
@@ -39,15 +43,20 @@ type eventStream struct {
 	bi             *blockIndexer
 	definition     *EventStream
 	signatures     map[string]bool
-	signatureList  []tktypes.Bytes32
+	signatureList  []pldtypes.Bytes32
 	batchSize      int
 	batchTimeout   time.Duration
 	blocks         chan *eventStreamBlock
 	dispatch       chan *eventDispatch
-	handler        InternalStreamCallback
+	useNOTXHandler bool
+	handlerDBTX    InternalStreamCallbackDBTX
+	handlerNOTX    InternalStreamCallbackNOTX
 	serializer     *abi.Serializer
 	detectorDone   chan struct{}
 	dispatcherDone chan struct{}
+	fromBlock      *ethtypes.HexUint64 // nil == latest
+	checkpoint     atomic.Int64        // set after we persist checkpoint
+	catchup        atomic.Bool
 }
 
 type eventBatch struct {
@@ -86,9 +95,29 @@ func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
 	}
 
 	for _, esDefinition := range eventStreams {
-		bi.initEventStream(ctx, esDefinition, nil /* no handler at this point */)
+		bi.initEventStream(ctx, esDefinition)
 	}
 	return nil
+}
+
+func (bi *blockIndexer) AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error) {
+	es, err := bi.upsertInternalEventStream(ctx, dbTX, stream)
+	if err != nil {
+		return nil, err
+	}
+
+	// Can be called before start as managers start before the block indexer
+	bi.stateLock.Lock()
+	blockIndexerStarted := bi.started
+	bi.stateLock.Unlock()
+
+	es.definition.Started = confutil.P(es.definition.Started == nil || *es.definition.Started)
+
+	if blockIndexerStarted && *es.definition.Started {
+		// no possibility of error if not updating DB
+		_ = bi.startEventStream(es, false)
+	}
+	return es.definition, nil
 }
 
 func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX persistence.DBTX, ies *InternalEventStream) (*eventStream, error) {
@@ -99,11 +128,17 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 		def = &EventStream{}
 	}
 
-	// This will need to open up when we have more externally consumable event streams
-	def.Type = EventStreamTypeInternal.Enum()
+	if def.Type == "" {
+		def.Type = EventStreamTypeInternal.Enum()
+	}
 
 	// Validate the name
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+	if err := pldtypes.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, pldtypes.DefaultNameMaxLen, "name"); err != nil {
+		return nil, err
+	}
+
+	// Validate the fromBlock
+	if _, err := bi.getFromBlock(ctx, def.Config.FromBlock, EventStreamDefaults.FromBlock); err != nil {
 		return nil, err
 	}
 
@@ -127,7 +162,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 			return nil, i18n.NewError(ctx, msgs.MsgBlockIndexerESSourceError)
 		}
 		for i := range existing[0].Sources {
-			if err := tktypes.ABIsMustMatch(ctx, existing[0].Sources[i].ABI, def.Sources[i].ABI,
+			if err := pldtypes.ABIsMustMatch(ctx, existing[0].Sources[i].ABI, def.Sources[i].ABI,
 				abi.Event, // we only need to compare on the events
 			); err != nil {
 				return nil, err
@@ -163,18 +198,35 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 		}
 	}
 
-	// We call init here
-	// TODO: Full stop/start lifecycle
-	es := bi.initEventStream(ctx, def, ies.Handler)
-
-	return es, nil
+	if ies.Type == IESTypeEventStreamDBTX {
+		return bi.initEventStreamDBTX(ctx, def, ies.HandlerDBTX), nil
+	}
+	return bi.initEventStreamNOTX(ctx, def, ies.HandlerNOTX), nil
 }
 
-// Note that the event stream must be stopped when this is called
-func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventStream, handler InternalStreamCallback) *eventStream {
+func (bi *blockIndexer) initEventStreamNOTX(ctx context.Context, definition *EventStream, handlerNOTX InternalStreamCallbackNOTX) *eventStream {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
 
+	es := bi.initEventStream(ctx, definition)
+	es.useNOTXHandler = true
+	es.handlerNOTX = handlerNOTX
+
+	return es
+}
+
+func (bi *blockIndexer) initEventStreamDBTX(ctx context.Context, definition *EventStream, handlerDBTX InternalStreamCallbackDBTX) *eventStream {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+
+	es := bi.initEventStream(ctx, definition)
+	es.handlerDBTX = handlerDBTX
+
+	return es
+}
+
+// Note that the event stream must be stopped when this is called
+func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventStream) *eventStream {
 	es := bi.eventStreams[definition.ID]
 	batchSize := confutil.IntMin(definition.Config.BatchSize, 1, *EventStreamDefaults.BatchSize)
 	if es != nil {
@@ -195,9 +247,10 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	// Set the batch config
 	es.batchSize = batchSize
 	es.batchTimeout = confutil.DurationMin(definition.Config.BatchTimeout, 0, *EventStreamDefaults.BatchTimeout)
-
-	// Note the handler will be nil when this is first called on startup before we've been passed handlers.
-	es.handler = handler
+	// The error is already checked before writing to the DB
+	es.fromBlock, _ = es.bi.getFromBlock(ctx, definition.Config.FromBlock, EventStreamDefaults.FromBlock)
+	es.checkpoint.Store(-1)
+	es.catchup.Store(true)
 
 	// Calculate all the signatures we require
 	for _, source := range definition.Sources {
@@ -209,7 +262,7 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 
 		for _, abiEntry := range source.ABI {
 			if abiEntry.Type == abi.Event {
-				sig := tktypes.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
+				sig := pldtypes.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
 				sigStr := sig.String()
 				if _, dup := es.signatures[sigStr]; !dup {
 					es.signatures[sigStr] = true
@@ -227,6 +280,78 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	return es
 }
 
+func (bi *blockIndexer) RemoveEventStream(ctx context.Context, id uuid.UUID) error {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+
+	es := bi.eventStreams[id]
+	if es == nil {
+		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, id)
+	}
+
+	err := bi.persistence.NOTX().DB().
+		WithContext(ctx).
+		Table("event_streams").
+		Where("id = ?", id).
+		Delete(&EventStream{}).
+		Error
+	if err != nil {
+		log.L(ctx).Errorf("Failed to delete event stream %s: %s", id, err)
+		return err
+	}
+	// no possibility of error if not updating DB
+	_ = es.stop(false)
+	delete(bi.eventStreams, id)
+	delete(bi.eventStreamsHeadSet, id)
+	return nil
+}
+
+func (bi *blockIndexer) QueryEventStreamDefinitions(ctx context.Context, dbTX persistence.DBTX, esType pldtypes.Enum[EventStreamType], jq *query.QueryJSON) ([]*EventStream, error) {
+	if jq == nil || jq.Limit == nil || *jq.Limit == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgBlockIndexerLimitRequired)
+	}
+	q := dbTX.DB().
+		Table("event_streams").
+		WithContext(ctx).
+		Where("type = ?", esType)
+
+	q = filters.BuildGORM(ctx, jq, q, EventStreamFilters)
+
+	var results []*EventStream
+	err := q.Find(&results).Error
+	return results, err
+}
+
+func (bi *blockIndexer) StartEventStream(ctx context.Context, id uuid.UUID) error {
+	if bi.eventStreams[id] == nil {
+		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, id)
+	}
+	return bi.startEventStream(bi.eventStreams[id], true)
+}
+
+func (bi *blockIndexer) StopEventStream(ctx context.Context, id uuid.UUID) error {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+
+	if bi.eventStreams[id] == nil {
+		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, id)
+	}
+	return bi.eventStreams[id].stop(true)
+}
+
+func (bi *blockIndexer) GetEventStreamStatus(ctx context.Context, id uuid.UUID) (*EventStreamStatus, error) {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+
+	if bi.eventStreams[id] == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, id)
+	}
+	return &EventStreamStatus{
+		CheckpointBlock: bi.eventStreams[id].checkpoint.Load(),
+		Catchup:         bi.eventStreams[id].catchup.Load(),
+	}, nil
+}
+
 func (bi *blockIndexer) getStreamList() []*eventStream {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
@@ -239,40 +364,70 @@ func (bi *blockIndexer) getStreamList() []*eventStream {
 
 func (bi *blockIndexer) startEventStreams() {
 	for _, es := range bi.getStreamList() {
-		es.start()
+		if es.definition.Started == nil || *es.definition.Started {
+			// no possibility of error if not updating DB
+			_ = es.start(false)
+		}
 	}
 }
 
-func (bi *blockIndexer) startEventStream(es *eventStream) {
+func (bi *blockIndexer) startEventStream(es *eventStream, updateDB bool) error {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
-	es.start()
+	return es.start(updateDB)
 }
 
-func (es *eventStream) start() {
-	if es.handler != nil && es.detectorDone == nil && es.dispatcherDone == nil {
+func (es *eventStream) start(updateDB bool) error {
+	if (es.handlerDBTX != nil || es.handlerNOTX != nil) && es.detectorDone == nil && es.dispatcherDone == nil {
 		es.ctx, es.cancelCtx = context.WithCancel(log.WithLogField(es.bi.parentCtxForReset, "eventstream", es.definition.ID.String()))
 		log.L(es.ctx).Infof("Starting event stream %s [%s]", es.definition.Name, es.definition.ID)
+		if updateDB {
+			err := es.bi.persistence.NOTX().DB().
+				WithContext(es.ctx).
+				Table("event_streams").
+				Where("id = ?", es.definition.ID).
+				Update("started", true).
+				Error
+			if err != nil {
+				return err
+			}
+		}
 		es.detectorDone = make(chan struct{})
 		es.dispatcherDone = make(chan struct{})
 		go es.detector()
 		go es.dispatcher()
 	}
+	return nil
 }
 
-func (es *eventStream) stop() {
+func (es *eventStream) stop(updateDB bool) error {
+	if updateDB {
+		err := es.bi.persistence.NOTX().DB().
+			WithContext(es.ctx).
+			Table("event_streams").
+			Where("id = ?", es.definition.ID).
+			Update("started", false).
+			Error
+		if err != nil {
+			return err
+		}
+	}
 	if es.cancelCtx != nil {
 		es.cancelCtx()
+		es.cancelCtx = nil
 	}
 	if es.detectorDone != nil {
 		<-es.detectorDone
+		es.detectorDone = nil
 	}
 	if es.dispatcherDone != nil {
 		<-es.dispatcherDone
+		es.dispatcherDone = nil
 	}
+	return nil
 }
 
-func (es *eventStream) readDBCheckpoint() (int64, error) {
+func (es *eventStream) readDBCheckpoint() (*int64, error) {
 	var checkpoints []*EventStreamCheckpoint
 	err := es.bi.persistence.DB().
 		Table("event_stream_checkpoints").
@@ -280,15 +435,28 @@ func (es *eventStream) readDBCheckpoint() (int64, error) {
 		WithContext(es.ctx).
 		Find(&checkpoints).
 		Error
-	if err != nil || len(checkpoints) < 1 {
-		return -1, err
+	if err != nil {
+		return nil, err
 	}
+
+	if len(checkpoints) < 1 {
+		// this is the case where we are starting up for the first time so we need to look
+		// at the value of fromBlock to decide what to do here
+		if es.fromBlock == nil {
+			log.L(es.ctx).Info("Using event stream config 'latest' as initial checkpoint")
+			return nil, nil
+		}
+		log.L(es.ctx).Infof("Using event stream config '%d' minus 1 as initial checkpoint", *es.fromBlock)
+		return confutil.P(int64(*es.fromBlock) - 1), nil
+	}
+
 	baseBlock := checkpoints[0].BlockNumber
+	es.checkpoint.Store(baseBlock)
 	log.L(es.ctx).Infof("read persisted checkpoint block %d", baseBlock)
-	return baseBlock, nil
+	return &baseBlock, nil
 }
 
-func (es *eventStream) processCheckpoint() (baseBlock int64, err error) {
+func (es *eventStream) processCheckpoint() (baseBlock *int64, err error) {
 	err = es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
 		baseBlock, err = es.readDBCheckpoint()
 		return true, err
@@ -331,18 +499,36 @@ func (es *eventStream) detector() {
 		return
 	}
 
-	// Find the highest block of the chain that's been persisted so far on startup,
-	// so we don't need to wait for a block to be mined (which feasibly might be
-	// mine-on-demand) to kick off our catchup.
-	// Note startupBlock might be nil, and that's fine
-	startupBlock, err := es.bi.getHighestIndexedBlock(es.ctx)
-	if err != nil {
-		log.L(es.ctx).Debugf("exiting before retrieving highest block")
-		return
-	}
-
+	// var checkpointBlock int64
+	var startupBlock *int64
 	var lastCatchupEvent *pldapi.IndexedEvent
 	var catchUpToBlock *eventStreamBlock
+
+	if checkpointBlock == nil {
+		// the event stream is starting from the latest block
+		// wait here for the first block to be read and processed so that we have a checkpoint to
+		// use in later logic for understanding whether we are in catchup mode or not
+		es.catchup.Store(false)
+		select {
+		case block := <-es.blocks:
+			checkpointBlock = confutil.P(int64(block.blockNumber))
+			es.processNotifiedBlock(block, true)
+		case <-es.ctx.Done():
+			log.L(es.ctx).Debugf("exiting")
+			return
+		}
+	} else {
+		// Find the highest block of the chain that's been persisted so far on startup,
+		// so we don't need to wait for a block to be mined (which feasibly might be
+		// mine-on-demand) to kick off our catchup.
+		// Note startupBlock might be nil, and that's fine
+		startupBlock, err = es.bi.getHighestIndexedBlock(es.ctx)
+		if err != nil {
+			log.L(es.ctx).Debugf("exiting before retrieving highest block")
+			return
+		}
+	}
+
 	for {
 		// we wait to be told about a block from the chain, to see whether that is a block that
 		// slots directly after our checkpoint. Under normal operation when we're caught up
@@ -352,13 +538,13 @@ func (es *eventStream) detector() {
 		if startupBlock == nil && catchUpToBlock == nil {
 			select {
 			case block := <-es.blocks:
-				if int64(block.blockNumber) <= checkpointBlock {
+				if int64(block.blockNumber) <= *checkpointBlock {
 					log.L(es.ctx).Debugf("notified of block %d at or behind checkpoint %d", block.blockNumber, checkpointBlock)
 					continue
 				}
-				if block.blockNumber == uint64(checkpointBlock+1) {
+				if block.blockNumber == uint64(*checkpointBlock+1) {
 					// Happy place
-					checkpointBlock = int64(block.blockNumber)
+					checkpointBlock = confutil.P(int64(block.blockNumber))
 					es.processNotifiedBlock(block, true)
 				} else {
 					// Entering catchup - defer processing of this block until catchup complete,
@@ -370,6 +556,7 @@ func (es *eventStream) detector() {
 				return
 			}
 		} else {
+			es.catchup.Store(true)
 			// Get a page of events from the DB
 			var catchUpToBlockNumber int64
 			if startupBlock != nil {
@@ -378,21 +565,22 @@ func (es *eventStream) detector() {
 				catchUpToBlockNumber = int64(catchUpToBlock.blockNumber)
 			}
 			var caughtUp bool
-			caughtUp, lastCatchupEvent, err = es.processCatchupEventPage(lastCatchupEvent, checkpointBlock, catchUpToBlockNumber)
+			caughtUp, lastCatchupEvent, err = es.processCatchupEventPage(lastCatchupEvent, *checkpointBlock, catchUpToBlockNumber)
 			if err != nil {
 				log.L(es.ctx).Debugf("exiting during catchup phase")
 				return
 			}
 			if caughtUp {
+				es.catchup.Store(false)
 				lastCatchupEvent = nil
 				if startupBlock == nil {
 					// Process the deferred notified block, and back to normal operation
 					es.processNotifiedBlock(catchUpToBlock, true)
-					checkpointBlock = int64(catchUpToBlock.blockNumber)
+					checkpointBlock = confutil.P(int64(catchUpToBlock.blockNumber))
 					catchUpToBlock = nil
 				} else {
 					// We've now started
-					checkpointBlock = *startupBlock
+					checkpointBlock = startupBlock
 					startupBlock = nil
 				}
 			}
@@ -486,34 +674,45 @@ func (es *eventStream) dispatcher() {
 	}
 }
 
-func (es *eventStream) runBatch(batch *eventBatch) error {
+func (es *eventStream) updateCheckpoint(ctx context.Context, dbTX persistence.DBTX, blockNumber int64) error {
+	err := dbTX.DB().
+		WithContext(ctx).
+		Table("event_stream_checkpoints").
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "stream"}},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"block_number",
+			}),
+		}).
+		Create(&EventStreamCheckpoint{
+			Stream:      es.definition.ID,
+			BlockNumber: blockNumber,
+		}).
+		Error
+	if err == nil {
+		es.checkpoint.Store(blockNumber)
+	}
+	return err
+}
 
-	// We start a database transaction, run the callback function
+func (es *eventStream) runBatch(batch *eventBatch) error {
 	return es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
-		err = es.bi.persistence.Transaction(es.ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
-			err = es.handler(ctx, dbTX, &batch.EventDeliveryBatch)
-			if err != nil {
-				return err
+		if es.useNOTXHandler {
+			err = es.handlerNOTX(es.ctx, &batch.EventDeliveryBatch)
+			if err == nil {
+				err = es.updateCheckpoint(es.ctx, es.bi.persistence.NOTX(), int64(batch.checkpointAfterBatch))
 			}
-			// commit the checkpoint
-			return dbTX.DB().
-				WithContext(ctx).
-				Table("event_stream_checkpoints").
-				Clauses(clause.OnConflict{
-					Columns: []clause.Column{{Name: "stream"}},
-					DoUpdates: clause.AssignmentColumns([]string{
-						"block_number",
-					}),
-				}).
-				Create(&EventStreamCheckpoint{
-					Stream:      es.definition.ID,
-					BlockNumber: int64(batch.checkpointAfterBatch),
-				}).
-				Error
+			return true, err
+		}
+		err = es.bi.persistence.Transaction(es.ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
+			err = es.handlerDBTX(ctx, dbTX, &batch.EventDeliveryBatch)
+			if err == nil {
+				err = es.updateCheckpoint(ctx, dbTX, int64(batch.checkpointAfterBatch))
+			}
+			return err
 		})
 		return true, err
 	})
-
 }
 
 func (es *eventStream) processCatchupEventPage(lastCatchupEvent *pldapi.IndexedEvent, checkpointBlock int64, catchUpToBlockNumber int64) (caughtUp bool, lastEvent *pldapi.IndexedEvent, err error) {
@@ -579,7 +778,7 @@ func (es *eventStream) processCatchupEventPage(lastCatchupEvent *pldapi.IndexedE
 	enrichments := make(chan error)
 	for txStr, _events := range byTxID {
 		events := _events // not safe to pass loop pointer
-		tx := tktypes.MustParseBytes32(txStr)
+		tx := pldtypes.MustParseBytes32(txStr)
 		for _, _source := range es.definition.Sources {
 			source := _source // not safe to pass loop pointer
 			go func() {

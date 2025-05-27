@@ -39,10 +39,12 @@ let receipt = await zetoCBDC.mint(cbdcIssuer, {
     {
       to: bank1,
       amount: 100000,
+      data: "0x",
     },
     {
       to: bank2,
       amount: 100000,
+      data: "0x",
     },
   ],
 });
@@ -58,6 +60,7 @@ receipt = await zetoCBDC.using(paladin1).transfer(bank1, {
     {
       to: bank2,
       amount: 1000,
+      data: "0x",
     },
   ],
 });
@@ -128,6 +131,7 @@ receipt = await zetoCBDC.using(paladin1).transfer(bank1, {
     {
       to: bank2,
       amount: 1000,
+      data: "0x",
     },
   ],
 });

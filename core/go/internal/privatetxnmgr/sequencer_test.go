@@ -29,9 +29,9 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/privatetxnmgrmocks"
 
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -55,9 +55,9 @@ type sequencerDepencyMocks struct {
 	transportWriter     *privatetxnmgrmocks.TransportWriter
 }
 
-func newSequencerForTesting(t *testing.T, ctx context.Context, domainAddress *tktypes.EthAddress) (*Sequencer, *sequencerDepencyMocks, func()) {
+func newSequencerForTesting(t *testing.T, ctx context.Context, domainAddress *pldtypes.EthAddress) (*Sequencer, *sequencerDepencyMocks, func()) {
 	if domainAddress == nil {
-		domainAddress = tktypes.MustEthAddress(tktypes.RandHex(20))
+		domainAddress = pldtypes.MustEthAddress(pldtypes.RandHex(20))
 	}
 
 	mocks := &sequencerDepencyMocks{
@@ -98,7 +98,7 @@ func newSequencerForTesting(t *testing.T, ctx context.Context, domainAddress *tk
 	//mocks.domain.On("Configuration").Return(&prototk.DomainConfig{}).Maybe()
 
 	syncPoints := syncpoints.NewSyncPoints(ctx, &pldconf.FlushWriterConfig{}, p, mocks.txManager, mocks.pubTxManager, mocks.transportManager)
-	o, err := NewSequencer(ctx, mocks.privateTxManager, tktypes.RandHex(16), *domainAddress, &pldconf.PrivateTxManagerSequencerConfig{}, mocks.allComponents, mocks.domainSmartContract, mocks.endorsementGatherer, mocks.publisher, syncPoints, mocks.identityResolver, mocks.transportWriter, 30*time.Second, 0)
+	o, err := NewSequencer(ctx, mocks.privateTxManager, pldtypes.RandHex(16), *domainAddress, &pldconf.PrivateTxManagerSequencerConfig{}, mocks.allComponents, mocks.domainSmartContract, mocks.endorsementGatherer, mocks.publisher, syncPoints, mocks.identityResolver, mocks.transportWriter, 30*time.Second, 0)
 	require.NoError(t, err)
 	ocDone, err := o.Start(ctx)
 	require.NoError(t, err)

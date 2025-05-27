@@ -21,7 +21,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"golang.org/x/text/language"
 )
 
@@ -98,7 +98,7 @@ var (
 	MsgErrorNewNodeIndex                     = pde("PD210056", "Failed to create new node index from hash. %s")
 	MsgErrorHashMismatch                     = pde("PD210057", "Coin (ref=%s) found in the merkle tree but the persisted hash %s (index=%s) did not match the expected hash %s (index=%s)")
 	MsgErrorConvertToCircomProof             = pde("PD210058", "Failed to convert to circom verifier proof. %s")
-	MsgErrorUnmarshalLockProofParams         = pde("PD210059", "Failed to unmarshal lockProof parameters. %s")
+	MsgErrorUnmarshalLockParams              = pde("PD210059", "Failed to unmarshal lock parameters. %s")
 	MsgErrorDecodeTransferCall               = pde("PD210060", "Failed to decode the transfer call. %s")
 	MsgErrorUpdateSMT                        = pde("PD210061", "Failed to update merkle tree for the %s event. %s")
 	MsgErrorAddLeafNode                      = pde("PD210062", "Failed to add leaf node. %s")
@@ -161,6 +161,16 @@ var (
 	MsgErrorMarshalValuesNonFungible         = pde("PD210120", "Failed to marshal TokenSecrets_NonFungible")
 	MsgErrorUnmarshalTokenSecretsFungible    = pde("PD210121", "Failed to unmarshal TokenSecrets_Fungible. %s")
 	MsgErrorUnmarshalTokenSecretsNonFungible = pde("PD210122", "Failed to unmarshal TokenSecrets_NonFungible. %s")
-	MsgErrorTokenTypeMismatch                = pde("PD210123", "Token type mismatch. %s")
+	MsgErrorTokenTypeMismatch                = pde("PD210123", "Token type mismatch. Actual: %s, Expected: %s")
 	MsgErrorProvingReqCommonNil              = pde("PD210124", "Proving request common is nil")
+	MsgErrorLockDelegateNotFound             = pde("PD210125", "lock delegate not found by ID in the local wallet: %s")
+	MsgErrorMissingLockInputs                = pde("PD210126", "locked inputs are required")
+	MsgErrorQueryLockedInputs                = pde("PD210127", "Failed to query the state store for locked inputs. Expected: %d. Found: %d")
+	MsgErrorInputNotLocked                   = pde("PD210128", "Input %s is not locked")
+	MsgErrorInsufficientInputAmount          = pde("PD210129", "Insufficient input amount (total=%s) for the transfers (total=%s)")
+	MsgErrorNoLockedInputs                   = pde("PD210130", "No locked inputs found")
+	MsgErrorParseInfoStates                  = pde("PD210131", "Failed to parse info states. %s")
+	MsgErrorDecodeDelegateExtras             = pde("PD210132", "Failed to decode delegate in extras. %s")
+	MsgErrorMissingLockDelegate              = pde("PD210133", "lock delegate is required")
+	MsgFailedToQueryStatesById               = pde("PD210134", "Failed to query states by IDs. Wanted: %d, Found: %d")
 )

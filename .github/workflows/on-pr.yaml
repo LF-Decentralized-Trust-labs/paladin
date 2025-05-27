@@ -1,0 +1,65 @@
+name: Build (PR)
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+on:
+  pull_request:
+
+# Ensure this workflow only runs for the most recent commit of a pull-request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+
+  build-project:
+    uses: ./.github/workflows/build.yaml
+
+  build-core-image:
+    uses: ./.github/workflows/build-image.yaml
+    with:
+      dockerfile: ./Dockerfile
+      registry: paladin.io
+      image: paladin
+      image_tag: ${{ github.sha }}
+      push: false
+      upload-artifact: true
+      platforms: linux/amd64
+      runs-on: ubuntu-latest
+
+  build-operator-image:
+    uses: ./.github/workflows/build-image.yaml
+    with:
+      dockerfile: ./operator/Dockerfile
+      registry: paladin.io
+      image: paladin-operator
+      image_tag: ${{ github.sha }}
+      push: false
+      upload-artifact: true
+      platforms: linux/amd64
+      runs-on: ubuntu-latest
+
+  chart-build:
+    needs: [build-core-image, build-operator-image]
+    uses: ./.github/workflows/build-chart.yaml
+    with:
+      paladin-image: paladin.io/paladin
+      paladin-image-tag: ${{ github.sha }}
+      operator-image: paladin.io/paladin-operator
+      operator-image-tag: ${{ github.sha }}
+  
+  # Mock job to ensure PR restriction on "build" passes
+  build:
+    needs: [build-project, chart-build]
+    runs-on: ubuntu-latest
+    if: always()  # This ensures the job runs even if previous jobs fail
+    steps:
+      - name: Check if all dependencies succeeded
+        run: |
+          if [[ "${{ needs.build-project.result }}" != "success" || "${{ needs.chart-build.result }}" != "success" ]]; then
+            echo "A dependent job has failed. Marking this job as failed."
+            exit 1
+          fi
+    

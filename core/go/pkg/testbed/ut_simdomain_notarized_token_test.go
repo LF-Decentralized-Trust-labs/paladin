@@ -34,14 +34,14 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,13 +60,13 @@ func toJSONString(t *testing.T, v interface{}) string {
 }
 
 type UTXOTransfer_Event struct {
-	TX        tktypes.Bytes32   `json:"txId"`
-	Inputs    []tktypes.Bytes32 `json:"inputs"`
-	Outputs   []tktypes.Bytes32 `json:"outputs"`
-	Signature tktypes.HexBytes  `json:"signature"`
+	TX        pldtypes.Bytes32   `json:"txId"`
+	Inputs    []pldtypes.Bytes32 `json:"inputs"`
+	Outputs   []pldtypes.Bytes32 `json:"outputs"`
+	Signature pldtypes.HexBytes  `json:"signature"`
 }
 
-func parseStatesFromEvent(txID tktypes.Bytes32, states []tktypes.Bytes32) []*prototk.StateUpdate {
+func parseStatesFromEvent(txID pldtypes.Bytes32, states []pldtypes.Bytes32) []*prototk.StateUpdate {
 	refs := make([]*prototk.StateUpdate, len(states))
 	for i, state := range states {
 		refs[i] = &prototk.StateUpdate{
@@ -168,7 +168,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}
 
 	type fakeCoinParser struct {
-		Salt   tktypes.HexBytes      `json:"salt"`
+		Salt   pldtypes.HexBytes     `json:"salt"`
 		Owner  ethtypes.Address0xHex `json:"owner"`
 		Amount *ethtypes.HexInteger  `json:"amount"`
 	}
@@ -178,7 +178,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}
 
 	type getBalanceResult struct {
-		Amount *tktypes.HexUint256 `json:"amount"`
+		Amount *pldtypes.HexUint256 `json:"amount"`
 	}
 
 	contractDataABI := &abi.ParameterArray{
@@ -207,20 +207,20 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					Statements: query.Statements{
 						Ops: query.Ops{
 							Eq: []*query.OpSingleVal{
-								{Op: query.Op{Field: "owner"}, Value: tktypes.JSONString(fromAddr.String())},
+								{Op: query.Op{Field: "owner"}, Value: pldtypes.JSONString(fromAddr.String())},
 							},
 						},
 					},
 				}
 				if lastStateTimestamp > 0 {
 					jq.GT = []*query.OpSingleVal{
-						{Op: query.Op{Field: ".created"}, Value: tktypes.RawJSON(strconv.FormatInt(lastStateTimestamp, 10))},
+						{Op: query.Op{Field: ".created"}, Value: pldtypes.RawJSON(strconv.FormatInt(lastStateTimestamp, 10))},
 					}
 				}
 				res, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
 					StateQueryContext: stateQueryContext,
 					SchemaId:          fakeCoinSchemaID,
-					QueryJson:         tktypes.JSONString(jq).String(),
+					QueryJson:         pldtypes.JSONString(jq).String(),
 				})
 				if err != nil {
 					return nil, nil, nil, err
@@ -283,7 +283,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			return
 		}
 
-		typedDataV4TransferWithSalts := func(contract *ethtypes.Address0xHex, inputs, outputs []*fakeCoinParser) (tktypes.HexBytes, error) {
+		typedDataV4TransferWithSalts := func(contract *ethtypes.Address0xHex, inputs, outputs []*fakeCoinParser) (pldtypes.HexBytes, error) {
 			typeSet := eip712.TypeSet{
 				"FakeTransfer": {
 					{Name: "inputs", Type: "Coin[]"},
@@ -331,7 +331,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					"outputs": messageOutputs,
 				},
 			})
-			return tktypes.HexBytes(tdv4), err
+			return pldtypes.HexBytes(tdv4), err
 		}
 
 		return &plugintk.DomainAPIBase{Functions: &plugintk.DomainAPIFunctions{
@@ -402,11 +402,11 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			InitContract: func(ctx context.Context, icr *prototk.InitContractRequest) (*prototk.InitContractResponse, error) {
 
 				configValues, err := contractDataABI.DecodeABIData(icr.ContractConfig, 0)
-				str := tktypes.HexBytes(icr.ContractConfig).HexString0xPrefix()
+				str := pldtypes.HexBytes(icr.ContractConfig).HexString0xPrefix()
 				assert.NotEqual(t, "", str)
 				require.NoError(t, err)
 
-				configJSON, err := tktypes.StandardABISerializer().SerializeJSON(configValues)
+				configJSON, err := pldtypes.StandardABISerializer().SerializeJSON(configValues)
 				require.NoError(t, err)
 				contractConfig := &prototk.ContractConfig{
 					ContractConfigJson:   string(configJSON),
@@ -476,7 +476,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				if fromAddr != nil && toKeep.Sign() > 0 {
 					// Generate a state to keep for ourselves
 					coin := fakeCoinParser{
-						Salt:   tktypes.RandBytes(32),
+						Salt:   pldtypes.RandBytes(32),
 						Owner:  *fromAddr,
 						Amount: (*ethtypes.HexInteger)(toKeep),
 					}
@@ -489,7 +489,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				if toAddr != nil && amount.Sign() > 0 {
 					// Generate the coin to transfer
 					coin := fakeCoinParser{
-						Salt:   tktypes.RandBytes(32),
+						Salt:   pldtypes.RandBytes(32),
 						Owner:  *toAddr,
 						Amount: (*ethtypes.HexInteger)(amount),
 					}
@@ -604,7 +604,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			},
 
 			PrepareTransaction: func(ctx context.Context, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-				var signerSignature tktypes.HexBytes
+				var signerSignature pldtypes.HexBytes
 				for _, att := range req.AttestationResult {
 					if att.AttestationType == prototk.AttestationType_SIGN && att.Name == "sender" {
 						signerSignature = att.Payload
@@ -707,8 +707,8 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 				}
 				return &prototk.ExecCallResponse{
-					ResultJson: tktypes.JSONString(&getBalanceResult{
-						Amount: (*tktypes.HexUint256)(balance),
+					ResultJson: pldtypes.JSONString(&getBalanceResult{
+						Amount: (*pldtypes.HexUint256)(balance),
 					}).Pretty(),
 				}, nil
 			},
@@ -730,20 +730,20 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 	tbRPC := rpcclient.WrapRestyClient(resty.New().SetBaseURL(url))
 
-	var contractAddr tktypes.EthAddress
-	rpcErr := tbRPC.CallRPC(ctx, &contractAddr, "testbed_deploy", "domain1", "me", tktypes.RawJSON(`{
+	var contractAddr pldtypes.EthAddress
+	rpcErr := tbRPC.CallRPC(ctx, &contractAddr, "testbed_deploy", "domain1", "me", pldtypes.RawJSON(`{
 		"notary": "domain1.contract1.notary",
 		"name": "FakeToken1",
 		"symbol": "FT1"
 	}`))
 	assert.NoError(t, rpcErr)
 
-	rpcErr = tbRPC.CallRPC(ctx, tktypes.RawJSON{}, "testbed_invoke", &pldapi.TransactionInput{
+	rpcErr = tbRPC.CallRPC(ctx, pldtypes.RawJSON{}, "testbed_invoke", &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			From:     "wallets.org1.aaaaaa",
 			To:       &contractAddr,
 			Function: "transfer",
-			Data: tktypes.RawJSON(`{
+			Data: pldtypes.RawJSON(`{
 				"from": "",
 				"to": "wallets.org1.aaaaaa",
 				"amount": "123000000000000000000"
@@ -753,12 +753,12 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}, true)
 	assert.NoError(t, rpcErr)
 
-	rpcErr = tbRPC.CallRPC(ctx, tktypes.RawJSON{}, "testbed_invoke", &pldapi.TransactionInput{
+	rpcErr = tbRPC.CallRPC(ctx, pldtypes.RawJSON{}, "testbed_invoke", &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			From:     "wallets.org1.aaaaaa",
 			To:       &contractAddr,
 			Function: "transfer",
-			Data: tktypes.RawJSON(`{
+			Data: pldtypes.RawJSON(`{
 				"from": "wallets.org1.aaaaaa",
 				"to": "wallets.org2.bbbbbb",
 				"amount": "23000000000000000000"
@@ -773,17 +773,17 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		TransactionBase: pldapi.TransactionBase{
 			To:       &contractAddr,
 			Function: "getBalance",
-			Data: tktypes.RawJSON(`{
+			Data: pldtypes.RawJSON(`{
 				"account": "wallets.org1.aaaaaa"
 			}`),
 		},
 		ABI: fakeCoinABI,
-	}, tktypes.DefaultJSONFormatOptions)
+	}, pldtypes.DefaultJSONFormatOptions)
 	assert.NoError(t, rpcErr)
 	assert.Equal(t, "100000000000000000000", balance.Amount.Int().String())
 
 	// Check we can also use the utility function externally to resolve verifiers
-	var address tktypes.EthAddress
+	var address pldtypes.EthAddress
 	rpcErr = tbRPC.CallRPC(ctx, &address, "testbed_resolveVerifier", "wallets.org2.bbbbbb", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	assert.NoError(t, rpcErr)
 	assert.False(t, address.IsZero())
@@ -792,7 +792,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 // We have create a testbed with no domains from our config, to be able to deploy the factory.
 // Then we return the factory
-func deploySmartContract(t *testing.T, confFile string) *tktypes.EthAddress {
+func deploySmartContract(t *testing.T, confFile string) *pldtypes.EthAddress {
 	ctx := context.Background()
 	tb := NewTestBed()
 	_, _, done, err := tb.StartForTest(confFile, nil)

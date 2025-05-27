@@ -4,10 +4,12 @@
 - **Node.js 20.x or newer**  
   Follow the [official Node.js documentation](https://nodejs.org/en/download/package-manager) for your platform to install the appropriate version.
 
-To access the tutorial code, clone the Paladin repository:
+To access the tutorial code, clone the **most recent release tag** of the Paladin repository:
 
 ```shell
-git clone https://github.com/LF-Decentralized-Trust-labs/paladin.git
+REPO=https://github.com/LF-Decentralized-Trust-labs/paladin.git && \
+git clone $REPO --single-branch --branch \
+$(git ls-remote --tags $REPO | cut -d/ -f3 | sort -V | tail -n1)
 ```
 
 ## Next Steps

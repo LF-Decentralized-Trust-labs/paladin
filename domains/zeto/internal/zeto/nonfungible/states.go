@@ -21,14 +21,14 @@ import (
 	"math/big"
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // this is a helper function to generate a random number
@@ -93,7 +93,7 @@ func prepareOutputsForTransfer(ctx context.Context, useNullifiers bool, params [
 			if err != nil {
 				return nil, nil, i18n.NewError(ctx, msgs.MsgErrorGenerateRandomNumber, err)
 			}
-			tokenID = (*tktypes.HexUint256)(r)
+			tokenID = (*pldtypes.HexUint256)(r)
 		}
 
 		newToken := types.NewZetoNFToken(tokenID, param.URI, recipientKey, NewSalt())

@@ -7,15 +7,15 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -45,7 +45,7 @@ func TestPrepareInputsForTransfer(t *testing.T) {
 	param := &types.NonFungibleTransferParamEntry{
 		To:      "recipient1",
 		URI:     "",
-		TokenID: (*tktypes.HexUint256)(big.NewInt(456)),
+		TokenID: (*pldtypes.HexUint256)(big.NewInt(456)),
 	}
 
 	tests := []struct {
@@ -151,7 +151,7 @@ func TestValidateTransferParams(t *testing.T) {
 				{
 					To:      "recipient",
 					URI:     "https://example.com",
-					TokenID: (*tktypes.HexUint256)(big.NewInt(456)),
+					TokenID: (*pldtypes.HexUint256)(big.NewInt(456)),
 				},
 			},
 			expectErr: false,
@@ -168,7 +168,7 @@ func TestValidateTransferParams(t *testing.T) {
 				{
 					To:      "",
 					URI:     "https://example.com",
-					TokenID: (*tktypes.HexUint256)(big.NewInt(456)),
+					TokenID: (*pldtypes.HexUint256)(big.NewInt(456)),
 				},
 			},
 			expectErr:   true,
@@ -193,7 +193,7 @@ func TestValidateTransferParams(t *testing.T) {
 					To:  "recipient",
 					URI: "https://example.com",
 					// Assuming that a tokenID equal to zero is considered invalid.
-					TokenID: (*tktypes.HexUint256)(big.NewInt(0)),
+					TokenID: (*pldtypes.HexUint256)(big.NewInt(0)),
 				},
 			},
 			expectErr:   true,
@@ -227,10 +227,10 @@ func TestFormatProvingRequest(t *testing.T) {
 	ctx := context.Background()
 	handler := &transferHandler{}
 
-	contractAddr := tktypes.MustEthAddress("0xabc123abc123abc123abc123abc123abc123abc1")
+	contractAddr := pldtypes.MustEthAddress("0xabc123abc123abc123abc123abc123abc123abc1")
 
 	token := types.NewZetoNFToken(
-		(*tktypes.HexUint256)(big.NewInt(1)),
+		(*pldtypes.HexUint256)(big.NewInt(1)),
 		"https://input.com",
 		mockPubKey(),
 		big.NewInt(2),
@@ -241,10 +241,10 @@ func TestFormatProvingRequest(t *testing.T) {
 		name               string
 		inputTokens        []*types.ZetoNFToken
 		outputTokens       []*types.ZetoNFToken
-		circuitId          string
+		circuit            *zetosignerapi.Circuit
 		tokenName          string
 		queryContext       string
-		contractAddr       *tktypes.EthAddress
+		contractAddr       *pldtypes.EthAddress
 		expectErr          bool
 		errContains        string
 		expectedCircuitId  string
@@ -254,7 +254,7 @@ func TestFormatProvingRequest(t *testing.T) {
 			name:               "success: valid input and output tokens",
 			inputTokens:        []*types.ZetoNFToken{token},
 			outputTokens:       []*types.ZetoNFToken{token},
-			circuitId:          "circuit123",
+			circuit:            &zetosignerapi.Circuit{Name: "circuit123"},
 			tokenName:          "nonfungible",
 			queryContext:       "ctx1",
 			contractAddr:       contractAddr,
@@ -266,7 +266,7 @@ func TestFormatProvingRequest(t *testing.T) {
 			name:         "failure: empty input tokens",
 			inputTokens:  []*types.ZetoNFToken{},
 			outputTokens: []*types.ZetoNFToken{token},
-			circuitId:    "circuit123",
+			circuit:      &zetosignerapi.Circuit{Name: "circuit123"},
 			tokenName:    "nonfungible",
 			queryContext: "ctx1",
 			contractAddr: contractAddr,
@@ -277,7 +277,7 @@ func TestFormatProvingRequest(t *testing.T) {
 			name:         "failure: empty output tokens",
 			inputTokens:  []*types.ZetoNFToken{token},
 			outputTokens: []*types.ZetoNFToken{}, // output error
-			circuitId:    "circuit123",
+			circuit:      &zetosignerapi.Circuit{Name: "circuit123"},
 			tokenName:    "nonfungible",
 			queryContext: "ctx1",
 			contractAddr: contractAddr,
@@ -288,7 +288,7 @@ func TestFormatProvingRequest(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			payloadBytes, err := handler.formatProvingRequest(ctx, tc.inputTokens, tc.outputTokens, tc.circuitId, tc.tokenName, tc.queryContext, tc.contractAddr)
+			payloadBytes, err := handler.formatProvingRequest(ctx, tc.inputTokens, tc.outputTokens, tc.circuit, tc.tokenName, tc.queryContext, tc.contractAddr)
 			if tc.expectErr {
 				require.Error(t, err, "expected error in test case %q", tc.name)
 				return
@@ -301,7 +301,7 @@ func TestFormatProvingRequest(t *testing.T) {
 			err = proto.Unmarshal(payloadBytes, &req)
 			require.NoError(t, err, "failed to unmarshal payload")
 
-			assert.Equal(t, tc.expectedCircuitId, req.CircuitId, "CircuitId mismatch")
+			assert.Equal(t, tc.expectedCircuitId, req.Circuit.Name, "CircuitId mismatch")
 			require.NotNil(t, req.Common, "Common must not be nil")
 			assert.Equal(t, tc.expectedInputOwner, req.Common.InputOwner, "InputOwner mismatch")
 
@@ -323,7 +323,7 @@ func TestFormatProvingRequest(t *testing.T) {
 func TestPrepareState(t *testing.T) {
 	ctx := context.Background()
 
-	validOwnerStr := tktypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey())).String()
+	validOwnerStr := pldtypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey())).String()
 
 	// Build a valid JSON string for a token.
 	validStateJSON := fmt.Sprintf(`{
@@ -412,12 +412,12 @@ func dummyFindAttestationBadPayload(string, []*pb.AttestationResult) *pb.Attesta
 }
 
 // dummyEncodeTxData returns fixed transaction data.
-func dummyEncodeTxData(ctx context.Context, transaction *pb.TransactionSpecification, transactionData ethtypes.HexBytes0xPrefix) (tktypes.HexBytes, error) {
+func dummyEncodeTxData(ctx context.Context, transaction *pb.TransactionSpecification, infoStates []*prototk.EndorsableState) (pldtypes.HexBytes, error) {
 	return []byte("txdata"), nil
 }
 
 // dummyEncodeTxDataFailed returns an error
-func dummyEncodeTxDataFailed(context.Context, *pb.TransactionSpecification, ethtypes.HexBytes0xPrefix) (tktypes.HexBytes, error) {
+func dummyEncodeTxDataFailed(context.Context, *pb.TransactionSpecification, []*prototk.EndorsableState) (pldtypes.HexBytes, error) {
 	return nil, fmt.Errorf("dummyEncodeTxDataFailed")
 }
 
@@ -437,7 +437,7 @@ func TestPrepare(t *testing.T) {
 	ctx := context.Background()
 	defer defaultHelpers()
 
-	validOwnerStr := tktypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey())).String()
+	validOwnerStr := pldtypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey())).String()
 	validStateJSON := fmt.Sprintf(`{
 		"salt": "123",
 		"uri": "https://example.com",
@@ -464,7 +464,7 @@ func TestPrepare(t *testing.T) {
 		errContains   string
 		nullifiers    bool
 		assertionFunc func(string, []*pb.AttestationResult) *pb.AttestationResult
-		encodeTxFunc  func(context.Context, *pb.TransactionSpecification, ethtypes.HexBytes0xPrefix) (tktypes.HexBytes, error)
+		encodeTxFunc  func(context.Context, *pb.TransactionSpecification, []*prototk.EndorsableState) (pldtypes.HexBytes, error)
 	}{
 		{
 			name: "success non-nullifier",
@@ -472,7 +472,7 @@ func TestPrepare(t *testing.T) {
 				Transaction: &pb.TransactionSpecification{},
 				DomainConfig: &types.DomainInstanceConfig{
 					TokenName: constants.TOKEN_NF_ANON,
-					CircuitId: constants.CIRCUIT_NF_ANON,
+					Circuits:  &zetosignerapi.Circuits{},
 				},
 			},
 			assertionFunc: dummyFindAttestationSuccess,
@@ -487,7 +487,7 @@ func TestPrepare(t *testing.T) {
 				Transaction: &pb.TransactionSpecification{},
 				DomainConfig: &types.DomainInstanceConfig{
 					TokenName: constants.TOKEN_NF_ANON_NULLIFIER,
-					CircuitId: constants.CIRCUIT_NF_ANON_NULLIFIER,
+					Circuits:  &zetosignerapi.Circuits{},
 				},
 			},
 			assertionFunc: dummyFindAttestationSuccess,
@@ -502,7 +502,7 @@ func TestPrepare(t *testing.T) {
 				Transaction: &pb.TransactionSpecification{},
 				DomainConfig: &types.DomainInstanceConfig{
 					TokenName: constants.TOKEN_NF_ANON,
-					CircuitId: constants.CIRCUIT_NF_ANON,
+					Circuits:  &zetosignerapi.Circuits{},
 				},
 			},
 			req: &pb.PrepareTransactionRequest{
@@ -522,7 +522,7 @@ func TestPrepare(t *testing.T) {
 				Transaction: &pb.TransactionSpecification{},
 				DomainConfig: &types.DomainInstanceConfig{
 					TokenName: constants.TOKEN_NF_ANON,
-					CircuitId: constants.CIRCUIT_NF_ANON,
+					Circuits:  &zetosignerapi.Circuits{},
 				},
 			},
 			req: func() *pb.PrepareTransactionRequest {
@@ -544,7 +544,7 @@ func TestPrepare(t *testing.T) {
 				Transaction: &pb.TransactionSpecification{},
 				DomainConfig: &types.DomainInstanceConfig{
 					TokenName: constants.TOKEN_NF_ANON,
-					CircuitId: constants.CIRCUIT_NF_ANON,
+					Circuits:  &zetosignerapi.Circuits{},
 				},
 			},
 			req: func() *pb.PrepareTransactionRequest {
@@ -638,7 +638,11 @@ func TestAssemble(t *testing.T) {
 
 	domainConfig := &types.DomainInstanceConfig{
 		TokenName: constants.TOKEN_NF_ANON,
-		CircuitId: constants.CIRCUIT_NF_ANON,
+		Circuits: &zetosignerapi.Circuits{
+			"transfer": &zetosignerapi.Circuit{
+				Name: "circuit123",
+			},
+		},
 	}
 
 	retStates := []*pb.StoredState{
@@ -652,7 +656,7 @@ func TestAssemble(t *testing.T) {
 	params := []*types.NonFungibleTransferParamEntry{
 		{
 			To:      "receiver", // empty to field, this should cause an error.
-			TokenID: (*tktypes.HexUint256)(big.NewInt(123)),
+			TokenID: (*pldtypes.HexUint256)(big.NewInt(123)),
 		},
 	}
 
@@ -722,7 +726,7 @@ func TestAssemble(t *testing.T) {
 			params: []*types.NonFungibleTransferParamEntry{
 				{
 					To:      "", // empty to field, this should cause an error.
-					TokenID: (*tktypes.HexUint256)(big.NewInt(123)),
+					TokenID: (*pldtypes.HexUint256)(big.NewInt(123)),
 				},
 			},
 			req:         req,
@@ -889,7 +893,7 @@ func newTransferParam(to string, tokenIDValue int64, uri string) *types.NonFungi
 	return &types.NonFungibleTransferParamEntry{
 		To:      to,
 		URI:     uri,
-		TokenID: (*tktypes.HexUint256)(big.NewInt(tokenIDValue)),
+		TokenID: (*pldtypes.HexUint256)(big.NewInt(tokenIDValue)),
 	}
 }
 

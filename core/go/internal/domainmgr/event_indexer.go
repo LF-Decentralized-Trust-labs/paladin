@@ -21,15 +21,15 @@ import (
 	"sort"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm/clause"
 )
 
@@ -60,14 +60,14 @@ func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persisten
 			// We only register against registries that we have indexed, so we should be able to find the domain for this address
 			d, err := dm.getDomainByAddress(ctx, &ev.Address)
 			if err != nil {
-				log.L(ctx).Errorf("Registration event for unknown domain event: %s", tktypes.JSONString(ev))
+				log.L(ctx).Errorf("Registration event for unknown domain event: %s", pldtypes.JSONString(ev))
 				continue
 			}
 
 			var parsedEvent event_PaladinRegisterSmartContract_V0
 			parseErr := json.Unmarshal(ev.Data, &parsedEvent)
 			if parseErr != nil {
-				log.L(ctx).Errorf("Failed to parse domain event (%s): %s", parseErr, tktypes.JSONString(ev))
+				log.L(ctx).Errorf("Failed to parse domain event (%s): %s", parseErr, pldtypes.JSONString(ev))
 			} else {
 				processedEvent = true
 				txID := parsedEvent.TXId.UUIDFirst16()
@@ -84,8 +84,8 @@ func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persisten
 						ReceiptType:   components.RT_Success,
 						TransactionID: txID,
 						Domain:        d.name,
-						OnChain: tktypes.OnChainLocation{
-							Type:             tktypes.OnChainEvent,
+						OnChain: pldtypes.OnChainLocation{
+							Type:             pldtypes.OnChainEvent,
 							TransactionHash:  ev.TransactionHash,
 							BlockNumber:      ev.BlockNumber,
 							TransactionIndex: ev.TransactionIndex,
@@ -137,9 +137,9 @@ func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) 
 
 }
 
-func (d *domain) batchEventsByAddress(ctx context.Context, dbTX persistence.DBTX, batchID string, events []*pldapi.EventWithData) (map[tktypes.EthAddress]*pscEventBatch, error) {
+func (d *domain) batchEventsByAddress(ctx context.Context, dbTX persistence.DBTX, batchID string, events []*pldapi.EventWithData) (map[pldtypes.EthAddress]*pscEventBatch, error) {
 
-	batches := make(map[tktypes.EthAddress]*pscEventBatch)
+	batches := make(map[pldtypes.EthAddress]*pscEventBatch)
 
 	for _, ev := range events {
 		batch := batches[ev.Address]
@@ -202,10 +202,10 @@ func (d *domain) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, ba
 			return err
 		}
 		for _, txCompletionEvent := range res.TransactionsComplete {
-			var txHash tktypes.Bytes32
+			var txHash pldtypes.Bytes32
 			txID, err := d.recoverTransactionID(ctx, txCompletionEvent.TransactionId)
 			if err == nil {
-				txHash, err = tktypes.ParseBytes32(txCompletionEvent.Location.TransactionHash)
+				txHash, err = pldtypes.ParseBytes32(txCompletionEvent.Location.TransactionHash)
 			}
 			if err != nil {
 				return err
@@ -217,8 +217,8 @@ func (d *domain) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, ba
 					TransactionID: *txID,
 					Domain:        d.name,
 					ReceiptType:   components.RT_Success,
-					OnChain: tktypes.OnChainLocation{
-						Type:             tktypes.OnChainEvent, // the on-chain confirmation is an event (even though it's a private transaction we're confirming)
+					OnChain: pldtypes.OnChainLocation{
+						Type:             pldtypes.OnChainEvent, // the on-chain confirmation is an event (even though it's a private transaction we're confirming)
 						TransactionHash:  txHash,
 						BlockNumber:      txCompletionEvent.Location.BlockNumber,
 						TransactionIndex: txCompletionEvent.Location.TransactionIndex,
@@ -263,7 +263,7 @@ func (d *domain) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, ba
 }
 
 func (d *domain) recoverTransactionID(ctx context.Context, txIDString string) (*uuid.UUID, error) {
-	txIDBytes, err := tktypes.ParseBytes32Ctx(ctx, txIDString)
+	txIDBytes, err := pldtypes.ParseBytes32Ctx(ctx, txIDString)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +271,7 @@ func (d *domain) recoverTransactionID(ctx context.Context, txIDString string) (*
 	return &txUUID, nil
 }
 
-func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX persistence.DBTX, addr tktypes.EthAddress, batch *pscEventBatch) (*prototk.HandleEventBatchResponse, error) {
+func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX persistence.DBTX, addr pldtypes.EthAddress, batch *pscEventBatch) (*prototk.HandleEventBatchResponse, error) {
 
 	// We have a domain context for queries, but we never flush it to DB - as the only updates
 	// we allow in this function are those performed within our dbTX.
@@ -324,9 +324,9 @@ func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX persisten
 
 	newStates := make([]*components.StateUpsertOutsideContext, 0)
 	for _, state := range res.NewStates {
-		var id tktypes.HexBytes
+		var id pldtypes.HexBytes
 		if state.Id != nil {
-			id, err = tktypes.ParseHexBytes(ctx, *state.Id)
+			id, err = pldtypes.ParseHexBytes(ctx, *state.Id)
 			if err != nil {
 				return nil, i18n.NewError(ctx, msgs.MsgDomainInvalidStateID, *state.Id)
 			}
@@ -335,7 +335,7 @@ func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX persisten
 		if err != nil {
 			return nil, err
 		}
-		schemaID, err := tktypes.ParseBytes32(state.SchemaId)
+		schemaID, err := pldtypes.ParseBytes32(state.SchemaId)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgDomainInvalidSchemaID, state.SchemaId)
 		}
@@ -343,7 +343,7 @@ func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX persisten
 			ID:              id,
 			SchemaID:        schemaID,
 			ContractAddress: &addr,
-			Data:            tktypes.RawJSON(state.StateDataJson),
+			Data:            pldtypes.RawJSON(state.StateDataJson),
 		})
 
 		// These have implicit confirmations
@@ -368,12 +368,12 @@ func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX persisten
 	return res, err
 }
 
-func (d *domain) prepareIndexRecord(ctx context.Context, txIDStr, stateIDStr string) (uuid.UUID, tktypes.HexBytes, error) {
+func (d *domain) prepareIndexRecord(ctx context.Context, txIDStr, stateIDStr string) (uuid.UUID, pldtypes.HexBytes, error) {
 	txUUID, err := d.recoverTransactionID(ctx, txIDStr)
 	if err != nil {
 		return uuid.UUID{}, nil, err
 	}
-	stateID, err := tktypes.ParseHexBytes(ctx, stateIDStr)
+	stateID, err := pldtypes.ParseHexBytes(ctx, stateIDStr)
 	if err != nil {
 		return uuid.UUID{}, nil, i18n.NewError(ctx, msgs.MsgDomainInvalidStateID, stateIDStr)
 	}

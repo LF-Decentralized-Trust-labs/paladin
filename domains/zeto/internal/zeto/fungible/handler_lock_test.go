@@ -17,17 +17,18 @@ package fungible
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
+	"math/big"
 	"testing"
 
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -55,37 +56,31 @@ func TestLockValidateParams(t *testing.T) {
 	}
 	config := &types.DomainInstanceConfig{
 		TokenName: "test",
-		CircuitId: "test",
+		Circuits: &zetosignerapi.Circuits{
+			"deposit": &zetosignerapi.Circuit{Name: "circuit-deposit"},
+		},
 	}
 	ctx := context.Background()
 	_, err := h.ValidateParams(ctx, config, "bad json")
-	assert.EqualError(t, err, "PD210059: Failed to unmarshal lockProof parameters. invalid character 'b' looking for beginning of value")
+	assert.EqualError(t, err, "PD210059: Failed to unmarshal lock parameters. invalid character 'b' looking for beginning of value")
 
 	config.TokenName = "Zeto_Anon"
-	lockParams := types.LockParams{
-		Delegate: tktypes.RandAddress(),
-		Call:     tktypes.HexBytes([]byte("bad call")),
-	}
-	jsonBytes, err := json.Marshal(lockParams)
-	assert.NoError(t, err)
-	_, err = h.ValidateParams(ctx, config, string(jsonBytes))
-	assert.ErrorContains(t, err, "PD210060: Failed to decode the transfer call. FF22049: Incorrect ID for signature transfer")
+	_, err = h.ValidateParams(ctx, config, "{\"delegate\":\"0x1234567890123456789012345678901234567890\"}")
+	assert.ErrorContains(t, err, "PD210026: Parameter 'amount' is required (index=0)")
 
-	params := sampleTransferPayload()
-	bytes, err := getTransferABI(config.TokenName).EncodeCallDataValues(params)
+	_, err = h.ValidateParams(ctx, config, "{\"amount\":-10,\"delegate\":\"0x1234567890123456789012345678901234567890\"}")
+	assert.ErrorContains(t, err, "PD210107: Total amount must be in the range (0, 2^100)")
+
+	amt1 := big.NewInt(0).Exp(big.NewInt(2), big.NewInt(100), nil) // max allowed
+	amt1.Sub(amt1, big.NewInt(1))
+	_, err = h.ValidateParams(ctx, nil, "{\"amount\":"+amt1.Text(10)+",\"delegate\":\"0x1234567890123456789012345678901234567890\"}")
 	assert.NoError(t, err)
-	lockParams = types.LockParams{
-		Delegate: tktypes.RandAddress(),
-		Call:     tktypes.HexBytes(bytes),
-	}
-	jsonBytes, err = json.Marshal(lockParams)
-	assert.NoError(t, err)
-	res, err := h.ValidateParams(ctx, config, string(jsonBytes))
-	assert.NoError(t, err)
-	assert.Equal(t, lockParams, *res.(*types.LockParams))
+	amt1.Add(amt1, big.NewInt(2))
+	_, err = h.ValidateParams(ctx, nil, "{\"amount\":"+amt1.Text(10)+",\"delegate\":\"0x1234567890123456789012345678901234567890\"}")
+	assert.EqualError(t, err, "PD210107: Total amount must be in the range (0, 2^100)")
 }
 
-func TestLocktInit(t *testing.T) {
+func TestLockInit(t *testing.T) {
 	h := lockHandler{
 		baseHandler: baseHandler{
 			name: "test1",
@@ -94,8 +89,7 @@ func TestLocktInit(t *testing.T) {
 	ctx := context.Background()
 	tx := &types.ParsedTransaction{
 		Params: &types.LockParams{
-			Delegate: tktypes.RandAddress(),
-			Call:     tktypes.HexBytes([]byte{0x01, 0x02, 0x03}),
+			Delegate: pldtypes.RandAddress(),
 		},
 		Transaction: &prototk.TransactionSpecification{
 			From: "Alice",
@@ -108,7 +102,6 @@ func TestLocktInit(t *testing.T) {
 }
 
 func TestLockAssemble(t *testing.T) {
-	params := sampleTransferPayload()
 	testCallbacks := &domain.MockDomainCallbacks{
 		MockFindAvailableStates: func() (*prototk.FindAvailableStatesResponse, error) {
 			return &prototk.FindAvailableStatesResponse{
@@ -127,25 +120,28 @@ func TestLockAssemble(t *testing.T) {
 	h := lockHandler{
 		baseHandler: baseHandler{
 			name: "test1",
-		},
-		coinSchema: &prototk.StateSchema{
-			Id: "coin",
+			stateSchemas: &common.StateSchemas{
+				CoinSchema: &prototk.StateSchema{
+					Id: "coin",
+				},
+			},
 		},
 		callbacks: testCallbacks,
 	}
 	ctx := context.Background()
 
 	config := &types.DomainInstanceConfig{
-		TokenName: "test",
-		CircuitId: "test",
+		TokenName: "test1",
+		Circuits: &zetosignerapi.Circuits{
+			"deposit":  &zetosignerapi.Circuit{Name: "circuit-deposit"},
+			"transfer": &zetosignerapi.Circuit{Name: "circuit-transfer"},
+		},
 	}
-	bytes, err := getTransferABI(config.TokenName).EncodeCallDataValues(params)
-	require.NoError(t, err)
 
 	tx := &types.ParsedTransaction{
 		Params: &types.LockParams{
-			Delegate: tktypes.RandAddress(),
-			Call:     bytes,
+			Amount:   pldtypes.Uint64ToUint256(100),
+			Delegate: pldtypes.RandAddress(),
 		},
 		DomainConfig: config,
 		Transaction: &prototk.TransactionSpecification{
@@ -160,15 +156,53 @@ func TestLockAssemble(t *testing.T) {
 		},
 		ResolvedVerifiers: []*prototk.ResolvedVerifier{
 			{
-				Lookup:       "Alice",
-				Verifier:     "0x1234567890123456789012345678901234567890",
+				Lookup:       "Bob",
+				Verifier:     "0x19d2ee6b9770a4f8d7c3b7906bc7595684509166fa42d718d1d880b62bcb7922",
 				Algorithm:    h.getAlgoZetoSnarkBJJ(),
 				VerifierType: zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X,
 			},
 		},
 	}
 
+	// Missing verifier for sender
+	_, err := h.Assemble(ctx, tx, req)
+	assert.EqualError(t, err, "PD210036: Failed to resolve verifier: Alice")
+	req.ResolvedVerifiers[0].Lookup = "Alice"
+
+	badCallbacks := &domain.MockDomainCallbacks{
+		MockFindAvailableStates: func() (*prototk.FindAvailableStatesResponse, error) {
+			return nil, errors.New("test error")
+		},
+	}
+	h.callbacks = badCallbacks
+
+	// Error querying states
+	_, err = h.Assemble(ctx, tx, req)
+	assert.EqualError(t, err, "PD210039: Failed to prepare transaction inputs. PD210032: Failed to query the state store for available coins. test error")
+	h.callbacks = testCallbacks
+
+	// Bad contract address
+	req.Transaction.ContractInfo.ContractAddress = "bad hex"
+	_, err = h.Assemble(ctx, tx, req)
+	assert.ErrorContains(t, err, "PD210017: Failed to decode contract address. bad address")
+
+	h.callbacks = &domain.MockDomainCallbacks{
+		MockFindAvailableStates: func() (*prototk.FindAvailableStatesResponse, error) {
+			return &prototk.FindAvailableStatesResponse{}, nil
+		},
+	}
+
+	// No states found
 	res, err := h.Assemble(ctx, tx, req)
+	assert.NoError(t, err)
+	assert.Equal(t, prototk.AssembleTransactionResponse_REVERT, res.AssemblyResult)
+	assert.Equal(t, "PD210033: Insufficient funds (available=0)", *res.RevertReason)
+	h.callbacks = testCallbacks
+
+	// Successful assembly
+	req.Transaction.ContractInfo.ContractAddress = "0x1234567890123456789012345678901234567890"
+	h.callbacks = testCallbacks
+	res, err = h.Assemble(ctx, tx, req)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -192,11 +226,10 @@ func TestLockPrepare(t *testing.T) {
 	ctx := context.Background()
 	tx := &types.ParsedTransaction{
 		Params: &types.LockParams{
-			Delegate: tktypes.RandAddress(),
-			Call:     tktypes.HexBytes([]byte{0x01, 0x02, 0x03}),
+			Delegate: pldtypes.RandAddress(),
 		},
 		DomainConfig: &types.DomainInstanceConfig{
-			TokenName: "test",
+			TokenName: "test1",
 		},
 		Transaction: &prototk.TransactionSpecification{
 			From: "Alice",
@@ -222,41 +255,62 @@ func TestLockPrepare(t *testing.T) {
 			"encryptedValues": "0x1234567890,0x1234567890",
 		},
 	}
-	payload, err := proto.Marshal(&proofReq)
-	assert.NoError(t, err)
+	payload, _ := proto.Marshal(&proofReq)
 	req := &prototk.PrepareTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
 			TransactionId: "bad hex",
 		},
-		AttestationResult: []*prototk.AttestationResult{
+		InputStates: []*prototk.EndorsableState{
 			{
-				Name:            "sender",
-				AttestationType: prototk.AttestationType_ENDORSE,
-				PayloadType:     &at,
-				Payload:         payload,
+				StateDataJson: "bad json",
+			},
+		},
+		InfoStates: []*prototk.EndorsableState{
+			{
+				StateDataJson: "bad json",
+			},
+		},
+		OutputStates: []*prototk.EndorsableState{
+			{
+				StateDataJson: "bad json",
 			},
 		},
 	}
+	_, err := h.Prepare(ctx, tx, req)
+	assert.ErrorContains(t, err, "PD210043: Did not find 'sender' attestation")
+
+	req.AttestationResult = append(req.AttestationResult, &prototk.AttestationResult{
+		Name:            "sender",
+		AttestationType: prototk.AttestationType_ENDORSE,
+		PayloadType:     &at,
+		Payload:         payload,
+	})
 	_, err = h.Prepare(ctx, tx, req)
-	assert.EqualError(t, err, "PD210060: Failed to decode the transfer call. FF22048: Insufficient bytes to read signature")
+	assert.ErrorContains(t, err, "PD210045: Failed to parse input states.")
+
+	req.InputStates[0].StateDataJson = "{\"salt\":\"0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec\",\"owner\":\"0x19d2ee6b9770a4f8d7c3b7906bc7595684509166fa42d718d1d880b62bcb7922\",\"amount\":\"0x0f\"}"
+	_, err = h.Prepare(ctx, tx, req)
+	assert.ErrorContains(t, err, "PD210087: Failed to unmarshal state data")
+
+	req.OutputStates[0].StateDataJson = "{\"salt\":\"0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec\",\"owner\":\"0x19d2ee6b9770a4f8d7c3b7906bc7595684509166fa42d718d1d880b62bcb7922\",\"amount\":\"0x0f\"}"
+	_, err = h.Prepare(ctx, tx, req)
+	assert.ErrorContains(t, err, "PD210049: Failed to encode transaction data. PD020008: Failed to parse value as 32 byte hex string")
+
+	req.Transaction.TransactionId = "0x87229d205a0f48bcf0da37542fc140a9bdfc3b4a55c0beffcb62efe25a770a7f"
+	req.AttestationResult[0].Payload = []byte("bad json")
+	_, err = h.Prepare(ctx, tx, req)
+	assert.ErrorContains(t, err, "PD210044: Failed to unmarshal proving response.", "cannot parse invalid wire-format data")
 
 	tx.DomainConfig.TokenName = "Zeto_Anon"
-	transfer := getTransferABI("Zeto_Anon")
-	params := sampleTransferPayload()
-
-	bytes, err := transfer.EncodeCallDataValues(params)
-	assert.NoError(t, err)
 	tx.Params = &types.LockParams{
-		Delegate: tktypes.RandAddress(),
-		Call:     tktypes.HexBytes(bytes),
+		Delegate: pldtypes.RandAddress(),
 	}
-
-	// TODO: lockProof does not currently accept a data payload
-	// _, err = h.Prepare(ctx, tx, req)
-	// assert.ErrorContains(t, err, "PD210049: Failed to encode transaction data. PD210028: Failed to parse transaction id. PD020007: Invalid hex:")
-
-	req.Transaction.TransactionId = "0x1234567890123456789012345678901234567890"
+	req.AttestationResult[0].Payload = payload
+	req.InfoStates = nil
 	_, err = h.Prepare(ctx, tx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, "", req.Transaction.FunctionAbiJson)
+
+	tx.DomainConfig.TokenName = "Zeto_AnonNullifier"
+	_, err = h.Prepare(ctx, tx, req)
+	assert.NoError(t, err)
 }

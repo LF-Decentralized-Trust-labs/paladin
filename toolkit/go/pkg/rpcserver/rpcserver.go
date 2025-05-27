@@ -24,10 +24,10 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/httpserver"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/router"
 	"github.com/kaleido-io/paladin/toolkit/pkg/staticserver"
 )

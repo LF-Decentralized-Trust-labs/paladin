@@ -21,9 +21,9 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type StringField string
@@ -36,7 +36,7 @@ func (sf StringField) SupportsLIKE() bool {
 	return true
 }
 
-func (sf StringField) SQLValue(ctx context.Context, jsonValue tktypes.RawJSON) (driver.Value, error) {
+func (sf StringField) SQLValue(ctx context.Context, jsonValue pldtypes.RawJSON) (driver.Value, error) {
 	if jsonValue.IsNil() {
 		return nil, nil
 	}

@@ -20,14 +20,14 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
@@ -92,7 +92,7 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		return nil, err
 	}
 
-	lockID := tktypes.RandBytes32()
+	lockID := pldtypes.RandBytes32()
 	lockedOutputStates, err := h.noto.prepareLockedOutputs(lockID, fromAddress, params.Amount, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	unlockedOutputStates := &preparedOutputs{}
 	if inputStates.total.Cmp(params.Amount.Int()) == 1 {
 		remainder := big.NewInt(0).Sub(inputStates.total, params.Amount.Int())
-		returnedStates, err := h.noto.prepareOutputs(fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
+		returnedStates, err := h.noto.prepareOutputs(fromAddress, (*pldtypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
 		if err != nil {
 			return nil, err
 		}
@@ -230,7 +230,7 @@ func (h *lockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepare
 	}, nil
 }
 
-func (h *lockHandler) hookInvoke(ctx context.Context, lockID tktypes.Bytes32, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+func (h *lockHandler) hookInvoke(ctx context.Context, lockID pldtypes.Bytes32, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.LockParams)
 
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
@@ -249,7 +249,7 @@ func (h *lockHandler) hookInvoke(ctx context.Context, lockID tktypes.Bytes32, tx
 		Amount: inParams.Amount,
 		Data:   inParams.Data,
 		Prepared: PreparedTransaction{
-			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
+			ContractAddress: (*pldtypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
 		},
 	}
@@ -271,16 +271,16 @@ func (h *lockHandler) hookInvoke(ctx context.Context, lockID tktypes.Bytes32, tx
 	}, nil
 }
 
-func (h *lockHandler) extractLockID(ctx context.Context, req *prototk.PrepareTransactionRequest) (tktypes.Bytes32, error) {
+func (h *lockHandler) extractLockID(ctx context.Context, req *prototk.PrepareTransactionRequest) (pldtypes.Bytes32, error) {
 	lockStates := h.noto.filterSchema(req.InfoStates, []string{h.noto.lockInfoSchema.Id})
 	if len(lockStates) == 1 {
 		lock, err := h.noto.unmarshalLock(lockStates[0].StateDataJson)
 		if err != nil {
-			return tktypes.Bytes32{}, err
+			return pldtypes.Bytes32{}, err
 		}
 		return lock.LockID, nil
 	}
-	return tktypes.Bytes32{}, i18n.NewError(ctx, msgs.MsgLockIDNotFound)
+	return pldtypes.Bytes32{}, i18n.NewError(ctx, msgs.MsgLockIDNotFound)
 }
 
 func (h *lockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {

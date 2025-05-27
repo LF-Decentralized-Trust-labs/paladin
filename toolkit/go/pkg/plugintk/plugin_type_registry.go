@@ -17,9 +17,9 @@ package plugintk
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"google.golang.org/grpc"
 	pb "google.golang.org/protobuf/proto"
 )
@@ -123,7 +123,7 @@ func (th *registryHandler) RequestToPlugin(ctx context.Context, iReq PluginMessa
 		resMsg.HandleRegistryEventsRes, err = th.api.HandleRegistryEvents(ctx, input.HandleRegistryEvents)
 		res.ResponseFromRegistry = resMsg
 	default:
-		err = i18n.NewError(ctx, tkmsgs.MsgPluginUnsupportedRequest, input)
+		err = i18n.NewError(ctx, pldmsgs.MsgPluginUnsupportedRequest, input)
 	}
 	return th.Wrap(res), err
 }

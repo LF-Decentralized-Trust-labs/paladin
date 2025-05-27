@@ -21,10 +21,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func (tm *txManager) buildRPCModule() {
@@ -33,6 +33,7 @@ func (tm *txManager) buildRPCModule() {
 		Add("ptx_sendTransactions", tm.rpcSendTransactions()).
 		Add("ptx_prepareTransaction", tm.rpcPrepareTransaction()).
 		Add("ptx_prepareTransactions", tm.rpcPrepareTransactions()).
+		Add("ptx_updateTransaction", tm.rpcUpdateTransaction()).
 		Add("ptx_call", tm.rpcCall()).
 		Add("ptx_getTransaction", tm.rpcGetTransaction()).
 		Add("ptx_getTransactionFull", tm.rpcGetTransactionFull()).
@@ -65,6 +66,13 @@ func (tm *txManager) buildRPCModule() {
 		Add("ptx_startReceiptListener", tm.rpcStartReceiptListener()).
 		Add("ptx_stopReceiptListener", tm.rpcStopReceiptListener()).
 		Add("ptx_deleteReceiptListener", tm.rpcDeleteReceiptListener()).
+		Add("ptx_createBlockchainEventListener", tm.rpcCreateBlockchainEventListener()).
+		Add("ptx_queryBlockchainEventListeners", tm.rpcQueryBlockchainEventListeners()).
+		Add("ptx_getBlockchainEventListener", tm.rpcGetBlockchainEventListener()).
+		Add("ptx_startBlockchainEventListener", tm.rpcStartBlockchainEventListener()).
+		Add("ptx_stopBlockchainEventListener", tm.rpcStopBlockchainEventListener()).
+		Add("ptx_deleteBlockchainEventListener", tm.rpcDeleteBlockchainEventListener()).
+		Add("ptx_getBlockchainEventListenerStatus", tm.rpcGetBlockchainEventListenerStatus()).
 		AddAsync(tm.rpcEventStreams)
 
 	tm.debugRpcModule = rpcserver.NewRPCModule("debug").
@@ -103,10 +111,19 @@ func (tm *txManager) rpcPrepareTransactions() rpcserver.RPCHandler {
 	})
 }
 
+func (tm *txManager) rpcUpdateTransaction() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod2(func(ctx context.Context,
+		id uuid.UUID,
+		tx *pldapi.TransactionInput,
+	) (uuid.UUID, error) {
+		return tm.UpdateTransaction(ctx, id, tx)
+	})
+}
+
 func (tm *txManager) rpcCall() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		tx *pldapi.TransactionCall,
-	) (result tktypes.RawJSON, err error) {
+	) (result pldtypes.RawJSON, err error) {
 		err = tm.CallTransaction(ctx, tm.p.NOTX(), &result, tx)
 		return
 	})
@@ -192,7 +209,7 @@ func (tm *txManager) rpcGetDomainReceipt() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
 		domain string,
 		id uuid.UUID,
-	) (tktypes.RawJSON, error) {
+	) (pldtypes.RawJSON, error) {
 		return tm.GetDomainReceiptByID(ctx, domain, id)
 	})
 }
@@ -247,8 +264,8 @@ func (tm *txManager) rpcQueryPendingPublicTransactions() rpcserver.RPCHandler {
 
 func (tm *txManager) rpcGetPublicTransactionByNonce() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
-		from tktypes.EthAddress,
-		nonce tktypes.HexUint64,
+		from pldtypes.EthAddress,
+		nonce pldtypes.HexUint64,
 	) (*pldapi.PublicTxWithBinding, error) {
 		return tm.GetPublicTransactionByNonce(ctx, from, nonce)
 	})
@@ -256,7 +273,7 @@ func (tm *txManager) rpcGetPublicTransactionByNonce() rpcserver.RPCHandler {
 
 func (tm *txManager) rpcGetPublicTransactionByHash() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
-		hash tktypes.Bytes32,
+		hash pldtypes.Bytes32,
 	) (*pldapi.PublicTxWithBinding, error) {
 		return tm.GetPublicTransactionByHash(ctx, hash)
 	})
@@ -265,14 +282,14 @@ func (tm *txManager) rpcGetPublicTransactionByHash() rpcserver.RPCHandler {
 func (tm *txManager) rpcStoreABI() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		a abi.ABI,
-	) (hash *tktypes.Bytes32, err error) {
+	) (hash *pldtypes.Bytes32, err error) {
 		return tm.storeABINewDBTX(ctx, a)
 	})
 }
 
 func (tm *txManager) rpcGetStoredABI() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
-		hash tktypes.Bytes32,
+		hash pldtypes.Bytes32,
 	) (*pldapi.StoredABI, error) {
 		return tm.getABIByHash(ctx, tm.p.NOTX(), hash)
 	})
@@ -307,8 +324,8 @@ func (tm *txManager) rpcDebugTransactionStatus() rpcserver.RPCHandler {
 
 func (tm *txManager) rpcDecodeError() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
-		revertError tktypes.HexBytes,
-		dataFormat tktypes.JSONFormatOptions,
+		revertError pldtypes.HexBytes,
+		dataFormat pldtypes.JSONFormatOptions,
 	) (*pldapi.ABIDecodedData, error) {
 		return tm.DecodeRevertError(ctx, tm.p.NOTX(), revertError, dataFormat)
 	})
@@ -316,8 +333,8 @@ func (tm *txManager) rpcDecodeError() rpcserver.RPCHandler {
 
 func (tm *txManager) rpcDecodeCall() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
-		callData tktypes.HexBytes,
-		dataFormat tktypes.JSONFormatOptions,
+		callData pldtypes.HexBytes,
+		dataFormat pldtypes.JSONFormatOptions,
 	) (*pldapi.ABIDecodedData, error) {
 		return tm.DecodeCall(ctx, tm.p.NOTX(), callData, dataFormat)
 	})
@@ -325,9 +342,9 @@ func (tm *txManager) rpcDecodeCall() rpcserver.RPCHandler {
 
 func (tm *txManager) rpcDecodeEvent() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
-		topics []tktypes.Bytes32,
-		data tktypes.HexBytes,
-		dataFormat tktypes.JSONFormatOptions,
+		topics []pldtypes.Bytes32,
+		data pldtypes.HexBytes,
+		dataFormat pldtypes.JSONFormatOptions,
 	) (*pldapi.ABIDecodedData, error) {
 		return tm.DecodeEvent(ctx, tm.p.NOTX(), topics, data, dataFormat)
 	})
@@ -379,5 +396,62 @@ func (tm *txManager) rpcDeleteReceiptListener() rpcserver.RPCHandler {
 		name string,
 	) (bool, error) {
 		return true, tm.DeleteReceiptListener(ctx, name)
+	})
+}
+
+func (tm *txManager) rpcCreateBlockchainEventListener() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		listener *pldapi.BlockchainEventListener,
+	) (bool, error) {
+		err := tm.CreateBlockchainEventListener(ctx, listener)
+		return err == nil, err
+	})
+}
+
+func (tm *txManager) rpcQueryBlockchainEventListeners() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		query query.QueryJSON,
+	) ([]*pldapi.BlockchainEventListener, error) {
+		return tm.QueryBlockchainEventListeners(ctx, tm.p.NOTX(), &query)
+	})
+}
+
+func (tm *txManager) rpcGetBlockchainEventListener() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		name string,
+	) (*pldapi.BlockchainEventListener, error) {
+		return tm.GetBlockchainEventListener(ctx, name), nil
+	})
+}
+
+func (tm *txManager) rpcStartBlockchainEventListener() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		name string,
+	) (bool, error) {
+		return true, tm.StartBlockchainEventListener(ctx, name)
+	})
+}
+
+func (tm *txManager) rpcStopBlockchainEventListener() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		name string,
+	) (bool, error) {
+		return true, tm.StopBlockchainEventListener(ctx, name)
+	})
+}
+
+func (tm *txManager) rpcDeleteBlockchainEventListener() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		name string,
+	) (bool, error) {
+		return true, tm.DeleteBlockchainEventListener(ctx, name)
+	})
+}
+
+func (tm *txManager) rpcGetBlockchainEventListenerStatus() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		name string,
+	) (*pldapi.BlockchainEventListenerStatus, error) {
+		return tm.GetBlockchainEventListenerStatus(ctx, name)
 	})
 }

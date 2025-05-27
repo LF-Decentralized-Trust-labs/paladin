@@ -32,11 +32,21 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 )
+
+var _ transactionReconcileInterface = &transactionReconcile{}
+
+type transactionReconcileInterface interface {
+	reconcile(ctx context.Context) error
+	isStatusChanged() bool
+	isSucceeded() bool
+	isFailed() bool
+	getReceipt() *pldapi.TransactionReceipt
+}
 
 type transactionReconcile struct {
 	client.Client
@@ -49,6 +59,7 @@ type transactionReconcile struct {
 	statusChanged        bool
 	succeeded            bool
 	failed               bool
+	getPaladinRPCFunc    func(ctx context.Context, c client.Client, nodeName string, namespace string, timeout string) (pldclient.PaladinClient, error)
 	timeout              string
 }
 
@@ -58,7 +69,7 @@ func newTransactionReconcile(c client.Client,
 	pStatus *corev1alpha1.TransactionSubmission,
 	timeout string,
 	txFactory func() (bool, *pldapi.TransactionInput, error),
-) *transactionReconcile {
+) transactionReconcileInterface {
 	return &transactionReconcile{
 		Client:               c,
 		idempotencyKeyPrefix: idempotencyKeyPrefix,
@@ -69,6 +80,10 @@ func newTransactionReconcile(c client.Client,
 		timeout:              timeout,
 	}
 }
+func (r *transactionReconcile) isStatusChanged() bool                  { return r.statusChanged }
+func (r *transactionReconcile) isSucceeded() bool                      { return r.succeeded }
+func (r *transactionReconcile) isFailed() bool                         { return r.failed }
+func (r *transactionReconcile) getReceipt() *pldapi.TransactionReceipt { return r.receipt }
 
 func (r *transactionReconcile) reconcile(ctx context.Context) error {
 
@@ -90,6 +105,9 @@ func (r *transactionReconcile) reconcile(ctx context.Context) error {
 		return nil
 	}
 
+	if r.getPaladinRPCFunc == nil {
+		r.getPaladinRPCFunc = getPaladinRPC
+	}
 	// Check availability of the Paladin node and deploy
 	paladinRPC, err := getPaladinRPC(ctx, r.Client, r.nodeName, r.namespace, r.timeout)
 	if err != nil || paladinRPC == nil {
@@ -162,13 +180,17 @@ func (r *transactionReconcile) trackTransactionAndRequeue(ctx context.Context, p
 	}
 	if r.receipt.Success {
 		r.pStatus.TransactionStatus = corev1alpha1.TransactionStatusSuccess
+		r.succeeded = true
 	} else {
 		r.pStatus.TransactionStatus = corev1alpha1.TransactionStatusFailed
 		r.pStatus.FailureMessage = r.receipt.FailureMessage
+		r.failed = true
 	}
 	r.statusChanged = true
 	return nil
 }
+
+var getPaladinURLEndpointFunc = getPaladinURLEndpoint
 
 func getPaladinRPC(ctx context.Context, c client.Client, nodeName, namespace string, timeout string) (pldclient.PaladinClient, error) {
 
@@ -189,7 +211,7 @@ func getPaladinRPC(ctx context.Context, c client.Client, nodeName, namespace str
 		return nil, nil
 	}
 
-	url, err := getPaladinURLEndpoint(ctx, c, nodeName, namespace)
+	url, err := getPaladinURLEndpointFunc(ctx, c, nodeName, namespace)
 	if err != nil {
 		return nil, err
 	}

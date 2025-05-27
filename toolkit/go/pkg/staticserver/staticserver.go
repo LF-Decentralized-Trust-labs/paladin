@@ -24,10 +24,10 @@ import (
 	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 // used to allow mocking of os.Stat in tests
@@ -40,16 +40,18 @@ type StaticServer interface {
 var _ StaticServer = &staticServer{}
 
 type staticServer struct {
-	staticPath string // path to static files
-	indexPath  string // path to the index file (relative to staticPath)
-	urlPrefix  string // prefix for the URL to serve static files from
+	staticPath   string // path to static files
+	indexPath    string // path to the index file (relative to staticPath)
+	urlPrefix    string // prefix for the URL to serve static files from
+	baseRedirect string // redirect when no path
 }
 
 func NewStaticServer(conf pldconf.StaticServerConfig) *staticServer {
 	return &staticServer{
-		staticPath: conf.StaticPath,
-		indexPath:  "index.html",
-		urlPrefix:  conf.URLPath,
+		staticPath:   conf.StaticPath,
+		indexPath:    "index.html",
+		urlPrefix:    conf.URLPath,
+		baseRedirect: conf.BaseRedirect,
 	}
 }
 
@@ -59,6 +61,12 @@ func (s *staticServer) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 
 // serveHTTP serves the static files in the ui directory
 func (s *staticServer) httpHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.URL.Path == s.urlPrefix && s.baseRedirect != "" {
+		w.Header().Set("Location", s.baseRedirect)
+		w.WriteHeader(http.StatusFound)
+		return
+	}
 
 	path, _ := filepath.Rel(s.urlPrefix, r.URL.Path)
 
@@ -76,7 +84,7 @@ func (s *staticServer) httpHandler(w http.ResponseWriter, r *http.Request) {
 		log.L(r.Context()).Errorf("Failed to serve file: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(&fftypes.RESTError{
-			Error: i18n.ExpandWithCode(r.Context(), i18n.MessageKey(tkmsgs.MsgUIServerFailed)),
+			Error: i18n.ExpandWithCode(r.Context(), i18n.MessageKey(pldmsgs.MsgUIServerFailed)),
 		})
 		return
 	}

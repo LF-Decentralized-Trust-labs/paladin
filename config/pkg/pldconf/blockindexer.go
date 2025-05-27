@@ -23,7 +23,7 @@ import (
 )
 
 type BlockIndexerConfig struct {
-	FromBlock             json.RawMessage    `json:"fromBlock,omitempty"`
+	FromBlock             json.RawMessage    `json:"fromBlock,omitempty"` // TODO: this should be a pldtypes.RawJSON but that's not possible right now because of a ciruclar dependency
 	CommitBatchSize       *int               `json:"commitBatchSize"`
 	CommitBatchTimeout    *string            `json:"commitBatchTimeout"`
 	RequiredConfirmations *int               `json:"requiredConfirmations"`

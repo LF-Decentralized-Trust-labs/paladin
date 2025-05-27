@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,21 +30,21 @@ func TestUUIDField(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := UUIDField("test").SQLValue(ctx, (tktypes.RawJSON)(`!json`))
+	_, err := UUIDField("test").SQLValue(ctx, (pldtypes.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = UUIDField("test").SQLValue(ctx, (tktypes.RawJSON)(`[]`))
+	_, err = UUIDField("test").SQLValue(ctx, (pldtypes.RawJSON)(`[]`))
 	assert.Regexp(t, "PD010705", err)
 
-	_, err = UUIDField("test").SQLValue(ctx, (tktypes.RawJSON)(`"not uuid"`))
+	_, err = UUIDField("test").SQLValue(ctx, (pldtypes.RawJSON)(`"not uuid"`))
 	assert.Regexp(t, "PD010720", err)
 
-	v, err := UUIDField("test").SQLValue(ctx, (tktypes.RawJSON)(`"F9E01529-6551-4C8E-8ACE-F1C4A6A1943F"`))
+	v, err := UUIDField("test").SQLValue(ctx, (pldtypes.RawJSON)(`"F9E01529-6551-4C8E-8ACE-F1C4A6A1943F"`))
 	require.NoError(t, err)
 	assert.Equal(t, "f9e01529-6551-4c8e-8ace-f1c4a6a1943f", v.(uuid.UUID).String())
 	assert.Equal(t, "test", UUIDField("test").SQLColumn())
 
-	nv, err := UUIDField("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
+	nv, err := UUIDField("test").SQLValue(ctx, (pldtypes.RawJSON)(`null`))
 	require.NoError(t, err)
 	assert.Nil(t, nv)
 

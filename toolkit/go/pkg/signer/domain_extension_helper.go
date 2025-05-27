@@ -19,9 +19,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 // As well as running inside of Paladin, domains with signing tech (like Zeto) can provide their signing
@@ -69,12 +69,12 @@ func (d *domainPrefixRouter[C]) NewSigner(ctx context.Context, conf C) (_ signer
 func (d *domainPrefixRouter[C]) getDomainSignerForAlgorithm(ctx context.Context, algorithm string) (signerapi.InMemorySigner, error) {
 	algoNoDomain, ok := strings.CutPrefix(strings.ToLower(algorithm), "domain:")
 	if !ok {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningInvalidDomainAlgorithmNoPrefix, algorithm)
+		return nil, i18n.NewError(ctx, pldmsgs.MsgSigningInvalidDomainAlgorithmNoPrefix, algorithm)
 	}
 	domain := strings.SplitN(algoNoDomain, ":", 2)[0]
 	s, ok := d.domainSigners[domain]
 	if !ok {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningNoDomainRegisteredWithModule, domain)
+		return nil, i18n.NewError(ctx, pldmsgs.MsgSigningNoDomainRegisteredWithModule, domain)
 	}
 	return s, nil
 }

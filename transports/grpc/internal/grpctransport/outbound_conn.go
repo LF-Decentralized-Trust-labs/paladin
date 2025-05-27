@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/transports/grpc/internal/msgs"
 	"github.com/kaleido-io/paladin/transports/grpc/pkg/proto"
 	"google.golang.org/grpc"

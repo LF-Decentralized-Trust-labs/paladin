@@ -21,17 +21,16 @@ import (
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -39,21 +38,22 @@ var _ types.DomainHandler = &depositHandler{}
 
 type depositHandler struct {
 	baseHandler
-	coinSchema *pb.StateSchema
 }
 
 func NewDepositHandler(name string, coinSchema *pb.StateSchema) *depositHandler {
 	return &depositHandler{
 		baseHandler: baseHandler{
 			name: name,
+			stateSchemas: &common.StateSchemas{
+				CoinSchema: coinSchema,
+			},
 		},
-		coinSchema: coinSchema,
 	}
 }
 
 var depositABI = &abi.Entry{
 	Type: abi.Function,
-	Name: "deposit",
+	Name: types.METHOD_DEPOSIT,
 	Inputs: abi.ParameterArray{
 		{Name: "amount", Type: "uint256"},
 		{Name: "outputs", Type: "uint256[]"},
@@ -89,7 +89,7 @@ func (h *depositHandler) Init(ctx context.Context, tx *types.ParsedTransaction, 
 }
 
 func (h *depositHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	amount := tx.Params.(*tktypes.HexUint256)
+	amount := tx.Params.(*pldtypes.HexUint256)
 
 	resolvedSender := domain.FindVerifier(tx.Transaction.From, h.getAlgoZetoSnarkBJJ(), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X, req.ResolvedVerifiers)
 	if resolvedSender == nil {
@@ -102,7 +102,7 @@ func (h *depositHandler) Assemble(ctx context.Context, tx *types.ParsedTransacti
 		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxOutputs, err)
 	}
 
-	payloadBytes, err := h.formatProvingRequest(ctx, outputCoins)
+	payloadBytes, err := h.formatProvingRequest(ctx, outputCoins, (*tx.DomainConfig.Circuits)[types.METHOD_DEPOSIT])
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorFormatProvingReq, err)
 	}
@@ -128,17 +128,17 @@ func (h *depositHandler) Assemble(ctx context.Context, tx *types.ParsedTransacti
 	}, nil
 }
 
-func (h *depositHandler) prepareOutputs(ctx context.Context, useNullifiers bool, amount *tktypes.HexUint256, resolvedSender *pb.ResolvedVerifier) ([]*types.ZetoCoin, []*pb.NewState, error) {
+func (h *depositHandler) prepareOutputs(ctx context.Context, useNullifiers bool, amount *pldtypes.HexUint256, resolvedSender *pb.ResolvedVerifier) ([]*types.ZetoCoin, []*pb.NewState, error) {
 	var coins []*types.ZetoCoin
 	// the token implementation allows up to 2 output states, we will use one of them
 	// to bear the deposit amount, and set the other to value of 0. we randomize
 	// which one to use and which one to set to 0
 	var newStates []*pb.NewState
-	amounts := make([]*tktypes.HexUint256, 2)
+	amounts := make([]*pldtypes.HexUint256, 2)
 	size := 2
 	randomIdx := randomSlot(size)
 	amounts[randomIdx] = amount
-	amounts[size-randomIdx-1] = tktypes.MustParseHexUint256("0x0")
+	amounts[size-randomIdx-1] = pldtypes.MustParseHexUint256("0x0")
 	for _, amt := range amounts {
 		resolvedRecipient := resolvedSender
 		recipientKey, err := common.LoadBabyJubKey([]byte(resolvedRecipient.Verifier))
@@ -149,12 +149,12 @@ func (h *depositHandler) prepareOutputs(ctx context.Context, useNullifiers bool,
 		salt := crypto.NewSalt()
 		compressedKeyStr := zetosigner.EncodeBabyJubJubPublicKey(recipientKey)
 		newCoin := &types.ZetoCoin{
-			Salt:   (*tktypes.HexUint256)(salt),
-			Owner:  tktypes.MustParseHexBytes(compressedKeyStr),
+			Salt:   (*pldtypes.HexUint256)(salt),
+			Owner:  pldtypes.MustParseHexBytes(compressedKeyStr),
 			Amount: amt,
 		}
 
-		newState, err := makeNewState(ctx, h.coinSchema, useNullifiers, newCoin, h.name, resolvedRecipient.Lookup)
+		newState, err := makeNewState(ctx, h.stateSchemas.CoinSchema, useNullifiers, newCoin, h.name, resolvedRecipient.Lookup)
 		if err != nil {
 			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorCreateNewState, err)
 		}
@@ -197,11 +197,11 @@ func (h *depositHandler) Prepare(ctx context.Context, tx *types.ParsedTransactio
 		}
 	}
 
-	data, err := common.EncodeTransactionData(ctx, req.Transaction, types.ZetoTransactionData_V0)
+	data, err := common.EncodeTransactionData(ctx, req.Transaction, req.InfoStates)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorEncodeTxData, err)
 	}
-	amount := tktypes.MustParseHexUint256(*req.DomainData)
+	amount := pldtypes.MustParseHexUint256(*req.DomainData)
 	params := map[string]any{
 		"amount":  amount.Int().Text(10),
 		"outputs": outputs,
@@ -227,7 +227,7 @@ func (h *depositHandler) Prepare(ctx context.Context, tx *types.ParsedTransactio
 	}, nil
 }
 
-func (h *depositHandler) formatProvingRequest(ctx context.Context, outputCoins []*types.ZetoCoin) ([]byte, error) {
+func (h *depositHandler) formatProvingRequest(ctx context.Context, outputCoins []*types.ZetoCoin, circuit *zetosignerapi.Circuit) ([]byte, error) {
 	outputSize := common.GetInputSize(len(outputCoins))
 	outputCommitments := make([]string, outputSize)
 	outputValueInts := make([]uint64, outputSize)
@@ -251,7 +251,7 @@ func (h *depositHandler) formatProvingRequest(ctx context.Context, outputCoins [
 	}
 
 	payload := &corepb.ProvingRequest{
-		CircuitId: constants.CIRCUIT_DEPOSIT,
+		Circuit: circuit.ToProto(),
 		Common: &corepb.ProvingRequestCommon{
 			OutputCommitments: outputCommitments,
 			OutputSalts:       outputSalts,

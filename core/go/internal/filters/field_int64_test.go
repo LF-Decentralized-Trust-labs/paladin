@@ -21,7 +21,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,26 +30,26 @@ func TestInt64Field(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := Int64Field("test").SQLValue(ctx, (tktypes.RawJSON)(`!json`))
+	_, err := Int64Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = Int64Field("test").SQLValue(ctx, (tktypes.RawJSON)(`[]`))
+	_, err = Int64Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`[]`))
 	assert.Regexp(t, "PD010703", err)
 
 	// Too big to fit (by 1)
 	tooBig := new(big.Int).Add(big.NewInt(9223372036854775807), big.NewInt(1))
-	_, err = Int64Field("test").SQLValue(ctx, tktypes.JSONString(tooBig.String()))
+	_, err = Int64Field("test").SQLValue(ctx, pldtypes.JSONString(tooBig.String()))
 	assert.Regexp(t, "PD010703", err)
 
 	// We handle bool -> Int64 conversion
-	iTrue, err := Int64Field("test").SQLValue(ctx, (tktypes.RawJSON)(`true`))
+	iTrue, err := Int64Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`true`))
 	require.NoError(t, err)
 	assert.Equal(t, (int64)(1), iTrue)
-	iFalse, err := Int64Field("test").SQLValue(ctx, (tktypes.RawJSON)(`false`))
+	iFalse, err := Int64Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`false`))
 	require.NoError(t, err)
 	assert.Equal(t, (int64)(0), iFalse)
 
-	nv, err := Int64Field("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
+	nv, err := Int64Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`null`))
 	require.NoError(t, err)
 	assert.Nil(t, nv)
 

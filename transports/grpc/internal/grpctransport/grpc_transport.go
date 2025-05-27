@@ -26,17 +26,17 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/tlsconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 	"github.com/kaleido-io/paladin/transports/grpc/internal/msgs"
 	"github.com/kaleido-io/paladin/transports/grpc/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type Server interface {
@@ -200,7 +200,8 @@ func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[prot
 			},
 		})
 		if err != nil {
-			log.L(ctx).Errorf("Receive failed (err=%s): %s", err, tktypes.ProtoToJSON(msg))
+			msgBytes, _ := protojson.Marshal(msg)
+			log.L(ctx).Errorf("Receive failed (err=%s): %s", err, msgBytes)
 			return err
 		}
 

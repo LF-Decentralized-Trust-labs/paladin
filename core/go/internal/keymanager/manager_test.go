@@ -29,10 +29,10 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/sirupsen/logrus"
 
@@ -104,7 +104,7 @@ func hdWalletConfig(name, keyPrefix string) *pldconf.WalletConfig {
 					Keys: map[string]pldconf.StaticKeyEntryConfig{
 						"seed": {
 							Encoding: "hex",
-							Inline:   tktypes.RandHex(32),
+							Inline:   pldtypes.RandHex(32),
 						},
 					},
 				},
@@ -130,7 +130,7 @@ func staticKeyConfig(name, keyPrefix string, keys ...string) *pldconf.WalletConf
 	for _, keyName := range keys {
 		wc.Signer.KeyStore.Static.Keys[keyName] = pldconf.StaticKeyEntryConfig{
 			Encoding: "hex",
-			Inline:   tktypes.RandHex(32),
+			Inline:   pldtypes.RandHex(32),
 		}
 	}
 	return wc
@@ -345,10 +345,10 @@ func TestE2EMixedKeyResolution(t *testing.T) {
 	err = km.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		kr := km.KeyResolverForDBTX(dbTX)
 
-		key1 := secp256k1.KeyPairFromBytes(tktypes.MustParseHexBytes(staticKeys.Signer.KeyStore.Static.Keys["static.key1"].Inline))
+		key1 := secp256k1.KeyPairFromBytes(pldtypes.MustParseHexBytes(staticKeys.Signer.KeyStore.Static.Keys["static.key1"].Inline))
 		require.Equal(t, key1.Address.String(), mappingStaticKey1.Verifier.Verifier)
 
-		key2 := secp256k1.KeyPairFromBytes(tktypes.MustParseHexBytes(staticKeys.Signer.KeyStore.Static.Keys["static.key2"].Inline))
+		key2 := secp256k1.KeyPairFromBytes(pldtypes.MustParseHexBytes(staticKeys.Signer.KeyStore.Static.Keys["static.key2"].Inline))
 		require.Equal(t, key2.Address.String(), mappingStaticKey2.Verifier.Verifier)
 
 		_, err = kr.ResolveKey(ctx, "anything.at.any.level", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
@@ -492,7 +492,7 @@ func TestReverseKeyLookupFail(t *testing.T) {
 
 	mc.db.ExpectQuery("SELECT.*key_verifiers").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := km.ReverseKeyLookup(ctx, mc.c.Persistence().NOTX(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, tktypes.RandAddress().String())
+	_, err := km.ReverseKeyLookup(ctx, mc.c.Persistence().NOTX(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, pldtypes.RandAddress().String())
 	assert.Regexp(t, "pop", err)
 }
 
@@ -502,7 +502,7 @@ func TestReverseKeyLookupNotFound(t *testing.T) {
 	})
 	defer done()
 
-	_, err := km.ReverseKeyLookup(ctx, mc.c.Persistence().NOTX(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, tktypes.RandAddress().String())
+	_, err := km.ReverseKeyLookup(ctx, mc.c.Persistence().NOTX(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, pldtypes.RandAddress().String())
 	assert.Regexp(t, "PD010511", err)
 }
 
@@ -512,7 +512,7 @@ func TestReverseKeyLookupFailMapping(t *testing.T) {
 	})
 	defer done()
 
-	verifier := tktypes.RandAddress().String()
+	verifier := pldtypes.RandAddress().String()
 	mc.db.ExpectQuery("SELECT.*key_verifiers").WillReturnRows(
 		sqlmock.NewRows([]string{"algorithm", "type", "verifier", "identifier"}).
 			AddRow(algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, verifier, "!!!!! wrong"),

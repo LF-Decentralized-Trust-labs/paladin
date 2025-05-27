@@ -21,17 +21,17 @@ import (
 	"strings"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -47,7 +47,7 @@ type transferHandler struct {
 
 var transferABI = &abi.Entry{
 	Type: abi.Function,
-	Name: "transfer",
+	Name: types.METHOD_TRANSFER,
 	Inputs: abi.ParameterArray{
 		{Name: "input", Type: "uint256"},
 		{Name: "output", Type: "uint256"},
@@ -134,11 +134,11 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxOutputs, err)
 	}
 
-	contractAddress, err := tktypes.ParseEthAddress(req.Transaction.ContractInfo.ContractAddress)
+	contractAddress, err := pldtypes.ParseEthAddress(req.Transaction.ContractInfo.ContractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
 	}
-	payloadBytes, err := h.formatProvingRequest(ctx, inputTokens, outputTokens, tx.DomainConfig.CircuitId, tx.DomainConfig.TokenName, req.StateQueryContext, contractAddress)
+	payloadBytes, err := h.formatProvingRequest(ctx, inputTokens, outputTokens, (*tx.DomainConfig.Circuits)[types.METHOD_TRANSFER], tx.DomainConfig.TokenName, req.StateQueryContext, contractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorFormatProvingReq, err)
 	}
@@ -192,7 +192,7 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 		return nil, err
 	}
 
-	data, err := encodeTransactionDataFunc(ctx, req.Transaction, types.ZetoTransactionData_V0)
+	data, err := encodeTransactionDataFunc(ctx, req.Transaction, req.InfoStates)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorEncodeTxData, err)
 	}
@@ -239,7 +239,7 @@ func prepareState(ctx context.Context, state *pb.EndorsableState) (string, error
 
 }
 
-func (h *transferHandler) formatProvingRequest(ctx context.Context, input, output []*types.ZetoNFToken, circuitId, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
+func (h *transferHandler) formatProvingRequest(ctx context.Context, input, output []*types.ZetoNFToken, circuit *zetosignerapi.Circuit, tokenName, stateQueryContext string, contractAddress *pldtypes.EthAddress) ([]byte, error) {
 
 	inputCommitments, inputSalts, tokenURIs, tokenIDs, inputOwners, err := processTokens(ctx, input)
 	if err != nil {
@@ -275,7 +275,7 @@ func (h *transferHandler) formatProvingRequest(ctx context.Context, input, outpu
 	}
 
 	payload := &corepb.ProvingRequest{
-		CircuitId: circuitId,
+		Circuit: circuit.ToProto(),
 		Common: &corepb.ProvingRequestCommon{
 			InputCommitments:  inputCommitments,
 			InputSalts:        inputSalts,

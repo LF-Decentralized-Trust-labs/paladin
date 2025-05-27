@@ -16,28 +16,17 @@
 package constants
 
 const (
-	// the base circuits support inputs and outputs up to size 2
-	CIRCUIT_ANON               = "anon"
-	CIRCUIT_NF_ANON            = "nf_anon"
-	CIRCUIT_ANON_ENC           = "anon_enc"
-	CIRCUIT_ANON_NULLIFIER     = "anon_nullifier"
-	CIRCUIT_NF_ANON_NULLIFIER  = "nf_anon_nullifier"
-	CIRCUIT_DEPOSIT            = "check_hashes_value"
-	CIRCUIT_WITHDRAW           = "check_inputs_outputs_value"
-	CIRCUIT_WITHDRAW_NULLIFIER = "check_nullifiers_value"
-	CIRCUIT_LOCK               = "check_utxos_owner"
+	// the circuit names supported by Zeto token implementations
+	CIRCUIT_NAME_TRANSFER        = "transfer"
+	CIRCUIT_NAME_TRANSFER_LOCKED = "transferLocked"
+	CIRCUIT_NAME_DEPOSIT         = "deposit"
+	CIRCUIT_NAME_WITHDRAW        = "withdraw"
 
-	// the batch circuits support inputs and outputs from size 3 up to size 10
-	CIRCUIT_ANON_BATCH               = "anon_batch"
-	CIRCUIT_ANON_ENC_BATCH           = "anon_enc_batch"
-	CIRCUIT_ANON_NULLIFIER_BATCH     = "anon_nullifier_batch"
-	CIRCUIT_WITHDRAW_BATCH           = "check_inputs_outputs_value_batch"
-	CIRCUIT_WITHDRAW_NULLIFIER_BATCH = "check_nullifiers_value_batch"
-	CIRCUIT_LOCK_BATCH               = "check_utxos_owner_batch"
+	// the names of the Zeto token implementations
+	TOKEN_ANON           = "Zeto_Anon"
+	TOKEN_ANON_ENC       = "Zeto_AnonEnc"
+	TOKEN_ANON_NULLIFIER = "Zeto_AnonNullifier"
 
-	TOKEN_ANON              = "Zeto_Anon"
 	TOKEN_NF_ANON           = "Zeto_NfAnon"
-	TOKEN_ANON_ENC          = "Zeto_AnonEnc"
-	TOKEN_ANON_NULLIFIER    = "Zeto_AnonNullifier"
 	TOKEN_NF_ANON_NULLIFIER = "Zeto_NfAnonNullifier"
 )

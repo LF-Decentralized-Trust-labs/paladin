@@ -1,3 +1,5 @@
+-- This migration uses signer_nonce as a primary key but migration 13 adds a new pub_txn_id column
+-- which becomes the primary key and signer_nonce is deleted
 CREATE TABLE public_txns (
   "signer_nonce"              VARCHAR         NOT NULL,
   "from"                      VARCHAR         NOT NULL,

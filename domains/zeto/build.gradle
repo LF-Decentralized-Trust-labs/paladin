@@ -13,9 +13,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import org.apache.tools.ant.taskdefs.condition.Os
-import org.apache.tools.ant.filters.LineContains
-
 ext {
     goFiles = fileTree(".") {
         include "internal/**/*.go"
@@ -24,7 +21,7 @@ ext {
     goFilesE2E = fileTree(".") {
         include "integration-test/**/*.go"
     }
-    targetCoverage = 92.0
+    targetCoverage = 92.3
     maxCoverageBarGap = 1
     coveragePackages = [
         "github.com/kaleido-io/paladin/domains/zeto/internal/...",
@@ -32,7 +29,7 @@ ext {
         "github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner",
     ]
 
-    zetoVersion = "v0.0.11"
+    zetoVersion = "v0.0.12"
     zetoHost = "hyperledger-labs"
     zkpOut = "${projectDir}/zkp"
     toolsOut = "${projectDir}/tools"
@@ -188,51 +185,6 @@ task copyPkgSolidity(type: Copy) {
     includeEmptyDirs = false
 }
 
-task copySolidityForTest(type: Copy, dependsOn: [extractZetoArtifacts, generatePoseidonArtifacts, ":solidity:compile"]) {
-    inputs.files(configurations.contractCompile)
-    from fileTree(configurations.contractCompile.asPath) {
-        include 'contracts/domains/zeto/ZetoFactory.sol/ZetoFactory.json'
-    }
-    from fileTree("${zkpOut}/artifacts/contracts") {
-        include '**/*.json'
-        exclude '**/*.dbg.json'
-    }
-    from fileTree("${zkpOut}/artifacts/@iden3/contracts") {
-        include '**/*.json'
-        exclude '**/*.dbg.json'
-    }
-    from fileTree("${toolsOut}/solidity") {
-        include 'Poseidon2.json'
-        include 'Poseidon3.json'
-    }
-    into 'integration-test/abis'
-
-    // Flatten all paths into the destination folder
-    eachFile { path = name }
-    includeEmptyDirs = false
-}
-
-task testE2E(type: Exec, dependsOn: [protoc, copySolidity, copyPkgSolidity, copySolidityForTest, ':testinfra:startTestInfra', ":core:go:makeMocks"]) {
-    inputs.files(configurations.toolkitGo)
-    inputs.files(configurations.coreGo)
-    inputs.files(goFiles)
-    inputs.files(goFilesE2E)
-    inputs.file('./integration-test/config-for-deploy-fungible.yaml')
-    inputs.file('./integration-test/config-for-deploy-non-fungible.yaml')
-    outputs.dir('coverage')
-
-    workingDir '.'
-    executable 'go'
-    args 'test'
-    args '-timeout=300s'
-    args './integration-test'
-    if (project.findProperty('verboseTests') == 'true') {
-        args '-v'
-    }
-
-    helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
-}
-
 task unitTests(type: Exec, dependsOn: [
         protoc,
         ":core:go:makeMocks",
@@ -285,14 +237,12 @@ task buildGo(type: GoLib, dependsOn: [":toolkit:go:protoc", copySolidity, copyPk
 
 task build {
     dependsOn test
-    dependsOn testE2E
 }
 
 task clean(type: Delete) {
     delete 'coverage'
     delete 'internal/zeto/abis'
     delete 'pkg/types/abis'
-    delete 'integration-test/abis'
     delete zkpOut
     delete toolsOut
 }
@@ -302,7 +252,7 @@ task assemble {
 }
 
 dependencies {
-    goSource files(goFiles, copySolidity, copyPkgSolidity, copySolidityForTest)
+    goSource files(goFiles, copySolidity, copyPkgSolidity)
     zetoArtifacts files(extractZetoArtifacts)
     poseidonArtifacts files(generatePoseidonArtifacts)
 }

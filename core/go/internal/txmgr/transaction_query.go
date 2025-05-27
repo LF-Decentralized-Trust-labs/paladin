@@ -19,14 +19,14 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"gorm.io/gorm"
 )
 
@@ -75,6 +75,31 @@ func (tm *txManager) mapPersistedTXFull(pt *persistedTransaction) *pldapi.Transa
 	}
 
 	return res
+}
+
+func (tm *txManager) mapPersistedTXHistory(pth *persistedTransactionHistory) *pldapi.TransactionHistory {
+	return &pldapi.TransactionHistory{
+		Created: pth.Created,
+		TransactionBase: pldapi.TransactionBase{
+			IdempotencyKey: stringOrEmpty(pth.IdempotencyKey),
+			Type:           pth.Type,
+			Domain:         stringOrEmpty(pth.Domain),
+			Function:       stringOrEmpty(pth.Function),
+			ABIReference:   pth.ABIReference,
+			From:           pth.From,
+			To:             pth.To,
+			Data:           pth.Data,
+			PublicTxOptions: pldapi.PublicTxOptions{
+				Value: pth.Value,
+				Gas:   pth.Gas,
+				PublicTxGasPricing: pldapi.PublicTxGasPricing{
+					GasPrice:             pth.GasPrice,
+					MaxFeePerGas:         pth.MaxFeePerGas,
+					MaxPriorityFeePerGas: pth.MaxPriorityFeePerGas,
+				},
+			},
+		},
+	}
 }
 
 func (tm *txManager) mapPersistedTXResolved(pt *persistedTransaction) *components.ResolvedTransaction {
@@ -165,14 +190,49 @@ func (tm *txManager) QueryTransactionsFullTx(ctx context.Context, jq *query.Quer
 	if err != nil {
 		return nil, err
 	}
-	return tm.mergePublicTransactions(ctx, dbTX, ptxs)
-}
 
-func (tm *txManager) mergePublicTransactions(ctx context.Context, dbTX persistence.DBTX, txs []*pldapi.TransactionFull) ([]*pldapi.TransactionFull, error) {
-	txIDs := make([]uuid.UUID, len(txs))
-	for i, tx := range txs {
+	txIDs := make([]uuid.UUID, len(ptxs))
+	for i, tx := range ptxs {
 		txIDs[i] = *tx.ID
 	}
+
+	ptxs, err = tm.AddTransactionHistory(ctx, dbTX, txIDs, ptxs)
+	if err != nil {
+		return nil, err
+	}
+
+	return tm.mergePublicTransactions(ctx, dbTX, txIDs, ptxs)
+}
+
+func (tm *txManager) AddTransactionHistory(ctx context.Context, dbTX persistence.DBTX, txIDs []uuid.UUID, ptxs []*pldapi.TransactionFull) ([]*pldapi.TransactionFull, error) {
+	txhs := []*persistedTransactionHistory{}
+	err := dbTX.DB().Table("transaction_history").
+		WithContext(ctx).
+		Order(`"created" DESC`).
+		Where(`"tx_id" IN (?)`, txIDs).
+		Find(&txhs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	// group by txID
+	txhMap := make(map[uuid.UUID][]*persistedTransactionHistory, len(txhs))
+	for _, txh := range txhs {
+		txhMap[txh.TXID] = append(txhMap[txh.TXID], txh)
+	}
+	// only add history if there are 2 or more entries
+	for _, tx := range ptxs {
+		if txhs, ok := txhMap[*tx.ID]; ok && len(txhs) > 1 {
+			tx.History = make([]*pldapi.TransactionHistory, len(txhs))
+			for i, txh := range txhs {
+				tx.History[i] = tm.mapPersistedTXHistory(txh)
+			}
+		}
+	}
+	return ptxs, nil
+}
+
+func (tm *txManager) mergePublicTransactions(ctx context.Context, dbTX persistence.DBTX, txIDs []uuid.UUID, txs []*pldapi.TransactionFull) ([]*pldapi.TransactionFull, error) {
 	pubTxByTX, err := tm.publicTxMgr.QueryPublicTxForTransactions(ctx, dbTX, txIDs, nil)
 	if err != nil {
 		return nil, err
@@ -185,7 +245,7 @@ func (tm *txManager) mergePublicTransactions(ctx context.Context, dbTX persisten
 }
 
 func (tm *txManager) resolveABIReferencesAndCache(ctx context.Context, dbTX persistence.DBTX, txs []*components.ResolvedTransaction) (_ []*components.ResolvedTransaction, err error) {
-	abis := make(map[tktypes.Bytes32]*pldapi.StoredABI, len(txs))
+	abis := make(map[pldtypes.Bytes32]*pldapi.StoredABI, len(txs))
 	for _, tx := range txs {
 		a := abis[*tx.Transaction.ABIReference]
 		if a == nil {
@@ -279,7 +339,7 @@ func (tm *txManager) queryPublicTransactions(ctx context.Context, jq *query.Quer
 	return tm.publicTxMgr.QueryPublicTxWithBindings(ctx, tm.p.NOTX(), jq)
 }
 
-func (tm *txManager) GetPublicTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce tktypes.HexUint64) (*pldapi.PublicTxWithBinding, error) {
+func (tm *txManager) GetPublicTransactionByNonce(ctx context.Context, from pldtypes.EthAddress, nonce pldtypes.HexUint64) (*pldapi.PublicTxWithBinding, error) {
 	prs, err := tm.publicTxMgr.QueryPublicTxWithBindings(ctx, tm.p.NOTX(),
 		query.NewQueryBuilder().Limit(1).
 			Equal("from", from).
@@ -291,6 +351,6 @@ func (tm *txManager) GetPublicTransactionByNonce(ctx context.Context, from tktyp
 	return prs[0], nil
 }
 
-func (tm *txManager) GetPublicTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error) {
+func (tm *txManager) GetPublicTransactionByHash(ctx context.Context, hash pldtypes.Bytes32) (*pldapi.PublicTxWithBinding, error) {
 	return tm.publicTxMgr.GetPublicTransactionForHash(ctx, tm.p.NOTX(), hash)
 }

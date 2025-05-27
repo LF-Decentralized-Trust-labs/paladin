@@ -20,10 +20,10 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func (rm *registryManager) RPCModule() *rpcserver.RPCModule {
@@ -57,7 +57,7 @@ func (rm *registryManager) rpcQueryEntries() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
 		registryName string,
 		jq query.QueryJSON,
-		activeFilter tktypes.Enum[pldapi.ActiveFilter],
+		activeFilter pldtypes.Enum[pldapi.ActiveFilter],
 	) ([]*pldapi.RegistryEntry, error) {
 		return withRegistry(ctx, rm, registryName,
 			func(r components.Registry) ([]*pldapi.RegistryEntry, error) {
@@ -71,7 +71,7 @@ func (rm *registryManager) rpcQueryEntriesWithProps() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
 		registryName string,
 		jq query.QueryJSON,
-		activeFilter tktypes.Enum[pldapi.ActiveFilter],
+		activeFilter pldtypes.Enum[pldapi.ActiveFilter],
 	) ([]*pldapi.RegistryEntryWithProperties, error) {
 		return withRegistry(ctx, rm, registryName,
 			func(r components.Registry) ([]*pldapi.RegistryEntryWithProperties, error) {
@@ -84,8 +84,8 @@ func (rm *registryManager) rpcQueryEntriesWithProps() rpcserver.RPCHandler {
 func (rm *registryManager) rpcGetEntryProperties() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
 		registryName string,
-		entryID tktypes.HexBytes,
-		activeFilter tktypes.Enum[pldapi.ActiveFilter],
+		entryID pldtypes.HexBytes,
+		activeFilter pldtypes.Enum[pldapi.ActiveFilter],
 	) ([]*pldapi.RegistryProperty, error) {
 		return withRegistry(ctx, rm, registryName,
 			func(r components.Registry) ([]*pldapi.RegistryProperty, error) {

@@ -33,8 +33,8 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -145,7 +145,7 @@ func newTestGRPCTransport(t *testing.T, nodeCert, nodeKey string, conf *Config) 
 func mockRegistry(cb *testCallbacks, ptds map[string]*PublishedTransportDetails) {
 	reg := make(map[string]string)
 	for node, ptd := range ptds {
-		reg[node] = tktypes.JSONString(ptd).String()
+		reg[node] = pldtypes.JSONString(ptd).String()
 	}
 	cb.getTransportDetails = func(ctx context.Context, gtdr *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
 		res := reg[gtdr.Node]
@@ -190,7 +190,7 @@ func testActivatePeer(t *testing.T, sender *grpcTransport, remoteNodeName string
 
 	res, err := sender.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         remoteNodeName,
-		TransportDetails: tktypes.JSONString(transportDetails).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails).Pretty(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -373,7 +373,7 @@ func TestGRPCTransport_CAServerWrongCA(t *testing.T) {
 
 	_, err = plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Error(t, err)
 
@@ -410,7 +410,7 @@ func TestGRPCTransport_CAClientWrongCA(t *testing.T) {
 
 	_, err = plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Error(t, err)
 
@@ -438,7 +438,7 @@ func TestGRPCTransport_DirectCertVerification_WrongIssuerServer(t *testing.T) {
 
 	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Regexp(t, "PD030007", err)
 
@@ -466,7 +466,7 @@ func TestGRPCTransport_DirectCertVerification_WrongIssuerClient(t *testing.T) {
 
 	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Error(t, err)
 
@@ -491,7 +491,7 @@ func TestGRPCTransport_DirectCertVerification_BadIssuersServer(t *testing.T) {
 
 	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Regexp(t, "PD030012", err)
 
@@ -517,7 +517,7 @@ func TestGRPCTransport_SubjectRegexpMismatch(t *testing.T) {
 
 	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Regexp(t, "PD030008", err)
 
@@ -541,7 +541,7 @@ func TestGRPCTransport_ClientWrongNode(t *testing.T) {
 
 	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node3",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Regexp(t, "PD030011", err)
 
@@ -569,7 +569,7 @@ func TestGRPCTransport_BadTransportDetails(t *testing.T) {
 
 	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Regexp(t, "PD030006", err)
 
@@ -595,7 +595,7 @@ func TestGRPCTransport_BadTransportIssuerPEM(t *testing.T) {
 
 	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Regexp(t, "PD030012", err)
 
@@ -619,7 +619,7 @@ func TestGRPCTransport_NodeUnknownToServer(t *testing.T) {
 
 	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Error(t, err)
 
@@ -643,7 +643,7 @@ func TestGRPCTransport_NodeUnknownToClient(t *testing.T) {
 
 	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Regexp(t, "not found", err)
 
@@ -668,7 +668,7 @@ func TestGRPCTransport_ServerRejectNoCerts(t *testing.T) {
 
 	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
-		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
+		TransportDetails: pldtypes.JSONString(transportDetails2).Pretty(),
 	})
 	assert.Error(t, err)
 

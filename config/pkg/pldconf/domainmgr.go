@@ -17,7 +17,6 @@ package pldconf
 
 import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // Intended to be embedded at root level of paladin config
@@ -38,8 +37,6 @@ type DomainConfig struct {
 	AllowSigning    bool             `json:"allowSigning"`
 	DefaultGasLimit *uint64          `json:"defaultGasLimit"`
 }
-
-var DefaultDefaultGasLimit tktypes.HexUint64 = 4000000 // high gas limit by default (accommodating zkp transactions)
 
 var ContractCacheDefaults = &CacheConfig{
 	Capacity: confutil.P(1000),

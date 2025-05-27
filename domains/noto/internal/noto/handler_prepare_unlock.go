@@ -19,14 +19,14 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
@@ -134,7 +134,7 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 	}
 	params := &NotoPrepareUnlockParams{
 		LockedInputs: endorsableStateIDs(lockedInputs),
-		UnlockHash:   tktypes.Bytes32(unlockHash),
+		UnlockHash:   pldtypes.Bytes32(unlockHash),
 		Signature:    sender.Payload,
 		Data:         data,
 	}
@@ -174,7 +174,7 @@ func (h *prepareUnlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedT
 		Recipients: recipients,
 		Data:       inParams.Data,
 		Prepared: PreparedTransaction{
-			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
+			ContractAddress: (*pldtypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
 		},
 	}

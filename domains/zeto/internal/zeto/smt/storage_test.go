@@ -23,9 +23,9 @@ import (
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/node"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -109,7 +109,7 @@ func returnNode(t int) func() (*prototk.FindAvailableStatesResponse, error) {
 }
 
 func TestStorage(t *testing.T) {
-	stateQueryConext := tktypes.ShortID()
+	stateQueryConext := pldtypes.ShortID()
 
 	storage := NewStatesStorage(&domain.MockDomainCallbacks{MockFindAvailableStates: returnCustomError}, "test", stateQueryConext, "root-schema", "node-schema")
 	smt, err := NewSmt(storage)
@@ -165,7 +165,7 @@ func TestStorage(t *testing.T) {
 }
 
 func TestUpsertRootNodeIndex(t *testing.T) {
-	stateQueryConext := tktypes.ShortID()
+	stateQueryConext := pldtypes.ShortID()
 	storage := NewStatesStorage(&domain.MockDomainCallbacks{MockFindAvailableStates: returnEmptyStates}, "test", stateQueryConext, "root-schema", "node-schema")
 	_, _ = NewSmt(storage)
 	assert.NotNil(t, storage)
@@ -186,7 +186,7 @@ func TestUpsertRootNodeIndex(t *testing.T) {
 }
 
 func TestGetNode(t *testing.T) {
-	stateQueryConext := tktypes.ShortID()
+	stateQueryConext := pldtypes.ShortID()
 	idx, _ := node.NewNodeIndexFromBigInt(big.NewInt(1234))
 
 	storage := NewStatesStorage(&domain.MockDomainCallbacks{MockFindAvailableStates: returnCustomError}, "test", stateQueryConext, "root-schema", "node-schema")
@@ -252,7 +252,7 @@ func TestGetNode(t *testing.T) {
 }
 
 func TestInsertNode(t *testing.T) {
-	stateQueryConext := tktypes.ShortID()
+	stateQueryConext := pldtypes.ShortID()
 	storage := NewStatesStorage(&domain.MockDomainCallbacks{MockFindAvailableStates: returnEmptyStates}, "test", stateQueryConext, "root-schema", "node-schema")
 	assert.NotNil(t, storage)
 	idx, _ := node.NewNodeIndexFromBigInt(big.NewInt(1234))
@@ -293,7 +293,7 @@ func TestInsertNode(t *testing.T) {
 }
 
 func TestUnimplementedMethods(t *testing.T) {
-	stateQueryConext := tktypes.ShortID()
+	stateQueryConext := pldtypes.ShortID()
 	storage := NewStatesStorage(&domain.MockDomainCallbacks{MockFindAvailableStates: returnEmptyStates}, "test", stateQueryConext, "root-schema", "node-schema")
 	assert.NotNil(t, storage)
 	storage.(*statesStorage).Close()

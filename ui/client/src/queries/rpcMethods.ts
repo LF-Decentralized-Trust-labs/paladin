@@ -14,27 +14,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export const RpcEndpoint = "/";
+import { getBasePath } from '../utils';
+
+export const RpcEndpoint = getBasePath();
 
 export const RpcMethods = {
-  bidx_QueryIndexedEvents: "bidx_queryIndexedEvents",
-  bidx_QueryIndexedTransactions: "bidx_queryIndexedTransactions",
-  ptx_QueryPendingTransactions: "ptx_queryPendingTransactions",
-  ptx_QueryTransactionReceipts: "ptx_queryTransactionReceipts",
-  ptx_getTransactionReceipt: "ptx_getTransactionReceipt",
-  ptx_QueryTransactions: "ptx_queryTransactions",
-  ptx_QueryTransactionsFull: "ptx_queryTransactionsFull",
-  ptx_getStateReceipt: "ptx_getStateReceipt",
-  ptx_getDomainReceipt: "ptx_getDomainReceipt",
-  ptx_decodeCall: "ptx_decodeCall",
-  ptx_decodeEvent: "ptx_decodeEvent",
-  ptx_storeABI: "ptx_storeABI",
-  ptx_resolveVerifier: "ptx_resolveVerifier",
-  reg_QueryEntriesWithProps: "reg_queryEntriesWithProps",
-  reg_Registries: "reg_registries",
-  transport_nodeName: "transport_nodeName",
-  transport_localTransportDetails: "transport_localTransportDetails",
-  transport_peers: "transport_peers",
-  keymgr_queryKeys: "keymgr_queryKeys",
-  keymgr_reverseKeyLookup: "keymgr_reverseKeyLookup"
+  bidx_QueryIndexedEvents: 'bidx_queryIndexedEvents',
+  bidx_QueryIndexedTransactions: 'bidx_queryIndexedTransactions',
+  domain_listDomains: 'domain_listDomains',
+  domain_getDomain: 'domain_getDomain',
+  domain_querySmartContracts: 'domain_querySmartContracts',
+  ptx_QueryPendingTransactions: 'ptx_queryPendingTransactions',
+  ptx_QueryTransactionReceipts: 'ptx_queryTransactionReceipts',
+  ptx_getTransactionReceipt: 'ptx_getTransactionReceipt',
+  ptx_QueryTransactions: 'ptx_queryTransactions',
+  ptx_QueryTransactionsFull: 'ptx_queryTransactionsFull',
+  ptx_getStateReceipt: 'ptx_getStateReceipt',
+  ptx_getDomainReceipt: 'ptx_getDomainReceipt',
+  ptx_decodeCall: 'ptx_decodeCall',
+  ptx_decodeEvent: 'ptx_decodeEvent',
+  ptx_storeABI: 'ptx_storeABI',
+  ptx_resolveVerifier: 'ptx_resolveVerifier',
+  ptx_sendTransaction: 'ptx_sendTransaction',
+  reg_QueryEntriesWithProps: 'reg_queryEntriesWithProps',
+  reg_Registries: 'reg_registries',
+  transport_nodeName: 'transport_nodeName',
+  transport_localTransportDetails: 'transport_localTransportDetails',
+  transport_peers: 'transport_peers',
+  keymgr_queryKeys: 'keymgr_queryKeys',
+  keymgr_reverseKeyLookup: 'keymgr_reverseKeyLookup',
 };

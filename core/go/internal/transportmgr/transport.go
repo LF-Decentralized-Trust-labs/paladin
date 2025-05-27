@@ -21,15 +21,15 @@ import (
 	"sync/atomic"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -177,7 +177,7 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 
 	p.updateReceivedStats(msg)
 
-	log.L(ctx).Debugf("transport %s message received from %s id=%s (cid=%s)", t.name, p.Name, rMsg.MessageID, tktypes.StrOrEmpty(msg.CorrelationId))
+	log.L(ctx).Debugf("transport %s message received from %s id=%s (cid=%s)", t.name, p.Name, rMsg.MessageID, pldtypes.StrOrEmpty(msg.CorrelationId))
 	if log.IsTraceEnabled() {
 		log.L(ctx).Tracef("transport %s message received: %s", t.name, protoToJSON(msg))
 	}

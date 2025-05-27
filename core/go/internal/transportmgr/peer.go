@@ -24,13 +24,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm/clause"
 )
 
@@ -64,7 +64,7 @@ func (p nameSortedPeers) Less(i, j int) bool { return cmp.Less(p[i].Name, p[j].N
 
 func (tm *transportManager) getPeer(ctx context.Context, nodeName string, sending bool) (*peer, error) {
 
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, nodeName, tktypes.DefaultNameMaxLen, "node"); err != nil {
+	if err := pldtypes.ValidateSafeCharsStartEndAlphaNum(ctx, nodeName, pldtypes.DefaultNameMaxLen, "node"); err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidTargetNode, nodeName)
 	}
 	if nodeName == tm.localNodeName {
@@ -179,7 +179,7 @@ func (tm *transportManager) connectPeer(ctx context.Context, nodeName string, se
 			tm: tm,
 			PeerInfo: pldapi.PeerInfo{
 				Name:      nodeName,
-				Activated: tktypes.TimestampNow(),
+				Activated: pldtypes.TimestampNow(),
 			},
 			persistedMsgsAvailable: make(chan struct{}, 1),
 			sendQueue:              make(chan *prototk.PaladinMsg, tm.senderBufferLen),
@@ -259,9 +259,9 @@ func (p *peer) send(msg *prototk.PaladinMsg, reliableSeq *uint64) error {
 	err := p.tm.sendShortRetry.Do(p.ctx, func(attempt int) (retryable bool, err error) {
 		return true, p.transport.send(p.ctx, p.Name, msg)
 	})
-	log.L(p.ctx).Infof("Sent %s/%s message %s to %s (cid=%s)", msg.Component.String(), msg.MessageType, msg.MessageId, p.Name, tktypes.StrOrEmpty(msg.CorrelationId))
+	log.L(p.ctx).Infof("Sent %s/%s message %s to %s (cid=%s)", msg.Component.String(), msg.MessageType, msg.MessageId, p.Name, pldtypes.StrOrEmpty(msg.CorrelationId))
 	if err == nil {
-		now := tktypes.TimestampNow()
+		now := pldtypes.TimestampNow()
 		p.statsLock.Lock()
 		defer p.statsLock.Unlock()
 		p.Stats.LastSend = &now
@@ -278,9 +278,9 @@ func (p *peer) send(msg *prototk.PaladinMsg, reliableSeq *uint64) error {
 }
 
 func (p *peer) updateReceivedStats(msg *prototk.PaladinMsg) {
-	log.L(p.ctx).Infof("Received %s/%s message %s from %s (cid=%s)", msg.Component.String(), msg.MessageType, msg.MessageId, p.Name, tktypes.StrOrEmpty(msg.CorrelationId))
+	log.L(p.ctx).Infof("Received %s/%s message %s from %s (cid=%s)", msg.Component.String(), msg.MessageType, msg.MessageId, p.Name, pldtypes.StrOrEmpty(msg.CorrelationId))
 
-	now := tktypes.TimestampNow()
+	now := pldtypes.TimestampNow()
 	p.statsLock.Lock()
 	defer p.statsLock.Unlock()
 	p.Stats.LastReceive = &now
@@ -399,7 +399,7 @@ func (p *peer) processReliableMsgPage(dbTX persistence.DBTX, page []*pldapi.Reli
 			log.L(p.ctx).Errorf("Unable to send reliable message %s - writing persistent error: %s", rm.ID, errorAck)
 			errorAcks = append(errorAcks, &pldapi.ReliableMessageAck{
 				MessageID: rm.ID,
-				Time:      tktypes.TimestampNow(),
+				Time:      pldtypes.TimestampNow(),
 				Error:     errorAck.Error(),
 			})
 		case msg != nil:

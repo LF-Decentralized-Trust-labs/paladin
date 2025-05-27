@@ -22,13 +22,13 @@ import (
 	"encoding/json"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
@@ -163,19 +163,19 @@ func (n *Noto) validateLockOwners(ctx context.Context, owner string, verifiers [
 }
 
 // Parse a resolved verifier as an eth address
-func (n *Noto) findEthAddressVerifier(ctx context.Context, label, lookup string, verifierList []*prototk.ResolvedVerifier) (*tktypes.EthAddress, error) {
+func (n *Noto) findEthAddressVerifier(ctx context.Context, label, lookup string, verifierList []*prototk.ResolvedVerifier) (*pldtypes.EthAddress, error) {
 	verifier := domain.FindVerifier(lookup, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, verifierList)
 	if verifier == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorVerifyingAddress, label)
 	}
-	return tktypes.ParseEthAddress(verifier.Verifier)
+	return pldtypes.ParseEthAddress(verifier.Verifier)
 }
 
 type TransactionWrapper struct {
 	transactionType prototk.PreparedTransaction_TransactionType
 	functionABI     *abi.Entry
 	paramsJSON      []byte
-	contractAddress *tktypes.EthAddress
+	contractAddress *pldtypes.EthAddress
 }
 
 func (tw *TransactionWrapper) prepare(metadata []byte) (*prototk.PrepareTransactionResponse, error) {

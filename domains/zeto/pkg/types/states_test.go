@@ -25,7 +25,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,9 +40,9 @@ var mockPubKey = func() *babyjub.PublicKey {
 }
 
 // validOwner returns a valid owner value by encoding the public key (mockPubKey)
-func validOwner() tktypes.HexBytes {
+func validOwner() pldtypes.HexBytes {
 	encoded := zetosigner.EncodeBabyJubJubPublicKey(mockPubKey())
-	return tktypes.MustParseHexBytes(encoded)
+	return pldtypes.MustParseHexBytes(encoded)
 }
 
 func TestZetoCoin_Hash(t *testing.T) {
@@ -57,8 +57,8 @@ func TestZetoCoin_Hash(t *testing.T) {
 			name: "valid coin",
 			coin: &ZetoCoin{
 				Owner:  validOwner(),
-				Amount: (*tktypes.HexUint256)(big.NewInt(500)),
-				Salt:   (*tktypes.HexUint256)(big.NewInt(123)),
+				Amount: (*pldtypes.HexUint256)(big.NewInt(500)),
+				Salt:   (*pldtypes.HexUint256)(big.NewInt(123)),
 				hash:   nil, // no cached hash yet
 			},
 			wantErr: false,
@@ -67,8 +67,8 @@ func TestZetoCoin_Hash(t *testing.T) {
 			name: "invalid coin (nil owner)",
 			coin: &ZetoCoin{
 				Owner:  nil,
-				Amount: (*tktypes.HexUint256)(big.NewInt(500)),
-				Salt:   (*tktypes.HexUint256)(big.NewInt(123)),
+				Amount: (*pldtypes.HexUint256)(big.NewInt(500)),
+				Salt:   (*pldtypes.HexUint256)(big.NewInt(123)),
 			},
 			wantErr:     true,
 			errContains: "PD210001: Failed to decode babyjubjub key",
@@ -106,7 +106,7 @@ func TestABIParameters(t *testing.T) {
 			param:              ZetoCoinABI,
 			expectedName:       "ZetoCoin",
 			expectedType:       "tuple",
-			expectedComponents: 3,
+			expectedComponents: 4,
 		},
 		{
 			name:               "ZetoNFToken ABI",
@@ -127,12 +127,12 @@ func TestABIParameters(t *testing.T) {
 }
 
 func TestNewZetoNFToken(t *testing.T) {
-	tokenID := (*tktypes.HexUint256)(big.NewInt(456))
+	tokenID := (*pldtypes.HexUint256)(big.NewInt(456))
 	uri := "https://example.com"
 	saltVal := big.NewInt(123)
 	tests := []struct {
 		name             string
-		tokenID          *tktypes.HexUint256
+		tokenID          *pldtypes.HexUint256
 		uri              string
 		pubKey           *babyjub.PublicKey
 		salt             *big.Int
@@ -160,9 +160,9 @@ func TestNewZetoNFToken(t *testing.T) {
 			require.NotNil(t, nft, "NewZetoNFToken should return a valid token")
 			assert.Equal(t, tc.expectedURI, nft.URI, "URI should match")
 			assert.Equal(t, tc.tokenID, nft.TokenID, "TokenID should match")
-			expectedOwner := tktypes.MustParseHexBytes(tc.expectedOwnerHex)
+			expectedOwner := pldtypes.MustParseHexBytes(tc.expectedOwnerHex)
 			assert.Equal(t, expectedOwner, nft.Owner, "Owner should be set from encoded public key")
-			expectedSalt := (*tktypes.HexUint256)(tc.salt)
+			expectedSalt := (*pldtypes.HexUint256)(tc.salt)
 			assert.Equal(t, expectedSalt, nft.Salt, "Salt should match")
 			assert.Nil(t, nft.utxoToken, "utxoToken should not be initialized")
 		})
@@ -171,7 +171,7 @@ func TestNewZetoNFToken(t *testing.T) {
 
 func TestZetoNFToken_UnmarshalJSON(t *testing.T) {
 	// Use mockPubKey for a valid owner.
-	ownerHex := tktypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey())).String()
+	ownerHex := pldtypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey())).String()
 	tests := []struct {
 		name         string
 		jsonStr      string
@@ -218,7 +218,7 @@ func TestZetoNFToken_UnmarshalJSON(t *testing.T) {
 				assert.Equal(t, tc.expectedURI, token.URI, "URI should match")
 				assert.Equal(t, tc.expectedSalt, token.Salt.Int().String(), "Salt should match")
 				assert.Equal(t, tc.expectedTID, token.TokenID.Int().String(), "TokenID should match")
-				expectedOwner := tktypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey()))
+				expectedOwner := pldtypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey()))
 				assert.Equal(t, expectedOwner, token.Owner, "Owner should match")
 				assert.Equal(t, "0x11e84f5f703728d1f231655c59597678524e3a14ce684d07a0b653bd51ccd650", hash.String(), "Hash should match")
 				// UnmarshalJSON calls setUTXO (ignoring errors), so utxoToken should be non-nil.
@@ -239,7 +239,7 @@ func (tu testUTXO) GetHash() (*big.Int, error) {
 
 func TestZetoNFToken_Hash(t *testing.T) {
 	ctx := context.Background()
-	tokenID := (*tktypes.HexUint256)(big.NewInt(456))
+	tokenID := (*pldtypes.HexUint256)(big.NewInt(456))
 	uri := "https://example.com"
 	tests := []struct {
 		name         string
@@ -250,9 +250,9 @@ func TestZetoNFToken_Hash(t *testing.T) {
 		{
 			name: "success",
 			token: &ZetoNFToken{
-				Salt:    (*tktypes.HexUint256)(big.NewInt(123)),
+				Salt:    (*pldtypes.HexUint256)(big.NewInt(123)),
 				URI:     uri,
-				Owner:   tktypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey())),
+				Owner:   pldtypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey())),
 				TokenID: tokenID,
 				// Set utxoToken to our testUTXO returning hash value 789.
 				utxoToken: testUTXO{hashVal: big.NewInt(789)},
@@ -263,9 +263,9 @@ func TestZetoNFToken_Hash(t *testing.T) {
 		{
 			name: "error - missing TokenID",
 			token: &ZetoNFToken{
-				Salt:      (*tktypes.HexUint256)(big.NewInt(123)),
+				Salt:      (*pldtypes.HexUint256)(big.NewInt(123)),
 				URI:       uri,
-				Owner:     tktypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey())),
+				Owner:     pldtypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey())),
 				TokenID:   nil,
 				utxoToken: nil,
 			},
@@ -288,10 +288,10 @@ func TestZetoNFToken_Hash(t *testing.T) {
 }
 
 func TestZetoNFToken_validate(t *testing.T) {
-	tokenID := (*tktypes.HexUint256)(big.NewInt(456))
-	salt := (*tktypes.HexUint256)(big.NewInt(123))
+	tokenID := (*pldtypes.HexUint256)(big.NewInt(456))
+	salt := (*pldtypes.HexUint256)(big.NewInt(123))
 	uri := "https://example.com"
-	owner := tktypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey()))
+	owner := pldtypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey()))
 	tests := []struct {
 		name      string
 		token     *ZetoNFToken
@@ -360,10 +360,10 @@ func TestZetoNFToken_validate(t *testing.T) {
 }
 
 func TestZetoNFToken_setUTXO(t *testing.T) {
-	tokenID := (*tktypes.HexUint256)(big.NewInt(456))
-	salt := (*tktypes.HexUint256)(big.NewInt(123))
+	tokenID := (*pldtypes.HexUint256)(big.NewInt(456))
+	salt := (*pldtypes.HexUint256)(big.NewInt(123))
 	uri := "https://example.com"
-	owner := tktypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey()))
+	owner := pldtypes.MustParseHexBytes(zetosigner.EncodeBabyJubJubPublicKey(mockPubKey()))
 	tests := []struct {
 		name      string
 		token     *ZetoNFToken

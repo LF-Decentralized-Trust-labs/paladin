@@ -728,9 +728,10 @@ func (r *PaladinReconciler) generatePaladinConfig(ctx context.Context, node *cor
 	if len(pldConf.RPCServer.HTTP.StaticServers) == 0 {
 		pldConf.RPCServer.HTTP.StaticServers = append(pldConf.RPCServer.HTTP.StaticServers,
 			pldconf.StaticServerConfig{
-				Enabled:    true,
-				StaticPath: "/app/ui",
-				URLPath:    "/ui",
+				Enabled:      true,
+				StaticPath:   "/app/ui",
+				URLPath:      "/ui",
+				BaseRedirect: "ui/activity",
 			})
 	}
 

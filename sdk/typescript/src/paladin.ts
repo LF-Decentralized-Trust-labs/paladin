@@ -307,6 +307,22 @@ export default class PaladinClient {
     return res.data.result;
   }
 
+  async getPrivacyGroupById(domainName: string, id: string) {
+    const res = await this.post<JsonRpcResult<IPrivacyGroup>>(
+      "pgroup_getGroupById",
+      [domainName, id]
+    );
+    return res.data.result;
+  }
+
+  async getPrivacyGroupByAddress(address: string) {
+    const res = await this.post<JsonRpcResult<IPrivacyGroup>>(
+      "pgroup_getGroupByAddress",
+      [address]
+    );
+    return res.data.result;
+  }
+
   async sendPrivacyGroupTransaction(txi: IPrivacyGroupEVMTXInput) {
     const res = await this.post<JsonRpcResult<string>>(
       "pgroup_sendTransaction",

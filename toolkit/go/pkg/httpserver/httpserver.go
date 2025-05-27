@@ -26,13 +26,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/tlsconf"
 )
 
 type Server interface {
@@ -63,12 +63,12 @@ func NewServer(ctx context.Context, description string, conf *pldconf.HTTPServer
 	s.ctx, s.cancelCtx = context.WithCancel(ctx)
 
 	if conf.Port == nil {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgHTTPServerMissingPort, description)
+		return nil, i18n.NewError(ctx, pldmsgs.MsgHTTPServerMissingPort, description)
 	}
 
 	listenAddr := fmt.Sprintf("%s:%d", confutil.StringNotEmpty(conf.Address, *pldconf.HTTPDefaults.Address), *conf.Port)
 	if s.listener, err = net.Listen("tcp", listenAddr); err != nil {
-		return nil, i18n.WrapError(ctx, err, tkmsgs.MsgHTTPServerStartFailed, listenAddr)
+		return nil, i18n.WrapError(ctx, err, pldmsgs.MsgHTTPServerStartFailed, listenAddr)
 	}
 	log.L(ctx).Infof("%s server listening on %s", description, s.listener.Addr())
 
@@ -98,7 +98,7 @@ func NewServer(ctx context.Context, description string, conf *pldconf.HTTPServer
 		ReadHeaderTimeout: readTimeout, // safe for this to always be the read timeout - should be short
 		TLSConfig:         tlsConfig,
 		ConnContext: func(newCtx context.Context, c net.Conn) context.Context {
-			l := log.L(ctx).WithField("req", tktypes.ShortID())
+			l := log.L(ctx).WithField("req", pldtypes.ShortID())
 			newCtx = log.WithLogger(newCtx, l)
 			l.Debugf("New %s connection: remote=%s local=%s", description, c.RemoteAddr().String(), c.LocalAddr().String())
 			return newCtx
@@ -171,7 +171,7 @@ func (lc *logCapture) WriteHeader(statusCode int) {
 func (lc *logCapture) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hj, ok := lc.res.(http.Hijacker)
 	if !ok {
-		return nil, nil, i18n.NewError(context.Background(), tkmsgs.MsgHTTPServerNoWSUpgradeSupport, lc.res)
+		return nil, nil, i18n.NewError(context.Background(), pldmsgs.MsgHTTPServerNoWSUpgradeSupport, lc.res)
 	}
 	return hj.Hijack()
 }

@@ -19,5 +19,6 @@ export const AppRoutes = {
   Submissions: '/ui/submissions',
   Peers: '/ui/peers',
   Keys: '/ui/keys',
-  Registry: '/ui/registry'
-}
+  Registry: '/ui/registry',
+  Domains: '/ui/domains',
+};

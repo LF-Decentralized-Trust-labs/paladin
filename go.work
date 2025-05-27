@@ -1,6 +1,9 @@
-go 1.22.5
+go 1.23.0
+
+toolchain go1.23.7
 
 use (
+	./common/go
 	./config
 	./core/go
 	./domains/integration-test
@@ -10,6 +13,7 @@ use (
 	./perf
 	./registries/evm
 	./registries/static
+	./sdk/go
 	./testinfra
 	./toolkit/go
 	./transports/grpc

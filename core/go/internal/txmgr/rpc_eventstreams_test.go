@@ -17,6 +17,7 @@ package txmgr
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"sync/atomic"
@@ -25,12 +26,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,20 +42,20 @@ var nextReq atomic.Uint64
 
 func rpcTestRequest(method string, params ...any) (uint64, []byte) {
 	reqID := nextReq.Add(1)
-	jsonParams := make([]tktypes.RawJSON, len(params))
+	jsonParams := make([]pldtypes.RawJSON, len(params))
 	for i, p := range params {
-		jsonParams[i] = tktypes.JSONString(p)
+		jsonParams[i] = pldtypes.JSONString(p)
 	}
 	req := &rpcclient.RPCRequest{
 		JSONRpc: "2.0",
-		ID:      tktypes.RawJSON(fmt.Sprintf("%d", reqID)),
+		ID:      pldtypes.RawJSON(fmt.Sprintf("%d", reqID)),
 		Method:  method,
 		Params:  jsonParams,
 	}
-	return reqID, []byte(tktypes.JSONString((req)).Pretty())
+	return reqID, []byte(pldtypes.JSONString((req)).Pretty())
 }
 
-func TestRPCEventListenerE2E(t *testing.T) {
+func TestRPCReceiptListenerE2E(t *testing.T) {
 	ctx, url, txm, done := newTestTransactionManagerWithWebSocketRPC(t)
 	defer done()
 
@@ -129,7 +133,7 @@ func TestRPCEventListenerE2E(t *testing.T) {
 		txs[i] = &components.ReceiptInput{
 			ReceiptType:   components.RT_Success,
 			TransactionID: uuid.New(),
-			OnChain:       randOnChain(tktypes.RandAddress()),
+			OnChain:       randOnChain(pldtypes.RandAddress()),
 		}
 	}
 
@@ -166,7 +170,7 @@ func TestRPCEventListenerE2E(t *testing.T) {
 
 }
 
-func TestRPCEventListenerE2ENack(t *testing.T) {
+func TestRPCReceiptListenerE2ENack(t *testing.T) {
 	ctx, url, txm, done := newTestTransactionManagerWithWebSocketRPC(t)
 	defer done()
 
@@ -254,7 +258,7 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 			{
 				ReceiptType:   components.RT_Success,
 				TransactionID: uuid.New(),
-				OnChain:       randOnChain(tktypes.RandAddress()),
+				OnChain:       randOnChain(pldtypes.RandAddress()),
 			},
 		})
 	})
@@ -273,6 +277,135 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 	err = wsc.Send(ctx, req)
 	require.NoError(t, err)
 	<-unSubChan
+
+}
+
+func TestRPCEventListenerE2E(t *testing.T) {
+	ctx, url, txm, done := newTestTransactionManagerWithWebSocketRPC(t,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.blockIndexer.On("AddEventStream", mock.Anything, mock.Anything, mock.Anything).Return(&blockindexer.EventStream{
+				ID: uuid.New(),
+			}, nil)
+			mc.blockIndexer.On("StopEventStream", mock.Anything, mock.Anything).Return(nil)
+		})
+	defer done()
+
+	wscConf, err := rpcclient.ParseWSConfig(ctx, &pldconf.WSClientConfig{
+		HTTPClientConfig: pldconf.HTTPClientConfig{URL: url},
+	})
+	require.NoError(t, err)
+
+	err = txm.CreateBlockchainEventListener(ctx, &pldapi.BlockchainEventListener{
+		Name: "listener1",
+		Sources: []pldapi.BlockchainEventListenerSource{{
+			ABI: abi.ABI{{
+				Name: "DataStored",
+				Inputs: abi.ParameterArray{
+					{Name: "data", Type: "uint256"},
+				},
+				Type: abi.Event,
+			}},
+		}},
+	})
+	require.NoError(t, err)
+
+	wsc, err := wsclient.New(ctx, wscConf, nil, nil)
+	require.NoError(t, err)
+	err = wsc.Connect()
+	require.NoError(t, err)
+	defer wsc.Close()
+
+	_, req := rpcTestRequest("ptx_subscribe", "blockchainevents")
+	err = wsc.Send(ctx, req)
+	require.NoError(t, err)
+
+	payload := <-wsc.Receive()
+
+	var subscribeErrResponse *rpcclient.RPCResponse
+	err = json.Unmarshal(payload, &subscribeErrResponse)
+	require.NoError(t, err)
+	require.ErrorContains(t, subscribeErrResponse.Error, "PD012249")
+
+	_, req = rpcTestRequest("ptx_subscribe", "blockchainevents", "listener1")
+	err = wsc.Send(ctx, req)
+	require.NoError(t, err)
+
+	payload = <-wsc.Receive()
+
+	var subscribeResponse *rpcclient.RPCResponse
+	err = json.Unmarshal(payload, &subscribeResponse)
+	require.NoError(t, err)
+	require.Nil(t, subscribeResponse.Error)
+	subID := subscribeResponse.Result.StringValue()
+
+	// there should be exactly one blockchain event listener- find it and send a batch of events
+	require.Contains(t, txm.blockchainEventListeners, "listener1")
+	el := txm.blockchainEventListeners["listener1"]
+	require.NotNil(t, el)
+
+	go func() {
+		<-wsc.Receive()
+
+		_, req := rpcTestRequest("ptx_nack", subID)
+		err = wsc.Send(ctx, req)
+		require.NoError(t, err)
+
+		payload := <-wsc.Receive()
+
+		var batchResponse *rpcclient.RPCResponse
+		err = json.Unmarshal(payload, &batchResponse)
+		require.NoError(t, err)
+
+		var batchPayload pldapi.JSONRPCSubscriptionNotification[pldapi.TransactionEventBatch]
+		err := json.Unmarshal(batchResponse.Params.Bytes(), &batchPayload)
+		require.NoError(t, err)
+
+		require.Len(t, batchPayload.Result.Events, 2)
+
+		_, req = rpcTestRequest("ptx_ack", subID)
+		err = wsc.Send(ctx, req)
+		require.NoError(t, err)
+
+		<-wsc.Receive()
+
+		_, req = rpcTestRequest("ptx_unsubscribe", subID)
+		err = wsc.Send(ctx, req)
+		require.NoError(t, err)
+	}()
+
+	batch1 := &blockindexer.EventDeliveryBatch{
+		Events: []*pldapi.EventWithData{
+			{
+				IndexedEvent: &pldapi.IndexedEvent{
+					BlockNumber: 1,
+				},
+			},
+			{
+				IndexedEvent: &pldapi.IndexedEvent{
+					BlockNumber: 2,
+				},
+			},
+		},
+	}
+
+	err = el.handleEventBatch(ctx, batch1)
+	require.ErrorContains(t, err, "PD012243")
+
+	err = el.handleEventBatch(ctx, batch1)
+	require.NoError(t, err)
+
+	batch2 := &blockindexer.EventDeliveryBatch{
+		Events: []*pldapi.EventWithData{
+			{
+				IndexedEvent: &pldapi.IndexedEvent{
+					BlockNumber: 3,
+				},
+			},
+		},
+	}
+
+	err = el.handleEventBatch(ctx, batch2)
+	require.ErrorContains(t, err, "PD012242")
 
 }
 
@@ -414,7 +547,7 @@ func TestHandleLifecycleUnkonwn(t *testing.T) {
 
 	res := txm.rpcEventStreams.HandleLifecycle(ctx, &rpcclient.RPCRequest{
 		Method: "wrong",
-		Params: []tktypes.RawJSON{tktypes.RawJSON(`"any"`)},
+		Params: []pldtypes.RawJSON{pldtypes.RawJSON(`"any"`)},
 	})
 	require.Regexp(t, "PD012239", res.Error.Error())
 
@@ -432,7 +565,7 @@ func TestHandleLifecycleNoBlockNack(t *testing.T) {
 
 	ctrl := &mockRPCAsyncControl{}
 	es := txm.rpcEventStreams
-	es.receiptSubs["sub1"] = &receiptListenerSubscription{
+	es.subs["sub1"] = &listenerSubscription{
 		es:        es,
 		ctrl:      ctrl,
 		acksNacks: make(chan *rpcAckNack),
@@ -441,13 +574,13 @@ func TestHandleLifecycleNoBlockNack(t *testing.T) {
 
 	res := es.HandleLifecycle(ctx, &rpcclient.RPCRequest{
 		JSONRpc: "2.0",
-		ID:      tktypes.RawJSON("12345"),
+		ID:      pldtypes.RawJSON("12345"),
 		Method:  "ptx_nack",
-		Params:  []tktypes.RawJSON{tktypes.RawJSON(`"sub1"`)},
+		Params:  []pldtypes.RawJSON{pldtypes.RawJSON(`"sub1"`)},
 	})
 	require.Nil(t, res)
 
 	es.getSubscription("sub1").ConnectionClosed()
-	require.Empty(t, es.receiptSubs)
+	require.Empty(t, es.subs)
 
 }

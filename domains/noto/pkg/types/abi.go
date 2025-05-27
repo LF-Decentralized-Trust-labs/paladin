@@ -19,9 +19,9 @@ import (
 	_ "embed"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 )
 
 //go:embed abis/INotoPrivate.json
@@ -43,8 +43,8 @@ const (
 	NotaryModeHooks NotaryMode = "hooks"
 )
 
-func (tt NotaryMode) Enum() tktypes.Enum[NotaryMode] {
-	return tktypes.Enum[NotaryMode](tt)
+func (tt NotaryMode) Enum() pldtypes.Enum[NotaryMode] {
+	return pldtypes.Enum[NotaryMode](tt)
 }
 
 func (tt NotaryMode) Options() []string {
@@ -55,69 +55,69 @@ func (tt NotaryMode) Options() []string {
 }
 
 type MintParams struct {
-	To     string              `json:"to"`
-	Amount *tktypes.HexUint256 `json:"amount"`
-	Data   tktypes.HexBytes    `json:"data"`
+	To     string               `json:"to"`
+	Amount *pldtypes.HexUint256 `json:"amount"`
+	Data   pldtypes.HexBytes    `json:"data"`
 }
 
 type TransferParams struct {
-	To     string              `json:"to"`
-	Amount *tktypes.HexUint256 `json:"amount"`
-	Data   tktypes.HexBytes    `json:"data"`
+	To     string               `json:"to"`
+	Amount *pldtypes.HexUint256 `json:"amount"`
+	Data   pldtypes.HexBytes    `json:"data"`
 }
 
 type BurnParams struct {
-	Amount *tktypes.HexUint256 `json:"amount"`
-	Data   tktypes.HexBytes    `json:"data"`
+	Amount *pldtypes.HexUint256 `json:"amount"`
+	Data   pldtypes.HexBytes    `json:"data"`
 }
 
 type ApproveParams struct {
 	Inputs   []*pldapi.StateEncoded `json:"inputs"`
 	Outputs  []*pldapi.StateEncoded `json:"outputs"`
-	Data     tktypes.HexBytes       `json:"data"`
-	Delegate *tktypes.EthAddress    `json:"delegate"`
+	Data     pldtypes.HexBytes      `json:"data"`
+	Delegate *pldtypes.EthAddress   `json:"delegate"`
 }
 
 type LockParams struct {
-	Amount *tktypes.HexUint256 `json:"amount"`
-	Data   tktypes.HexBytes    `json:"data"`
+	Amount *pldtypes.HexUint256 `json:"amount"`
+	Data   pldtypes.HexBytes    `json:"data"`
 }
 
 type UnlockParams struct {
-	LockID     tktypes.Bytes32    `json:"lockId"`
+	LockID     pldtypes.Bytes32   `json:"lockId"`
 	From       string             `json:"from"`
 	Recipients []*UnlockRecipient `json:"recipients"`
-	Data       tktypes.HexBytes   `json:"data"`
+	Data       pldtypes.HexBytes  `json:"data"`
 }
 
 type DelegateLockParams struct {
-	LockID   tktypes.Bytes32     `json:"lockId"`
-	Unlock   *UnlockPublicParams `json:"unlock"`
-	Delegate *tktypes.EthAddress `json:"delegate"`
-	Data     tktypes.HexBytes    `json:"data"`
+	LockID   pldtypes.Bytes32     `json:"lockId"`
+	Unlock   *UnlockPublicParams  `json:"unlock"`
+	Delegate *pldtypes.EthAddress `json:"delegate"`
+	Data     pldtypes.HexBytes    `json:"data"`
 }
 
 type UnlockRecipient struct {
-	To     string              `json:"to"`
-	Amount *tktypes.HexUint256 `json:"amount"`
+	To     string               `json:"to"`
+	Amount *pldtypes.HexUint256 `json:"amount"`
 }
 
 type UnlockPublicParams struct {
-	LockedInputs  []string         `json:"lockedInputs"`
-	LockedOutputs []string         `json:"lockedOutputs"`
-	Outputs       []string         `json:"outputs"`
-	Signature     tktypes.HexBytes `json:"signature"`
-	Data          tktypes.HexBytes `json:"data"`
+	LockedInputs  []string          `json:"lockedInputs"`
+	LockedOutputs []string          `json:"lockedOutputs"`
+	Outputs       []string          `json:"outputs"`
+	Signature     pldtypes.HexBytes `json:"signature"`
+	Data          pldtypes.HexBytes `json:"data"`
 }
 
 type ApproveExtraParams struct {
-	Data tktypes.HexBytes `json:"data"`
+	Data pldtypes.HexBytes `json:"data"`
 }
 
 type NotoPublicTransaction struct {
-	FunctionABI *abi.Entry       `json:"functionABI"`
-	ParamsJSON  tktypes.RawJSON  `json:"paramsJSON"`
-	EncodedCall tktypes.HexBytes `json:"encodedCall"`
+	FunctionABI *abi.Entry        `json:"functionABI"`
+	ParamsJSON  pldtypes.RawJSON  `json:"paramsJSON"`
+	EncodedCall pldtypes.HexBytes `json:"encodedCall"`
 }
 
 type NotoTransferMetadata struct {

@@ -23,14 +23,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func (tb *testbed) initRPC() {
@@ -90,8 +90,8 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod4(func(ctx context.Context,
 		from string,
 		abi abi.ABI,
-		bytecode tktypes.HexBytes,
-		params tktypes.RawJSON,
+		bytecode pldtypes.HexBytes,
+		params pldtypes.RawJSON,
 	) (*ethtypes.Address0xHex, error) {
 
 		receipt, err := tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{
@@ -101,7 +101,7 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 				Data: params,
 			},
 			ABI:      abi,
-			Bytecode: tktypes.HexBytes(bytecode),
+			Bytecode: pldtypes.HexBytes(bytecode),
 		})
 		if err != nil {
 			return nil, err
@@ -131,8 +131,8 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
 		domainName string,
 		from string,
-		constructorParams tktypes.RawJSON,
-	) (*tktypes.EthAddress, error) {
+		constructorParams pldtypes.RawJSON,
+	) (*pldtypes.EthAddress, error) {
 
 		domain, err := tb.c.DomainManager().GetDomainByName(ctx, domainName)
 		if err != nil {
@@ -496,8 +496,8 @@ func (tb *testbed) rpcResolveVerifier() rpcserver.RPCHandler {
 func (tb *testbed) rpcTestbedCall() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
 		invocation *pldapi.TransactionInput,
-		dataFormat tktypes.JSONFormatOptions,
-	) (tktypes.RawJSON, error) {
+		dataFormat pldtypes.JSONFormatOptions,
+	) (pldtypes.RawJSON, error) {
 		tx, err := tb.newTestbedTransaction(ctx, invocation, prototk.TransactionSpecification_CALL)
 		if err != nil {
 			return nil, err

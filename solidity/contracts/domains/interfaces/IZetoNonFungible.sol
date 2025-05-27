@@ -7,7 +7,6 @@ pragma solidity ^0.8.20;
  *      Note: This interface is not intended for direct implementation in smart contracts.
  */
 interface IZetoNonFungible {
-
     struct MintParam {
         string to;
         string uri;

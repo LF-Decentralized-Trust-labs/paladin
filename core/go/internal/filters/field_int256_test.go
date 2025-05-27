@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,33 +30,33 @@ func TestInt256Field(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := Int256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`!json`))
+	_, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = Int256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`[]`))
+	_, err = Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`[]`))
 	assert.Regexp(t, "FF22091", err)
 
-	vBigNeg, err := Int256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`"-0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
+	vBigNeg, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`"-0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
 	require.NoError(t, err)
 	assert.Equal(t, "00000000000000000000000000000000000000000000000000000000000000001", vBigNeg)
 	assert.Len(t, vBigNeg, 65)
 
-	vBigPos, err := Int256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
+	vBigPos, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
 	require.NoError(t, err)
 	assert.Equal(t, "1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", vBigPos)
 	assert.Len(t, vBigPos, 65)
 
-	vZero, err := Int256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`0`))
+	vZero, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`0`))
 	require.NoError(t, err)
 	assert.Equal(t, "10000000000000000000000000000000000000000000000000000000000000000", vZero)
 	assert.Len(t, vZero, 65)
 
-	vSmallNeg, err := Int256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`-12345`))
+	vSmallNeg, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`-12345`))
 	require.NoError(t, err)
 	assert.Equal(t, "0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffcfc7", vSmallNeg)
 	assert.Len(t, vSmallNeg, 65)
 
-	vSmallPos, err := Int256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`12345`))
+	vSmallPos, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`12345`))
 	require.NoError(t, err)
 	assert.Equal(t, "10000000000000000000000000000000000000000000000000000000000003039", vSmallPos)
 	assert.Len(t, vSmallPos, 65)
@@ -69,7 +69,7 @@ func TestInt256Field(t *testing.T) {
 	assert.Equal(t, 1, strings.Compare(vBigPos.(string), vZero.(string)))
 	assert.Equal(t, 1, strings.Compare(vBigPos.(string), vSmallPos.(string)))
 
-	nv, err := Int256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
+	nv, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`null`))
 	require.NoError(t, err)
 	assert.Nil(t, nv)
 

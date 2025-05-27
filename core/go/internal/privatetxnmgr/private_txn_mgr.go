@@ -22,10 +22,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
@@ -35,12 +35,12 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
@@ -110,7 +110,7 @@ func (p *privateTxManager) OnNewBlockHeight(ctx context.Context, blockHeight int
 	}
 }
 
-func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr tktypes.EthAddress, domainAPI components.DomainSmartContract) (oc *Sequencer, err error) {
+func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract) (oc *Sequencer, err error) {
 
 	if domainAPI == nil {
 		domainAPI, err = p.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
@@ -185,7 +185,7 @@ func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX per
 	return p.sequencers[contractAddr.String()], nil
 }
 
-func (p *privateTxManager) getEndorsementGathererForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr tktypes.EthAddress) (ptmgrtypes.EndorsementGatherer, error) {
+func (p *privateTxManager) getEndorsementGathererForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress) (ptmgrtypes.EndorsementGatherer, error) {
 	// We need to have this as a function of the PrivateTransactionManager rather than a function of the sequencer because the endorsement gatherer is needed
 	// even if we don't have a sequencer.  e.g. maybe the transaction is being coordinated by another node and this node has just been asked to endorse it
 	// in that case, we need to make sure that we are using the domainContext provided by the endorsement request
@@ -242,7 +242,7 @@ func (p *privateTxManager) handleNewTx(ctx context.Context, dbTX persistence.DBT
 	log.L(ctx).Debugf("Handling new transaction: %v", tx)
 
 	contractAddr := *localTx.Transaction.To
-	emptyAddress := tktypes.EthAddress{}
+	emptyAddress := pldtypes.EthAddress{}
 	if contractAddr == emptyAddress {
 		return i18n.NewError(ctx, msgs.MsgContractAddressNotProvided)
 	}
@@ -284,7 +284,7 @@ func (p *privateTxManager) validateDelegatedTransaction(ctx context.Context, tx 
 		return i18n.NewError(ctx, msgs.MsgDomainNotProvided)
 	}
 
-	emptyAddress := tktypes.EthAddress{}
+	emptyAddress := pldtypes.EthAddress{}
 	if tx.Address == emptyAddress {
 		return i18n.NewError(ctx, msgs.MsgContractAddressNotProvided)
 	}
@@ -385,7 +385,7 @@ func (p *privateTxManager) revertDeploy(ctx context.Context, tx *components.Priv
 
 	var tryFinalize func()
 	tryFinalize = func() {
-		p.syncPoints.QueueTransactionFinalize(ctx, tx.Domain, tktypes.EthAddress{}, tx.ID, deployError.Error(),
+		p.syncPoints.QueueTransactionFinalize(ctx, tx.Domain, pldtypes.EthAddress{}, tx.ID, deployError.Error(),
 			func(ctx context.Context) {
 				log.L(ctx).Debugf("Finalized deployment transaction: %s", tx.ID)
 			},
@@ -412,7 +412,7 @@ func (p *privateTxManager) evaluateDeployment(ctx context.Context, domain compon
 	publicTransactionEngine := p.components.PublicTxManager()
 
 	// The signer needs to be in our local node or it's an error
-	identifier, node, err := tktypes.PrivateIdentityLocator(tx.Signer).Validate(ctx, p.nodeName, true)
+	identifier, node, err := pldtypes.PrivateIdentityLocator(tx.Signer).Validate(ctx, p.nodeName, true)
 	if err != nil {
 		return err
 	}
@@ -443,7 +443,7 @@ func (p *privateTxManager) evaluateDeployment(ctx context.Context, domain compon
 		if err != nil {
 			return p.revertDeploy(ctx, tx, i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrEncodeCallDataFailed))
 		}
-		publicTXs[0].Data = tktypes.HexBytes(data)
+		publicTXs[0].Data = pldtypes.HexBytes(data)
 		publicTXs[0].To = &tx.InvokeTransaction.To
 
 	} else if tx.DeployTransaction != nil {
@@ -529,7 +529,7 @@ func (p *privateTxManager) handleEndorsementRequest(ctx context.Context, message
 		return
 	}
 	contractAddressString := endorsementRequest.ContractAddress
-	contractAddress, err := tktypes.ParseEthAddress(contractAddressString)
+	contractAddress, err := pldtypes.ParseEthAddress(contractAddressString)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to parse contract address %s: %s", contractAddressString, err)
 		return
@@ -802,7 +802,7 @@ func (p *privateTxManager) handleAssembleRequest(ctx context.Context, messagePay
 	}
 
 	contractAddressString := assembleRequest.ContractAddress
-	contractAddress, err := tktypes.ParseEthAddress(contractAddressString)
+	contractAddress, err := pldtypes.ParseEthAddress(contractAddressString)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to parse contract address: %s", err)
 		return
@@ -963,8 +963,8 @@ func (p *privateTxManager) NotifyFailedPublicTx(ctx context.Context, dbTX persis
 		privateFailureReceipts[i] = &components.ReceiptInput{
 			ReceiptType:   components.RT_FailedOnChainWithRevertData,
 			TransactionID: tx.TransactionID,
-			OnChain: tktypes.OnChainLocation{
-				Type:             tktypes.OnChainTransaction,
+			OnChain: pldtypes.OnChainLocation{
+				Type:             pldtypes.OnChainTransaction,
 				TransactionHash:  tx.Hash,
 				BlockNumber:      tx.BlockNumber,
 				TransactionIndex: tx.BlockNumber,

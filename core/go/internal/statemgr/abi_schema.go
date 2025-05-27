@@ -27,13 +27,13 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type abiSchema struct {
@@ -63,7 +63,7 @@ func newABISchema(ctx context.Context, domainName string, def *abi.Parameter) (*
 		as.Schema.Signature, err = as.FullSignature(ctx)
 	}
 	if err == nil {
-		as.Schema.ID = tktypes.Bytes32Keccak([]byte(as.Schema.Signature))
+		as.Schema.ID = pldtypes.Bytes32Keccak([]byte(as.Schema.Signature))
 	}
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (as *abiSchema) Type() pldapi.SchemaType {
 	return pldapi.SchemaTypeABI
 }
 
-func (as *abiSchema) ID() tktypes.Bytes32 {
+func (as *abiSchema) ID() pldtypes.Bytes32 {
 	return as.Schema.ID
 }
 
@@ -214,7 +214,7 @@ func (as *abiSchema) mapValueToLabel(ctx context.Context, fieldName string, labe
 			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
 		}
 		// Otherwise we fall back to encoding as a fixed-width hex string - with a leading sign character
-		filterString := tktypes.Int256To65CharDBSafeSortableString(bigIntVal)
+		filterString := pldtypes.Int256To65CharDBSafeSortableString(bigIntVal)
 		return &pldapi.StateLabel{Label: fieldName, Value: filterString}, nil, nil
 	case labelTypeUint256:
 		bigIntVal, ok := f.Value.(*big.Int)
@@ -286,7 +286,7 @@ type parsedStateData struct {
 	labelValues filters.PassthroughValueSet
 }
 
-func (as *abiSchema) parseStateData(ctx context.Context, data tktypes.RawJSON) (*parsedStateData, error) {
+func (as *abiSchema) parseStateData(ctx context.Context, data pldtypes.RawJSON) (*parsedStateData, error) {
 	var psd parsedStateData
 	err := json.Unmarshal([]byte(data), &psd.jsonTree)
 	if err != nil {
@@ -326,7 +326,7 @@ func (as *abiSchema) parseStateData(ctx context.Context, data tktypes.RawJSON) (
 
 // Take the state, parse the value into the type tree of this schema, and from that
 // build the label values to store in the DB for comparison appropriate to the type.
-func (as *abiSchema) ProcessState(ctx context.Context, contractAddress *tktypes.EthAddress, data tktypes.RawJSON, id tktypes.HexBytes, customHashFunction bool) (*components.StateWithLabels, error) {
+func (as *abiSchema) ProcessState(ctx context.Context, contractAddress *pldtypes.EthAddress, data pldtypes.RawJSON, id pldtypes.HexBytes, customHashFunction bool) (*components.StateWithLabels, error) {
 
 	// We need to re-serialize the data according to the ABI to:
 	// - Ensure it's valid
@@ -335,7 +335,7 @@ func (as *abiSchema) ProcessState(ctx context.Context, contractAddress *tktypes.
 	var jsonData []byte
 	psd, err := as.parseStateData(ctx, data)
 	if err == nil {
-		jsonData, err = tktypes.StandardABISerializer().SerializeJSONCtx(ctx, psd.cv)
+		jsonData, err = pldtypes.StandardABISerializer().SerializeJSONCtx(ctx, psd.cv)
 	}
 	if err != nil {
 		return nil, err
@@ -366,10 +366,10 @@ func (as *abiSchema) ProcessState(ctx context.Context, contractAddress *tktypes.
 		if err != nil {
 			return nil, i18n.WrapError(ctx, err, msgs.MsgStateInvalidCalculatingHash)
 		}
-		if id != nil && !id.Equals(tktypes.HexBytes(hash)) {
+		if id != nil && !id.Equals(pldtypes.HexBytes(hash)) {
 			return nil, i18n.NewError(ctx, msgs.MsgStateHashMismatch, id, hash)
 		}
-		id = tktypes.HexBytes(hash)
+		id = pldtypes.HexBytes(hash)
 	}
 
 	for i := range psd.labels {
@@ -381,7 +381,7 @@ func (as *abiSchema) ProcessState(ctx context.Context, contractAddress *tktypes.
 		psd.int64Labels[i].State = id
 	}
 
-	now := tktypes.TimestampNow()
+	now := pldtypes.TimestampNow()
 	return &components.StateWithLabels{
 		State: &pldapi.State{
 			StateBase: pldapi.StateBase{

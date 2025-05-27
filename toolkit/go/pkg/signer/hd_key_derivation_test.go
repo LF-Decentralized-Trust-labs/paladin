@@ -24,10 +24,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,7 +94,7 @@ func TestHDSigningStaticExamplePreResolved(t *testing.T) {
 				Keys: map[string]pldconf.StaticKeyEntryConfig{
 					"directly.resolved": {
 						Encoding: "hex",
-						Inline:   tktypes.RandHex(32),
+						Inline:   pldtypes.RandHex(32),
 					},
 				},
 			},
@@ -271,7 +271,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 
 	testSign, err := testKeyPair.SignDirect(([]byte)("some data"))
 	require.NoError(t, err)
-	assert.Equal(t, tktypes.HexBytes(testSign.CompactRSV()), resSign.Payload)
+	assert.Equal(t, pldtypes.HexBytes(testSign.CompactRSV()), resSign.Payload)
 	sig, err := secp256k1.DecodeCompactRSV(ctx, resSign.Payload)
 	require.NoError(t, err)
 	assert.Equal(t, testSign, sig)

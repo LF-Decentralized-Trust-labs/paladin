@@ -24,8 +24,8 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/flushwriter"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 /*
@@ -53,7 +53,7 @@ to atomically allocate and record the nonce under that same transaction.
 // but never more than one of these.  We probably could make the mutually exclusive nature more explicit by using interfaces but its not worth the added complexity
 
 type syncPointOperation struct {
-	contractAddress   tktypes.EthAddress
+	contractAddress   pldtypes.EthAddress
 	domainContext     components.DomainContext
 	finalizeOperation *finalizeOperation
 	dispatchOperation *dispatchOperation

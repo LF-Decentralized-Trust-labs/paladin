@@ -165,7 +165,7 @@ task goGet(type:Exec, dependsOn:[protoc, copyContracts, ":toolkit:go:goGet"]) {
 task makeMocks(type: Mockery, dependsOn: [":installMockery", protoc, goGet]) {
     args '--case', 'underscore'
     mock {
-        inputDir "go list -f {{.Dir}} github.com/kaleido-io/paladin/toolkit/pkg/rpcclient".execute().text.trim()
+        inputDir "go list -f {{.Dir}} github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient".execute().text.trim()
         includeAll true
         outputPackage 'rpcclientmocks'
         outputDir 'mocks/rpcclientmocks'

@@ -17,9 +17,9 @@ package plugintk
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"google.golang.org/grpc"
 	pb "google.golang.org/protobuf/proto"
 )
@@ -214,7 +214,7 @@ func (dp *domainHandler) RequestToPlugin(ctx context.Context, iReq PluginMessage
 		resMsg.WrapPrivacyGroupEvmtxRes, err = dp.api.WrapPrivacyGroupEVMTX(ctx, input.WrapPrivacyGroupEvmtx)
 		res.ResponseFromDomain = resMsg
 	default:
-		err = i18n.NewError(ctx, tkmsgs.MsgPluginUnsupportedRequest, input)
+		err = i18n.NewError(ctx, pldmsgs.MsgPluginUnsupportedRequest, input)
 	}
 	return dp.Wrap(res), err
 }

@@ -18,7 +18,7 @@ package publictxmgr
 import (
 	"testing"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +26,7 @@ func TestDispatchActionsUnknownActionIgnored(t *testing.T) {
 	ctx, txm, _, done := newTestPublicTxManager(t, false)
 	defer done()
 
-	err := txm.dispatchAction(ctx, *tktypes.RandAddress(), 12345, AsyncRequestType(42))
+	err := txm.dispatchAction(ctx, *pldtypes.RandAddress(), 12345, AsyncRequestType(42))
 	require.NoError(t, err)
 }
 
@@ -34,6 +34,6 @@ func TestDispatchCompletedActionForNonInflightIgnored(t *testing.T) {
 	ctx, txm, _, done := newTestPublicTxManager(t, false)
 	defer done()
 
-	err := txm.dispatchAction(ctx, *tktypes.RandAddress(), 12345, ActionCompleted)
+	err := txm.dispatchAction(ctx, *pldtypes.RandAddress(), 12345, ActionCompleted)
 	require.NoError(t, err)
 }

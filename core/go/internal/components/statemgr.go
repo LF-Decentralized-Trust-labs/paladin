@@ -22,9 +22,9 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"gorm.io/gorm"
 )
 
@@ -35,7 +35,7 @@ type StateManager interface {
 	ListDomainContexts() []DomainContextInfo
 
 	// Create a new domain context - caller is responsible for closing it
-	NewDomainContext(ctx context.Context, domain Domain, contractAddress tktypes.EthAddress) DomainContext
+	NewDomainContext(ctx context.Context, domain Domain, contractAddress pldtypes.EthAddress) DomainContext
 
 	// Get a previously created domain context
 	GetDomainContext(ctx context.Context, id uuid.UUID) DomainContext
@@ -44,7 +44,7 @@ type StateManager interface {
 	EnsureABISchemas(ctx context.Context, dbTX persistence.DBTX, domainName string, defs []*abi.Parameter) ([]Schema, error)
 
 	// Get an individual schema by ID
-	GetSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (*pldapi.Schema, error)
+	GetSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID pldtypes.Bytes32, failNotFound bool) (*pldapi.Schema, error)
 
 	// State finalizations are written on the DB context of the block indexer, by the domain manager.
 	WriteStateFinalizations(ctx context.Context, dbTX persistence.DBTX, spends []*pldapi.StateSpendRecord, reads []*pldapi.StateReadRecord, confirms []*pldapi.StateConfirmRecord, infoRecords []*pldapi.StateInfoRecord) (err error)
@@ -60,10 +60,10 @@ type StateManager interface {
 	WriteNullifiersForReceivedStates(ctx context.Context, dbTX persistence.DBTX, domainName string, nullifiers []*NullifierUpsert) error
 
 	// Find states from outside of a domain context (noting you can reference a domain context by ID)
-	FindStates(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID tktypes.Bytes32, query *query.QueryJSON, extQueryOptions *StateQueryOptions) (s []*pldapi.State, err error)
+	FindStates(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID pldtypes.Bytes32, query *query.QueryJSON, extQueryOptions *StateQueryOptions) (s []*pldapi.State, err error)
 
 	// GetState returns state by ID, with optional labels
-	GetStatesByID(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress *tktypes.EthAddress, stateIDs []tktypes.HexBytes, failNotFound, withLabels bool) ([]*pldapi.State, error)
+	GetStatesByID(ctx context.Context, dbTX persistence.DBTX, domainName string, contractAddress *pldtypes.EthAddress, stateIDs []pldtypes.HexBytes, failNotFound, withLabels bool) ([]*pldapi.State, error)
 
 	// Get all states created, read or spent by a confirmed transaction
 	GetTransactionStates(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID) (*pldapi.TransactionStates, error)
@@ -71,14 +71,14 @@ type StateManager interface {
 
 type StateQueryOptions struct {
 	StatusQualifier pldapi.StateStatusQualifier
-	ExcludedIDs     []tktypes.HexBytes
+	ExcludedIDs     []pldtypes.HexBytes
 	QueryModifier   func(db persistence.DBTX, query *gorm.DB) *gorm.DB
 }
 
 type DomainContextInfo struct {
-	ID              uuid.UUID          `json:"id"`
-	DomainName      string             `json:"domain"`
-	ContractAddress tktypes.EthAddress `json:"contractAddress"`
+	ID              uuid.UUID           `json:"id"`
+	DomainName      string              `json:"domain"`
+	ContractAddress pldtypes.EthAddress `json:"contractAddress"`
 }
 
 // The DSI is the state interface that is exposed outside of the statestore package, for the
@@ -107,13 +107,13 @@ type DomainContext interface {
 	//    be on the same transaction where those states are locked.
 	//
 	// The dbTX is passed in to allow re-use of a connection during read operations.
-	FindAvailableStates(dbTX persistence.DBTX, schemaID tktypes.Bytes32, query *query.QueryJSON) (Schema, []*pldapi.State, error)
+	FindAvailableStates(dbTX persistence.DBTX, schemaID pldtypes.Bytes32, query *query.QueryJSON) (Schema, []*pldapi.State, error)
 
 	// GetStatesByID retrieves a set of states by ID - regardless of whether they are:
 	// - Written to the DB or not (or just pending in the domain context)
 	// - Confirmed or not
 	// - Spent or not
-	GetStatesByID(dbTX persistence.DBTX, schemaID tktypes.Bytes32, ids []string) (Schema, []*pldapi.State, error)
+	GetStatesByID(dbTX persistence.DBTX, schemaID pldtypes.Bytes32, ids []string) (Schema, []*pldapi.State, error)
 
 	// Return a snapshot of all currently known state locks
 	ExportSnapshot() ([]byte, error)
@@ -125,7 +125,7 @@ type DomainContext interface {
 	// nullifiers to record spending.
 	//
 	// The dbTX is passed in to allow re-use of a connection during read operations.
-	FindAvailableNullifiers(dbTX persistence.DBTX, schemaID tktypes.Bytes32, query *query.QueryJSON) (Schema, []*pldapi.State, error)
+	FindAvailableNullifiers(dbTX persistence.DBTX, schemaID pldtypes.Bytes32, query *query.QueryJSON) (Schema, []*pldapi.State, error)
 
 	// AddStateLocks updates the in-memory state of the domain context, to record a set of locks
 	// that affect queries on available states and nullifiers.
@@ -190,17 +190,17 @@ type DomainContext interface {
 }
 
 type StateUpsert struct {
-	ID        tktypes.HexBytes `json:"id"`
-	Schema    tktypes.Bytes32  `json:"schema"`
-	Data      tktypes.RawJSON  `json:"data"`
-	CreatedBy *uuid.UUID       `json:"createdBy,omitempty"` // not exported
+	ID        pldtypes.HexBytes `json:"id"`
+	Schema    pldtypes.Bytes32  `json:"schema"`
+	Data      pldtypes.RawJSON  `json:"data"`
+	CreatedBy *uuid.UUID        `json:"createdBy,omitempty"` // not exported
 }
 
 type StateUpsertOutsideContext struct {
-	ID              tktypes.HexBytes
-	SchemaID        tktypes.Bytes32
-	ContractAddress *tktypes.EthAddress
-	Data            tktypes.RawJSON
+	ID              pldtypes.HexBytes
+	SchemaID        pldtypes.Bytes32
+	ContractAddress *pldtypes.EthAddress
+	Data            pldtypes.RawJSON
 }
 
 // StateWithLabels is a newly prepared state that has not yet been persisted
@@ -214,15 +214,15 @@ func (s *StateWithLabels) ValueSet() filters.ValueSet {
 }
 
 type NullifierUpsert struct {
-	ID    tktypes.HexBytes `json:"id"              gorm:"primaryKey"`
-	State tktypes.HexBytes `json:"-"`
+	ID    pldtypes.HexBytes `json:"id"              gorm:"primaryKey"`
+	State pldtypes.HexBytes `json:"-"`
 }
 
 type Schema interface {
 	Type() pldapi.SchemaType
-	ID() tktypes.Bytes32
+	ID() pldtypes.Bytes32
 	Signature() string
 	Persisted() *pldapi.Schema
-	ProcessState(ctx context.Context, contractAddress *tktypes.EthAddress, data tktypes.RawJSON, id tktypes.HexBytes, customHash bool) (*StateWithLabels, error)
+	ProcessState(ctx context.Context, contractAddress *pldtypes.EthAddress, data pldtypes.RawJSON, id pldtypes.HexBytes, customHash bool) (*StateWithLabels, error)
 	RecoverLabels(ctx context.Context, s *pldapi.State) (*StateWithLabels, error)
 }

@@ -27,14 +27,15 @@ import (
 	"github.com/iden3/go-rapidsnark/prover"
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/witness/v2"
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/signer/common"
+	wtns "github.com/kaleido-io/paladin/domains/zeto/internal/zeto/signer/witness"
 	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
-	"github.com/kaleido-io/paladin/toolkit/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"google.golang.org/protobuf/proto"
 )
@@ -42,7 +43,7 @@ import (
 var defaultSnarkProverConfig = zetosignerapi.SnarkProverConfig{
 	MaxProverPerCircuit: confutil.P(10),
 }
-var getWitnessInputs func(circuitId string, extras interface{}) (witnessInputs, error) = newWitnessInputs
+var getWitnessInputs func(tokeType pb.TokenType, circuit *zetosignerapi.Circuit, extras interface{}) (witnessInputs, error) = newWitnessInputs
 
 // snarkProver encapsulates the logic for generating SNARK proofs
 type snarkProver struct {
@@ -83,11 +84,11 @@ func (sp *snarkProver) GetVerifier(ctx context.Context, algorithm, verifierType 
 	if verifierType != zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X {
 		return "", i18n.NewError(ctx, msgs.MsgErrorVerifierTypeMismatch, algorithm, zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
 	}
-	pk, err := NewBabyJubJubPrivateKey(privateKey)
+	pk, err := common.NewBabyJubJubPrivateKey(privateKey)
 	if err != nil {
 		return "", err
 	}
-	return EncodeBabyJubJubPublicKey(pk.Public()), nil
+	return common.EncodeBabyJubJubPublicKey(pk.Public()), nil
 }
 
 func (sp *snarkProver) GetMinimumKeyLen(ctx context.Context, algorithm string) (int, error) {
@@ -114,14 +115,16 @@ func (sp *snarkProver) Sign(ctx context.Context, algorithm, payloadType string, 
 		return nil, err
 	}
 	// Perform proof generation
-	if inputs.CircuitId == "" {
+	if inputs.Circuit.Name == "" {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorMissingCircuitID)
 	}
-	circuitId := getCircuitId(inputs)
+
+	circuit := getCircuit(inputs)
 
 	// obtain a slot for the proof generation for this specific circuit
 	// check whether this is a controlling channel
 	sp.circuitsWorkerIndexChanRWLock.RLock()
+	circuitId := circuit.Name
 	ccChan, chanelFound := sp.circuitsWorkerIndexChan[circuitId]
 	sp.circuitsWorkerIndexChanRWLock.RUnlock()
 	if !chanelFound {
@@ -153,15 +156,15 @@ func (sp *snarkProver) Sign(ctx context.Context, algorithm, payloadType string, 
 	// Perform proof generation
 	// Read lock to check the cache
 	sp.proverCacheRWLock.RLock()
-	circuit, _ := sp.circuitsCache.Get(workerID)
+	witnessCalculator, _ := sp.circuitsCache.Get(workerID)
 	provingKey, _ := sp.provingKeysCache.Get(workerID)
 	sp.proverCacheRWLock.RUnlock() // release the lock, happy path, 1 lock is good enough
-	if circuit == nil || provingKey == nil {
+	if witnessCalculator == nil || provingKey == nil {
 		sp.proverCacheRWLock.Lock()
 		// obtain the W&R lock and check again
-		circuit, _ = sp.circuitsCache.Get(workerID)
+		witnessCalculator, _ = sp.circuitsCache.Get(workerID)
 		provingKey, _ = sp.provingKeysCache.Get(workerID)
-		if circuit == nil || provingKey == nil {
+		if witnessCalculator == nil || provingKey == nil {
 			// the generated WASM instance can only generate one proof at a time, circuitsWorkerIndexChan is used to ensure only 1 proof request
 			// is served per WASM instance at any given time
 			c, p, err := sp.circuitLoader(ctx, circuitId, sp.zkpProverConfig)
@@ -170,12 +173,13 @@ func (sp *snarkProver) Sign(ctx context.Context, algorithm, payloadType string, 
 			}
 			sp.circuitsCache.Set(workerID, c)
 			sp.provingKeysCache.Set(workerID, p)
-			circuit = c
+			witnessCalculator = c
 			provingKey = p
 		}
 		sp.proverCacheRWLock.Unlock()
 	}
-	wtns, err := calculateWitness(ctx, circuitId, inputs.Common, extras, keyEntry, circuit)
+
+	wtns, err := calculateWitness(ctx, circuit, inputs.Common, extras, keyEntry, witnessCalculator)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +189,7 @@ func (sp *snarkProver) Sign(ctx context.Context, algorithm, payloadType string, 
 		return nil, err
 	}
 
-	proofBytes, err := serializeProofResponse(circuitId, proof)
+	proofBytes, err := serializeProofResponse(circuit, proof)
 	if err != nil {
 		return nil, err
 	}
@@ -193,15 +197,17 @@ func (sp *snarkProver) Sign(ctx context.Context, algorithm, payloadType string, 
 	return proofBytes, nil
 }
 
-func getCircuitId(inputs *pb.ProvingRequest) string {
-	circuitId := inputs.CircuitId
+func getCircuit(inputs *pb.ProvingRequest) *zetosignerapi.Circuit {
+	circuitId := inputs.Circuit.Name
 	if len(inputs.Common.InputCommitments) > 2 {
-		circuitId += "_batch"
+		circuitId = getBatchCircuit(circuitId)
 	}
-	return circuitId
+	ret := zetosignerapi.NewCircuitFromProto(inputs.Circuit)
+	ret.Name = circuitId
+	return ret
 }
 
-func serializeProofResponse(circuitId string, proof *types.ZKProof) ([]byte, error) {
+func serializeProofResponse(circuit *zetosignerapi.Circuit, proof *types.ZKProof) ([]byte, error) {
 	snark := pb.SnarkProof{}
 	snark.A = proof.Proof.A
 	snark.B = make([]*pb.B_Item, 0, len(proof.Proof.B))
@@ -213,27 +219,36 @@ func serializeProofResponse(circuitId string, proof *types.ZKProof) ([]byte, err
 	snark.C = proof.Proof.C
 
 	publicInputs := make(map[string]string)
-	switch circuitId {
-	case constants.CIRCUIT_ANON_ENC:
-		publicInputs["ecdhPublicKey"] = strings.Join(proof.PubSignals[0:2], ",")
-		publicInputs["encryptedValues"] = strings.Join(proof.PubSignals[2:10], ",")
-		publicInputs["encryptionNonce"] = proof.PubSignals[14]
-	case constants.CIRCUIT_ANON_ENC_BATCH:
-		publicInputs["ecdhPublicKey"] = strings.Join(proof.PubSignals[0:2], ",")
-		publicInputs["encryptedValues"] = strings.Join(proof.PubSignals[2:42], ",")
-		publicInputs["encryptionNonce"] = proof.PubSignals[62]
-	case constants.CIRCUIT_ANON_NULLIFIER:
-		publicInputs["nullifiers"] = strings.Join(proof.PubSignals[:2], ",")
-		publicInputs["root"] = proof.PubSignals[2]
-	case constants.CIRCUIT_ANON_NULLIFIER_BATCH:
-		publicInputs["nullifiers"] = strings.Join(proof.PubSignals[:10], ",")
-		publicInputs["root"] = proof.PubSignals[10]
-	case constants.CIRCUIT_WITHDRAW_NULLIFIER:
-		publicInputs["nullifiers"] = strings.Join(proof.PubSignals[1:3], ",")
-		publicInputs["root"] = proof.PubSignals[3]
-	case constants.CIRCUIT_WITHDRAW_NULLIFIER_BATCH:
-		publicInputs["nullifiers"] = strings.Join(proof.PubSignals[1:11], ",")
-		publicInputs["root"] = proof.PubSignals[11]
+	if circuit.Type == zetosignerapi.Transfer {
+		if circuit.UsesEncryption {
+			if !IsBatchCircuit(circuit.Name) {
+				publicInputs["ecdhPublicKey"] = strings.Join(proof.PubSignals[0:2], ",")
+				publicInputs["encryptedValues"] = strings.Join(proof.PubSignals[2:10], ",")
+				publicInputs["encryptionNonce"] = proof.PubSignals[14]
+			} else {
+				publicInputs["ecdhPublicKey"] = strings.Join(proof.PubSignals[0:2], ",")
+				publicInputs["encryptedValues"] = strings.Join(proof.PubSignals[2:42], ",")
+				publicInputs["encryptionNonce"] = proof.PubSignals[62]
+			}
+		} else if circuit.UsesNullifiers {
+			if !IsBatchCircuit(circuit.Name) {
+				publicInputs["nullifiers"] = strings.Join(proof.PubSignals[0:2], ",")
+				publicInputs["root"] = proof.PubSignals[2]
+			} else {
+				publicInputs["nullifiers"] = strings.Join(proof.PubSignals[0:10], ",")
+				publicInputs["root"] = proof.PubSignals[10]
+			}
+		}
+	} else if circuit.Type == zetosignerapi.Withdraw {
+		if circuit.UsesNullifiers {
+			if !IsBatchCircuit(circuit.Name) {
+				publicInputs["nullifiers"] = strings.Join(proof.PubSignals[1:3], ",")
+				publicInputs["root"] = proof.PubSignals[3]
+			} else {
+				publicInputs["nullifiers"] = strings.Join(proof.PubSignals[1:11], ",")
+				publicInputs["root"] = proof.PubSignals[11]
+			}
+		}
 	}
 
 	res := pb.ProvingResponse{
@@ -244,31 +259,30 @@ func serializeProofResponse(circuitId string, proof *types.ZKProof) ([]byte, err
 	return proto.Marshal(&res)
 }
 
-func calculateWitness(ctx context.Context, circuitId string, commonInputs *pb.ProvingRequestCommon, extras interface{}, keyEntry *core.KeyEntry, circuit witness.Calculator) ([]byte, error) {
-
-	inputs, err := getWitnessInputs(circuitId, extras)
+func calculateWitness(ctx context.Context, circuit *zetosignerapi.Circuit, commonInputs *pb.ProvingRequestCommon, extras interface{}, keyEntry *core.KeyEntry, witnessCalculator witness.Calculator) ([]byte, error) {
+	inputs, err := getWitnessInputs(commonInputs.TokenType, circuit, extras)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate the inputs
-	if err := inputs.validate(ctx, commonInputs); err != nil {
+	if err := inputs.Validate(ctx, commonInputs); err != nil {
 		return nil, err
 	}
 
 	// Build the common witness inputs
-	if err := inputs.build(ctx, commonInputs); err != nil {
+	if err := inputs.Build(ctx, commonInputs); err != nil {
 		return nil, err
 	}
 
 	// Assemble the circuit-specific witness inputs
-	witnessInputs, err := inputs.assemble(ctx, keyEntry)
+	witnessInputs, err := inputs.Assemble(ctx, keyEntry)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorAssembleInputs, err)
 	}
 
 	// Calculate the witness binary
-	wtns, err := circuit.CalculateWTNSBin(witnessInputs, true)
+	wtns, err := witnessCalculator.CalculateWTNSBin(witnessInputs, true)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorCalcWitness, err)
 	}
@@ -276,32 +290,50 @@ func calculateWitness(ctx context.Context, circuitId string, commonInputs *pb.Pr
 	return wtns, nil
 }
 
-func newWitnessInputs(circuitId string, extras interface{}) (witnessInputs, error) {
-	switch circuitId {
-	case constants.CIRCUIT_NF_ANON:
-		return &nonFungibleWitnessInputs{}, nil
-	case constants.CIRCUIT_NF_ANON_NULLIFIER: // TODO: implemented
-		return &nonFungibleWitnessInputs{}, nil
-	case constants.CIRCUIT_ANON_ENC, constants.CIRCUIT_ANON_ENC_BATCH:
-		encExtras, ok := extras.(*pb.ProvingRequestExtras_Encryption)
-		if !ok {
-			return nil, fmt.Errorf("unexpected extras type for encryption circuit")
+func newWitnessInputs(tokenType pb.TokenType, circuit *zetosignerapi.Circuit, extras interface{}) (witnessInputs, error) {
+	switch circuit.Type {
+	case zetosignerapi.Deposit:
+		return &wtns.DepositWitnessInputs{}, nil
+	case zetosignerapi.Withdraw:
+		if circuit.UsesNullifiers {
+			nullifierExtras, ok := extras.(*pb.ProvingRequestExtras_Nullifiers)
+			if !ok {
+				return nil, fmt.Errorf("unexpected extras type for anon nullifier circuit")
+			}
+			return &wtns.WithdrawNullifierWitnessInputs{
+				FungibleNullifierWitnessInputs: wtns.FungibleNullifierWitnessInputs{
+					Extras: nullifierExtras,
+				},
+			}, nil
 		}
-		return &fungibleEncWitnessInputs{enc: encExtras}, nil
-	case constants.CIRCUIT_ANON_NULLIFIER, constants.CIRCUIT_ANON_NULLIFIER_BATCH,
-		constants.CIRCUIT_WITHDRAW_NULLIFIER, constants.CIRCUIT_WITHDRAW_NULLIFIER_BATCH:
-		nullifierExtras, ok := extras.(*pb.ProvingRequestExtras_Nullifiers)
-		if !ok {
-			return nil, fmt.Errorf("unexpected extras type for anon nullifier circuit")
+		return &wtns.WithdrawWitnessInputs{}, nil
+	case zetosignerapi.Transfer:
+		if tokenType == pb.TokenType_fungible {
+			if circuit.UsesEncryption {
+				encExtras, ok := extras.(*pb.ProvingRequestExtras_Encryption)
+				if !ok {
+					return nil, fmt.Errorf("unexpected extras type for encryption circuit")
+				}
+				return &wtns.FungibleEncWitnessInputs{Enc: encExtras}, nil
+			} else if circuit.UsesNullifiers {
+				nullifierExtras, ok := extras.(*pb.ProvingRequestExtras_Nullifiers)
+				if !ok {
+					return nil, fmt.Errorf("unexpected extras type for anon nullifier circuit")
+				}
+				return &wtns.FungibleNullifierWitnessInputs{
+					Extras: nullifierExtras,
+				}, nil
+			} else {
+				return &wtns.FungibleWitnessInputs{}, nil
+			}
+		} else {
+			return &wtns.NonFungibleWitnessInputs{}, nil
 		}
-		return &fungibleNullifierWitnessInputs{nul: nullifierExtras}, nil
-	case constants.CIRCUIT_DEPOSIT:
-		return &depositWitnessInputs{}, nil
-	case constants.CIRCUIT_LOCK, constants.CIRCUIT_LOCK_BATCH:
-		return &lockWitnessInputs{}, nil
-	default:
-		return &fungibleWitnessInputs{}, nil
+	case zetosignerapi.TransferLocked:
+		return &wtns.FungibleWitnessInputs{}, nil
 	}
+
+	return nil, fmt.Errorf("unsupported circuit type %s", circuit.Type)
 }
 
 func generateProof(ctx context.Context, wtns, provingKey []byte) (*types.ZKProof, error) {

@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/kaleido-io/paladin/perf/internal/conf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type publicContract struct {
@@ -44,8 +44,8 @@ func (tc *publicContract) Name() string {
 
 func (tc *publicContract) RunOnce(iterationCount int) (string, error) {
 	// This will always be the ABI reference for simple storage - can disregard error when hardcoded to a valid value
-	abiRef := tktypes.MustParseBytes32("0x23dbc09b901a3bf265a44b60ca7337eeba63f506ddd8ed77ac1505a52a2c5d15")
-	to := tktypes.MustEthAddress(tc.pr.cfg.ContractOptions.Address)
+	abiRef := pldtypes.MustParseBytes32("0x23dbc09b901a3bf265a44b60ca7337eeba63f506ddd8ed77ac1505a52a2c5d15")
+	to := pldtypes.MustEthAddress(tc.pr.cfg.ContractOptions.Address)
 	result, err := tc.pr.httpClient.PTX().SendTransaction(tc.pr.ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type:         pldapi.TransactionTypePublic.Enum(),
@@ -56,7 +56,7 @@ func (tc *publicContract) RunOnce(iterationCount int) (string, error) {
 			// a single transaction orchestrator. This approach works when using the default paladin
 			// wallet, but may require additional configuration if testing with an external wallet
 			From:           fmt.Sprintf("test%d", tc.workerID),
-			Data:           tktypes.RawJSON(fmt.Sprintf("[%d]", tc.workerID)),
+			Data:           pldtypes.RawJSON(fmt.Sprintf("[%d]", tc.workerID)),
 			IdempotencyKey: tc.pr.getIdempotencyKey(tc.workerID, iterationCount),
 		},
 	})

@@ -25,9 +25,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 )
 
 func (s *rpcServer) newWSConnection(conn *websocket.Conn) {
@@ -35,7 +35,7 @@ func (s *rpcServer) newWSConnection(conn *websocket.Conn) {
 	defer s.wsMux.Unlock()
 
 	c := &webSocketConnection{
-		id:             tktypes.ShortID(),
+		id:             pldtypes.ShortID(),
 		server:         s,
 		conn:           conn,
 		asyncInstances: make(map[uuid.UUID]*asyncWrapper),
@@ -80,7 +80,7 @@ func (aw *asyncWrapper) Send(method string, params any) {
 	aw.wsc.sendMessage(&rpcclient.RPCResponse{
 		JSONRpc: "2.0",
 		Method:  method,
-		Params:  tktypes.JSONString(params),
+		Params:  pldtypes.JSONString(params),
 	})
 }
 

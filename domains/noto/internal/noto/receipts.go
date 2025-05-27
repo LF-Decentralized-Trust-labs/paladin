@@ -21,8 +21,8 @@ import (
 	"math/big"
 
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptRequest) (res *prototk.BuildReceiptResponse, err error) {
@@ -82,8 +82,8 @@ func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 			LockedInputs:  endorsableStateIDs(n.filterSchema(req.ReadStates, []string{n.lockedCoinSchema.Id})),
 			LockedOutputs: endorsableStateIDs(n.filterSchema(req.InfoStates, []string{n.lockedCoinSchema.Id})),
 			Outputs:       endorsableStateIDs(n.filterSchema(req.InfoStates, []string{n.coinSchema.Id})),
-			Signature:     tktypes.HexBytes{},
-			Data:          tktypes.HexBytes{},
+			Signature:     pldtypes.HexBytes{},
+			Data:          pldtypes.HexBytes{},
 		}
 		paramsJSON, err := json.Marshal(receipt.LockInfo.UnlockParams)
 		if err != nil {
@@ -114,13 +114,13 @@ func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 func (n *Noto) receiptStates(ctx context.Context, states []*prototk.EndorsableState) ([]*types.ReceiptState, error) {
 	coins := make([]*types.ReceiptState, len(states))
 	for i, state := range states {
-		id, err := tktypes.ParseHexBytes(ctx, state.Id)
+		id, err := pldtypes.ParseHexBytes(ctx, state.Id)
 		if err != nil {
 			return nil, err
 		}
 		coins[i] = &types.ReceiptState{
 			ID:   id,
-			Data: tktypes.RawJSON(state.StateDataJson),
+			Data: pldtypes.RawJSON(state.StateDataJson),
 		}
 	}
 	return coins, nil
@@ -136,11 +136,11 @@ func (n *Noto) receiptTransfers(ctx context.Context, req *prototk.BuildReceiptRe
 		return nil, err
 	}
 
-	var from *tktypes.EthAddress
+	var from *pldtypes.EthAddress
 	fromAmount := big.NewInt(0)
-	to := make(map[tktypes.EthAddress]*big.Int)
+	to := make(map[pldtypes.EthAddress]*big.Int)
 
-	parseInput := func(owner *tktypes.EthAddress, amount *big.Int) bool {
+	parseInput := func(owner *pldtypes.EthAddress, amount *big.Int) bool {
 		if from == nil {
 			from = owner
 		} else if !owner.Equals(from) {
@@ -150,7 +150,7 @@ func (n *Noto) receiptTransfers(ctx context.Context, req *prototk.BuildReceiptRe
 		return true
 	}
 
-	parseOutput := func(owner tktypes.EthAddress, amount *big.Int) bool {
+	parseOutput := func(owner pldtypes.EthAddress, amount *big.Int) bool {
 		if owner.Equals(from) {
 			fromAmount.Sub(fromAmount, amount)
 		} else if toAmount, ok := to[owner]; ok {
@@ -186,7 +186,7 @@ func (n *Noto) receiptTransfers(ctx context.Context, req *prototk.BuildReceiptRe
 		// special case for burn (no recipients)
 		return []*types.ReceiptTransfer{{
 			From:   from,
-			Amount: (*tktypes.HexUint256)(fromAmount),
+			Amount: (*pldtypes.HexUint256)(fromAmount),
 		}}, nil
 	}
 
@@ -196,7 +196,7 @@ func (n *Noto) receiptTransfers(ctx context.Context, req *prototk.BuildReceiptRe
 			transfers = append(transfers, &types.ReceiptTransfer{
 				From:   from,
 				To:     &owner,
-				Amount: (*tktypes.HexUint256)(amount),
+				Amount: (*pldtypes.HexUint256)(amount),
 			})
 		}
 	}

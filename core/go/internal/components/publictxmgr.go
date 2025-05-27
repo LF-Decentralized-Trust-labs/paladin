@@ -22,9 +22,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 )
 
 var PublicTxFilterFields filters.FieldSet = filters.FieldMap{
@@ -45,7 +45,7 @@ type PublicTxSubmission struct {
 
 type PaladinTXReference struct {
 	TransactionID   uuid.UUID
-	TransactionType tktypes.Enum[pldapi.TransactionType]
+	TransactionType pldtypes.Enum[pldapi.TransactionType]
 }
 
 type PublicTxMatch struct {
@@ -59,7 +59,7 @@ type PublicTxManager interface {
 	// Synchronous functions that are executed on the callers thread
 	QueryPublicTxForTransactions(ctx context.Context, dbTX persistence.DBTX, boundToTxns []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*pldapi.PublicTx, error)
 	QueryPublicTxWithBindings(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.PublicTxWithBinding, error)
-	GetPublicTransactionForHash(ctx context.Context, dbTX persistence.DBTX, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error)
+	GetPublicTransactionForHash(ctx context.Context, dbTX persistence.DBTX, hash pldtypes.Bytes32) (*pldapi.PublicTxWithBinding, error)
 
 	// Perform (potentially expensive) transaction level validation, such as gas estimation. Call before starting a DB transaction
 	ValidateTransaction(ctx context.Context, dbTX persistence.DBTX, transaction *PublicTxSubmission) error
@@ -70,4 +70,6 @@ type PublicTxManager interface {
 
 	MatchUpdateConfirmedTransactions(ctx context.Context, dbTX persistence.DBTX, itxs []*blockindexer.IndexedTransactionNotify) ([]*PublicTxMatch, error)
 	NotifyConfirmPersisted(ctx context.Context, confirms []*PublicTxMatch)
+
+	UpdateTransaction(ctx context.Context, id uuid.UUID, pubTXID uint64, from *pldtypes.EthAddress, tx *pldapi.TransactionInput, publicTxData []byte, txmgrDBUpdate func(dbTX persistence.DBTX) error) error
 }

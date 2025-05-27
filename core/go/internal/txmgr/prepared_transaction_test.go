@@ -28,9 +28,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/statemgr"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -46,15 +46,15 @@ var testStateSchema = &abi.Parameter{
 	},
 }
 
-func writeStates(t *testing.T, txm *txManager, dbTX persistence.DBTX, testSchemaID tktypes.Bytes32, fakeContractAddr tktypes.EthAddress, count int) ([]*pldapi.StateBase, []tktypes.HexBytes) {
+func writeStates(t *testing.T, txm *txManager, dbTX persistence.DBTX, testSchemaID pldtypes.Bytes32, fakeContractAddr pldtypes.EthAddress, count int) ([]*pldapi.StateBase, []pldtypes.HexBytes) {
 	stateInputs := make([]*components.StateUpsertOutsideContext, count)
 	for i := range stateInputs {
 		stateInputs[i] = &components.StateUpsertOutsideContext{
-			SchemaID:        tktypes.Bytes32(testSchemaID),
+			SchemaID:        pldtypes.Bytes32(testSchemaID),
 			ContractAddress: &fakeContractAddr,
-			Data: tktypes.JSONString(map[string]any{
-				"salt":   tktypes.RandHex(32),
-				"owner":  tktypes.RandAddress(),
+			Data: pldtypes.JSONString(map[string]any{
+				"salt":   pldtypes.RandHex(32),
+				"owner":  pldtypes.RandAddress(),
 				"amount": 10000 + i,
 			}),
 		}
@@ -63,7 +63,7 @@ func writeStates(t *testing.T, txm *txManager, dbTX persistence.DBTX, testSchema
 	require.NoError(t, err)
 
 	states := make([]*pldapi.StateBase, len(written))
-	stateIDs := make([]tktypes.HexBytes, len(written))
+	stateIDs := make([]pldtypes.HexBytes, len(written))
 	for i, s := range written {
 		states[i] = &s.StateBase
 		stateIDs[i] = s.ID
@@ -84,8 +84,8 @@ func newRealStateManager(t *testing.T, mc *mockComponents) components.StateManag
 
 func TestPreparedTransactionRealDB(t *testing.T) {
 
-	contractAddressDomain1 := *tktypes.RandAddress()
-	contractAddressDomain2 := *tktypes.RandAddress()
+	contractAddressDomain1 := *pldtypes.RandAddress()
+	contractAddressDomain2 := *pldtypes.RandAddress()
 
 	var stateMgr components.StateManager
 	ctx, txm, done := newTestTransactionManager(t, true,
@@ -103,7 +103,7 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 	txm.stateMgr = stateMgr
 	defer txm.stateMgr.Stop()
 
-	var testSchemaID tktypes.Bytes32
+	var testSchemaID pldtypes.Bytes32
 	var parentTx *components.ValidatedTransaction
 	err := txm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 
@@ -143,7 +143,7 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 				ID:       *parentTx.Transaction.ID,
 				Domain:   parentTx.Transaction.Domain,
 				To:       &contractAddressDomain1,
-				Metadata: tktypes.RawJSON(`{"some":"data"}`),
+				Metadata: pldtypes.RawJSON(`{"some":"data"}`),
 				Transaction: pldapi.TransactionInput{
 					TransactionBase: pldapi.TransactionBase{
 						From:           "me@node1",
@@ -182,12 +182,12 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 					Type:           pldapi.TransactionTypePrivate.Enum(),
 					Domain:         "domain2",
 					To:             &contractAddressDomain2,
-					Function:       "doThing2()",          // now fully qualified
-					ABIReference:   &storedABI.Hash,       // now resolved
-					Data:           tktypes.RawJSON(`{}`), // normalized
+					Function:       "doThing2()",           // now fully qualified
+					ABIReference:   &storedABI.Hash,        // now resolved
+					Data:           pldtypes.RawJSON(`{}`), // normalized
 				},
 			},
-			Metadata: tktypes.RawJSON(`{"some":"data"}`),
+			Metadata: pldtypes.RawJSON(`{"some":"data"}`),
 		}
 
 		// Query it back
@@ -222,8 +222,8 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 
 }
 
-func stateIDs(states []*pldapi.StateBase) []tktypes.HexBytes {
-	stateIDs := make([]tktypes.HexBytes, len(states))
+func stateIDs(states []*pldapi.StateBase) []pldtypes.HexBytes {
+	stateIDs := make([]pldtypes.HexBytes, len(states))
 	for i, s := range states {
 		stateIDs[i] = s.ID
 	}

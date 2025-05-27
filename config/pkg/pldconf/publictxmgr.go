@@ -172,4 +172,5 @@ type PublicTxManagerOrchestratorConfig struct {
 	PersistenceRetryTime      *string            `json:"persistenceRetryTime"`
 	UnavailableBalanceHandler *string            `json:"unavailableBalanceHandler"`
 	SubmissionRetry           RetryConfigWithMax `json:"submissionRetry"`
+	TimeLineLoggingMaxEntries int                `json:"timelineMaxEntries"`
 }

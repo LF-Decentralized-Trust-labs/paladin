@@ -25,8 +25,8 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +47,7 @@ func TestRPCMessageBatch(t *testing.T) {
 		return "resultB", nil
 	}))
 
-	var jsonResponse tktypes.RawJSON
+	var jsonResponse pldtypes.RawJSON
 	res, err := resty.New().R().
 		SetBody(`[
 			{
@@ -99,7 +99,7 @@ func TestRPCMessageBatchOneFails200WithError(t *testing.T) {
 		return "", fmt.Errorf("pop")
 	}))
 
-	var jsonResponse tktypes.RawJSON
+	var jsonResponse pldtypes.RawJSON
 	res, err := resty.New().R().
 		SetBody(`[
 			{
@@ -158,7 +158,7 @@ func TestRPCMessageBatchAllFail(t *testing.T) {
 		return "", fmt.Errorf("pop")
 	}))
 
-	var jsonResponse tktypes.RawJSON
+	var jsonResponse pldtypes.RawJSON
 	res, err := resty.New().R().
 		SetBody(`[
 			{

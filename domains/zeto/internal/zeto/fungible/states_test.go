@@ -21,9 +21,9 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,13 +40,13 @@ func TestPrepareInputs(t *testing.T) {
 
 	stateQueryContext := "test"
 	ctx := context.Background()
-	_, _, _, _, err := prepareInputsForTransfer(ctx, callbacks, coinSchema, false, stateQueryContext, "Alice", []*types.FungibleTransferParamEntry{{Amount: tktypes.Uint64ToUint256(100)}})
+	_, _, _, err := prepareInputsForTransfer(ctx, callbacks, coinSchema, false, stateQueryContext, "Alice", []*types.FungibleTransferParamEntry{{Amount: pldtypes.Uint64ToUint256(100)}})
 	assert.EqualError(t, err, "PD210032: Failed to query the state store for available coins. test error")
 
 	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		return &prototk.FindAvailableStatesResponse{}, nil
 	}
-	_, _, _, _, err = prepareInputsForTransfer(ctx, callbacks, coinSchema, false, stateQueryContext, "Alice", []*types.FungibleTransferParamEntry{{Amount: tktypes.Uint64ToUint256(100)}})
+	_, _, _, err = prepareInputsForTransfer(ctx, callbacks, coinSchema, false, stateQueryContext, "Alice", []*types.FungibleTransferParamEntry{{Amount: pldtypes.Uint64ToUint256(100)}})
 	assert.EqualError(t, err, "PD210033: Insufficient funds (available=0)")
 
 	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
@@ -59,7 +59,7 @@ func TestPrepareInputs(t *testing.T) {
 			},
 		}, nil
 	}
-	_, _, _, _, err = prepareInputsForTransfer(ctx, callbacks, coinSchema, false, stateQueryContext, "Alice", []*types.FungibleTransferParamEntry{{Amount: tktypes.Uint64ToUint256(100)}})
+	_, _, _, err = prepareInputsForTransfer(ctx, callbacks, coinSchema, false, stateQueryContext, "Alice", []*types.FungibleTransferParamEntry{{Amount: pldtypes.Uint64ToUint256(100)}})
 	assert.EqualError(t, err, "PD210034: Coin state-1 is invalid: invalid character 'b' looking for beginning of value")
 
 	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
@@ -78,6 +78,6 @@ func TestPrepareInputs(t *testing.T) {
 			},
 		}, nil
 	}
-	_, _, _, _, err = prepareInputsForTransfer(ctx, callbacks, coinSchema, false, stateQueryContext, "Alice", []*types.FungibleTransferParamEntry{{Amount: tktypes.Uint64ToUint256(200)}})
+	_, _, _, err = prepareInputsForTransfer(ctx, callbacks, coinSchema, false, stateQueryContext, "Alice", []*types.FungibleTransferParamEntry{{Amount: pldtypes.Uint64ToUint256(200)}})
 	assert.EqualError(t, err, "PD210035: Need more than maximum number (10) of coins to fulfill the transfer amount total")
 }
