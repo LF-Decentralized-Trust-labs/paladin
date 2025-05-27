@@ -381,7 +381,17 @@ func (tb *testbed) execPrivateTransaction(ctx context.Context, tx *testbedTransa
 	}
 }
 
-func mapTransactionState(state *components.FullState, tx *testbedTransaction) *pldapi.StateEncoded {
+func mapToBaseState(state *components.FullState, tx *testbedTransaction) *pldapi.StateBase {
+	return &pldapi.StateBase{
+		DomainName:      tx.ptx.Domain,
+		ContractAddress: &tx.ptx.Address,
+		ID:              state.ID,
+		Schema:          state.Schema,
+		Data:            state.Data.Bytes(),
+	}
+}
+
+func mapToEncodedState(state *components.FullState, tx *testbedTransaction) *pldapi.StateEncoded {
 	return &pldapi.StateEncoded{
 		DomainName:      tx.ptx.Domain,
 		ContractAddress: &tx.ptx.Address,
@@ -391,22 +401,39 @@ func mapTransactionState(state *components.FullState, tx *testbedTransaction) *p
 	}
 }
 
+func mapStatesForReceipt(tx *testbedTransaction) *pldapi.TransactionStates {
+	states := &pldapi.TransactionStates{}
+	for _, state := range tx.ptx.PostAssembly.InputStates {
+		states.Spent = append(states.Spent, mapToBaseState(state, tx))
+	}
+	for _, state := range tx.ptx.PostAssembly.OutputStates {
+		states.Confirmed = append(states.Confirmed, mapToBaseState(state, tx))
+	}
+	for _, state := range tx.ptx.PostAssembly.ReadStates {
+		states.Read = append(states.Read, mapToBaseState(state, tx))
+	}
+	for _, state := range tx.ptx.PostAssembly.InfoStates {
+		states.Info = append(states.Info, mapToBaseState(state, tx))
+	}
+	return states
+}
+
 func (tb *testbed) mapTransaction(ctx context.Context, tx *testbedTransaction) (*TransactionResult, error) {
 	inputStates := make([]*pldapi.StateEncoded, len(tx.ptx.PostAssembly.InputStates))
 	for i, state := range tx.ptx.PostAssembly.InputStates {
-		inputStates[i] = mapTransactionState(state, tx)
+		inputStates[i] = mapToEncodedState(state, tx)
 	}
 	outputStates := make([]*pldapi.StateEncoded, len(tx.ptx.PostAssembly.OutputStates))
 	for i, state := range tx.ptx.PostAssembly.OutputStates {
-		outputStates[i] = mapTransactionState(state, tx)
+		outputStates[i] = mapToEncodedState(state, tx)
 	}
 	readStates := make([]*pldapi.StateEncoded, len(tx.ptx.PostAssembly.ReadStates))
 	for i, state := range tx.ptx.PostAssembly.ReadStates {
-		readStates[i] = mapTransactionState(state, tx)
+		readStates[i] = mapToEncodedState(state, tx)
 	}
 	infoStates := make([]*pldapi.StateEncoded, len(tx.ptx.PostAssembly.InfoStates))
 	for i, state := range tx.ptx.PostAssembly.InfoStates {
-		infoStates[i] = mapTransactionState(state, tx)
+		infoStates[i] = mapToEncodedState(state, tx)
 	}
 
 	preparedTransaction := tx.ptx.PreparedPublicTransaction
@@ -424,6 +451,8 @@ func (tb *testbed) mapTransaction(ctx context.Context, tx *testbedTransaction) (
 		domainData = []byte(*tx.ptx.PostAssembly.DomainData)
 	}
 
+	domainReceipt, _ := tx.psc.Domain().BuildDomainReceipt(ctx, nil, tx.ptx.ID, mapStatesForReceipt(tx))
+
 	return &TransactionResult{
 		ID:                  tx.ptx.ID,
 		EncodedCall:         encodedCall,
@@ -433,6 +462,7 @@ func (tb *testbed) mapTransaction(ctx context.Context, tx *testbedTransaction) (
 		OutputStates:        outputStates,
 		ReadStates:          readStates,
 		InfoStates:          infoStates,
+		DomainReceipt:       domainReceipt,
 		DomainData:          domainData,
 	}, nil
 }
