@@ -128,14 +128,27 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
 	}
 
+	lockOptions := types.NotoLockOptions{
+		UnlockHash: pldtypes.Bytes32(unlockHash),
+	}
+	lockOptionsJSON, err := json.Marshal(lockOptions)
+	if err != nil {
+		return nil, err
+	}
+	lockOptionsEncoded, err := types.NotoLockOptionsABI.EncodeABIDataJSONCtx(ctx, lockOptionsJSON)
+	if err != nil {
+		return nil, err
+	}
+
 	data, err := h.noto.encodeTransactionData(ctx, req.Transaction, req.InfoStates)
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoPrepareUnlockParams{
+	params := &NotoSetLockOptionsParams{
+		LockID:       inParams.LockID,
 		LockedInputs: endorsableStateIDs(lockedInputs),
-		UnlockHash:   pldtypes.Bytes32(unlockHash),
-		Signature:    sender.Payload,
+		Options:      lockOptionsEncoded,
+		Proof:        sender.Payload,
 		Data:         data,
 	}
 	paramsJSON, err := json.Marshal(params)
@@ -143,7 +156,7 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()["prepareUnlock"],
+		functionABI: interfaceBuild.ABI.Functions()["setLockOptions"],
 		paramsJSON:  paramsJSON,
 	}, nil
 }

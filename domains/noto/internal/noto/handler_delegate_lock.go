@@ -44,9 +44,6 @@ func (h *delegateLockHandler) ValidateParams(ctx context.Context, config *types.
 	if delegateParams.LockID.IsZero() {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "lockId")
 	}
-	if delegateParams.Unlock == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "unlock")
-	}
 	if delegateParams.Delegate.IsZero() {
 		return nil, i18n.NewError(ctx, msgs.MsgInvalidDelegate, delegateParams.Delegate)
 	}
@@ -175,21 +172,16 @@ func (h *delegateLockHandler) baseLedgerInvoke(ctx context.Context, tx *types.Pa
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
 	}
 
-	unlockHash, err := h.noto.unlockHashFromIDs(ctx, tx.ContractAddress, inParams.Unlock.LockedInputs, inParams.Unlock.LockedOutputs, inParams.Unlock.Outputs, inParams.Unlock.Data)
-	if err != nil {
-		return nil, err
-	}
-
 	data, err := h.noto.encodeTransactionData(ctx, req.Transaction, req.InfoStates)
 	if err != nil {
 		return nil, err
 	}
 	params := &NotoDelegateLockParams{
-		TxId:       req.Transaction.TransactionId,
-		UnlockHash: pldtypes.Bytes32(unlockHash),
-		Delegate:   inParams.Delegate,
-		Signature:  sender.Payload,
-		Data:       data,
+		TxId:     req.Transaction.TransactionId,
+		LockID:   inParams.LockID,
+		Delegate: inParams.Delegate,
+		Proof:    sender.Payload,
+		Data:     data,
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {

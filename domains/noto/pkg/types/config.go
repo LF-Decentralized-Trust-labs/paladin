@@ -121,3 +121,11 @@ const (
 )
 
 var NotoVariantDefault pldtypes.HexUint64 = 0x0000
+
+type NotoLockOptions struct {
+	UnlockHash pldtypes.Bytes32 `json:"unlockHash"`
+}
+
+var NotoLockOptionsABI = &abi.ParameterArray{
+	{Name: "unlockHash", Type: "bytes32"},
+}

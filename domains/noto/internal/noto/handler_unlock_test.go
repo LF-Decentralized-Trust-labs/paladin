@@ -219,17 +219,18 @@ func TestUnlock(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	expectedFunction := mustParseJSON(interfaceBuild.ABI.Functions()["unlock"])
+	expectedFunction := mustParseJSON(interfaceBuild.ABI.Functions()["transferLocked"])
 	assert.JSONEq(t, expectedFunction, prepareRes.Transaction.FunctionAbiJson)
 	assert.Nil(t, prepareRes.Transaction.ContractAddress)
 	assert.JSONEq(t, fmt.Sprintf(`{
+		"lockId": "%s",
 		"lockedInputs": ["%s"],
 		"lockedOutputs": [],
 		"outputs": ["0x26b394af655bdc794a6d7cd7f8004eec20bffb374e4ddd24cdaefe554878d945"],
-		"signature": "%s",
+		"proof": "%s",
 		"txId": "0x015e1881f2ba769c22d05c841f06949ec6e1bd573f5e1e0328885494212f077d",
 		"data": "0x00010000015e1881f2ba769c22d05c841f06949ec6e1bd573f5e1e0328885494212f077d000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000024cc7840e186de23c4127b4853c878708d2642f1942959692885e098f1944547d69101a0740ec8096b83653600fa7553d676fc92bcc6e203c3572d2cac4f1db2f"
-	}`, inputCoin.ID, signatureBytes), prepareRes.Transaction.ParamsJson)
+	}`, lockID, inputCoin.ID, signatureBytes), prepareRes.Transaction.ParamsJson)
 
 	var invokeFn abi.Entry
 	err = json.Unmarshal([]byte(prepareRes.Transaction.FunctionAbiJson), &invokeFn)

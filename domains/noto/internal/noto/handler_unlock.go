@@ -283,7 +283,9 @@ func (h *unlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction
 	return h.endorse(ctx, tx, params, req, inputs, outputs)
 }
 
-func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+	inParams := tx.Params.(*types.UnlockParams)
+
 	lockedInputs := req.InputStates
 	outputs, lockedOutputs := h.noto.splitStates(req.OutputStates)
 
@@ -298,12 +300,13 @@ func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepa
 	if err != nil {
 		return nil, err
 	}
-	params := &types.UnlockPublicParams{
+	params := &types.TransferLockedPublicParams{
 		TxId:          req.Transaction.TransactionId,
+		LockID:        inParams.LockID,
 		LockedInputs:  endorsableStateIDs(lockedInputs),
 		LockedOutputs: endorsableStateIDs(lockedOutputs),
 		Outputs:       endorsableStateIDs(outputs),
-		Signature:     unlockSignature.Payload,
+		Proof:         unlockSignature.Payload,
 		Data:          data,
 	}
 	paramsJSON, err := json.Marshal(params)
@@ -311,7 +314,7 @@ func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepa
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()["unlock"],
+		functionABI: interfaceBuild.ABI.Functions()["transferLocked"],
 		paramsJSON:  paramsJSON,
 	}, nil
 }
@@ -370,7 +373,7 @@ func (h *unlockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "notary")
 	}
 
-	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, req)
 	if err != nil {
 		return nil, err
 	}
