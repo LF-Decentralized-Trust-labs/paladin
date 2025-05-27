@@ -173,7 +173,7 @@ func TestNewEthClientFactoryBadConfig(t *testing.T) {
 			},
 		},
 	})
-	assert.Regexp(t, "PD020500", err)
+	assert.Regexp(t, "PD021100", err)
 }
 
 func TestNewEthClientFactoryMissingURL(t *testing.T) {

@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
@@ -162,7 +161,10 @@ func TestWebSocketEthSubscribeUnsubscribe(t *testing.T) {
 	ethSubs := NewEthSubscribe()
 	s.Register(NewRPCModule("eth").AddAsync(ethSubs.RPCAsyncHandler()))
 
-	client := rpcclient.WrapWSConfig(&wsclient.WSConfig{WebSocketURL: url, DisableReconnect: true})
+	wsConfig := &pldconf.WSClientConfig{}
+	wsConfig.URL = url
+	client := rpcclient.WrapWSConfig(wsConfig)
+
 	defer client.Close()
 	err := client.Connect(context.Background())
 	require.NoError(t, err)
