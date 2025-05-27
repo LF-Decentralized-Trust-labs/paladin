@@ -120,14 +120,17 @@ public class BondTest {
             var mapper = new ObjectMapper();
 
             List<HashMap<String, Object>> notoSchemas = testbed.getRpcClient().request("pstate_listSchemas", "noto");
-            StateSchema notoSchema = null;
+            StateSchema coinSchema = null;
+            StateSchema lockedCoinSchema = null;
             for (var schemaJson : notoSchemas) {
                 var schema = mapper.convertValue(schemaJson, StateSchema.class);
                 if (schema.signature().startsWith("type=NotoCoin")) {
-                    notoSchema = schema;
+                    coinSchema = schema;
+                } else if (schema.signature().startsWith("type=NotoLockedCoin")) {
+                    lockedCoinSchema = schema;
                 }
             }
-            assertNotNull(notoSchema);
+            assertNotNull(coinSchema);
 
             String bondTrackerPublicBytecode = ResourceLoader.jsonResourceEntryText(
                     this.getClass().getClassLoader(),
@@ -216,11 +219,11 @@ public class BondTest {
             notoBond.mint(bondIssuer, bondCustodian, 1000);
 
             // Validate Noto balances
-            var notoCashStates = notoCash.queryStates(notoSchema.id, null);
+            var notoCashStates = notoCash.queryStates(coinSchema.id, null);
             assertEquals(1, notoCashStates.size());
             assertEquals("100000", notoCashStates.getFirst().data().amount());
             assertEquals(aliceAddress, notoCashStates.getFirst().data().owner());
-            var notoBondStates = notoBond.queryStates(notoSchema.id, null);
+            var notoBondStates = notoBond.queryStates(coinSchema.id, null);
             assertEquals(1, notoBondStates.size());
             assertEquals("1000", notoBondStates.getFirst().data().amount());
             assertEquals(custodianAddress, notoBondStates.getFirst().data().owner());
@@ -251,28 +254,21 @@ public class BondTest {
                 put("atomFactory_", atomFactoryAddress);
             }});
 
-            // Prepare the bond transfer (requires 2 calls to prepare, as the Noto transaction spawns a Pente transaction to wrap it)
-            var bondTransfer = notoBond.prepareTransfer(bondCustodian, alice, 1000);
-            assertEquals("private", bondTransfer.preparedTransaction().type());
-            assertEquals("pente", bondTransfer.preparedTransaction().domain());
-            assertEquals(issuerCustodianInstance.address(), bondTransfer.preparedTransaction().to().toString());
-            assertEquals(1, bondTransfer.preparedTransaction().abi().size());
-            var bondTransfer2 = issuerCustodianInstance.prepare(
-                    bondTransfer.preparedTransaction().from(),
-                    bondTransfer.preparedTransaction().abi().getFirst(),
-                    bondTransfer.preparedTransaction().data()
-            );
-            assertEquals("public", bondTransfer2.preparedTransaction().type());
-            var bondTransferMetadata = mapper.convertValue(bondTransfer2.preparedMetadata(), PenteHelper.PenteTransitionMetadata.class);
+            // Prepare the bond transfer
+            var bondLock = notoBond.lock(bondCustodian, 1000);
+            var bondLockReceipt = mapper.convertValue(bondLock.domainReceipt(), NotoHelper.NotoDomainReceipt.class);
+            var bondUnlock = notoBond.prepareUnlock(bondCustodian, bondLockReceipt.lockInfo().lockId(), bondCustodian, alice, 1000);
+            var bondUnlockReceipt = mapper.convertValue(bondUnlock.domainReceipt(), NotoHelper.NotoDomainReceipt.class);
 
             // Prepare the payment transfer
-            var paymentTransfer = notoCash.prepareTransfer(alice, bondCustodian, 1000);
-            assertEquals("public", paymentTransfer.preparedTransaction().type());
-            var paymentMetadata = mapper.convertValue(paymentTransfer.preparedMetadata(), NotoHelper.NotoTransferMetadata.class);
+            var cashLock = notoCash.lock(alice, 1000);
+            var cashLockReceipt = mapper.convertValue(cashLock.domainReceipt(), NotoHelper.NotoDomainReceipt.class);
+            var cashUnlock = notoCash.prepareUnlock(alice, cashLockReceipt.lockInfo().lockId(), alice, bondCustodian, 1000);
+            var cashUnlockReceipt = mapper.convertValue(cashUnlock.domainReceipt(), NotoHelper.NotoDomainReceipt.class);
 
             // Pass the prepared transfers to the subscription contract
-            bondSubscription.prepareBond(bondCustodian, bondTransfer2.preparedTransaction().to(), bondTransferMetadata.transitionWithApproval().encodedCall());
-            bondSubscription.preparePayment(alice, paymentTransfer.preparedTransaction().to(), paymentMetadata.transferWithApproval().encodedCall());
+            bondSubscription.prepareBond(bondCustodian, JsonHex.addressFrom(notoBond.address()), bondUnlockReceipt.lockInfo().unlockCall());
+            bondSubscription.preparePayment(alice, JsonHex.addressFrom(notoCash.address()), cashUnlockReceipt.lockInfo().unlockCall());
 
             // Alice receives full bond distribution
             var distributeTX = bondSubscription.distribute(bondCustodian);
@@ -290,25 +286,13 @@ public class BondTest {
             var atomAddress = JsonHex.addressFrom(deployEventData.get("addr").toString());
 
             // Alice approves payment transfer
-            notoCash.approveTransfer(
-                    "alice",
-                    paymentTransfer.inputStates(),
-                    paymentTransfer.outputStates(),
-                    paymentMetadata.approvalParams().data(),
-                    atomAddress.toString());
+            notoCash.delegateLock(alice, cashLockReceipt.lockInfo().lockId(), atomAddress, cashUnlockReceipt.lockInfo().unlockParams());
 
             // Custodian approves bond transfer
-            var txID = issuerCustodianInstance.approveTransition(
-                    bondCustodian,
-                    JsonHex.randomBytes32(),
-                    atomAddress,
-                    bondTransferMetadata.approvalParams().transitionHash(),
-                    bondTransferMetadata.approvalParams().signatures());
-            var receipt = TestbedHelper.pollForReceipt(testbed, txID, 3000);
-            assertNotNull(receipt);
+            notoBond.delegateLock(bondCustodian, bondLockReceipt.lockInfo().lockId(), atomAddress, bondUnlockReceipt.lockInfo().unlockParams());
 
             // Execute the Atom
-            txID = TestbedHelper.sendTransaction(testbed,
+            var txID = TestbedHelper.sendTransaction(testbed,
                     new Testbed.TransactionInput(
                             "public",
                             "",
@@ -318,27 +302,22 @@ public class BondTest {
                             atomABI,
                             "execute"
                     ));
-            receipt = TestbedHelper.pollForReceipt(testbed, txID, 3000);
+            var receipt = TestbedHelper.pollForReceipt(testbed, txID, 3000);
             assertNotNull(receipt);
 
-            // All prepared transactions should now be resolved
-            receipt = TestbedHelper.pollForReceipt(testbed, paymentTransfer.id(), 3000);
-            assertNotNull(receipt);
-            receipt = TestbedHelper.pollForReceipt(testbed, bondTransfer2.id(), 3000);
-            assertNotNull(receipt);
-            receipt = TestbedHelper.pollForReceipt(testbed, bondTransfer.id(), 3000);
-            assertNotNull(receipt);
+            // TODO: figure out a better way to wait for events to settle
+            Thread.sleep(2000);
 
             // TODO: figure out how to test negative cases (such as when Pente reverts due to a non-allowed investor)
 
             // Validate Noto balance
-            notoCashStates = notoCash.queryStates(notoSchema.id, null);
+            notoCashStates = notoCash.queryStates(coinSchema.id, null);
             assertEquals(2, notoCashStates.size());
-            assertEquals("1000", notoCashStates.get(0).data().amount());
-            assertEquals(custodianAddress, notoCashStates.get(0).data().owner());
-            assertEquals("99000", notoCashStates.get(1).data().amount());
-            assertEquals(aliceAddress, notoCashStates.get(1).data().owner());
-            notoBondStates = notoBond.queryStates(notoSchema.id, null);
+            assertEquals("99000", notoCashStates.get(0).data().amount());
+            assertEquals(aliceAddress, notoCashStates.get(0).data().owner());
+            assertEquals("1000", notoCashStates.get(1).data().amount());
+            assertEquals(custodianAddress, notoCashStates.get(1).data().owner());
+            notoBondStates = notoBond.queryStates(coinSchema.id, null);
             assertEquals(1, notoBondStates.size());
             assertEquals("1000", notoBondStates.getFirst().data().amount());
             assertEquals(aliceAddress, notoBondStates.getFirst().data().owner());

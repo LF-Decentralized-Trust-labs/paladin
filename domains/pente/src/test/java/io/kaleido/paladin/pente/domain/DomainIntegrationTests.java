@@ -263,8 +263,8 @@ public class DomainIntegrationTests {
                                     notoTrackerABI,
                                     "deploy"
                             ), true));
-            var domainData = mapper.convertValue(tx.domainData(), PenteConfiguration.DomainData.class);
-            var notoTrackerAddress = domainData.contractAddress();
+            var domainReceipt = mapper.convertValue(tx.domainReceipt(), PenteEVMTransaction.JSONReceipt.class);
+            var notoTrackerAddress = domainReceipt.receipt().contractAddress();
 
             // Create Noto token
             String notoInstanceAddress = testbed.getRpcClient().request("testbed_deploy",

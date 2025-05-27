@@ -165,7 +165,7 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	log.L(ctx).Infof("TestNotoForNoto (withHooks=%t)", withHooks)
 
 	log.L(ctx).Infof("Initializing testbed")
-	_, notoTestbed := newNotoDomain(t, &nototypes.DomainConfig{
+	waitForNoto, notoTestbed := newNotoDomain(t, &nototypes.DomainConfig{
 		FactoryAddress: s.notoFactoryAddress,
 	})
 	done, _, tb, rpc := newTestbed(t, s.hdWalletSeed, map[string]*testbed.TestbedDomain{
@@ -173,6 +173,8 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	})
 	defer done()
 	pld := helpers.NewPaladinClient(t, ctx, tb)
+
+	notoDomain := <-waitForNoto
 
 	aliceKey, err := tb.ResolveKey(ctx, alice, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
@@ -184,6 +186,9 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	var tracker *helpers.NotoTrackerHelper
 	var trackerAddress *pldtypes.EthAddress
 	if withHooks {
+		// Note: this tracker is deployed to the base ledger
+		// Realistically, it would be deployed to a Pente privacy group (this flow
+		// is tested elsewhere in tests that load both Noto and Pente domains)
 		tracker = helpers.DeployTracker(ctx, t, tb, pld, notary)
 		trackerAddress = tracker.Address
 	}
@@ -199,7 +204,6 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	log.L(ctx).Infof("Mint 100 silver to Bob")
 	notoSilver.Mint(ctx, bob, 100).SignAndSend(notary).Wait()
 
-	// TODO: this should be a Pente private contract, instead of a base ledger contract
 	log.L(ctx).Infof("Propose a trade of 1 gold for 10 silver")
 	swap := helpers.DeploySwap(ctx, t, tb, pld, alice, &helpers.TradeRequestInput{
 		Holder1:       aliceKey.Verifier.Verifier,
@@ -212,49 +216,84 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	})
 
 	log.L(ctx).Infof("Prepare the transfers")
-	transferGold := notoGold.Transfer(ctx, bob, 1).Prepare(alice)
-	transferSilver := notoSilver.Transfer(ctx, alice, 10).Prepare(bob)
-	require.NotNil(t, transferGold)
-	require.NotNil(t, transferGold.PreparedMetadata)
-	require.NotNil(t, transferSilver)
-	require.NotNil(t, transferSilver.PreparedMetadata)
+	notoGoldLock := notoGold.Lock(ctx, &nototypes.LockParams{
+		Amount: pldtypes.Int64ToInt256(1),
+	}).SignAndSend(alice).Wait()
+	notoGoldLockResult := decodeTransactionResult(t, notoGoldLock)
+	goldLockInfo, err := extractLockInfo(notoDomain, notoGoldLockResult)
+	require.NoError(t, err)
+	require.NotNil(t, goldLockInfo)
+	require.NotEmpty(t, goldLockInfo.LockID)
 
-	// TODO: this should actually be a Pente state transition
+	notoSilverLock := notoSilver.Lock(ctx, &nototypes.LockParams{
+		Amount: pldtypes.Int64ToInt256(10),
+	}).SignAndSend(bob).Wait()
+	notoSilverLockResult := decodeTransactionResult(t, notoSilverLock)
+	silverLockInfo, err := extractLockInfo(notoDomain, notoSilverLockResult)
+	require.NoError(t, err)
+	require.NotNil(t, silverLockInfo)
+	require.NotEmpty(t, silverLockInfo.LockID)
+
+	time.Sleep(1 * time.Second) // TODO: remove
+
+	goldPrepareUnlock := notoGold.PrepareUnlock(ctx, &nototypes.UnlockParams{
+		LockID: goldLockInfo.LockID,
+		From:   alice,
+		Recipients: []*nototypes.UnlockRecipient{{
+			To:     bob,
+			Amount: pldtypes.Int64ToInt256(1),
+		}},
+	}).SignAndSend(alice).Wait()
+	require.NotNil(t, goldPrepareUnlock)
+	goldPrepareUnlockResult := decodeTransactionResult(t, goldPrepareUnlock)
+
+	goldInputStates, goldOutputStates, goldUnlockParams, transferGold, err :=
+		buildUnlock(ctx, notoDomain, notoGold.ABI, goldPrepareUnlockResult)
+	require.NoError(t, err)
+
+	silverPrepareUnlock := notoSilver.PrepareUnlock(ctx, &nototypes.UnlockParams{
+		LockID: silverLockInfo.LockID,
+		From:   bob,
+		Recipients: []*nototypes.UnlockRecipient{{
+			To:     alice,
+			Amount: pldtypes.Int64ToInt256(10),
+		}},
+	}).SignAndSend(bob).Wait()
+	require.NotNil(t, silverPrepareUnlock)
+	silverPrepareUnlockResult := decodeTransactionResult(t, silverPrepareUnlock)
+
+	silverInputStates, silverOutputStates, silverUnlockParams, transferSilver, err :=
+		buildUnlock(ctx, notoDomain, notoSilver.ABI, silverPrepareUnlockResult)
+	require.NoError(t, err)
+
 	log.L(ctx).Infof("Prepare the trade execute")
 	encodedExecute := swap.Execute(ctx).Prepare()
 
 	log.L(ctx).Infof("Record the prepared transfers")
 	sent := swap.Prepare(ctx, &helpers.StateData{
-		Inputs:  transferGold.InputStates,
-		Outputs: transferGold.OutputStates,
+		Inputs:  goldInputStates,
+		Outputs: goldOutputStates,
 	}).SignAndSend(alice).Wait(5 * time.Second)
 	require.NoError(t, sent.Error())
 	sent = swap.Prepare(ctx, &helpers.StateData{
-		Inputs:  transferSilver.InputStates,
-		Outputs: transferSilver.OutputStates,
+		Inputs:  silverInputStates,
+		Outputs: silverOutputStates,
 	}).SignAndSend(bob).Wait(5 * time.Second)
 	require.NoError(t, sent.Error())
-
-	var transferGoldExtra nototypes.NotoTransferMetadata
-	err = json.Unmarshal(transferGold.PreparedMetadata, &transferGoldExtra)
-	require.NoError(t, err)
-	var transferSilverExtra nototypes.NotoTransferMetadata
-	err = json.Unmarshal(transferSilver.PreparedMetadata, &transferSilverExtra)
-	require.NoError(t, err)
 
 	log.L(ctx).Infof("Create Atom instance")
 	transferAtom := atomFactory.Create(ctx, alice, []*helpers.AtomOperation{
 		{
-			ContractAddress: transferGold.PreparedTransaction.To,
-			CallData:        transferGoldExtra.TransferWithApproval.EncodedCall,
+			ContractAddress: notoGold.Address,
+			CallData:        transferGold,
 		},
 		{
-			ContractAddress: transferSilver.PreparedTransaction.To,
-			CallData:        transferSilverExtra.TransferWithApproval.EncodedCall,
+			ContractAddress: notoSilver.Address,
+			CallData:        transferSilver,
 		},
 		{
 			ContractAddress: swap.Address,
-			CallData:        pldtypes.HexBytes(encodedExecute),
+			CallData:        encodedExecute,
 		},
 	})
 
@@ -262,26 +301,23 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	// If any party found a discrepancy at this point, they could cancel the swap (last chance to back out)
 
 	log.L(ctx).Infof("Approve both Noto transactions")
-	goldDelegate := transferAtom.Address
-	if withHooks {
-		goldDelegate = trackerAddress
-	}
-	notoGold.ApproveTransfer(ctx, &nototypes.ApproveParams{
-		Inputs:   transferGold.InputStates,
-		Outputs:  transferGold.OutputStates,
-		Data:     transferGoldExtra.ApprovalParams.Data,
-		Delegate: goldDelegate,
+	notoGold.DelegateLock(ctx, &nototypes.DelegateLockParams{
+		LockID:   goldLockInfo.LockID,
+		Unlock:   goldUnlockParams,
+		Delegate: transferAtom.Address,
 	}).SignAndSend(alice).Wait()
-	notoSilver.ApproveTransfer(ctx, &nototypes.ApproveParams{
-		Inputs:   transferSilver.InputStates,
-		Outputs:  transferSilver.OutputStates,
-		Data:     transferSilverExtra.ApprovalParams.Data,
+	notoSilver.DelegateLock(ctx, &nototypes.DelegateLockParams{
+		LockID:   silverLockInfo.LockID,
+		Unlock:   silverUnlockParams,
 		Delegate: transferAtom.Address,
 	}).SignAndSend(bob).Wait()
 
 	log.L(ctx).Infof("Execute the atomic operation")
 	sent = transferAtom.Execute(ctx).SignAndSend(alice).Wait(5 * time.Second)
 	require.NoError(t, sent.Error())
+
+	// TODO: better way to wait for events to be indexed after Atom execution
+	time.Sleep(2 * time.Second)
 
 	if withHooks {
 		assert.Equal(t, int64(9), tracker.GetBalance(ctx, aliceKey.Verifier.Verifier))
@@ -358,7 +394,6 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 	bobsKey := resolveZetoKey(t, ctx, rpc, zetoDomain.Name(), bob)
 	assert.Equal(t, bobsKey, zetoCoins[0].Data.Owner.String())
 
-	// TODO: this should be a Pente private contract, instead of a base ledger contract
 	log.L(ctx).Infof("Propose a trade of 1 Noto for 1 Zeto")
 	swap := helpers.DeploySwap(ctx, t, tb, pld, alice, &helpers.TradeRequestInput{
 		Holder1:       aliceKey.Verifier.Verifier,
@@ -416,7 +451,6 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 
 	transferZeto := zeto.TransferLocked(ctx, lockedZeto, bobKey.Verifier.Verifier, alice, 1).Prepare(bob)
 
-	// TODO: this should actually be a Pente state transition
 	log.L(ctx).Infof("Prepare the trade execute")
 	encodedExecute := swap.Execute(ctx).Prepare()
 

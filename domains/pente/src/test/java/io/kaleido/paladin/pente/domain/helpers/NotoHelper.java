@@ -25,8 +25,10 @@ import io.kaleido.paladin.pente.domain.PenteConfiguration.GroupTupleJSON;
 import io.kaleido.paladin.toolkit.*;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class NotoHelper {
     final String domainName;
@@ -80,29 +82,22 @@ public class NotoHelper {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record ApproveExtraParams(
+    public record ReceiptLockInfo(
             @JsonProperty
-            JsonHex.Bytes data
+            JsonHex.Bytes32 lockId,
+            @JsonProperty
+            JsonHex.Address delegate,
+            @JsonProperty
+            JsonNode unlockParams,
+            @JsonProperty
+            JsonHex.Bytes unlockCall
     ) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record PublicTransaction(
+    public record NotoDomainReceipt(
             @JsonProperty
-            JsonABI.Entry functionABI,
-            @JsonProperty
-            JsonNode paramsJSON,
-            @JsonProperty
-            JsonHex.Bytes encodedCall
-    ) {
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record NotoTransferMetadata(
-            @JsonProperty
-            ApproveExtraParams approvalParams,
-            @JsonProperty
-            PublicTransaction transferWithApproval
+            ReceiptLockInfo lockInfo
     ) {
     }
 
@@ -166,37 +161,59 @@ public class NotoHelper {
         ), true);
     }
 
-    public Testbed.TransactionResult prepareTransfer(String sender, String to, int amount) throws IOException {
+    public Testbed.TransactionResult lock(String sender, int amount) throws IOException {
         return TestbedHelper.getTransactionResult(
-                testbed.getRpcClient().request("testbed_prepare", new Testbed.TransactionInput(
+                testbed.getRpcClient().request("testbed_invoke", new Testbed.TransactionInput(
                         "private",
                         "",
                         sender,
                         JsonHex.addressFrom(address),
                         new HashMap<>() {{
-                            put("to", to);
                             put("amount", amount);
                             put("data", "0x");
                         }},
                         abi,
-                        "transfer"
-                )));
+                        "lock"
+                ), true));
     }
 
-    public void approveTransfer(String sender, List<Testbed.StateEncoded> inputs, List<Testbed.StateEncoded> outputs, JsonHex.Bytes data, String delegate) throws IOException {
+    public Testbed.TransactionResult prepareUnlock(String sender, JsonHex.Bytes32 lockId, String from, String to, int amount) throws IOException {
+        return TestbedHelper.getTransactionResult(
+                testbed.getRpcClient().request("testbed_invoke", new Testbed.TransactionInput(
+                        "private",
+                        "",
+                        sender,
+                        JsonHex.addressFrom(address),
+                        new HashMap<>() {{
+                            put("lockId", lockId);
+                            put("from", from);
+                            put("recipients", new ArrayDeque<Map<String, Object>>() {{
+                                add(new HashMap<>() {{
+                                    put("to", to);
+                                    put("amount", amount);
+                                }});
+                            }});
+                            put("data", "0x");
+                        }},
+                        abi,
+                        "prepareUnlock"
+                ), true));
+    }
+
+    public void delegateLock(String sender, JsonHex.Bytes32 lockId, JsonHex.Address delegate, JsonNode unlockParams) throws IOException {
         testbed.getRpcClient().request("testbed_invoke", new Testbed.TransactionInput(
                 "private",
                 "",
                 sender,
                 JsonHex.addressFrom(address),
                 new HashMap<>() {{
-                    put("inputs", inputs);
-                    put("outputs", outputs);
-                    put("data", data);
+                    put("lockId", lockId);
+                    put("unlock", unlockParams);
                     put("delegate", delegate);
+                    put("data", "0x");
                 }},
                 abi,
-                "approveTransfer"
+                "delegateLock"
         ), true);
     }
 }

@@ -21,7 +21,6 @@
  import org.apache.logging.log4j.Logger;
  
  public class PenteDomainFactory extends DomainBase {
- 
      private static final Logger LOGGER = PaladinLogging.getLogger(PenteDomainFactory.class);
  
      @Override

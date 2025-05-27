@@ -37,7 +37,7 @@
  
  // This is the data structure
  @JsonIgnoreProperties(ignoreUnknown = true)
- class PenteEVMTransaction {
+ public class PenteEVMTransaction {
  
      private static final Logger LOGGER = PaladinLogging.getLogger(PenteEVMTransaction.class);
  
@@ -273,7 +273,7 @@
      }
  
      @JsonIgnoreProperties(ignoreUnknown = true)
-     record JSONReceipt(
+     public record JSONReceipt(
              @JsonProperty()
              PenteEVMTransaction transaction,
              @JsonProperty()
@@ -281,7 +281,7 @@
      ) {}
  
      @JsonIgnoreProperties(ignoreUnknown = true)
-     record EVMReceipt(
+     public record EVMReceipt(
              @JsonProperty()
              Address from,
              @JsonProperty()

@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kaleido.paladin.pente.domain.PenteConfiguration;
+import io.kaleido.paladin.pente.domain.PenteEVMTransaction;
 import io.kaleido.paladin.testbed.Testbed;
 import io.kaleido.paladin.toolkit.JsonABI;
 import io.kaleido.paladin.toolkit.JsonHex;
@@ -123,8 +124,8 @@ public class PenteHelper {
                         new JsonABI(List.of(deployABI)),
                         ""
                 ), true));
-        var domainData = new ObjectMapper().convertValue(tx.domainData(), PenteConfiguration.DomainData.class);
-        return domainData.contractAddress();
+        var domainReceipt = new ObjectMapper().convertValue(tx.domainReceipt(), PenteEVMTransaction.JSONReceipt.class);
+        return domainReceipt.receipt().contractAddress();
     }
 
     public Testbed.TransactionResult invoke(String methodName, JsonABI.Parameters inputParams, String sender, JsonHex.Address privateAddress, Object inputValues) throws IOException {

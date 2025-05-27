@@ -121,9 +121,7 @@
              @JsonProperty
              List<StateEncoded> infoStates,
              @JsonProperty
-             JsonNode domainReceipt,
-             @JsonProperty
-             JsonNode domainData
+             JsonNode domainReceipt
      ) {
      }
  

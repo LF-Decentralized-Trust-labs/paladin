@@ -4,9 +4,9 @@ import PaladinClient, {
   PenteFactory,
   TransactionType,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
-import helloWorldJson from "./abis/HelloWorld.json";
-import { checkDeploy } from "./util";
 import { nanoid } from "nanoid";
+import { checkDeploy } from "../../common/util";
+import helloWorldJson from "./abis/HelloWorld.json";
 
 const logger = console;
 

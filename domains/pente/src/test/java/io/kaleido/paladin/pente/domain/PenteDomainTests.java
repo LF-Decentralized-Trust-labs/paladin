@@ -175,8 +175,8 @@ public class PenteDomainTests {
                                     simpleStorageABI,
                                     "deploy"
                             ), true));
-            var domainData = mapper.convertValue(tx.domainData(), PenteConfiguration.DomainData.class);
-            var expectedContractAddress = domainData.contractAddress();
+            var domainReceipt = mapper.convertValue(tx.domainReceipt(), PenteEVMTransaction.JSONReceipt.class);
+            var expectedContractAddress = domainReceipt.receipt().contractAddress();
 
             // Invoke set on Simple Storage
             Map<String, Object> setValues = new HashMap<>() {{
@@ -267,8 +267,8 @@ public class PenteDomainTests {
                                     simpleStorageABI,
                                     "deploy"
                             ), true));
-            var domainData = mapper.convertValue(tx.domainData(), PenteConfiguration.DomainData.class);
-            var expectedContractAddress = domainData.contractAddress();
+            var domainReceipt = mapper.convertValue(tx.domainReceipt(), PenteEVMTransaction.JSONReceipt.class);
+            var expectedContractAddress = domainReceipt.receipt().contractAddress();
 
             // Prepare a "set" on Simple Storage
             Map<String, Object> setValues = new HashMap<>() {{
@@ -398,8 +398,8 @@ public class PenteDomainTests {
                                     simpleStorageLinkedABI,
                                     "deploy"
                             ), true));
-            var domainData = mapper.convertValue(tx.domainData(), PenteConfiguration.DomainData.class);
-            var ssLinkedAddr = domainData.contractAddress();
+            var domainReceipt = mapper.convertValue(tx.domainReceipt(), PenteEVMTransaction.JSONReceipt.class);
+            var ssLinkedAddr = domainReceipt.receipt().contractAddress();
 
             testbed.getRpcClient().request("testbed_invoke",
                     new Testbed.TransactionInput(

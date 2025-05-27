@@ -1,9 +1,9 @@
 import PaladinClient, {
-  PenteFactory
+  PenteFactory,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
+import { checkDeploy } from "../../common/util";
 import storageJson from "./abis/Storage.json";
 import { PrivateStorage } from "./helpers/storage";
-import { checkDeploy } from "./util";
 
 const logger = console;
 
@@ -34,7 +34,7 @@ async function main(): Promise<boolean> {
   const contractAddress = await memberPrivacyGroup.deploy({
     abi: storageJson.abi,
     bytecode: storageJson.bytecode,
-    from: verifierNode1.lookup
+    from: verifierNode1.lookup,
   });
 
   if (!contractAddress) {
@@ -45,7 +45,10 @@ async function main(): Promise<boolean> {
   logger.log(`Contract deployed successfully! Address: ${contractAddress}`);
 
   // Step 3: Use the deployed contract for private storage
-  const privateStorageContract = new PrivateStorage(memberPrivacyGroup, contractAddress);
+  const privateStorageContract = new PrivateStorage(
+    memberPrivacyGroup,
+    contractAddress
+  );
 
   // Store a value in the contract
   const valueToStore = 125; // Example value to store
@@ -53,18 +56,23 @@ async function main(): Promise<boolean> {
   const storeTx = await privateStorageContract.sendTransaction({
     from: verifierNode1.lookup,
     function: "store",
-    data: { num: valueToStore }
+    data: { num: valueToStore },
   });
-  logger.log("Value stored successfully! Transaction hash:", storeTx?.transactionHash);
+  logger.log(
+    "Value stored successfully! Transaction hash:",
+    storeTx?.transactionHash
+  );
 
   // Retrieve the value as Node1
   logger.log("Node1 retrieving the value from the contract...");
   const retrievedValueNode1 = await privateStorageContract.call({
-      from: verifierNode1.lookup,
-      function: "retrieve"
-    }
+    from: verifierNode1.lookup,
+    function: "retrieve",
+  });
+  logger.log(
+    "Node1 retrieved the value successfully:",
+    retrievedValueNode1["value"]
   );
-  logger.log("Node1 retrieved the value successfully:", retrievedValueNode1["value"]);
 
   // Retrieve the value as Node2
   logger.log("Node2 retrieving the value from the contract...");
@@ -74,7 +82,10 @@ async function main(): Promise<boolean> {
       from: verifierNode2.lookup,
       function: "retrieve",
     });
-  logger.log("Node2 retrieved the value successfully:", retrievedValueNode2["value"]);
+  logger.log(
+    "Node2 retrieved the value successfully:",
+    retrievedValueNode2["value"]
+  );
 
   // Attempt to retrieve the value as Node3 (outsider)
   try {
@@ -83,10 +94,14 @@ async function main(): Promise<boolean> {
       from: verifierNode3.lookup,
       function: "retrieve",
     });
-    logger.error("Node3 (outsider) should not have access to the privacy group!");
+    logger.error(
+      "Node3 (outsider) should not have access to the privacy group!"
+    );
     return false;
   } catch (error) {
-    logger.info("Expected behavior - Node3 (outsider) cannot retrieve the data from the privacy group. Access denied.");
+    logger.info(
+      "Expected behavior - Node3 (outsider) cannot retrieve the data from the privacy group. Access denied."
+    );
   }
 
   logger.log("All steps completed successfully!");

@@ -3,8 +3,8 @@ import PaladinClient, {
   TransactionType,
   ZetoFactory,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
+import { checkDeploy, checkReceipt } from "../../common/util";
 import erc20Abi from "./abis/SampleERC20.json";
-import { checkDeploy, checkReceipt } from "./util";
 
 const logger = console;
 

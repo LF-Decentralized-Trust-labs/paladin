@@ -446,11 +446,6 @@ func (tb *testbed) mapTransaction(ctx context.Context, tx *testbedTransaction) (
 		return nil, err
 	}
 
-	var domainData []byte
-	if tx.ptx.PostAssembly.DomainData != nil {
-		domainData = []byte(*tx.ptx.PostAssembly.DomainData)
-	}
-
 	domainReceipt, _ := tx.psc.Domain().BuildDomainReceipt(ctx, nil, tx.ptx.ID, mapStatesForReceipt(tx))
 
 	return &TransactionResult{
@@ -463,7 +458,6 @@ func (tb *testbed) mapTransaction(ctx context.Context, tx *testbedTransaction) (
 		ReadStates:          readStates,
 		InfoStates:          infoStates,
 		DomainReceipt:       domainReceipt,
-		DomainData:          domainData,
 	}, nil
 }
 
