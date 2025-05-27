@@ -190,11 +190,11 @@ func (h *transferCommon) baseLedgerInvokeTransfer(ctx context.Context, req *prot
 		return nil, err
 	}
 	params := &NotoTransferParams{
-		TxId:      req.Transaction.TransactionId,
-		Inputs:    endorsableStateIDs(req.InputStates),
-		Outputs:   endorsableStateIDs(req.OutputStates),
-		Signature: signature.Payload,
-		Data:      data,
+		TxId:    req.Transaction.TransactionId,
+		Inputs:  endorsableStateIDs(req.InputStates),
+		Outputs: endorsableStateIDs(req.OutputStates),
+		Proof:   signature.Payload,
+		Data:    data,
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {

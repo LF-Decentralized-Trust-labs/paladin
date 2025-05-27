@@ -182,11 +182,11 @@ func (h *burnCommon) baseLedgerInvokeBurn(ctx context.Context, req *prototk.Prep
 		return nil, err
 	}
 	params := &NotoBurnParams{
-		TxId:      req.Transaction.TransactionId,
-		Inputs:    endorsableStateIDs(req.InputStates),
-		Outputs:   endorsableStateIDs(req.OutputStates),
-		Signature: sender.Payload,
-		Data:      data,
+		TxId:    req.Transaction.TransactionId,
+		Inputs:  endorsableStateIDs(req.InputStates),
+		Outputs: endorsableStateIDs(req.OutputStates),
+		Proof:   sender.Payload,
+		Data:    data,
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {

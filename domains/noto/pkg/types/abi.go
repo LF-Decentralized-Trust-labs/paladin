@@ -106,7 +106,6 @@ type UnlockParams struct {
 
 type DelegateLockParams struct {
 	LockID   pldtypes.Bytes32     `json:"lockId"`
-	Unlock   *UnlockPublicParams  `json:"unlock"`
 	Delegate *pldtypes.EthAddress `json:"delegate"`
 	Data     pldtypes.HexBytes    `json:"data"`
 }
@@ -116,12 +115,13 @@ type UnlockRecipient struct {
 	Amount *pldtypes.HexUint256 `json:"amount"`
 }
 
-type UnlockPublicParams struct {
+type TransferLockedPublicParams struct {
 	TxId          string            `json:"txId"`
+	LockID        pldtypes.Bytes32  `json:"lockId"`
 	LockedInputs  []string          `json:"lockedInputs"`
 	LockedOutputs []string          `json:"lockedOutputs"`
 	Outputs       []string          `json:"outputs"`
-	Signature     pldtypes.HexBytes `json:"signature"`
+	Proof         pldtypes.HexBytes `json:"proof"`
 	Data          pldtypes.HexBytes `json:"data"`
 }
 

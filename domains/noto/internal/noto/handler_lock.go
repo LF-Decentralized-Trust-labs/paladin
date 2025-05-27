@@ -198,7 +198,7 @@ func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *lockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *lockHandler) baseLedgerInvoke(ctx context.Context, lockID pldtypes.Bytes32, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inputs := req.InputStates
 	outputs, lockedOutputs := h.noto.splitStates(req.OutputStates)
 
@@ -214,12 +214,17 @@ func (h *lockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepare
 		return nil, err
 	}
 	params := &NotoLockParams{
-		TxId:          req.Transaction.TransactionId,
-		Inputs:        endorsableStateIDs(inputs),
-		Outputs:       endorsableStateIDs(outputs),
-		LockedOutputs: endorsableStateIDs(lockedOutputs),
-		Signature:     lockSignature.Payload,
-		Data:          data,
+		TxId:   req.Transaction.TransactionId,
+		LockID: lockID,
+		States: LockStatesInput{
+			Inputs:        endorsableStateIDs(inputs),
+			Outputs:       endorsableStateIDs(outputs),
+			LockedOutputs: endorsableStateIDs(lockedOutputs),
+		},
+		Delegate: &pldtypes.EthAddress{},
+		Options:  nil,
+		Proof:    lockSignature.Payload,
+		Data:     data,
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
@@ -295,7 +300,7 @@ func (h *lockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "notary")
 	}
 
-	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, lockID, req)
 	if err != nil {
 		return nil, err
 	}

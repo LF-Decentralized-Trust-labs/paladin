@@ -70,19 +70,19 @@ var (
 )
 
 var (
-	NotoTransfer       = "NotoTransfer"
-	NotoLock           = "NotoLock"
-	NotoUnlock         = "NotoUnlock"
-	NotoUnlockPrepared = "NotoUnlockPrepared"
-	NotoLockDelegated  = "NotoLockDelegated"
+	EventTransfer       = "Transfer"
+	EventLocked         = "Locked"
+	EventTransferLocked = "TransferLocked"
+	EventLockUpdated    = "LockUpdated"
+	EventLockDelegated  = "LockDelegated"
 )
 
 var allEvents = []string{
-	NotoTransfer,
-	NotoLock,
-	NotoUnlock,
-	NotoUnlockPrepared,
-	NotoLockDelegated,
+	EventTransfer,
+	EventLocked,
+	EventTransferLocked,
+	EventLockUpdated,
+	EventLockDelegated,
 }
 
 var eventsJSON = mustBuildEventsJSON(interfaceBuild.ABI, errorsBuild.ABI)
@@ -119,103 +119,110 @@ type NotoDeployParams struct {
 }
 
 type NotoMintParams struct {
-	TxId      string            `json:"txId"`
-	Outputs   []string          `json:"outputs"`
-	Signature pldtypes.HexBytes `json:"signature"`
-	Data      pldtypes.HexBytes `json:"data"`
+	TxId    string            `json:"txId"`
+	Outputs []string          `json:"outputs"`
+	Proof   pldtypes.HexBytes `json:"proof"`
+	Data    pldtypes.HexBytes `json:"data"`
 }
 
 type NotoTransferParams struct {
-	TxId      string            `json:"txId"`
-	Inputs    []string          `json:"inputs"`
-	Outputs   []string          `json:"outputs"`
-	Signature pldtypes.HexBytes `json:"signature"`
-	Data      pldtypes.HexBytes `json:"data"`
+	TxId    string            `json:"txId"`
+	Inputs  []string          `json:"inputs"`
+	Outputs []string          `json:"outputs"`
+	Proof   pldtypes.HexBytes `json:"proof"`
+	Data    pldtypes.HexBytes `json:"data"`
 }
 
 type NotoBurnParams struct {
-	TxId      string            `json:"txId"`
-	Inputs    []string          `json:"inputs"`
-	Outputs   []string          `json:"outputs"`
-	Signature pldtypes.HexBytes `json:"signature"`
-	Data      pldtypes.HexBytes `json:"data"`
+	TxId    string            `json:"txId"`
+	Inputs  []string          `json:"inputs"`
+	Outputs []string          `json:"outputs"`
+	Proof   pldtypes.HexBytes `json:"proof"`
+	Data    pldtypes.HexBytes `json:"data"`
 }
 
-type NotoApproveTransferParams struct {
-	TxId      string               `json:"txId"`
-	Delegate  *pldtypes.EthAddress `json:"delegate"`
-	TXHash    pldtypes.Bytes32     `json:"txhash"`
-	Signature pldtypes.HexBytes    `json:"signature"`
-	Data      pldtypes.HexBytes    `json:"data"`
+type LockStatesInput struct {
+	Inputs        []string `json:"inputs"`
+	Outputs       []string `json:"outputs"`
+	LockedOutputs []string `json:"lockedOutputs"`
 }
 
 type NotoLockParams struct {
-	TxId          string            `json:"txId"`
-	Inputs        []string          `json:"inputs"`
-	Outputs       []string          `json:"outputs"`
-	LockedOutputs []string          `json:"lockedOutputs"`
-	Signature     pldtypes.HexBytes `json:"signature"`
-	Data          pldtypes.HexBytes `json:"data"`
+	TxId     string               `json:"txId"`
+	LockID   pldtypes.Bytes32     `json:"lockId"`
+	States   LockStatesInput      `json:"states"`
+	Delegate *pldtypes.EthAddress `json:"delegate"`
+	Options  pldtypes.HexBytes    `json:"options"`
+	Proof    pldtypes.HexBytes    `json:"proof"`
+	Data     pldtypes.HexBytes    `json:"data"`
 }
 
-type NotoPrepareUnlockParams struct {
+type NotoSetLockOptionsParams struct {
+	TxId         string            `json:"txId"`
+	LockID       pldtypes.Bytes32  `json:"lockId"`
 	LockedInputs []string          `json:"lockedInputs"`
-	UnlockHash   pldtypes.Bytes32  `json:"unlockHash"`
-	Signature    pldtypes.HexBytes `json:"signature"`
+	Options      pldtypes.HexBytes `json:"options"`
+	Proof        pldtypes.HexBytes `json:"proof"`
 	Data         pldtypes.HexBytes `json:"data"`
 }
 
 type NotoDelegateLockParams struct {
-	TxId       string               `json:"txId"`
-	UnlockHash pldtypes.Bytes32     `json:"unlockHash"`
-	Delegate   *pldtypes.EthAddress `json:"delegate"`
-	Signature  pldtypes.HexBytes    `json:"signature"`
-	Data       pldtypes.HexBytes    `json:"data"`
+	TxId     string               `json:"txId"`
+	LockID   pldtypes.Bytes32     `json:"lockId"`
+	Delegate *pldtypes.EthAddress `json:"delegate"`
+	Proof    pldtypes.HexBytes    `json:"proof"`
+	Data     pldtypes.HexBytes    `json:"data"`
 }
 
 type NotoTransfer_Event struct {
-	Inputs    []pldtypes.Bytes32 `json:"inputs"`
-	Outputs   []pldtypes.Bytes32 `json:"outputs"`
-	Signature pldtypes.HexBytes  `json:"signature"`
-	Data      pldtypes.HexBytes  `json:"data"`
+	Operator *pldtypes.EthAddress `json:"operator"`
+	Inputs   []pldtypes.Bytes32   `json:"inputs"`
+	Outputs  []pldtypes.Bytes32   `json:"outputs"`
+	Proof    pldtypes.HexBytes    `json:"proof"`
+	Data     pldtypes.HexBytes    `json:"data"`
 }
 
-type NotoApproved_Event struct {
-	Delegate  pldtypes.EthAddress `json:"delegate"`
-	TXHash    pldtypes.Bytes32    `json:"txhash"`
-	Signature pldtypes.HexBytes   `json:"signature"`
-	Data      pldtypes.HexBytes   `json:"data"`
-}
-
-type NotoLock_Event struct {
+type LockStates struct {
 	Inputs        []pldtypes.Bytes32 `json:"inputs"`
 	Outputs       []pldtypes.Bytes32 `json:"outputs"`
 	LockedOutputs []pldtypes.Bytes32 `json:"lockedOutputs"`
-	Signature     pldtypes.HexBytes  `json:"signature"`
-	Data          pldtypes.HexBytes  `json:"data"`
 }
 
-type NotoUnlock_Event struct {
-	Sender        *pldtypes.EthAddress `json:"sender"`
+type NotoLocked_Event struct {
+	Operator *pldtypes.EthAddress `json:"operator"`
+	LockID   pldtypes.Bytes32     `json:"lockId"`
+	States   LockStates           `json:"states"`
+	Delegate *pldtypes.EthAddress `json:"delegate"`
+	Options  pldtypes.HexBytes    `json:"options"`
+	Proof    pldtypes.HexBytes    `json:"proof"`
+	Data     pldtypes.HexBytes    `json:"data"`
+}
+
+type NotoTransferLocked_Event struct {
+	Operator      *pldtypes.EthAddress `json:"operator"`
+	LockID        pldtypes.Bytes32     `json:"lockId"`
 	LockedInputs  []pldtypes.Bytes32   `json:"lockedInputs"`
 	LockedOutputs []pldtypes.Bytes32   `json:"lockedOutputs"`
 	Outputs       []pldtypes.Bytes32   `json:"outputs"`
-	Signature     pldtypes.HexBytes    `json:"signature"`
+	Proof         pldtypes.HexBytes    `json:"proof"`
 	Data          pldtypes.HexBytes    `json:"data"`
 }
 
-type NotoUnlockPrepared_Event struct {
-	LockedInputs []pldtypes.Bytes32 `json:"lockedInputs"`
-	UnlockHash   pldtypes.Bytes32   `json:"unlockHash"`
-	Signature    pldtypes.HexBytes  `json:"signature"`
-	Data         pldtypes.HexBytes  `json:"data"`
+type NotoLockUpdated_Event struct {
+	Operator     *pldtypes.EthAddress `json:"operator"`
+	LockID       pldtypes.Bytes32     `json:"lockId"`
+	LockedInputs []pldtypes.Bytes32   `json:"lockedInputs"`
+	Options      pldtypes.HexBytes    `json:"options"`
+	Proof        pldtypes.HexBytes    `json:"proof"`
+	Data         pldtypes.HexBytes    `json:"data"`
 }
 
 type NotoLockDelegated_Event struct {
-	UnlockHash pldtypes.Bytes32     `json:"unlockHash"`
-	Delegate   *pldtypes.EthAddress `json:"delegate"`
-	Signature  pldtypes.HexBytes    `json:"signature"`
-	Data       pldtypes.HexBytes    `json:"data"`
+	Operator pldtypes.EthAddress  `json:"operator"`
+	LockID   pldtypes.Bytes32     `json:"lockId"`
+	Delegate *pldtypes.EthAddress `json:"delegate"`
+	Proof    pldtypes.HexBytes    `json:"proof"`
+	Data     pldtypes.HexBytes    `json:"data"`
 }
 
 type parsedCoins struct {

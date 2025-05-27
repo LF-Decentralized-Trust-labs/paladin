@@ -171,10 +171,10 @@ func (h *mintHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepare
 		return nil, err
 	}
 	params := &NotoMintParams{
-		TxId:      req.Transaction.TransactionId,
-		Outputs:   endorsableStateIDs(req.OutputStates),
-		Signature: sender.Payload,
-		Data:      data,
+		TxId:    req.Transaction.TransactionId,
+		Outputs: endorsableStateIDs(req.OutputStates),
+		Proof:   sender.Payload,
+		Data:    data,
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {

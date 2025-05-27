@@ -299,10 +299,10 @@ public class BondTest {
             var atomAddress = JsonHex.addressFrom(deployEventData.get("addr").toString());
 
             // Alice approves payment transfer
-            notoCash.delegateLock(alice, cashLockReceipt.lockInfo().lockId(), atomAddress, cashUnlockReceipt.lockInfo().unlockParams());
+            notoCash.delegateLock(alice, cashLockReceipt.lockInfo().lockId(), atomAddress);
 
             // Custodian approves bond transfer
-            notoBond.delegateLock(bondCustodian, bondLockReceipt.lockInfo().lockId(), atomAddress, bondUnlockReceipt.lockInfo().unlockParams());
+            notoBond.delegateLock(bondCustodian, bondLockReceipt.lockInfo().lockId(), atomAddress);
 
             // Execute the Atom
             var txID = TestbedHelper.sendTransaction(testbed,

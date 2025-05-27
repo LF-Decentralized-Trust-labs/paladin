@@ -18,7 +18,7 @@ ext {
         include 'internal/**/*.go'
         include 'pkg/**/*.go'
     }
-    targetCoverage = 66
+    targetCoverage = 67
     maxCoverageBarGap = 1
 }
 
