@@ -145,6 +145,8 @@ func (st *SentDomainTransaction) Wait() map[string]any {
 	switch r := result.(type) {
 	case error:
 		require.NoError(st.t, r)
+	case string:
+		require.Fail(st.t, "RPC error", r)
 	case map[string]any:
 		return r
 	default:

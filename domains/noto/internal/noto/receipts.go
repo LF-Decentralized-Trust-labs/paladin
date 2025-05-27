@@ -118,9 +118,14 @@ func (n *Noto) receiptStates(ctx context.Context, states []*prototk.EndorsableSt
 		if err != nil {
 			return nil, err
 		}
+		schemaID, err := pldtypes.ParseBytes32Ctx(ctx, state.SchemaId)
+		if err != nil {
+			return nil, err
+		}
 		coins[i] = &types.ReceiptState{
-			ID:   id,
-			Data: pldtypes.RawJSON(state.StateDataJson),
+			ID:     id,
+			Schema: schemaID,
+			Data:   pldtypes.RawJSON(state.StateDataJson),
 		}
 	}
 	return coins, nil

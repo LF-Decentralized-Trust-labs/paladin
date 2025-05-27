@@ -46,8 +46,9 @@ type ReceiptLockInfo struct {
 }
 
 type ReceiptState struct {
-	ID   pldtypes.HexBytes `json:"id"`
-	Data pldtypes.RawJSON  `json:"data"`
+	ID     pldtypes.HexBytes `json:"id"`
+	Schema pldtypes.Bytes32  `json:"schema"`
+	Data   pldtypes.RawJSON  `json:"data"`
 }
 
 type ReceiptTransfer struct {

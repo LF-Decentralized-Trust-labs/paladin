@@ -379,10 +379,11 @@ func (s *notoTestSuite) TestNotoLock() {
 	}, true)
 	require.NoError(t, rpcerr)
 
-	lockInfo, err := extractLockInfo(notoDomain, &invokeResult)
+	var lockReceipt types.NotoDomainReceipt
+	err = json.Unmarshal(invokeResult.DomainReceipt, &lockReceipt)
 	require.NoError(t, err)
-	require.NotNil(t, lockInfo)
-	require.NotEmpty(t, lockInfo.LockID)
+	require.NotNil(t, lockReceipt.LockInfo)
+	require.NotEmpty(t, lockReceipt.LockInfo.LockID)
 
 	lockedCoins := findAvailableCoins[types.NotoLockedCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.Len(t, lockedCoins, 1)
@@ -424,7 +425,7 @@ func (s *notoTestSuite) TestNotoLock() {
 			To:       noto.Address,
 			Function: "prepareUnlock",
 			Data: toJSON(t, &types.UnlockParams{
-				LockID: lockInfo.LockID,
+				LockID: lockReceipt.LockInfo.LockID,
 				From:   recipient1Name,
 				Recipients: []*types.UnlockRecipient{{
 					To:     recipient2Name,
@@ -437,7 +438,8 @@ func (s *notoTestSuite) TestNotoLock() {
 	}, true)
 	require.NoError(t, rpcerr)
 
-	_, _, unlockParams, _, err := buildUnlock(ctx, notoDomain, noto.ABI, &invokeResult)
+	var unlockReceipt types.NotoDomainReceipt
+	err = json.Unmarshal(invokeResult.DomainReceipt, &unlockReceipt)
 	require.NoError(t, err)
 
 	log.L(ctx).Infof("Delegate lock to recipient2")
@@ -447,8 +449,8 @@ func (s *notoTestSuite) TestNotoLock() {
 			To:       noto.Address,
 			Function: "delegateLock",
 			Data: toJSON(t, &types.DelegateLockParams{
-				LockID:   lockInfo.LockID,
-				Unlock:   unlockParams,
+				LockID:   unlockReceipt.LockInfo.LockID,
+				Unlock:   unlockReceipt.LockInfo.UnlockParams,
 				Delegate: pldtypes.MustEthAddress(recipient2Key.Verifier.Verifier),
 			}),
 		},
@@ -463,7 +465,7 @@ func (s *notoTestSuite) TestNotoLock() {
 		From(recipient2Name).
 		To(noto.Address).
 		Function("unlock").
-		Inputs(unlockParams).
+		Inputs(unlockReceipt.LockInfo.UnlockParams).
 		Send().
 		Wait(3 * time.Second)
 	require.NoError(t, tx.Error())
