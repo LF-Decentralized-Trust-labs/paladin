@@ -677,15 +677,7 @@ func TestStartStopEventStream(t *testing.T) {
 	err = bi.StopEventStream(ctx, esID)
 	require.ErrorContains(t, err, "PD011312")
 
-	// these are the DB calls that will be made when starting the the event stream
-	p.Mock.ExpectExec("UPDATE.*event_streams").WillReturnError(errors.New("pop"))
-	p.Mock.ExpectExec("UPDATE.*event_streams").WillReturnResult(sqlmock.NewResult(1, 1))
-
-	// these are the DB calls that the detector go routine might call
-	p.Mock.ExpectQuery("SELECT.*event_stream_checkpoints").WillReturnRows(sqlmock.NewRows([]string{}))
-	p.Mock.ExpectQuery("SELECT.*indexed_blocks").WillReturnRows(sqlmock.NewRows([]string{}))
-
-	// these are the DB calls that will be made when stopping the the event stream
+	// DB calls when starting the event stream
 	p.Mock.ExpectExec("UPDATE.*event_streams").WillReturnError(errors.New("pop"))
 	p.Mock.ExpectExec("UPDATE.*event_streams").WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -702,21 +694,37 @@ func TestStartStopEventStream(t *testing.T) {
 
 	bi.eventStreams[esID] = eventStream
 
+	// first StartEventStream fails
 	err = bi.StartEventStream(ctx, esID)
 	require.ErrorContains(t, err, "pop")
 
+	// second StartEventStream succeeds
 	err = bi.StartEventStream(ctx, esID)
 	require.NoError(t, err)
 
 	assert.NotNil(t, eventStream.detectorDone)
 	assert.NotNil(t, eventStream.dispatcherDone)
+	assert.NotNil(t, eventStream.detectorStarted)
+	assert.NotNil(t, eventStream.dispatcherStarted)
 
-	// retry because the detector DB mocks run in a different thread and we can't guarantee the ordering otherwise
+	// Declare expected DB queries that the detector/dispatcher may run
+	p.Mock.ExpectQuery("SELECT.*event_stream_checkpoints").WillReturnRows(sqlmock.NewRows([]string{}))
+	p.Mock.ExpectQuery("SELECT.*indexed_blocks").WillReturnRows(sqlmock.NewRows([]string{}))
+
+	// Wait for goroutines to start
+	<-eventStream.detectorStarted
+	<-eventStream.dispatcherStarted
+
+	// StopEventStream DB update expectations
+	p.Mock.ExpectExec("UPDATE.*event_streams").WillReturnError(errors.New("pop"))
+	p.Mock.ExpectExec("UPDATE.*event_streams").WillReturnResult(sqlmock.NewResult(1, 1))
+
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		err = bi.StopEventStream(ctx, esID)
-		assert.ErrorContains(t, err, "pop")
+		assert.ErrorContains(c, err, "pop")
 	}, testTimeout(t), 1*time.Millisecond)
 
+	// final StopEventStream
 	err = bi.StopEventStream(ctx, esID)
 	require.NoError(t, err)
 
