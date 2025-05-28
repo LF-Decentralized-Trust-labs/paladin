@@ -46,8 +46,10 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 		engineIntegration,
 		clock.Duration(1000),
 		clock.Duration(5000),
+		5,
 		NewGrapher(ctx),
 		nil,
+		func(context.Context) {}, // onCleanup function, not used in tests
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, txn)

@@ -48,6 +48,18 @@ type SentMessageRecorder struct {
 	numberOfSentDispatchConfirmationRequests      int
 }
 
+func (r *SentMessageRecorder) Reset(ctx context.Context) {
+	r.hasSentAssembleRequest = false
+	r.sentAssembleRequestIdempotencyKey = uuid.UUID{}
+	r.numberOfSentAssembleRequests = 0
+	r.hasSentDispatchConfirmationRequest = false
+	r.numberOfSentEndorsementRequests = 0
+	r.sentEndorsementRequestsForPartyIdempotencyKey = make(map[string]uuid.UUID)
+	r.numberOfEndorsementRequestsForParty = make(map[string]int)
+	r.sentDispatchConfirmationRequestIdempotencyKey = uuid.UUID{}
+	r.numberOfSentDispatchConfirmationRequests = 0
+}
+
 func (r *SentMessageRecorder) HasSentAssembleRequest() bool {
 	return r.hasSentAssembleRequest
 }
@@ -140,20 +152,21 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 }
 
 type TransactionBuilderForTesting struct {
-	privateTransactionBuilder *testutil.PrivateTransactionBuilderForTesting
-	sender                    *identityForTesting
-	dispatchConfirmed         bool
-	signerAddress             *tktypes.EthAddress
-	latestSubmissionHash      *tktypes.Bytes32
-	nonce                     *uint64
-	state                     State
-	sentMessageRecorder       *SentMessageRecorder
-	fakeClock                 *common.FakeClockForTesting
-	fakeEngineIntegration     *common.FakeEngineIntegrationForTesting
-	grapher                   Grapher
-	txn                       *Transaction
-	requestTimeout            int
-	assembleTimeout           int
+	privateTransactionBuilder          *testutil.PrivateTransactionBuilderForTesting
+	sender                             *identityForTesting
+	dispatchConfirmed                  bool
+	signerAddress                      *tktypes.EthAddress
+	latestSubmissionHash               *tktypes.Bytes32
+	nonce                              *uint64
+	state                              State
+	sentMessageRecorder                *SentMessageRecorder
+	fakeClock                          *common.FakeClockForTesting
+	fakeEngineIntegration              *common.FakeEngineIntegrationForTesting
+	grapher                            Grapher
+	txn                                *Transaction
+	requestTimeout                     int
+	assembleTimeout                    int
+	heartbeatIntervalsSinceStateChange int
 }
 
 // Function NewTransactionBuilderForTesting creates a TransactionBuilderForTesting with random values for all fields
@@ -249,6 +262,11 @@ func (b *TransactionBuilderForTesting) Sender(sender *identityForTesting) *Trans
 	return b
 }
 
+func (b *TransactionBuilderForTesting) HeartbeatIntervalsSinceStateChange(heartbeatIntervalsSinceStateChange int) *TransactionBuilderForTesting {
+	b.heartbeatIntervalsSinceStateChange = heartbeatIntervalsSinceStateChange
+	return b
+}
+
 func (b *TransactionBuilderForTesting) GetSender() *identityForTesting {
 	return b.sender
 }
@@ -302,8 +320,10 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		b.fakeEngineIntegration,
 		b.fakeClock.Duration(b.requestTimeout),
 		b.fakeClock.Duration(b.assembleTimeout),
+		5,
 		b.grapher,
 		nil,
+		func(context.Context) {}, // onCleanup function, not used in tests
 	)
 	if err != nil {
 		panic(fmt.Sprintf("Error from NewTransaction: %v", err))
@@ -323,6 +343,11 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		if err != nil {
 			panic("error from applyPostAssembly")
 		}
+	}
+
+	if b.state == State_Confirmed ||
+		b.state == State_Reverted {
+		b.txn.heartbeatIntervalsSinceStateChange = b.heartbeatIntervalsSinceStateChange
 	}
 
 	//enter the current state

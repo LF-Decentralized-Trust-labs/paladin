@@ -38,7 +38,7 @@ const (
 )
 
 const (
-	Event_Activated EventType = iota //TODO comments to describe these
+	Event_Activated EventType = iota + common.Event_HeartbeatInterval + 1 //TODO comments to describe these
 	Event_Nominated
 	Event_Flushed
 	Event_Closed
@@ -157,8 +157,17 @@ func init() {
 		State_Active: {
 			OnTransitionTo: action_SelectTransaction,
 			Events: map[EventType]EventHandler{
-				common.Event_HeartbeatInterval: {},
-				Event_TransactionsDelegated:    {},
+				common.Event_HeartbeatInterval: {
+					Actions: []ActionRule{{
+						Action: action_SendHeartbeat,
+					}},
+				},
+				Event_TransactionsDelegated: {
+					Actions: []ActionRule{{
+						Action: action_SelectTransaction,
+						If:     guard_Not(guard_HasTransactionAssembling),
+					}},
+				},
 				Event_TransactionConfirmed: {
 					Transitions: []Transition{{
 						To: State_Idle,
@@ -220,6 +229,11 @@ func (c *coordinator) HandleEvent(ctx context.Context, event common.Event) error
 	//Apply the event to the coordinator to update the internal state
 	// so that the guards and actions defined in the state machine can reference the new internal state of the coordinator
 	err = c.applyEvent(ctx, event)
+	if err != nil {
+		return err
+	}
+
+	err = c.performActions(ctx, *eventHandler)
 	if err != nil {
 		return err
 	}
@@ -299,12 +313,27 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 		}
 	case *common.HeartbeatIntervalEvent:
 		c.heartbeatIntervalsSinceStateChange++
+		//TODO is this the right place to do this vs more generically in the handleEvent function?
 		err = c.propagateEventToAllTransactions(ctx, event)
 	}
 	if err != nil {
 		log.L(ctx).Errorf("Error applying event %v: %v", event.Type(), err)
 	}
 	return err
+}
+
+func (c *coordinator) performActions(ctx context.Context, eventHandler EventHandler) error {
+	for _, rule := range eventHandler.Actions {
+		if rule.If == nil || rule.If(ctx, c) {
+			err := rule.Action(ctx, c)
+			if err != nil {
+				//any recoverable errors should have been handled by the action function
+				log.L(ctx).Errorf("Error applying action: %v", err)
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Event, eventHandler EventHandler) error {

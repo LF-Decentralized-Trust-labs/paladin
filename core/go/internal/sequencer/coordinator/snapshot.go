@@ -23,6 +23,16 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
+func action_SendHeartbeat(ctx context.Context, c *coordinator) error {
+	return c.sendHeartbeat(ctx)
+}
+
+func (c *coordinator) sendHeartbeat(ctx context.Context) error {
+	snapshot := c.getSnapshot(ctx)
+	c.messageSender.SendHeartbeat(ctx, snapshot)
+	return nil
+}
+
 func (c *coordinator) getSnapshot(ctx context.Context) *common.CoordinatorSnapshot {
 	// This function is called from the sequencer loop so is safe to read internal state
 	pooledTransactions := make([]*common.Transaction, 0, len(c.transactionsByID))

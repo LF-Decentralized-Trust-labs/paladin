@@ -224,9 +224,11 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		mocks.engineIntegration,
 		mocks.clock.Duration(1000),
 		mocks.clock.Duration(5000),
+		5,
 		grapher,
 		func(ctx context.Context, txn *Transaction, from, to State) {
 		},
+		func(context.Context) {}, // onCleanup function, not used in tests
 	)
 	require.NoError(t, err)
 

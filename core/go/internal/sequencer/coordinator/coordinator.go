@@ -148,6 +148,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			c.engineIntegration,
 			c.requestTimeout,
 			c.assembleTimeout,
+			c.closingGracePeriod,
 			c.grapher,
 			func(ctx context.Context, t *transaction.Transaction, to, from transaction.State) {
 				//callback function to notify us when the transaction changes state
@@ -166,6 +167,12 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 						}
 					}
 				}
+			},
+			func(ctx context.Context) {
+				//callback function to notify us when the transaction is cleaned up
+				delete(c.transactionsByID, txn.ID)
+				c.grapher.Forget(txn.ID)
+				log.L(ctx).Debugf("Transaction %s cleaned up", txn.ID.String())
 			})
 		if err != nil {
 			log.L(ctx).Errorf("Error creating transaction: %v", err)
@@ -291,7 +298,7 @@ func ptrTo[T any](v T) *T {
 }
 
 //TODO the following getter methods are not safe to call on anything other than the sequencer goroutine because they are reading data structures that are being modified by the state machine.
-// We should consider making them safe to call from any goroutine by reading maintaining a copy of the data structures that are updated async from the sequencer thread under a mutex
+// We should consider making them safe to call from any goroutine by maintaining a copy of the data structures that are updated async from the sequencer thread under a mutex
 
 func (c *coordinator) GetCurrentState() State {
 	return c.stateMachine.currentState

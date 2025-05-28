@@ -67,3 +67,13 @@ func guard_HasTransactionsInflight(ctx context.Context, c *coordinator) bool {
 func guard_ClosingGracePeriodExpired(ctx context.Context, c *coordinator) bool {
 	return c.heartbeatIntervalsSinceStateChange >= c.closingGracePeriod
 }
+
+func guard_HasTransactionAssembling(ctx context.Context, c *coordinator) bool {
+
+	//TODO this could be optimized by keeping track of a boolean that is switched from the onStateChange handler
+	return len(
+		c.getTransactionsInStates(ctx, []transaction.State{
+			transaction.State_Assembling,
+		}),
+	) > 0
+}

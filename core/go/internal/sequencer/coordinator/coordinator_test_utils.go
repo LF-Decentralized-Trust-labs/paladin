@@ -49,6 +49,12 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 	}
 }
 
+func (r *SentMessageRecorder) Reset(ctx context.Context) {
+	r.hasSentHandoverRequest = false
+	r.hasSentHeartbeat = false
+	r.SentMessageRecorder.Reset(ctx)
+}
+
 func (r *SentMessageRecorder) SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *tktypes.EthAddress) {
 	r.hasSentHandoverRequest = true
 }
