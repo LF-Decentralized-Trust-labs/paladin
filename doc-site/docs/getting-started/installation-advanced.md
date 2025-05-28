@@ -138,5 +138,5 @@ This configuration ensures Paladin aligns with existing network contracts.
 
 ## Advanced Customization
 
-For users requiring direct application and full manual control, including complex multi-cluster setups, refer to the previous [detailed manual installation documentation](#). This approach involves manually configuring Custom Resources (CRs), applying individual artifacts, and managing explicit node and domain settings.
+For users requiring direct application and full manual control, including complex multi-cluster setups, refer to the [manual installation documentation](./installation-manual.md). This approach involves manually configuring CRs, applying individual artifacts, and managing explicit node and domain settings.
  

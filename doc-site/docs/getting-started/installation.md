@@ -175,6 +175,10 @@ Each Paladin node runs an instance of the Paladin UI at the path `/ui`. If you u
 
 Learn about interacting with the [UI](./user-interface.md), and try out the [Tutorials](./../tutorials/index.md).
 
+## Advanced installation
+
+This guide is designed for first-time Paladin users looking for a quick and easy introduction. For more complex setups, integration with existing blockchain networks, or detailed customization, please refer to the [Advanced Installation](./installation-advanced.md) or [Manual Installation](./installation-manual.md) guides.
+
 ## Troubleshooting
 
 If you encounter any issues during installation, please refer to the [Troubleshooting Guide](./troubleshooting.md).  
