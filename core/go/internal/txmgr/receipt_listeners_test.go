@@ -963,14 +963,17 @@ func TestDeliverBatchCancelledCtxNotifyReceiver(t *testing.T) {
 	l := txm.receiptListeners["listener1"]
 	l.initStart()
 
+	ready := make(chan struct{})
+
 	go func() {
-		time.Sleep(10 * time.Millisecond)
+		<-ready
 		receipts := newTestReceiptReceiver(nil)
 		closeReceiver, err := txm.AddReceiptReceiver(ctx, "listener1", receipts)
 		require.NoError(t, err)
 		t.Cleanup(func() { closeReceiver.Close() })
 	}()
 
+	close(ready)
 	r, err := l.nextReceiver(&receiptDeliveryBatch{})
 	require.NoError(t, err)
 	require.NotNil(t, r)

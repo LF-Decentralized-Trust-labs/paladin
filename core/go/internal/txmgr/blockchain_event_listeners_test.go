@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -444,6 +443,8 @@ func TestAddRemoveBlockchainEventReceiver(t *testing.T) {
 }
 
 func TestNextReceiver(t *testing.T) {
+	readyToReceive := make(chan struct{}) // used to signal when goroutine
+
 	// waiting for a receiver to be added
 	nextReceiver := make(chan components.BlockchainEventReceiver, 1)
 	el := &blockchainEventListener{
@@ -452,12 +453,13 @@ func TestNextReceiver(t *testing.T) {
 	el.ctx, el.cancelCtx = context.WithCancel(context.Background())
 
 	go func() {
+		close(readyToReceive) // signal that we're about to call nextReceiver
 		r, err := el.nextReceiver()
 		require.NoError(t, err)
 		nextReceiver <- r
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	<-readyToReceive // block until goroutine is waiting on nextReceiver
 
 	el.addReceiver(&testBlockchainEventReceiver{
 		index: 0,

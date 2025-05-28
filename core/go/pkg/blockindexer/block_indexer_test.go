@@ -736,12 +736,17 @@ func TestBlockIndexerHandleRandomConflictingBlockNotification(t *testing.T) {
 	}
 
 	sentRandom := false
+	randBlockHandled := make(chan struct{}) // <- New sync point
+
 	mockBlocksRPCCallsDynamic(mRPC, func(args mock.Arguments) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
 		if !sentRandom && args[3].(ethtypes.HexUint64) == 4 {
 			sentRandom = true
-			bi.blockListener.notifyBlock(randBlock)
-			// Give notification handler likelihood to run before we continue the by-number getting
-			time.Sleep(1 * time.Millisecond)
+
+			// Use goroutine to avoid blocking and signal completion
+			go func() {
+				bi.blockListener.notifyBlock(randBlock)
+				close(randBlockHandled)
+			}()
 		}
 		return blocks, receipts
 	})
@@ -750,6 +755,11 @@ func TestBlockIndexerHandleRandomConflictingBlockNotification(t *testing.T) {
 	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	bi.startOrReset() // do not start block listener
+
+	// Wait for the random block to be handled if it was sent
+	if sentRandom {
+		<-randBlockHandled
+	}
 
 	for i := 0; i < len(blocks)-bi.requiredConfirmations; i++ {
 		notifiedBlocks := <-utBatchNotify

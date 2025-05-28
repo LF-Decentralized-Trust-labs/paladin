@@ -38,25 +38,27 @@ import (
 )
 
 type eventStream struct {
-	ctx            context.Context
-	cancelCtx      context.CancelFunc
-	bi             *blockIndexer
-	definition     *EventStream
-	signatures     map[string]bool
-	signatureList  []pldtypes.Bytes32
-	batchSize      int
-	batchTimeout   time.Duration
-	blocks         chan *eventStreamBlock
-	dispatch       chan *eventDispatch
-	useNOTXHandler bool
-	handlerDBTX    InternalStreamCallbackDBTX
-	handlerNOTX    InternalStreamCallbackNOTX
-	serializer     *abi.Serializer
-	detectorDone   chan struct{}
-	dispatcherDone chan struct{}
-	fromBlock      *ethtypes.HexUint64 // nil == latest
-	checkpoint     atomic.Int64        // set after we persist checkpoint
-	catchup        atomic.Bool
+	ctx               context.Context
+	cancelCtx         context.CancelFunc
+	bi                *blockIndexer
+	definition        *EventStream
+	signatures        map[string]bool
+	signatureList     []pldtypes.Bytes32
+	batchSize         int
+	batchTimeout      time.Duration
+	blocks            chan *eventStreamBlock
+	dispatch          chan *eventDispatch
+	useNOTXHandler    bool
+	handlerDBTX       InternalStreamCallbackDBTX
+	handlerNOTX       InternalStreamCallbackNOTX
+	serializer        *abi.Serializer
+	detectorDone      chan struct{}
+	detectorStarted   chan struct{}
+	dispatcherDone    chan struct{}
+	dispatcherStarted chan struct{}
+	fromBlock         *ethtypes.HexUint64 // nil == latest
+	checkpoint        atomic.Int64        // set after we persist checkpoint
+	catchup           atomic.Bool
 }
 
 type eventBatch struct {
@@ -394,6 +396,8 @@ func (es *eventStream) start(updateDB bool) error {
 		}
 		es.detectorDone = make(chan struct{})
 		es.dispatcherDone = make(chan struct{})
+		es.dispatcherDone = make(chan struct{})
+		es.detectorStarted = make(chan struct{})
 		go es.detector()
 		go es.dispatcher()
 	}
@@ -496,8 +500,12 @@ func (es *eventStream) detector() {
 	checkpointBlock, err := es.processCheckpoint()
 	if err != nil {
 		log.L(es.ctx).Debugf("exiting before retrieving checkpoint")
+		close(es.detectorStarted)
 		return
 	}
+
+	// indicate that the detector has started
+	close(es.detectorStarted)
 
 	// var checkpointBlock int64
 	var startupBlock *int64
@@ -617,6 +625,7 @@ func (es *eventStream) sendToDispatcher(event *pldapi.EventWithData, lastInBlock
 
 func (es *eventStream) dispatcher() {
 	defer close(es.dispatcherDone)
+	close(es.dispatcherStarted)
 
 	log.L(es.ctx).Debugf("Dispatcher started for event stream %s [%s]", es.definition.Name, es.definition.ID)
 

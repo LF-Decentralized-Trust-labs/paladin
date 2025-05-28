@@ -119,18 +119,14 @@ func newTestGRPCTransport(t *testing.T, nodeCert, nodeKey string, conf *Config) 
 	}
 
 	// Wait until the socket is up
-	startTime := time.Now()
-	for {
-		c, err := net.Dial("tcp", transport.listener.Addr().String())
-		if err == nil {
-			c.Close()
-			break
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		conn, err := net.Dial("tcp", transport.listener.Addr().String())
+		if err != nil {
+			return
 		}
-		if time.Since(startTime) > 2*time.Second {
-			require.Failf(t, "server took too long to start: %s", err.Error())
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		_ = conn.Close()
+		assert.True(c, true) // explicitly pass
+	}, 2*time.Second, 10*time.Millisecond, "server took too long to start")
 
 	return transport, transportDetails, callbacks, func() {
 		panicked := recover()
