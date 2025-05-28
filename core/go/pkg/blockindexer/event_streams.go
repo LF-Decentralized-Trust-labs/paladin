@@ -396,8 +396,8 @@ func (es *eventStream) start(updateDB bool) error {
 		}
 		es.detectorDone = make(chan struct{})
 		es.dispatcherDone = make(chan struct{})
-		es.dispatcherDone = make(chan struct{})
 		es.detectorStarted = make(chan struct{})
+		es.dispatcherStarted = make(chan struct{})
 		go es.detector()
 		go es.dispatcher()
 	}

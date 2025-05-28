@@ -980,6 +980,8 @@ func TestExitStartFromLatest(t *testing.T) {
 		assert.NotPanics(t, func() { es.detector() })
 	}()
 
+	<-es.detectorStarted
+
 	cancelCtx()
 	<-es.detectorDone
 
