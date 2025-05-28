@@ -187,8 +187,7 @@ async function main(): Promise<boolean> {
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;
-  receipt = await paladin2.getTransactionReceipt(receipt.id, true);
-
+  receipt = await paladin3.getTransactionReceipt(receipt.id, true);
   let domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const cashLockId = domainReceipt?.lockInfo?.lockId;
   if (cashLockId === undefined) {
@@ -205,8 +204,7 @@ async function main(): Promise<boolean> {
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;
-  receipt = await paladin2.getTransactionReceipt(receipt.id, true);
-
+  receipt = await paladin3.getTransactionReceipt(receipt.id, true);
   domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const cashUnlockParams = domainReceipt?.lockInfo?.unlockParams;
   const cashUnlockCall = domainReceipt?.lockInfo?.unlockCall;
@@ -217,13 +215,12 @@ async function main(): Promise<boolean> {
 
   // Prepare the bond transfer (custodian -> investor)
   logger.log("Locking bond asset from custodian...");
-  receipt = await notoCash.using(paladin2).lock(bondCustodian, {
+  receipt = await notoBond.using(paladin2).lock(bondCustodian, {
     amount: 100,
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;
   receipt = await paladin2.getTransactionReceipt(receipt.id, true);
-
   domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const bondLockId = domainReceipt?.lockInfo?.lockId;
   if (bondLockId === undefined) {
@@ -233,7 +230,7 @@ async function main(): Promise<boolean> {
 
   // Prepare unlock operation
   logger.log("Preparing unlock to investor...");
-  receipt = await notoCash.using(paladin2).prepareUnlock(bondCustodian, {
+  receipt = await notoBond.using(paladin2).prepareUnlock(bondCustodian, {
     lockId: bondLockId,
     from: bondCustodian,
     recipients: [{ to: investor, amount: 100 }],
@@ -241,7 +238,6 @@ async function main(): Promise<boolean> {
   });
   if (!checkReceipt(receipt)) return false;
   receipt = await paladin2.getTransactionReceipt(receipt.id, true);
-
   domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const assetUnlockParams = domainReceipt?.lockInfo?.unlockParams;
   const assetUnlockCall = domainReceipt?.lockInfo?.unlockCall;

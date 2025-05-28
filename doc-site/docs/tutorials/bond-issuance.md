@@ -230,48 +230,76 @@ const bondSubscription = await newBondSubscription(
 An investor may request to subscribe to the bond by creating a [private subscription contract](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/private/BondSubscription.sol)
 in their private EVM with the bond custodian.
 
-#### Prepare tokens for exchange
+#### Prepare cash transfer
 
 ```typescript
-const paymentTransfer = await notoCash
-  .using(paladin3)
-  .prepareTransfer(investor, {
-    to: bondCustodian,
-    amount: 100,
-    data: "0x",
-  });
+receipt = await notoCash.using(paladin3).lock(investor, {
+  amount: 100,
+  data: "0x",
+});
 
-const bondTransfer1 = await notoBond
-  .using(paladin2)
-  .prepareTransfer(bondCustodian, {
-    to: investor,
-    amount: 100,
-    data: "0x",
-  });
-txID = await paladin2.prepareTransaction(bondTransfer1.transaction);
-const bondTransfer2 = await paladin2.pollForPreparedTransaction(txID, 10000);
+receipt = await paladin3.getTransactionReceipt(receipt.id, true);
+let domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
+const cashLockId = domainReceipt?.lockInfo?.lockId;
+
+receipt = await notoCash.using(paladin3).prepareUnlock(investor, {
+  lockId: cashLockId,
+  from: investor,
+  recipients: [{ to: bondCustodian, amount: 100 }],
+  data: "0x",
+});
+
+receipt = await paladin3.getTransactionReceipt(receipt.id, true);
+domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
+const cashUnlockParams = domainReceipt?.lockInfo?.unlockParams;
+const cashUnlockCall = domainReceipt?.lockInfo?.unlockCall;
 ```
 
-The investor prepares (but does not submit) a cash payment. This results in a public transaction
-containing prepared UTXO states. The transaction can be delegated to another party or contract to
-allow them to execute the payment transfer.
+The investor prepares a cash payment by calling "lock" and then "prepareUnlock".
+This will set aside some amount of value in the form of locked UTXOs (which will be
+temporarily removed from the sender's spending pool) and then prepare (but not execute)
+an unlock operation. The unlock transaction can be delegated to another party or contract
+to allow them to execute the payment transfer.
 
-The bond custodian prepares a similar transaction for the bond transfer. Because the bond token
-uses Pente hooks, the result of the first "prepare" is a private Pente transaction. This can
-be prepared again to receive a public transaction that wraps both the Pente hook transition and
-the Noto bond token transfer.
+#### Prepare bond transfer
+
+```typescript
+receipt = await notoBond.using(paladin2).lock(bondCustodian, {
+  amount: 100,
+  data: "0x",
+});
+
+receipt = await paladin2.getTransactionReceipt(receipt.id, true);
+domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
+const bondLockId = domainReceipt?.lockInfo?.lockId;
+
+receipt = await notoBond.using(paladin2).prepareUnlock(bondCustodian, {
+  lockId: bondLockId,
+  from: bondCustodian,
+  recipients: [{ to: investor, amount: 100 }],
+  data: "0x",
+});
+
+receipt = await paladin2.getTransactionReceipt(receipt.id, true);
+domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
+const assetUnlockParams = domainReceipt?.lockInfo?.unlockParams;
+const assetUnlockCall = domainReceipt?.lockInfo?.unlockCall;
+```
+
+The bond custodian prepares a similar transaction for the bond, using the same
+"lock" and "prepareUnlock" pattern to prepare a bond transfer to the investor.
 
 #### Share the prepared transactions with the private contract
 
 ```typescript
 await bondSubscription.using(paladin3).preparePayment(investor, {
-  to: paymentTransfer.transaction.to,
-  encodedCall: paymentTransfer.metadata?.transferWithApproval?.encodedCall,
+  to: notoCash.address,
+  encodedCall: cashUnlockCall,
 });
 
 await bondSubscription.using(paladin2).prepareBond(bondCustodian, {
-  to: bondTransfer2.transaction.to,
-  encodedCall: bondTransfer2.metadata.transitionWithApproval.encodedCall,
+  to: notoBond.address,
+  encodedCall: assetUnlockCall,
 });
 ```
 
