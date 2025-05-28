@@ -1,18 +1,17 @@
+# Paladin Manual Installation Guide
 
-# Installation: custom
+This guide provides detailed instructions for manually installing a Paladin Network by directly configuring the Custom Resources (CRs) provided by the Paladin operator. This approach offers maximum flexibility for customizing network configuration, node distribution, blockchain integration, and smart contract management.
 
-This guide describes how to install a Paladin Network by directly configures the Custom Resources that the Paladin operator provides. This allows for flexibility in how many nodes are in the network, which EVM chain is used, and whether those nodes all run in a single Kubernetes cluster or are distributed across multiple clusters. It assumes that you are using a HD Wallet signer, the `selfsigned-issuer` from `cert-manager`, and that the contracts/plugins that the Paladin project provides for the EVM registry, GRPC transport, and Noto, Pente and Zeto domains. 
+## Prerequisites
 
-In the case that nodes are distributed across multiple Kubernetes clusters, the same instructions need to be followed on all of them. However, one cluster needs to be designated to deploy the smart contracts that the Paladin Network requires, and this cluster needs to be installed first. Resources created in the other clusters will reference the addresses of the smart contracts deployed by this first cluster.
+Ensure the following are installed:
 
-## Pre-requisites
+* [Helm v3](https://helm.sh/docs/intro/install/)
+* [kubectl](https://kubernetes.io/docs/tasks/tools/)
 
-* [helm](https://helm.sh/) `v3` installed
-* [kubectl](https://kubernetes.io/docs/reference/kubectl/) installed
+## Step 1: Install Paladin Operator CRDs
 
-## Step 1: Install the CRD Chart
-   
-Install the CRD chart that contains the necessary Custom Resource Definitions (CRDs) for the Paladin operator:
+Add the Paladin Helm repository:
 
 ```bash
 helm repo add paladin https://LF-Decentralized-Trust-labs.github.io/paladin --force-update
@@ -21,120 +20,122 @@ helm upgrade --install paladin-crds paladin/paladin-operator-crd
 
 ## Step 2: Install cert-manager CRDs
 
-Install the [cert-manager](https://artifacthub.io/packages/helm/cert-manager/cert-manager) CRDs:
+Install the [cert-manager](https://artifacthub.io/packages/helm/cert-manager/cert-manager) required by Paladin:
 
 ```bash
 helm repo add jetstack https://charts.jetstack.io --force-update
 helm install cert-manager --namespace cert-manager --version v1.16.1 jetstack/cert-manager --create-namespace --set crds.enabled=true
 ```
 
-## Step 3: Install operator in `none` mode
+## Step 3: Install Paladin Operator
 
-Install the Paladin operator chart:
+Install the Paladin operator in `operator-only` mode (without additional resources):
 
 ```bash
-helm upgrade --install paladin paladin/paladin-operator -n paladin --create-namespace --set mode=none
+helm upgrade --install paladin paladin/paladin-operator -n paladin --create-namespace --set mode=operator-only
 ```
 
-## Step 4: Unpack and apply release artifacts
+## Step 4: Deploy Smart Contract Artifacts
 
-Download and extract the artifacts for the latest release from https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/latest/artifacts.tar.gz.
+Download the latest release artifacts:
 
-In all clusters apply the selfsigned cert issuer.
 ```bash
-kubectl apply -f cert_issuer_selfsigned.yaml
+wget https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/latest/artifacts.tar.gz
+tar -xzvf artifacts.tar.gz
 ```
 
-If this is the Kubernetes cluster that will be used to deploy smart contracts, also apply the registry and domain smart contract deployments as well as the transaction invokes required for configuring zeto.
+Apply the self-signed certificate issuer in all Kubernetes clusters:
+
 ```bash
-kubectl apply -f core_v1alpha1_paladinregistry.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_noto_factory.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_pente_factory.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_registry.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_factory.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon_batch.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon_enc_batch.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon_enc.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon_nullifier_transfer_batch.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon_nullifier_transfer.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_deposit.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_withdraw_batch.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_withdraw_nullifier_batch.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_withdraw_nullifier.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_withdraw.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_impl_anon_enc.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_impl_anon_nullifier.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_impl_anon.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_poseidon_unit2l.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_poseidon_unit3l.yaml
-kubectl apply -f core_v1alpha1_smartcontractdeployment_zeto_smt_lib.yaml
-kubectl apply -f core_v1alpha1_transactioninvoke_zeto_register_anon_enc.yaml
-kubectl apply -f core_v1alpha1_transactioninvoke_zeto_register_anon_nullifier.yaml
-kubectl apply -f core_v1alpha1_transactioninvoke_zeto_register_anon.yaml
+kubectl -n paladin apply -f cert_issuer_selfsigned.yaml
 ```
 
-Note that the smart contracts will not actually be deployed until step 7 is complete, as a Paladin node is required to submit the deployment transactions.
+
+On the primary Kubernetes cluster (designated for smart contract deployment), apply the smart contract resources:
 
 The contents of these CRs should not be modified, with the exception of
-
 * `spec.node`- the name of the node that will be used to submit the transactions. Change this if you wish to name your first node something other than `node1`.
 * `spec.from`- the identifier of the key that will be used to sign the transactions. Change this if you wish to use a specific key from your signer for this purpose.
 
+```bash
+kubectl -n paladin apply -f core_v1alpha1_paladinregistry.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_noto_factory.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_pente_factory.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_registry.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_factory.yaml
+# Apply other provided Zeto-related smart contracts similarly
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon_batch.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon_enc_batch.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon_enc.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon_nullifier_transfer_batch.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon_nullifier_transfer.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_anon.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_deposit.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_withdraw_batch.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_withdraw_nullifier_batch.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_withdraw_nullifier.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_g16_withdraw.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_impl_anon_enc.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_impl_anon_nullifier.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_impl_anon.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_poseidon_unit2l.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_poseidon_unit3l.yaml
+kubectl -n paladin apply -f core_v1alpha1_smartcontractdeployment_zeto_smt_lib.yaml
+kubectl -n paladin apply -f core_v1alpha1_transactioninvoke_zeto_register_anon_enc.yaml
+kubectl -n paladin apply -f core_v1alpha1_transactioninvoke_zeto_register_anon_nullifier.yaml
+kubectl -n paladin apply -f core_v1alpha1_transactioninvoke_zeto_register_anon.yaml
+```
+
+**Note:** Smart contracts won't be fully deployed until Step 7.
+
 ## Step 5: Create an EVM Registry
 
-Create an EVM registry that uses the `registry` smart contract deployment created in step 3. The examples below are suitable for the first Kubernetes cluster that is used to deploy the smart contracts. For subsequent clusters, `spec.evm.smartContractDeployment` should be replaced with `spec.evm.contractAddress`. The value of the contract address can found by running `kubectl get paladinregistry` on the first cluster once all steps in this guide have been completed for the first cluster.
+Create the registry CR. For the primary cluster, use a deployment name; subsequent clusters should reference the existing contract address:
 
-The value of `metadata.lavels.paladin.io/registry-name` is significant as this what Paladin nodes will use to reference the registry.
-
+> The `paladin.io/registry-name` label is significant as this what Paladin nodes will use to reference the registry.
 
 ```yaml
 apiVersion: core.paladin.io/v1alpha1
 kind: PaladinRegistry
 metadata:
-  labels:
-    paladin.io/registry-name: evm-registry
   name: evm-registry
   namespace: paladin
+  labels:
+    paladin.io/registry-name: evm-registry
 spec:
   type: evm
   evm:
-    smartContractDeployment: registry
+    smartContractDeployment: registry  # use 'contractAddress' if referencing existing deployment
+    # contractAddress: "0x...."
   plugin:
     library: /app/registries/libevm.so
     type: c-shared
 ```
 
-## Step 6: Create Domains
+## Step 6: Deploy Domains
 
-Create Noto, Pente, and Zeto domains, which reference the `noto-factory`, `pente-factory`, and `zeto-factory` smart contract deployments created in step 1.
-
-The examples below are suitable for the first Kubernetes cluster that is used to deploy the smart contracts. For subsequent clusters, `spec.smartContractDeployment` should be replaced with `spec.registryAddress`. The value of the contract address can found by running `kubectl get paladindomain` on the first cluster once all steps in this guide have been completed for the first cluster.
-
-```bash
-kubectl get paladindomain
-NAME    STATUS      DOMAIN_REGISTRY                              DEPLOYMENT      LIBRARY
-noto    Available   0x2681852a96b053746ff2f2f0bb94c3fbe1d63e7e   noto-factory    /app/domains/libnoto.so
-pente   Available   0x4ea4549eca420802f1d74606775370063b7bcc70   pente-factory   /app/domains/pente.jar
-zeto    Available   0x6ff1c15409614ad89b67baa6018d3499ef779e0b   zeto-factory    /app/domains/libzeto.so
-```
-
-The value of `metadata.lavels.paladin.io/domain-name` is significant as this what Paladin nodes will use to reference the domains.
+Deploy Paladin domains (`noto`, `pente`, `zeto`). Similar to the registry, reference the deployment name initially and contract address for subsequent clusters:
 
 ```yaml
 apiVersion: core.paladin.io/v1alpha1
 kind: PaladinDomain
 metadata:
-  labels:
-    paladin.io/domain-name: noto
   name: noto
   namespace: paladin
+  labels:
+    paladin.io/domain-name: noto
 spec:
   plugin:
     library: /app/domains/libnoto.so
     type: c-shared
-  smartContractDeployment: noto-factory
+  smartContractDeployment: noto-factory  # use 'contractAddress' for existing deployments
+  # contractAddress: "0x...."
+
 ```
+
+Repeat for `pente` and `zeto` domains.
+
+<details><summary>pente</summary>
 ```yaml
 apiVersion: core.paladin.io/v1alpha1
 kind: PaladinDomain
@@ -150,6 +151,9 @@ spec:
     type: jar
   smartContractDeployment: pente-factory
 ```
+</details>
+
+<details><summary>zeto</summary>
 ```yaml
 apiVersion: core.paladin.io/v1alpha1
 kind: PaladinDomain
@@ -232,14 +236,13 @@ spec:
     type: c-shared
   smartContractDeployment: zeto-factory
 ```
+</details>
 
 ## Step 7: Create Paladin Nodes
 
-Create as many Paladin nodes as you wish to run in this Kubernetes cluster. More nodes can be added at a later point by following this step and step 8.
+Deploy Paladin nodes with unique names. The first node (`node1`) handles initial smart contract deployment transactions:
 
-Paladin node names need to be unique within the network. The Paladin node that is used to deploy the smart contracts must be called `node1`. 
-
-The full specification for the Paladin node CRD is available [here](../reference/crds/core.paladin.io/#paladin); however, there are detailed explanations for the most relevant sections in the example below.
+> Paladin node names need to be unique within the network. The Paladin node that is used to deploy the smart contracts must be called `node1`. 
 
 ```yaml
 apiVersion: core.paladin.io/v1alpha1
@@ -313,6 +316,8 @@ spec:
       issuer: selfsigned-issuer
       secretName: paladin-node1-mtls
 ```
+
+**Adjust configuration fields as needed:**
 
 ### `baseLedgerEndpoint`
 ```yaml
@@ -457,11 +462,10 @@ transports:
 
 The certificates generated to match the `tls` configuration section is added in by the operator to the configuration for the transport plugin.
 
-## Step 8: Create Registrations
+## Step 8: Register Paladin Nodes
 
-Register all the Paladin nodes created in step 7 with the registry created in step 5. Creating a PaladinRegistration CR will cause a registration transaction to be submitted to the node being registered.
+Create `PaladinRegistration` CRs for each Paladin node:
 
-This CR references two keys
 
 * `spec.registryAdminKey`: the identifier for the key that will be used to sign the root registration transaction
 * `spec.nodeAdminKey`: the identifier for the key that is used as the owner of the registration, and used to register transports
@@ -472,19 +476,22 @@ apiVersion: core.paladin.io/v1alpha1
 kind: PaladinRegistration
 metadata:
   name: node1
-  namespace: paladin
 spec:
-  node: node1
-  nodeAdminKey: registry.node1
+  node: node1 # <node name>
+  nodeAdminKey: registry.node1 # registry.<node name>
   registry: evm-registry
   registryAdminKey: registry.operator
-  registryAdminNode: node1
+  registryAdminNode: node1 # <admin node name>
   transports:
   - grpc
 ```
 
+Repeat for all nodes created in Step 7.
 
+## Multi-cluster Considerations
 
+When deploying across multiple clusters:
 
-
+* Follow Steps 1-8 on the primary cluster.
+* On additional clusters, reference the existing contract addresses obtained from the primary cluster (Steps 5-6).
 
