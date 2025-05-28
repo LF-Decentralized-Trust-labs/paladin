@@ -32,3 +32,47 @@ type FlushPoint struct {
 func (f *FlushPoint) GetSignerNonce() string {
 	return fmt.Sprintf("%s:%d", f.From.String(), f.Nonce)
 }
+
+type CoordinatorSnapshot struct {
+	FlushPoints            []*FlushPoint            `json:"flushPoints"`
+	DispatchedTransactions []*DispatchedTransaction `json:"dispatchedTransactions"`
+	PooledTransactions     []*Transaction           `json:"pooledTransactions"`
+	ConfirmedTransactions  []*ConfirmedTransaction  `json:"confirmedTransactions"`
+	CoordinatorState       CoordinatorState         `json:"coordinatorState"`
+	BlockHeight            uint64                   `json:"blockHeight"`
+}
+
+type CoordinatorState string
+
+const (
+	CoordinatorState_Idle     CoordinatorState = "CoordinatorState_Idle"
+	CoordinatorState_Standby  CoordinatorState = "CoordinatorState_Standby"
+	CoordinatorState_Elect    CoordinatorState = "CoordinatorState_Elect"
+	CoordinatorState_Prepared CoordinatorState = "CoordinatorState_Prepared"
+	CoordinatorState_Active   CoordinatorState = "CoordinatorState_Active"
+	CoordinatorState_Flush    CoordinatorState = "CoordinatorState_Flush"
+	CoordinatorState_Closing  CoordinatorState = "CoordinatorState_Closing"
+)
+
+type Transaction struct {
+	//components.PrivateTransaction
+	ID uuid.UUID
+}
+
+func (t *Transaction) GetID() string {
+	return t.ID.String()
+}
+
+type DispatchedTransaction struct {
+	Transaction
+	SignerLocator        string
+	Signer               tktypes.EthAddress
+	LatestSubmissionHash *tktypes.Bytes32
+	Nonce                *uint64
+}
+
+type ConfirmedTransaction struct {
+	DispatchedTransaction
+	Hash         tktypes.Bytes32
+	RevertReason tktypes.HexBytes
+}

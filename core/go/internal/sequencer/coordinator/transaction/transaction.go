@@ -51,6 +51,7 @@ type Transaction struct {
 	latestSubmissionHash *tktypes.Bytes32
 	nonce                *uint64
 	stateMachine         *StateMachine
+	revertReason         tktypes.HexBytes
 
 	//TODO move the fields that are really just fine grained state info.  Move them into the stateMachine struct ( consider separate structs for each concrete state)
 	heartbeatIntervalsSinceStateChange               int
@@ -125,6 +126,10 @@ func (t *Transaction) GetState() State {
 
 func (t *Transaction) GetLatestSubmissionHash() *tktypes.Bytes32 {
 	return t.latestSubmissionHash
+}
+
+func (t *Transaction) GetRevertReason() tktypes.HexBytes {
+	return t.revertReason
 }
 
 // Hash method of Transaction

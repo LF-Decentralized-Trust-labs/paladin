@@ -25,35 +25,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-type CoordinatorState string
-
-const (
-	CoordinatorState_Idle     CoordinatorState = "CoordinatorState_Idle"
-	CoordinatorState_Standby  CoordinatorState = "CoordinatorState_Standby"
-	CoordinatorState_Elect    CoordinatorState = "CoordinatorState_Elect"
-	CoordinatorState_Prepared CoordinatorState = "CoordinatorState_Prepared"
-	CoordinatorState_Active   CoordinatorState = "CoordinatorState_Active"
-	CoordinatorState_Flush    CoordinatorState = "CoordinatorState_Flush"
-	CoordinatorState_Closing  CoordinatorState = "CoordinatorState_Closing"
-)
-
-type Transaction struct {
-	components.PrivateTransaction
-}
-type DispatchedTransaction struct {
-	*Transaction
-	SignerLocator        string
-	Signer               tktypes.EthAddress
-	LatestSubmissionHash *tktypes.Bytes32
-	Nonce                *uint64
-}
-
-type ConfirmedTransaction struct {
-	*Transaction
-	Hash         tktypes.Bytes32
-	RevertReason tktypes.HexBytes
-}
-
 const (
 	MessageType_TransactionRequest               = "TransactionRequest"
 	MessageType_HandoverRequest                  = "HandoverRequest"
@@ -63,14 +34,9 @@ const (
 )
 
 type CoordinatorHeartbeatNotification struct {
-	From                   string                   `json:"from"`
-	ContractAddress        *tktypes.EthAddress      `json:"contractAddress"`
-	FlushPoints            []*common.FlushPoint     `json:"flushPoints"`
-	DispatchedTransactions []*DispatchedTransaction `json:"dispatchedTransactions"`
-	PooledTransactions     []*Transaction           `json:"pooledTransactions"`
-	ConfirmedTransactions  []*ConfirmedTransaction  `json:"confirmedTransactions"`
-	CoordinatorState       CoordinatorState         `json:"coordinatorState"`
-	BlockHeight            uint64                   `json:"blockHeight"`
+	From            string              `json:"from"`
+	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
+	common.CoordinatorSnapshot
 }
 
 type EndorsementResponse struct {

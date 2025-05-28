@@ -28,6 +28,10 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
+type Coordinator interface {
+	GetTransactionsReadyToDispatch(ctx context.Context) ([]*components.PrivateTransaction, error)
+}
+
 type coordinator struct {
 	/* State */
 	stateMachine                               *StateMachine
@@ -102,6 +106,24 @@ func NewCoordinator(ctx context.Context, messageSender MessageSender, committeeM
 
 }
 
+func (c *coordinator) GetTransactionsReadyToDispatch(ctx context.Context) ([]*components.PrivateTransaction, error) {
+	// Get the next transaction that is ready to be dispatched
+	// This is the transaction that is in the State_Ready_For_Dispatch state
+	// If there are no transactions in that state, return nil
+	transactions := c.getTransactionsInStates(ctx, []transaction.State{transaction.State_Ready_For_Dispatch})
+	if len(transactions) == 0 {
+		return nil, nil
+	}
+	privateTransactions := make([]*components.PrivateTransaction, 0, len(transactions))
+	for _, txn := range transactions {
+		privateTransactions = append(privateTransactions, txn.PrivateTransaction)
+
+	}
+
+	//TODO should we return the first one or should we return all of them?
+	return privateTransactions, nil
+}
+
 func (c *coordinator) sendHandoverRequest(ctx context.Context) {
 	c.messageSender.SendHandoverRequest(ctx, c.activeCoordinator, c.contractAddress)
 }
@@ -130,6 +152,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			func(ctx context.Context, t *transaction.Transaction, to, from transaction.State) {
 				//callback function to notify us when the transaction changes state
 				log.L(ctx).Debugf("Transaction %s moved from %s to %s", t.ID.String(), from.String(), to.String())
+				//TODO the following logic should be moved to the state machine so that all the rules are in one place
 				if c.stateMachine.currentState == State_Active {
 					if from == transaction.State_Assembling {
 						err := c.selectNextTransaction(ctx, &TransactionStateTransitionEvent{

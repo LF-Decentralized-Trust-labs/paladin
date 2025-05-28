@@ -131,8 +131,10 @@ func (_ *DispatchConfirmationRejectedEvent) Type() EventType {
 }
 
 // CollectedEvent
+// Collected by the dispatcher thread and dispatched to a public transaction manager for a given signer address
 type CollectedEvent struct {
 	BaseEvent
+	SignerAddress tktypes.EthAddress
 }
 
 func (_ *CollectedEvent) Type() EventType {
@@ -152,6 +154,7 @@ func (_ *NonceAllocatedEvent) Type() EventType {
 // SubmittedEvent
 type SubmittedEvent struct {
 	BaseEvent
+	SubmissionHash tktypes.Bytes32
 }
 
 func (_ *SubmittedEvent) Type() EventType {

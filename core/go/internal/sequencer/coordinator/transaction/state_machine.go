@@ -250,6 +250,7 @@ func init() {
 							To: State_Submitted,
 						}},
 				},
+				Event_NonceAllocated: {},
 			},
 		},
 		State_Submitted: {
@@ -264,6 +265,7 @@ func init() {
 		},
 		State_Reverted: {
 			OnTransitionTo: action_NotifyDependentsOfRevert,
+			//TODO add transition to final state and call cleanup
 		},
 		//TODO add transition to final state and call cleanup
 	}
@@ -352,8 +354,14 @@ func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error 
 		err = t.applyEndorsementRejection(ctx, event.RevertReason, event.Party, event.AttestationRequestName)
 	case *DispatchConfirmedEvent:
 		err = t.applyDispatchConfirmation(ctx, event.RequestID)
+	case *CollectedEvent:
+		t.signerAddress = &event.SignerAddress
 	case *NonceAllocatedEvent:
 		t.nonce = &event.Nonce
+	case *SubmittedEvent:
+		t.latestSubmissionHash = &event.SubmissionHash
+	case *ConfirmedEvent:
+		t.revertReason = event.RevertReason
 	default:
 		//other events may trigger actions and/or state transitions but not require any internal state to be updated
 		log.L(ctx).Debugf("no internal state to apply for event type %T", event)

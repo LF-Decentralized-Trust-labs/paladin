@@ -40,10 +40,13 @@ func privateTransactionMatcher(txID ...uuid.UUID) func(*components.PrivateTransa
 type SentMessageRecorder struct {
 	transaction.SentMessageRecorder
 	hasSentHandoverRequest bool
+	hasSentHeartbeat       bool
 }
 
 func NewSentMessageRecorder() *SentMessageRecorder {
-	return &SentMessageRecorder{}
+	return &SentMessageRecorder{
+		SentMessageRecorder: *transaction.NewSentMessageRecorder(),
+	}
 }
 
 func (r *SentMessageRecorder) SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *tktypes.EthAddress) {
@@ -52,6 +55,14 @@ func (r *SentMessageRecorder) SendHandoverRequest(ctx context.Context, activeCoo
 
 func (r *SentMessageRecorder) HasSentHandoverRequest() bool {
 	return r.hasSentHandoverRequest
+}
+
+func (r *SentMessageRecorder) SendHeartbeat(ctx context.Context, coordinatorSnapshop *common.CoordinatorSnapshot) {
+	r.hasSentHeartbeat = true
+}
+
+func (r *SentMessageRecorder) HasSentHeartbeat() bool {
+	return r.hasSentHeartbeat
 }
 
 type CoordinatorBuilderForTesting struct {

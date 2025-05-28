@@ -18,6 +18,7 @@ package coordinator
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
@@ -25,4 +26,5 @@ import (
 type MessageSender interface {
 	transaction.MessageSender
 	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *tktypes.EthAddress)
+	SendHeartbeat(ctx context.Context, coordinatorSnapshop *common.CoordinatorSnapshot)
 }
