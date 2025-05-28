@@ -15,24 +15,19 @@
 
 configurations {
     // Resolvable configurations
-    contractCompile {
-        canBeConsumed = false
-        canBeResolved = true
-    }
     buildSDK {
         canBeConsumed = false
         canBeResolved = true
     }
+    // Consumable configurations
     buildCommon {
-        canBeConsumed = false
-        canBeResolved = true
+        canBeConsumed = true
+        canBeResolved = false
     }
 }
 
 dependencies {
-    contractCompile project(path: ':solidity', configuration: 'compiledContracts')
     buildSDK project(path: ':sdk:typescript', configuration: 'buildSDK')
-    buildCommon project(path: ':example:common', configuration: 'buildCommon')
 }
 
 task install(type: Exec) {
@@ -40,40 +35,25 @@ task install(type: Exec) {
     args 'install'
 
     inputs.files(configurations.buildSDK)
-    inputs.files(configurations.buildCommon)
     inputs.files('package.json')
     outputs.files('package-lock.json')
     outputs.dir('node_modules')
 }
 
-task copyABI(type: Exec, dependsOn: install) {
-    executable 'npm'
-    args 'run'
-    args 'abi'
-
-    inputs.files(configurations.contractCompile)
-    inputs.dir('scripts')
-    outputs.dir('src/abis')
-}
-
-task build(type: Exec, dependsOn: [install, copyABI]) {
+task build(type: Exec, dependsOn: install) {
     executable 'npm'
     args 'run'
     args 'build'
 
-    inputs.dir('src')
+    inputs.files('*.ts')
     outputs.dir('build')
-}
-
-task e2e(type: Exec, dependsOn: [build]) {
-    dependsOn ':operator:deploy'
-
-    executable 'npm'
-    args 'run'
-    args 'start'
 }
 
 task clean(type: Delete) {
     delete 'node_modules'
     delete 'build'
+}
+
+dependencies {
+    buildCommon files(build)
 }

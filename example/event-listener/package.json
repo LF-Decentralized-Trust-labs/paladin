@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@lfdecentralizedtrust-labs/paladin-sdk": "file:../../sdk/typescript",
-    "nanoid": "^3.3.9"
+    "nanoid": "^3.3.9",
+    "paladin-example-common": "file:../common"
   }
 }

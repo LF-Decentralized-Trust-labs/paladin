@@ -25,6 +25,14 @@ npm run abi
 npm run build
 ```
 
+Build common utilities
+
+```shell
+cd ../common
+npm install
+npm run build
+```
+
 Run example:
 
 ```shell

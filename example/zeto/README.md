@@ -38,7 +38,7 @@ These dependency resources can be obtained by one of the following ways.
 
 You can perform the setup with just `npm`, without having to run Gradle builds.
 
-1. **Compile Solidity Contracts**
+1. **Compile Solidity contracts**
 
 ```shell
 cd <paladin-root>/solidity
@@ -55,7 +55,15 @@ npm run abi
 npm run build
 ```
 
-3. **Copy the ABIs needed by the example**
+3. **Build common utilities**
+
+```shell
+cd <paladin-root>/example/common
+npm install
+npm run build
+```
+
+4. **Copy the ABIs needed by the example**
 
 ```shell
 cd <paladin-root>/example/zeto

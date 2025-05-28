@@ -4,7 +4,7 @@ import PaladinClient, {
   PenteFactory,
   TransactionType,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
-import { checkDeploy, checkReceipt } from "../../common/util";
+import { checkDeploy, checkReceipt } from "paladin-example-common";
 import atomJson from "./abis/Atom.json";
 import atomFactoryJson from "./abis/AtomFactory.json";
 import bondTrackerPublicJson from "./abis/BondTrackerPublic.json";

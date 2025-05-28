@@ -5,7 +5,7 @@ import PaladinClient, {
   TransactionType,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import { nanoid } from "nanoid";
-import { checkDeploy } from "../../common/util";
+import { checkDeploy } from "paladin-example-common";
 import helloWorldJson from "./abis/HelloWorld.json";
 
 const logger = console;

@@ -11,7 +11,7 @@ Requires a local 3-node Paladin cluster running on `localhost:31548`, `localhost
 
 ## Option 1: Use the Latest Stable Version
 
-1. **Download and Extract Contracts**
+1. **Download and extract contracts**
    - [Download Solidity contracts](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/latest/abis.tar.gz)
    - Extract `abis.tar.gz` and copy the `abis` directory to `src/`. (full path should be: `paladin/example/bond/src/abis`)
 
@@ -24,7 +24,15 @@ npm install
 npm run build
 ```
 
-3. **Run the Example**
+3. **Build common utilities**
+
+```shell
+cd ../common
+npm install
+npm run build
+```
+
+4. **Run the example**
 
 ```shell
 npm install
@@ -35,7 +43,7 @@ npm run start
 
 ## Option 2: Build Locally
 
-1. **Compile Solidity Contracts**
+1. **Compile Solidity contracts**
 
 ```shell
 cd ../../solidity
@@ -52,7 +60,15 @@ npm run abi
 npm run build
 ```
 
-3. **Run the Example**
+3. **Build common utilities**
+
+```shell
+cd ../common
+npm install
+npm run build
+```
+
+4. **Run the example**
 
 ```shell
 npm install

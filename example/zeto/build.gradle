@@ -19,10 +19,15 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
+    buildCommon {
+        canBeConsumed = false
+        canBeResolved = true
+    }
 }
 
 dependencies {
     buildSDK project(path: ':sdk:typescript', configuration: 'buildSDK')
+    buildCommon project(path: ':example:common', configuration: 'buildCommon')
 }
 
 task copyContracts(type: Copy, dependsOn: [":domains:zeto:extractZetoArtifacts"]) {
@@ -41,6 +46,7 @@ task install(type: Exec) {
     args 'install'
 
     inputs.files(configurations.buildSDK)
+    inputs.files(configurations.buildCommon)
     inputs.files('package.json')
     outputs.files('package-lock.json')
     outputs.dir('node_modules')

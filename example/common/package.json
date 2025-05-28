@@ -2,7 +2,9 @@
   "name": "paladin-example-common",
   "version": "0.0.1",
   "description": "",
-  "scripts": {},
+  "scripts": {
+    "build": "tsc"
+  },
   "author": "",
   "license": "Apache-2.0",
   "devDependencies": {

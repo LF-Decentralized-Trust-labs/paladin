@@ -6,7 +6,7 @@ import PaladinClient, {
   ZetoFactory,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import { ethers } from "ethers";
-import { checkDeploy, checkReceipt } from "../../common/util";
+import { checkDeploy, checkReceipt } from "paladin-example-common";
 import { newAtomFactory } from "./helpers/atom";
 import { newERC20Tracker } from "./helpers/erc20tracker";
 

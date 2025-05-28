@@ -1,7 +1,7 @@
 import PaladinClient, {
   PenteFactory,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
-import { checkDeploy } from "../../common/util";
+import { checkDeploy } from "paladin-example-common";
 import storageJson from "./abis/Storage.json";
 import { PrivateStorage } from "./helpers/storage";
 
