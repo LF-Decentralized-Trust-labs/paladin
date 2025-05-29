@@ -136,7 +136,7 @@ contract NotoTrackerERC20 is INotoHooks, ERC20 {
         address delegate,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external virtual override {
+    ) external virtual override onlySelf(sender, from) {
         approvals++; // must store something on each call (see https://github.com/kaleido-io/paladin/issues/252)
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -147,7 +147,7 @@ contract NotoTrackerERC20 is INotoHooks, ERC20 {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external virtual override {
+    ) external virtual override onlySelf(sender, from) {
         _onBurn(sender, from, amount, data, prepared);
     }
 
@@ -158,7 +158,7 @@ contract NotoTrackerERC20 is INotoHooks, ERC20 {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external virtual override {
+    ) external virtual override onlySelf(sender, from) {
         _onLock(sender, lockId, from, amount, data, prepared);
     }
 
