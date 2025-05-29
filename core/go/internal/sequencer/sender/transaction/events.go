@@ -57,12 +57,20 @@ func (_ *ConfirmedSuccessEvent) Type() EventType {
 	return Event_ConfirmedSuccess
 }
 
+func (_ *ConfirmedSuccessEvent) TypeString() string {
+	return "Event_ConfirmedSuccess"
+}
+
 type ConfirmedRevertedEvent struct {
 	BaseEvent
 }
 
 func (_ *ConfirmedRevertedEvent) Type() EventType {
 	return Event_ConfirmedReverted
+}
+
+func (_ *ConfirmedRevertedEvent) TypeString() string {
+	return "Event_ConfirmedReverted"
 }
 
 type CreatedEvent struct {
@@ -74,6 +82,10 @@ func (_ *CreatedEvent) Type() EventType {
 	return Event_Created
 }
 
+func (_ *CreatedEvent) TypeString() string {
+	return "Event_Created"
+}
+
 type DelegatedEvent struct {
 	BaseEvent
 	Coordinator string
@@ -83,6 +95,9 @@ func (_ *DelegatedEvent) Type() EventType {
 	return Event_Delegated
 }
 
+func (_ *DelegatedEvent) TypeString() string {
+	return "Event_Delegated"
+}
 func (event *DelegatedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.currentDelegate = event.Coordinator
 	return nil
@@ -100,6 +115,9 @@ func (_ *AssembleRequestReceivedEvent) Type() EventType {
 	return Event_AssembleRequestReceived
 }
 
+func (_ *AssembleRequestReceivedEvent) TypeString() string {
+	return "Event_AssembleRequestReceived"
+}
 func (event *AssembleRequestReceivedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.currentDelegate = event.Coordinator
 
@@ -122,6 +140,9 @@ func (_ *AssembleAndSignSuccessEvent) Type() EventType {
 	return Event_AssembleAndSignSuccess
 }
 
+func (_ *AssembleAndSignSuccessEvent) TypeString() string {
+	return "Event_AssembleAndSignSuccess"
+}
 func (event *AssembleAndSignSuccessEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.PostAssembly = event.PostAssembly
 	txn.latestFulfilledAssembleRequestID = event.RequestID
@@ -138,6 +159,9 @@ func (_ *AssembleRevertEvent) Type() EventType {
 	return Event_AssembleRevert
 }
 
+func (_ *AssembleRevertEvent) TypeString() string {
+	return "Event_AssembleRevert"
+}
 func (event *AssembleRevertEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.PostAssembly = event.PostAssembly
 	txn.latestFulfilledAssembleRequestID = event.RequestID
@@ -154,6 +178,9 @@ func (_ *AssembleParkEvent) Type() EventType {
 	return Event_AssemblePark
 }
 
+func (_ *AssembleParkEvent) TypeString() string {
+	return "Event_AssemblePark"
+}
 func (event *AssembleParkEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.PostAssembly = event.PostAssembly
 	txn.latestFulfilledAssembleRequestID = event.RequestID
@@ -168,6 +195,10 @@ func (_ *AssembleErrorEvent) Type() EventType {
 	return Event_AssembleError
 }
 
+func (_ *AssembleErrorEvent) TypeString() string {
+	return "Event_AssembleError"
+}
+
 type DispatchConfirmationRequestReceivedEvent struct {
 	BaseEvent
 	RequestID        uuid.UUID
@@ -179,6 +210,10 @@ func (_ *DispatchConfirmationRequestReceivedEvent) Type() EventType {
 	return Event_DispatchConfirmationRequestReceived
 }
 
+func (_ *DispatchConfirmationRequestReceivedEvent) TypeString() string {
+	return "Event_DispatchConfirmationRequestReceived"
+}
+
 type CoordinatorChangedEvent struct {
 	BaseEvent
 	Coordinator string
@@ -188,6 +223,9 @@ func (_ *CoordinatorChangedEvent) Type() EventType {
 	return Event_CoordinatorChanged
 }
 
+func (_ *CoordinatorChangedEvent) TypeString() string {
+	return "Event_CoordinatorChanged"
+}
 func (event *CoordinatorChangedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.currentDelegate = event.Coordinator
 	return nil
@@ -202,6 +240,9 @@ func (_ *DispatchedEvent) Type() EventType {
 	return Event_Dispatched
 }
 
+func (_ *DispatchedEvent) TypeString() string {
+	return "Event_Dispatched"
+}
 func (event *DispatchedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.signerAddress = &event.SignerAddress
 	return nil
@@ -217,6 +258,9 @@ func (_ *NonceAssignedEvent) Type() EventType {
 	return Event_NonceAssigned
 }
 
+func (_ *NonceAssignedEvent) TypeString() string {
+	return "Event_NonceAssigned"
+}
 func (event *NonceAssignedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.signerAddress = &event.SignerAddress //TODO should we throw an error if the signer address is already set to something else?
 	txn.nonce = &event.Nonce
@@ -234,6 +278,9 @@ func (_ *SubmittedEvent) Type() EventType {
 	return Event_Submitted
 }
 
+func (_ *SubmittedEvent) TypeString() string {
+	return "Event_Submitted"
+}
 func (event *SubmittedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
 	txn.signerAddress = &event.SignerAddress //TODO should we throw an error if the signer address or nonce are already set to something else?
 	txn.nonce = &event.Nonce
@@ -247,4 +294,8 @@ type ResumedEvent struct {
 
 func (_ *ResumedEvent) Type() EventType {
 	return Event_Resumed
+}
+
+func (_ *ResumedEvent) TypeString() string {
+	return "Event_Resumed"
 }

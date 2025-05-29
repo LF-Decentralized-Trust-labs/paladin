@@ -339,19 +339,19 @@ func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*E
 			valid, err := eventHandler.Validator(ctx, t, event)
 			if err != nil {
 				//This is an unexpected error.  If the event is invalid, the validator should return false and not an error
-				log.L(ctx).Errorf("Error validating event %v: %v", event.Type(), err)
+				log.L(ctx).Errorf("Error validating event %s: %v", event.TypeString(), err)
 				return nil, err
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the transaction so we just ignore it and move on
-				log.L(ctx).Debugf("Event %v is not valid: %v", event.Type(), valid)
+				log.L(ctx).Debugf("Event %v is not valid: %s", event.TypeString(), valid)
 				return nil, nil
 			}
 		}
 		return &eventHandler, nil
 	} else {
 		// no event handler defined for this event while in this state
-		log.L(ctx).Debugf("No event handler defined for Event %v in State %s", event.Type(), sm.currentState.String())
+		log.L(ctx).Debugf("No event handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
 		return nil, nil
 	}
 

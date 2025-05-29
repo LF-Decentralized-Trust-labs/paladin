@@ -17,7 +17,6 @@ package transaction
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -433,19 +432,19 @@ func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*E
 			valid, err := eventHandler.Validator(ctx, t, event)
 			if err != nil {
 				//This is an unexpected error.  If the event is invalid, the validator should return false and not an error
-				log.L(ctx).Errorf("Error validating event %v: %v", event.Type(), err)
+				log.L(ctx).Errorf("Error validating event %s: %v", event.TypeString(), err)
 				return nil, err
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the transaction so we just ignore it and move on
-				log.L(ctx).Debugf("Event %v is not valid: %v", event.Type(), valid)
+				log.L(ctx).Debugf("Event %v is not valid: %s", event.TypeString(), valid)
 				return nil, nil
 			}
 		}
 		return &eventHandler, nil
 	} else {
 		// no event handler defined for this event while in this state
-		log.L(ctx).Debugf("No event handler defined for Event %v in State %s", event.Type(), sm.currentState.String())
+		log.L(ctx).Debugf("No event handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
 		return nil, nil
 	}
 
@@ -548,6 +547,30 @@ func (s State) String() string {
 	switch s {
 	case State_Initial:
 		return "Initial"
+	case State_Pending:
+		return "State_Pending"
+	case State_Delegated:
+		return "State_Delegated"
+	case State_Assembling:
+		return "State_Assembling"
+	case State_EndorsementGathering:
+		return "State_EndorsementGathering"
+	case State_Signing:
+		return "State_Signing"
+	case State_Prepared:
+		return "State_Prepared"
+	case State_Dispatched:
+		return "State_Dispatched"
+	case State_Sequenced:
+		return "State_Sequenced"
+	case State_Submitted:
+		return "State_Submitted"
+	case State_Confirmed:
+		return "State_Confirmed"
+	case State_Reverted:
+		return "State_Reverted"
+	case State_Parked:
+		return "State_Parked"
 	}
-	return fmt.Sprintf("Unknown (%d)", s)
+	return "Unknown"
 }

@@ -47,6 +47,10 @@ func (_ *ReceivedEvent) Type() EventType {
 	return Event_Received
 }
 
+func (_ *ReceivedEvent) TypeString() string {
+	return "Event_Received"
+}
+
 // TransactionSelectedEvent
 type SelectedEvent struct {
 	BaseEvent
@@ -56,6 +60,10 @@ func (_ *SelectedEvent) Type() EventType {
 	return Event_Selected
 }
 
+func (_ *SelectedEvent) TypeString() string {
+	return "Event_Selected"
+}
+
 // AssembleRequestSentEvent
 type AssembleRequestSentEvent struct {
 	BaseEvent
@@ -63,6 +71,10 @@ type AssembleRequestSentEvent struct {
 
 func (_ *AssembleRequestSentEvent) Type() EventType {
 	return Event_AssembleRequestSent
+}
+
+func (_ *AssembleRequestSentEvent) TypeString() string {
+	return "Event_AssembleRequestSent"
 }
 
 // AssembleSuccessEvent
@@ -76,6 +88,10 @@ func (_ *AssembleSuccessEvent) Type() EventType {
 	return Event_Assemble_Success
 }
 
+func (_ *AssembleSuccessEvent) TypeString() string {
+	return "Event_Assemble_Success"
+}
+
 // AssembleRevertResponseEvent
 type AssembleRevertResponseEvent struct {
 	BaseEvent
@@ -87,6 +103,10 @@ func (_ *AssembleRevertResponseEvent) Type() EventType {
 	return Event_Assemble_Revert_Response
 }
 
+func (_ *AssembleRevertResponseEvent) TypeString() string {
+	return "Event_Assemble_Revert_Response"
+}
+
 // EndorsedEvent
 type EndorsedEvent struct {
 	BaseEvent
@@ -96,6 +116,10 @@ type EndorsedEvent struct {
 
 func (_ *EndorsedEvent) Type() EventType {
 	return Event_Endorsed
+}
+
+func (_ *EndorsedEvent) TypeString() string {
+	return "Event_Endorsed"
 }
 
 // EndorsedRejectedEvent
@@ -111,6 +135,10 @@ func (_ *EndorsedRejectedEvent) Type() EventType {
 	return Event_EndorsedRejected
 }
 
+func (_ *EndorsedRejectedEvent) TypeString() string {
+	return "Event_EndorsedRejected"
+}
+
 // DispatchConfirmedEvent
 type DispatchConfirmedEvent struct {
 	BaseEvent
@@ -121,6 +149,10 @@ func (_ *DispatchConfirmedEvent) Type() EventType {
 	return Event_DispatchConfirmed
 }
 
+func (_ *DispatchConfirmedEvent) TypeString() string {
+	return "Event_DispatchConfirmed"
+}
+
 // DispatchConfirmationRejectedEvent
 type DispatchConfirmationRejectedEvent struct {
 	BaseEvent
@@ -128,6 +160,10 @@ type DispatchConfirmationRejectedEvent struct {
 
 func (_ *DispatchConfirmationRejectedEvent) Type() EventType {
 	return Event_DispatchConfirmationRejected
+}
+
+func (_ *DispatchConfirmationRejectedEvent) TypeString() string {
+	return "Event_DispatchConfirmationRejected"
 }
 
 // CollectedEvent
@@ -141,6 +177,10 @@ func (_ *CollectedEvent) Type() EventType {
 	return Event_Collected
 }
 
+func (_ *CollectedEvent) TypeString() string {
+	return "Event_Collected"
+}
+
 // NonceAllocatedEvent
 type NonceAllocatedEvent struct {
 	BaseEvent
@@ -151,6 +191,10 @@ func (_ *NonceAllocatedEvent) Type() EventType {
 	return Event_NonceAllocated
 }
 
+func (_ *NonceAllocatedEvent) TypeString() string {
+	return "Event_NonceAllocated"
+}
+
 // SubmittedEvent
 type SubmittedEvent struct {
 	BaseEvent
@@ -159,6 +203,10 @@ type SubmittedEvent struct {
 
 func (_ *SubmittedEvent) Type() EventType {
 	return Event_Submitted
+}
+
+func (_ *SubmittedEvent) TypeString() string {
+	return "Event_Submitted"
 }
 
 // ConfirmedEvent
@@ -173,6 +221,10 @@ func (_ *ConfirmedEvent) Type() EventType {
 	return Event_Confirmed
 }
 
+func (_ *ConfirmedEvent) TypeString() string {
+	return "Event_Confirmed"
+}
+
 type DependencyAssembledEvent struct {
 	BaseEvent
 	DependencyID uuid.UUID
@@ -180,6 +232,10 @@ type DependencyAssembledEvent struct {
 
 func (_ *DependencyAssembledEvent) Type() EventType {
 	return Event_DependencyAssembled
+}
+
+func (_ *DependencyAssembledEvent) TypeString() string {
+	return "Event_DependencyAssembled"
 }
 
 type DependencyRevertedEvent struct {
@@ -191,6 +247,10 @@ func (_ *DependencyRevertedEvent) Type() EventType {
 	return Event_DependencyReverted
 }
 
+func (_ *DependencyRevertedEvent) TypeString() string {
+	return "Event_DependencyReverted"
+}
+
 type DependencyReadyEvent struct {
 	BaseEvent
 	DependencyID uuid.UUID
@@ -200,12 +260,20 @@ func (_ *DependencyReadyEvent) Type() EventType {
 	return Event_DependencyReady
 }
 
+func (_ *DependencyReadyEvent) TypeString() string {
+	return "Event_DependencyReady"
+}
+
 type RequestTimeoutIntervalEvent struct {
 	BaseEvent
 }
 
 func (_ *RequestTimeoutIntervalEvent) Type() EventType {
 	return Event_RequestTimeoutInterval
+}
+
+func (_ *RequestTimeoutIntervalEvent) TypeString() string {
+	return "Event_RequestTimeoutInterval"
 }
 
 // events emitted by the transaction state machine whenever a state transition occurs
@@ -217,4 +285,8 @@ type StateTransitionEvent struct {
 
 func (_ *StateTransitionEvent) Type() EventType {
 	return Event_StateTransition
+}
+
+func (_ *StateTransitionEvent) TypeString() string {
+	return "Event_StateTransition"
 }

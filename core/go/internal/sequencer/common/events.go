@@ -26,6 +26,7 @@ const (
 
 type Event interface {
 	Type() EventType
+	TypeString() string
 }
 
 type HeartbeatIntervalEvent struct {
@@ -33,4 +34,8 @@ type HeartbeatIntervalEvent struct {
 
 func (_ *HeartbeatIntervalEvent) Type() EventType {
 	return Event_HeartbeatInterval
+}
+
+func (_ *HeartbeatIntervalEvent) TypeString() string {
+	return "Event_HeartbeatInterval"
 }

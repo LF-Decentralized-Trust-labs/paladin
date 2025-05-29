@@ -33,6 +33,10 @@ func (_ *HeartbeatIntervalEvent) Type() EventType {
 	return Event_HeartbeatInterval
 }
 
+func (_ *HeartbeatIntervalEvent) TypeString() string {
+	return "Event_HeartbeatInterval"
+}
+
 type HeartbeatReceivedEvent struct {
 	transport.CoordinatorHeartbeatNotification
 }
@@ -41,12 +45,20 @@ func (_ *HeartbeatReceivedEvent) Type() EventType {
 	return Event_HeartbeatReceived
 }
 
+func (_ *HeartbeatReceivedEvent) TypeString() string {
+	return "Event_HeartbeatReceived"
+}
+
 type TransactionCreatedEvent struct {
 	Transaction *components.PrivateTransaction
 }
 
 func (_ *TransactionCreatedEvent) Type() EventType {
 	return Event_TransactionCreated
+}
+
+func (_ *TransactionCreatedEvent) TypeString() string {
+	return "Event_TransactionCreated"
 }
 
 type TransactionConfirmedEvent struct {
@@ -58,4 +70,8 @@ type TransactionConfirmedEvent struct {
 
 func (_ *TransactionConfirmedEvent) Type() EventType {
 	return Event_TransactionConfirmed
+}
+
+func (_ *TransactionConfirmedEvent) TypeString() string {
+	return "Event_TransactionConfirmed"
 }

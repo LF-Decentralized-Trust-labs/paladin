@@ -44,10 +44,18 @@ func (_ *TransactionsDelegatedEvent) Type() EventType {
 	return Event_TransactionsDelegated
 }
 
+func (_ *TransactionsDelegatedEvent) TypeString() string {
+	return "Event_TransactionsDelegated"
+}
+
 type CoordinatorFlushedEvent struct{}
 
 func (_ *CoordinatorFlushedEvent) Type() EventType {
 	return Event_Flushed
+}
+
+func (_ *CoordinatorFlushedEvent) TypeString() string {
+	return "Event_Flushed"
 }
 
 type TransactionConfirmedEvent struct {
@@ -61,6 +69,10 @@ func (_ *TransactionConfirmedEvent) Type() EventType {
 	return Event_TransactionConfirmed
 }
 
+func (_ *TransactionConfirmedEvent) TypeString() string {
+	return "Event_TransactionConfirmed"
+}
+
 type TransactionDispatchConfirmedEvent struct {
 	TransactionID uuid.UUID
 }
@@ -69,6 +81,9 @@ func (_ *TransactionDispatchConfirmedEvent) Type() EventType {
 	return Event_TransactionDispatchConfirmed
 }
 
+func (_ *TransactionDispatchConfirmedEvent) TypeString() string {
+	return "Event_TransactionDispatchConfirmed"
+}
 func (t *TransactionDispatchConfirmedEvent) GetTransactionID() uuid.UUID {
 	return t.TransactionID
 }
@@ -81,12 +96,20 @@ func (_ *HeartbeatReceivedEvent) Type() EventType {
 	return Event_HeartbeatReceived
 }
 
+func (_ *HeartbeatReceivedEvent) TypeString() string {
+	return "Event_HeartbeatReceived"
+}
+
 type HandoverRequestEvent struct {
 	Requester string
 }
 
 func (_ *HandoverRequestEvent) Type() EventType {
 	return Event_HandoverRequestReceived
+}
+
+func (_ *HandoverRequestEvent) TypeString() string {
+	return "Event_HandoverRequestReceived"
 }
 
 type NewBlockEvent struct {
@@ -97,11 +120,19 @@ func (_ *NewBlockEvent) Type() EventType {
 	return Event_NewBlock
 }
 
+func (_ *NewBlockEvent) TypeString() string {
+	return "Event_NewBlock"
+}
+
 type HandoverReceivedEvent struct {
 }
 
 func (_ *HandoverReceivedEvent) Type() EventType {
 	return Event_HandoverReceived
+}
+
+func (_ *HandoverReceivedEvent) TypeString() string {
+	return "Event_HandoverReceived"
 }
 
 type TransactionStateTransitionEvent struct {
@@ -112,4 +143,8 @@ type TransactionStateTransitionEvent struct {
 
 func (_ *TransactionStateTransitionEvent) Type() EventType {
 	return Event_TransactionStateTransition
+}
+
+func (_ *TransactionStateTransitionEvent) TypeString() string {
+	return "Event_TransactionStateTransition"
 }
