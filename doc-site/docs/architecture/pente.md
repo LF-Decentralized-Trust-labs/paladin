@@ -182,7 +182,7 @@ Other fields:
 
 ## Public ABI
 
-The public ABI of Pente is implemented in Solidity by [PentePrivacyGroup.sol](../https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/pente/PentePrivacyGroup.sol),
+The public ABI of Pente is implemented in Solidity by [PentePrivacyGroup.sol](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/pente/PentePrivacyGroup.sol),
 and can be accessed by calling `ptx_sendTransaction` with `"type": "public"`. However, it is not often required
 to invoke the public ABI directly.
 
