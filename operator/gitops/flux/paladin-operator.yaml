@@ -39,7 +39,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
   name: paladin
-  namespace: paladin # This value must match spec.values.operator.namespace
+  namespace: paladin
 spec:
   releaseName: paladin
   interval: 5m

@@ -95,7 +95,6 @@ func (r *PaladinRegistrationReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	} else if registryAddr == nil {
 		log.Info("waiting for registry address", "registry", reg.Name)
-		log.Info(fmt.Sprintf("'%s' A steps wait", req.Name))
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil // we're waiting
 	}
 	publishCount := 0

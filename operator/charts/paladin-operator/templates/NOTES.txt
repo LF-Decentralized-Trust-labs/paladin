@@ -3,10 +3,10 @@ Welcome to Paladin! 🎉
 {{- if or (eq .Values.mode "devnet") (eq .Values.mode "basenet") }}
 
 List Deployed Smart Contracts 📋
-kubectl -n {{ .Values.operator.namespace }} get scd
+kubectl -n {{ .Release.Namespace }} get scd
 
 List available Registries ⚜️
-kubectl -n {{ .Values.operator.namespace }} get reg
+kubectl -n {{ .Release.Namespace }} get reg
 
 {{- end }}
 {{- if eq .Values.mode "devnet" }}

@@ -11,7 +11,7 @@ nodeCount: 3
 # Default values for paladin-operator
 operator:
   name: paladin-operator
-  namespace: paladin
+  namespace: "" # DEPRECATED: Use the namespace field in the HelmRelease instead. e.g. helm install ... --namespace <namespace>
   image:
     repository: ghcr.io/lf-decentralized-trust-labs/paladin-operator
     tag: main

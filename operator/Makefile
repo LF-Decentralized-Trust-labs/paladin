@@ -196,7 +196,7 @@ uninstall-crds: ## Uninstall CRDs.
 
 .PHONY: helm-template
 helm-template: ## Install operator using Helm.
-	$(HELM) template ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} --values ${VALUES_FILE} --set operator.namespace=${NAMESPACE} --set mode=${MODE}
+	$(HELM) template ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} --values ${VALUES_FILE} --namespace=${NAMESPACE} --set mode=${MODE}
 
 .PHONY: helm-install-dependencies
 helm-install-dependencies: ## Install operator using Helm.
@@ -213,7 +213,6 @@ helm-install: helm-install-dependencies ## Install operator using Helm.
 		-n ${NAMESPACE} --create-namespace \
 		--values ${VALUES_FILE} \
 		--set nodeCount=${NODE_COUNT} \
-		--set operator.namespace=${NAMESPACE} \
 		--set operator.image.repository=${OPERATOR_IMAGE_NAME} \
 		--set operator.image.pullPolicy=IfNotPresent \
 		--set operator.image.tag=${OPERATOR_IMAGE_TAG} \
@@ -244,7 +243,7 @@ helm-uninstall: helm-uninstall-dependencies ## Uninstall operator using Helm.
 
 .PHONY: helm-pause
 helm-pause: ## Pause the operator (set replica count to 0).
-	$(HELM) upgrade --install ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} -n ${NAMESPACE} --create-namespace --set operator.namespace=${NAMESPACE} --set replicaCount=0
+	$(HELM) upgrade --install ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} -n ${NAMESPACE} --create-namespace --set replicaCount=0
 
 ##@ Dependencies
 LOCALBIN ?= $(shell pwd)/bin

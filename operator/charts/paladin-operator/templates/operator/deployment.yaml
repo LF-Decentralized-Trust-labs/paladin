@@ -3,7 +3,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Values.operator.name }}
-  namespace: {{ .Values.operator.namespace }}
   labels:
     app.kubernetes.io/name: {{ .Values.operator.name }}
     {{- with .Values.operator.labels }}
