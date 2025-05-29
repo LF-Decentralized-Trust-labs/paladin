@@ -20,6 +20,7 @@ import (
 	"os"
 	"runtime/debug"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
@@ -249,7 +250,16 @@ func TestTransportRegisterFail(t *testing.T) {
 	})
 	defer done()
 
-	assert.Regexp(t, "pop", <-waitForError)
+	var got error
+	require.Eventually(t, func() bool {
+		select {
+		case got = <-waitForError:
+			return true
+		default:
+			return false
+		}
+	}, 5*time.Second, 10*time.Millisecond, "transport failure callback never fired")
+	assert.Regexp(t, "pop", got)
 }
 
 func TestFromTransportRequestBadReq(t *testing.T) {
