@@ -8,6 +8,8 @@ import {
   StateStatus,
   Verifiers,
 } from "./interfaces";
+import { IBlockchainEventListener } from "./interfaces/blockchainevent";
+import { IEventWithData } from "./interfaces/blockindex";
 import { Logger } from "./interfaces/logger";
 import {
   JsonRpcResult,
@@ -23,7 +25,6 @@ import {
 import { IQuery } from "./interfaces/query";
 import {
   IDecodedEvent,
-  IEventWithData,
   INotoDomainReceipt,
   IPenteDomainReceipt,
   IPreparedTransaction,
@@ -350,5 +351,39 @@ export default class PaladinClient {
       [name]
     );
     return res.data.result;
+  }
+
+  async getReceiptListener(name: string) {
+    const res = await this.post<JsonRpcResult<ITransactionReceiptListener>>(
+      "ptx_getReceiptListener",
+      [name],
+      { validateStatus: (status) => status < 300 || status === 404 }
+    );
+    return res.status === 404 ? undefined : res.data.result;
+  }
+
+  async createBlockchainEventListener(listener: IBlockchainEventListener) {
+    const res = await this.post<JsonRpcResult<boolean>>(
+      "ptx_createBlockchainEventListener",
+      [listener]
+    );
+    return res.data.result;
+  }
+
+  async deleteBlockchainEventListener(name: string) {
+    const res = await this.post<JsonRpcResult<boolean>>(
+      "ptx_deleteBlockchainEventListener",
+      [name]
+    );
+    return res.data.result;
+  }
+
+  async getBlockchainEventListener(name: string) {
+    const res = await this.post<JsonRpcResult<IBlockchainEventListener>>(
+      "ptx_getBlockchainEventListener",
+      [name],
+      { validateStatus: (status) => status < 300 || status === 404 }
+    );
+    return res.status === 404 ? undefined : res.data.result;
   }
 }
