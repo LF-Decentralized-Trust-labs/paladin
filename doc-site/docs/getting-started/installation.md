@@ -1,4 +1,6 @@
-# Installation Guide
+# Installation: devnet
+
+Installing the operator in `devnet` mode also installs and configures a three node Paladin network and three node Besu network. This is great way to get up and running quickly with Paladin and to try out the [tutorials](../tutorials/index.md).
 
 ## Pre-requisites
 
@@ -172,6 +174,10 @@ Each Paladin node runs an instance of the Paladin UI at the path `/ui`. If you u
 * http://localhost:31748/ui
 
 Learn about interacting with the [UI](./user-interface.md), and try out the [Tutorials](./../tutorials/index.md).
+
+## Advanced installation
+
+This guide is designed for first-time Paladin users looking for a quick and easy introduction. For more complex setups, integration with existing blockchain networks, or detailed customization, please refer to the [Advanced Installation](./installation-advanced.md) or [Manual Installation](./installation-manual.md) guides.
 
 ## Troubleshooting
 
