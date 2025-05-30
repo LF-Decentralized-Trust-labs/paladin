@@ -101,8 +101,25 @@ task buildCoverageTxt(type: Exec, dependsOn: [
 
 }
 
-task checkCoverage(type: GoCheckCoverage, dependsOn: [buildCoverageTxt]) {
-    coverageFile('coverage/coverage.txt')
+// Filter the coverage report file.
+// The coverage.txt file generated contains the file "pkg/wsclient/wstestserver.go" which is not
+// relevant for the coverage report as it is a helper file used to run the tests
+task filterCoverageTxt {
+    dependsOn buildCoverageTxt
+    inputs.file("$projectDir/coverage/coverage.txt")
+    outputs.file("$projectDir/coverage/coverage.filtered.txt")
+    doLast {
+        def inFile  = file("$projectDir/coverage/coverage.txt")
+        def outFile = file("$projectDir/coverage/coverage.filtered.txt")
+        outFile.text = inFile.readLines()
+            // drop any line that starts with the path to the tet file helper
+            .findAll { line -> !line.startsWith("pkg/wsclient/wstestserver.go") }
+            .join(System.lineSeparator())
+    }
+}
+
+task checkCoverage(type: GoCheckCoverage, dependsOn: [filterCoverageTxt]) {
+    coverageFile('coverage/coverage.filtered.txt')
     target = targetCoverage
     maxGap = maxCoverageBarGap
 }
