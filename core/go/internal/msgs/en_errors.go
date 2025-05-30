@@ -453,6 +453,7 @@ var (
 	MsgTxMgrBlockchainEventListenerInvalidTimeout = pde("PD012250", "Error parsing batch timeout '%s': %s")
 	MsgTxMgrBlockchainEventListenerNoSources      = pde("PD012251", "Blockchain event listener '%s' has no sources configured")
 	MsgTxMgrBlockchainEventListenerNoABIs         = pde("PD012252", "Blockchain event listener '%s' has a source with no ABI configured")
+	MsgTxMgrVerifierNotEthAddress                 = pde("PD012253", "Verifier '%s' is not an Ethereum address")
 
 	// FlushWriter module PD0123XX
 	MsgFlushWriterQuiescing      = pde("PD012300", "Writer shutting down")
