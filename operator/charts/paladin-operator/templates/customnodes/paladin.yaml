@@ -1,5 +1,5 @@
 # templates/paladin-nodes.yaml
-{{- if (eq .Values.mode "customnet") }}
+{{- if or (eq .Values.mode "customnet") (eq .Values.mode "attach") }}
 
 {{- range .Values.paladinNodes }}
 {{- $name := .name }}

@@ -36,16 +36,11 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// file names that are basenet specific
-var basenet = []string{"issuer", "smartcontractdeployment", "transactioninvoke"}
-
-// file names that are devnet specific
-var devnet = []string{"paladindomain", "paladinregistry"}
-
 var scope = map[string][]string{
-	"basenet":   basenet,
-	"devnet":    append(devnet, basenet...),
-	"customnet": append(devnet, basenet...),
+	"basenet":   {"issuer", "smartcontractdeployment", "transactioninvoke"},
+	"devnet":    {"issuer", "smartcontractdeployment", "transactioninvoke", "paladindomain", "paladinregistry"},
+	"customnet": {"issuer", "smartcontractdeployment", "transactioninvoke", "paladindomain", "paladinregistry"},
+	"attach":    {"issuer", "paladindomain", "paladinregistry"},
 }
 
 type ContractMap map[string]*ContractMapBuild
