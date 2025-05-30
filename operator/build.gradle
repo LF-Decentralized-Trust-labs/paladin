@@ -54,6 +54,7 @@ ext {
     clusterName = project.hasProperty('clusterName') ? project.clusterName : 'paladin' 
     namespace = project.hasProperty('namespace') ? project.namespace : 'default' // Default namespace is 'default'
     mode = project.hasProperty('mode') ? project.mode : 'devnet'
+    nodeCount = project.hasProperty('nodeCount') ? project.nodeCount.toInteger()  : 3 // Default node count is 3
     deleteCluster = project.hasProperty('deleteCluster') ? project.deleteCluster.toBoolean() : false // By default, do not delete the cluster
     loadImages = project.hasProperty('loadImages') ? project.loadImages == 'true' : true // Default is to load images
     buildPaladin = project.hasProperty('buildPaladin') ? project.buildPaladin == 'true' : true // Default is to build Paladin
@@ -331,6 +332,7 @@ task installOperator(type: Exec, dependsOn: [installCrds, promoteKindImages, pre
     executable 'make'
     args 'helm-install'
     args "NAMESPACE=${namespace}"
+    args "NODE_COUNT=${nodeCount}"
     args "OPERATOR_IMAGE_NAME=${operatorImageName}"
     args "OPERATOR_IMAGE_TAG=${operatorImageTag}"
     args "PALADIN_IMAGE_NAME=${paladinImageName}"
@@ -352,7 +354,7 @@ task verifyBesu(dependsOn: verifyOperator) {
     doLast {
         println 'Waiting for besu statefulSet to become ready...'
 
-        verifyResourceCreated(namespace,  'statefulset', 'besu-node1', "1", 120)
+        verifyResourceCreated(namespace, 'statefulset', 'besu-node1', "1", 120)
         verifyResourceCreated(namespace, 'statefulset', 'besu-node2', "1", 120)
         verifyResourceCreated(namespace, 'statefulset', 'besu-node3', "1", 120)
     }
@@ -419,6 +421,7 @@ task cleanCluster(type: Exec) {
 task clean {
     dependsOn cleanCluster
     delete 'test/e2e/abis'
+    delete 'charts/paladin-operator/templates/samples'
 }
 
 // The 'e2e' task runs the whole flow

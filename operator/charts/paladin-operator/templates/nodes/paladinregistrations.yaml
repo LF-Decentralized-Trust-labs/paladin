@@ -1,0 +1,28 @@
+{{- if (eq .Values.mode "devnet") }}
+
+{{- $prefix := .Values.paladin.nodeNamePrefix }}
+{{- $count := .Values.nodeCount | int }}
+
+{{- $adminNode := printf "%s1" $prefix }}
+
+{{- range $i, $ := until $count }}
+{{- $n := add $i 1 }}
+{{- $name := printf "%s%d" $prefix $n }}
+apiVersion: core.paladin.io/v1alpha1
+kind: PaladinRegistration
+metadata:
+  labels:
+    app.kubernetes.io/name: operator-go
+    app.kubernetes.io/managed-by: kustomize
+  name: {{ $name }}
+spec:
+  registry: evm-registry
+  registryAdminNode: {{ $adminNode }} # home of the root key
+  registryAdminKey: registry.operator
+  node: {{ $name }}
+  nodeAdminKey: registry.{{ $name }}
+  transports:
+    - grpc
+---
+{{- end }}
+{{- end }}

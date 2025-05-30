@@ -5,12 +5,6 @@ tests:
       - matchSnapshot: {}
     set:
       unittest: true
-  - it: Change namespace
-    asserts:
-      - matchSnapshot: {}
-    set:
-      unittest: true
-      operator.namespace: test
   - it: Mode none
     asserts:
       - matchSnapshot: {}

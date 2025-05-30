@@ -3,21 +3,21 @@ Welcome to Paladin! 🎉
 {{- if or (eq .Values.mode "devnet") (eq .Values.mode "basenet") }}
 
 List Deployed Smart Contracts 📋
-kubectl -n {{ .Values.operator.namespace }} get scd
+kubectl -n {{ .Release.Namespace }} get scd
 
 List available Registries ⚜️
-kubectl -n {{ .Values.operator.namespace }} get reg
+kubectl -n {{ .Release.Namespace }} get reg
 
 {{- end }}
-
 {{- if eq .Values.mode "devnet" }}
 
 Access the Paladin UI
 The Paladin UI is available on the following URLs:
-- Node 1: http://localhost:31548/ui
-- Node 2: http://localhost:31648/ui
-- Node 3: http://localhost:31748/ui
-
+{{- $basePort := .Values.paladin.baseNodePort }}
+{{- $count := .Values.nodeCount | int }}
+{{- range $i := until $count }}
+- Node {{ add $i 1 }}: http://localhost:{{ add $basePort (mul $i 100) }}/ui
+{{- end }}
 {{- end }}
 
 For additional information or troubleshooting, please refer to the official documentation or reach out to our support team.

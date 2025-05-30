@@ -1,14 +1,17 @@
-# Installation mode. This setting determines which Custom Resources (CRs) will be installed by default when deploying this chart.
-# Supported modes:
-# - devnet: Installs a default Paladin network (3 nodes) along with the related Domains and Smart Contracts CRs.
-# - basenet: Deploys the Domains and Smart Contracts CRs without installing the Paladin network.
-# - none (or left empty): Only the operator will be installed.
+# Installation mode: determines the default resources to deploy when installing this chart.
+# Available options:
+# - devnet (default): Deploys a complete Paladin network (default: 3 nodes), including Domains and Smart Contract CRs.
+# - basenet: Deploys only Smart Contract CRs without Domains or Paladin nodes.
+# - none / operator-only (or leave empty): Deploys only the Paladin operator without additional resources.
 mode: devnet
+
+# Number of Paladin and Besu nodes to deploy. Relevant only when mode is set to "devnet".
+nodeCount: 3
 
 # Default values for paladin-operator
 operator:
   name: paladin-operator
-  namespace: paladin
+  namespace: "" # DEPRECATED: Use the namespace field in the HelmRelease instead. e.g. helm install ... --namespace <namespace>
   image:
     repository: ghcr.io/lf-decentralized-trust-labs/paladin-operator
     tag: main
@@ -89,27 +92,53 @@ prometheus:
   pushgateway:
     enabled: false  # Enable if you need the push gateway
 
-paladin:
-  image:
-    repository: ghcr.io/lf-decentralized-trust-labs/paladin
-    tag: main
-    pullPolicy: Always
-  labels:
-    app: paladin
-  
-besu:
-  image:
-    repository: hyperledger/besu
-    tag: latest
-    pullPolicy: Always
-  labels:
-    app: besu
 postgres: # the postgres container runs as a sidecar to the paladin container
   image:
     repository: postgres
     tag: latest
     pullPolicy: Always
 
+# Smart Contracts References
+# Provide either 'deployment' or 'address':
+# - 'deployment' should be set for new installations.
+# - 'address' should be set if using an existing deployment from another operator, to join the same network.
+smartContractsReferences:
+  notoFactory:
+    address: ""       # Existing contract address (leave blank if deploying new)
+    deployment: noto-factory   # Deployment resource name (leave blank if using existing address)
+  zetoFactory:
+    address: ""
+    deployment: zeto-factory
+  penteFactory:
+    address: ""
+    deployment: pente-factory
+  registry:
+    address: ""
+    deployment: registry
+
+    
 # Install CRDs as part of the chart installation
 # When this is set to false, the CRDs are expected to be installed separately
 installCRDs: false
+
+# Setting for devnet mode 
+paladin:
+  nodeNamePrefix: node
+  image:
+    repository: ghcr.io/lf-decentralized-trust-labs/paladin
+    tag: main
+    pullPolicy: Always
+  labels:
+    app: paladin
+  baseNodePort: 31548
+
+# Setting for devnet mode 
+besu:
+  nodeNamePrefix: node
+  image:
+    repository: hyperledger/besu
+    tag: latest
+    pullPolicy: Always
+  labels:
+    app: besu
+  baseNodePort: 31545

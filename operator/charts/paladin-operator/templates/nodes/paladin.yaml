@@ -1,0 +1,77 @@
+{{- if (eq .Values.mode "devnet") }}
+
+{{- $prefix := .Values.paladin.nodeNamePrefix }}
+{{- $besuPrefix := .Values.besu.nodeNamePrefix }}
+{{- $basePort := .Values.paladin.baseNodePort }}
+
+{{- range $i, $ := until (.Values.nodeCount | int) }}
+{{- $name := printf "%s%d" $prefix (add $i 1) }}
+{{- $besuName := printf "%s%d" $besuPrefix (add $i 1) }}
+apiVersion: core.paladin.io/v1alpha1
+kind: Paladin
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  config: |
+    log:
+      level: debug
+    publicTxManager:
+      gasLimit:
+        gasEstimateFactor: 2.0
+  database:
+    mode: sidecarPostgres
+    migrationMode: auto
+  baseLedgerEndpoint:
+    type: local
+    local:
+      nodeName: {{ $besuName }}
+  secretBackedSigners:
+    - name: signer-1
+      secret: {{ $name }}.keys
+      type: autoHDWallet
+      keySelector: .*
+  domains:
+    - labelSelector:
+        matchLabels:
+          paladin.io/domain-name: noto
+    - labelSelector:
+        matchLabels:
+          paladin.io/domain-name: zeto
+    - labelSelector:
+        matchLabels:
+          paladin.io/domain-name: pente
+  registries:
+    - labelSelector:
+        matchLabels:
+          paladin.io/registry-name: evm-registry
+  transports:
+    - name: grpc
+      plugin:
+        type: c-shared
+        library: /app/transports/libgrpc.so
+      configJSON: |
+        {
+          "port": 9000,
+          "address": "0.0.0.0"
+        }
+      ports:
+        - name: transport-grpc
+          port: 9000
+          targetPort: 9000
+      tls:
+        secretName: paladin-{{ $name }}-mtls
+        certName: paladin-{{ $name }}-mtls
+  service:
+    type: NodePort
+    ports:
+      - name: rpc-http
+        port: 8548
+        nodePort: {{ add $basePort (mul $i 100) }}
+      - name: rpc-ws
+        port: 8549
+        nodePort: {{ add $basePort (add (mul $i 100) 1) }}
+---
+{{- end }}
+{{- end }}
