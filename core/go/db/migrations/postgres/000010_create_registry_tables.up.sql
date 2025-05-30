@@ -17,7 +17,7 @@ CREATE TABLE reg_entries (
 );
 
 -- The name is scoped uniquely within the parent
-CREATE UNIQUE INDEX reg_entries_name ON reg_entries("registry", "name", "parent_id") NULLS NOT DISTINCT;
+CREATE UNIQUE INDEX reg_entries_name ON reg_entries("registry", "name", "parent_id");
 
 CREATE TABLE reg_props (
     "registry"           VARCHAR NOT NULL,
