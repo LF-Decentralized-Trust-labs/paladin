@@ -62,7 +62,20 @@ type coordinator struct {
 	transactionSelector TransactionSelector
 }
 
-func NewCoordinator(ctx context.Context, messageSender MessageSender, committeeMembers []string, clock common.Clock, emit common.EmitEvent, engineIntegration common.EngineIntegration, requestTimeout, assembleTimeout common.Duration, blockRangeSize uint64, contractAddress *tktypes.EthAddress, blockHeightTolerance uint64, closingGracePeriod int) (*coordinator, error) {
+func NewCoordinator(
+	ctx context.Context,
+	messageSender MessageSender,
+	committeeMembers []string,
+	clock common.Clock,
+	emit common.EmitEvent,
+	engineIntegration common.EngineIntegration,
+	requestTimeout,
+	assembleTimeout common.Duration,
+	blockRangeSize uint64,
+	contractAddress *tktypes.EthAddress,
+	blockHeightTolerance uint64,
+	closingGracePeriod int,
+) (*coordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
 		transactionsByID:                   make(map[uuid.UUID]*transaction.Transaction),
@@ -224,13 +237,13 @@ func (c *coordinator) getTransactionsInStates(ctx context.Context, states []tran
 	for _, state := range states {
 		matchingStates[state] = true
 	}
-	dispatched := make([]*transaction.Transaction, 0, len(c.transactionsByID))
+	matchingTxns := make([]*transaction.Transaction, 0, len(c.transactionsByID))
 	for _, txn := range c.transactionsByID {
 		if matchingStates[txn.GetState()] {
-			dispatched = append(dispatched, txn)
+			matchingTxns = append(matchingTxns, txn)
 		}
 	}
-	return dispatched
+	return matchingTxns
 }
 
 func (c *coordinator) getTransactionsNotInStates(ctx context.Context, states []transaction.State) []*transaction.Transaction {
@@ -240,13 +253,13 @@ func (c *coordinator) getTransactionsNotInStates(ctx context.Context, states []t
 	for _, state := range states {
 		nonMatchingStates[state] = true
 	}
-	dispatched := make([]*transaction.Transaction, 0, len(c.transactionsByID))
+	matchingTxns := make([]*transaction.Transaction, 0, len(c.transactionsByID))
 	for _, txn := range c.transactionsByID {
 		if !nonMatchingStates[txn.GetState()] {
-			dispatched = append(dispatched, txn)
+			matchingTxns = append(matchingTxns, txn)
 		}
 	}
-	return dispatched
+	return matchingTxns
 }
 
 func (c *coordinator) findTransactionBySignerNonce(ctx context.Context, signer *tktypes.EthAddress, nonce uint64) *transaction.Transaction {
