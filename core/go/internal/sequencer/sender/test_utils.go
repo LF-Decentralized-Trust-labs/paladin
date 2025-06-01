@@ -18,6 +18,7 @@ package sender
 import (
 	"context"
 
+	uuid "github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
@@ -32,6 +33,7 @@ const (
 type SentMessageRecorder struct {
 	transaction.SentMessageRecorder
 	hasSentDelegationRequest bool
+	delegatedTransactions    []*components.PrivateTransaction
 }
 
 func NewSentMessageRecorder() *SentMessageRecorder {
@@ -39,16 +41,27 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 }
 
 func (r *SentMessageRecorder) SendDelegationRequest(ctx context.Context, coordinator string, transactions []*components.PrivateTransaction, sendersBlockHeight uint64) {
+	r.delegatedTransactions = transactions
 	r.hasSentDelegationRequest = true
-
 }
 
 func (r *SentMessageRecorder) HasSentDelegationRequest() bool {
 	return r.hasSentDelegationRequest
 }
+
+func (r *SentMessageRecorder) HasDelegatedTransaction(txid uuid.UUID) bool {
+	for _, tx := range r.delegatedTransactions {
+		if tx.ID == txid {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *SentMessageRecorder) Reset(ctx context.Context) {
 	r.SentMessageRecorder.Reset(ctx)
 	r.hasSentDelegationRequest = false
+	r.delegatedTransactions = nil
 }
 
 type SenderBuilderForTesting struct {
