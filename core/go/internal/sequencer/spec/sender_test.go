@@ -19,6 +19,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/testutil"
@@ -137,4 +138,40 @@ func TestStateMachine_Observing_NoTransition_OnHeartbeatInterval_IfHeartbeatThre
 	err = s.HandleEvent(ctx, &sender.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
 	assert.Equal(t, sender.State_Observing, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
+}
+
+func TestStateMachine_Sending_DoDelegateTransactions_OnHeartbeatReceived_IfHasDroppedTransaction(t *testing.T) {
+	ctx := context.Background()
+	coordinatorLocator := "coordinator@node1"
+
+	builder := sender.NewSenderBuilderForTesting(sender.State_Sending)
+	s, mocks := builder.Build(ctx)
+
+	txn1 := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender("sender@node1").Build()
+	err := s.HandleEvent(ctx, &sender.TransactionCreatedEvent{
+		Transaction: txn1,
+	})
+	assert.NoError(t, err)
+
+	txn2 := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender("sender@node1").Build()
+	err = s.HandleEvent(ctx, &sender.TransactionCreatedEvent{
+		Transaction: txn2,
+	})
+	assert.NoError(t, err)
+
+	mocks.SentMessageRecorder.Reset(ctx)
+
+	// Only one of the delegated transactions are included in the heartbeat
+	heartbeatEvent := &sender.HeartbeatReceivedEvent{}
+	heartbeatEvent.From = coordinatorLocator
+	heartbeatEvent.PooledTransactions = []*common.Transaction{
+		{
+			ID:     txn1.ID,
+			Sender: "sender@node1",
+		},
+	}
+
+	err = s.HandleEvent(ctx, heartbeatEvent)
+	assert.NoError(t, err)
+	assert.True(t, mocks.SentMessageRecorder.HasSentDelegationRequest())
 }

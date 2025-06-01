@@ -37,6 +37,7 @@ type sender struct {
 	submittedTransactionsByHash  map[tktypes.Bytes32]*uuid.UUID
 	transactionsOrdered          []*uuid.UUID
 	currentBlockHeight           uint64
+	latestCoordinatorSnapshot    *common.CoordinatorSnapshot
 
 	/* Config */
 	nodeName             string

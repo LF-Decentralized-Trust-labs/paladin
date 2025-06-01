@@ -72,6 +72,13 @@ func (r *SentMessageRecorder) SendAssembleResponse(ctx context.Context, requestI
 	}
 }
 
+func (r *SentMessageRecorder) Reset(_ context.Context) {
+	r.hasSentConfirmationResponse = false
+	r.hasSentAssembleSuccessResponse = false
+	r.hasSentAssembleRevertResponse = false
+	r.hasSentAssembleParkResponse = false
+}
+
 type TransactionBuilderForTesting struct {
 	privateTransactionBuilder *testutil.PrivateTransactionBuilderForTesting
 	state                     State

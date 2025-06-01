@@ -123,11 +123,16 @@ func init() {
 						Action: action_SendDelegationRequest,
 					}},
 				},
-				Event_NewBlock:          {},
-				Event_HeartbeatReceived: {},
+				Event_NewBlock: {},
+				Event_HeartbeatReceived: {
+					Actions: []ActionRule{{
+						If:     guard_HasDroppedTransactions,
+						Action: action_SendDelegationRequest,
+					}},
+				},
 				Event_Base_Ledger_Transaction_Reverted: {
 					Actions: []ActionRule{{
-						Action: action_SendDelegationRequest,
+						Action: action_SendDelegationRequest, //TODO Is this redundant?, coordinator should retry this unless it has dropped the transaction and we already handle the dropped case
 					}},
 				},
 			},
@@ -161,6 +166,11 @@ func (s *sender) HandleEvent(ctx context.Context, event common.Event) error {
 		return err
 	}
 
+	err = s.performActions(ctx, *eventHandler)
+	if err != nil {
+		return err
+	}
+
 	//Determine whether this event triggers a state transition
 	err = s.evaluateTransitions(ctx, event, *eventHandler)
 	return err
@@ -180,19 +190,19 @@ func (s *sender) evaluateEvent(ctx context.Context, event common.Event) (*EventH
 			valid, err := eventHandler.Validator(ctx, s, event)
 			if err != nil {
 				//This is an unexpected error.  If the event is invalid, the validator should return false and not an error
-				log.L(ctx).Errorf("Error validating event %v: %v", event.Type(), err)
+				log.L(ctx).Errorf("Error validating event %s: %v", event.TypeString(), err)
 				return nil, err
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the coordinator so we just ignore it and move on
-				log.L(ctx).Debugf("Event %v is not valid: %v", event.Type(), valid)
+				log.L(ctx).Debugf("Event %s is not valid", event.TypeString())
 				return nil, nil
 			}
 		}
 		return &eventHandler, nil
 	} else {
 		// no event handler defined for this event while in this state
-		log.L(ctx).Debugf("No event handler defined for Event %v in State %s", event.Type(), sm.currentState.String())
+		log.L(ctx).Debugf("No event handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
 		return nil, nil
 	}
 }
@@ -203,9 +213,13 @@ func (s *sender) evaluateEvent(ctx context.Context, event common.Event) (*EventH
 func (s *sender) applyEvent(ctx context.Context, event common.Event) error {
 	var err error
 	// First apply the event to the update the internal fine grained state of the coordinator if there is any handler registered for the current state
-	switch event.(type) {
+	switch event := event.(type) {
 	case *HeartbeatReceivedEvent:
-		err = s.applyHeartbeatReceived(ctx)
+		err = s.applyHeartbeatReceived(ctx, event)
+	case *TransactionCreatedEvent:
+		err = s.createTransaction(ctx, event.Transaction)
+	case *TransactionConfirmedEvent:
+		err = s.confirmTransaction(ctx, event.From, event.Nonce, event.Hash, event.RevertReason)
 	default:
 		log.L(ctx).Debugf("No action defined for event %T", event)
 
@@ -216,12 +230,26 @@ func (s *sender) applyEvent(ctx context.Context, event common.Event) error {
 	return err
 }
 
+func (s *sender) performActions(ctx context.Context, eventHandler EventHandler) error {
+	for _, rule := range eventHandler.Actions {
+		if rule.If == nil || rule.If(ctx, s) {
+			err := rule.Action(ctx, s)
+			if err != nil {
+				//any recoverable errors should have been handled by the action function
+				log.L(ctx).Errorf("Error applying action: %v", err)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (s *sender) evaluateTransitions(ctx context.Context, event common.Event, eventHandler EventHandler) error {
 	sm := s.stateMachine
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, s) { //if there is no guard defined, or the guard returns true
-			log.L(ctx).Infof("Coordinator for address %s transitioning from %s to %s triggered by event %T", s.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
+			log.L(ctx).Infof("Sender for address %s transitioning from %s to %s triggered by event %T", s.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first
@@ -287,6 +315,8 @@ func (s State) String() string {
 		return "Idle"
 	case State_Observing:
 		return "Observing"
+	case State_Sending:
+		return "Sending"
 	}
 	return "Unknown"
 }

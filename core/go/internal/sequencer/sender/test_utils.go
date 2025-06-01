@@ -46,6 +46,10 @@ func (r *SentMessageRecorder) SendDelegationRequest(ctx context.Context, coordin
 func (r *SentMessageRecorder) HasSentDelegationRequest() bool {
 	return r.hasSentDelegationRequest
 }
+func (r *SentMessageRecorder) Reset(ctx context.Context) {
+	r.SentMessageRecorder.Reset(ctx)
+	r.hasSentDelegationRequest = false
+}
 
 type SenderBuilderForTesting struct {
 	state            State
