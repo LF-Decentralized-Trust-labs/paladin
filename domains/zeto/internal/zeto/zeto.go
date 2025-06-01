@@ -349,6 +349,15 @@ func (z *Zeto) GetHandler(method, tokenName string) types.DomainHandler {
 	}
 }
 
+func (z *Zeto) GetCallHandler(method, tokenName string) types.DomainCallHandler {
+	switch method {
+	case types.METHOD_BALANCE_OF:
+		return fungible.NewBalanceOfHandler(z.name, z.Callbacks, z.coinSchema, z.merkleTreeRootSchema, z.merkleTreeNodeSchema, z.dataSchema)
+	default:
+		return nil
+	}
+}
+
 func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*types.DomainInstanceConfig, error) {
 	configValues, err := types.DomainInstanceConfigABI.DecodeABIDataCtx(ctx, domainConfig, 0)
 	if err != nil {
@@ -416,6 +425,55 @@ func (z *Zeto) validateTransaction(ctx context.Context, tx *prototk.TransactionS
 		DomainConfig:    domainConfig,
 		Params:          params,
 	}, handler, nil
+}
+
+func (z *Zeto) validateCall(ctx context.Context, call *prototk.TransactionSpecification) (*types.ParsedTransaction, types.DomainCallHandler, error) {
+	var functionABI abi.Entry
+	err := json.Unmarshal([]byte(call.FunctionAbiJson), &functionABI)
+	if err != nil {
+		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalFuncAbi, err)
+	}
+
+	var domainConfig *types.DomainInstanceConfig
+	err = json.Unmarshal([]byte(call.ContractInfo.ContractConfigJson), &domainConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var abi *abi.Entry
+	if common.IsNonFungibleToken(domainConfig.TokenName) {
+		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorNonFungibleTokenNotSupported, functionABI.Name)
+	} else {
+		abi = types.ZetoFungibleABI.Functions()[functionABI.Name]
+	}
+
+	handler := z.GetCallHandler(functionABI.Name, domainConfig.TokenName)
+	if abi == nil || handler == nil {
+		return nil, nil, i18n.NewError(ctx, msgs.MsgUnknownFunction, functionABI.Name)
+	}
+	params, err := handler.ValidateParams(ctx, domainConfig, call.FunctionParamsJson)
+	if err != nil {
+		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorValidateFuncParams, err)
+	}
+
+	signature := abi.SolString()
+	if call.FunctionSignature != signature {
+		return nil, nil, i18n.NewError(ctx, msgs.MsgUnexpectedFuncSignature, functionABI.Name, signature, call.FunctionSignature)
+	}
+
+	contractAddress, err := ethtypes.NewAddress(call.ContractInfo.ContractAddress)
+	if err != nil {
+		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
+	}
+
+	return &types.ParsedTransaction{
+		Transaction:     call,
+		FunctionABI:     &functionABI,
+		ContractAddress: contractAddress,
+		DomainConfig:    domainConfig,
+		Params:          params,
+	}, handler, nil
+
 }
 
 func (z *Zeto) registerEventSignatures(eventAbis abi.ABI) {
@@ -612,11 +670,19 @@ func (z *Zeto) ValidateStateHashes(ctx context.Context, req *prototk.ValidateSta
 }
 
 func (z *Zeto) InitCall(ctx context.Context, req *prototk.InitCallRequest) (*prototk.InitCallResponse, error) {
-	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+	ptx, handler, err := z.validateCall(ctx, req.Transaction)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorValidateInitCallTxSpec, err)
+	}
+	return handler.InitCall(ctx, ptx, req)
 }
 
 func (z *Zeto) ExecCall(ctx context.Context, req *prototk.ExecCallRequest) (*prototk.ExecCallResponse, error) {
-	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+	ptx, handler, err := z.validateCall(ctx, req.Transaction)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorValidateExecCallTxSpec, err)
+	}
+	return handler.ExecCall(ctx, ptx, req)
 }
 
 func (z *Zeto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptRequest) (*prototk.BuildReceiptResponse, error) {

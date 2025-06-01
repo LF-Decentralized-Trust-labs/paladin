@@ -215,3 +215,55 @@ func findAvailableStates(ctx context.Context, callbacks plugintk.DomainCallbacks
 func randomSlot(size int) int {
 	return rand.IntN(size)
 }
+
+func getAccountBalance(
+	ctx context.Context,
+	callbacks plugintk.DomainCallbacks,
+	coinSchema *pb.StateSchema,
+	useNullifiers bool,
+	stateQueryContext, accountKey string,
+) (*big.Int, error) {
+	total := big.NewInt(0)
+	var lastStateTimestamp int64
+
+	for {
+		queryBuilder := query.NewQueryBuilder().
+			Limit(10).
+			Sort(".created").
+			Equal("owner", accountKey).
+			Equal("locked", false)
+
+		if lastStateTimestamp > 0 {
+			queryBuilder.GreaterThan(".created", lastStateTimestamp)
+		}
+
+		states, err := findAvailableStates(
+			ctx, callbacks, coinSchema,
+			useNullifiers, stateQueryContext, queryBuilder.Query().String(),
+		)
+		if err != nil {
+			return nil, i18n.NewError(ctx, msgs.MsgErrorQueryAvailCoins, err)
+		}
+		// no more pages
+		if len(states) == 0 {
+			break
+		}
+
+		// sum up this page
+		for _, state := range states {
+			lastStateTimestamp = state.CreatedAt
+			coin, err := makeCoin(state.DataJson)
+			if err != nil {
+				return nil, i18n.NewError(ctx, msgs.MsgInvalidCoin, state.Id, err)
+			}
+			total.Add(total, coin.Amount.Int())
+		}
+
+		// if fewer than our page size, we’re done
+		if len(states) < 10 {
+			break
+		}
+	}
+
+	return total, nil
+}
