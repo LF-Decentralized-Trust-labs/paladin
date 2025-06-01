@@ -262,7 +262,7 @@ func (c *coordinator) evaluateEvent(ctx context.Context, event common.Event) (*E
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the coordinator so we just ignore it and move on
-				log.L(ctx).Debugf("Event %v is not valid: %s", event.TypeString(), valid)
+				log.L(ctx).Debugf("Event %s is not valid: %t", event.TypeString(), valid)
 				return nil, nil
 			}
 		}
