@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
+	"golang.org/x/crypto/sha3"
 )
 
 type identityForTesting struct {
@@ -323,6 +324,17 @@ func (b *PrivateTransactionBuilderForTesting) BuildEndorsement(endorserIndex int
 }
 
 // Function BuildPostAssembly creates a new PostAssembly with all fields populated as per the builder's configuration using defaults unless explicitly set
+func (b *PrivateTransactionBuilderForTesting) BuildPostAssemblyAndHash() (*components.TransactionPostAssembly, *tktypes.Bytes32) {
+	postAssembly := b.BuildPostAssembly()
+	hash := sha3.NewLegacyKeccak256()
+	for _, signature := range postAssembly.Signatures {
+		hash.Write(signature.Payload)
+	}
+	var h32 tktypes.Bytes32
+	_ = hash.Sum(h32[0:0])
+	return postAssembly, &h32
+}
+
 func (b *PrivateTransactionBuilderForTesting) BuildPostAssembly() *components.TransactionPostAssembly {
 
 	if b.revertReason != nil {
