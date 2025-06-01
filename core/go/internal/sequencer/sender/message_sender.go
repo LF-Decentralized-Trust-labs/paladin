@@ -24,5 +24,5 @@ import (
 
 type MessageSender interface {
 	transaction.MessageSender
-	SendDelegationRequest(ctx context.Context, Transactions []*components.PrivateTransaction, SendersBlockHeight uint64)
+	SendDelegationRequest(ctx context.Context, coordinatorLocator string, transactions []*components.PrivateTransaction, sendersBlockHeight uint64)
 }
