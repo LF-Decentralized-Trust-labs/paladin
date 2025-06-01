@@ -34,10 +34,12 @@ type sender struct {
 	activeCoordinatorBlockHeight uint64
 	timeOfMostRecentHeartbeat    common.Time
 	transactionsByID             map[uuid.UUID]*transaction.Transaction
+	submittedTransactionsByHash  map[tktypes.Bytes32]*uuid.UUID
 	transactionsOrdered          []*uuid.UUID
 	currentBlockHeight           uint64
 
 	/* Config */
+	nodeName             string
 	blockRangeSize       uint64
 	contractAddress      *tktypes.EthAddress
 	blockHeightTolerance uint64
@@ -53,6 +55,7 @@ type sender struct {
 
 func NewSender(
 	ctx context.Context,
+	nodeName string,
 	messageSender MessageSender,
 	committeeMembers []string,
 	clock common.Clock,
@@ -64,14 +67,16 @@ func NewSender(
 	heartbeatThresholdIntervals int,
 ) (*sender, error) {
 	s := &sender{
-		transactionsByID:     make(map[uuid.UUID]*transaction.Transaction),
-		messageSender:        messageSender,
-		blockRangeSize:       blockRangeSize,
-		contractAddress:      contractAddress,
-		clock:                clock,
-		engineIntegration:    engineIntegration,
-		emit:                 emit,
-		heartbeatThresholdMs: clock.Duration(heartbeatPeriodMs * heartbeatThresholdIntervals),
+		nodeName:                    nodeName,
+		transactionsByID:            make(map[uuid.UUID]*transaction.Transaction),
+		submittedTransactionsByHash: make(map[tktypes.Bytes32]*uuid.UUID),
+		messageSender:               messageSender,
+		blockRangeSize:              blockRangeSize,
+		contractAddress:             contractAddress,
+		clock:                       clock,
+		engineIntegration:           engineIntegration,
+		emit:                        emit,
+		heartbeatThresholdMs:        clock.Duration(heartbeatPeriodMs * heartbeatThresholdIntervals),
 	}
 	s.committee = make(map[string][]string)
 	for _, member := range committeeMembers {
@@ -115,25 +120,56 @@ func (s *sender) createTransaction(ctx context.Context, txn *components.PrivateT
 		return err
 	}
 	s.transactionsByID[txn.ID] = newTxn
-	transactionCreatedEvent := &transaction.CreatedEvent{}
-	transactionCreatedEvent.TransactionID = txn.ID
-
-	err = newTxn.HandleEvent(ctx, transactionCreatedEvent)
-	if err != nil {
-		log.L(ctx).Errorf("Error applying transaction created event: %v", err)
-	}
 	s.transactionsOrdered = append(s.transactionsOrdered, &txn.ID)
-
+	createdEvent := &transaction.CreatedEvent{}
+	createdEvent.TransactionID = txn.ID
+	err = newTxn.HandleEvent(context.Background(), createdEvent)
+	if err != nil {
+		log.L(ctx).Errorf("Error handling CreatedEvent for transaction %s: %v", txn.ID.String(), err)
+		return err
+	}
 	return nil
-
 }
 
-func (s *sender) transactionsOrderedByCreatedTime(ctx context.Context) ([]*components.PrivateTransaction, error) {
-	ordered := make([]*components.PrivateTransaction, len(s.transactionsOrdered))
+func (s *sender) transactionsOrderedByCreatedTime(ctx context.Context) ([]*transaction.Transaction, error) {
+	//TODO are we actually saving anything by transactionsOrdered being an array of IDs rather than an array of *transaction.Transaction
+	ordered := make([]*transaction.Transaction, len(s.transactionsOrdered))
 	for i, id := range s.transactionsOrdered {
-		ordered[i] = s.transactionsByID[*id].PrivateTransaction
+		ordered[i] = s.transactionsByID[*id]
 	}
 	return ordered, nil
+}
+
+func (s *sender) getTransactionsInStates(ctx context.Context, states []transaction.State) []*transaction.Transaction {
+	//TODO this could be made more efficient by maintaining a separate index of transactions for each state but that is error prone so
+	// deferring until we have a comprehensive test suite to catch errors
+	matchingStates := make(map[transaction.State]bool)
+	for _, state := range states {
+		matchingStates[state] = true
+	}
+	matchingTxns := make([]*transaction.Transaction, 0, len(s.transactionsByID))
+	for _, txn := range s.transactionsByID {
+		if matchingStates[txn.GetCurrentState()] {
+			matchingTxns = append(matchingTxns, txn)
+		}
+	}
+	return matchingTxns
+}
+
+func (s *sender) getTransactionsNotInStates(ctx context.Context, states []transaction.State) []*transaction.Transaction {
+	//TODO this could be made more efficient by maintaining a separate index of transactions for each state but that is error prone so
+	// deferring until we have a comprehensive test suite to catch errors
+	nonMatchingStates := make(map[transaction.State]bool)
+	for _, state := range states {
+		nonMatchingStates[state] = true
+	}
+	matchingTxns := make([]*transaction.Transaction, 0, len(s.transactionsByID))
+	for _, txn := range s.transactionsByID {
+		if !nonMatchingStates[txn.GetCurrentState()] {
+			matchingTxns = append(matchingTxns, txn)
+		}
+	}
+	return matchingTxns
 }
 
 func ptrTo[T any](v T) *T {

@@ -38,7 +38,7 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 	return &SentMessageRecorder{}
 }
 
-func (r *SentMessageRecorder) SendDelegationRequest(ctx context.Context, Transactions []*components.PrivateTransaction, SendersBlockHeight uint64) {
+func (r *SentMessageRecorder) SendDelegationRequest(ctx context.Context, coordinator string, transactions []*components.PrivateTransaction, sendersBlockHeight uint64) {
 	r.hasSentDelegationRequest = true
 
 }
@@ -49,6 +49,7 @@ func (r *SentMessageRecorder) HasSentDelegationRequest() bool {
 
 type SenderBuilderForTesting struct {
 	state            State
+	nodeName         *string
 	committeeMembers []string
 	contractAddress  *tktypes.EthAddress
 	emitFunction     func(event common.Event)
@@ -73,6 +74,11 @@ func (b *SenderBuilderForTesting) ContractAddress(contractAddress *tktypes.EthAd
 	return b
 }
 
+func (b *SenderBuilderForTesting) NodeName(nodeName string) *SenderBuilderForTesting {
+	b.nodeName = &nodeName
+	return b
+}
+
 func (b *SenderBuilderForTesting) CommitteeMembers(committeeMembers ...string) *SenderBuilderForTesting {
 	b.committeeMembers = committeeMembers
 	return b
@@ -93,8 +99,12 @@ func (b *SenderBuilderForTesting) GetCoordinatorHeartbeatThresholdMs() int {
 
 func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDependencyMocks) {
 
+	if b.nodeName == nil {
+		b.nodeName = ptrTo("member1@node1")
+	}
+
 	if b.committeeMembers == nil {
-		b.committeeMembers = []string{"member1@node1"}
+		b.committeeMembers = []string{*b.nodeName}
 	}
 
 	if b.contractAddress == nil {
@@ -106,12 +116,16 @@ func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDe
 		EngineIntegration:   &common.FakeEngineIntegrationForTesting{},
 	}
 
+	var sender *sender
+
 	b.emitFunction = func(event common.Event) {
 		mocks.emittedEvents = append(mocks.emittedEvents, event)
+		sender.HandleEvent(ctx, event)
 	}
-
-	sender, err := NewSender(
+	var err error
+	sender, err = NewSender(
 		ctx,
+		*b.nodeName,
 		mocks.SentMessageRecorder,
 		b.committeeMembers,
 		mocks.Clock,
@@ -126,6 +140,10 @@ func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDe
 	for _, tx := range b.transactions {
 		sender.transactionsByID[tx.ID] = tx
 		sender.transactionsOrdered = append(sender.transactionsOrdered, &tx.ID)
+		switch tx.GetCurrentState() {
+		case transaction.State_Submitted:
+			sender.submittedTransactionsByHash[*tx.GetLatestSubmissionHash()] = &tx.ID
+		}
 	}
 
 	if err != nil {

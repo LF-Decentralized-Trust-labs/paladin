@@ -63,6 +63,7 @@ func (_ *ConfirmedSuccessEvent) TypeString() string {
 
 type ConfirmedRevertedEvent struct {
 	BaseEvent
+	RevertReason tktypes.HexBytes
 }
 
 func (_ *ConfirmedRevertedEvent) Type() EventType {
@@ -262,7 +263,7 @@ func (_ *NonceAssignedEvent) TypeString() string {
 	return "Event_NonceAssigned"
 }
 func (event *NonceAssignedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
-	txn.signerAddress = &event.SignerAddress //TODO should we throw an error if the signer address is already set to something else?
+	txn.signerAddress = &event.SignerAddress //TODO should we throw an error if the signer address is already set to something else? Or remove these fields from this event?
 	txn.nonce = &event.Nonce
 	return nil
 }
@@ -282,7 +283,7 @@ func (_ *SubmittedEvent) TypeString() string {
 	return "Event_Submitted"
 }
 func (event *SubmittedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
-	txn.signerAddress = &event.SignerAddress //TODO should we throw an error if the signer address or nonce are already set to something else?
+	txn.signerAddress = &event.SignerAddress //TODO should we throw an error if the signer address or nonce are already set to something else? Or remove these fields from this event?
 	txn.nonce = &event.Nonce
 	txn.latestSubmissionHash = &event.LatestSubmissionHash
 	return nil

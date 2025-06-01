@@ -21,6 +21,7 @@ import (
 
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,10 +45,14 @@ func TestStateMachine_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 
 func TestStateMachine_Idle_ToSending_OnTransactionCreated(t *testing.T) {
 	ctx := context.Background()
-	s, mocks := sender.NewSenderBuilderForTesting(sender.State_Idle).Build(ctx)
+	builder := sender.NewSenderBuilderForTesting(sender.State_Idle)
+	s, mocks := builder.Build(ctx)
 	assert.Equal(t, sender.State_Idle, s.GetCurrentState())
 
-	err := s.HandleEvent(ctx, &sender.TransactionCreatedEvent{})
+	txn := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender("sender@node1").Build()
+	err := s.HandleEvent(ctx, &sender.TransactionCreatedEvent{
+		Transaction: txn,
+	})
 	assert.NoError(t, err)
 	assert.Equal(t, sender.State_Sending, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 
@@ -56,9 +61,13 @@ func TestStateMachine_Idle_ToSending_OnTransactionCreated(t *testing.T) {
 
 func TestStateMachine_Observing_ToSending_OnTransactionCreated(t *testing.T) {
 	ctx := context.Background()
-	s, mocks := sender.NewSenderBuilderForTesting(sender.State_Observing).Build(ctx)
+	builder := sender.NewSenderBuilderForTesting(sender.State_Observing)
+	s, mocks := builder.Build(ctx)
 
-	err := s.HandleEvent(ctx, &sender.TransactionCreatedEvent{})
+	txn := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender("sender@node1").Build()
+	err := s.HandleEvent(ctx, &sender.TransactionCreatedEvent{
+		Transaction: txn,
+	})
 	assert.NoError(t, err)
 	assert.Equal(t, sender.State_Sending, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 
@@ -98,7 +107,7 @@ func TestStateMachine_Sending_NoTransition_OnTransactionConfirmed_IfHasTransacti
 		Hash:  *txn1.GetLatestSubmissionHash(),
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, sender.State_Observing, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
+	assert.Equal(t, sender.State_Sending, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 }
 
 func TestStateMachine_Observing_ToIdle_OnHeartbeatInterval_IfHeartbeatThresholdExpired(t *testing.T) {

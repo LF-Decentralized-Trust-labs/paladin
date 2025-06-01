@@ -56,7 +56,8 @@ const (
 
 type Transaction struct {
 	//components.PrivateTransaction
-	ID uuid.UUID
+	ID     uuid.UUID
+	Sender string
 }
 
 func (t *Transaction) GetID() string {

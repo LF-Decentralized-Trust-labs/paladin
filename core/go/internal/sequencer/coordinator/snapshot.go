@@ -72,6 +72,7 @@ func (c *coordinator) getSnapshot(ctx context.Context) *common.CoordinatorSnapsh
 		case transaction.State_Dispatched:
 			dispatchedTransaction := &common.DispatchedTransaction{}
 			dispatchedTransaction.ID = txn.ID
+			dispatchedTransaction.Sender = txn.Sender()
 			signerAddressPtr := txn.GetSignerAddress()
 			if signerAddressPtr != nil {
 				dispatchedTransaction.Signer = *signerAddressPtr

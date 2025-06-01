@@ -333,6 +333,7 @@ func init() {
 		},
 		State_Submitted: {
 			Events: map[EventType]EventHandler{
+				Event_Submitted: {}, // continue to handle submitted events in this state in case the submission hash changes
 				Event_ConfirmedSuccess: {
 					Transitions: []Transition{{
 						To: State_Confirmed,
@@ -437,7 +438,7 @@ func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*E
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the transaction so we just ignore it and move on
-				log.L(ctx).Debugf("Event %v is not valid: %s", event.TypeString(), valid)
+				log.L(ctx).Debugf("Event %s is not valid", event.TypeString())
 				return nil, nil
 			}
 		}
