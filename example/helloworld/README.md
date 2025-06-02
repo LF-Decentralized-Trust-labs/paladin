@@ -11,7 +11,8 @@ Check out the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/h
 ## Option 1: Use the Latest Stable Version
 
 1. **Download and Extract Contracts**
-   - [Download Solidity contracts](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/latest/abis.tar.gz)
+
+   - Go to the [latest release](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/latest) and download the `abis.tar.gz` bundle.
    - Extract `abis.tar.gz` and copy the `abis` directory to `src/`. (full path should be: `paladin/example/helloworld/src/abis`)
 
 2. **Build TypeScript SDK**
@@ -20,6 +21,7 @@ Check out the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/h
 cp -rf src/abis ../../sdk/typescript/src/domains/
 cd ../../sdk/typescript
 npm install
+npm run abi
 npm run build
 ```
 
