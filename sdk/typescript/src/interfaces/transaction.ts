@@ -154,7 +154,7 @@ export enum TransactionType {
   Public = "public",
 }
 
-export interface IDecodedEvent {
+export interface IABIDecodedData {
   signature: string;
   definition: ethers.JsonFragment;
   data: any;

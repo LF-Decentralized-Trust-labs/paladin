@@ -24,7 +24,7 @@ import {
 } from "./interfaces/privacygroups";
 import { IQuery } from "./interfaces/query";
 import {
-  IDecodedEvent,
+  IABIDecodedData,
   INotoDomainReceipt,
   IPenteDomainReceipt,
   IPreparedTransaction,
@@ -213,8 +213,8 @@ export default class PaladinClient {
 
   async resolveVerifier(
     lookup: string,
-    algorithm: Algorithms,
-    verifierType: Verifiers
+    algorithm: Algorithms | string,
+    verifierType: Verifiers | string
   ) {
     const res = await this.post<JsonRpcResult<string>>("ptx_resolveVerifier", [
       lookup,
@@ -235,9 +235,17 @@ export default class PaladinClient {
     return res.data.result;
   }
 
+  async decodeCall(callData: string, dataFormat: string) {
+    const res = await this.post<JsonRpcResult<IABIDecodedData>>(
+      "ptx_decodeCall",
+      [callData, dataFormat]
+    );
+    return res.data.result;
+  }
+
   async decodeEvent(topics: string[], data: string) {
     try {
-      const res = await this.post<JsonRpcResult<IDecodedEvent>>(
+      const res = await this.post<JsonRpcResult<IABIDecodedData>>(
         "ptx_decodeEvent",
         [topics, data, ""]
       );
