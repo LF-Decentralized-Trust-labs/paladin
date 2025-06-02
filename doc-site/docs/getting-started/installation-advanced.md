@@ -7,7 +7,7 @@ This guide covers advanced installation options for deploying Paladin using Helm
 1. [**devnet** (default)](#mode-devnet-default) — Sandbox/demo network, ideal for a quick start and getting a first taste of Paladin.
 2. [**customnet**](#) — Full control: explicitly configure each Paladin node and its settings.
 3. [**attach**](#attach) — Connect to an existing Paladin network and reuse deployed contracts.
-4. **operator-only** — Install only the operator, then apply CRs manually.
+4. [**operator-only**](#mode-operator-only) — Install only the operator, then apply CRs manually.
 
 
 ## Mode: `devnet` (default)**
