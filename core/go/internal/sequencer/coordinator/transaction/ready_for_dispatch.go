@@ -92,3 +92,44 @@ func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
 func action_NotifyDependentsOfReadiness(ctx context.Context, txn *Transaction) error {
 	return txn.notifyDependentsOfReadiness(ctx)
 }
+
+// Function HasDependenciesNotIn checks if the transaction has any that are not in the provided ignoreList array.
+func (t *Transaction) hasDependenciesNotIn(ctx context.Context, ignoreList []*Transaction) bool {
+
+	var ignore = func(t *Transaction) bool {
+		for _, ignoreTxn := range ignoreList {
+			if ignoreTxn.ID == t.ID {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Dependencies as per the order provided when the transaction was delegated
+	if t.previousTransaction != nil && !ignore(t.previousTransaction) {
+		return true
+	}
+
+	// Dependencies calculated at the time of assembly based on the state(s) being spent
+	dependencies := t.dependencies
+
+	//augment with the dependencies explicitly declared in the pre-assembly
+	if t.PreAssembly != nil {
+		dependencies = append(dependencies, t.PreAssembly.Dependencies...)
+	}
+
+	for _, dependencyID := range dependencies {
+		dependency := t.grapher.TransactionByID(ctx, dependencyID)
+		if dependency == nil {
+			//assume the dependency has been confirmed and no longer in memory
+			//hasUnknownDependencies guard will be used to explicitly ensure the correct thing happens
+			continue
+		}
+
+		if !ignore(dependency) {
+			return true
+		}
+	}
+
+	return false
+}

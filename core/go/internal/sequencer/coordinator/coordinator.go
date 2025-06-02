@@ -119,24 +119,6 @@ func NewCoordinator(
 
 }
 
-func (c *coordinator) GetTransactionsReadyToDispatch(ctx context.Context) ([]*components.PrivateTransaction, error) {
-	// Get the next transaction that is ready to be dispatched
-	// This is the transaction that is in the State_Ready_For_Dispatch state
-	// If there are no transactions in that state, return nil
-	transactions := c.getTransactionsInStates(ctx, []transaction.State{transaction.State_Ready_For_Dispatch})
-	if len(transactions) == 0 {
-		return nil, nil
-	}
-	privateTransactions := make([]*components.PrivateTransaction, 0, len(transactions))
-	for _, txn := range transactions {
-		privateTransactions = append(privateTransactions, txn.PrivateTransaction)
-
-	}
-
-	//TODO should we return the first one or should we return all of them?
-	return privateTransactions, nil
-}
-
 func (c *coordinator) sendHandoverRequest(ctx context.Context) {
 	c.messageSender.SendHandoverRequest(ctx, c.activeCoordinator, c.contractAddress)
 }

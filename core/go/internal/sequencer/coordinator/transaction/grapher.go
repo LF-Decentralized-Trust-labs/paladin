@@ -89,3 +89,43 @@ func (s *grapher) Forget(transactionID uuid.UUID) error {
 func (s *grapher) TransactionByID(ctx context.Context, transactionID uuid.UUID) *Transaction {
 	return s.transactionByID[transactionID]
 }
+
+// SortTransactions sorts the transactions based on their dependencies.
+// It ensures that transactions are sequenced in such a way that all dependencies are resolved before the transaction itself is processed.
+// It returns an error if a circular dependency is detected or if any transaction has dependencies that are not in the input list.
+// This function is used to ensure that transactions are processed in the correct order, respecting their dependencies.
+// It assumes that the transactions are provided in a state where they are ready to be sequenced.
+func SortTransactions(ctx context.Context, transactions []*Transaction) ([]*Transaction, error) {
+	sortedTransactions := make([]*Transaction, 0, len(transactions))
+	// Ensure the returned array is sorted according to the dependency graph
+
+	// continue to loop through all transactions picking off any who have no dependencies
+	//  other than transactions that have already been sequenced
+	for len(transactions) > 0 {
+
+		//assume we don't find any transaction with no dependencies in this iteration
+		found := false
+
+		// Find the next transaction that has no dependencies
+		for i, txn := range transactions {
+			// If the transaction has no dependencies, we can sequence it
+			if !txn.hasDependenciesNotIn(ctx, sortedTransactions) {
+				// Add the transaction to the sequenced transactions
+				sortedTransactions = append(sortedTransactions, txn)
+
+				// Remove the transaction from the transactions array
+				transactions = append(transactions[:i], transactions[i+1:]...)
+				found = true
+				break // Restart the loop to check for more transactions
+			}
+		}
+		if !found {
+			// If we didn't find any transaction with no dependencies, it means we have a circular dependency
+			// or some transactions are not in the input list, which should not happen in normal usage
+			msg := "Circular dependency detected or some transactions are not in the input list"
+			log.L(ctx).Errorf(msg)
+			return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
+		}
+	}
+	return sortedTransactions, nil
+}
