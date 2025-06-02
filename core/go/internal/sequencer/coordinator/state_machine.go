@@ -27,18 +27,18 @@ type State int
 type EventType = common.EventType
 
 const (
-	State_Idle      State = iota //Not acting as a coordinator and not aware of any other active coordinators
-	State_Observing              //Not acting as a coordinator but aware of another node acting as a coordinator
-	State_Elect                  //Elected to take over from another coordinator and waiting for handover information
-	State_Standby
-	State_Prepared
-	State_Active
-	State_Flush
-	State_Closing
+	State_Idle      State = iota // Not acting as a coordinator and not aware of any other active coordinators
+	State_Observing              // Not acting as a coordinator but aware of another node acting as a coordinator
+	State_Elect                  // Elected to take over from another coordinator and waiting for handover information
+	State_Standby                // Going to be coordinator on the next block range but local indexer is not at that block yet.
+	State_Prepared               // Have received the handover response but haven't seen the flush point confirmed
+	State_Active                 // Have seen the flush point or have reason to believe the old coordinator has become unavailable and am now assembling transactions based on available knowledge of the state of the base ledger and submitting transactions to the base ledger.
+	State_Flush                  // Stopped assembling and dispatching transactions but continue to submit transactions that are already dispatched
+	State_Closing                // Have flushed and am continuing to sent closing status for `x` heartbeats.
 )
 
 const (
-	Event_Activated EventType = iota + common.Event_HeartbeatInterval + 1 //TODO comments to describe these
+	Event_Activated EventType = iota + common.Event_HeartbeatInterval + 1 //
 	Event_Nominated
 	Event_Flushed
 	Event_Closed

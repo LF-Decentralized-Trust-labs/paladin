@@ -53,10 +53,7 @@ const (
 type EventType = common.EventType
 
 const (
-	Event_HeartbeatInterval                   EventType = iota // the heartbeat interval has passed since the last time a heartbeat was received or the last time this event was received
-	Event_HeartbeatReceived                                    // a heartbeat message was received from the current active coordinator
-	Event_CoordinatorChanged                                   // the coordinator has changed
-	Event_Created                                              // Transaction initially received by the sender or has been loaded from the database after a restart / swap-in
+	Event_Created                             EventType = iota // Transaction initially received by the sender or has been loaded from the database after a restart / swap-in
 	Event_ConfirmedSuccess                                     // confirmation received from the blockchain of base ledge transaction successful completion
 	Event_ConfirmedReverted                                    // confirmation received from the blockchain of base ledge transaction failure
 	Event_Delegated                                            // transaction has been delegated to a coordinator
@@ -70,6 +67,7 @@ const (
 	Event_Resumed                                              // Received an RPC call to resume a parked transaction
 	Event_NonceAssigned                                        // the public transaction manager has assigned a nonce to the transaction
 	Event_Submitted                                            // the transaction has been submitted to the blockchain
+	Event_CoordinatorChanged                                   // the coordinator has changed
 )
 
 type StateMachine struct {
@@ -173,6 +171,11 @@ func init() {
 				},
 				Event_CoordinatorChanged: {
 					//would be very strange to have missed a bunch of heartbeats and switched coordinators if we recently received an assemble request but it is possible so we need to handle it
+					Transitions: []Transition{
+						{
+							To: State_Delegated,
+						},
+					},
 				},
 			},
 		},
