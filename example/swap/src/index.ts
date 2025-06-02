@@ -183,7 +183,6 @@ async function main(): Promise<boolean> {
       },
     ],
   });
-  if (!checkReceipt(receipt)) return false;
   const preparedCashTransfer = await paladin3.pollForPreparedTransaction(
     txID,
     10000
