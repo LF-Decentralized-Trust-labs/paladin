@@ -2,139 +2,222 @@
 
 This guide covers advanced installation options for deploying Paladin using Helm, providing detailed control over various configuration options for different deployment scenarios.
 
-## Prerequisites
+# Installation Modes
 
-* [Helm v3](https://helm.sh/docs/intro/install/) installed
-* [kubectl](https://kubernetes.io/docs/tasks/tools/) installed
+1. [**devnet** (default)](#mode-devnet-default) — Sandbox/demo network, ideal for a quick start and getting a first taste of Paladin.
+2. [**customnet**](#) — Full control: explicitly configure each Paladin node and its settings.
+3. [**attach**](#attach) — Connect to an existing Paladin network and reuse deployed contracts.
+4. **operator-only** — Install only the operator, then apply CRs manually.
 
-## Installation Modes
 
-Paladin supports the following advanced installation modes:
-1. [devnet](#1-devnet-default)
-2. [customnet](#2-customnet)
-3. [operator-only](#3-operator-only-none)
-
-### 1. **devnet (default)**
+## Mode: `devnet` (default)**
 
 Deploys a complete, ready-to-use Paladin network including domains and smart contract resources with default settings (3 nodes).
 
 Default installation:
 
 ```bash
-helm install paladin paladin/paladin-operator
+helm install paladin paladin/paladin-operator -n paladin --create-namespace
 ```
 
-You can customize various parameters such as:
-
-* **Number of nodes**
-* **Node name prefixes** (for both Paladin and Besu nodes)
+Refer to the provided [`values.yaml`](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/operator/charts/paladin-operator/values.yaml) for additional configurable options, including: `Number of nodes`, `node name prefixes`, `ports`, `images`, `environment variables`, etc.
 
 Example custom installation:
 
 ```bash
-helm install paladin paladin/paladin-operator \
+helm install paladin paladin/paladin-operator -n paladin --create-namespace \
   --set nodeCount=5 \
   --set paladin.nodeNamePrefix=worker \
   --set besu.nodeNamePrefix=evm
 ```
 
-Refer to the provided [`values.yaml`](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/operator/charts/paladin-operator/values.yaml) for additional configurable options, including:
+## Mode: `customnet`
 
-* Docker image repositories and tags
-* Resource limits and requests
-* Custom environment variables
-* Service configurations (ports, node ports)
+The `customnet` mode offers maximum flexibility, allowing detailed customization of `Paladin`, `Registry`, and `PaladinDomain` CRs. It is ideal for advanced use cases, such as integration with external blockchain nodes.
 
-### 2. **customnet**
+Declare each node explicitly for setups:
 
-The `customnet` mode offers maximum flexibility, allowing detailed customization of `Paladin`, `Registry`, and `PaladinDomain` CRs. It is ideal for advanced use cases, such as integration with external blockchain nodes or deployments across multiple Kubernetes clusters.
+**Example `values-customnet.yaml`**:
 
-Example usage:
-
-```bash
-helm install paladin paladin/paladin-operator \
-  --set mode=customnet \
-  --values values-customnet.yaml
+```yaml
+mode: customnet
+paladinNodes:
+  - name: bank
+    baseLedgerEndpoint:
+      type: endpoint       # or "local" for built-in Besu
+      endpoint:
+        jsonrpc: https://mychain.rpc
+        ws:    wss://mychain.ws
+        auth:
+          enabled: false    # set true + secretName if basic auth
+          secretName: creds
+    domains:
+      - noto
+      - zeto
+      - pente
+    registries:
+      - evm-reg
+    transports:
+      - name: grpc
+        plugin:
+          type: c-shared
+          library: /app/transports/libgrpc.so
+        config:
+          port: 9000
+          address: 0.0.0.0
+    service:
+      type: NodePort    # change service type if needed
+      ports:
+        rpcHttp: { port: 8548, nodePort: 31548 }
+        rpcWs:   { port: 8549, nodePort: 31549 }
+    database:
+      mode: sidecarPostgres
+      migrationMode: auto
+    secretBackedSigners:
+      - name: signer-auto-wallet
+        secret: bank.keys
+        type: autoHDWallet  # or preConfigured. in case of preConfigured you must create the secret with the seed
+        keySelector: ".*"
+    config: |
+      log:
+        level: debug  # Log levels: debug, info, warn, error
+      publicTxManager:
+        gasLimit:
+          gasEstimateFactor: 2.0
 ```
 
-The [`values-customnet.yaml`](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/operator/charts/paladin-operator/values-customnet.yaml) file provided within the Helm chart allows you to explicitly configure:
 
-* **Paladin node names** (set individually for each node)
-* **Blockchain endpoints** (local or remote)
+**Run**:
 
-  * Options:
+```bash
+helm install paladin paladin/paladin-operator -n paladin --create-namespace \
+  -f values-customnet.yaml
+```
 
-    * Local Besu node
-    * External blockchain JSON-RPC and WebSocket endpoints (with optional basic authentication)
-* [**Smart Contract references**](#smart-contracts-references)
+This will deploy one Paladin node named `bank`. Add more entries under `paladinNodes` to scale horizontally.
 
-  * Deploy new smart contracts or reuse existing ones by setting either `deployment` (new) or `address` (existing)
-* **Secret-backed signers**
+Refer to the provided [`values-customnet.yaml`](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/operator/charts/paladin-operator/values-customnet.yaml) for additional configurable options.
 
-  * Automatically generated HD wallets or pre-configured HD wallets stored in Kubernetes Secrets
-* **Detailed service configurations** (including NodePort settings)
-* **Database modes and migration settings**
+### Options
+Here are some customiztions that you will most lieklly make when in stalling with `customnet ` mode.
 
-### 3. **operator-only (none)**
+#### `baseLedgerEndpoint`
+
+Configure the JSON RPC and websocket endpoints for the blockchain node you wish this Paladin node to connect to.
+If the blockchain node is secured with basic auth, you may specify a secret that contains the username and password:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: node1-auth
+  namespace: paladin
+data:
+  password: ...
+  username: ...
+type: Opaque
+```
+
+#### `transports.config.externalHostname`
+
+`externalHostname` - this can be set if the Paladin node needs to be accessible from outside the cluster. The value will depend on how ingress in configured, which is outside the scope of the Paladin project. If not set it defaults to the internal hostname, which is adequate if all Paladin nodes are running in the same cluster
+
+#### `secretBackedSigners`
+
+Set `autoHDWallet` or `preConfigured` (must supply `keys.yaml`).
+To use a HD wallet with a seed phrase generated by the Paladin operator, set `type: autoHDWallet` and provide the name of a secret you wish the seed phrase to be stored into, but which doesn't exist yet.
+
+```yaml
+secretBackedSigners:
+- keySelector: .*
+  name: signer-1
+  secret: node1.keys
+  type: autoHDWallet
+```
+
+If you wish to use an existing seed phrase, store a file containing this seed phrase in a secret, and reference it in the signer configuration.
+
+  ```yaml
+  seed:
+    inline: manual rabbit frost hero squeeze adjust link crystal filter purchase fruit border coin able tennis until endless crisp scout figure wage finish aisle rabbit
+  ```
+
+  ```bash
+  kubectl create secret generic <secret name> --from-file=keys.yaml=<file name>
+  ```
+
+  ```yaml
+  secretBackedSigners:
+  - keySelector: .*
+    name: signer-1
+    secret: node1.keys
+  ```
+
+
+## Mode: `attach`
+
+Set `mode=attach` when you have an existing blockchain network and previously deployed smart contracts that you want Paladin to reuse.
+This mode will tipacly be in use after you already installed Paladin in `customnet` mode and now you want to run another paladin node in a differnet namespace/cluster and attach it to the already exsiting blockchain and paldin network.
+
+### Retrieving Contract Addresses
+
+
+```bash
+kubectl -n paladin get paladindomains,paladinregistries
+```
+
+Example output:
+
+```
+NAME                                  STATUS      DOMAIN_REGISTRY                              DEPLOYMENT      LIBRARY
+paladindomain.core.paladin.io/noto    Available   0xd93630936d854fb718b89537cce4acc97fd50463   noto-factory    /app/domains/libnoto.so
+paladindomain.core.paladin.io/pente   Available   0x48c11bbb7caa77329d53b89235fec64733a24ca1   pente-factory   /app/domains/pente.jar
+paladindomain.core.paladin.io/zeto    Available   0xc29ed8a902ff787445bdabee9ae5e2380089959d   zeto-factory    /app/domains/libzeto.so
+
+NAME                                           TYPE   STATUS      CONTRACT
+paladinregistry.core.paladin.io/evm-registry   evm    Available   0x07f73d1d358fe9f178b0b8a749a99bf08e4e4140
+```
+
+### Example `values-attach.yaml`:
+
+```yaml
+mode: attach
+smartContractsReferences:
+  notoFactory:
+    address: "0xd93630936d854fb718b89537cce4acc97fd50463"
+  zetoFactory:
+    address: "0xc29ed8a902ff787445bdabee9ae5e2380089959d"
+  penteFactory:
+    address: "0x48c11bbb7caa77329d53b89235fec64733a24ca1"
+  registry:
+    address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
+
+paladinNodes:
+  - name: branch-a
+    baseLedgerEndpoint:
+      type: endpoint
+      endpoint:
+        jsonrpc: http://besu1:8545
+        ws:    ws://besu1:8546
+    paladinRegistration:
+      registryAdminNode: admin
+      registryAdminKey:  registry.operator
+      registry:         evm-registry
+```
+
+**Run**:
+
+```bash
+helm install paladin paladin/paladin-operator -n paladin --create-namespace \
+  -f values-attach.yaml
+```
+
+### Mode: `operator-only`
 
 Deploys only the Paladin operator without additional nodes or domains, useful for advanced scenarios or incremental setup:
 
 ```bash
 helm install paladin paladin/paladin-operator --set mode=operator-only
 ```
-
-## Smart Contracts References
-
-You have the flexibility to manage smart contracts by either deploying new instances or referencing existing contract addresses.
-
-**Default Scenario:**
-During a fresh installation, smart contracts for domains and the registry are deployed automatically and referenced by deployment names:
-```yaml
-smartContractsReferences:
-  notoFactory:
-    address: ""                # Leave blank to deploy a new instance
-    deployment: noto-factory
-  zetoFactory:
-    address: ""
-    deployment: zeto-factory
-  penteFactory:
-    address: ""
-    deployment: pente-factory
-  registry:
-    address: ""
-    deployment: registry
-```
-
-**Existing Deployment Scenario:**
-If you already have smart contracts deployed (e.g., deploying Paladin on multiple namespaces/clusters referencing a shared blockchain), first retrieve the existing smart contract addresses:
-
-```bash
-% kubectl get registry,paladindomain
-NAME           TYPE   STATUS      CONTRACT
-evm-registry   evm    Available   0x4456307ef3f119dac17a5e974d2640f714e6edb0
-```
-
-Example output:
-```bash
-NAME    STATUS      DOMAIN_REGISTRY                              DEPLOYMENT      LIBRARY
-noto    Available   0x2681852a96b053746ff2f2f0bb94c3fbe1d63e7e   noto-factory    /app/domains/libnoto.so
-pente   Available   0x4ea4549eca420802f1d74606775370063b7bcc70   pente-factory   /app/domains/pente.jar
-zeto    Available   0x6ff1c15409614ad89b67baa6018d3499ef779e0b   zeto-factory    /app/domains/libzeto.so
-```
-
-Then update your values file accordingly to ensure Paladin uses the existing contracts:
-```yaml
-smartContractsReferences:
-  notoFactory:
-    address: "0x2681852a96b053746ff2f2f0bb94c3fbe1d63e7e"
-  zetoFactory:
-    address: "0x4ea4549eca420802f1d74606775370063b7bcc70"
-  penteFactory:
-    address: "0x6ff1c15409614ad89b67baa6018d3499ef779e0b"
-  registry:
-    address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
-```
-This configuration ensures Paladin aligns with existing network contracts.
 
 ## Advanced Customization
 
