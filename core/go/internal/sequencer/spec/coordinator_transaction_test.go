@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -530,7 +531,22 @@ func TestCoordinatorTransaction_Dispatched_ToSubmitted_OnSubmitted(t *testing.T)
 	assert.Equal(t, transaction.State_Submitted, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestCoordinatorTransaction_Submitted_ToConfirmed_OnConfirmed(t *testing.T) {
+func TestCoordinatorTransaction_Submitted_ToPooled_OnConfirmed_IfRevert(t *testing.T) {
+	ctx := context.Background()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
+
+	err := txn.HandleEvent(ctx, &transaction.ConfirmedEvent{
+		BaseEvent: transaction.BaseEvent{
+			TransactionID: txn.ID,
+		},
+		RevertReason: tktypes.HexBytes("0x01020304"),
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, transaction.State_Pooled, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+}
+
+func TestCoordinatorTransaction_Submitted_ToConfirmed_IfNoRevert(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 

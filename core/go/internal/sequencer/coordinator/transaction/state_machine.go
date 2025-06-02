@@ -259,8 +259,14 @@ func init() {
 				Event_Confirmed: {
 					Transitions: []Transition{
 						{
+							If: guard_Not(guard_HasRevertReason),
 							To: State_Confirmed,
-						}},
+						},
+						{
+							If: guard_HasRevertReason,
+							To: State_Pooled,
+						},
+					},
 				},
 			},
 		},
