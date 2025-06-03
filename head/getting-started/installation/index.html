@@ -12,7 +12,7 @@
         <link rel="prev" href="../../architecture/ledger_layers/">
       
       
-        <link rel="next" href="../user-interface/">
+        <link rel="next" href="../installation-advanced/">
       
       
       <link rel="icon" href="../../assets/paladin-icon-light.png">
@@ -20,7 +20,7 @@
     
     
       
-        <title>Installation - Paladin</title>
+        <title>Default Installation - Paladin</title>
       
     
     
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installation-guide" class="md-skip">
+        <a href="#installation-devnet" class="md-skip">
           Skip to content
         </a>
       
@@ -196,7 +196,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Installation
+              Default Installation
             
           </span>
         </div>
@@ -340,6 +340,14 @@
   
     
     
+      
+  
+  
+    
+  
+  
+    
+    
       <li class="md-tabs__item md-tabs__item--active">
         <a href="./" class="md-tabs__link">
           
@@ -350,6 +358,9 @@
 
         </a>
       </li>
+    
+  
+
     
   
 
@@ -1051,6 +1062,8 @@
       
         
       
+        
+      
     
     
       
@@ -1093,6 +1106,54 @@
   
   
   
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Installation
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            Installation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
     <li class="md-nav__item md-nav__item--active">
       
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
@@ -1105,7 +1166,7 @@
           
   
   <span class="md-ellipsis">
-    Installation
+    Default Installation
   </span>
   
 
@@ -1116,7 +1177,7 @@
         
   
   <span class="md-ellipsis">
-    Installation
+    Default Installation
   </span>
   
 
@@ -1216,6 +1277,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#advanced-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced installation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       Troubleshooting
@@ -1249,11 +1319,82 @@
   
   
     <li class="md-nav__item">
+      <a href="../installation-advanced/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Advanced Installation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation-manual/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Manual Installation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user-interface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
     User Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Troubleshooting
   </span>
   
 
@@ -3365,6 +3506,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#advanced-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced installation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       Troubleshooting
@@ -3400,7 +3550,8 @@
   
 
 
-<h1 id="installation-guide">Installation Guide<a class="headerlink" href="#installation-guide" title="Permanent link">&para;</a></h1>
+<h1 id="installation-devnet">Installation: devnet<a class="headerlink" href="#installation-devnet" title="Permanent link">&para;</a></h1>
+<p>Installing the operator in <code>devnet</code> mode also installs and configures a three node Paladin network and three node Besu network. This is great way to get up and running quickly with Paladin and to try out the <a href="../../tutorials/">tutorials</a>.</p>
 <h2 id="pre-requisites">Pre-requisites<a class="headerlink" href="#pre-requisites" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Access to a running Kubernetes cluster</li>
@@ -3533,6 +3684,8 @@ documentation for any issues with these tools.</p>
 <li><a href="http://localhost:31748/ui">http://localhost:31748/ui</a></li>
 </ul>
 <p>Learn about interacting with the <a href="../user-interface/">UI</a>, and try out the <a href="../../tutorials/">Tutorials</a>.</p>
+<h2 id="advanced-installation">Advanced installation<a class="headerlink" href="#advanced-installation" title="Permanent link">&para;</a></h2>
+<p>This guide is designed for first-time Paladin users looking for a quick and easy introduction. For more complex setups, integration with existing blockchain networks, or detailed customization, please refer to the <a href="../installation-advanced/">Advanced Installation</a> or <a href="../installation-manual/">Manual Installation</a> guides.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <p>If you encounter any issues during installation, please refer to the <a href="../troubleshooting/">Troubleshooting Guide</a>.  </p>
 <p>If your issue is not listed or remains unresolved, please report it by <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/issues">opening an issue on the Paladin GitHub page</a>.</p>
@@ -3593,13 +3746,13 @@ documentation for any issues with these tools.</p>
         
         
           
-          <a href="../user-interface/" class="md-footer__link md-footer__link--next" aria-label="Next: User Interface">
+          <a href="../installation-advanced/" class="md-footer__link md-footer__link--next" aria-label="Next: Advanced Installation">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                User Interface
+                Advanced Installation
               </div>
             </div>
             <div class="md-footer__button md-icon">
