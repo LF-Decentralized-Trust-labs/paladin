@@ -87,7 +87,7 @@ func TestBalanceOfInitCall(t *testing.T) {
 	ctx := context.Background()
 	tx := &types.ParsedTransaction{
 		Params: &types.FungibleBalanceOfParam{
-			Account: "0x1234567890123456789012345678901234567890",
+			Account: "Alice",
 		},
 		Transaction: &pb.TransactionSpecification{
 			From: "Bob",
@@ -95,8 +95,8 @@ func TestBalanceOfInitCall(t *testing.T) {
 	}
 	req, err := h.InitCall(ctx, tx, nil)
 	assert.NoError(t, err)
-	assert.Len(t, req.RequiredVerifiers, 2)
-	assert.Equal(t, "Bob", req.RequiredVerifiers[0].Lookup)
+	assert.Len(t, req.RequiredVerifiers, 1)
+	assert.Equal(t, "Alice", req.RequiredVerifiers[0].Lookup)
 	assert.Equal(t, h.getAlgoZetoSnarkBJJ(), req.RequiredVerifiers[0].Algorithm)
 	assert.Equal(t, zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X, req.RequiredVerifiers[0].VerifierType)
 }
