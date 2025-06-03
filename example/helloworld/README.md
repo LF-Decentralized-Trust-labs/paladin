@@ -12,7 +12,7 @@ Check out the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/h
 
 1. **Download and Extract Contracts**
 
-   - Go to the [latest release](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/latest) and download the `abis.tar.gz` bundle.
+   - [Download Solidity contracts](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/latest/download/abis.tar.gz)
    - Extract `abis.tar.gz` and copy the `abis` directory to `src/`. (full path should be: `paladin/example/helloworld/src/abis`)
 
 2. **Build TypeScript SDK**
