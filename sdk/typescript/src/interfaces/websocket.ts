@@ -1,7 +1,8 @@
 import * as http from "http";
 import WebSocket from "ws";
-import { ITransactionReceipt } from "./transaction";
+import { IEventWithData } from "./blockindex";
 import { Logger } from "./logger";
+import { ITransactionReceipt } from "./transaction";
 
 export interface WebSocketSender {
   send: (json: object) => void;
@@ -18,9 +19,9 @@ export interface WebSocketEventCallback {
 
 export interface WebSocketClientOptions {
   url: string;
-  subscriptions?: string[];
   username?: string;
   password?: string;
+  subscriptions?: string[] | WebSocketSubscription[]; // TODO: deprecate string[]
   logger?: Logger;
   heartbeatInterval?: number;
   reconnectDelay?: number;
@@ -28,12 +29,25 @@ export interface WebSocketClientOptions {
   socketOptions?: WebSocket.ClientOptions | http.ClientRequestArgs;
 }
 
+export interface WebSocketSubscription {
+  type: "receipts" | "blockchainevents";
+  name: string;
+}
+
 export interface WebSocketEvent {
   method: "ptx_subscription" | undefined;
   params: {
     subscription: string;
-    result: {
-      receipts: ITransactionReceipt[];
-    };
+    result: TransactionReceiptBatch | TransactionEventBatch;
   };
+}
+
+export interface TransactionReceiptBatch {
+  batchId: number;
+  receipts: ITransactionReceipt[];
+}
+
+export interface TransactionEventBatch {
+  batchId: number;
+  events: IEventWithData[];
 }

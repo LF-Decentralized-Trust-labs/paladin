@@ -1,0 +1,21 @@
+{{- if or (eq .Values.mode "customnet") (eq .Values.mode "attach") }}
+{{- range .Values.paladinNodes }}
+{{- $name := .name }}
+{{- $pr := .paladinRegistration }}
+---
+apiVersion: core.paladin.io/v1alpha1
+kind: PaladinRegistration
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  registry: {{ .paladinRegistration.registry }}
+  registryAdminNode: {{ .paladinRegistration.registryAdminNode }}
+  registryAdminKey: {{ .paladinRegistration.registryAdminKey }}
+  node: {{ $name }}
+  nodeAdminKey: registry.{{ $name }}
+  transports:
+    - grpc
+{{- end }}
+{{- end }}

@@ -1,0 +1,88 @@
+# templates/paladin-nodes.yaml
+{{- if or (eq .Values.mode "customnet") (eq .Values.mode "attach") }}
+
+{{- range .Values.paladinNodes }}
+{{- $name := .name }}
+
+---
+apiVersion: core.paladin.io/v1alpha1
+kind: Paladin
+metadata:
+  name: {{ .name }}
+  labels:
+    app.kubernetes.io/name: {{ .name }}
+spec:
+  baseLedgerEndpoint:
+    type: {{ .baseLedgerEndpoint.type }}
+    {{- if eq .baseLedgerEndpoint.type "endpoint" }}
+    endpoint:
+      jsonrpc: {{ .baseLedgerEndpoint.endpoint.jsonrpc }}
+      ws: {{ .baseLedgerEndpoint.endpoint.ws }}
+      {{- if .baseLedgerEndpoint.endpoint.auth.enabled }}
+      auth:
+        type: secret
+        secret:
+          name: {{ .baseLedgerEndpoint.endpoint.auth.secretName }}
+      {{- end }}
+    {{- else if eq .baseLedgerEndpoint.type "local" }}
+    local:
+      nodeName: {{ .baseLedgerEndpoint.local.nodeName }}
+    {{- end }}
+
+  domains:
+  {{- range .domains }}
+    - labelSelector:
+        matchLabels:
+          paladin.io/domain-name: {{ . }}
+  {{- end }}
+
+  registries:
+  {{- range .registries }}
+    - labelSelector:
+        matchLabels:
+          paladin.io/registry-name: {{ . }}
+  {{- end }}
+
+  transports:
+  {{- range .transports }}
+    - name: {{ .name }}
+      plugin:
+        type: {{ .plugin.type }}
+        library: {{ .plugin.library }}
+      configJSON: |-
+{{ toJson .config | indent 8 }}
+      ports:
+        - name: transport-grpc
+          port: {{ .ports.transportGrpc.port }}
+          targetPort: {{ .ports.transportGrpc.targetPort }}
+      tls:
+        secretName: {{ .tls.secretName }}
+        certName: {{ .tls.certName }}
+  {{- end }}
+
+  service:
+    type: {{ .service.type }}
+    ports:
+      - name: rpc-http
+        port: {{ .service.ports.rpcHttp.port }}
+        nodePort: {{ .service.ports.rpcHttp.nodePort }}
+      - name: rpc-ws
+        port: {{ .service.ports.rpcWs.port }}
+        nodePort: {{ .service.ports.rpcWs.nodePort }}
+
+  database:
+    mode: {{ .database.mode }}
+    migrationMode: {{ .database.migrationMode }}
+
+  secretBackedSigners:
+  {{- range .secretBackedSigners }}
+    - name: {{ .name }}
+      secret: {{ .secret }}
+      type: {{ .type }}
+      keySelector: {{ .keySelector }}
+  {{- end }}
+
+  config: |-
+{{ .config | indent 4 }}
+{{- end }}
+{{- end }}

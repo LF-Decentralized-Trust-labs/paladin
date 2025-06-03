@@ -8,6 +8,8 @@ import {
   StateStatus,
   Verifiers,
 } from "./interfaces";
+import { IBlockchainEventListener } from "./interfaces/blockchainevent";
+import { IEventWithData } from "./interfaces/blockindex";
 import { Logger } from "./interfaces/logger";
 import {
   JsonRpcResult,
@@ -22,8 +24,7 @@ import {
 } from "./interfaces/privacygroups";
 import { IQuery } from "./interfaces/query";
 import {
-  IDecodedEvent,
-  IEventWithData,
+  IABIDecodedData,
   INotoDomainReceipt,
   IPenteDomainReceipt,
   IPreparedTransaction,
@@ -212,8 +213,8 @@ export default class PaladinClient {
 
   async resolveVerifier(
     lookup: string,
-    algorithm: Algorithms,
-    verifierType: Verifiers
+    algorithm: Algorithms | string,
+    verifierType: Verifiers | string
   ) {
     const res = await this.post<JsonRpcResult<string>>("ptx_resolveVerifier", [
       lookup,
@@ -234,9 +235,17 @@ export default class PaladinClient {
     return res.data.result;
   }
 
+  async decodeCall(callData: string, dataFormat: string) {
+    const res = await this.post<JsonRpcResult<IABIDecodedData>>(
+      "ptx_decodeCall",
+      [callData, dataFormat]
+    );
+    return res.data.result;
+  }
+
   async decodeEvent(topics: string[], data: string) {
     try {
-      const res = await this.post<JsonRpcResult<IDecodedEvent>>(
+      const res = await this.post<JsonRpcResult<IABIDecodedData>>(
         "ptx_decodeEvent",
         [topics, data, ""]
       );
@@ -350,5 +359,39 @@ export default class PaladinClient {
       [name]
     );
     return res.data.result;
+  }
+
+  async getReceiptListener(name: string) {
+    const res = await this.post<JsonRpcResult<ITransactionReceiptListener>>(
+      "ptx_getReceiptListener",
+      [name],
+      { validateStatus: (status) => status < 300 || status === 404 }
+    );
+    return res.status === 404 ? undefined : res.data.result;
+  }
+
+  async createBlockchainEventListener(listener: IBlockchainEventListener) {
+    const res = await this.post<JsonRpcResult<boolean>>(
+      "ptx_createBlockchainEventListener",
+      [listener]
+    );
+    return res.data.result;
+  }
+
+  async deleteBlockchainEventListener(name: string) {
+    const res = await this.post<JsonRpcResult<boolean>>(
+      "ptx_deleteBlockchainEventListener",
+      [name]
+    );
+    return res.data.result;
+  }
+
+  async getBlockchainEventListener(name: string) {
+    const res = await this.post<JsonRpcResult<IBlockchainEventListener>>(
+      "ptx_getBlockchainEventListener",
+      [name],
+      { validateStatus: (status) => status < 300 || status === 404 }
+    );
+    return res.status === 404 ? undefined : res.data.result;
   }
 }

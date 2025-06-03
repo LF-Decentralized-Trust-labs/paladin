@@ -154,22 +154,11 @@ export enum TransactionType {
   Public = "public",
 }
 
-export interface IDecodedEvent {
+export interface IABIDecodedData {
   signature: string;
   definition: ethers.JsonFragment;
   data: any;
   summary: string; // errors only
-}
-
-export interface IEventWithData {
-  blockNumber: number;
-  transactionIndex: number;
-  logIndex: number;
-  transactionHash: string;
-  signature: string;
-  soliditySignature: string;
-  address: string;
-  data: any;
 }
 
 export interface IStoredABI {

@@ -8,7 +8,7 @@ The graphical user interface makes it easy to visualize activity in Paladin node
 ## Accessing the UI
 
 Each Paladin node runs an instance of the Paladin UI at the path `/ui`. If you used the provided kind config
-(or a similar port mapping), you should be able to access the UI for each node:
+(or a similar port mapping) with devnet, you should be able to access the UI for each node:
 
 * http://localhost:31548/ui
 * http://localhost:31648/ui

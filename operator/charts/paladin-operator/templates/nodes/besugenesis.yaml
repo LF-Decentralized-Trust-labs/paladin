@@ -1,0 +1,22 @@
+{{- if (eq .Values.mode "devnet") }}
+
+apiVersion: core.paladin.io/v1alpha1
+kind: BesuGenesis
+metadata:
+  labels:
+    app.kubernetes.io/name: testnet
+    app.kubernetes.io/managed-by: kustomize
+  name: testnet
+spec:
+  chainID: 1337
+  gasLimit: 700000000
+  consensus: qbft
+  blockPeriod: 100ms
+  emptyBlockPeriod: 10s
+  initialValidators:
+  {{- $prefix := .Values.besu.nodeNamePrefix }}
+  {{- range $i, $ := until (.Values.nodeCount | int) }}
+  - {{ printf "%s%d" $prefix (add $i 1) }}
+  {{- end }}
+
+{{- end }}

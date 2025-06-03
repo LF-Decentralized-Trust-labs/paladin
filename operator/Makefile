@@ -1,5 +1,7 @@
 CLUSTER_NAME ?= paladin
 NAMESPACE ?= default
+NODE_COUNT ?= 3
+MODE ?= devnet
 
 OPERATOR_IMAGE_NAME ?= paladin-operator
 OPERATOR_IMAGE_TAG ?= test
@@ -42,6 +44,7 @@ CHART_PATH_CRD = charts/paladin-operator-crd
 CHART_NAME_CRD = paladin-crds
 CHART_PATH_OPERATOR = charts/paladin-operator
 CHART_NAME_OPERATOR = paladin-ci
+VALUES_FILE ?= charts/paladin-operator/values.yaml
 
 # SHELL setup to allow bash commands
 SHELL = /usr/bin/env bash -o pipefail
@@ -193,7 +196,7 @@ uninstall-crds: ## Uninstall CRDs.
 
 .PHONY: helm-template
 helm-template: ## Install operator using Helm.
-	$(HELM) template ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} --set operator.namespace=${NAMESPACE} --set mode=${MODE}
+	$(HELM) template ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} --values ${VALUES_FILE} --namespace=${NAMESPACE} --set mode=${MODE}
 
 .PHONY: helm-install-dependencies
 helm-install-dependencies: ## Install operator using Helm.
@@ -208,7 +211,8 @@ helm-install-dependencies: ## Install operator using Helm.
 helm-install: helm-install-dependencies ## Install operator using Helm.
 	$(HELM) upgrade --install ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} \
 		-n ${NAMESPACE} --create-namespace \
-		--set operator.namespace=${NAMESPACE} \
+		--values ${VALUES_FILE} \
+		--set nodeCount=${NODE_COUNT} \
 		--set operator.image.repository=${OPERATOR_IMAGE_NAME} \
 		--set operator.image.pullPolicy=IfNotPresent \
 		--set operator.image.tag=${OPERATOR_IMAGE_TAG} \
@@ -239,7 +243,7 @@ helm-uninstall: helm-uninstall-dependencies ## Uninstall operator using Helm.
 
 .PHONY: helm-pause
 helm-pause: ## Pause the operator (set replica count to 0).
-	$(HELM) upgrade --install ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} -n ${NAMESPACE} --create-namespace --set operator.namespace=${NAMESPACE} --set replicaCount=0
+	$(HELM) upgrade --install ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} -n ${NAMESPACE} --create-namespace --set replicaCount=0
 
 ##@ Dependencies
 LOCALBIN ?= $(shell pwd)/bin

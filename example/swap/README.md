@@ -12,7 +12,8 @@ Requires a local 3-node Paladin cluster running on `localhost:31548`, `localhost
 ## Option 1: Use the Latest Stable Version
 
 1. **Download and extract contracts**
-   - [Download Solidity contracts](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/latest/abis.tar.gz)
+
+   - [Download Solidity contracts](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/latest/download/abis.tar.gz)
    - Extract `abis.tar.gz` and copy the `abis` directory to `src/`. (full path should be: `paladin/example/swap/src/abis`)
 
 2. **Build TypeScript SDK**

@@ -112,8 +112,12 @@ nav:
     - Data Transports & Registry: architecture/data_and_registry.md
     - Ledger Layers: architecture/ledger_layers.md
   - Getting Started:
-    - Installation: getting-started/installation.md
+    - Installation: 
+      - Default Installation: getting-started/installation.md
+      - Advanced Installation: getting-started/installation-advanced.md
+      - Manual Installation: getting-started/installation-manual.md
     - User Interface: getting-started/user-interface.md
+    - Troubleshooting: getting-started/troubleshooting.md
   - Tutorials:
     - Introduction: tutorials/index.md
     - Hello World: tutorials/hello-world.md

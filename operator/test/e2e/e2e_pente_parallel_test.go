@@ -69,9 +69,9 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 		}
 
 		It("waits to connect to all three nodes", func() {
-			connectNode(node1HttpURL, "node1")
-			connectNode(node2HttpURL, "node2")
-			connectNode(node3HttpURL, "node3")
+			connectNode(node1HttpURL, paladinPrefix+"1")
+			connectNode(node2HttpURL, paladinPrefix+"2")
+			connectNode(node3HttpURL, paladinPrefix+"3")
 		})
 
 		It("checks nodes can talk to each other", func() {
@@ -94,8 +94,8 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 		})
 
 		penteGroupStars := nototypes.PentePrivateGroup{
-			Salt:    pldtypes.RandBytes32(),                               // unique salt must be shared privately to retain anonymity
-			Members: []string{"tara@node1", "hoshi@node2", "seren@node3"}, // these will be salted to establish the endorsement key identifiers
+			Salt:    pldtypes.RandBytes32(),                                                                                                             // unique salt must be shared privately to retain anonymity
+			Members: []string{fmt.Sprintf("tara@%s1", paladinPrefix), fmt.Sprintf("hoshi@%s2", paladinPrefix), fmt.Sprintf("seren@%s3", paladinPrefix)}, // these will be salted to establish the endorsement key identifiers
 		}
 
 		var penteContract *pldtypes.EthAddress
@@ -103,7 +103,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 
 			const ENDORSEMENT_TYPE__GROUP_SCOPED_IDENTITIES = "group_scoped_identities"
 
-			deploy := rpc["node1"].ForABI(ctx, abi.ABI{penteConstructorABI}).
+			deploy := rpc[paladinPrefix+"1"].ForABI(ctx, abi.ABI{penteConstructorABI}).
 				Private().
 				Domain("pente").
 				Constructor().
@@ -126,7 +126,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 		var erc20DeployID uuid.UUID
 		It("deploys a vanilla ERC-20 into the the privacy group with a minter/owner", func() {
 
-			deploy := rpc["node1"].ForABI(ctx, erc20PrivateABI).
+			deploy := rpc[paladinPrefix+"1"].ForABI(ctx, erc20PrivateABI).
 				Private().
 				Domain("pente").
 				To(penteContract).
@@ -139,7 +139,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 						"symbol": "STAR",
 					},
 				}).
-				From("tara@node1").
+				From(fmt.Sprintf("tara@%s1", paladinPrefix)).
 				Send().
 				Wait(5 * time.Second)
 			testLog("Deployed SimpleERC20 contract into privacy group in transaction %s", deploy.ID())
@@ -150,7 +150,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 		var erc20StarsAddr *pldtypes.EthAddress
 		It("requests the receipt from pente to get the contract address", func() {
 
-			domainReceiptJSON, err := rpc["node1"].PTX().GetDomainReceipt(ctx, "pente", erc20DeployID)
+			domainReceiptJSON, err := rpc[paladinPrefix+"1"].PTX().GetDomainReceipt(ctx, "pente", erc20DeployID)
 			Expect(err).To(BeNil())
 			var pr penteReceipt
 			err = json.Unmarshal(domainReceiptJSON, &pr)
@@ -192,16 +192,16 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 		}
 
 		users := [][]string{
-			{"tara", "node1"},
-			{"hoshi", "node2"},
-			{"seren", "node3"},
+			{"tara", paladinPrefix + "1"},
+			{"hoshi", paladinPrefix + "2"},
+			{"seren", paladinPrefix + "3"},
 		}
 
 		It("mints some ERC-20 inside the the privacy group", func() {
 
 			for _, user := range users {
 
-				invoke := rpc["node1"].ForABI(ctx, erc20PrivateABI).
+				invoke := rpc[paladinPrefix+"1"].ForABI(ctx, erc20PrivateABI).
 					Private().
 					Domain("pente").
 					To(penteContract).
@@ -214,7 +214,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 							"amount": with18Decimals(1000),
 						},
 					}).
-					From("tara@node1"). // operator
+					From(fmt.Sprintf("tara@%s1", paladinPrefix)). // operator
 					Send().
 					Wait(5 * time.Second)
 				testLog("SimpleERC20 mint transaction %s", invoke.ID())

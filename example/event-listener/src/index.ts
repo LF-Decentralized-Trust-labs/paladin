@@ -95,7 +95,10 @@ async function main(): Promise<boolean> {
       subscriptions: ["example-event-listener"],
     },
     async (sender, event) => {
-      if (event.method === "ptx_subscription") {
+      if (
+        event.method === "ptx_subscription" &&
+        "receipts" in event.params.result
+      ) {
         for (const receipt of event.params.result.receipts) {
           // Process each transaction receipt
           await processReceipt(receipt);

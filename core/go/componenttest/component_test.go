@@ -164,15 +164,14 @@ func TestBlockchainEventListeners(t *testing.T) {
 	listener1 := make(chan string)
 	subscribeAndSendDataToChannel(ctx, t, wsClient, "listener1", listener1)
 
-	// pause to make sure that if an event was going to be received, it would have been
-	ticker1 := time.NewTicker(10 * time.Millisecond)
-	defer ticker1.Stop()
-
-	select {
-	case <-listener1:
-		t.FailNow()
-	case <-ticker1.C:
-	}
+	require.Never(t, func() bool {
+		select {
+		case <-listener1:
+			return true
+		default:
+			return false
+		}
+	}, 100*time.Millisecond, 5*time.Millisecond, "unexpected event received on stopped listener")
 
 	_, err = c.PTX().StartBlockchainEventListener(ctx, "listener1")
 	require.NoError(t, err)
@@ -360,14 +359,13 @@ func TestUpdatePublicTransaction(t *testing.T) {
 	require.NoError(t, setRes.Error())
 	require.NotNil(t, setRes.ID())
 
-	// wait for the submission to be tried and to fail
-	time.Sleep(2 * time.Second)
-
-	tx, err = c.PTX().GetTransactionFull(ctx, *setRes.ID())
-	require.NoError(t, err)
-	require.Len(t, tx.Public, 1)
-	require.NotNil(t, tx.Public[0].Activity[0])
-	assert.Regexp(t, "ERROR.*Intrinsic", tx.Public[0].Activity[0])
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		tx, err = c.PTX().GetTransactionFull(ctx, *setRes.ID())
+		require.NoError(ct, err)
+		require.Len(ct, tx.Public, 1)
+		require.NotNil(ct, tx.Public[0].Activity[0])
+		assert.Regexp(ct, "ERROR.*Intrinsic", tx.Public[0].Activity[0])
+	}, 10*time.Second, 100*time.Millisecond, "Transaction was not processed with error in time")
 
 	_, err = c.PTX().UpdateTransaction(ctx, *setRes.ID(), &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{

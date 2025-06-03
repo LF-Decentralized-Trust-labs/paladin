@@ -6,6 +6,7 @@ import {
   WebSocketClientOptions,
   WebSocketEvent,
   WebSocketEventCallback,
+  WebSocketSubscription,
 } from "./interfaces/websocket";
 
 export class PaladinWebSocketClient {
@@ -54,10 +55,14 @@ export class PaladinWebSocketClient {
           this.logger.log("Connected");
         }
         this.schedulePing();
-        for (const name of this.options.subscriptions ?? []) {
+        for (const subOrName of this.options.subscriptions ?? []) {
           // Automatically connect subscriptions
-          this.subscribe("receipts", name);
-          this.logger.log(`Started listening on subscription ${name}`);
+          const sub: WebSocketSubscription =
+            typeof subOrName === "string"
+              ? { type: "receipts", name: subOrName }
+              : subOrName;
+          this.subscribe(sub.type, sub.name);
+          this.logger.log(`Started listening on subscription ${sub.name}`);
         }
         if (this.options?.afterConnect !== undefined) {
           this.options.afterConnect(this);
