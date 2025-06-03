@@ -381,7 +381,6 @@ func (z *Zeto) validateDeploy(tx *prototk.DeployTransactionSpecification) (*type
 
 func validateTransactionCommon[T any](
 	ctx context.Context,
-	z *Zeto,
 	tx *prototk.TransactionSpecification,
 	getHandler func(method, tokenName string) T,
 ) (*types.ParsedTransaction, T, error) {
@@ -451,7 +450,6 @@ func validateTransactionCommon[T any](
 func (z *Zeto) validateTransaction(ctx context.Context, tx *prototk.TransactionSpecification) (*types.ParsedTransaction, types.DomainHandler, error) {
 	return validateTransactionCommon(
 		ctx,
-		z,
 		tx,
 		z.GetHandler,
 	)
@@ -460,7 +458,6 @@ func (z *Zeto) validateTransaction(ctx context.Context, tx *prototk.TransactionS
 func (z *Zeto) validateCall(ctx context.Context, call *prototk.TransactionSpecification) (*types.ParsedTransaction, types.DomainCallHandler, error) {
 	return validateTransactionCommon(
 		ctx,
-		z,
 		call,
 		z.GetCallHandler,
 	)
