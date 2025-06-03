@@ -85,11 +85,10 @@ func (h *balanceOfHandler) ExecCall(ctx context.Context, tx *types.ParsedTransac
 	if resolvedAccount == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorResolveVerifier, param.Account)
 	}
-	// unclear what useNullifiers are
 	useNullifiers := common.IsNullifiersToken(tx.DomainConfig.TokenName)
 	balance, err := getAccountBalance(ctx, h.callbacks, h.stateSchemas.CoinSchema, useNullifiers, req.StateQueryContext, resolvedAccount.Verifier)
 	if err != nil {
-		// don't think we are wrapping errors currently, throwing this out here see if people are fond of it.
+		// don't think we are wrapping errors currently, throwing this out here see if folks are fond of it.
 		return nil, i18n.WrapError(ctx, err, msgs.MsgErrorGetAccountBalance, param.Account)
 	}
 	// Format balance as JSON string
