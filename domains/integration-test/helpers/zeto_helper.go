@@ -123,6 +123,13 @@ func (z *ZetoHelperFungible) Transfer(ctx context.Context, to []string, amounts 
 	}))
 }
 
+func (z *ZetoHelperFungible) BalanceOf(ctx context.Context, account string) *DomainTransactionHelper {
+	fn := types.ZetoFungibleABI.Functions()["balanceOf"]
+	return NewDomainTransactionHelper(ctx, z.t, z.rpc, z.Address, fn, toJSON(z.t, &types.FungibleBalanceOfParam{
+		Account: account,
+	}))
+}
+
 func (z *ZetoHelper) TransferLocked(ctx context.Context, lockedUtxo *pldtypes.HexUint256, delegate, to string, amount uint64) *DomainTransactionHelper {
 	fn := types.ZetoFungibleABI.Functions()["transferLocked"]
 	return NewDomainTransactionHelper(ctx, z.t, z.rpc, z.Address, fn, toJSON(z.t, &types.FungibleTransferLockedParams{

@@ -103,5 +103,5 @@ type WithdrawParams struct {
 }
 
 type FungibleBalanceOfParam struct {
-	Account string `json:"owner"`
+	Account string `json:"account"`
 }

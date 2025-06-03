@@ -71,7 +71,7 @@ func (h *balanceOfHandler) ValidateParams(ctx context.Context, config *types.Dom
 		return nil, err
 	}
 
-	return balanceOfParam, nil
+	return &balanceOfParam, nil
 }
 
 func (h *balanceOfHandler) InitCall(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitCallRequest) (*pb.InitCallResponse, error) {
@@ -93,7 +93,6 @@ func (h *balanceOfHandler) InitCall(ctx context.Context, tx *types.ParsedTransac
 func (h *balanceOfHandler) ExecCall(ctx context.Context, tx *types.ParsedTransaction, req *pb.ExecCallRequest) (*pb.ExecCallResponse, error) {
 
 	param := tx.Params.(*types.FungibleBalanceOfParam)
-
 	resolvedAccount := domain.FindVerifier(tx.Transaction.From, h.getAlgoZetoSnarkBJJ(), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X, req.ResolvedVerifiers)
 	if resolvedAccount == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorResolveVerifier, tx.Transaction.From)
