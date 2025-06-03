@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"reflect"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -574,6 +575,69 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *prototk.TransactionS
 		FunctionABI:     &functionABI,
 		ContractAddress: contractAddress,
 		DomainConfig:    &domainConfig,
+		Params:          params,
+	}, handler, nil
+}
+
+func validateTransactionCommon[T any](
+	ctx context.Context,
+	tx *prototk.TransactionSpecification,
+	getHandler func(method string) T,
+) (*types.ParsedTransaction, T, error) {
+	var functionABI abi.Entry
+	err := json.Unmarshal([]byte(tx.FunctionAbiJson), &functionABI)
+	if err != nil {
+		var zero T
+		return nil, zero, err
+	}
+
+	var domainConfig *types.NotoParsedConfig
+	err = json.Unmarshal([]byte(tx.ContractInfo.ContractConfigJson), &domainConfig)
+	if err != nil {
+		var zero T
+		return nil, zero, err
+	}
+
+	abi := types.NotoABI.Functions()[functionABI.Name]
+	handler := getHandler(functionABI.Name)
+	handlerValue := reflect.ValueOf(handler)
+	if abi == nil || handlerValue.IsNil() {
+		var zero T
+		return nil, zero, i18n.NewError(ctx, msgs.MsgUnknownFunction, functionABI.Name)
+	}
+
+	// check if the handler implements the ValidateParams method
+	validator, ok := any(handler).(interface {
+		ValidateParams(ctx context.Context, domainConfig *types.NotoParsedConfig, paramsJson string) (any, error)
+	})
+	if !ok {
+		var zero T
+		return nil, zero, i18n.NewError(ctx, msgs.MsgErrorHandlerImplementationNotFound)
+	}
+
+	params, err := validator.ValidateParams(ctx, domainConfig, tx.FunctionParamsJson)
+	if err != nil {
+		var zero T
+		return nil, zero, i18n.NewError(ctx, msgs.MsgErrorValidateFuncParams, err)
+	}
+
+	signature := abi.SolString()
+	if tx.FunctionSignature != signature {
+		var zero T
+		return nil, zero, i18n.NewError(ctx, msgs.MsgUnexpectedFuncSignature, functionABI.Name, signature, tx.FunctionSignature)
+	}
+
+	contractAddress, err := ethtypes.NewAddress(tx.ContractInfo.ContractAddress)
+	if err != nil {
+		var zero T
+		return nil, zero, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
+	}
+
+	return &types.ParsedTransaction{
+		Transaction:     tx,
+		FunctionABI:     &functionABI,
+		ContractAddress: contractAddress,
+		DomainConfig:    domainConfig,
 		Params:          params,
 	}, handler, nil
 }
