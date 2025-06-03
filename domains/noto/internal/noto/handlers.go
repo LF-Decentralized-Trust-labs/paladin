@@ -59,6 +59,15 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 	}
 }
 
+func (n *Noto) GetCallHandler(method string) types.DomainCallHandler {
+	switch method {
+	case "balanceOf":
+		return &balanceOfHandler{noto: n}
+	default:
+		return nil
+	}
+}
+
 // Check that a mint has no inputs, and an output matching the requested amount
 func (n *Noto) validateMintAmounts(ctx context.Context, params *types.MintParams, inputs, outputs *parsedCoins) error {
 	if len(inputs.coins) > 0 {

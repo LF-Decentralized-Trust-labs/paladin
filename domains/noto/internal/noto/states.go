@@ -538,3 +538,41 @@ func (n *Noto) encodeDelegateLock(ctx context.Context, contract *ethtypes.Addres
 		},
 	})
 }
+
+func (n *Noto) getAccountBalance(ctx context.Context, stateQueryContext string, owner *pldtypes.EthAddress) (total *big.Int, revert bool, err error) {
+	var lastStateTimestamp int64
+	total = big.NewInt(0)
+	for {
+		queryBuilder := query.NewQueryBuilder().
+			Limit(10).
+			Sort(".created").
+			Equal("owner", owner.String())
+
+		if lastStateTimestamp > 0 {
+			queryBuilder.GreaterThan(".created", lastStateTimestamp)
+		}
+
+		log.L(ctx).Debugf("State query: %s", queryBuilder.Query())
+		states, err := n.findAvailableStates(ctx, stateQueryContext, n.coinSchema.Id, queryBuilder.Query().String())
+		if err != nil {
+			return nil, false, err
+		}
+		if len(states) == 0 {
+			return nil, true, i18n.NewError(ctx, msgs.MsgInsufficientFunds, total.Text(10))
+		}
+		for _, state := range states {
+			lastStateTimestamp = state.CreatedAt
+			coin, err := n.unmarshalCoin(state.DataJson)
+			if err != nil {
+				return nil, false, i18n.NewError(ctx, msgs.MsgInvalidStateData, state.Id, err)
+			}
+			total = total.Add(total, coin.Amount.Int())
+		}
+
+		// no more pages
+		if len(states) == 0 {
+			break
+		}
+	}
+	return total, false, nil
+}

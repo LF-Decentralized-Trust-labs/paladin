@@ -753,11 +753,19 @@ func (n *Noto) ValidateStateHashes(ctx context.Context, req *prototk.ValidateSta
 }
 
 func (n *Noto) InitCall(ctx context.Context, req *prototk.InitCallRequest) (*prototk.InitCallResponse, error) {
-	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+	ptx, handler, err := n.validateCall(ctx, req.Transaction)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorValidateInitCallTxSpec, err)
+	}
+	return handler.InitCall(ctx, ptx, req)
 }
 
 func (n *Noto) ExecCall(ctx context.Context, req *prototk.ExecCallRequest) (*prototk.ExecCallResponse, error) {
-	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+	ptx, handler, err := n.validateCall(ctx, req.Transaction)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorValidateExecCallTxSpec, err)
+	}
+	return handler.ExecCall(ctx, ptx, req)
 }
 
 func (n *Noto) ConfigurePrivacyGroup(ctx context.Context, req *prototk.ConfigurePrivacyGroupRequest) (*prototk.ConfigurePrivacyGroupResponse, error) {
