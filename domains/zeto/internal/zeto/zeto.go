@@ -352,7 +352,7 @@ func (z *Zeto) GetHandler(method, tokenName string) types.DomainHandler {
 func (z *Zeto) GetCallHandler(method, tokenName string) types.DomainCallHandler {
 	switch method {
 	case types.METHOD_BALANCE_OF:
-		return fungible.NewBalanceOfHandler(z.name, z.Callbacks, z.coinSchema, z.merkleTreeRootSchema, z.merkleTreeNodeSchema, z.dataSchema)
+		return fungible.NewBalanceOfHandler(z.name, z.Callbacks, z.coinSchema)
 	default:
 		return nil
 	}

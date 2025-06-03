@@ -114,7 +114,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	assert.Equal(t, int64(20), coins[1].Data.Amount.Int().Int64())
 	assert.Equal(t, controllerAddr.String(), coins[1].Data.Owner.String())
 
-	balanceOfResult := zeto.BalanceOf(ctx, controllerName).SignAndSendCall(controllerName, true).Wait()
+	balanceOfResult := zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName, true).Wait()
 	assert.Equal(t, "30", balanceOfResult["balance"].(string), "Balance of controller should be 30")
 	// for testing the batch circuits, we mint the 3rd UTXO
 	if useBatch {
@@ -122,7 +122,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 		log.L(ctx).Infof("Mint 30 from controller to controller")
 		log.L(ctx).Info("*************************************")
 		zeto.Mint(ctx, controllerName, []uint64{30}).SignAndSend(controllerName, true).Wait()
-		balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndSendCall(controllerName, true).Wait()
+		balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName, true).Wait()
 		assert.Equal(t, "60", balanceOfResult["balance"].(string), "Balance of controller should be 60")
 	}
 
@@ -142,7 +142,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 		zeto.Transfer(ctx, []string{recipient1Name}, []uint64{uint64(amount)}).SignAndSend(controllerName, true).Wait()
 
 	}
-	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndSendCall(controllerName, true).Wait()
+	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName, true).Wait()
 	assert.Equal(t, "5", balanceOfResult["balance"].(string), "Balance of controller should be 5")
 
 	// check that we now only have one unspent coin, of value 5
@@ -193,7 +193,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	log.L(ctx).Info("*************************************")
 	zeto.Deposit(ctx, 100).SignAndSend(controllerName, true).Wait()
 
-	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndSendCall(controllerName, true).Wait()
+	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName, true).Wait()
 	assert.Equal(t, "105", balanceOfResult["balance"].(string), "Balance of controller should be 105")
 
 	expectedCoins += 2 // the deposit call produces 2 output UTXOs for the receiver
@@ -212,7 +212,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 		return
 	}
 
-	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndSendCall(controllerName, true).Wait()
+	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName, true).Wait()
 	assert.Equal(t, "5", balanceOfResult["balance"].(string), "Balance of controller should be 5")
 
 	log.L(ctx).Info("*************************************")
@@ -227,7 +227,7 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	zeto.Lock(ctx, recipient1EthAddr, 1).SignAndSend(controllerName, true).Wait()
 	zeto.Lock(ctx, recipient1EthAddr, 1).SignAndSend(controllerName, true).Wait()
 
-	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndSendCall(controllerName, true).Wait()
+	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName, true).Wait()
 	assert.Equal(t, "3", balanceOfResult["balance"].(string), "Balance of controller should be 3")
 
 	jq = query.NewQueryBuilder().Limit(100).Equal("locked", true).Query()

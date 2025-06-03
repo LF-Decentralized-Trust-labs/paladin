@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
@@ -38,23 +37,12 @@ type balanceOfHandler struct {
 	callbacks plugintk.DomainCallbacks
 }
 
-var balanceOfABI = &abi.Entry{
-	Type: abi.Function,
-	Name: types.METHOD_BALANCE_OF,
-	Inputs: abi.ParameterArray{
-		{Name: "data", Type: "bytes"},
-	},
-}
-
-func NewBalanceOfHandler(name string, callbacks plugintk.DomainCallbacks, coinSchema, merkleTreeRootSchema, merkleTreeNodeSchema, dataSchema *pb.StateSchema) *balanceOfHandler {
+func NewBalanceOfHandler(name string, callbacks plugintk.DomainCallbacks, coinSchema *pb.StateSchema) *balanceOfHandler {
 	return &balanceOfHandler{
 		baseHandler: baseHandler{
 			name: name,
 			stateSchemas: &common.StateSchemas{
-				CoinSchema:           coinSchema,
-				MerkleTreeRootSchema: merkleTreeRootSchema,
-				MerkleTreeNodeSchema: merkleTreeNodeSchema,
-				DataSchema:           dataSchema,
+				CoinSchema: coinSchema,
 			},
 		},
 		callbacks: callbacks,
@@ -93,9 +81,9 @@ func (h *balanceOfHandler) InitCall(ctx context.Context, tx *types.ParsedTransac
 func (h *balanceOfHandler) ExecCall(ctx context.Context, tx *types.ParsedTransaction, req *pb.ExecCallRequest) (*pb.ExecCallResponse, error) {
 
 	param := tx.Params.(*types.FungibleBalanceOfParam)
-	resolvedAccount := domain.FindVerifier(tx.Transaction.From, h.getAlgoZetoSnarkBJJ(), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X, req.ResolvedVerifiers)
+	resolvedAccount := domain.FindVerifier(param.Account, h.getAlgoZetoSnarkBJJ(), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X, req.ResolvedVerifiers)
 	if resolvedAccount == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgErrorResolveVerifier, tx.Transaction.From)
+		return nil, i18n.NewError(ctx, msgs.MsgErrorResolveVerifier, param.Account)
 	}
 	// unclear what useNullifiers are
 	useNullifiers := common.IsNullifiersToken(tx.DomainConfig.TokenName)

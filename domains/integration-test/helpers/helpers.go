@@ -130,7 +130,7 @@ func (dth *DomainTransactionHelper) SignAndSend(signer string, confirm ...bool) 
 	return tx
 }
 
-func (dth *DomainTransactionHelper) SignAndSendCall(signer string, confirm ...bool) *SentDomainTransaction {
+func (dth *DomainTransactionHelper) SignAndCall(signer string, confirm ...bool) *SentDomainTransaction {
 	tx := &SentDomainTransaction{
 		t:      dth.t,
 		result: make(chan any),
