@@ -141,6 +141,7 @@ func buildInputsForExpectedTotal(ctx context.Context, callbacks plugintk.DomainC
 				Id:       state.Id,
 			})
 			coins = append(coins, coin)
+			//TODO: a complete algorithm to select coins https://github.com/LF-Decentralized-Trust-labs/paladin/issues/669
 			if total.Cmp(expectedTotal) >= 0 {
 				return &preparedInputs{
 					coins:  coins,

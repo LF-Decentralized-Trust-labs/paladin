@@ -178,4 +178,5 @@ var (
 	MsgErrorValidateInitCallTxSpec           = pde("PD210137", "Failed to validate init call transaction spec. %s")
 	MsgErrorValidateExecCallTxSpec           = pde("PD210138", "Failed to validate execute call transaction spec. %s")
 	MsgErrorGetAccountBalance                = pde("PD210139", "Failed to get account balance. %s")
+	MsgErrorHandlerImplementationNotFound    = pde("PD210140", "Handler implementation not found. %s")
 )
