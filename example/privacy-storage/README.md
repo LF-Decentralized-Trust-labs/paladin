@@ -21,6 +21,7 @@ Requires a local Paladin instance running on `localhost:31748`.
 cp -rf src/abis ../../sdk/typescript/src/domains/
 cd ../../sdk/typescript
 npm install
+npm run abi
 npm run build
 ```
 
@@ -36,6 +37,7 @@ npm run build
 
 ```shell
 npm install
+npm run abi
 npm run start
 ```
 

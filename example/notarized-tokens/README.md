@@ -48,7 +48,6 @@ npm run compile
 ```shell
 cd ../../sdk/typescript
 npm install
-npm run abi
 npm run build
 ```
 

@@ -37,6 +37,7 @@ npm run build
 
 ```shell
 npm install
+npm run abi
 npm run start
 ```
 
