@@ -10,9 +10,9 @@ The objective of this algorithm is to maximize efficiency ( reduce probably for 
 
  The desired properties of that algorithm are
 
- - **deterministic**: all nodes can run the algorithm and eventually agree on a single coordinator at any given point in time. This is a significant property because it means we don't want to rely on a message-based leader election process like in some algorithms such as Raft. This reduces the overhead of message exchanges among the nodes
- - **fair**: the algorithm results in each node being selected as coordinator for a proportional number of times over a long enough time frame
- - **fault tolerant**:  Although pente already depends on all nodes being available (because of the 100% endorsement model) the desired algorithm should be future proof and be compatible with <100% endorsement model where network faults and down time of a minority of nodes can bee tolerated.
+ - **deterministic**: All nodes can run the algorithm and eventually agree on a single coordinator at any given point in time. This is a significant property because it means we don't want to rely on a message-based leader election process like in some algorithms such as Raft. This reduces the overhead of message exchanges among the nodes.
+ - **fair**: The algorithm results in each node being selected as coordinator for a proportional number of times over a long enough time frame.
+ - **fault tolerant**:  The algorithm tolerates nodes being unavailable for periods of time and even network partitions. Efficiency may be impacted during such times but the algorithm allows available nodes to continue to process transactions and maximum efficiency is restored once any partitions or down time has been recovered.
 
 ## Summary
 The basic premises of the algorithm are:
