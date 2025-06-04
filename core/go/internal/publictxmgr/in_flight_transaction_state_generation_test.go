@@ -35,7 +35,7 @@ type testInFlightTransactionStateVersionWithMocks struct {
 }
 
 func newTestInFlightTransactionStateVersion(t *testing.T) (*testInFlightTransactionStateVersionWithMocks, *mocksAndTestControl, func()) {
-	_, balanceManager, ptm, m, done := newTestBalanceManager(t, false)
+	_, balanceManager, ptm, m, done := newTestBalanceManager(t)
 
 	mockInMemoryState := NewTestInMemoryTxState(t)
 	mockActionTriggers := publictxmocks.NewInFlightStageActionTriggers(t)

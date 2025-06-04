@@ -26,7 +26,7 @@ import (
 )
 
 func newTestInFlightTransactionStateManager(t *testing.T) (InFlightTransactionStateManager, func()) {
-	_, balanceManager, ptm, _, done := newTestBalanceManager(t, false)
+	_, balanceManager, ptm, _, done := newTestBalanceManager(t)
 
 	mockInMemoryState := NewTestInMemoryTxState(t)
 	mockActionTriggers := publictxmocks.NewInFlightStageActionTriggers(t)

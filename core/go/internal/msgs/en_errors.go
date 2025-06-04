@@ -334,11 +334,6 @@ var (
 	MsgPrivateTxMgrAssembleTxnNotFound           = pde("PD011838", "Transaction %s not found in local node")
 
 	// Public Transaction Manager PD0119XX
-	MsgInsufficientBalance             = pde("PD011900", "Balance %s of fueling source address %s is below the required amount %s")
-	MsgBalanceBelowMinimum             = pde("PD011901", "Balance %s of fueling source address %s is below the configured minimum balance %s")
-	MsgInvalidBigIntString             = pde("PD011902", "Value of '%s' is not a valid bigInt string")
-	MsgMaxBelowMin                     = pde("PD011903", "Value of '%s' is not a valid max, it is below the min value")
-	MsgMaxBelowMinThreshold            = pde("PD011904", "Value of '%s' is not a valid max, it is below the min threshold")
 	MsgSubmitFailedWrongHashReturned   = pde("PD011905", "Submission of transaction with calculatedHash '%s' returned hash '%s'")
 	MsgSubmissionResponseMissingTxHash = pde("PD011906", "Missing transaction hash from the submission response for transaction with ID: %s")
 	MsgPublicTxMgrAlreadyInit          = pde("PD011907", "Public transaction manager already initialized")
@@ -359,7 +354,6 @@ var (
 	MsgPublicTxHistoryInfo             = pde("PD011931", "PubTx[INFO] from=%s nonce=%s subStatus=%s action=%s info=%s")
 	MsgPublicTxHistoryError            = pde("PD011932", "PubTx[ERROR] from=%s nonce=%s subStatus=%s action=%s error=%s")
 	MsgPublicBatchCompleted            = pde("PD011933", "Batch already completed")
-	MsgInvalidAutoFuelSource           = pde("PD011934", "Invalid auto-fueling source '%s'")
 	MsgInvalidStateMissingTXHash       = pde("PD011935", "Invalid state - missing transaction hash from previous sign stage")
 	MsgInvalidTXMissingFromAddr        = pde("PD011936", "From address missing for transaction")
 	MsgTransactionAlreadyComplete      = pde("PD011937", "Transaction cannot be updated as it is already complete")
@@ -453,6 +447,7 @@ var (
 	MsgTxMgrBlockchainEventListenerInvalidTimeout = pde("PD012250", "Error parsing batch timeout '%s': %s")
 	MsgTxMgrBlockchainEventListenerNoSources      = pde("PD012251", "Blockchain event listener '%s' has no sources configured")
 	MsgTxMgrBlockchainEventListenerNoABIs         = pde("PD012252", "Blockchain event listener '%s' has a source with no ABI configured")
+	MsgTxMgrVerifierNotEthAddress                 = pde("PD012253", "Verifier '%s' is not an Ethereum address")
 
 	// FlushWriter module PD0123XX
 	MsgFlushWriterQuiescing      = pde("PD012300", "Writer shutting down")

@@ -114,13 +114,8 @@ type TransactionHeaders struct {
 }
 
 type BalanceManager interface {
-	TopUpAccount(ctx context.Context, addAccount *AddressAccount) (mtx *pldapi.PublicTx, err error)
-	IsAutoFuelingEnabled(ctx context.Context) bool
 	GetAddressBalance(ctx context.Context, address pldtypes.EthAddress) (*AddressAccount, error)
 	NotifyAddressBalanceChanged(ctx context.Context, address pldtypes.EthAddress)
-}
-
-type AutoFuelTransactionHandler interface {
 }
 
 // AddressAccount provides the following feature:

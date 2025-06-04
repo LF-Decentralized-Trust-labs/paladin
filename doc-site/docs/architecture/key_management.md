@@ -154,6 +154,16 @@ This is useful for logical partitioning of keys owned by different entities, as 
 used by the signing module to influence grouping of keys. For example to influence the derivation
 path of keys in a BIP32 Hierarchical Deterministic (HD) Wallet.
 
+When submitting public transactions, the key may also be referred to using the Ethereum Address
+(Referred to in Paladin as a `Verifier`, described in detail in the
+[Public Verifiers and Algorithms](#3-public-identifiers-and-algorithms) section below). To do this, the `from`
+string of a transaction must be prefixed with `eth_address:`, e.g.
+`"from": "eth_address:0xf8f3fcf26a437cac6f8bdc92257f3b03e2f5c546`. The syntax is case sensitive, and
+Etherum Addresses are stored in lower case. Referring to keys by public verifier is not supported more widely
+as cross node reverse lookups may result in identifiers being leaked.
+
+> Note that resolving a key in a backend key storage system by verifier (derived from the public key) is only possible in Paladin, after that verifier has been resolved at least once for the correct `algorithm` and `verifierType`. Otherwise Paladin does not have a reverse-lookup mapping stored in the database to be able to perform the resolution.
+
 ### 2. Key Mappings
 
 These are database persisted, and cached, records that the main Paladin runtime maintains that match
@@ -171,7 +181,19 @@ Every `key mapping` and `folder` gets two attributes automatically:
 - `name`: the part of the `key identifier` representing this key / folder
 - `index`: a numeric identifier, assured to be unique at this folder level
 
-### 3. Public identifiers and algorithms
+### 3. Public key identifiers (or "verifiers") and algorithms
+
+Cryptographic keys use public/private cryptography, meaning every key can be identified publicly in a way that does not leak the key information itself.
+
+Any party can _verify_ that a transaction was signed with a particular private key, by _recovering_ the public key used to sign that transaction.
+
+However, to do this we need a standard way to represent a public key so that it can be verified in a standard way against a transaction. Each cryptographic ecosystem actually does this differently, even when using the same private key, and the same _algorithm_ (such as SECP256K1).
+
+The most obvious example of this is the Ethereum address. This is a 20 byte compressed representation of a SECP256K1 public key, derived using a well documented algorithm. It looks like `0xfdcba455d748cb3e085472cc6f49b4ae86ee4d1f` in hex, and sometimes is represented in a case-sensitive way to provide a checksum and avoid copy/paste errors like `0xFdcBa455D748cB3e085472CC6F49B4AE86eE4d1F` per the EIP-55 standard.
+
+Paladin supports multiple of these "verifiers" to be calculated, and stored, for public keys. This is fully pluggable, so all the different types of cryptography used in Paladin.
+
+For example the IDEN3 standards for representing public keys with Baby JubJub are plugged in by the Zeto domain that implements signing proofs within zero-knowledge proof (ZKP) circuits.
 
 In Paladin transaction signing can be complex, requiring multiple signatures, using
 different algorithms, at different stages in the assembly, endorsement/proof and
@@ -184,11 +206,11 @@ An algorithm might be domain specific, such as usage of a ZKP friendly cryptogra
 inside of the proof generator of a specific circuit generated in a toolkit like Circom.
 
 Some of these algorithms have different ways to represent the same key materials,
-and require distribution of those public identifiers to multiple parties during
+and require distribution of those public verifiers to multiple parties during
 the creation of endorsements/proofs of the transaction.
 
 So Paladin has a scheme for identification of the `algorithm` for a signing/proof
-generation request, and associating multiple `public identifiers` to the same
+generation request, and associating multiple `public verifiers` to the same
 key materials.
 
 ### 4. Signing Modules

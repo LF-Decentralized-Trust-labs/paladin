@@ -1,4 +1,4 @@
-# Installation: devnet
+# Installation
 
 Installing the operator in `devnet` mode also installs and configures a three node Paladin network and three node Besu network. This is great way to get up and running quickly with Paladin and to try out the [tutorials](../tutorials/index.md).
 

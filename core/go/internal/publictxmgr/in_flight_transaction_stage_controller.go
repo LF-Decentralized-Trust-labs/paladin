@@ -592,9 +592,8 @@ func calculateGasRequiredForTransaction(ctx context.Context, gpo *pldapi.PublicT
 	} else if gpo.MaxFeePerGas != nil && gpo.MaxPriorityFeePerGas != nil {
 		// max-fee and max-priority-fee have been provided. We can only use
 		// max-fee to calculate how much this TX could cost, but we ultimately
-		// require both to be set (max-priority-fee will be needed when we send
-		// the TX asking for fuel)
-		log.L(ctx).Debugf("fuel gas calculation using MaxFeePerGas (%v)", gpo.MaxFeePerGas)
+		// require both to be set
+		log.L(ctx).Debugf("gas calculation using MaxFeePerGas (%v)", gpo.MaxFeePerGas)
 		maxFeePerGasCopy := new(big.Int).Set(gpo.MaxFeePerGas.Int())
 		gasRequired = maxFeePerGasCopy.Mul(maxFeePerGasCopy, new(big.Int).SetUint64(gasLimit))
 	}

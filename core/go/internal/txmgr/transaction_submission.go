@@ -555,7 +555,6 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX persistence
 			return nil, i18n.NewError(ctx, msgs.MsgTxMgrPrivateOnlyForPrepare)
 		}
 	default:
-		// Note autofuel transactions can only be created internally within the public TX manager
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrInvalidTXType)
 	}
 
@@ -574,6 +573,19 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX persistence
 	bypassFromCheck := submitMode == pldapi.SubmitModePrepare || /* no checking on from for prepare */
 		(submitMode == pldapi.SubmitModeCall && tx.From == "") /* call is allowed no sender */
 	if !bypassFromCheck {
+		if strings.HasPrefix(tx.From, "eth_address:") {
+			addr := strings.TrimPrefix(tx.From, "eth_address:")
+			if _, err := pldtypes.ParseEthAddress(addr); err != nil {
+				return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrVerifierNotEthAddress, addr)
+			}
+			// Doing the reverse lookup here means that we can persist the identifier on the transaction. It does mean that the
+			// identifier will later be resolved back to the verifier but this should just be a cache read
+			mapping, err := tm.keyManager.ReverseKeyLookup(ctx, dbTX, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, addr)
+			if err != nil {
+				return nil, err
+			}
+			tx.From = mapping.Identifier
+		}
 
 		identifier, node, err := pldtypes.PrivateIdentityLocator(tx.From).Validate(ctx, tm.localNodeName, false)
 		if err != nil || node != tm.localNodeName {
