@@ -116,7 +116,7 @@ var (
 	TransactionDomain                                       = pdm("Transaction.domain", "Name of a domain - only required on input for private deploy transactions")
 	TransactionFunction                                     = pdm("Transaction.function", "Function signature - inferred from definition if not supplied")
 	TransactionABIReference                                 = pdm("Transaction.abiReference", "Calculated ABI reference - required with ABI on input if not constructor")
-	TransactionFrom                                         = pdm("Transaction.from", "Locator for a local signing identity to use for submission of this transaction")
+	TransactionFrom                                         = pdm("Transaction.from", "Locator for a local signing identity to use for submission of this transaction. May be a key identifier, or an eth address prefixed with 'eth_address:'.")
 	TransactionTo                                           = pdm("Transaction.to", "Target contract address, or null for a deploy")
 	TransactionData                                         = pdm("Transaction.data", "Pre-encoded array with/without function selector, array, or object input")
 	TransactionInputDependsOn                               = pdm("TransactionInput.dependsOn", "Transactions that must be mined on the blockchain successfully before this transaction submits")

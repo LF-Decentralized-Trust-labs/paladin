@@ -37,9 +37,7 @@ import (
 // 2. handle external requests of transaction status change
 //       - update/delete of a transaction when its signing address not in-flight
 //       - signal update/delete of a transaction in-flight to corresponding transaction orchestrator
-// 3. auto fueling management - the autofueling transactions
-//    - creating auto-fueling transactions when asked by transaction orchestrators
-// 4. provides shared functionalities for optimization
+// 3. provides shared functionalities for optimization
 //    - handles gas price information which is not signer specific
 
 func (ptm *pubTxManager) engineLoop() {

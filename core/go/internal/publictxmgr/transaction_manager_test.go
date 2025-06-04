@@ -182,26 +182,6 @@ func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...fu
 	}
 }
 
-func TestNewEngineErrors(t *testing.T) {
-	mocks := baseMocks(t)
-
-	mockKeyManager := componentmocks.NewKeyManager(t)
-	mocks.keyManager = mockKeyManager
-	mocks.allComponents.On("Persistence").Return(mocks.db)
-	mocks.allComponents.On("KeyManager").Return(mocks.keyManager)
-	pmgr := NewPublicTransactionManager(context.Background(), &pldconf.PublicTxManagerConfig{
-		BalanceManager: pldconf.BalanceManagerConfig{
-			AutoFueling: pldconf.AutoFuelingConfig{
-				Source: confutil.P("bad address"),
-			},
-		},
-	})
-	mockKeyManager.On("ResolveKeyNewDatabaseTX", mock.Anything, "bad address", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS).
-		Return(nil, fmt.Errorf("lookup failed"))
-	err := pmgr.PostInit(mocks.allComponents)
-	assert.Regexp(t, "lookup failed", err)
-}
-
 func TestInit(t *testing.T) {
 	_, _, _, done := newTestPublicTxManager(t, false)
 	defer done()

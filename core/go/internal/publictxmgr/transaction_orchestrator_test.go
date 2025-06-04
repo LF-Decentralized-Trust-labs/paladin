@@ -25,8 +25,6 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 
-	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
@@ -161,28 +159,10 @@ func TestNewOrchestratorPollingRemoveCompleted(t *testing.T) {
 	<-ocDone
 }
 
-func TestOrchestratorTriggerTopUp(t *testing.T) {
-
-	autoFuelingSourceAddr := *pldtypes.RandAddress()
+func TestOrchestratorWaitingForBalance(t *testing.T) {
 	ctx, o, m, done := newTestOrchestrator(t, func(m *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Orchestrator.MaxInFlight = confutil.P(1) // just one inflight - which we inject in
 		conf.GasPrice.FixedGasPrice = 1
-		conf.BalanceManager.AutoFueling.Source = confutil.P("autofueler")
-
-		keyMapping := &pldapi.KeyMappingAndVerifier{
-			KeyMappingWithPath: &pldapi.KeyMappingWithPath{
-				KeyMapping: &pldapi.KeyMapping{
-					Identifier: "autofueler",
-				},
-			},
-			Verifier: &pldapi.KeyVerifier{
-				Verifier: autoFuelingSourceAddr.String(),
-			},
-		}
-		mockKeyMgr := m.keyManager.(*componentmocks.KeyManager)
-		mockKeyMgr.On("ResolveKeyNewDatabaseTX", mock.Anything, "autofueler", mock.Anything, mock.Anything).
-			Return(keyMapping, nil).Maybe()
-
 	})
 	defer done()
 
@@ -198,40 +178,22 @@ func TestOrchestratorTriggerTopUp(t *testing.T) {
 	// Fill first slot with a stage controller
 	o.inFlightTxs = []*inFlightTransactionStageController{mockIT}
 	o.state = OrchestratorStateRunning
+	o.lastQueueUpdate = time.Now()
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		// return empty rows - once for max nonce calculation, and then again for the actual query
 		m.db.ExpectQuery("SELECT.*public_txn").WillReturnRows(sqlmock.NewRows([]string{}))
 	}
 
-	// Then insert of the auto-fueling transaction
-	m.db.ExpectBegin()
-	m.db.ExpectQuery("INSERT.*public_txns").WillReturnRows(m.db.NewRows([]string{"pub_txn_id"}).AddRow(12345))
-	m.db.ExpectCommit()
-
 	// Mock the insufficient balance on the account that's submitting
 	m.ethClient.On("GetBalance", mock.Anything, o.signingAddress, "latest").Return(pldtypes.Uint64ToUint256(0), nil)
-
-	// Mock the sufficient balance on the auto-fueling source address, and the nonce assignment
-	m.ethClient.On("GetBalance", mock.Anything, autoFuelingSourceAddr, "latest").Return(pldtypes.Uint64ToUint256(100*1000), nil)
-	// Gas estimate for the auto-fueling TX
-	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
-		Return(ethclient.EstimateGasResult{GasLimit: pldtypes.HexUint64(10)}, nil)
 
 	oDone, err := o.Start(ctx)
 	require.NoError(t, err)
 
-	var trackedTx *pldapi.PublicTx
-	for trackedTx == nil {
-		time.Sleep(10 * time.Millisecond)
-		if t.Failed() {
-			return
-		}
-		af := o.balanceManager.(*BalanceManagerWithInMemoryTracking)
-		af.addressBalanceChangedMapMux.Lock()
-		trackedTx = af.trackedFuelingTransactions[o.signingAddress]
-		af.addressBalanceChangedMapMux.Unlock()
-	}
+	require.Eventually(t, func() bool {
+		return o.state == OrchestratorStateWaiting
+	}, time.Second, 10*time.Millisecond)
 
 	o.Stop()
 	<-oDone
