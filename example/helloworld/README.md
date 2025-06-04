@@ -1,73 +1,48 @@
 # Example: Hello World
 
-Check out the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tutorials/hello-world/) for a step-by-step guide.
+Check out the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tutorials/hello-world/) for a detailed explanation.
 
-## Prerequisites
+## Pre-requisites
 
-- Local Paladin instance running on `localhost:31548`.
+Run the common [setup steps](../README.md) before running the example.
 
----
+## Running the example
 
-## Option 1: Use the Latest Stable Version
+### Option 1 - `npm` with downloaded solidity contracts
 
-1. **Download and Extract Contracts**
+- **Extract contracts**
 
-   - [Download Solidity contracts](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/latest/download/abis.tar.gz)
-   - Extract `abis.tar.gz` and copy the `abis` directory to `src/`. (full path should be: `paladin/example/helloworld/src/abis`)
+  - Extract the `abis.tar.gz` file that was downloaded in the [setup steps](../README.md) and copy the `abis` directory to `src/`. (full path should be: `paladin/example/helloworld/src/abis`)
 
-2. **Build TypeScript SDK**
+- **Run the example**
 
-```shell
-cp -rf src/abis ../../sdk/typescript/src/domains/
-cd ../../sdk/typescript
-npm install
-npm run abi
-npm run build
-```
-
-3. **Run the Example**
-
-```shell
-npm install
-npm run start
-```
+  ```shell
+  cd <paladin-root>/example/helloworld
+  npm install
+  npm run start
+  ```
 
 ---
 
-## Option 2: Build Locally
+### Option 2 - `npm` with locally built solidity contracts and ABIs
 
-1. **Compile Solidity Contracts**
+- **Run the example**
 
-```shell
-cd ../../solidity
-npm install
-npm run compile
-```
-
-2. **Build TypeScript SDK**
-
-```shell
-cd ../../sdk/typescript
-npm install
-npm run abi
-npm run build
-```
-
-3. **Run the Example**
-
-```shell
-npm install
-npm run abi
-npm run start
-```
+  ```shell
+  cd <paladin-root>/example/helloworld
+  npm install
+  npm run abi
+  npm run start
+  ```
 
 ---
 
-## Option 3: Run with Gradle
+### Option 3 - Run with Gradle
 
-To perform all prerequisites and run the example in one go:
+- **Run the gradle build task, then run the sample:**
 
-```shell
-../../gradlew build
-npm run start
-```
+  ```shell
+  cd <paladin-root>/example/helloworld
+  ../../gradlew build
+  npm run start
+  ```

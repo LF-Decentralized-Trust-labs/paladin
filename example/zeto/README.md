@@ -6,23 +6,9 @@ See the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tu
 
 ## Pre-requisites
 
-### Local Paladin network
+Run the common [setup steps](../README.md) before running the example.
 
-This sample requires a local 3-node Paladin network running on `localhost:31548`, `localhost:31648`, and `localhost:31748`. You can get one setup by referring to the [Getting Started](https://lf-decentralized-trust-labs.github.io/paladin/head/getting-started/installation/) guide.
-
-This should provision a local kubernetes (based on Kind) cluster and provision a Besu and Paladin network including these pods:
-
-```shell
-$ kubectl get po
-NAME                               READY   STATUS    RESTARTS   AGE
-besu-node1-0                       1/1     Running   0          19m
-besu-node2-0                       1/1     Running   0          19m
-besu-node3-0                       1/1     Running   0          19m
-paladin-node1-0                    2/2     Running   0          17m
-paladin-node2-0                    2/2     Running   0          17m
-paladin-node3-0                    2/2     Running   0          17m
-paladin-operator-bc788db4f-mzbs7   1/1     Running   0          19m
-```
+## Running the example
 
 ### ABI resources for Zeto
 
@@ -34,51 +20,44 @@ The sample uses the following ABIs to accomplish the end to end flow:
 
 These dependency resources can be obtained by one of the following ways.
 
-#### Option 1: Manually Building with `npm`
+### Option 1 - `npm` with downloaded solidity contracts
 
-You can perform the setup with just `npm`, without having to run Gradle builds.
+- **Extract contracts**
 
-1. **Compile Solidity contracts**
+  - Extract the `abis.tar.gz` file that was downloaded in the [setup steps](../README.md) and copy the `abis` directory to `src/`. (full path should be: `paladin/example/zeto/src/abis`)
 
-```shell
-cd <paladin-root>/solidity
-npm install
-npm run compile
-```
+- **Run the example**
 
-2. **Build TypeScript SDK**
+  ```shell
+  cd <paladin-root>/example/zeto
+  npm install
+  npm run start
+  ```
 
-```shell
-cd <paladin-root>/sdk/typescript
-npm install
-npm run abi
-npm run build
-```
+---
 
-3. **Build common utilities**
+### Option 2 - `npm` with locally built solidity contracts and ABIs
 
-```shell
-cd <paladin-root>/example/common
-npm install
-npm run build
-```
+- **Run the example**
 
-4. **Copy the ABIs needed by the example**
+  ```shell
+  cd <paladin-root>/example/zeto
+  npm install
+  npm run abi
+  npm run start
+  ```
 
-```shell
-cd <paladin-root>/example/zeto
-npm install
-npm run abi
-```
+---
 
-#### Option 2: Running The Gradle Build
+### Option 3 - Run with Gradle
 
-If you are already running Gradle builds, the following build will set up all the dependency artifacts.
+- **Run the gradle build task, then run the sample:**
 
-```shell
-cd <paladin-root>
-./gradlew :example:zeto:build
-```
+  ```shell
+  cd <paladin-root>/example/zeto
+  ../../gradlew build
+  npm run start
+  ```
 
 ### Verify Dependent Zeto Resources
 

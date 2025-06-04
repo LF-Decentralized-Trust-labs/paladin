@@ -5,7 +5,9 @@ In the [previous tutorial](./hello-world.md), we deployed and interacted with a 
 1. **Stores values** on the blockchain
 2. **Retrieves stored values** on demand
 
-This tutorial will guide you through **deploying, storing, and retrieving data** using the Paladin SDK
+This tutorial will guide you through **deploying, storing, and retrieving data** using the Paladin SDK.
+
+Like the previous tutorial this one demonstrates traditional, non-private Ethereum activity using the Paladin APIs to drive the Paladin transaction manager.
 
 ---
 

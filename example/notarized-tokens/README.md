@@ -6,66 +6,44 @@ See the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tu
 
 ## Pre-requisites
 
-Requires a local 3-node Paladin cluster running on `localhost:31548`, `localhost:31648`, and `localhost:31748`.
+Run the common [setup steps](../README.md) before running the example.
 
-## Option 1: Use the Latest Stable Version
+## Running the example
 
-1. **Download and Extract Contracts**
+### Option 1 - `npm` with downloaded solidity contracts
 
-   - [Download Solidity contracts](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/latest/download/abis.tar.gz)
-   - Extract `abis.tar.gz` and copy the `abis` directory to `src/`. (full path should be: `paladin/example/notarized-tokens/src/abis`)
+- **Extract contracts**
 
-2. **Build TypeScript SDK**
+  - Extract the `abis.tar.gz` file that was downloaded in the [setup steps](../README.md) and copy the `abis` directory to `src/`. (full path should be: `paladin/example/notarized-tokens/src/abis`)
 
-```shell
-cp -rf src/abis ../../sdk/typescript/src/domains/
-cd ../../sdk/typescript
-npm install
-npm run build
-```
+- **Run the example**
 
-3. **Run the Example**
-
-```shell
-npm install
-npm run start
-```
+  ```shell
+  cd <paladin-root>/example/notarized-tokens
+  npm install
+  npm run start
+  ```
 
 ---
 
-## Option 2: Build Locally
+### Option 2 - `npm` with locally built solidity contracts and ABIs
 
-1. **Compile Solidity Contracts**
+- **Run the example**
 
-```shell
-cd ../../solidity
-npm install
-npm run compile
-```
-
-2. **Build TypeScript SDK**
-
-```shell
-cd ../../sdk/typescript
-npm install
-npm run build
-```
-
-3. **Run the Example**
-
-```shell
-npm install
-npm run abi
-npm run start
-```
+  ```shell
+  cd <paladin-root>/example/notarized-tokens
+  npm install
+  npm run start
+  ```
 
 ---
 
-## Option 3: Run with Gradle
+### Option 3 - Run with Gradle
 
-To perform all prerequisites and run the example in one go:
+- **Run the gradle build task, then run the sample:**
 
-```shell
-../../gradlew build
-npm run start
-```
+  ```shell
+  cd <paladin-root>/example/notarized-tokens
+  ../../gradlew build
+  npm run start
+  ```

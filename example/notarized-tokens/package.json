@@ -6,8 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "ts-node ./src/index.ts",
-    "start:prod": "node ./build/index.js",
-    "abi": "node scripts/abi.mjs"
+    "start:prod": "node ./build/index.js"
   },
   "author": "",
   "license": "Apache-2.0",

@@ -1,90 +1,48 @@
-n# Example: Storage with Privacy Groups
+# Example: Storage with Privacy Groups
 
 See the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tutorials/private-storage/) for a detailed explanation.
 
 ## Pre-requisites
 
-Requires a local Paladin instance running on `localhost:31548`.
-Requires a local Paladin instance running on `localhost:31648`.
-Requires a local Paladin instance running on `localhost:31748`.
+Run the common [setup steps](../README.md) before running the example.
 
-## Option 1: Use the Latest Stable Version
+## Running the example
 
-1. **Download and extract contracts**
+### Option 1 - `npm` with downloaded solidity contracts
 
-   - [Download Solidity contracts](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/latest/download/abis.tar.gz)
-   - Extract `abis.tar.gz` and copy the `abis` directory to `src/`. (full path should be: `paladin/example/private-storage/src/abis`)
+- **Extract contracts**
 
-2. **Build TypeScript SDK**
+  - Extract the `abis.tar.gz` file that was downloaded in the [setup steps](../README.md) and copy the `abis` directory to `src/`. (full path should be: `paladin/example/privacy-storage/src/abis`)
 
-```shell
-cp -rf src/abis ../../sdk/typescript/src/domains/
-cd ../../sdk/typescript
-npm install
-npm run abi
-npm run build
-```
+- **Run the example**
 
-3. **Build common utilities**
-
-```shell
-cd ../common
-npm install
-npm run build
-```
-
-4. **Run the example**
-
-```shell
-npm install
-npm run abi
-npm run start
-```
+  ```shell
+  cd <paladin-root>/example/privacy-storage
+  npm install
+  npm run start
+  ```
 
 ---
 
-## Option 2: Build Locally
+### Option 2 - `npm` with locally built solidity contracts and ABIs
 
-1. **Compile Solidity contracts**
+- **Run the example**
 
-```shell
-cd ../../solidity
-npm install
-npm run compile
-```
-
-2. **Build TypeScript SDK**
-
-```shell
-cd ../../sdk/typescript
-npm install
-npm run abi
-npm run build
-```
-
-3. **Build common utilities**
-
-```shell
-cd ../common
-npm install
-npm run build
-```
-
-4. **Run the example**
-
-```shell
-npm install
-npm run abi
-npm run start
-```
+  ```shell
+  cd <paladin-root>/example/privacy-storage
+  npm install
+  npm run abi
+  npm run start
+  ```
 
 ---
 
-## Option 3: Run with Gradle
+### Option 3 - Run with Gradle
 
-To perform all prerequisites and run the example in one go:
+- **Run the gradle build task, then run the sample:**
 
-```shell
-../../gradlew build
-npm run start
-```
+  ```shell
+  cd <paladin-root>/example/privacy-storage
+  ../../gradlew build
+  npm run start
+  ```
