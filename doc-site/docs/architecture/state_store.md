@@ -4,7 +4,7 @@ As discussed in [Programming Model](./programming_model.md) each of the privacy 
 contract domains of a Paladin runtime has a layer of code that must efficiently access private states.
 
 The nature of private states being selectively disclosed, means the model most commonly used to
-manage the relationships between these states is a the Unspent Transaction Output (UTXO) model.
+manage the relationships between these states is the Unspent Transaction Output (UTXO) model.
 
 > This includes domains like [Pente](./pente.md) that implement EVM programmability on top of these states,
 > with each UTXO representing the current state of a private EVM smart contract
@@ -65,6 +65,7 @@ Specifically we support the subset that the [ERC-712](https://github.com/ethereu
 what is required for our UTXO states.
 
 When creating a schema using an ABI definition (JSON) we:
+
 - Require a single type definition of type `tuple` (not an array, or a function definition)
 - Require the `"internalType": "struct StructName` extension of ABI is used to define all `tuple` names
 - Use the `indexed` boolean parameter on the _top level_ type to specify the `labels` 
