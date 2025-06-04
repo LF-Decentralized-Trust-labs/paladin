@@ -149,9 +149,10 @@ var _ = Describe("Paladin Controller", func() {
 				},
 			}
 			controllerReconciler := &PaladinReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-				config: cfg,
+				Client:           k8sClient,
+				Scheme:           k8sClient.Scheme(),
+				RPCClientManager: NewRPCCache(),
+				config:           cfg,
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -410,10 +411,11 @@ func setupTestReconciler(objs ...client.Object) (*PaladinReconciler, client.Clie
 	}
 
 	reconciler := &PaladinReconciler{
-		Client:  client,
-		Scheme:  scheme,
-		config:  cfg,
-		Changes: NewInFlight(1 * time.Second),
+		Client:           client,
+		Scheme:           scheme,
+		config:           cfg,
+		RPCClientManager: NewRPCCache(),
+		Changes:          NewInFlight(1 * time.Second),
 	}
 
 	return reconciler, client, nil
@@ -496,6 +498,18 @@ func TestPaladinReconcile_NewResource(t *testing.T) {
 
 	// Check that the status phase is set to Ready
 	assert.Equal(t, corev1alpha1.StatusPhaseReady, updatedPaladin.Status.Phase)
+
+	// delete the resource
+	err = client.Delete(ctx, updatedPaladin)
+	require.NoError(t, err)
+
+	_, err = reconciler.Reconcile(ctx, req)
+	require.NoError(t, err)
+
+	// Check that the resource is deleted
+	err = client.Get(ctx, req.NamespacedName, updatedPaladin)
+	require.Error(t, err)
+	assert.True(t, errors.IsNotFound(err), "Expected resource to be not found")
 }
 
 func TestPaladinCreateService(t *testing.T) {
