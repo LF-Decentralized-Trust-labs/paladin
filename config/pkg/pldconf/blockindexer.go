@@ -25,6 +25,7 @@ import (
 type BlockIndexerConfig struct {
 	FromBlock             json.RawMessage    `json:"fromBlock,omitempty"` // TODO: this should be a pldtypes.RawJSON but that's not possible right now because of a ciruclar dependency
 	CommitBatchSize       *int               `json:"commitBatchSize"`
+	InsertDBBatchSize     *int               `json:"insertDBBatchSize"` // Amount of tx and events to insert in a single DB transaction
 	CommitBatchTimeout    *string            `json:"commitBatchTimeout"`
 	RequiredConfirmations *int               `json:"requiredConfirmations"`
 	ChainHeadCacheLen     *int               `json:"chainHeadCacheLen"`
@@ -46,6 +47,7 @@ var EventStreamDefaults = &EventStreamsConfig{
 var BlockIndexerDefaults = &BlockIndexerConfig{
 	FromBlock:             json.RawMessage(`0`),
 	CommitBatchSize:       confutil.P(50),
+	InsertDBBatchSize:     confutil.P(5000),
 	CommitBatchTimeout:    confutil.P("100ms"),
 	RequiredConfirmations: confutil.P(0),
 	ChainHeadCacheLen:     confutil.P(50),
