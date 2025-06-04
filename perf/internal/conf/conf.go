@@ -19,7 +19,6 @@ package conf
 import (
 	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 )
 
@@ -31,7 +30,7 @@ type RunnerConfig struct {
 	ContractOptions         ContractOptions
 	WSConfig                pldconf.WSClientConfig
 	HTTPConfig              pldconf.HTTPClientConfig
-	DelinquentAction        string
+	DelinquentAction        DelinquentAction
 	Daemon                  bool
 	LogEvents               bool
 	MaxTimePerAction        time.Duration
@@ -63,13 +62,13 @@ type InstanceConfig struct {
 	RampLength              time.Duration    `json:"rampLength,omitempty"`
 	NoWaitSubmission        bool             `json:"noWaitSubmission"`
 	MaxSubmissionsPerSecond int              `json:"maxSubmissionsPerSecond"`
-	DelinquentAction        string           `json:"delinquentAction,omitempty"`
+	DelinquentAction        DelinquentAction `json:"delinquentAction,omitempty"`
 }
 
 type TestCaseConfig struct {
-	Name           fftypes.FFEnum `json:"name"`
-	Workers        int            `json:"workers"`
-	ActionsPerLoop int            `json:"actionsPerLoop"`
+	Name           TestName `json:"name"`
+	Workers        int      `json:"workers"`
+	ActionsPerLoop int      `json:"actionsPerLoop"`
 }
 
 type NodeConfig struct {
@@ -82,18 +81,18 @@ type ContractOptions struct {
 	Address string `json:"address"`
 }
 
-var (
+type TestName string
+
+const (
 	// PerfTestPublicContract invokes a public smart contract and checks for transaction receipts
-	PerfTestPublicContract fftypes.FFEnum = "public_contract"
+	PerfTestPublicContract TestName = "public_contract"
 )
 
-var (
+type DelinquentAction string
+
+const (
 	// DelinquentActionExit causes paladin perf to exit after detecting delinquent messages
-	DelinquentActionExit fftypes.FFEnum = "exit"
+	DelinquentActionExit DelinquentAction = "exit"
 	// DelinquentActionLog causes paladin perf to log and move on after delinquent messages
-	DelinquentActionLog fftypes.FFEnum = "log"
+	DelinquentActionLog DelinquentAction = "log"
 )
-
-var ValidPerfTests = map[string]fftypes.FFEnum{
-	PerfTestPublicContract.String(): PerfTestPublicContract,
-}

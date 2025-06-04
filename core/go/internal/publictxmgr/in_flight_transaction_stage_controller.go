@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
@@ -325,12 +324,12 @@ func (it *inFlightTransactionStageController) processRetrieveGasPriceStageOutput
 		rsc.SetNewPersistenceUpdateOutput()
 		if stageOutput.GasPriceOutput.Err != nil {
 			// if failed to get gas price, persist the error
-			rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionRetrieveGasPrice, nil, fftypes.JSONAnyPtr(`{"error":"`+stageOutput.GasPriceOutput.Err.Error()+`"}`))
+			rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionRetrieveGasPrice, nil, pldtypes.RawJSON(`{"error":"`+stageOutput.GasPriceOutput.Err.Error()+`"}`))
 		} else {
 			gpo := it.calculateNewGasPrice(ctx, rsc.InMemoryTx.GetGasPriceObject(), stageOutput.GasPriceOutput.GasPriceObject)
 			gpoJSON, _ := json.Marshal(gpo)
 			rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{GasPricing: gpo}
-			rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionRetrieveGasPrice, fftypes.JSONAnyPtr(string(gpoJSON)), nil)
+			rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionRetrieveGasPrice, pldtypes.RawJSON(gpoJSON), nil)
 		}
 		_ = it.TriggerPersistTxState(ctx)
 	}
@@ -365,13 +364,13 @@ func (it *inFlightTransactionStageController) processSigningStageOutput(ctx cont
 		if rsIn.SignOutput.Err != nil {
 			// persist the error
 			log.L(ctx).Errorf("Transaction signing failed for transaction with ID: %s, due to error: %+v", rsc.InMemoryTx.GetSignerNonce(), rsIn.SignOutput.Err)
-			rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSign, nil, fftypes.JSONAnyPtr(`{"error":"`+rsIn.SignOutput.Err.Error()+`"}`))
+			rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSign, nil, pldtypes.RawJSON(`{"error":"`+rsIn.SignOutput.Err.Error()+`"}`))
 		} else {
 			log.L(ctx).Tracef("SignOutput %+v", rsIn.SignOutput)
 			// signed data received
 			if rsIn.SignOutput.SignedMessage != nil {
 				// signed message can be nil when no signer is configured
-				rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSign, fftypes.JSONAnyPtr(fmt.Sprintf(`{"hash":"%s"}`, rsIn.SignOutput.TxHash)), nil)
+				rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSign, pldtypes.RawJSON(fmt.Sprintf(`{"hash":"%s"}`, rsIn.SignOutput.TxHash)), nil)
 			}
 		}
 
@@ -430,7 +429,7 @@ func (it *inFlightTransactionStageController) processSubmittingStageOutput(ctx c
 			rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{
 				ErrorMessage: &errMsg,
 			}
-			rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSubmitTransaction, fftypes.JSONAnyPtr(`{"reason":"`+string(stageOutput.SubmitOutput.ErrorReason)+`"}`), fftypes.JSONAnyPtr(`{"error":"`+stageOutput.SubmitOutput.Err.Error()+`"}`))
+			rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSubmitTransaction, pldtypes.RawJSON(`{"reason":"`+string(stageOutput.SubmitOutput.ErrorReason)+`"}`), pldtypes.RawJSON(`{"error":"`+stageOutput.SubmitOutput.Err.Error()+`"}`))
 			// TODO: this should be set from the signing stage- it doesn't tell us anything about whether this is a resubmission or not
 			if rsc.InMemoryTx.GetTransactionHash() != nil {
 				// did a re-submission, no matter the result, update the last warn time to avoid another retry
@@ -444,11 +443,11 @@ func (it *inFlightTransactionStageController) processSubmittingStageOutput(ctx c
 
 			if stageOutput.SubmitOutput.SubmissionOutcome == SubmissionOutcomeSubmittedNew {
 				// new transaction submitted successfully
-				rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSubmitTransaction, fftypes.JSONAnyPtr(fmt.Sprintf(`{"hash":"%s"}`, stageOutput.SubmitOutput.TxHash)), nil)
+				rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSubmitTransaction, pldtypes.RawJSON(fmt.Sprintf(`{"hash":"%s"}`, stageOutput.SubmitOutput.TxHash)), nil)
 				log.L(ctx).Debugf("Transaction submitted for tx %s (hash=%s)", rsc.InMemoryTx.GetSignerNonce(), rsc.InMemoryTx.GetTransactionHash())
 			} else if stageOutput.SubmitOutput.SubmissionOutcome == SubmissionOutcomeNonceTooLow {
 				log.L(ctx).Debugf("Nonce too low for tx %s (hash=%s)", rsc.InMemoryTx.GetSignerNonce(), rsc.InMemoryTx.GetTransactionHash())
-				rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSubmitTransaction, fftypes.JSONAnyPtr(`{"txHash":"`+stageOutput.SubmitOutput.TxHash.String()+`"}`), nil)
+				rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSubmitTransaction, pldtypes.RawJSON(`{"txHash":"`+stageOutput.SubmitOutput.TxHash.String()+`"}`), nil)
 			} else if stageOutput.SubmitOutput.SubmissionOutcome == SubmissionOutcomeAlreadyKnown {
 				// nothing to add for persistence, go to the tracking stage
 				log.L(ctx).Debugf("Transaction already known for tx %s (hash=%s)", rsc.InMemoryTx.GetSignerNonce(), rsc.InMemoryTx.GetTransactionHash())
@@ -636,7 +635,7 @@ func (it *inFlightTransactionStageController) TriggerStatusUpdate(ctx context.Co
 	it.executeAsync(func() {
 		rsc := generation.GetRunningStageContext(ctx)
 		rsc.SetNewPersistenceUpdateOutput()
-		rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionStateTransition, fftypes.JSONAnyPtr(fmt.Sprintf(`{"status":"%s"}`, *it.newStatus)), nil)
+		rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionStateTransition, pldtypes.RawJSON(fmt.Sprintf(`{"status":"%s"}`, *it.newStatus)), nil)
 		rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{
 			InFlightStatus: it.newStatus,
 		}

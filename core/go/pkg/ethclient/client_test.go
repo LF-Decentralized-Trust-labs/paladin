@@ -21,7 +21,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
@@ -388,7 +387,7 @@ func TestGetReceiptNotFound(t *testing.T) {
 
 }
 func TestProtocolIDForReceipt(t *testing.T) {
-	assert.Equal(t, "000000012345/000042", ProtocolIDForReceipt(fftypes.NewFFBigInt(12345), fftypes.NewFFBigInt(42)))
+	assert.Equal(t, "000000012345/000042", ProtocolIDForReceipt(pldtypes.NewPLDBigInt(12345), pldtypes.NewPLDBigInt(42)))
 	assert.Equal(t, "", ProtocolIDForReceipt(nil, nil))
 }
 

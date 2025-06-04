@@ -51,6 +51,9 @@ var (
 	MsgTypesTypeInferenceNotSupportedForX    = pde("PD020021", "ABI type inference not supported for '%s' property of type %T")
 	MsgTypesNumberTypeInferenceRequiresInt   = pde("PD020022", "ABI type inference only support integer JSON numbers. Property '%s' has non-integer value '%s'")
 	MsgTypesCannotInferTypeOfEmptyArray      = pde("PD020023", "ABI type inference cannot determine type of empty array '%s'")
+	MsgBigIntParseFailed                     = pde("PD020024", "Failed to parse JSON value '%s' into BigInt")
+	MsgBigIntTooLarge                        = pde("PD020025", "Byte length of serialized integer is too large %d (max=%d)")
+	MsgTypeRestoreFailed                     = pde("PD020026", "Failed to restore type '%T' into '%T'")
 
 	// Inflight PD0201XX
 	MsgInflightRequestCancelled = pde("PD020100", "Request cancelled after %s")

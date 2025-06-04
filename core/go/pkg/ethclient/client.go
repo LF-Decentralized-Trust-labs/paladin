@@ -24,7 +24,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -319,11 +318,11 @@ func (ec *ethClient) GetTransactionReceipt(ctx context.Context, txHash string) (
 
 	fullReceipt, _ := json.Marshal(&receiptExtraInfo{
 		ContractAddress:   ethReceipt.ContractAddress,
-		CumulativeGasUsed: (*fftypes.FFBigInt)(ethReceipt.CumulativeGasUsed),
+		CumulativeGasUsed: (*pldtypes.PLDBigInt)(ethReceipt.CumulativeGasUsed),
 		From:              ethReceipt.From,
 		To:                ethReceipt.To,
-		GasUsed:           (*fftypes.FFBigInt)(ethReceipt.GasUsed),
-		Status:            (*fftypes.FFBigInt)(ethReceipt.Status),
+		GasUsed:           (*pldtypes.PLDBigInt)(ethReceipt.GasUsed),
+		Status:            (*pldtypes.PLDBigInt)(ethReceipt.Status),
 		ReturnValue:       returnDataString,
 		ErrorMessage:      transactionErrorMessage,
 	})
@@ -333,19 +332,19 @@ func (ec *ethClient) GetTransactionReceipt(ctx context.Context, txHash string) (
 		txIndex = ethReceipt.TransactionIndex.BigInt().Int64()
 	}
 	receiptResponse := &TransactionReceiptResponse{
-		BlockNumber:      (*fftypes.FFBigInt)(ethReceipt.BlockNumber),
-		TransactionIndex: fftypes.NewFFBigInt(txIndex),
+		BlockNumber:      (*pldtypes.PLDBigInt)(ethReceipt.BlockNumber),
+		TransactionIndex: pldtypes.NewPLDBigInt(txIndex),
 		BlockHash:        ethReceipt.BlockHash.String(),
 		Success:          isSuccess,
-		ProtocolID:       ProtocolIDForReceipt((*fftypes.FFBigInt)(ethReceipt.BlockNumber), fftypes.NewFFBigInt(txIndex)),
-		ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
+		ProtocolID:       ProtocolIDForReceipt((*pldtypes.PLDBigInt)(ethReceipt.BlockNumber), pldtypes.NewPLDBigInt(txIndex)),
+		ExtraInfo:        pldtypes.RawJSON(fullReceipt),
 	}
 
 	if ethReceipt.ContractAddress != nil {
 		location, _ := json.Marshal(map[string]string{
 			"address": ethReceipt.ContractAddress.String(),
 		})
-		receiptResponse.ContractLocation = fftypes.JSONAnyPtrBytes(location)
+		receiptResponse.ContractLocation = pldtypes.RawJSON(location)
 	}
 	return receiptResponse, nil
 }

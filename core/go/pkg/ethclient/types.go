@@ -18,8 +18,8 @@ package ethclient
 import (
 	"strings"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 // ErrorReason are a set of standard error conditions that a blockchain connector can return
@@ -119,14 +119,14 @@ type logJSONRPC struct {
 }
 
 type TransactionReceiptResponse struct {
-	BlockNumber      *fftypes.FFBigInt `json:"blockNumber"`
-	TransactionIndex *fftypes.FFBigInt `json:"transactionIndex"`
-	BlockHash        string            `json:"blockHash"`
-	Success          bool              `json:"success"`
-	ProtocolID       string            `json:"protocolId"`
-	ExtraInfo        *fftypes.JSONAny  `json:"extraInfo,omitempty"`
-	ContractLocation *fftypes.JSONAny  `json:"contractLocation,omitempty"`
-	Logs             []fftypes.JSONAny `json:"logs,omitempty"` // all raw un-decoded logs should be included if includeLogs=true
+	BlockNumber      *pldtypes.PLDBigInt `json:"blockNumber"`
+	TransactionIndex *pldtypes.PLDBigInt `json:"transactionIndex"`
+	BlockHash        string              `json:"blockHash"`
+	Success          bool                `json:"success"`
+	ProtocolID       string              `json:"protocolId"`
+	ExtraInfo        pldtypes.RawJSON    `json:"extraInfo,omitempty"`
+	ContractLocation pldtypes.RawJSON    `json:"contractLocation,omitempty"`
+	Logs             []pldtypes.RawJSON  `json:"logs,omitempty"` // all raw un-decoded logs should be included if includeLogs=true
 }
 
 // receiptExtraInfo is the version of the receipt we store under the TX.
@@ -135,22 +135,22 @@ type TransactionReceiptResponse struct {
 // - We format numbers as decimals
 type receiptExtraInfo struct {
 	ContractAddress   *ethtypes.Address0xHex `json:"contractAddress"`
-	CumulativeGasUsed *fftypes.FFBigInt      `json:"cumulativeGasUsed"`
+	CumulativeGasUsed *pldtypes.PLDBigInt    `json:"cumulativeGasUsed"`
 	From              *ethtypes.Address0xHex `json:"from"`
 	To                *ethtypes.Address0xHex `json:"to"`
-	GasUsed           *fftypes.FFBigInt      `json:"gasUsed"`
-	Status            *fftypes.FFBigInt      `json:"status"`
+	GasUsed           *pldtypes.PLDBigInt    `json:"gasUsed"`
+	Status            *pldtypes.PLDBigInt    `json:"status"`
 	ErrorMessage      *string                `json:"errorMessage"`
 	ReturnValue       *string                `json:"returnValue,omitempty"`
 }
 
 type StructLog struct {
-	PC      *fftypes.FFBigInt `json:"pc"`
-	Op      *string           `json:"op"`
-	Gas     *fftypes.FFBigInt `json:"gas"`
-	GasCost *fftypes.FFBigInt `json:"gasCost"`
-	Depth   *fftypes.FFBigInt `json:"depth"`
-	Stack   []*string         `json:"stack"`
-	Memory  []*string         `json:"memory"`
-	Reason  *string           `json:"reason"`
+	PC      *pldtypes.PLDBigInt `json:"pc"`
+	Op      *string             `json:"op"`
+	Gas     *pldtypes.PLDBigInt `json:"gas"`
+	GasCost *pldtypes.PLDBigInt `json:"gasCost"`
+	Depth   *pldtypes.PLDBigInt `json:"depth"`
+	Stack   []*string           `json:"stack"`
+	Memory  []*string           `json:"memory"`
+	Reason  *string             `json:"reason"`
 }

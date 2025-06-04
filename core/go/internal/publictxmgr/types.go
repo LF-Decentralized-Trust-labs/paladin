@@ -27,8 +27,6 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 )
 
 // TXUpdates specifies a set of updates that are possible on the base structure.
@@ -36,7 +34,6 @@ import (
 // Any non-nil fields will be set.
 // Sub-objects are set as a whole, apart from TransactionHeaders where each field
 // is considered and stored individually.
-// JSONAny fields can be set explicitly to null using fftypes.NullString
 //
 // This is the update interface for the policy engine to update base status on the
 // transaction object.
@@ -106,11 +103,11 @@ const (
 )
 
 type TransactionHeaders struct {
-	From  string            `json:"from,omitempty"`
-	To    string            `json:"to,omitempty"`
-	Nonce *fftypes.FFBigInt `json:"nonce,omitempty"`
-	Gas   *fftypes.FFBigInt `json:"gas,omitempty"`
-	Value *fftypes.FFBigInt `json:"value,omitempty"`
+	From  string              `json:"from,omitempty"`
+	To    string              `json:"to,omitempty"`
+	Nonce *pldtypes.PLDBigInt `json:"nonce,omitempty"`
+	Gas   *pldtypes.PLDBigInt `json:"gas,omitempty"`
+	Value *pldtypes.PLDBigInt `json:"value,omitempty"`
 }
 
 type BalanceManager interface {
@@ -155,22 +152,6 @@ func (ab *AddressAccount) Spend(ctx context.Context, cost *big.Int) (availableTo
 func (ab *AddressAccount) GetAvailableToSpend(ctx context.Context) *big.Int {
 	balanceCopy := new(big.Int).Set(ab.Balance)
 	return balanceCopy.Sub(balanceCopy, ab.Spent)
-}
-
-type Confirmation struct {
-	BlockNumber fftypes.FFuint64 `json:"blockNumber"`
-	BlockHash   string           `json:"blockHash"`
-	ParentHash  string           `json:"parentHash"`
-}
-
-type ConfirmationsNotification struct {
-	// Confirmed marks we've reached the confirmation threshold
-	Confirmed bool
-	// NewFork is true when NewConfirmations is a complete list of confirmations.
-	// Otherwise, Confirmations is an additive delta on top of a previous list of confirmations.
-	NewFork bool
-	// Confirmations is the list of confirmations being notified - assured to be non-nil, but might be empty.
-	Confirmations []*Confirmation
 }
 
 // in flight tx stages are calculated based on a snapshot of a persisted managed transaction
@@ -361,7 +342,7 @@ func (ctx *RunningStageContext) SetNewPersistenceUpdateOutput() {
 }
 
 type StatusUpdater interface {
-	UpdateSubStatus(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info *fftypes.JSONAny, err *fftypes.JSONAny, actionOccurred *pldtypes.Timestamp) error
+	UpdateSubStatus(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info pldtypes.RawJSON, err pldtypes.RawJSON, actionOccurred *pldtypes.Timestamp) error
 }
 
 type RunningStageContextPersistenceOutput struct {
@@ -372,7 +353,7 @@ type RunningStageContextPersistenceOutput struct {
 	StatusUpdates []func(p StatusUpdater) error
 }
 
-func (sOut *RunningStageContextPersistenceOutput) UpdateSubStatus(action BaseTxAction, info *fftypes.JSONAny, err *fftypes.JSONAny) {
+func (sOut *RunningStageContextPersistenceOutput) UpdateSubStatus(action BaseTxAction, info pldtypes.RawJSON, err pldtypes.RawJSON) {
 	actionOccurred := pldtypes.TimestampNow()
 	sOut.StatusUpdates = append(sOut.StatusUpdates, func(p StatusUpdater) error {
 		return p.UpdateSubStatus(sOut.Ctx, sOut.InMemoryTx, sOut.SubStatus, action, info, err, &actionOccurred)

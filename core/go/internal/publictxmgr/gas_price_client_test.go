@@ -21,7 +21,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 
@@ -35,20 +34,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func longLivedGasPriceTestCache() cache.Cache[string, *fftypes.JSONAny] {
-	return cache.NewCache[string, *fftypes.JSONAny](&pldconf.CacheConfig{}, &pldconf.PublicTxManagerDefaults.GasPrice.Cache)
+func longLivedGasPriceTestCache() cache.Cache[string, pldtypes.RawJSON] {
+	return cache.NewCache[string, pldtypes.RawJSON](&pldconf.CacheConfig{}, &pldconf.PublicTxManagerDefaults.GasPrice.Cache)
 }
 
 func NewTestFixedPriceGasPriceClient(t *testing.T) GasPriceClient {
 	hgc := &HybridGasPriceClient{}
-	hgc.fixedGasPrice = fftypes.JSONAnyPtr(`{"gasPrice": 10}`)
+	hgc.fixedGasPrice = pldtypes.RawJSON(`{"gasPrice": 10}`)
 	hgc.gasPriceCache = longLivedGasPriceTestCache()
 	return hgc
 }
 
 func NewTestZeroGasPriceChainClient(t *testing.T) GasPriceClient {
 	hgc := &HybridGasPriceClient{}
-	hgc.fixedGasPrice = fftypes.JSONAnyPtr(`0`)
+	hgc.fixedGasPrice = pldtypes.RawJSON(`0`)
 	hgc.hasZeroGasPrice = true
 	hgc.gasPriceCache = longLivedGasPriceTestCache()
 	return hgc
@@ -56,7 +55,7 @@ func NewTestZeroGasPriceChainClient(t *testing.T) GasPriceClient {
 
 func NewTestFixedPriceGasPriceClientEIP1559(t *testing.T) GasPriceClient {
 	hgc := &HybridGasPriceClient{}
-	hgc.fixedGasPrice = fftypes.JSONAnyPtr(`{
+	hgc.fixedGasPrice = pldtypes.RawJSON(`{
 		"maxPriorityFeePerGas": 1,
 		"maxFeePerGas": 10
 	}`)
@@ -113,12 +112,12 @@ func TestSetFixedGasPriceIfConfigured(t *testing.T) {
 func TestGasPriceClientInit(t *testing.T) {
 	ctx := context.Background()
 	hgc := &HybridGasPriceClient{}
-	hgc.fixedGasPrice = fftypes.JSONAnyPtr(`invalid`)
+	hgc.fixedGasPrice = pldtypes.RawJSON(`invalid`)
 	hgc.gasPriceCache = longLivedGasPriceTestCache()
 	assert.False(t, hgc.hasZeroGasPrice)
 	hgc.Init(ctx, nil)
 	assert.False(t, hgc.hasZeroGasPrice)
-	hgc.fixedGasPrice = fftypes.JSONAnyPtr(`0`)
+	hgc.fixedGasPrice = pldtypes.RawJSON(`0`)
 	hgc.Init(ctx, nil)
 	assert.True(t, hgc.hasZeroGasPrice)
 }

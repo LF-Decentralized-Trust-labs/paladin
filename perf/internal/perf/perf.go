@@ -29,9 +29,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/kaleido-io/paladin/perf/internal/conf"
 	"github.com/kaleido-io/paladin/perf/internal/util"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -112,7 +112,7 @@ type PerfRunner interface {
 type TestCase interface {
 	WorkerID() int
 	RunOnce(iterationCount int) (trackingID string, err error)
-	Name() string
+	Name() conf.TestName
 	ActionsPerLoop() int
 }
 
@@ -291,13 +291,13 @@ perfLoop:
 			}
 			i++
 			if time.Since(lastCheckedTime).Seconds() > pr.cfg.MaxTimePerAction.Seconds() {
-				if pr.detectDelinquentMsgs() && pr.cfg.DelinquentAction == conf.DelinquentActionExit.String() {
+				if pr.detectDelinquentMsgs() && pr.cfg.DelinquentAction == conf.DelinquentActionExit {
 					break perfLoop
 				}
 				lastCheckedTime = time.Now()
 			}
 		case <-timeout:
-			if pr.detectDelinquentMsgs() && pr.cfg.DelinquentAction == conf.DelinquentActionExit.String() {
+			if pr.detectDelinquentMsgs() && pr.cfg.DelinquentAction == conf.DelinquentActionExit {
 				break perfLoop
 			}
 			lastCheckedTime = time.Now()
@@ -346,14 +346,11 @@ perfLoop:
 
 	testNames := make([]string, len(pr.cfg.Tests))
 	for i, t := range pr.cfg.Tests {
-		testNames[i] = t.Name.String()
+		testNames[i] = string(t.Name)
 	}
-	testNameString := testNames[0]
-	if len(testNames) > 1 {
-		testNameString = strings.Join(testNames[:], ",")
-	}
+
 	tps := util.GenerateTPS(measuredActions, pr.startTime, pr.endSendTime)
-	pr.reportBuilder.AddTestRunMetrics(testNameString, measuredActions, measuredTime, tps, pr.totalTime)
+	pr.reportBuilder.AddTestRunMetrics(strings.Join(testNames, ","), measuredActions, measuredTime, tps, pr.totalTime)
 	err = pr.reportBuilder.GenerateHTML()
 
 	if err != nil {
@@ -505,7 +502,7 @@ func (pr *perfRunner) runLoop(tc TestCase) error {
 
 			// Worker sends its task
 			hist, histErr := perfTestDurationHistogram.GetMetricWith(prometheus.Labels{
-				"test": testName,
+				"test": string(testName),
 			})
 
 			if histErr != nil {
@@ -546,7 +543,7 @@ func (pr *perfRunner) runLoop(tc TestCase) error {
 				aResponse := <-actionResponses
 				resultCount++
 				if aResponse.err != nil {
-					if pr.cfg.DelinquentAction == conf.DelinquentActionExit.String() {
+					if pr.cfg.DelinquentAction == conf.DelinquentActionExit {
 						return aResponse.err
 					} else {
 						log.Errorf("Worker %d error running job (logging but continuing): %s", workerID, aResponse.err)
@@ -623,7 +620,7 @@ func (pr *perfRunner) runLoop(tc TestCase) error {
 	}
 }
 
-func containsTargetTest(tests []conf.TestCaseConfig, target fftypes.FFEnum) bool {
+func containsTargetTest(tests []conf.TestCaseConfig, target conf.TestName) bool {
 	for _, test := range tests {
 		if test.Name == target {
 			return true
@@ -704,7 +701,7 @@ func (pr *perfRunner) getIdempotencyKey(workerId int, iteration int) string {
 	workerIdStr := fmt.Sprintf("%05d", workerId)
 	// Left pad iteration ID to 9 digits (supporting up to 999,999,999 iterations)
 	iterationIdStr := fmt.Sprintf("%09d", iteration)
-	return fmt.Sprintf("%v-%s-%s-%s", pr.startTime, workerIdStr, iterationIdStr, fftypes.NewUUID())
+	return fmt.Sprintf("%v-%s-%s-%s", pr.startTime, workerIdStr, iterationIdStr, uuid.New())
 }
 
 func (pr *perfRunner) calculateCurrentTps(logValue bool) float64 {

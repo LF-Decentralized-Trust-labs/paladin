@@ -19,7 +19,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,5 +33,5 @@ func TestRunningStageContext(t *testing.T) {
 	assert.Equal(t, newSubStatus, testRunningStageContext.SubStatus)
 	testRunningStageContext.SetNewPersistenceUpdateOutput()
 	assert.NotNil(t, testRunningStageContext.StageOutputsToBePersisted)
-	testRunningStageContext.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionRetrieveGasPrice, fftypes.JSONAnyPtr("info"), fftypes.JSONAnyPtr("error"))
+	testRunningStageContext.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionRetrieveGasPrice, pldtypes.RawJSON("info"), pldtypes.RawJSON("error"))
 }

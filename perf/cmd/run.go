@@ -162,7 +162,7 @@ func generateRunnerConfigFromInstance(instance *conf.InstanceConfig, perfConfig 
 	runnerConfig.Length = instance.Length
 	runnerConfig.Daemon = perfConfig.Daemon
 	runnerConfig.LogEvents = perfConfig.LogEvents
-	runnerConfig.DelinquentAction = deliquentAction
+	runnerConfig.DelinquentAction = conf.DelinquentAction(deliquentAction)
 	runnerConfig.MaxTimePerAction = instance.MaxTimePerAction
 	runnerConfig.MaxActions = instance.MaxActions
 	runnerConfig.RampLength = instance.RampLength

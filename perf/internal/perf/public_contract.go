@@ -38,8 +38,8 @@ func newPublicContractTestWorker(pr *perfRunner, workerID int, actionsPerLoop in
 	}
 }
 
-func (tc *publicContract) Name() string {
-	return conf.PerfTestPublicContract.String()
+func (tc *publicContract) Name() conf.TestName {
+	return conf.PerfTestPublicContract
 }
 
 func (tc *publicContract) RunOnce(iterationCount int) (string, error) {

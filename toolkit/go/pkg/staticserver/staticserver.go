@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
@@ -32,6 +31,10 @@ import (
 
 // used to allow mocking of os.Stat in tests
 var osStat = os.Stat
+
+type RESTError struct {
+	Error string `json:"error"`
+}
 
 type StaticServer interface {
 	HTTPHandler(w http.ResponseWriter, r *http.Request)
@@ -83,7 +86,7 @@ func (s *staticServer) httpHandler(w http.ResponseWriter, r *http.Request) {
 		// file, return a 500 internal server error and stop
 		log.L(r.Context()).Errorf("Failed to serve file: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(&fftypes.RESTError{
+		_ = json.NewEncoder(w).Encode(&RESTError{
 			Error: i18n.ExpandWithCode(r.Context(), i18n.MessageKey(pldmsgs.MsgUIServerFailed)),
 		})
 		return

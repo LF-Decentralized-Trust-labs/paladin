@@ -18,8 +18,8 @@ package ethclient
 import (
 	"fmt"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 var (
@@ -37,7 +37,7 @@ var (
 	defaultErrorID = defaultError.FunctionSelectorBytes()
 )
 
-func ProtocolIDForReceipt(blockNumber, transactionIndex *fftypes.FFBigInt) string {
+func ProtocolIDForReceipt(blockNumber, transactionIndex *pldtypes.PLDBigInt) string {
 	if blockNumber != nil && transactionIndex != nil {
 		return fmt.Sprintf("%.12d/%.6d", blockNumber.Int(), transactionIndex.Int())
 	}
