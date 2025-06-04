@@ -1059,9 +1059,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-public-identifiers-and-algorithms" class="md-nav__link">
+  <a href="#3-public-key-identifiers-or-verifiers-and-algorithms" class="md-nav__link">
     <span class="md-ellipsis">
-      3. Public identifiers and algorithms
+      3. Public key identifiers (or "verifiers") and algorithms
     </span>
   </a>
   
@@ -3493,9 +3493,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-public-identifiers-and-algorithms" class="md-nav__link">
+  <a href="#3-public-key-identifiers-or-verifiers-and-algorithms" class="md-nav__link">
     <span class="md-ellipsis">
-      3. Public identifiers and algorithms
+      3. Public key identifiers (or "verifiers") and algorithms
     </span>
   </a>
   
@@ -3671,6 +3671,16 @@ represents that key with a particular signing algorithm (like <code>secp256k1</c
 <p>This is useful for logical partitioning of keys owned by different entities, as well as being
 used by the signing module to influence grouping of keys. For example to influence the derivation
 path of keys in a BIP32 Hierarchical Deterministic (HD) Wallet.</p>
+<p>When submitting public transactions, the key may also be referred to using the Ethereum Address
+(Referred to in Paladin as a <code>Verifier</code>, described in detail in the
+<a href="#3-public-identifiers-and-algorithms">Public Verifiers and Algorithms</a> section below). To do this, the <code>from</code>
+string of a transaction must be prefixed with <code>eth_address:</code>, e.g.
+<code>"from": "eth_address:0xf8f3fcf26a437cac6f8bdc92257f3b03e2f5c546</code>. The syntax is case sensitive, and
+Etherum Addresses are stored in lower case. Referring to keys by public verifier is not supported more widely
+as cross node reverse lookups may result in identifiers being leaked.</p>
+<blockquote>
+<p>Note that resolving a key in a backend key storage system by verifier (derived from the public key) is only possible in Paladin, after that verifier has been resolved at least once for the correct <code>algorithm</code> and <code>verifierType</code>. Otherwise Paladin does not have a reverse-lookup mapping stored in the database to be able to perform the resolution.</p>
+</blockquote>
 <h3 id="2-key-mappings">2. Key Mappings<a class="headerlink" href="#2-key-mappings" title="Permanent link">&para;</a></h3>
 <p>These are database persisted, and cached, records that the main Paladin runtime maintains that match
 a <code>key identifier</code> to the <code>key handle</code> of that key in the signing module.</p>
@@ -3683,7 +3693,13 @@ constraints of that signing module).</p>
 <p>Every <code>key mapping</code> and <code>folder</code> gets two attributes automatically:
 - <code>name</code>: the part of the <code>key identifier</code> representing this key / folder
 - <code>index</code>: a numeric identifier, assured to be unique at this folder level</p>
-<h3 id="3-public-identifiers-and-algorithms">3. Public identifiers and algorithms<a class="headerlink" href="#3-public-identifiers-and-algorithms" title="Permanent link">&para;</a></h3>
+<h3 id="3-public-key-identifiers-or-verifiers-and-algorithms">3. Public key identifiers (or "verifiers") and algorithms<a class="headerlink" href="#3-public-key-identifiers-or-verifiers-and-algorithms" title="Permanent link">&para;</a></h3>
+<p>Cryptographic keys use public/private cryptography, meaning every key can be identified publicly in a way that does not leak the key information itself.</p>
+<p>Any party can <em>verify</em> that a transaction was signed with a particular private key, by <em>recovering</em> the public key used to sign that transaction.</p>
+<p>However, to do this we need a standard way to represent a public key so that it can be verified in a standard way against a transaction. Each cryptographic ecosystem actually does this differently, even when using the same private key, and the same <em>algorithm</em> (such as SECP256K1).</p>
+<p>The most obvious example of this is the Ethereum address. This is a 20 byte compressed representation of a SECP256K1 public key, derived using a well documented algorithm. It looks like <code>0xfdcba455d748cb3e085472cc6f49b4ae86ee4d1f</code> in hex, and sometimes is represented in a case-sensitive way to provide a checksum and avoid copy/paste errors like <code>0xFdcBa455D748cB3e085472CC6F49B4AE86eE4d1F</code> per the EIP-55 standard.</p>
+<p>Paladin supports multiple of these "verifiers" to be calculated, and stored, for public keys. This is fully pluggable, so all the different types of cryptography used in Paladin.</p>
+<p>For example the IDEN3 standards for representing public keys with Baby JubJub are plugged in by the Zeto domain that implements signing proofs within zero-knowledge proof (ZKP) circuits.</p>
 <p>In Paladin transaction signing can be complex, requiring multiple signatures, using
 different algorithms, at different stages in the assembly, endorsement/proof and
 submission of the transaction to the base blockchain.</p>
@@ -3692,10 +3708,10 @@ signing, and maybe can happen natively inside a HSM device.</p>
 <p>An algorithm might be domain specific, such as usage of a ZKP friendly cryptography
 inside of the proof generator of a specific circuit generated in a toolkit like Circom.</p>
 <p>Some of these algorithms have different ways to represent the same key materials,
-and require distribution of those public identifiers to multiple parties during
+and require distribution of those public verifiers to multiple parties during
 the creation of endorsements/proofs of the transaction.</p>
 <p>So Paladin has a scheme for identification of the <code>algorithm</code> for a signing/proof
-generation request, and associating multiple <code>public identifiers</code> to the same
+generation request, and associating multiple <code>public verifiers</code> to the same
 key materials.</p>
 <h3 id="4-signing-modules">4. Signing Modules<a class="headerlink" href="#4-signing-modules" title="Permanent link">&para;</a></h3>
 <p>These are the engines that have direct or indirect access to key materials, and coordinate
