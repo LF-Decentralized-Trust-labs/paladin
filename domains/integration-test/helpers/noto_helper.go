@@ -109,3 +109,8 @@ func (n *NotoHelper) DelegateLock(ctx context.Context, params *types.DelegateLoc
 	fn := types.NotoABI.Functions()["delegateLock"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
 }
+
+func (n *NotoHelper) BalanceOf(ctx context.Context, params *types.BalanceOfParam) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["balanceOf"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
+}
