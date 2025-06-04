@@ -567,7 +567,7 @@ func (n *Noto) getAccountBalance(ctx context.Context, stateQueryContext string, 
 		}
 
 		// no more pages
-		if len(states) == 0 {
+		if len(states) < 10 {
 			break
 		}
 	}
