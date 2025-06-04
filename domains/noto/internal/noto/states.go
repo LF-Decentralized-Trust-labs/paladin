@@ -557,9 +557,6 @@ func (n *Noto) getAccountBalance(ctx context.Context, stateQueryContext string, 
 		if err != nil {
 			return nil, false, err
 		}
-		if len(states) == 0 {
-			return nil, true, i18n.NewError(ctx, msgs.MsgInsufficientFunds, total.Text(10))
-		}
 		for _, state := range states {
 			lastStateTimestamp = state.CreatedAt
 			coin, err := n.unmarshalCoin(state.DataJson)

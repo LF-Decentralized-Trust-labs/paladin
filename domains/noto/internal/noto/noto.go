@@ -533,52 +533,6 @@ func (n *Noto) validateDeploy(tx *prototk.DeployTransactionSpecification) (*type
 	return &params, err
 }
 
-func (n *Noto) validateTransaction(ctx context.Context, tx *prototk.TransactionSpecification) (*types.ParsedTransaction, types.DomainHandler, error) {
-	var functionABI abi.Entry
-	err := json.Unmarshal([]byte(tx.FunctionAbiJson), &functionABI)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var domainConfig types.NotoParsedConfig
-	err = json.Unmarshal([]byte(tx.ContractInfo.ContractConfigJson), &domainConfig)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	abi := types.NotoABI.Functions()[functionABI.Name]
-	handler := n.GetHandler(functionABI.Name)
-	if abi == nil || handler == nil {
-		return nil, nil, i18n.NewError(ctx, msgs.MsgUnknownFunction, functionABI.Name)
-	}
-
-	contractAddress, err := ethtypes.NewAddress(tx.ContractInfo.ContractAddress)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	params, err := handler.ValidateParams(ctx, &domainConfig, tx.FunctionParamsJson)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	signature, err := abi.SolidityStringCtx(ctx)
-	if err == nil && tx.FunctionSignature != signature {
-		err = i18n.NewError(ctx, msgs.MsgUnexpectedFunctionSignature, functionABI.Name, signature, tx.FunctionSignature)
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return &types.ParsedTransaction{
-		Transaction:     tx,
-		FunctionABI:     &functionABI,
-		ContractAddress: contractAddress,
-		DomainConfig:    &domainConfig,
-		Params:          params,
-	}, handler, nil
-}
-
 func validateTransactionCommon[T any](
 	ctx context.Context,
 	tx *prototk.TransactionSpecification,
@@ -591,7 +545,7 @@ func validateTransactionCommon[T any](
 		return nil, zero, err
 	}
 
-	var domainConfig *types.NotoParsedConfig
+	var domainConfig types.NotoParsedConfig
 	err = json.Unmarshal([]byte(tx.ContractInfo.ContractConfigJson), &domainConfig)
 	if err != nil {
 		var zero T
@@ -606,7 +560,7 @@ func validateTransactionCommon[T any](
 		return nil, zero, i18n.NewError(ctx, msgs.MsgUnknownFunction, functionABI.Name)
 	}
 
-	// check if the handler implements the ValidateParams method
+	// check if the handler implements the ValidateParams method cause generic T
 	validator, ok := any(handler).(interface {
 		ValidateParams(ctx context.Context, domainConfig *types.NotoParsedConfig, paramsJson string) (any, error)
 	})
@@ -615,31 +569,50 @@ func validateTransactionCommon[T any](
 		return nil, zero, i18n.NewError(ctx, msgs.MsgErrorHandlerImplementationNotFound)
 	}
 
-	params, err := validator.ValidateParams(ctx, domainConfig, tx.FunctionParamsJson)
+	params, err := validator.ValidateParams(ctx, &domainConfig, tx.FunctionParamsJson)
 	if err != nil {
 		var zero T
-		return nil, zero, i18n.NewError(ctx, msgs.MsgErrorValidateFuncParams, err)
+		return nil, zero, err
 	}
 
-	signature := abi.SolString()
-	if tx.FunctionSignature != signature {
+	signature, err := abi.SolidityStringCtx(ctx)
+	if err == nil && tx.FunctionSignature != signature {
+		err = i18n.NewError(ctx, msgs.MsgUnexpectedFunctionSignature, functionABI.Name, signature, tx.FunctionSignature)
+	}
+	if err != nil {
 		var zero T
-		return nil, zero, i18n.NewError(ctx, msgs.MsgUnexpectedFuncSignature, functionABI.Name, signature, tx.FunctionSignature)
+		return nil, zero, err
 	}
 
 	contractAddress, err := ethtypes.NewAddress(tx.ContractInfo.ContractAddress)
 	if err != nil {
 		var zero T
-		return nil, zero, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
+		return nil, zero, err
 	}
 
 	return &types.ParsedTransaction{
 		Transaction:     tx,
 		FunctionABI:     &functionABI,
 		ContractAddress: contractAddress,
-		DomainConfig:    domainConfig,
+		DomainConfig:    &domainConfig,
 		Params:          params,
 	}, handler, nil
+}
+
+func (n *Noto) validateTransaction(ctx context.Context, tx *prototk.TransactionSpecification) (*types.ParsedTransaction, types.DomainHandler, error) {
+	return validateTransactionCommon(
+		ctx,
+		tx,
+		n.GetHandler,
+	)
+}
+
+func (n *Noto) validateCall(ctx context.Context, call *prototk.TransactionSpecification) (*types.ParsedTransaction, types.DomainCallHandler, error) {
+	return validateTransactionCommon(
+		ctx,
+		call,
+		n.GetCallHandler,
+	)
 }
 
 func (n *Noto) ethAddressVerifiers(lookups ...string) []*prototk.ResolveVerifierRequest {
