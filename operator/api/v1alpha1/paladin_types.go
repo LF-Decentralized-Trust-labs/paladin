@@ -1,5 +1,5 @@
 /*
-Copyright 2024.
+Copyright 2025.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -60,6 +60,9 @@ type PaladinSpec struct {
 	// A list of registries to merge into the configuration, and rebuild the config of paladin when this list changes
 	Registries []RegistryReference `json:"registries"`
 
+	// A list of pluggable signing modules to merge into the configuration, and rebuild the config of paladin when this list changes
+	SigningModules []SigningModuleConfig `json:"signingModules,omitempty"`
+
 	// Transports are configured individually on each node, as they reference security details specific to that node
 	Transports []TransportConfig `json:"transports"`
 }
@@ -101,6 +104,14 @@ type LabelReference struct {
 	// Label selectors provide a flexible many-to-many mapping between nodes and domains in a namespace.
 	// The domain CRs you reference must be labelled to match. For example you could use a label like "paladin.io/domain-name" to select by name.
 	LabelSelector metav1.LabelSelector `json:"labelSelector"`
+}
+
+type SigningModuleConfig struct {
+	Name string `json:"name"`
+	// Plugin configuration for loading the signing module
+	Plugin PluginConfig `json:"plugin"`
+	// JSON configuration specific to the individual signing module.
+	ConfigJSON string `json:"configJSON"`
 }
 
 type TransportConfig struct {
@@ -181,6 +192,10 @@ type SecretBackedSigner struct {
 	// rules first on key matching and more generic rules (like the default of ".*") last.
 	// +kubebuilder:default=.*
 	KeySelector string `json:"keySelector"`
+	// To instruct the key selector to behave in a non-matching mode whereby wallet selection applies when the
+	// key identifier DOES NOT match against the given regular expression for the key selector.
+	// +kubebuilder:default=false
+	KeySelectorMustNotMatch bool `json:"keySelectorMustNotMatch"`
 }
 
 type AuthType string

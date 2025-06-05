@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -19,7 +19,8 @@ import "github.com/kaleido-io/paladin/config/pkg/confutil"
 
 type KeyManagerConfig struct {
 	KeyManagerManagerConfig `json:"keyManager"`
-	Wallets                 []*WalletConfig `json:"wallets"` // ordered list
+	SigningModules          map[string]*SigningModuleConfig `json:"signingModules"`
+	Wallets                 []*WalletConfig                 `json:"wallets"` // ordered list
 }
 
 type KeyManagerManagerConfig struct {
@@ -27,20 +28,34 @@ type KeyManagerManagerConfig struct {
 	VerifierCache   CacheConfig `json:"verifierCache"`
 }
 
+type SigningModuleConfig struct {
+	Init   SigningModuleInitConfig `json:"init"`
+	Plugin PluginConfig            `json:"plugin"`
+	Config map[string]any          `json:"config"`
+}
+
+type SigningModuleInitConfig struct {
+	Retry RetryConfig `json:"retry"`
+}
+
 type WalletConfig struct {
-	Name        string        `json:"name"`
-	KeySelector string        `json:"keySelector"`
-	SignerType  string        `json:"signerType"`
-	Signer      *SignerConfig `json:"signer"` // embedded only
+	Name                    string        `json:"name"`
+	KeySelector             string        `json:"keySelector"`             // Regex pattern conforming to https://golang.org/s/re2syntax
+	KeySelectorMustNotMatch bool          `json:"keySelectorMustNotMatch"` // To allow for specifying a non-matching regex i.e. all keys that aren't this pattern
+	Signer                  *SignerConfig `json:"signer"`                  // embedded only
+	SignerPluginName        string        `json:"signerPluginName"`
+	SignerType              string        `json:"signerType"`
 }
 
 const (
 	WalletSignerTypeEmbedded string = "embedded"
+	WalletSignerTypePlugin   string = "plugin"
 )
 
 var WalletDefaults = &WalletConfig{
-	KeySelector: `.*`,                     // catch-all
-	SignerType:  WalletSignerTypeEmbedded, // uses the embedded signing module running in the Paladin process
+	KeySelector:             `.*`, // catch-all
+	KeySelectorMustNotMatch: false,
+	SignerType:              WalletSignerTypeEmbedded, // uses the embedded signing module running in the Paladin process
 }
 
 var KeyManagerDefaults = &KeyManagerConfig{

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -63,6 +63,7 @@ type testManagers struct {
 	testDomainManager    *testDomainManager
 	testTransportManager *testTransportManager
 	testRegistryManager  *testRegistryManager
+	testKeyManager       *testKeyManager
 }
 
 func (tm *testManagers) componentMocks(t *testing.T) *componentmocks.AllComponents {
@@ -79,6 +80,10 @@ func (tm *testManagers) componentMocks(t *testing.T) *componentmocks.AllComponen
 		tm.testRegistryManager = &testRegistryManager{}
 	}
 	mc.On("RegistryManager").Return(tm.testRegistryManager.mock(t)).Maybe()
+	if tm.testKeyManager == nil {
+		tm.testKeyManager = &testKeyManager{}
+	}
+	mc.On("KeyManager").Return(tm.testKeyManager.mock(t)).Maybe()
 	return mc
 }
 
@@ -87,11 +92,14 @@ func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
 	for name, td := range ts.testDomainManager.domains {
 		testPlugins[name] = td
 	}
-	for name, td := range ts.testTransportManager.transports {
-		testPlugins[name] = td
+	for name, tt := range ts.testTransportManager.transports {
+		testPlugins[name] = tt
 	}
-	for name, td := range ts.testRegistryManager.registries {
-		testPlugins[name] = td
+	for name, tr := range ts.testRegistryManager.registries {
+		testPlugins[name] = tr
+	}
+	for name, tsm := range ts.testKeyManager.signingModules {
+		testPlugins[name] = tsm
 	}
 	return testPlugins
 }

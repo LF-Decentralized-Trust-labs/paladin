@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -18,9 +18,13 @@ package components
 import (
 	"context"
 
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 )
 
@@ -28,8 +32,18 @@ type KeyResolver interface {
 	ResolveKey(ctx context.Context, identifier, algorithm, verifierType string) (mapping *pldapi.KeyMappingAndVerifier, err error)
 }
 
+type KeyManagerToSigningModule interface {
+	plugintk.SigningModuleAPI
+	Initialized()
+}
+
 type KeyManager interface {
 	ManagerLifecycle
+
+	// plugin signing modules management
+	ConfiguredSigningModules() map[string]*pldconf.PluginConfig
+	GetSigningModule(ctx context.Context, name string) (signer.SigningModule, error)
+	SigningModuleRegistered(name string, id uuid.UUID, toSigningModule KeyManagerToSigningModule) (fromSigningModule plugintk.SigningModuleCallbacks, err error)
 
 	// Note resolving a key is a persistent activity that requires a database transaction to be managed by the caller.
 	// To avoid deadlock when resolving multiple keys in the same DB transaction, the caller is responsible for using the same

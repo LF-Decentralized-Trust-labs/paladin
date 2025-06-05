@@ -1,5 +1,5 @@
 /*
-Copyright 2024.
+Copyright 2025.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -120,6 +120,16 @@ var _ = Describe("Paladin Controller", func() {
 										},
 									},
 								},
+							},
+						},
+						SigningModules: []corev1alpha1.SigningModuleConfig{
+							{
+								Name: "sm",
+								Plugin: corev1alpha1.PluginConfig{
+									Type:    "c-shared",
+									Library: "/app/signingmodules/libsm.so",
+								},
+								ConfigJSON: `{"url": "http://smendpoint"}`,
 							},
 						},
 					},
