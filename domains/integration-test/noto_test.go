@@ -121,6 +121,10 @@ func (s *notoTestSuite) TestNoto() {
 	assert.Equal(t, int64(100), coins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, notaryKey.Verifier.Verifier, coins[0].Data.Owner.String())
 
+	// check balance
+	balanceOfResult := noto.BalanceOf(ctx, &types.BalanceOfParam{Account: notaryName}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "100", balanceOfResult["totalBalance"].(string), "Balance of notary should be 100")
+
 	log.L(ctx).Infof("Attempt mint from non-notary (should fail)")
 	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
@@ -178,6 +182,12 @@ func (s *notoTestSuite) TestNoto() {
 	require.NoError(t, err)
 	require.Len(t, coins, 2)
 
+	balanceOfResult = noto.BalanceOf(ctx, &types.BalanceOfParam{Account: notaryName}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "50", balanceOfResult["totalBalance"].(string), "Balance of notary should be 50")
+
+	balanceOfResult = noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient1Name}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "50", balanceOfResult["totalBalance"].(string), "Balance of recipient1 should be 50")
+
 	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient1Key.Verifier.Verifier, coins[0].Data.Owner.String())
 	assert.Equal(t, int64(50), coins[1].Data.Amount.Int().Int64())
@@ -207,6 +217,12 @@ func (s *notoTestSuite) TestNoto() {
 	assert.Equal(t, int64(50), coins[1].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[1].Data.Owner.String())
 
+	balanceOfResult = noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient1Name}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "0", balanceOfResult["totalBalance"].(string), "Balance of recipient1 should be 0")
+
+	balanceOfResult = noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient2Name}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "50", balanceOfResult["totalBalance"].(string), "Balance of recipient2 should be 50")
+
 	log.L(ctx).Infof("Burn 25 from recipient2")
 	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
@@ -224,6 +240,9 @@ func (s *notoTestSuite) TestNoto() {
 	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.NoError(t, err)
 	require.Len(t, coins, 2)
+
+	balanceOfResult = noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient2Name}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "25", balanceOfResult["totalBalance"].(string), "Balance of recipient should be 25")
 
 	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, notaryKey.Verifier.Verifier, coins[0].Data.Owner.String())
@@ -379,6 +398,9 @@ func (s *notoTestSuite) TestNotoLock() {
 	}, true)
 	require.NoError(t, rpcerr)
 
+	balanceOfResult := noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient1Name}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "50", balanceOfResult["totalBalance"].(string), "Balance of recipient should be 50")
+
 	var lockReceipt types.NotoDomainReceipt
 	err = json.Unmarshal(invokeResult.DomainReceipt, &lockReceipt)
 	require.NoError(t, err)
@@ -408,6 +430,9 @@ func (s *notoTestSuite) TestNotoLock() {
 		ABI: types.NotoABI,
 	}, true)
 	require.NoError(t, rpcerr)
+
+	balanceOfResult = noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient1Name}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "0", balanceOfResult["totalBalance"].(string), "Balance of recipient should be 0")
 
 	lockedCoins = findAvailableCoins[types.NotoLockedCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
 	require.Len(t, lockedCoins, 1)
@@ -469,6 +494,9 @@ func (s *notoTestSuite) TestNotoLock() {
 		Send().
 		Wait(3 * time.Second)
 	require.NoError(t, tx.Error())
+
+	balanceOfResult = noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient2Name}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "100", balanceOfResult["totalBalance"].(string), "Balance of recipient should be 100")
 
 	findAvailableCoins(t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), "pstate_queryContractStates", noto.Address, nil, func(coins []*types.NotoLockedCoinState) bool {
 		return len(coins) == 0

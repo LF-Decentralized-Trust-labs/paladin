@@ -96,6 +96,7 @@ var NotoTransactionDataABI_V0 = &abi.ParameterArray{
 }
 
 type DomainHandler = domain.DomainHandler[NotoParsedConfig]
+type DomainCallHandler = domain.DomainCallHandler[NotoParsedConfig]
 type ParsedTransaction = domain.ParsedTransaction[NotoParsedConfig]
 
 const (

@@ -673,12 +673,6 @@ func TestUnimplementedMethods(t *testing.T) {
 
 	_, err = n.ValidateStateHashes(ctx, nil)
 	assert.ErrorContains(t, err, "PD200022")
-
-	_, err = n.InitCall(ctx, nil)
-	assert.ErrorContains(t, err, "PD200022")
-
-	_, err = n.ExecCall(ctx, nil)
-	assert.ErrorContains(t, err, "PD200022")
 }
 
 func TestDecodeConfigInvalid(t *testing.T) {
