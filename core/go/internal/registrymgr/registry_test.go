@@ -304,6 +304,74 @@ func TestUpsertRegistryRecordsRealDBok(t *testing.T) {
 	require.Equal(t, rootEntry2Props2.Value, propsMap[rootEntry2Props2.Name])
 }
 
+func TestUpsertRegistryRecordsRealDBNameIsUniqueScopedToParentId(t *testing.T) {
+	ctx, _, tp, _, done := newTestRegistry(t, true)
+	defer done()
+
+	// r, err := rm.GetRegistry(ctx, "test1")
+	// require.NoError(t, err)
+
+	// Insert a root entry
+	rootId1 := randID()
+	rootId2 := randID()
+	parentId := randID()
+	rootEntry1 := &prototk.RegistryEntry{Id: rootId1, Name: "entry1", Location: randChainInfo(), Active: true, ParentId: parentId}
+	rootEntry1SysProp := newSystemPropFor(rootEntry1.Id, "$owner", pldtypes.RandAddress().String())
+	rootEntry1Props1 := randPropFor(rootEntry1.Id)
+	rootEntry2 := &prototk.RegistryEntry{Id: rootId2, Name: "entry1", Location: randChainInfo(), Active: true, ParentId: parentId}
+	rootEntry2Props1 := randPropFor(rootEntry2.Id)
+	rootEntry2Props2 := randPropFor(rootEntry2.Id)
+	upsert1 := &prototk.UpsertRegistryRecordsRequest{
+		Entries:    []*prototk.RegistryEntry{rootEntry1, rootEntry2},
+		Properties: []*prototk.RegistryProperty{rootEntry1Props1, rootEntry2Props1, rootEntry2Props2, rootEntry1SysProp},
+	}
+
+	// Upsert first entry
+	res, err := tp.r.UpsertRegistryRecords(ctx, upsert1)
+	require.Error(t, err)
+	assert.Nil(t, res)
+	require.Error(t, err)
+	//Observed error messages:
+	//Postgres: "ERROR: duplicate key value violates unique constraint "reg_entries_name" (SQLSTATE 23505)"
+	//          "ERROR: insert or update on table \"reg_entries\" violates foreign key constraint \"reg_entries_registry_parent_id_fkey\"
+	//SQLite: "UNIQUE constraint failed: index 'reg_entries_name"
+	//pass as long as it mentions the table and a constraint
+	assert.Regexp(t, ".*constraint.*", err)
+	assert.Regexp(t, ".*reg_entries.*", err)
+}
+
+func TestUpsertRegistryRecordsRealDBpreventsTwoRootEntries(t *testing.T) {
+	ctx, _, tp, _, done := newTestRegistry(t, true)
+	defer done()
+
+	// r, err := rm.GetRegistry(ctx, "test1")
+	// require.NoError(t, err)
+
+	// Insert a root entry
+	rootId1 := randID()
+	rootId2 := randID()
+	rootEntry1 := &prototk.RegistryEntry{Id: rootId1, Name: "entry1", Location: randChainInfo(), Active: true}
+	rootEntry1SysProp := newSystemPropFor(rootEntry1.Id, "$owner", pldtypes.RandAddress().String())
+	rootEntry1Props1 := randPropFor(rootEntry1.Id)
+	rootEntry2 := &prototk.RegistryEntry{Id: rootId2, Name: "entry1", Location: randChainInfo(), Active: true}
+	rootEntry2Props1 := randPropFor(rootEntry2.Id)
+	rootEntry2Props2 := randPropFor(rootEntry2.Id)
+	upsert1 := &prototk.UpsertRegistryRecordsRequest{
+		Entries:    []*prototk.RegistryEntry{rootEntry1, rootEntry2},
+		Properties: []*prototk.RegistryProperty{rootEntry1Props1, rootEntry2Props1, rootEntry2Props2, rootEntry1SysProp},
+	}
+
+	// Upsert first entry
+	res, err := tp.r.UpsertRegistryRecords(ctx, upsert1)
+	require.Error(t, err)
+	assert.Nil(t, res)
+	require.Error(t, err)
+	//Observed error messages:
+	//Postgres: "ERROR: duplicate key value violates unique constraint "reg_entries_name" (SQLSTATE 23505)"
+	//SQLite: "UNIQUE constraint failed: index 'reg_entries_name"
+	assert.Regexp(t, ".*constraint.*reg_entries_name.*", err)
+}
+
 func TestUpsertRegistryRecordsInsertBadID(t *testing.T) {
 	ctx, _, tp, m, done := newTestRegistry(t, false)
 	defer done()
