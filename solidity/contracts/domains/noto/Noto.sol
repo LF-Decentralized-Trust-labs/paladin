@@ -32,6 +32,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
     mapping(bytes32 => bool) private _locked;
     mapping(bytes32 => bytes32) private _unlockHashes; // state ID => unlock hash
     mapping(bytes32 => address) private _unlockDelegates; // unlock hash => delegate
+    mapping(bytes32 => bool) private _txids;
 
     // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
     bytes4 public constant NotoConfigID_V0 = 0x00010000;
@@ -59,6 +60,14 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
 
     modifier onlyNotary() {
         requireNotary(msg.sender);
+        _;
+    }
+
+    modifier txIdNotUsed(bytes32 txId) {
+        if (_txids[txId]) {
+            revert NotoDuplicateTransaction(txId);
+        }
+        _txids[txId] = true;
         _;
     }
 
@@ -153,12 +162,13 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
      * Emits a {UTXOTransfer} event.
      */
     function transfer(
+        bytes32 txId,
         bytes32[] calldata inputs,
         bytes32[] calldata outputs,
         bytes calldata signature,
         bytes calldata data
     ) external virtual onlyNotary {
-        _transfer(inputs, outputs, signature, data);
+        _transfer(txId, inputs, outputs, signature, data);
     }
 
     /**
@@ -166,23 +176,25 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
      *      to transfer(), but both methods can be overriden to provide different constraints.
      */
     function mint(
+        bytes32 txId,
         bytes32[] calldata outputs,
         bytes calldata signature,
         bytes calldata data
     ) external virtual onlyNotary {
         bytes32[] memory inputs;
-        _transfer(inputs, outputs, signature, data);
+        _transfer(txId, inputs, outputs, signature, data);
     }
 
     function _transfer(
+        bytes32 txId,
         bytes32[] memory inputs,
         bytes32[] memory outputs,
         bytes calldata signature,
         bytes calldata data
-    ) internal {
+    ) internal txIdNotUsed(txId) {
         _processInputs(inputs);
         _processOutputs(outputs);
-        emit NotoTransfer(inputs, outputs, signature, data);
+        emit NotoTransfer(txId, inputs, outputs, signature, data);
     }
 
     /**
@@ -227,13 +239,14 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
      * Emits a {NotoApproved} event.
      */
     function approveTransfer(
+        bytes32 txId,
         address delegate,
         bytes32 txhash,
         bytes calldata signature,
         bytes calldata data
-    ) external virtual onlyNotary {
+    ) external virtual onlyNotary txIdNotUsed(txId) {
         _approvals[txhash] = delegate;
-        emit NotoApproved(delegate, txhash, signature, data);
+        emit NotoApproved(txId, delegate, txhash, signature, data);
     }
 
     /**
@@ -247,6 +260,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
      * Emits a {NotoTransfer} event.
      */
     function transferWithApproval(
+        bytes32 txId,
         bytes32[] calldata inputs,
         bytes32[] calldata outputs,
         bytes calldata signature,
@@ -257,7 +271,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
             revert NotoInvalidDelegate(txhash, _approvals[txhash], msg.sender);
         }
 
-        _transfer(inputs, outputs, signature, data);
+        _transfer(txId, inputs, outputs, signature, data);
 
         delete _approvals[txhash];
     }
@@ -309,16 +323,17 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
      * Emits a {NotoLock} event.
      */
     function lock(
+        bytes32 txId,
         bytes32[] calldata inputs,
         bytes32[] calldata outputs,
         bytes32[] calldata lockedOutputs,
         bytes calldata signature,
         bytes calldata data
-    ) public virtual override onlyNotary {
+    ) public virtual override onlyNotary txIdNotUsed(txId) {
         _processInputs(inputs);
         _processOutputs(outputs);
         _processLockedOutputs(lockedOutputs);
-        emit NotoLock(inputs, outputs, lockedOutputs, signature, data);
+        emit NotoLock(txId, inputs, outputs, lockedOutputs, signature, data);
     }
 
     /**
@@ -335,12 +350,13 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
      * Emits a {NotoUnlock} event.
      */
     function unlock(
+        bytes32 txId,
         bytes32[] calldata lockedInputs,
         bytes32[] calldata lockedOutputs,
         bytes32[] calldata outputs,
         bytes calldata signature,
         bytes calldata data
-    ) external virtual override {
+    ) external virtual override txIdNotUsed(txId) {
         bytes32 expectedHash;
         if (lockedInputs.length > 0) {
             expectedHash = _unlockHashes[lockedInputs[0]];
@@ -378,6 +394,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         _processOutputs(outputs);
 
         emit NotoUnlock(
+            txId,
             msg.sender,
             lockedInputs,
             lockedOutputs,
@@ -399,11 +416,12 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
      * Emits a {NotoUnlockPrepared} event.
      */
     function prepareUnlock(
+        bytes32 txId,
         bytes32[] calldata lockedInputs,
         bytes32 unlockHash,
         bytes calldata signature,
         bytes calldata data
-    ) external virtual override onlyNotary {
+    ) external virtual override onlyNotary txIdNotUsed(txId) {
         if (_unlockDelegates[unlockHash] != address(0)) {
             revert NotoAlreadyPrepared(unlockHash);
         }
@@ -411,7 +429,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         for (uint256 i = 0; i < lockedInputs.length; ++i) {
             _unlockHashes[lockedInputs[i]] = unlockHash;
         }
-        emit NotoUnlockPrepared(lockedInputs, unlockHash, signature, data);
+        emit NotoUnlockPrepared(txId, lockedInputs, unlockHash, signature, data);
     }
 
     /**
@@ -426,11 +444,12 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
      * Emits a {NotoLockDelegated} event.
      */
     function delegateLock(
+        bytes32 txId,
         bytes32 unlockHash,
         address delegate,
         bytes calldata signature,
         bytes calldata data
-    ) external virtual {
+    ) external virtual txIdNotUsed(txId) {
         address currentDelegate = _unlockDelegates[unlockHash];
         if (currentDelegate == address(0)) {
             requireNotary(msg.sender);
@@ -438,7 +457,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
             requireLockDelegate(unlockHash, msg.sender);
         }
         _unlockDelegates[unlockHash] = delegate;
-        emit NotoLockDelegated(unlockHash, delegate, signature, data);
+        emit NotoLockDelegated(txId, unlockHash, delegate, signature, data);
     }
 
     /**
