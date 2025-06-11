@@ -3531,10 +3531,13 @@
 
 
 <h1 id="hello-world-with-paladin">Hello World with Paladin<a class="headerlink" href="#hello-world-with-paladin" title="Permanent link">&para;</a></h1>
-<p>This tutorial walks you through deploying and interacting with a simple <code>HelloWorld</code> smart contract using the Paladin SDK. The example demonstrates how to:
-1. Deploy the contract,
-2. Interact with it by calling its <code>sayHello</code> function,
-3. Retrieve and verify the emitted event.</p>
+<p>This tutorial walks you through deploying and interacting with a simple <code>HelloWorld</code> smart contract using the Paladin SDK. The example demonstrates how to:</p>
+<ol>
+<li>Deploy the contract,</li>
+<li>Interact with it by calling its <code>sayHello</code> function,</li>
+<li>Retrieve and verify the emitted event.</li>
+</ol>
+<p>This tutorial demonstrates how traditional, non-private Ethereum smart contract interactions can be achieved via a Paladin node and its transaction manager. Later tutorials will demonstrate how to make use of more advanced features of the Paladin APIs.</p>
 <hr />
 <h2 id="running-the-example">Running the Example<a class="headerlink" href="#running-the-example" title="Permanent link">&para;</a></h2>
 <p>The example code can be found in the <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/helloworld">Paladin example repository</a>.</p>
@@ -3542,12 +3545,16 @@
 <p>Follow the <a href="../../getting-started/installation/">Getting Started</a> instructions to set up a Paladin environment. Then, follow the example <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/helloworld/README.md">README</a> to run the code.</p>
 <hr />
 <h3 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h3>
-<p>We have a <code>HelloWorld</code> smart contract, which:
-- Emits a "welcome" message as an event when its <code>sayHello</code> function is called.</p>
+<p>We have a <code>HelloWorld</code> smart contract, which:</p>
+<ul>
+<li>Emits a "welcome" message as an event when its <code>sayHello</code> function is called.</li>
+</ul>
 <h3 id="key-artifacts">Key Artifacts<a class="headerlink" href="#key-artifacts" title="Permanent link">&para;</a></h3>
-<p>To deploy and interact with the contract, we use:
-1. <strong>ABI</strong>: Describes the contract's interface, including its functions and events.
-2. <strong>Bytecode</strong>: The compiled contract code.</p>
+<p>To deploy and interact with the contract, we use:</p>
+<ol>
+<li><strong>ABI</strong>: Describes the contract's interface, including its functions and events.</li>
+<li><strong>Bytecode</strong>: The compiled contract code.</li>
+</ol>
 <p>These are pre-compiled and provided in the <code>helloWorldJson</code> object.</p>
 <hr />
 <p>To address the PR comment and clarify the differences between <strong>contract deployment</strong> and <strong>function invocation</strong>, here’s a revised version of the tutorial with an explicit callout:</p>
@@ -3574,12 +3581,19 @@
 </ul>
 <hr />
 <h3 id="step-2-confirm-the-deployment">Step 2: Confirm the Deployment<a class="headerlink" href="#step-2-confirm-the-deployment" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">deploymentReceipt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">pollForReceipt</span><span class="p">(</span><span class="nx">deploymentTxID</span><span class="p">,</span><span class="w"> </span><span class="mf">10000</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">);</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">deploymentReceipt</span><span class="o">?</span><span class="p">.</span><span class="nx">contractAddress</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s2">&quot;Deployment failed!&quot;</span><span class="p">);</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">}</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;Contract deployed successfully at address:&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">deploymentReceipt</span><span class="p">.</span><span class="nx">contractAddress</span><span class="p">);</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">deploymentReceipt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">pollForReceipt</span><span class="p">(</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nx">deploymentTxID</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="mf">10000</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="kc">true</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">);</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">deploymentReceipt</span><span class="o">?</span><span class="p">.</span><span class="nx">contractAddress</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s2">&quot;Deployment failed!&quot;</span><span class="p">);</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">}</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="s2">&quot;Contract deployed successfully at address:&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="nx">deploymentReceipt</span><span class="p">.</span><span class="nx">contractAddress</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="p">);</span>
 </code></pre></div>
 <h4 id="what-happens_1">What happens:<a class="headerlink" href="#what-happens_1" title="Permanent link">&para;</a></h4>
 <ul>
@@ -3628,7 +3642,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">decodeTransactionEvents</span><span class="p">(</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nx">functionReceipt</span><span class="p">.</span><span class="nx">transactionHash</span><span class="p">,</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nx">helloWorldJson</span><span class="p">.</span><span class="nx">abi</span><span class="p">,</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="s2">&quot;pretty=true&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="s2">&quot;pretty=true&quot;</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="p">);</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">events</span><span class="p">[</span><span class="mf">0</span><span class="p">].</span><span class="nx">data</span><span class="p">[</span><span class="s2">&quot;message&quot;</span><span class="p">]);</span>
@@ -3639,11 +3653,13 @@
 </ul>
 <hr />
 <h2 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h2>
-<p>Congratulations! You've successfully:
-1. Deployed the <code>HelloWorld</code> contract,
-2. Called its <code>sayHello</code> function,
-3. Retrieved and validated the emitted event.</p>
-<p>This simple example demonstrates how to interact with smart contracts using the Paladin SDK. </p>
+<p>Congratulations! You've successfully:</p>
+<ol>
+<li>Deployed the <code>HelloWorld</code> contract,</li>
+<li>Called its <code>sayHello</code> function,</li>
+<li>Retrieved and validated the emitted event.</li>
+</ol>
+<p>This simple example demonstrates how to interact with smart contracts using the Paladin SDK.</p>
 <hr />
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <p>Now that you’ve deployed and interacted with the <code>HelloWorld</code> contract, you’re ready to explore more complex interactions with smart contracts. In the next tutorial, we will introduce you to a <strong>Storage</strong> contract where you will write and read from from the blockchain!</p>
