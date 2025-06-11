@@ -1,0 +1,3 @@
+## Transaction
+
+A Transaction is the state machine related to a coordinator's view of a transaction. This may be a transaction that the coordinator node also happens to be the sender for or may be the case that the transaction was delegated by another node.  Either way, if a transaction is currently being coordinated by a node, then that node will have an in-memory instance of a `Transaction` object to track the status of that transaction.
