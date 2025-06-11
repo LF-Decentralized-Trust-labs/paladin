@@ -3599,6 +3599,13 @@
 <li><strong>Interacting with the contract</strong> – Members will <strong>store and retrieve values</strong> securely.</li>
 <li><strong>Testing unauthorized access</strong> – A non-member (Node3) will attempt to retrieve data, demonstrating <strong>privacy enforcement</strong>.</li>
 </ol>
+<p>There is a second example (<code>update.js</code>) in the privacy storage example folder which does the following:</p>
+<ol>
+<li><strong>Attaches to an existing privacy group and private storage smart contract</strong></li>
+<li><strong>Reads the value of the existing smart contract, then adds a new random number to it</strong></li>
+<li><strong>Writes the newly update value to the smart contract</strong></li>
+</ol>
+<p>You can use this second example to learn about using resuming use of existing privacy groups and contracts.</p>
 <p>The <strong>full example</strong> code is available in the <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/private-storage">Paladin example repository</a>.</p>
 <hr />
 <h2 id="step-1-create-a-privacy-group">Step 1: Create a Privacy Group<a class="headerlink" href="#step-1-create-a-privacy-group" title="Permanent link">&para;</a></h2>
@@ -3619,9 +3626,9 @@
 </code></pre></div>
 <h4 id="key-points">Key Points:<a class="headerlink" href="#key-points" title="Permanent link">&para;</a></h4>
 <ol>
-<li>The <strong>privacy group</strong> consists of <strong>Node1 and Node2</strong>.  </li>
-<li>Transactions within this group will <strong>only be visible</strong> to these members.  </li>
-<li><strong>Node3 is excluded</strong>, meaning it <strong>won’t have access</strong> to private transactions.  </li>
+<li>The <strong>privacy group</strong> consists of <strong>Node1 and Node2</strong>.</li>
+<li>Transactions within this group will <strong>only be visible</strong> to these members.</li>
+<li><strong>Node3 is excluded</strong>, meaning it <strong>won’t have access</strong> to private transactions.</li>
 </ol>
 <hr />
 <h2 id="step-2-deploy-the-contract-in-the-privacy-group">Step 2: Deploy the Contract in the Privacy Group<a class="headerlink" href="#step-2-deploy-the-contract-in-the-privacy-group" title="Permanent link">&para;</a></h2>
@@ -3630,7 +3637,7 @@
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">contractAddress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">memberPrivacyGroup</span><span class="p">.</span><span class="nx">deploy</span><span class="p">({</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nx">abi</span><span class="o">:</span><span class="w"> </span><span class="kt">storageJson.abi</span><span class="p">,</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nx">bytecode</span><span class="o">:</span><span class="w"> </span><span class="kt">storageJson.bytecode</span><span class="p">,</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">verifierNode1.lookup</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">verifierNode1.lookup</span><span class="p">,</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">});</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">contractAddress</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -3641,8 +3648,8 @@
 </code></pre></div>
 <h4 id="key-points_1">Key Points<a class="headerlink" href="#key-points_1" title="Permanent link">&para;</a></h4>
 <ol>
-<li>The contract is deployed <strong>inside the privacy group</strong>, meaning <strong>only group members</strong> can interact with it.  </li>
-<li><strong>Transactions involving this contract are private</strong> and only visible to <strong>Node1 &amp; Node2</strong>.  </li>
+<li>The contract is deployed <strong>inside the privacy group</strong>, meaning <strong>only group members</strong> can interact with it.</li>
+<li><strong>Transactions involving this contract are private</strong> and only visible to <strong>Node1 &amp; Node2</strong>.</li>
 </ol>
 <hr />
 <h2 id="step-3-store-and-retrieve-values-as-group-members">Step 3: Store and Retrieve Values as Group Members<a class="headerlink" href="#step-3-store-and-retrieve-values-as-group-members" title="Permanent link">&para;</a></h2>
@@ -3655,9 +3662,12 @@
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="kd">const</span><span class="w"> </span><span class="nx">storeTx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">privateStorageContract</span><span class="p">.</span><span class="nx">sendTransaction</span><span class="p">({</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">verifierNode1.lookup</span><span class="p">,</span>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="kd">function</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;store&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">num</span><span class="o">:</span><span class="w"> </span><span class="kt">valueToStore</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">num</span><span class="o">:</span><span class="w"> </span><span class="kt">valueToStore</span><span class="w"> </span><span class="p">},</span>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">});</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;Value stored successfully! Transaction hash:&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">storeTx</span><span class="o">?</span><span class="p">.</span><span class="nx">transactionHash</span><span class="p">);</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">  </span><span class="s2">&quot;Value stored successfully! Transaction hash:&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">  </span><span class="nx">storeTx</span><span class="o">?</span><span class="p">.</span><span class="nx">transactionHash</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="p">);</span>
 </code></pre></div>
 <hr />
 <h3 id="retrieving-the-stored-value">Retrieving the Stored Value<a class="headerlink" href="#retrieving-the-stored-value" title="Permanent link">&para;</a></h3>
@@ -3665,46 +3675,55 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// Retrieve the value as Node1</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;Node1 retrieving the value from the contract...&quot;</span><span class="p">);</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">retrievedValueNode1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">privateStorageContract</span><span class="p">.</span><span class="nx">call</span><span class="p">({</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">verifierNode1.lookup</span><span class="p">,</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="kd">function</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;retrieve&quot;</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">);</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;Node1 retrieved the value successfully:&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">retrievedValueNode1</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]);</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1">// Retrieve the value as Node2</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;Node2 retrieving the value from the contract...&quot;</span><span class="p">);</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="kd">const</span><span class="w"> </span><span class="nx">retrievedValueNode2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">privateStorageContract</span>
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">  </span><span class="p">.</span><span class="nx">using</span><span class="p">(</span><span class="nx">paladinNode2</span><span class="p">)</span>
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">  </span><span class="p">.</span><span class="nx">call</span><span class="p">({</span>
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">    </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">verifierNode2.lookup</span><span class="p">,</span>
-<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">    </span><span class="kd">function</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;retrieve&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">  </span><span class="p">});</span>
-<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;Node2 retrieved the value successfully:&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">retrievedValueNode2</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]);</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">verifierNode1.lookup</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="kd">function</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;retrieve&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">});</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="s2">&quot;Node1 retrieved the value successfully:&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nx">retrievedValueNode1</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p">);</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="c1">// Retrieve the value as Node2</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;Node2 retrieving the value from the contract...&quot;</span><span class="p">);</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="kd">const</span><span class="w"> </span><span class="nx">retrievedValueNode2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">privateStorageContract</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">  </span><span class="p">.</span><span class="nx">using</span><span class="p">(</span><span class="nx">paladinNode2</span><span class="p">)</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">  </span><span class="p">.</span><span class="nx">call</span><span class="p">({</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">    </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">verifierNode2.lookup</span><span class="p">,</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">    </span><span class="kd">function</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;retrieve&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">  </span><span class="p">});</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">  </span><span class="s2">&quot;Node2 retrieved the value successfully:&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">  </span><span class="nx">retrievedValueNode2</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="p">);</span>
 </code></pre></div>
 <hr />
 <h2 id="step-4-verify-privacy-by-testing-unauthorized-access">Step 4: Verify Privacy by Testing Unauthorized Access<a class="headerlink" href="#step-4-verify-privacy-by-testing-unauthorized-access" title="Permanent link">&para;</a></h2>
-<p>Now, let’s test if <strong>Node3 (an outsider)</strong> can access the stored data.  </p>
+<p>Now, let’s test if <strong>Node3 (an outsider)</strong> can access the stored data.</p>
 <h3 id="what-should-happen"><strong>What should happen?</strong><a class="headerlink" href="#what-should-happen" title="Permanent link">&para;</a></h3>
-<p>Node3 should NOT be able to retrieve the stored value because it wasn’t part of the privacy group.  </p>
+<p>Node3 should NOT be able to retrieve the stored value because it wasn’t part of the privacy group.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">try</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;Node3 (outsider) attempting to retrieve the value...&quot;</span><span class="p">);</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">     </span><span class="k">await</span><span class="w"> </span><span class="nx">privateStorageContract</span><span class="p">.</span><span class="nx">using</span><span class="p">(</span><span class="nx">paladinNode3</span><span class="p">).</span><span class="nx">call</span><span class="p">({</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">      </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">verifierNode3.lookup</span><span class="p">,</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">      </span><span class="kd">function</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;retrieve&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="nx">privateStorageContract</span><span class="p">.</span><span class="nx">using</span><span class="p">(</span><span class="nx">paladinNode3</span><span class="p">).</span><span class="nx">call</span><span class="p">({</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">verifierNode3.lookup</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="kd">function</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;retrieve&quot;</span><span class="p">,</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="p">});</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s2">&quot;Node3 (outsider) should not have access to the private Storage contract!&quot;</span><span class="p">);</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">info</span><span class="p">(</span><span class="s2">&quot;Expected error - Node3 (outsider) cannot retrieve the data. Access denied.&quot;</span><span class="p">);</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="p">}</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="s2">&quot;Node3 (outsider) should not have access to the private Storage contract!&quot;</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span><span class="p">);</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">info</span><span class="p">(</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">    </span><span class="s2">&quot;Expected error - Node3 (outsider) cannot retrieve the data. Access denied.&quot;</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">  </span><span class="p">);</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="why-privacy-groups-work">Why Privacy Groups Work<a class="headerlink" href="#why-privacy-groups-work" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Private State Isolation</strong> – Transactions within a privacy group are only visible to its members.  </li>
-<li><strong>No Global State Sharing</strong> – Outsiders (e.g., Node3) never receive the transaction history, making it impossible for them to infer contract data.  </li>
-<li><strong>Selective State Distribution</strong> – Only group members can access and verify the shared state.  </li>
+<li><strong>Private State Isolation</strong> – Transactions within a privacy group are only visible to its members.</li>
+<li><strong>No Global State Sharing</strong> – Outsiders (e.g., Node3) never receive the transaction history, making it impossible for them to infer contract data.</li>
+<li><strong>Selective State Distribution</strong> – Only group members can access and verify the shared state.</li>
 </ul>
-<p>By design, <strong>Node3 does not just “lack permission” to call the contract—it lacks any knowledge of its state, history, or data, making unauthorized access fundamentally impossible</strong>.  </p>
+<p>By design, <strong>Node3 does not just “lack permission” to call the contract—it lacks any knowledge of its state, history, or data, making unauthorized access fundamentally impossible</strong>.</p>
 <h2 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h2>
 <p>Congratulations! You’ve successfully:</p>
 <ol>
