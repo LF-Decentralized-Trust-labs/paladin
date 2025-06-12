@@ -64,9 +64,10 @@ var checkPsqlScript string
 // PaladinReconciler reconciles a Paladin object
 type PaladinReconciler struct {
 	client.Client
-	config  *config.Config
-	Scheme  *runtime.Scheme
-	Changes *InFlight
+	config           *config.Config
+	Scheme           *runtime.Scheme
+	Changes          *InFlight
+	RPCClientManager *rpcClientManager
 }
 
 // allows generic functions by giving a mapping between the types and interfaces for the CR
@@ -89,6 +90,7 @@ func (r *PaladinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if errors.IsNotFound(err) {
 			// Resource not found; could have been deleted after reconcile request.
 			// Return and don't requeue.
+			r.RPCClientManager.removeNode(name)
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.

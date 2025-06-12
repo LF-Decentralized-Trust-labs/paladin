@@ -42,16 +42,18 @@ import (
 // SmartContractDeploymentReconciler reconciles a SmartContractDeployment object
 type SmartContractDeploymentReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme           *runtime.Scheme
+	RPCClientManager *rpcClientManager
 
-	checkDepsFunc               func(ctx context.Context, c client.Client, namespace string, requiredContractDeployments []string, pStatus *corev1alpha1.ContactDependenciesStatus) (bool, bool, error)
-	newTransactionReconcileFunc func(c client.Client, idempotencyKeyPrefix string, nodeName string, namespace string, pStatus *corev1alpha1.TransactionSubmission, timeout string, txFactory func() (bool, *pldapi.TransactionInput, error)) transactionReconcileInterface
+	checkDepsFunc               func(context.Context, client.Client, string, []string, *corev1alpha1.ContactDependenciesStatus) (bool, bool, error)
+	newTransactionReconcileFunc func(client.Client, *rpcClientManager, string, string, string, *corev1alpha1.TransactionSubmission, string, func() (bool, *pldapi.TransactionInput, error)) transactionReconcileInterface
 }
 
-func NewSmartContractDeploymentReconciler(c client.Client, scheme *runtime.Scheme) *SmartContractDeploymentReconciler {
+func NewSmartContractDeploymentReconciler(c client.Client, rpcClientManager *rpcClientManager, scheme *runtime.Scheme) *SmartContractDeploymentReconciler {
 	return &SmartContractDeploymentReconciler{
 		Client:                      c,
 		Scheme:                      scheme,
+		RPCClientManager:            rpcClientManager,
 		checkDepsFunc:               checkSmartContractDeps,
 		newTransactionReconcileFunc: newTransactionReconcile,
 	}
@@ -100,6 +102,7 @@ func (r *SmartContractDeploymentReconciler) Reconcile(ctx context.Context, req c
 	}
 
 	txReconcile := r.newTransactionReconcileFunc(r.Client,
+		r.RPCClientManager,
 		"scdeploy."+scd.Name,
 		scd.Spec.Node, scd.Namespace,
 		&scd.Status.TransactionSubmission,

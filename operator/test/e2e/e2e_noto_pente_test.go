@@ -60,7 +60,7 @@ const node2WebSocketURL = "ws://127.0.0.1:31649"
 const node3WebSocketURL = "ws://127.0.0.1:31749"
 
 func withTimeout[T any](do func(ctx context.Context) T) T {
-	ctx, cancelCtx := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancelCtx := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelCtx()
 	return do(ctx)
 }

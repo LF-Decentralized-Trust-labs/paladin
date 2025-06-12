@@ -20,6 +20,7 @@ import (
 	"os"
 	"runtime/debug"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
@@ -176,9 +177,10 @@ func TestRegistryRegisterFail(t *testing.T) {
 	tdm := &testRegistryManager{
 		registries: map[string]plugintk.Plugin{
 			"registry1": &mockPlugin[prototk.RegistryMessage]{
-				t:              t,
-				connectFactory: registryConnectFactory,
-				headerAccessor: registryHeaderAccessor,
+				t:                   t,
+				allowRegisterErrors: true,
+				connectFactory:      registryConnectFactory,
+				headerAccessor:      registryHeaderAccessor,
 				preRegister: func(registryID string) *prototk.RegistryMessage {
 					return &prototk.RegistryMessage{
 						Header: &prototk.Header{
@@ -189,6 +191,7 @@ func TestRegistryRegisterFail(t *testing.T) {
 					}
 				},
 				expectClose: func(err error) {
+					time.Sleep(100 * time.Millisecond)
 					waitForError <- err
 				},
 			},
@@ -203,7 +206,12 @@ func TestRegistryRegisterFail(t *testing.T) {
 	})
 	defer done()
 
-	assert.Regexp(t, "pop", <-waitForError)
+	select {
+	case err := <-waitForError:
+		assert.Regexp(t, "pop", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out waiting for registration callback")
+	}
 }
 
 func TestFromRegistryRequestBadReq(t *testing.T) {
@@ -244,6 +252,9 @@ func TestFromRegistryRequestBadReq(t *testing.T) {
 	})
 	defer done()
 
-	<-waitForResponse
-
+	select {
+	case <-waitForResponse:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out waiting for waitForResponse callback")
+	}
 }

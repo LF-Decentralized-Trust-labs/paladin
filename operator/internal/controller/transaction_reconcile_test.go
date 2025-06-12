@@ -153,7 +153,7 @@ func TestTransactionReconcile_PaladinNodeNotReady(t *testing.T) {
 	err = fakeClient.Create(context.Background(), paladin)
 	require.NoError(t, err)
 
-	tr.getPaladinRPCFunc = func(ctx context.Context, c client.Client, nodeName string, namespace string, timeout string) (pldclient.PaladinClient, error) {
+	tr.getPaladinRPCFunc = func(ctx context.Context, c client.Client, r *rpcClientManager, nodeName string, namespace string, timeout string) (pldclient.PaladinClient, error) {
 		return nil, nil // Node not ready
 	}
 
@@ -394,7 +394,7 @@ func TestGetPaladinRPC_NodeNotFound(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().Build()
 	ctx := context.Background()
 
-	paladinRPC, err := getPaladinRPC(ctx, fakeClient, "non-existent-node", "default", "1s")
+	paladinRPC, err := getPaladinRPC(ctx, fakeClient, nil, "non-existent-node", "default", "1s")
 	require.NoError(t, err)
 	assert.Nil(t, paladinRPC)
 }
@@ -412,7 +412,7 @@ func TestGetPaladinRPC_NodeNotReady(t *testing.T) {
 
 	ctx := context.Background()
 
-	paladinRPC, err := getPaladinRPC(ctx, fakeClient, "test-node", "default", "1s")
+	paladinRPC, err := getPaladinRPC(ctx, fakeClient, nil, "test-node", "default", "1s")
 	require.NoError(t, err)
 	assert.Nil(t, paladinRPC)
 }
@@ -449,7 +449,8 @@ func TestGetPaladinRPC_Success(t *testing.T) {
 		getPaladinURLEndpointFunc = getPaladinURLEndpoint // Reset after test
 	}()
 
-	paladinClient, err := getPaladinRPC(ctx, fakeClient, "test-node", "default", "1s")
+	r := NewRPCCache()
+	paladinClient, err := getPaladinRPC(ctx, fakeClient, r, "test-node", "default", "1s")
 	require.NoError(t, err)
 	assert.NotNil(t, paladinClient)
 }

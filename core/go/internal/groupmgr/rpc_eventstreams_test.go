@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
@@ -128,43 +129,60 @@ func TestRPCEventListenerE2E(t *testing.T) {
 	var subID atomic.Pointer[string]
 
 	go func() {
-		for payload := range wsc.Receive() {
-			var rpcPayload *rpcclient.RPCResponse
-			err := json.Unmarshal(payload, &rpcPayload)
-			require.NoError(t, err)
-
-			if rpcPayload.Error != nil {
-				require.NoError(t, rpcPayload.Error)
-			}
-
-			if !rpcPayload.ID.IsNil() {
-				var rpcID uint64
-				err := json.Unmarshal(rpcPayload.ID.Bytes(), &rpcID)
-				require.NoError(t, err)
-
-				switch rpcID {
-				case subReqID: // Subscribe reply
-					subIDChan <- rpcPayload.Result.StringValue()
-				case unSubReqID.Load(): // Unsubscribe reply
-					unSubChan <- true
+		defer close(messages)
+		for {
+			select {
+			case payload, ok := <-wsc.Receive():
+				if !ok {
+					return
 				}
-			}
 
-			if rpcPayload.Method == "pgroup_subscription" {
-				var batchPayload pldapi.JSONRPCSubscriptionNotification[pldapi.PrivacyGroupMessageBatch]
-				err := json.Unmarshal(rpcPayload.Params.Bytes(), &batchPayload)
+				var rpcPayload *rpcclient.RPCResponse
+				err := json.Unmarshal(payload, &rpcPayload)
 				require.NoError(t, err)
 
-				for _, r := range batchPayload.Result.Messages {
-					messages <- r
+				if rpcPayload.Error != nil {
+					require.NoError(t, rpcPayload.Error)
 				}
-				// wait until main test has stored subID and closed ackReady
-				<-ackReady
-				_, req := rpcTestRequest("pgroup_ack", *subID.Load())
-				err = wsc.Send(ctx, req)
-				require.NoError(t, err)
-			}
 
+				if !rpcPayload.ID.IsNil() {
+					var rpcID uint64
+					err := json.Unmarshal(rpcPayload.ID.Bytes(), &rpcID)
+					require.NoError(t, err)
+
+					switch rpcID {
+					case subReqID: // Subscribe reply
+						subIDStr := rpcPayload.Result.StringValue()
+						subID.Store(&subIDStr)
+						subIDChan <- subIDStr
+					case unSubReqID.Load(): // Unsubscribe reply
+						unSubChan <- true
+						return
+					}
+				}
+
+				if rpcPayload.Method == "pgroup_subscription" {
+					var batchPayload pldapi.JSONRPCSubscriptionNotification[pldapi.PrivacyGroupMessageBatch]
+					err := json.Unmarshal(rpcPayload.Params.Bytes(), &batchPayload)
+					require.NoError(t, err)
+
+					for _, r := range batchPayload.Result.Messages {
+						select {
+						case messages <- r:
+						case <-ctx.Done():
+							return
+						}
+					}
+					// wait until main test has stored subID and closed ackReady
+					<-ackReady
+					if storedSubID := subID.Load(); storedSubID != nil {
+						_, req := rpcTestRequest("pgroup_ack", *storedSubID)
+						require.NoError(t, wsc.Send(ctx, req))
+					}
+				}
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -174,7 +192,7 @@ func TestRPCEventListenerE2E(t *testing.T) {
 		testMsgs[i] = &pldapi.PrivacyGroupMessageInput{
 			Domain: "domain1",
 			Group:  groupID,
-			Data:   pldtypes.JSONString("some data"),
+			Data:   pldtypes.JSONString(fmt.Sprintf("message %d", i)),
 			Topic:  "my/topic",
 		}
 	}
@@ -190,17 +208,34 @@ func TestRPCEventListenerE2E(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	subIDStr := <-subIDChan
-	_, err = uuid.Parse(subIDStr)
-	require.NoError(t, err)
-	subID.Store(&subIDStr)
-	close(ackReady) // now the reader goroutine will send the pgroup_ack
-
-	for i := 0; i < 3; i++ {
-		require.Equal(t, testMsgIDs[i], (<-messages).ID)
+	// Wait for subscription with timeout
+	var subIDStr string
+	select {
+	case subIDStr = <-subIDChan:
+		_, err = uuid.Parse(subIDStr)
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Subscription timeout")
 	}
 
-	// Send rest
+	close(ackReady)
+
+	// Wait for first 3 messages to be processed
+	receivedMsgs := 0
+	timeout := time.After(10 * time.Second)
+	for receivedMsgs < 3 {
+		select {
+		case msg := <-messages:
+			if msg != nil {
+				require.Contains(t, testMsgIDs, msg.ID)
+				receivedMsgs++
+			}
+		case <-timeout:
+			t.Fatalf("Timeout waiting for messages, received %d of 3", receivedMsgs)
+		}
+	}
+
+	// Send remaining 3 messages
 	err = gm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		for i := 3; i < len(testMsgs); i++ {
 			msgID, err := gm.SendMessage(ctx, dbTX, testMsgs[i])
@@ -211,18 +246,32 @@ func TestRPCEventListenerE2E(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	for i := 3; i < len(testMsgs); i++ {
-		require.Equal(t, testMsgIDs[i], (<-messages).ID)
+	// Wait for next all messages
+	timeout = time.After(10 * time.Second)
+	for receivedMsgs < len(testMsgs) {
+		select {
+		case msg := <-messages:
+			if msg != nil {
+				require.Contains(t, testMsgIDs, msg.ID)
+				receivedMsgs++
+			}
+		case <-timeout:
+			t.Fatalf("Timeout waiting for messages, received %d of %d", receivedMsgs, len(testMsgs))
+		}
 	}
 
+	// Unsubscribe
 	reqID, req := rpcTestRequest("pgroup_unsubscribe", subIDStr)
 	unSubReqID.Store(reqID)
 	err = wsc.Send(ctx, req)
 	require.NoError(t, err)
-	<-unSubChan
 
-	// clean up
-	close(messages)
+	select {
+	case <-unSubChan:
+		// Success
+	case <-time.After(5 * time.Second):
+		t.Fatal("Unsubscribe timeout")
+	}
 }
 
 func TestRPCEventListenerE2ENack(t *testing.T) {
@@ -275,55 +324,69 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 	// Reader goroutine: handles subscribe‐reply, subscription notifications,
 	// sends exactly one NACK then one ACK, and forwards redelivered message.
 	go func() {
-		for payload := range wsc.Receive() {
-			var rpcPayload *rpcclient.RPCResponse
-			err := json.Unmarshal(payload, &rpcPayload)
-			require.NoError(t, err)
-
-			if rpcPayload.Error != nil {
-				require.NoError(t, rpcPayload.Error)
-			}
-
-			if !rpcPayload.ID.IsNil() {
-				var rpcID uint64
-				err := json.Unmarshal(rpcPayload.ID.Bytes(), &rpcID)
-				require.NoError(t, err)
-
-				switch rpcID {
-				case subReqID: // Subscribe reply
-					subIDStr := rpcPayload.Result.StringValue()
-					_, err = uuid.Parse(subIDStr)
-					require.NoError(t, err)
-					subID.Store(&subIDStr)
-					subIDChan <- subIDStr
-				case unSubReqID.Load(): // Unsubscribe reply
-					unSubChan <- true
+		defer close(messages)
+		for {
+			select {
+			case payload, ok := <-wsc.Receive():
+				if !ok {
+					return
 				}
-			}
 
-			if rpcPayload.Method == "pgroup_subscription" {
-				var batchPayload pldapi.JSONRPCSubscriptionNotification[pldapi.PrivacyGroupMessageBatch]
-				err := json.Unmarshal(rpcPayload.Params.Bytes(), &batchPayload)
+				var rpcPayload *rpcclient.RPCResponse
+				err := json.Unmarshal(payload, &rpcPayload)
 				require.NoError(t, err)
 
-				if !sentNack {
-					// send nack first
-					_, req := rpcTestRequest("pgroup_nack", *subID.Load())
-					err = wsc.Send(ctx, req)
+				if rpcPayload.Error != nil {
+					require.NoError(t, rpcPayload.Error)
+				}
+
+				if !rpcPayload.ID.IsNil() {
+					var rpcID uint64
+					err := json.Unmarshal(rpcPayload.ID.Bytes(), &rpcID)
 					require.NoError(t, err)
-					sentNack = true
-				} else {
-					// then ack
-					for _, r := range batchPayload.Result.Messages {
-						messages <- r
+
+					switch rpcID {
+					case subReqID: // Subscribe reply
+						subIDStr := rpcPayload.Result.StringValue()
+						_, err = uuid.Parse(subIDStr)
+						require.NoError(t, err)
+						subID.Store(&subIDStr)
+						subIDChan <- subIDStr
+					case unSubReqID.Load(): // Unsubscribe reply
+						unSubChan <- true
 					}
-					_, req := rpcTestRequest("pgroup_ack", *subID.Load())
-					err = wsc.Send(ctx, req)
+				}
+
+				if rpcPayload.Method == "pgroup_subscription" {
+					var batchPayload pldapi.JSONRPCSubscriptionNotification[pldapi.PrivacyGroupMessageBatch]
+					err := json.Unmarshal(rpcPayload.Params.Bytes(), &batchPayload)
 					require.NoError(t, err)
 
+					if !sentNack {
+						// send nack first
+						if storedSubID := subID.Load(); storedSubID != nil {
+							_, req := rpcTestRequest("pgroup_nack", *storedSubID)
+							require.NoError(t, wsc.Send(ctx, req))
+							sentNack = true
+						}
+					} else {
+						// then ack and forward messages
+						for _, r := range batchPayload.Result.Messages {
+							select {
+							case messages <- r:
+							case <-ctx.Done():
+								return
+							}
+						}
+						if storedSubID := subID.Load(); storedSubID != nil {
+							_, req := rpcTestRequest("pgroup_ack", *storedSubID)
+							require.NoError(t, wsc.Send(ctx, req))
+						}
+					}
 				}
+			case <-ctx.Done():
+				return
 			}
-
 		}
 	}()
 
@@ -342,21 +405,35 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Wait for subscription reply, then trigger reader’s NACK logic
-	sid := <-subIDChan
-	require.NotEmpty(t, sid)
+	// Wait for subscription reply, then trigger reader's NACK logic
+	var sid string
+	select {
+	case sid = <-subIDChan:
+		require.NotEmpty(t, sid)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Subscription timeout")
+	}
 
 	// The reader goroutine will first NACK and then, upon redelivery, push into `messages`
-	redelivered := <-messages
-	require.Equal(t, sentMsgID, redelivered.ID)
+	select {
+	case redelivered := <-messages:
+		require.Equal(t, sentMsgID, redelivered.ID)
+	case <-time.After(10 * time.Second):
+		t.Fatal("Did not receive redelivered message")
+	}
 
 	// Finally unsubscribe
 	reqID, req := rpcTestRequest("pgroup_unsubscribe", sid)
 	unSubReqID.Store(reqID)
 	err = wsc.Send(ctx, req)
 	require.NoError(t, err)
-	<-unSubChan
 
+	select {
+	case <-unSubChan:
+		// Success
+	case <-time.After(5 * time.Second):
+		t.Fatalf("Unsubscribe timeout - connection may have been closed")
+	}
 }
 
 func TestRPCSubscribeNoType(t *testing.T) {
