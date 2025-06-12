@@ -1,7 +1,5 @@
 # Key Management
 
-> TODO: Well established architecture already being brought across to Paladin here (Lead: Matt Clarke)
-
 ![Key Management](../images/key_management.jpg)
 
 Key management in Paladin is designed to meet a complex set of requirements for enterprise
@@ -15,7 +13,7 @@ Zero Knowledge Proofs (ZKP).
 
 ## Choices for the key administrator
 
-This leads to some key decisions that must be made by the administrator responsible for the 
+This leads to some key decisions that must be made by the administrator responsible for the
 Paladin node on how keys are managed.
 
 ### In-memory vs in-key-store signing
@@ -28,10 +26,10 @@ _The key materials never leave the store_
 There are two challenges to this in the Web3 domain:
 
 1. **Algorithm / ZKP support** - HSM/SSM modules may not support all of the algorithms required
-for signing, or the ability to execute ZKP circuit provers natively.
+   for signing, or the ability to execute ZKP circuit provers natively.
 2. **Numeracy of keys** - HSM/SSM modules are commonly optimized for high value keys, and
-thus generating/storing millions of single-use keys for anonymous TX transaction submission 
-might be inefficient (on cost or performance)
+   thus generating/storing millions of single-use keys for anonymous TX transaction submission
+   might be inefficient (on cost or performance)
 
 Paladin lets you choose _use case by use case_ all within a single Paladin engine whether you
 delegate signing into your key store using its internal cryptography, or whether you allow the
@@ -45,14 +43,14 @@ you should be cautious about where the signing modules run that will hold those 
 in volatile memory.
 
 - You might choose to have that happen embedded into the Paladin node
-    - The shortest code path for performance
-    - The simplest deployment architecture
+  - The shortest code path for performance
+  - The simplest deployment architecture
 - You might choose to run them on a completely separate infrastructure
-    - In a more trusted network segment, with very limited secure key path for signing requests 
-    - Maybe co-located with your HSM with a local PKCS#11 interface
-    - Maybe runtime-embedded into your SSM / Vault technology as a code-module
+  - In a more trusted network segment, with very limited secure key path for signing requests
+  - Maybe co-located with your HSM with a local PKCS#11 interface
+  - Maybe runtime-embedded into your SSM / Vault technology as a code-module
 
-Paladin packages the signing module for maximum flexibility. You will see all the quick start
+Paladin packages the signing module for maximum flexibility. You will see the majority of the quick start
 setup guides, and kubernetes deployment samples, have it Paladin-embedded by default.
 
 However, the code is structured to make it very easy to run it remotely.
@@ -60,6 +58,7 @@ However, the code is structured to make it very easy to run it remotely.
 You can extend it with code to support more key storage technologies, including proprietary
 technologies unique to your enterprise. The modular code design for extensibility, is combined
 with a set of options on remote connectivity:
+
 - HTTPS+JSON
 - gRPC+Protobuf
 - Both with mutual-TLS and additional session/JWT credentials
@@ -67,7 +66,12 @@ with a set of options on remote connectivity:
 > Multiple signing-modules are supported by a single Paladin node, so you can use a mixture
 > of embedded and remote signing modules in one node
 
-### Direct key mapping vs. key derivation 
+Alternatively you can choose to leverage the plugin ecosystem of Paladin and _bring-your-own_ signing
+module implementation that gives you the freedom to achieve all of the above. (Refer to the paladin
+[example signing module](https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/signingmodules/example)
+plugin as a starting point).
+
+### Direct key mapping vs. key derivation
 
 We discussed earlier that the numeracy of keys used by Web3 technologies (particularly with
 anonymity), and speed of key generation, is a challenge for some HSM/SSM technologies.
@@ -114,14 +118,15 @@ This is commonly referred to as a Hierarchical Deterministic (HD) wallet.
 
 Paladin supports a well established set of standards for the operation of this
 key derivation:
+
 - [BIP-32](https://en.bitcoin.it/wiki/BIP_0032) defines the fundamental operation of the
-derivation algorithm for cryptographic keys
+  derivation algorithm for cryptographic keys
 - [BIP-39](https://en.bitcoin.it/wiki/BIP_0039) allows mnemonic seed phrases to _optionally_
-be used (instead of a 32 byte private key) as the `seed`, or root, of the key hierarchy
+  be used (instead of a 32 byte private key) as the `seed`, or root, of the key hierarchy
 - [BIP-44](https://en.bitcoin.it/wiki/BIP_0044) provides a string semantic for expressing
-a derivation path within a BIP-32 HD Wallet with a string pattern such as
-`m / 44' / 60' / 0' / 1 / 2 / 3`. This syntax is used in the signing module configuration
-for the prefix to use for keys, and as the way to refer uniquely to a key in the hierarchy.
+  a derivation path within a BIP-32 HD Wallet with a string pattern such as
+  `m / 44' / 60' / 0' / 1 / 2 / 3`. This syntax is used in the signing module configuration
+  for the prefix to use for keys, and as the way to refer uniquely to a key in the hierarchy.
 
 Some key storage systems internally use key derivation, similarly to that performed by
 the signing module. In these cases the signing module is configured for `direct` key mapping,
@@ -142,7 +147,7 @@ The architecture has the following core concepts:
 When applications and configuration refer to keys, they can do so via string identifiers.
 
 > See [Data & Registry](./data_and_registry.md) for details about the format of these identifiers
-> and how they are resolved across separate Paladin runtimes. 
+> and how they are resolved across separate Paladin runtimes.
 
 These identifiers can be human/application friendly strings describing the **purpose** of the key,
 rather than needing to be one of the public-key identifiers (like an Eth `address`) that
@@ -174,10 +179,11 @@ all the way up to a single root folder that is pre-created by the Paladin runtim
 
 Key mappings also have `attributes` that can be specified when creating a key mapping explicitly
 over an API, and are passed to the signing module when resolving the key. This allows the behavior of
-the signing module when obtaining/creating key materials to be customized at runtime (within the 
+the signing module when obtaining/creating key materials to be customized at runtime (within the
 constraints of that signing module).
 
 Every `key mapping` and `folder` gets two attributes automatically:
+
 - `name`: the part of the `key identifier` representing this key / folder
 - `index`: a numeric identifier, assured to be unique at this folder level
 
@@ -231,6 +237,8 @@ outside the core runtime connected of a mutual-TLS secure connection, supplement
 with JWT credentials for each signing request that propagate context from the Paladin
 runtime on the context of the signing.
 
+Or it can achieve the same flexability as a pluggable component using Paladin's gRPC plugin framework.
+
 ### 5. Key resolution and creation of new keys on-demand
 
 The resolution from a `key identifier` to a `key handle` happens dynamically, when a
@@ -243,9 +251,10 @@ storage (which is pluggable to many technologies).
 However, the resolution result might end up with many possible outcomes.
 
 For example:
+
 - Returning the identifier of a key that already was pre-created in the cryptographic
   storage system, thus establishing a new `key mapping` to an existing `key handle`
-- Instructing the cryptographic storage system to generate a brand new key, thus 
+- Instructing the cryptographic storage system to generate a brand new key, thus
   on-demand creating a `key mapping` to a new unique key
 - Allocating a unique derivation path in a Hierarchical Deterministic (HD) derivation
   path scheme like BIP32, that references a new unique key backed by an existing

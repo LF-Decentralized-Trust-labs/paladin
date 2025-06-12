@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -26,6 +26,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -85,9 +86,9 @@ func TestFileSystemStoreCreate(t *testing.T) {
 	key0, err := secp256k1.GenerateSecp256k1KeyPair()
 	require.NoError(t, err)
 
-	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{
+	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &prototk.ResolveKeyRequest{
 		Name: "42",
-		Path: []*signerapi.ResolveKeyPathSegment{{Name: "bob"}, {Name: "blue"}},
+		Path: []*prototk.ResolveKeyPathSegment{{Name: "bob"}, {Name: "blue"}},
 	}, func() ([]byte, error) { return key0.PrivateKeyBytes(), nil })
 	require.NoError(t, err)
 
@@ -122,7 +123,7 @@ func TestFileSystemStoreCreateReloadMnemonic(t *testing.T) {
 
 	phrase := []byte("fame point uphold pumpkin april violin orphan cat bid upper meadow family")
 
-	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{
+	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &prototk.ResolveKeyRequest{
 		Name: "sally",
 	}, func() ([]byte, error) { return phrase, nil })
 	require.NoError(t, err)
@@ -147,11 +148,11 @@ func TestFileSystemStoreCreateReloadMnemonic(t *testing.T) {
 func TestFileSystemStoreBadSegments(t *testing.T) {
 	ctx, fs := newTestFilesystemStore(t)
 
-	_, _, err := fs.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{}, nil)
+	_, _, err := fs.FindOrCreateLoadableKey(ctx, &prototk.ResolveKeyRequest{}, nil)
 	assert.Regexp(t, "PD020803", err)
 
-	_, _, err = fs.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{
-		Path: []*signerapi.ResolveKeyPathSegment{
+	_, _, err = fs.FindOrCreateLoadableKey(ctx, &prototk.ResolveKeyRequest{
+		Path: []*prototk.ResolveKeyPathSegment{
 			{},
 		},
 	}, nil)
@@ -164,7 +165,7 @@ func TestFileSystemClashes(t *testing.T) {
 	err := os.MkdirAll(path.Join(fs.path, "-clash"), fs.dirMode)
 	require.NoError(t, err)
 
-	_, _, err = fs.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{
+	_, _, err = fs.FindOrCreateLoadableKey(ctx, &prototk.ResolveKeyRequest{
 		Name: "clash",
 	}, func() ([]byte, error) { return []byte("key1"), nil })
 	assert.Regexp(t, "PD020805", err)

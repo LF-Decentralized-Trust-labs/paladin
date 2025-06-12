@@ -17,8 +17,9 @@
 package pldapi
 
 type WalletInfo struct {
-	Name        string `docstruct:"WalletInfo" json:"name"`
-	KeySelector string `docstruct:"WalletInfo" json:"keySelector"`
+	Name                    string `docstruct:"WalletInfo" json:"name"`
+	KeySelector             string `docstruct:"WalletInfo" json:"keySelector"`
+	KeySelectorMustNotMatch bool   `docstruct:"WalletInfo" json:"keySelectorMustNotMatch"`
 }
 
 type KeyMapping struct {
