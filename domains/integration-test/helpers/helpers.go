@@ -130,6 +130,23 @@ func (dth *DomainTransactionHelper) SignAndSend(signer string, confirm ...bool) 
 	return tx
 }
 
+func (dth *DomainTransactionHelper) SignAndCall(signer string) *SentDomainTransaction {
+	tx := &SentDomainTransaction{
+		t:      dth.t,
+		result: make(chan any),
+	}
+	dth.tx.From = signer
+	go func() {
+		var result any
+		rpcerr := dth.rpc.CallRPC(dth.ctx, &result, "testbed_call", dth.tx, pldtypes.JSONFormatOptions(""))
+		if rpcerr != nil {
+			tx.result <- rpcerr.Error()
+		}
+		tx.result <- result
+	}()
+	return tx
+}
+
 func (dth *DomainTransactionHelper) Prepare(signer string) *testbed.TransactionResult {
 	var result testbed.TransactionResult
 	dth.tx.From = signer

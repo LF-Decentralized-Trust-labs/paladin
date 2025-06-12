@@ -105,4 +105,5 @@ var ZetoTransactionDataABI_V0 = &abi.ParameterArray{
 }
 
 type DomainHandler = domain.DomainHandler[DomainInstanceConfig]
+type DomainCallHandler = domain.DomainCallHandler[DomainInstanceConfig]
 type ParsedTransaction = domain.ParsedTransaction[DomainInstanceConfig]

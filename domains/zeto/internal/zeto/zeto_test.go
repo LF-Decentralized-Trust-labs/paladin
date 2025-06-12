@@ -844,13 +844,7 @@ func TestGetHandler(t *testing.T) {
 
 func TestUnimplementedMethods(t *testing.T) {
 	z := &Zeto{}
-	_, err := z.InitCall(context.Background(), nil)
-	assert.ErrorContains(t, err, "PD210085: Not implemented")
-
-	_, err = z.ExecCall(context.Background(), nil)
-	assert.ErrorContains(t, err, "PD210085: Not implemented")
-
-	_, err = z.BuildReceipt(context.Background(), nil)
+	_, err := z.BuildReceipt(context.Background(), nil)
 	assert.ErrorContains(t, err, "PD210102: Not implemented")
 }
 
