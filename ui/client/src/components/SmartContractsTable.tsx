@@ -79,7 +79,7 @@ export const SmartContractsTable: React.FC<Props> = ({ domainAddress }) => {
             >
               {t('contractAddress')}
             </TableCell>
-            <TableCell
+            <TableCell align="right"
               sx={{
                 backgroundColor: (theme) => theme.palette.background.paper,
               }}
@@ -94,7 +94,7 @@ export const SmartContractsTable: React.FC<Props> = ({ domainAddress }) => {
               <TableCell>
                 <Hash title={t('address')} hash={contract.address} />
               </TableCell>
-              <TableCell>
+              <TableCell align="right">
                 <DomainButtons
                   domainName={contract.domainName}
                   contractAddress={contract.address}
