@@ -24,4 +24,5 @@ interface IZetoFungible {
     function deposit(uint256 amount) external;
     function withdraw(uint256 amount) external;
     function setERC20(address erc20) external;
+    function balanceOf(string memory account) external view returns (uint256 totalStates, uint256 totalBalance, bool overflow);
 }
