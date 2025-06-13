@@ -15,18 +15,17 @@ const paladinNode3 = new PaladinClient({ url: "http://127.0.0.1:31748" });
 
 async function main(): Promise<boolean> {
   // Get the first argument from the command line
-  if (process.argv.length < 5) {
+  if (process.argv.length !== 4) {
     logger.error(
-      "To run the update example, pass the privacy group address, privacy group ID, and storage contract address from a previous invocation of `npm run start`:"
+      "To run the update example, pass the privacy group ID and private contract address from a previous invocation of `npm run start`:"
     );
     logger.error(
-      "E.g: node run update <privacyGroupAddress> <privacyGroupID> <privacyStorageContractAddress>"
+      "E.g: node run update <privacy group ID> <private contract address>"
     );
     return false;
   }
-  const groupAddress = process.argv[2];
-  const groupId = process.argv[3];
-  const contractAddress = process.argv[4];
+  const groupId = process.argv[2];
+  const contractAddress = process.argv[3];
 
   // Get verifiers for each node
   const [verifierNode1] = paladinNode1.getVerifiers("member@node1");
@@ -34,18 +33,16 @@ async function main(): Promise<boolean> {
   const [verifierNode3] = paladinNode3.getVerifiers("outsider@node3");
 
   // Step 1: Create a privacy group for members
-  logger.log("Recreating a privacy group for Node1 and Node2...");
-  const existingPrivacyMemberGroup = new PentePrivacyGroup(
-    paladinNode1,
-    {
-      id: groupId,
-      domain: "pente",
-      created: new Date().toISOString(),
-      members: ["member@node2", "outsider@node3"],
-      contractAddress: groupAddress,
-    },
-    {}
-  );
+  logger.log(`Resuming privacy group ${groupId} for Node1 and Node2...`);
+  const penteFactory = new PenteFactory(paladinNode1, "pente");
+  const existingPrivacyMemberGroup = await penteFactory.resumePrivacyGroup({
+    id: groupId,
+  });
+
+  if (existingPrivacyMemberGroup === undefined) {
+    logger.error(`Failed to resume privacy group ${groupId}`);
+    return false;
+  }
 
   // Step 3: Use the deployed contract for private storage
   const privateStorageContract = new PrivateStorage(
@@ -54,7 +51,7 @@ async function main(): Promise<boolean> {
   );
 
   logger.log(
-    `Using existing private member group ${existingPrivacyMemberGroup.address}, with existing storage contract address ${privateStorageContract.address}`
+    `Using existing private member group ${groupId}, with existing storage contract address ${privateStorageContract.address}`
   );
 
   // Retrieve the current value as Node1
