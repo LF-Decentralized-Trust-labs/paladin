@@ -2,7 +2,7 @@ module github.com/kaleido-io/paladin/testinfra
 
 go 1.23.0
 
-toolchain go1.23.7
+toolchain go1.23.10
 
 require github.com/hyperledger/firefly-signer v1.1.21
 

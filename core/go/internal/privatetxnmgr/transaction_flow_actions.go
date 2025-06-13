@@ -259,10 +259,16 @@ func (tf *transactionFlow) finalize(ctx context.Context) {
 	//flush that to the txmgr database
 	// so that the user can see that it is reverted and so that we stop retrying to assemble and endorse it
 
+	var fromIdentity string
+	preAssembly := tf.transaction.PreAssembly
+	if preAssembly != nil && preAssembly.TransactionSpecification != nil {
+		fromIdentity = tf.transaction.PreAssembly.TransactionSpecification.From
+	}
 	tf.syncPoints.QueueTransactionFinalize(
 		ctx,
 		tf.transaction.Domain,
 		tf.domainAPI.Address(),
+		fromIdentity,
 		tf.transaction.ID,
 		tf.finalizeRevertReason,
 		func(ctx context.Context) {

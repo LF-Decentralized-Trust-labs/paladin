@@ -2,7 +2,7 @@ module github.com/kaleido-io/paladin/domains/zeto
 
 go 1.23.0
 
-toolchain go1.23.7
+toolchain go1.23.10
 
 require (
 	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20241004174307-aa3c1fdf0966

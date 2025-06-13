@@ -1096,6 +1096,33 @@ func TestNotaryDelegated(t *testing.T) {
 		"Transaction did not receive a receipt",
 	)
 
+	// Attempt a private transaction on alices node that will fail due to insufficent funds
+	var transferA2FailTxId uuid.UUID
+	err = client1.CallRPC(ctx, &transferA2FailTxId, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "transferFailA2B1",
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           aliceIdentity,
+			Data: pldtypes.RawJSON(`{
+					"from": "` + aliceIdentity + `",
+					"to": "` + bobIdentity + `",
+					"amount": "5000000000000000000"
+				}`),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, transferA2FailTxId)
+	assert.Eventually(t,
+		transactionRevertedCondition(t, ctx, transferA2FailTxId, client1),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+
 }
 func TestNotaryDelegatedPrepare(t *testing.T) {
 	//Similar to the TestNotaryDelegated test except in this case, the transaction is not submitted to the base ledger by the notary.

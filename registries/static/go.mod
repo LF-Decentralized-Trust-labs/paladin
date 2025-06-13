@@ -2,7 +2,7 @@ module github.com/kaleido-io/paladin/registries/static
 
 go 1.23.0
 
-toolchain go1.23.7
+toolchain go1.23.10
 
 require (
 	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000

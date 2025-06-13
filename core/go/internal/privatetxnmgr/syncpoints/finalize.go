@@ -20,8 +20,10 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
@@ -32,10 +34,11 @@ type finalizeOperation struct {
 	Domain         string
 	TransactionID  uuid.UUID
 	FailureMessage string
+	Originator     string
 }
 
 // QueueTransactionFinalize
-func (s *syncPoints) QueueTransactionFinalize(ctx context.Context, domain string, contractAddress pldtypes.EthAddress, transactionID uuid.UUID, failureMessage string, onCommit func(context.Context), onRollback func(context.Context, error)) {
+func (s *syncPoints) QueueTransactionFinalize(ctx context.Context, domain string, contractAddress pldtypes.EthAddress, originator string, transactionID uuid.UUID, failureMessage string, onCommit func(context.Context), onRollback func(context.Context, error)) {
 
 	op := s.writer.Queue(ctx, &syncPointOperation{
 		domainContext:   nil, // finalize does not depend on the flushing of any states
@@ -44,6 +47,7 @@ func (s *syncPoints) QueueTransactionFinalize(ctx context.Context, domain string
 			Domain:         domain,
 			TransactionID:  transactionID,
 			FailureMessage: failureMessage,
+			Originator:     originator,
 		},
 	})
 	go func() {
@@ -63,20 +67,44 @@ func (s *syncPoints) writeFailureOperations(ctx context.Context, dbTX persistenc
 	//
 	// However, a syncpoint gets triggered for every finalize so that we can flush the Domain Context to the DB
 	// so that all states are stored, before we clear out the transaction from the in-memory Domain Context.
-	failureReceipts := make([]*components.ReceiptInput, 0)
+	//
+	// Receipts need to go back to their originator, so we either store the receive ourselves locally - or
+	// push it in a reliable message back to the sender.
+	localFailureReceipts := make([]*components.ReceiptInput, 0)
+	remoteSends := make([]*pldapi.ReliableMessage, 0)
 	for _, op := range finalizeOperations {
 		if op.FailureMessage != "" {
-			failureReceipts = append(failureReceipts, &components.ReceiptInput{
+			receipt := &components.ReceiptInput{
 				ReceiptType:    components.RT_FailedWithMessage,
 				Domain:         op.Domain,
 				TransactionID:  op.TransactionID,
 				FailureMessage: op.FailureMessage,
-			})
+			}
+			node, _ := pldtypes.PrivateIdentityLocator(op.Originator).Node(ctx, true)
+			log.L(ctx).Warnf("Failure receipt %s for node %s: %s", receipt.TransactionID, node, receipt.FailureMessage)
+			if node != "" && node != s.transportMgr.LocalNodeName() {
+				remoteSends = append(remoteSends, &pldapi.ReliableMessage{
+					Node:        node,
+					MessageType: pldapi.RMTReceipt.Enum(),
+					Metadata:    pldtypes.JSONString(receipt),
+				})
+			} else {
+				localFailureReceipts = append(localFailureReceipts, receipt)
+			}
 		}
 	}
-	if len(failureReceipts) > 0 {
-		return s.txMgr.FinalizeTransactions(ctx, dbTX, failureReceipts)
+	var err error
+	if len(localFailureReceipts) > 0 {
+		err = s.txMgr.FinalizeTransactions(ctx, dbTX, localFailureReceipts)
 	}
-	return nil
+	if err == nil && len(remoteSends) > 0 {
+		// We log and ignore errors here, because if it is a DB transaction error we will
+		// fail the DB transaction. If it is a peer resolution error - then we are not
+		// going to be able to get this receipt back. So we can only log it.
+		if peerErr := s.transportMgr.SendReliable(ctx, dbTX, remoteSends...); peerErr != nil {
+			log.L(ctx).Errorf("Failed to send receipts back to node: %s", peerErr)
+		}
+	}
+	return err
 
 }

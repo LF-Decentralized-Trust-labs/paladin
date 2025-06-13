@@ -1178,3 +1178,19 @@ func TestParsePrivacyGroupMessageGetMessageNotFound(t *testing.T) {
 	require.Regexp(t, "PD012021", parseErr)
 
 }
+
+func TestBuildReceiptDistributionMsgBadMsg(t *testing.T) {
+
+	ctx, tm, _, done := newTestTransport(t, false,
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+			mc.db.Mock.ExpectBegin()
+			mc.db.Mock.ExpectCommit()
+		},
+	)
+	defer done()
+
+	_, parseErr, err := tm.buildReceiptDistributionMsg(ctx, tm.persistence.NOTX(), &pldapi.ReliableMessage{})
+	require.NoError(t, err)
+	require.Regexp(t, "PD012016", parseErr)
+
+}

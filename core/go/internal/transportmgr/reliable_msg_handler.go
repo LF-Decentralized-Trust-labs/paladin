@@ -530,3 +530,27 @@ func parseState(ctx context.Context, sd *components.StateDistributionWithData) (
 	}
 	return parsed, err
 }
+
+func (tm *transportManager) buildReceiptDistributionMsg(ctx context.Context, dbTX persistence.DBTX, rm *pldapi.ReliableMessage) (*prototk.PaladinMsg, error, error) {
+
+	// Validate the message first (not retryable)
+	receipt, parseErr := parseMessageReceiptDistribution(ctx, rm.ID, rm.Metadata)
+	if parseErr != nil {
+		return nil, parseErr, nil
+	}
+
+	return &prototk.PaladinMsg{
+		MessageId:   rm.ID.String(),
+		Component:   prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
+		MessageType: RMHMessageTypeReceipt,
+		Payload:     pldtypes.JSONString(receipt),
+	}, nil, nil
+}
+
+func parseMessageReceiptDistribution(ctx context.Context, msgID uuid.UUID, data []byte) (receipt *components.ReceiptInput, err error) {
+	err = json.Unmarshal(data, &receipt)
+	if err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidMessageData, msgID)
+	}
+	return
+}

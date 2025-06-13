@@ -2,7 +2,7 @@ module github.com/kaleido-io/paladin/domains/integration-test
 
 go 1.23.0
 
-toolchain go1.23.7
+toolchain go1.23.10
 
 require (
 	github.com/go-resty/resty/v2 v2.14.0

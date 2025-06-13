@@ -125,6 +125,9 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 			}
 			receipt.Success = true
 		case components.RT_FailedWithMessage:
+			if len(ri.RevertData) == 0 {
+				ri.RevertData = nil // when we receive over the wire this becomes an empty byte string
+			}
 			if ri.FailureMessage == "" || ri.RevertData != nil {
 				return i18n.NewError(ctx, msgs.MsgTxMgrInvalidReceiptNotification, pldtypes.JSONString(ri))
 			}

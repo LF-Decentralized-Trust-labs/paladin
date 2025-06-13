@@ -259,6 +259,14 @@ export default class PaladinClient {
     }
   }
 
+  async decodeError(revertError: string, dataFormat: string) {
+    const res = await this.post<JsonRpcResult<IABIDecodedData>>(
+      "ptx_decodeError",
+      [revertError, dataFormat]
+    );
+    return res.data.result;
+  }
+
   async decodeTransactionEvents(
     transactionHash: string,
     abi: InterfaceAbi,

@@ -783,6 +783,7 @@ func TestRPCBlockchainEventListenersCRUD(t *testing.T) {
 		mc.blockIndexer.On("StartEventStream", mock.Anything, id).Return(nil)
 		mc.blockIndexer.On("StopEventStream", mock.Anything, id).Return(nil)
 		mc.blockIndexer.On("RemoveEventStream", mock.Anything, id).Return(nil)
+		mc.blockIndexer.On("GetEventStreamStatus", mock.Anything, id).Return(&blockindexer.EventStreamStatus{}, nil)
 	})
 	defer done()
 
@@ -818,6 +819,13 @@ func TestRPCBlockchainEventListenersCRUD(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, l)
 	assert.Equal(t, eventListener, *l)
+
+	// Get listener status
+	var ls *pldapi.BlockchainEventListenerStatus
+	err = rpcClient.CallRPC(ctx, &ls, "ptx_getBlockchainEventListenerStatus", "listener1")
+	require.NoError(t, err)
+	require.NotNil(t, ls)
+	assert.False(t, ls.Catchup)
 
 	// Stop listener
 	err = rpcClient.CallRPC(ctx, &boolRes, "ptx_stopBlockchainEventListener", "listener1")

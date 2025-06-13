@@ -2,7 +2,7 @@ module github.com/kaleido-io/paladin/toolkit
 
 go 1.23.0
 
-toolchain go1.23.7
+toolchain go1.23.10
 
 require (
 	github.com/Code-Hex/go-generics-cache v1.5.1

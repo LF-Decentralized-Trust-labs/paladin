@@ -491,7 +491,7 @@ func TestProcessReliableMsgPageIgnoreUnsupported(t *testing.T) {
 			ID:          uuid.New(),
 			Sequence:    50,
 			Created:     pldtypes.TimestampNow(),
-			MessageType: pldapi.RMTReceipt.Enum(),
+			MessageType: pldtypes.Enum[pldapi.ReliableMessageType]("wrong"),
 		},
 	})
 	require.Regexp(t, "pop", err)
@@ -658,4 +658,56 @@ func TestProcessReliableMsgPagePrivacyGroupMessage(t *testing.T) {
 	origMsg.Received = receivedMsg.Received // expect to be changed on incoming message
 	origMsg.Node = receivedMsg.Node         // expect to be changed on incoming message
 	require.Equal(t, origMsg, receivedMsg)
+}
+
+func TestProcessReliableMsgPageReceipt(t *testing.T) {
+
+	ctx, tm, tp, done := newTestTransport(t, false,
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+			mc.db.Mock.ExpectExec("INSERT.*reliable_msgs").WillReturnResult(driver.ResultNoRows)
+		})
+	defer done()
+
+	p := &peer{
+		ctx:       ctx,
+		tm:        tm,
+		transport: tp.t,
+	}
+
+	receipt := &components.ReceiptInput{
+		Domain:        "domain1",
+		ReceiptType:   components.RT_Success,
+		TransactionID: uuid.New(),
+	}
+
+	rm := &pldapi.ReliableMessage{
+		ID:          uuid.New(),
+		Sequence:    50,
+		MessageType: pldapi.RMTReceipt.Enum(),
+		Node:        "node2",
+		Metadata:    pldtypes.JSONString(receipt),
+		Created:     pldtypes.TimestampNow(),
+	}
+
+	sentMessages := make(chan *prototk.PaladinMsg, 1)
+	tp.Functions.SendMessage = func(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
+		sent := req.Message
+		sentMessages <- sent
+		return nil, nil
+	}
+
+	err := p.processReliableMsgPage(tm.persistence.NOTX(), []*pldapi.ReliableMessage{rm})
+	require.NoError(t, err)
+
+	sentMsg := <-sentMessages
+
+	rMsg, err := parseReceivedMessage(ctx, "node2", sentMsg)
+	require.NoError(t, err)
+	require.Equal(t, RMHMessageTypeReceipt, rMsg.MessageType)
+
+	receivedReceipt, err := parseMessageReceiptDistribution(ctx, rMsg.MessageID, rMsg.Payload)
+	require.NoError(t, err)
+	require.Equal(t, "domain1", receivedReceipt.Domain)
+	require.Equal(t, components.RT_Success, receivedReceipt.ReceiptType)
+	require.Equal(t, receipt.TransactionID, receivedReceipt.TransactionID)
 }
