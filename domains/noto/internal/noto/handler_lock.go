@@ -214,6 +214,7 @@ func (h *lockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepare
 		return nil, err
 	}
 	params := &NotoLockParams{
+		TxId:          req.Transaction.TransactionId,
 		Inputs:        endorsableStateIDs(inputs),
 		Outputs:       endorsableStateIDs(outputs),
 		LockedOutputs: endorsableStateIDs(lockedOutputs),

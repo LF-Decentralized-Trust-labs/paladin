@@ -107,12 +107,14 @@ type NotoDeployParams struct {
 }
 
 type NotoMintParams struct {
+	TxId      string            `json:"txId"`
 	Outputs   []string          `json:"outputs"`
 	Signature pldtypes.HexBytes `json:"signature"`
 	Data      pldtypes.HexBytes `json:"data"`
 }
 
 type NotoTransferParams struct {
+	TxId      string            `json:"txId"`
 	Inputs    []string          `json:"inputs"`
 	Outputs   []string          `json:"outputs"`
 	Signature pldtypes.HexBytes `json:"signature"`
@@ -120,6 +122,7 @@ type NotoTransferParams struct {
 }
 
 type NotoBurnParams struct {
+	TxId      string            `json:"txId"`
 	Inputs    []string          `json:"inputs"`
 	Outputs   []string          `json:"outputs"`
 	Signature pldtypes.HexBytes `json:"signature"`
@@ -127,6 +130,7 @@ type NotoBurnParams struct {
 }
 
 type NotoApproveTransferParams struct {
+	TxId      string               `json:"txId"`
 	Delegate  *pldtypes.EthAddress `json:"delegate"`
 	TXHash    pldtypes.Bytes32     `json:"txhash"`
 	Signature pldtypes.HexBytes    `json:"signature"`
@@ -134,6 +138,7 @@ type NotoApproveTransferParams struct {
 }
 
 type NotoLockParams struct {
+	TxId          string            `json:"txId"`
 	Inputs        []string          `json:"inputs"`
 	Outputs       []string          `json:"outputs"`
 	LockedOutputs []string          `json:"lockedOutputs"`
@@ -149,6 +154,7 @@ type NotoPrepareUnlockParams struct {
 }
 
 type NotoDelegateLockParams struct {
+	TxId       string               `json:"txId"`
 	UnlockHash pldtypes.Bytes32     `json:"unlockHash"`
 	Delegate   *pldtypes.EthAddress `json:"delegate"`
 	Signature  pldtypes.HexBytes    `json:"signature"`

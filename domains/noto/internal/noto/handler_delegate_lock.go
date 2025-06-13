@@ -185,6 +185,7 @@ func (h *delegateLockHandler) baseLedgerInvoke(ctx context.Context, tx *types.Pa
 		return nil, err
 	}
 	params := &NotoDelegateLockParams{
+		TxId:       req.Transaction.TransactionId,
 		UnlockHash: pldtypes.Bytes32(unlockHash),
 		Delegate:   inParams.Delegate,
 		Signature:  sender.Payload,
