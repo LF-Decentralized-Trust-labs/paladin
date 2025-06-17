@@ -481,6 +481,49 @@ Inputs:
 * **signature** - sender's signature (not verified on-chain, but can be verified by anyone with the private state data)
 * **data** - encoded Paladin and/or user data
 
+### balanceOf
+
+Returns the balance information for a specified account. This function provides a quick balance check but is limited to processing up to 1000 states and is not intended to replace the role of a proper indexer for comprehensive balance tracking.
+
+```json
+{
+  "type": "function",
+  "name": "balanceOf",
+  "inputs": [
+    {
+      "name": "account",
+      "type": "string"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "totalStates",
+      "type": "uint256"
+    },
+    {
+      "name": "totalBalance",
+      "type": "uint256"
+    },
+    {
+      "name": "overflow",
+      "type": "bool"
+    }
+  ]
+}
+```
+
+Inputs:
+
+- **account** - lookup string for the identity to query the balance for
+
+Outputs:
+
+- **totalStates** - number of unspent UTXO states found for the account
+- **totalBalance** - sum of all unspent UTXO values for the account
+- **overflow** - indicates if there are at least 1000 states available (true means the returned balance may be incomplete)
+
+**Note:** This function is limited to querying up to 1000 states and should not be used as a replacement for proper indexing infrastructure.
+
 ## Notary logic
 
 The notary logic (implemented in the domain [Go library](../../../domains/noto)) is responsible for validating and

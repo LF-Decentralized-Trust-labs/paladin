@@ -49,6 +49,9 @@ async function main(): Promise<boolean> {
   });
   if (!checkReceipt(receipt)) return false;
 
+  let balanceInvestor = await notoCash.balanceOf(cashIssuer, { "account": investor.lookup });
+  logger.log(`(NotoCash) Investor State: ${balanceInvestor.totalBalance} units of cash, ${balanceInvestor.totalStates} states, overflow: ${balanceInvestor.overflow}`);
+
   // Create a Pente privacy group between the bond issuer and bond custodian
   logger.log("Creating issuer+custodian privacy group...");
   const penteFactory = new PenteFactory(paladin1, "pente");
@@ -136,6 +139,8 @@ async function main(): Promise<boolean> {
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;
+  let balanceCustodian = await notoBond.balanceOf(bondIssuer, { "account": bondCustodian.lookup });
+  logger.log(`(NotoBond) Bond Custodian State: ${balanceCustodian.totalBalance} units of cash, ${balanceCustodian.totalStates} states, overflow: ${balanceCustodian.overflow}`);
 
   // Begin bond distribution to investors
   logger.log("Beginning distribution...");
@@ -194,6 +199,8 @@ async function main(): Promise<boolean> {
     logger.error("No lock ID found in domain receipt");
     return false;
   }
+  balanceInvestor = await notoCash.using(paladin3).balanceOf(investor, { "account": investor.lookup });
+  logger.log(`(NotoCash) Investor State: ${balanceInvestor.totalBalance} units of cash, ${balanceInvestor.totalStates} states, overflow: ${balanceInvestor.overflow}`);
 
   // Prepare unlock operation
   logger.log("Preparing unlock to bond custodian...");
@@ -227,6 +234,8 @@ async function main(): Promise<boolean> {
     logger.error("No lock ID found in domain receipt");
     return false;
   }
+  balanceCustodian = await notoBond.using(paladin2).balanceOf(bondCustodian, { "account": bondCustodian.lookup });
+  logger.log(`(NotoBond) Bond Custodian State: ${balanceCustodian.totalBalance} units of bonds, ${balanceCustodian.totalStates} states, overflow: ${balanceCustodian.overflow}`);
 
   // Prepare unlock operation
   logger.log("Preparing unlock to investor...");
@@ -314,7 +323,6 @@ async function main(): Promise<boolean> {
     data: {},
   });
   if (!checkReceipt(receipt)) return false;
-
   return true;
 }
 

@@ -51,6 +51,8 @@ interface INotoPrivate {
         bytes calldata data
     ) external;
 
+    function balanceOf(string memory account) external view returns (uint256 totalStates, uint256 totalBalance, bool overflow);
+
     struct StateEncoded {
         bytes id;
         string domain;
