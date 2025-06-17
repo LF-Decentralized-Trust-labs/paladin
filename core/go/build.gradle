@@ -235,6 +235,32 @@ task makeMocks(type: Mockery, dependsOn: [":installMockery", protoc, goGet]) {
         name "TransactionFlow"
         inpackage true
     }
+    mock {
+        inputDir 'internal/sequencer/common'
+        name "Clock"
+        inpackage true
+    }
+    mock {
+        inputDir 'internal/sequencer/coordinator'
+        name "MessageSender"
+        inpackage true
+    }
+    mock {
+        inputDir 'internal/sequencer/coordinator/transaction'
+        name "MessageSender"
+        inpackage true
+    }
+    mock {
+        inputDir 'internal/sequencer/sender'
+        name "MessageSender"
+        inpackage true
+    }
+    mock {
+        inputDir 'internal/sequencer/common'
+        includeAll true
+        outputPackage 'sequencermocks'
+        outputDir 'mocks/sequencermocks'
+    }
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {

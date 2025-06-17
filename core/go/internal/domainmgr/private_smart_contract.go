@@ -210,10 +210,11 @@ func (dc *domainContract) AssembleTransaction(dCtx components.DomainContext, rea
 		return err
 	}
 	txSpec.TransactionId = tktypes.Bytes32UUIDFirst16(tx.ID).String()
-	tx.PreAssembly.TransactionSpecification = txSpec
 
 	// Clear any previous assembly state out, as it's considered completely invalid
 	// at this point if we're re-assembling.
+	tx.PreAssembly.TransactionSpecification = txSpec
+
 	preAssembly := tx.PreAssembly
 
 	c := dc.d.newInFlightDomainRequest(readTX, dCtx, true)
