@@ -181,6 +181,7 @@ func (h *transferHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Pre
 		return nil, err
 	}
 	params := &NotoTransferParams{
+		TxId:      req.Transaction.TransactionId,
 		Inputs:    endorsableStateIDs(req.InputStates),
 		Outputs:   endorsableStateIDs(req.OutputStates),
 		Signature: signature.Payload,

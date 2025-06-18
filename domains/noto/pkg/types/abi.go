@@ -103,6 +103,7 @@ type UnlockRecipient struct {
 }
 
 type UnlockPublicParams struct {
+	TxId          string            `json:"txId"`
 	LockedInputs  []string          `json:"lockedInputs"`
 	LockedOutputs []string          `json:"lockedOutputs"`
 	Outputs       []string          `json:"outputs"`

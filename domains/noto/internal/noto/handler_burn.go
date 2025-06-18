@@ -188,6 +188,7 @@ func (h *burnHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepare
 		return nil, err
 	}
 	params := &NotoBurnParams{
+		TxId:      req.Transaction.TransactionId,
 		Inputs:    endorsableStateIDs(req.InputStates),
 		Outputs:   endorsableStateIDs(req.OutputStates),
 		Signature: sender.Payload,
