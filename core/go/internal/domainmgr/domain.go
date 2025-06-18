@@ -773,12 +773,12 @@ func (d *domain) BuildDomainReceipt(ctx context.Context, dbTX persistence.DBTX, 
 
 	// As long as we have some knowledge, we call to the domain and see what it builds with what we have available
 	res, err := d.api.BuildReceipt(ctx, &prototk.BuildReceiptRequest{
-		TransactionId: pldtypes.Bytes32UUIDFirst16(txID).String(),
-		Complete:      txStates.Unavailable == nil, // important for the domain to know if we have everything (it may fail with partial knowledge)
-		InputStates:   d.toEndorsableListBase(txStates.Spent),
-		ReadStates:    d.toEndorsableListBase(txStates.Read),
-		OutputStates:  d.toEndorsableListBase(txStates.Confirmed),
-		InfoStates:    d.toEndorsableListBase(txStates.Info),
+		TransactionId:     pldtypes.Bytes32UUIDFirst16(txID).String(),
+		UnavailableStates: txStates.Unavailable != nil, // important for the domain to know if we have everything (it may fail with partial knowledge)
+		InputStates:       d.toEndorsableListBase(txStates.Spent),
+		ReadStates:        d.toEndorsableListBase(txStates.Read),
+		OutputStates:      d.toEndorsableListBase(txStates.Confirmed),
+		InfoStates:        d.toEndorsableListBase(txStates.Info),
 	})
 	if err != nil {
 		return nil, err
@@ -896,4 +896,16 @@ func (d *domain) InitPrivacyGroup(ctx context.Context, id pldtypes.HexBytes, gen
 		ABI: abi.ABI{&functionABI},
 	}, nil
 
+}
+
+func (d *domain) CheckStateCompletion(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID, txStates *pldapi.TransactionStates) (bool, error) {
+	res, err := d.api.CheckStateCompletion(ctx, &prototk.CheckStateCompletionRequest{
+		TransactionId:     pldtypes.Bytes32UUIDFirst16(txID).String(),
+		UnavailableStates: txStates.Unavailable != nil,
+		InputStates:       d.toEndorsableListBase(txStates.Spent),
+		ReadStates:        d.toEndorsableListBase(txStates.Read),
+		OutputStates:      d.toEndorsableListBase(txStates.Confirmed),
+		InfoStates:        d.toEndorsableListBase(txStates.Info),
+	})
+	return res.Complete, err
 }

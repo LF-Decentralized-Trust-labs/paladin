@@ -20,7 +20,11 @@
 }
 ```
 
-Note the ability to filter on particular receipt types, and most importantly the ability to block delivery on a given contract address while a "gap" exists in the available states.
+Note the ability to filter on particular receipt types, and most importantly the ability to control delivery behavior when states are incomplete:
+
+- **`block_contract`** (default): Pauses delivery for each individual smart contract address when incomplete states are detected
+- **`process`**: Delivers all receipts immediately, regardless of what private state data is available
+- **`complete_only`**: Delivers receipts whenever the domain confirms all expected states are complete, without regard for strict ordering
 
 ### Subscribe (WebSockets only)
 

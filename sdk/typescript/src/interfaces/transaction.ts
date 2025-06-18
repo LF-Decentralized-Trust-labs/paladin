@@ -175,6 +175,6 @@ export interface ITransactionReceiptListener {
   };
   options?: {
     domainReceipts?: boolean;
-    incompleteStateReceiptBehavior?: "block_contract" | "process";
+    incompleteStateReceiptBehavior?: "block_contract" | "process" | "complete_only";
   };
 }
