@@ -372,6 +372,8 @@ func (tm *txManager) buildFullReceipt(ctx context.Context, receipt *pldapi.Trans
 			d, err := tm.domainMgr.GetDomainByName(ctx, receipt.Domain)
 			if err == nil {
 				tm.addDomainReceipt(ctx, d, fullReceipt)
+			} else {
+				fullReceipt.DomainReceiptError = err.Error()
 			}
 		}
 	}

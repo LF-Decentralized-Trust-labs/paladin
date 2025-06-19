@@ -137,23 +137,26 @@ type receiptBatchContext struct {
 	domains  map[string]components.Domain
 }
 
-func (l *receiptListener) newReceiptBatchContext(receipts []*transactionReceipt) (*receiptBatchContext, error) {
+func (l *receiptListener) newReceiptBatchContext() *receiptBatchContext {
 	ctx := &receiptBatchContext{
 		listener: l,
 		domains:  make(map[string]components.Domain),
 	}
-	for _, receipt := range receipts {
-		if receipt.Domain != "" {
-			if _, exists := ctx.domains[receipt.Domain]; !exists {
-				domain, err := ctx.listener.tm.domainMgr.GetDomainByName(ctx.listener.ctx, receipt.Domain)
-				if err != nil {
-					return nil, err
-				}
-				ctx.domains[receipt.Domain] = domain
-			}
-		}
+	return ctx
+}
+
+func (ctx *receiptBatchContext) getDomain(domainName string) (components.Domain, error) {
+	if domain, exists := ctx.domains[domainName]; exists {
+		return domain, nil
 	}
-	return ctx, nil
+	domain, err := ctx.listener.tm.domainMgr.GetDomainByName(ctx.listener.ctx, domainName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache the domain for future use
+	ctx.domains[domainName] = domain
+	return domain, nil
 }
 
 func (ctx *receiptBatchContext) buildFullReceipt(receipt *pldapi.TransactionReceipt, domainReceipt bool) (*pldapi.TransactionReceiptFull, error) {
@@ -163,7 +166,10 @@ func (ctx *receiptBatchContext) buildFullReceipt(receipt *pldapi.TransactionRece
 			return nil, err
 		}
 		if domainReceipt {
-			domain := ctx.domains[receipt.Domain]
+			domain, err := ctx.getDomain(receipt.Domain)
+			if err != nil {
+				return nil, err
+			}
 			if domain != nil {
 				ctx.listener.tm.addDomainReceipt(ctx.listener.ctx, domain, fullReceipt)
 			}
@@ -683,7 +689,10 @@ func (l *receiptListener) processPersistedReceipt(b *receiptDeliveryBatch, pr *t
 	}
 
 	if fr.TransactionReceiptDataOnchainEvent != nil && fr.Domain != "" {
-		d := batchCtx.domains[fr.Domain]
+		d, err := batchCtx.getDomain(fr.Domain)
+		if err != nil {
+			return err
+		}
 
 		// Check if the states are complete
 		complete := false
@@ -812,10 +821,7 @@ func (l *receiptListener) updateCheckpoint(batch *receiptDeliveryBatch, newSeque
 }
 
 func (l *receiptListener) processPage(page []*transactionReceipt) (*receiptDeliveryBatch, error) {
-	batchCtx, err := l.newReceiptBatchContext(page)
-	if err != nil {
-		return nil, err
-	}
+	batchCtx := l.newReceiptBatchContext()
 
 	// Process each one building up a batch to process
 	var batch receiptDeliveryBatch
@@ -905,11 +911,7 @@ func (l *receiptListener) processIncompleteReceiptsBatch(incompleteReceipts []*p
 		receiptsByTxID[receipt.TransactionID] = receipt
 	}
 
-	batchCtx, err := l.newReceiptBatchContext(receipts)
-	if err != nil {
-		return err
-	}
-
+	batchCtx := l.newReceiptBatchContext()
 	var receiptsToRemove []*persistedIncompleteReceipt
 
 	// Process each incomplete receipt using the fetched data
