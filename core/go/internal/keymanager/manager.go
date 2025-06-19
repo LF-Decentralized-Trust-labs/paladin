@@ -19,12 +19,15 @@ import (
 	"context"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signer"
 	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
@@ -52,6 +55,11 @@ type keyManager struct {
 	allocLock       sync.Mutex
 	allocLockHolder *keyResolver
 
+	// plugin signing modules
+	mux                  sync.Mutex
+	signingModulesByID   map[uuid.UUID]*signingModule
+	signingModulesByName map[string]*signingModule
+
 	p persistence.Persistence
 }
 
@@ -60,6 +68,8 @@ func NewKeyManager(bgCtx context.Context, conf *pldconf.KeyManagerConfig) compon
 		bgCtx:                   bgCtx,
 		conf:                    conf,
 		identifierCache:         cache.NewCache[string, *pldapi.KeyMappingWithPath](&conf.IdentifierCache, &pldconf.KeyManagerDefaults.IdentifierCache),
+		signingModulesByID:      make(map[uuid.UUID]*signingModule),
+		signingModulesByName:    make(map[string]*signingModule),
 		verifierByIdentityCache: cache.NewCache[string, *pldapi.KeyVerifier](&conf.VerifierCache, &pldconf.KeyManagerDefaults.VerifierCache),
 		verifierReverseCache:    cache.NewCache[string, *pldapi.KeyMappingAndVerifier](&conf.VerifierCache, &pldconf.KeyManagerDefaults.VerifierCache),
 		walletsByName:           make(map[string]*wallet),
@@ -91,11 +101,77 @@ func (km *keyManager) PostInit(c components.AllComponents) error {
 	return nil
 }
 
+func (km *keyManager) setWalletSigningModule(ctx context.Context, walletName string, signingModule signer.SigningModule) error {
+	wallet, ok := km.walletsByName[walletName]
+	if !ok {
+		return i18n.NewError(ctx, msgs.MsgKeyManagerWalletNotConfigured, walletName)
+	}
+
+	wallet.signingModule = signingModule
+	wallet.signingModuleInitialized = true
+
+	return nil
+}
+
 func (km *keyManager) Start() error {
 	return nil
 }
 
 func (km *keyManager) Stop() {
+}
+
+func (km *keyManager) cleanupSigningModule(sm *signingModule) {
+	sm.close()
+	delete(km.signingModulesByID, sm.id)
+	delete(km.signingModulesByName, sm.name)
+}
+
+func (km *keyManager) ConfiguredSigningModules() map[string]*pldconf.PluginConfig {
+	pluginConf := make(map[string]*pldconf.PluginConfig)
+	for name, conf := range km.conf.SigningModules {
+		pluginConf[name] = &conf.Plugin
+	}
+	return pluginConf
+}
+
+func (km *keyManager) SigningModuleRegistered(name string, id uuid.UUID, toSigningModule components.KeyManagerToSigningModule) (fromSigningModule plugintk.SigningModuleCallbacks, err error) {
+	km.mux.Lock()
+	defer km.mux.Unlock()
+
+	// Replaces any previously registered instance
+	existing := km.signingModulesByName[name]
+	for existing != nil {
+		// Can't hold the lock in cleanup, hence the loop
+		km.mux.Unlock()
+		km.cleanupSigningModule(existing)
+		km.mux.Lock()
+		existing = km.signingModulesByName[name]
+	}
+
+	// Get the config for this signing module
+	conf := km.conf.SigningModules[name]
+	if conf == nil {
+		// Shouldn't be possible
+		return nil, i18n.NewError(km.bgCtx, msgs.MsgKeyManagerSigningModuleNotFound, name)
+	}
+
+	// Initialize
+	sm := km.newSigningModule(id, name, conf, toSigningModule).(*signingModule)
+	km.signingModulesByID[id] = sm
+	km.signingModulesByName[name] = sm
+	go sm.init()
+	return sm, nil
+}
+
+func (km *keyManager) GetSigningModule(ctx context.Context, name string) (signer.SigningModule, error) {
+	km.mux.Lock()
+	defer km.mux.Unlock()
+
+	sm := km.signingModulesByName[name]
+	if sm == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgKeyManagerSigningModuleNotFound, name)
+	}
+	return sm, nil
 }
 
 func (km *keyManager) Sign(ctx context.Context, mapping *pldapi.KeyMappingAndVerifier, payloadType string, payload []byte) ([]byte, error) {
@@ -153,7 +229,11 @@ func (km *keyManager) unlockAllocation(ctx context.Context, kr *keyResolver) {
 func (km *keyManager) AddInMemorySigner(prefix string, signer signerapi.InMemorySigner) {
 	// Called during PostInit phase by domain manager
 	for _, w := range km.walletsByName {
-		w.signingModule.AddInMemorySigner(prefix, signer)
+		if !w.signingModuleInitialized {
+			log.L(km.bgCtx).Warnf("Unable to add in-memory signer, wallet '%s' signing module not initialized", w.name)
+		} else {
+			w.signingModule.AddInMemorySigner(prefix, signer)
+		}
 	}
 }
 

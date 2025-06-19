@@ -34,7 +34,7 @@ There is a second example (`update.js`) in the privacy storage example folder wh
 
 You can use this second example to learn about using resuming use of existing privacy groups and contracts.
 
-The **full example** code is available in the [Paladin example repository](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/private-storage).
+The **full example** code is available in the [Paladin example repository](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/privacy-storage).
 
 ---
 

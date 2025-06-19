@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -64,6 +64,9 @@ type pluginManager struct {
 	registryManager components.RegistryManager
 	registryPlugins map[uuid.UUID]*plugin[prototk.RegistryMessage]
 
+	signingModuleManager components.KeyManager
+	signingModulePlugins map[uuid.UUID]*plugin[prototk.SigningModuleMessage]
+
 	notifyPluginsUpdated chan bool
 	notifySystemCommand  chan prototk.PluginLoad_SysCommand
 	pluginLoaderDone     chan struct{}
@@ -83,9 +86,10 @@ func NewPluginManager(bgCtx context.Context,
 		loaderID:        loaderID,
 		shutdownTimeout: confutil.DurationMin(conf.GRPC.ShutdownTimeout, 0, *pldconf.DefaultGRPCConfig.ShutdownTimeout),
 
-		domainPlugins:    make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
-		transportPlugins: make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
-		registryPlugins:  make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
+		domainPlugins:        make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
+		transportPlugins:     make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
+		registryPlugins:      make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
+		signingModulePlugins: make(map[uuid.UUID]*plugin[prototk.SigningModuleMessage]),
 
 		serverDone:           make(chan error),
 		notifyPluginsUpdated: make(chan bool, 1),
@@ -138,6 +142,7 @@ func (pm *pluginManager) PostInit(c components.AllComponents) error {
 	pm.domainManager = c.DomainManager()
 	pm.transportManager = c.TransportManager()
 	pm.registryManager = c.RegistryManager()
+	pm.signingModuleManager = c.KeyManager()
 
 	if err := pm.ReloadPluginList(); err != nil {
 		return err
@@ -221,6 +226,11 @@ func (pm *pluginManager) ReloadPluginList() (err error) {
 	for name, tp := range pm.registryManager.ConfiguredRegistries() {
 		if err == nil {
 			err = initPlugin(pm.bgCtx, pm, pm.registryPlugins, name, prototk.PluginInfo_REGISTRY, tp)
+		}
+	}
+	for name, smp := range pm.signingModuleManager.ConfiguredSigningModules() {
+		if err == nil {
+			err = initPlugin(pm.bgCtx, pm, pm.signingModulePlugins, name, prototk.PluginInfo_SIGNING_MODULE, smp)
 		}
 	}
 	if err != nil {
@@ -384,6 +394,12 @@ func (pm *pluginManager) sendPluginsToLoader(stream prototk.PluginController_Ini
 		}
 		_, notInitializingRegistries := unloadedPlugins(pm, pm.registryPlugins, prototk.PluginInfo_REGISTRY, true)
 		for _, plugin := range notInitializingRegistries {
+			if err == nil {
+				err = stream.Send(plugin.def)
+			}
+		}
+		_, notInitializingSigningModules := unloadedPlugins(pm, pm.signingModulePlugins, prototk.PluginInfo_SIGNING_MODULE, true)
+		for _, plugin := range notInitializingSigningModules {
 			if err == nil {
 				err = stream.Send(plugin.def)
 			}
