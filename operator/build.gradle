@@ -230,6 +230,7 @@ task copySolidity(type: Copy) {
 }
 
 task copyZetoSolidity(type: Copy) {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     inputs.files(configurations.zetoArtifacts)
     inputs.files(configurations.poseidonArtifacts)
     inputs.files(configurations.contractCompile)

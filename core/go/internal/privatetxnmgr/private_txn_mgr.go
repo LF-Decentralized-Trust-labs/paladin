@@ -18,6 +18,7 @@ package privatetxnmgr
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
@@ -26,6 +27,8 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/sender"
 
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
@@ -110,7 +113,7 @@ func (p *privateTxManager) OnNewBlockHeight(ctx context.Context, blockHeight int
 	}
 }
 
-func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract) (oc *Sequencer, err error) {
+func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract, tx *components.PrivateTransaction) (oc *Sequencer, err error) {
 
 	if domainAPI == nil {
 		domainAPI, err = p.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
@@ -267,7 +270,7 @@ func (p *privateTxManager) handleNewTx(ctx context.Context, dbTX persistence.DBT
 		return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "PreAssembly is nil")
 	}
 
-	oc, err := p.getSequencerForContract(ctx, dbTX, contractAddr, domainAPI)
+	oc, err := p.getSequencerForContract(ctx, dbTX, contractAddr, domainAPI, tx)
 	if err != nil {
 		return err
 	}
@@ -304,7 +307,7 @@ func (p *privateTxManager) handleDelegatedTransaction(ctx context.Context, dbTX 
 		log.L(ctx).Errorf("handleDelegatedTransaction: Failed to get domain smart contract for contract address %s: %s", tx.Address, err)
 		return err
 	}
-	sequencer, err := p.getSequencerForContract(ctx, dbTX, tx.Address, domainAPI)
+	sequencer, err := p.getSequencerForContract(ctx, dbTX, tx.Address, domainAPI, tx)
 	if err != nil {
 		return err
 	}
@@ -820,7 +823,7 @@ func (p *privateTxManager) handleAssembleRequest(ctx context.Context, messagePay
 		return
 	}
 
-	sequencer, err := p.getSequencerForContract(ctx, p.components.Persistence().NOTX(), *contractAddress, nil) // this is just to make sure the sequencer is running
+	sequencer, err := p.getSequencerForContract(ctx, p.components.Persistence().NOTX(), *contractAddress, nil, nil) // this is just to make sure the sequencer is running
 	if err != nil {
 		log.L(ctx).Errorf("Failed to get sequencer for contract address %s: %s", contractAddressString, err)
 		p.sendAssembleError(ctx, replyTo, assembleRequest.AssembleRequestId, assembleRequest.ContractAddress, assembleRequest.TransactionId, err)
@@ -982,7 +985,7 @@ func (p *privateTxManager) PrivateTransactionConfirmed(ctx context.Context, rece
 	log.L(ctx).Infof("private TX manager notified of transaction confirmation %s deploy=%t",
 		receipt.TransactionID, receipt.PSC == nil)
 	if receipt.PSC != nil {
-		seq, err := p.getSequencerForContract(ctx, p.components.Persistence().NOTX(), receipt.PSC.Address(), receipt.PSC)
+		seq, err := p.getSequencerForContract(ctx, p.components.Persistence().NOTX(), receipt.PSC.Address(), receipt.PSC, nil)
 		if err != nil {
 			log.L(ctx).Errorf("failed to obtain sequence to process receipts on contract %s: %s", receipt.PSC.Address(), err)
 			return
@@ -1037,4 +1040,50 @@ func (p *privateTxManager) CallPrivateSmartContract(ctx context.Context, call *c
 
 func (p *privateTxManager) BuildStateDistributions(ctx context.Context, tx *components.PrivateTransaction) (*components.StateDistributionSet, error) {
 	return newStateDistributionBuilder(p.components, tx).Build(ctx)
+}
+
+func (p *privateTxManager) handleCoordinatorHeartbeatNotification(ctx context.Context, messagePayload []byte) {
+
+	heartbeatNotification := &pbEngine.CoordinatorHeartbeatNotification{}
+	err := proto.Unmarshal(messagePayload, heartbeatNotification)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to unmarshal heartbeatNotification: %s", err)
+		return
+	}
+
+	from := heartbeatNotification.From
+	if from == "" {
+		log.L(ctx).Errorf("Failed to handle coordinator heartbeat - from field not set")
+		return
+	}
+
+	contractAddressString := heartbeatNotification.ContractAddress
+	contractAddress, err := pldtypes.ParseEthAddress(contractAddressString)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to parse contract address from coordinator heartbeat: %s", err)
+		return
+	}
+
+	coordinatorSnapshot := &common.CoordinatorSnapshot{}
+	err = json.Unmarshal(heartbeatNotification.CoordinatorSnapshot, coordinatorSnapshot)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to unmarshal coordinatorSnapshot: %s", err)
+		return
+	}
+
+	heartbeatEvent := &sender.HeartbeatReceivedEvent{}
+	heartbeatEvent.From = from
+	heartbeatEvent.ContractAddress = contractAddress
+	heartbeatEvent.CoordinatorSnapshot = *coordinatorSnapshot
+
+	fmt.Println(heartbeatEvent)
+
+	_, err = p.getSequencerForContract(ctx, p.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("failed to obtain sequencer to pass heartbeat eventct %v:", err)
+		return
+	}
+
+	// MRW TODO - does event handling exist here?
+	// seq.coordinatorSelector.HandleCoordinatorEvent(ctx, heartbeatEvent)
 }

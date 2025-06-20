@@ -47,18 +47,18 @@ type transportManager struct {
 	cancelCtx context.CancelFunc
 	mux       sync.Mutex
 
-	rpcModule        *rpcserver.RPCModule
-	conf             *pldconf.TransportManagerConfig
-	localNodeName    string
-	registryManager  components.RegistryManager
-	stateManager     components.StateManager
-	domainManager    components.DomainManager
-	keyManager       components.KeyManager
-	txManager        components.TXManager
-	privateTxManager components.PrivateTxManager
-	identityResolver components.IdentityResolver
-	groupManager     components.GroupManager
-	persistence      persistence.Persistence
+	rpcModule                   *rpcserver.RPCModule
+	conf                        *pldconf.TransportManagerConfig
+	localNodeName               string
+	registryManager             components.RegistryManager
+	stateManager                components.StateManager
+	domainManager               components.DomainManager
+	keyManager                  components.KeyManager
+	txManager                   components.TXManager
+	distributedSequencerManager components.DistributedSequencerManager
+	identityResolver            components.IdentityResolver
+	groupManager                components.GroupManager
+	persistence                 persistence.Persistence
 
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
@@ -133,7 +133,7 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 	tm.domainManager = c.DomainManager()
 	tm.keyManager = c.KeyManager()
 	tm.txManager = c.TxManager()
-	tm.privateTxManager = c.PrivateTxManager()
+	tm.distributedSequencerManager = c.DistributedSequencerManager()
 	tm.identityResolver = c.IdentityResolver()
 	tm.groupManager = c.GroupManager()
 	tm.persistence = c.Persistence()

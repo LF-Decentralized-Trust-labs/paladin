@@ -23,7 +23,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -147,23 +146,24 @@ func (tb *testbed) gatherSignatures(ctx context.Context, tx *testbedTransaction)
 
 func (tb *testbed) writeNullifiersToContext(dCtx components.DomainContext, tx *components.PrivateTransaction) error {
 
-	distributions, err := tb.c.PrivateTxManager().BuildStateDistributions(tb.ctx, tx)
-	if err != nil {
-		return err
-	}
+	// MRW TODO - nullifiers with distributed sequencer
+	// distributions, err := tb.c.DistributedSequencerManager().BuildStateDistributions(tb.ctx, tx)
+	// if err != nil {
+	// 	return err
+	// }
 
-	if len(distributions.Remote) > 0 {
-		log.L(tb.ctx).Errorf("States for remote nodes: %+v", distributions.Remote)
-		return fmt.Errorf("testbed does not support states for remote nodes")
-	}
+	// if len(distributions.Remote) > 0 {
+	// 	log.L(tb.ctx).Errorf("States for remote nodes: %+v", distributions.Remote)
+	// 	return fmt.Errorf("testbed does not support states for remote nodes")
+	// }
 
-	nullifiers, err := tb.c.PrivateTxManager().BuildNullifiers(tb.ctx, distributions.Local)
-	if err != nil {
-		return err
-	}
+	// nullifiers, err := tb.c.PrivateTxManager().BuildNullifiers(tb.ctx, distributions.Local)
+	// if err != nil {
+	// 	return err
+	// }
 
-	return dCtx.UpsertNullifiers(nullifiers...)
-
+	// return dCtx.UpsertNullifiers(nullifiers...)
+	return nil
 }
 
 func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState {

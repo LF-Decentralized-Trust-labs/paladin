@@ -126,7 +126,7 @@ func TestInitOK(t *testing.T) {
 	assert.NotNil(t, cm.TransportManager())
 	assert.NotNil(t, cm.RegistryManager())
 	assert.NotNil(t, cm.PluginManager())
-	assert.NotNil(t, cm.PrivateTxManager())
+	assert.NotNil(t, cm.DistributedSequencerManager())
 	assert.NotNil(t, cm.PublicTxManager())
 	assert.NotNil(t, cm.TxManager())
 	assert.NotNil(t, cm.GroupManager())
@@ -196,9 +196,9 @@ func TestStartOK(t *testing.T) {
 	mockPublicTxManager.On("Start").Return(nil)
 	mockPublicTxManager.On("Stop").Return()
 
-	mockPrivateTxManager := componentsmocks.NewPrivateTxManager(t)
-	mockPrivateTxManager.On("Start").Return(nil)
-	mockPrivateTxManager.On("Stop").Return()
+	mockDistributedSequencerManager := componentsmocks.NewDistributedSequencerManager(t)
+	mockDistributedSequencerManager.On("Start").Return(nil)
+	mockDistributedSequencerManager.On("Stop").Return()
 
 	mockTxManager := componentsmocks.NewTXManager(t)
 	mockTxManager.On("Start").Return(nil)
@@ -243,7 +243,7 @@ func TestStartOK(t *testing.T) {
 	cm.stateManager = mockStateManager
 	cm.rpcServer = mockRPCServer
 	cm.publicTxManager = mockPublicTxManager
-	cm.privateTxManager = mockPrivateTxManager
+	cm.distributedSequencerManager = mockDistributedSequencerManager
 	cm.txManager = mockTxManager
 	cm.groupManager = mockGroupManager
 	cm.additionalManagers = append(cm.additionalManagers, mockExtraManager)

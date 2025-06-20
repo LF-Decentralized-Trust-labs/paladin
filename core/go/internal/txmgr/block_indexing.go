@@ -71,13 +71,14 @@ func (tm *txManager) blockIndexerPreCommit(
 		return err
 	}
 
-	// Deliver the failures to the private transaction manager
-	if len(failedForPrivateTx) > 0 {
-		err = tm.privateTxMgr.NotifyFailedPublicTx(ctx, dbTX, failedForPrivateTx)
-		if err != nil {
-			return err
-		}
-	}
+	// MRW TODO
+	// Deliver the failures to the distributed sequencer
+	// if len(failedForPrivateTx) > 0 {
+	// 	err = tm.privateTxMgr.NotifyFailedPublicTx(ctx, dbTX, failedForPrivateTx)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	dbTX.AddPostCommit(func(ctx context.Context) {
 		// We need to notify the public TX manager when the DB transaction for these has completed,

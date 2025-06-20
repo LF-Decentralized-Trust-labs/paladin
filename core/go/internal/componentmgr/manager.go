@@ -30,9 +30,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/keymanager"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/plugins"
-	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr"
 	"github.com/kaleido-io/paladin/core/internal/publictxmgr"
 	"github.com/kaleido-io/paladin/core/internal/registrymgr"
+	"github.com/kaleido-io/paladin/core/internal/sequencer"
 	"github.com/kaleido-io/paladin/core/internal/statemgr"
 	"github.com/kaleido-io/paladin/core/internal/transportmgr"
 	"github.com/kaleido-io/paladin/core/internal/txmgr"
@@ -71,16 +71,16 @@ type componentManager struct {
 	rpcServer        rpcserver.RPCServer
 
 	// managers
-	stateManager     components.StateManager
-	domainManager    components.DomainManager
-	transportManager components.TransportManager
-	registryManager  components.RegistryManager
-	pluginManager    components.PluginManager
-	publicTxManager  components.PublicTxManager
-	privateTxManager components.PrivateTxManager
-	txManager        components.TXManager
-	identityResolver components.IdentityResolver
-	groupManager     components.GroupManager
+	stateManager                components.StateManager
+	domainManager               components.DomainManager
+	transportManager            components.TransportManager
+	registryManager             components.RegistryManager
+	pluginManager               components.PluginManager
+	publicTxManager             components.PublicTxManager
+	distributedSequencerManager components.DistributedSequencerManager
+	txManager                   components.TXManager
+	identityResolver            components.IdentityResolver
+	groupManager                components.GroupManager
 	// managers that are not a core part of the engine, but allow Paladin to operate in an extended mode - the testbed is an example.
 	// these cannot be queried by other components (no AdditionalManagers() function on AllComponents)
 	additionalManagers []components.AdditionalManager
@@ -204,9 +204,9 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	if err == nil {
-		cm.privateTxManager = privatetxnmgr.NewPrivateTransactionMgr(cm.bgCtx, &cm.conf.PrivateTxManager)
-		cm.initResults["private_tx_manager"], err = cm.privateTxManager.PreInit(cm)
-		err = cm.wrapIfErr(err, msgs.MsgComponentPrivateTxManagerInitError)
+		cm.distributedSequencerManager = sequencer.NewDistributedSequencerManager(cm.bgCtx, &cm.conf.DistributedSequencerManager)
+		cm.initResults["distributed_sequencer_manager"], err = cm.distributedSequencerManager.PreInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentDistributedSequencerManagerInitError)
 	}
 
 	if err == nil {
@@ -272,8 +272,8 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	if err == nil {
-		err = cm.privateTxManager.PostInit(cm)
-		err = cm.wrapIfErr(err, msgs.MsgComponentPrivateTxManagerInitError)
+		err = cm.distributedSequencerManager.PostInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentDistributedSequencerManagerInitError)
 	}
 
 	if err == nil {
@@ -371,8 +371,8 @@ func (cm *componentManager) StartManagers() (err error) {
 	}
 
 	if err == nil {
-		err = cm.privateTxManager.Start()
-		err = cm.addIfStarted("private_tx_manager", cm.privateTxManager, err, msgs.MsgComponentPrivateTxManagerStartError)
+		err = cm.distributedSequencerManager.Start()
+		err = cm.addIfStarted("distributed_sequencer_manager", cm.distributedSequencerManager, err, msgs.MsgComponentDistributedSequencerStartError)
 	}
 
 	if err == nil {
@@ -537,8 +537,8 @@ func (cm *componentManager) PublicTxManager() components.PublicTxManager {
 	return cm.publicTxManager
 }
 
-func (cm *componentManager) PrivateTxManager() components.PrivateTxManager {
-	return cm.privateTxManager
+func (cm *componentManager) DistributedSequencerManager() components.DistributedSequencerManager {
+	return cm.distributedSequencerManager
 }
 
 func (cm *componentManager) TxManager() components.TXManager {

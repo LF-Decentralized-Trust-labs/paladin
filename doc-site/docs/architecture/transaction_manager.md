@@ -14,7 +14,7 @@ The core function of the Paladin runtime, is to operate as a distributed transac
 
 ⚠ WORK IN PROGRESS ⚠
 
-![Distributed Transaction Manager - Component Flow](../images/distribute_tx_manager_component_flow.jpg)
+![Distributed Transaction Manager - Component Flow](../images/distribute_tx_manager_component_flow.jpg){.zoomable-image}
 
 The major components of the transaction manager are highlighted in this diagram. Key items are:
 
@@ -47,12 +47,12 @@ In order to build an engine that works with asynchronous transaction stage updat
   - **Base EVM ledger events**: events from the tracked privacy preserving contracts drives the finalization of Paladin transactions. The engine will coordinate and trigger associated completion and rollbacks.
 
 
-![transaction engine event sources](../images/tx_event_sources.png)
+![transaction engine event sources](../images/tx_event_sources.png){.zoomable-image}
 
 
 - **Efficient dependency checks**: A single Paladin node will need to handle transactions from multiple privacy preserving contracts and multiple UTXO states within each privacy preserving contracts. Paladin transaction engine maintains core transaction status information that are discovered through handling transaction events and stage tasks to provide efficient dependency checks. The transaction engine is designed to be the gate for all transaction record updates so that it can maintain data integrity of the core tracking information.
 
-![transaction engine components](../images/tx_engine_components.jpg)
+![transaction engine components](../images/tx_engine_components.jpg){.zoomable-image}
 
 - **Critical changes must be persisted between stage tasks**: in the situations the transaction stage processor are switching between different stage tasks, any critical changes from the previous task must be persisted on-disk before the next task is triggered. This is to ensure the engine can resume transaction process with the correct context without losing critical information. The stage tasks themselves must be designed with idempotency in mind, so retries with persisted information do not cause unexpected behavior.
 

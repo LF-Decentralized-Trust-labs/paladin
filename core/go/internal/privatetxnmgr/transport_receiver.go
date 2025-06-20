@@ -20,6 +20,7 @@ import (
 
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
 )
 
 func (p *privateTxManager) HandlePaladinMsg(ctx context.Context, message *components.ReceivedMessage) {
@@ -45,6 +46,8 @@ func (p *privateTxManager) HandlePaladinMsg(ctx context.Context, message *compon
 		go p.handleAssembleResponse(p.ctx, messagePayload)
 	case "AssembleError":
 		go p.handleAssembleError(p.ctx, messagePayload)
+	case transport.MessageType_CoordinatorHeartbeatNotification:
+		go p.handleCoordinatorHeartbeatNotification(p.ctx, messagePayload)
 	default:
 		log.L(ctx).Errorf("Unknown message type: %s", message.MessageType)
 	}
