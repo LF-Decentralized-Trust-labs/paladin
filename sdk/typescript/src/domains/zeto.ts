@@ -167,6 +167,21 @@ export class ZetoInstance {
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
   }
 
+  transferLocked(from: PaladinVerifier, data: ZetoTransferLockedParams) {
+    return this.paladin.sendTransaction({
+      type: TransactionType.PRIVATE,
+      abi: zetoAbi,
+      function: "transferLocked",
+      to: this.address,
+      from: from.lookup,
+      data: {
+        lockedInputs: data.lockedInputs,
+        delegate: data.delegate,
+        transfers: data.transfers.map((t) => ({ ...t, to: t.to.lookup })),
+      },
+    });
+  }
+
   prepareTransferLocked(from: PaladinVerifier, data: ZetoTransferLockedParams) {
     return this.paladin.prepareTransaction({
       type: TransactionType.PRIVATE,
