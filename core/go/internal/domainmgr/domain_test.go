@@ -1220,7 +1220,7 @@ func TestGetDomainReceiptAllAvailable(t *testing.T) {
 	assert.Nil(t, td.d.initError.Load())
 
 	td.tp.Functions.BuildReceipt = func(ctx context.Context, req *prototk.BuildReceiptRequest) (*prototk.BuildReceiptResponse, error) {
-		require.True(t, req.Complete)
+		require.False(t, req.UnavailableStates)
 		require.Len(t, req.InputStates, 1)
 		require.Equal(t, stateID1.String(), req.InputStates[0].Id)
 		require.Len(t, req.ReadStates, 1)
@@ -1260,7 +1260,7 @@ func TestGetDomainReceiptIncomplete(t *testing.T) {
 	assert.Nil(t, td.d.initError.Load())
 
 	td.tp.Functions.BuildReceipt = func(ctx context.Context, req *prototk.BuildReceiptRequest) (*prototk.BuildReceiptResponse, error) {
-		require.False(t, req.Complete)
+		require.True(t, req.UnavailableStates)
 		require.Len(t, req.InputStates, 1)
 
 		return &prototk.BuildReceiptResponse{

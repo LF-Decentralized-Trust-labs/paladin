@@ -69,6 +69,9 @@ type Domain interface {
 
 	GetDomainReceipt(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID) (pldtypes.RawJSON, error)
 	BuildDomainReceipt(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID, txStates *pldapi.TransactionStates) (pldtypes.RawJSON, error)
+
+	// Check if the transaction states are complete (all expected states are available)
+	CheckStateCompletion(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID, txStates *pldapi.TransactionStates) (bool, error)
 }
 
 // External interface for other components to call against a private smart contract

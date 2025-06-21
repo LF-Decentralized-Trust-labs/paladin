@@ -17,7 +17,6 @@
 
  import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  import com.fasterxml.jackson.annotation.JsonProperty;
- import com.fasterxml.jackson.core.type.TypeReference;
  import com.fasterxml.jackson.databind.JsonNode;
  import com.fasterxml.jackson.databind.ObjectMapper;
  import com.fasterxml.jackson.databind.node.*;
@@ -558,7 +557,7 @@
      @Override
      protected CompletableFuture<BuildReceiptResponse> buildReceipt(BuildReceiptRequest request) {
          try {
-             if (!request.getComplete()) {
+             if (request.getUnavailableStates()) {
                  throw new IllegalStateException("all states must be available to build an EVM receipt");
              }
 
@@ -807,6 +806,12 @@
          } catch (Exception e) {
              return CompletableFuture.failedFuture(e);
          }
+     }
+
+     @Override
+     protected CompletableFuture<CheckStateCompletionResponse> checkStateCompletion(CheckStateCompletionRequest request) {
+         return CompletableFuture.completedFuture(
+            CheckStateCompletionResponse.newBuilder().setComplete(!request.getUnavailableStates()).build());
      }
 
      @NotNull

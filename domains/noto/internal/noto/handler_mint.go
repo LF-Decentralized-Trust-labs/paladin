@@ -82,11 +82,11 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		return nil, err
 	}
 
-	outputStates, err := h.noto.prepareOutputs(toAddress, params.Amount, []string{notary, params.To})
+	outputStates, err := h.noto.prepareOutputs(toAddress, params.Amount, []string{notary, tx.Transaction.From, params.To})
 	if err != nil {
 		return nil, err
 	}
-	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, params.To})
+	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, tx.Transaction.From, params.To})
 	if err != nil {
 		return nil, err
 	}

@@ -15,12 +15,13 @@
 
  package io.kaleido.paladin.toolkit;
 
- import io.grpc.stub.StreamObserver;
- import io.kaleido.paladin.logging.PaladinLogging;
+ import java.util.concurrent.CompletableFuture;
+
  import org.apache.logging.log4j.Logger;
  import org.apache.logging.log4j.message.FormattedMessage;
- 
- import java.util.concurrent.CompletableFuture;
+
+ import io.grpc.stub.StreamObserver;
+ import io.kaleido.paladin.logging.PaladinLogging;
  
  public abstract class DomainInstance extends PluginInstance<DomainMessage> {
  
@@ -45,6 +46,7 @@
      protected abstract CompletableFuture<ConfigurePrivacyGroupResponse> configurePrivacyGroup(ConfigurePrivacyGroupRequest request);
      protected abstract CompletableFuture<InitPrivacyGroupResponse> initPrivacyGroup(InitPrivacyGroupRequest request);
      protected abstract CompletableFuture<WrapPrivacyGroupEVMTXResponse> wrapPrivacyGroupTransaction(WrapPrivacyGroupEVMTXRequest request);
+     protected abstract CompletableFuture<CheckStateCompletionResponse> checkStateCompletion(CheckStateCompletionRequest request);
 
      protected DomainInstance(String grpcTarget, String instanceId) {
          super(grpcTarget, instanceId);
@@ -123,6 +125,7 @@
                  case CONFIGURE_PRIVACY_GROUP -> configurePrivacyGroup(request.getConfigurePrivacyGroup()).thenApply(response::setConfigurePrivacyGroupRes);
                  case INIT_PRIVACY_GROUP -> initPrivacyGroup(request.getInitPrivacyGroup()).thenApply(response::setInitPrivacyGroupRes);
                  case WRAP_PRIVACY_GROUP_EVMTX -> wrapPrivacyGroupTransaction(request.getWrapPrivacyGroupEvmtx()).thenApply(response::setWrapPrivacyGroupEvmtxRes);
+                 case CHECK_STATE_COMPLETION -> checkStateCompletion(request.getCheckStateCompletion()).thenApply(response::setCheckStateCompletionRes);
                  default -> throw new IllegalArgumentException("unknown request: %s".formatted(request.getRequestToDomainCase()));
              };
              return resultApplied.thenApply((ra) -> {

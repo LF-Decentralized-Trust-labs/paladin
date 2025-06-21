@@ -37,6 +37,7 @@ type IncompleteStateReceiptBehavior string
 const (
 	IncompleteStateReceiptBehaviorBlockContract IncompleteStateReceiptBehavior = "block_contract"
 	IncompleteStateReceiptBehaviorProcess       IncompleteStateReceiptBehavior = "process"
+	IncompleteStateReceiptBehaviorCompleteOnly  IncompleteStateReceiptBehavior = "complete_only"
 )
 
 func (tt IncompleteStateReceiptBehavior) Enum() pldtypes.Enum[IncompleteStateReceiptBehavior] {
@@ -47,6 +48,7 @@ func (tt IncompleteStateReceiptBehavior) Options() []string {
 	return []string{
 		string(IncompleteStateReceiptBehaviorBlockContract),
 		string(IncompleteStateReceiptBehaviorProcess),
+		string(IncompleteStateReceiptBehaviorCompleteOnly),
 	}
 }
 

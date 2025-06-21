@@ -126,11 +126,15 @@ func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTrans
 		return nil, nil, err
 	}
 
-	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, params.From})
+	infoDistribution := []string{notary, params.From}
+	for _, entry := range params.Recipients {
+		infoDistribution = append(infoDistribution, entry.To)
+	}
+	infoStates, err := h.noto.prepareInfo(params.Data, infoDistribution)
 	if err != nil {
 		return nil, nil, err
 	}
-	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, nil, []string{notary, params.From})
+	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, nil, infoDistribution)
 	if err != nil {
 		return nil, nil, err
 	}
