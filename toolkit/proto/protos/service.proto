@@ -65,6 +65,7 @@ message DomainMessage {
     ConfigurePrivacyGroupRequest  configure_privacy_group =      1170;
     InitPrivacyGroupRequest       init_privacy_group =           1180;
     WrapPrivacyGroupEVMTXRequest  wrap_privacy_group_evmtx =     1190;
+    CheckStateCompletionRequest   check_state_completion =       1200;
   }
 
   oneof response_from_domain {
@@ -87,6 +88,7 @@ message DomainMessage {
     ConfigurePrivacyGroupResponse configure_privacy_group_res =  1171;
     InitPrivacyGroupResponse      init_privacy_group_res =       1181;
     WrapPrivacyGroupEVMTXResponse wrap_privacy_group_evmtx_res = 1191;
+    CheckStateCompletionResponse  check_state_completion_res =   1201;
   }
 
   // Request/reply exchanges initiated by the domain, to the paladin node

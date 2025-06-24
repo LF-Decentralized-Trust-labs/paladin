@@ -22,11 +22,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSIncompleteStateReceiptBehavior(t *testing.T) {
+func TestIncompleteStateReceiptBehavior(t *testing.T) {
 	require.Equal(t, IncompleteStateReceiptBehaviorProcess, IncompleteStateReceiptBehaviorProcess.Enum().V())
 	def, err := IncompleteStateReceiptBehavior("").Enum().Validate()
 	require.NoError(t, err)
-	require.Equal(t, "block_contract", string(def))
+	require.Equal(t, IncompleteStateReceiptBehaviorBlockContract.Default(), string(def))
 	_, err = IncompleteStateReceiptBehavior("wrong").Enum().Validate()
 	require.Regexp(t, "PD020003", err)
+
+	// Test the complete_only option
+	require.Equal(t, IncompleteStateReceiptBehaviorCompleteOnly, IncompleteStateReceiptBehaviorCompleteOnly.Enum().V())
+	completeOnly, err := IncompleteStateReceiptBehavior("complete_only").Enum().Validate()
+	require.NoError(t, err)
+	require.Equal(t, "complete_only", string(completeOnly))
+
+	// Test that all options are available
+	options := IncompleteStateReceiptBehaviorBlockContract.Options()
+	require.Contains(t, options, "block_contract")
+	require.Contains(t, options, "process")
+	require.Contains(t, options, "complete_only")
 }

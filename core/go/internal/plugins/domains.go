@@ -414,3 +414,18 @@ func (br *domainBridge) WrapPrivacyGroupEVMTX(ctx context.Context, req *prototk.
 	)
 	return
 }
+
+func (br *domainBridge) CheckStateCompletion(ctx context.Context, req *prototk.CheckStateCompletionRequest) (res *prototk.CheckStateCompletionResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_CheckStateCompletion{CheckStateCompletion: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_CheckStateCompletionRes); ok {
+				res = r.CheckStateCompletionRes
+			}
+			return res != nil
+		},
+	)
+	return
+}

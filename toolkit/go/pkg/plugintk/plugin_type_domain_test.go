@@ -485,3 +485,20 @@ func TestDomainRequestError(t *testing.T) {
 		assert.Regexp(t, "PD020300", *res.Header.ErrorMessage)
 	})
 }
+
+func TestDomainFunction_CheckStateCompletion(t *testing.T) {
+	_, exerciser, funcs, _, _, done := setupDomainTests(t)
+	defer done()
+
+	// CheckStateCompletion - paladin to domain
+	funcs.CheckStateCompletion = func(ctx context.Context, cdr *prototk.CheckStateCompletionRequest) (*prototk.CheckStateCompletionResponse, error) {
+		return &prototk.CheckStateCompletionResponse{}, nil
+	}
+	exerciser.doExchangeToPlugin(func(req *prototk.DomainMessage) {
+		req.RequestToDomain = &prototk.DomainMessage_CheckStateCompletion{
+			CheckStateCompletion: &prototk.CheckStateCompletionRequest{},
+		}
+	}, func(res *prototk.DomainMessage) {
+		assert.IsType(t, &prototk.DomainMessage_CheckStateCompletionRes{}, res.ResponseFromDomain)
+	})
+}

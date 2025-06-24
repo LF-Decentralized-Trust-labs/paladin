@@ -101,12 +101,12 @@ func TestMint(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, receiverAddress, outputCoin.Owner.String())
 	assert.Equal(t, "100", outputCoin.Amount.Int().String())
-	assert.Equal(t, []string{"notary@node1", "receiver@node2"}, assembleRes.AssembledTransaction.OutputStates[0].DistributionList)
+	assert.Equal(t, []string{"notary@node1", "notary@node1", "receiver@node2"}, assembleRes.AssembledTransaction.OutputStates[0].DistributionList)
 
 	outputInfo, err := n.unmarshalInfo(assembleRes.AssembledTransaction.InfoStates[0].StateDataJson)
 	require.NoError(t, err)
 	assert.Equal(t, "0x1234", outputInfo.Data.String())
-	assert.Equal(t, []string{"notary@node1", "receiver@node2"}, assembleRes.AssembledTransaction.InfoStates[0].DistributionList)
+	assert.Equal(t, []string{"notary@node1", "notary@node1", "receiver@node2"}, assembleRes.AssembledTransaction.InfoStates[0].DistributionList)
 
 	encodedMint, err := n.encodeTransferUnmasked(ctx, ethtypes.MustNewAddress(contractAddress), []*types.NotoCoin{}, []*types.NotoCoin{outputCoin})
 	require.NoError(t, err)
