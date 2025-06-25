@@ -527,6 +527,12 @@ spec:
                         defined. The key selector regular expression allows wallets to sub-select, with more specific
                         rules first on key matching and more generic rules (like the default of ".*") last.
                       type: string
+                    keySelectorMustNotMatch:
+                      default: false
+                      description: |-
+                        To instruct the key selector to behave in a non-matching mode whereby wallet selection applies when the
+                        key identifier DOES NOT match against the given regular expression for the key selector.
+                      type: boolean
                     name:
                       pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                       type: string
@@ -543,6 +549,7 @@ spec:
                       type: string
                   required:
                   - keySelector
+                  - keySelectorMustNotMatch
                   - name
                   - secret
                   - type
@@ -882,6 +889,45 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
                     type: string
                 type: object
+              signingModules:
+                description: A list of pluggable signing modules to merge into the
+                  configuration, and rebuild the config of paladin when this list
+                  changes
+                items:
+                  properties:
+                    configJSON:
+                      description: JSON configuration specific to the individual signing
+                        module.
+                      type: string
+                    name:
+                      type: string
+                    plugin:
+                      description: Plugin configuration for loading the signing module
+                      properties:
+                        class:
+                          description: For Java only, the name of the class to load
+                            from the Jar
+                          type: string
+                        library:
+                          description: The location of the library - do not include
+                            the "lib" prefix or the ".so" suffix for shared libraries
+                          type: string
+                        type:
+                          description: The library type to load
+                          enum:
+                          - c-shared
+                          - jar
+                          type: string
+                      required:
+                      - library
+                      - type
+                      type: object
+                  required:
+                  - configJSON
+                  - name
+                  - plugin
+                  type: object
+                type: array
               transports:
                 description: Transports are configured individually on each node,
                   as they reference security details specific to that node

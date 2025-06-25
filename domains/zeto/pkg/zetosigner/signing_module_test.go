@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -23,6 +23,7 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
@@ -63,13 +64,13 @@ func TestZKPSigningModuleKeyResolution(t *testing.T) {
 	ctx, sm, done := newZetoSigningModule(t)
 	defer done()
 
-	resp1, err := sm.Resolve(ctx, &signerapi.ResolveKeyRequest{
-		RequiredIdentifiers: []*signerapi.PublicKeyIdentifierType{
+	resp1, err := sm.Resolve(ctx, &prototk.ResolveKeyRequest{
+		RequiredIdentifiers: []*prototk.PublicKeyIdentifierType{
 			{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS},
 			{Algorithm: zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), VerifierType: zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X},
 		},
 		Name: "blueKey",
-		Path: []*signerapi.ResolveKeyPathSegment{
+		Path: []*prototk.ResolveKeyPathSegment{
 			{Name: "alice"},
 		},
 	})

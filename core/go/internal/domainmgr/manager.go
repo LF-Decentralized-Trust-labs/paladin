@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -123,7 +123,7 @@ func (dm *domainManager) PostInit(c components.AllComponents) error {
 	dm.keyManager = c.KeyManager()
 	dm.transportMgr = c.TransportManager()
 
-	// Register ourselves as a signing on the key manager
+	// Register ourselves as a signing module on the key manager
 	dm.domainSigner = &domainSigner{dm: dm}
 	c.KeyManager().AddInMemorySigner("domain", dm.domainSigner)
 

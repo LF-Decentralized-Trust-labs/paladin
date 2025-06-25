@@ -56,6 +56,7 @@ var (
 var (
 	WalletInfoName                     = pdm("WalletInfo.name", "The name of the wallet")
 	WalletInfoKeySelector              = pdm("WalletInfo.keySelector", "The key selector for the wallet")
+	WalletInfoKeySelectorMustNotMatch  = pdm("WalletInfo.keySelectorMustNotMatch", "To instruct the key selector to behave in a non-matching mode whereby wallet selection applies when the key identifier DOES NOT match against the given regular expression for the key selector")
 	KeyMappingIdentifier               = pdm("KeyMapping.identifier", "The full identifier used to look up this key")
 	KeyMappingWallet                   = pdm("KeyMapping.wallet", "The name of the wallet containing this key")
 	KeyMappingKeyHandle                = pdm("KeyMapping.keyHandle", "The handle within the wallet containing the key")
