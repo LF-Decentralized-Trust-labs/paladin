@@ -41,6 +41,9 @@
     "zeto_g16_withdraw_nullifier_batch": {
         "filename": "test/e2e/abis/zeto/Groth16Verifier_WithdrawNullifierBatch.json"
     },
+    "zeto_g16_nf_anon": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_NfAnon.json"
+    },
     "zeto_poseidon_unit2l": {
         "filename": "test/e2e/abis/zeto/Poseidon2.json"
     },
@@ -66,6 +69,9 @@
             "PoseidonUnit3L": "zeto_poseidon_unit3l",
             "SmtLib": "zeto_smt_lib"
         }
+    },
+    "zeto_impl_nf_anon": {
+        "filename": "test/e2e/abis/zeto/Zeto_NfAnon.json"
     },
     "zeto_factory": {
         "filename": "test/e2e/abis/zeto/ZetoFactory.json"

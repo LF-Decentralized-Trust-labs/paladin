@@ -1,0 +1,102 @@
+apiVersion: core.paladin.io/v1alpha1
+kind: TransactionInvoke
+metadata:
+  labels:
+    app.kubernetes.io/name: operator-go
+    app.kubernetes.io/managed-by: kustomize
+  name: zeto-nf-anon
+spec:
+  node: node1
+  from: zeto.operator
+  txType: public
+  toTemplate: '{{ index .status.resolvedContractAddresses "zeto-factory" }}'
+  requiredContractDeployments:
+    - 'zeto-factory'
+    - 'zeto-impl-nf-anon'
+    - 'zeto-g16-nf-anon'
+  function: registerImplementation
+  paramsJSONTemplate: |
+    {
+      "name": "Zeto_NfAnon",
+      "implementation": {
+        "implementation":          "{{ index .status.resolvedContractAddresses "zeto-impl-nf-anon" }}",
+        "verifiers": {
+          "verifier":              "{{ index .status.resolvedContractAddresses "zeto-g16-nf-anon" }}",
+          "depositVerifier":       "0x0000000000000000000000000000000000000000",
+          "withdrawVerifier":      "0x0000000000000000000000000000000000000000",
+          "batchVerifier":         "0x0000000000000000000000000000000000000000",
+          "batchWithdrawVerifier": "0x0000000000000000000000000000000000000000",
+          "lockVerifier":          "0x0000000000000000000000000000000000000000",
+          "batchLockVerifier":     "0x0000000000000000000000000000000000000000"
+        }
+      }
+    }
+  abiJSON: |
+    [
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "implementation",
+                "type": "address"
+              },
+              {
+                "name": "verifiers",
+                "type": "tuple",
+                "components": [
+                  {
+                    "internalType": "address",
+                    "name": "verifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "depositVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "withdrawVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "batchVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "batchWithdrawVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "lockVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "batchLockVerifier",
+                    "type": "address"
+                  }
+                ]
+              }
+            ],
+            "internalType": "struct ZetoTokenFactory.ImplementationInfo",
+            "name": "implementation",
+            "type": "tuple"
+          }
+        ],
+        "name": "registerImplementation",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }
+    ]
