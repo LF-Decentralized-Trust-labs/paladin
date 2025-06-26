@@ -59,6 +59,7 @@ operator:
     configMap:
       name: paladin-operator     
 
+
   volumeMounts:
   - name: config
     mountPath: /etc/config/config.json    # Where the file will be mounted in the container
@@ -80,6 +81,10 @@ operator:
   configMap:
     # Referring to the external config.yaml file
     dataFile: assets/config.json
+
+webhook:
+  enabled: true
+
 # Prometheus dependencies
 prometheus:
   enabled: false

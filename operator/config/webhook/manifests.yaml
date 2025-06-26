@@ -1,0 +1,90 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-core-paladin-io-v1alpha1-paladinregistration
+  failurePolicy: Fail
+  name: vpaladinregistration.kb.io
+  rules:
+  - apiGroups:
+    - core.paladin.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - paladinregistrations
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-core-paladin-io-v1alpha1-paladinregistry
+  failurePolicy: Fail
+  name: vpaladinregistry.kb.io
+  rules:
+  - apiGroups:
+    - core.paladin.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - paladinregistries
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-core-paladin-io-v1alpha1-smartcontractdeployment
+  failurePolicy: Fail
+  name: vsmartcontractdeployment.kb.io
+  rules:
+  - apiGroups:
+    - core.paladin.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - smartcontractdeployments
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-core-paladin-io-v1alpha1-transactioninvoke
+  failurePolicy: Fail
+  name: vtransactioninvoke.kb.io
+  rules:
+  - apiGroups:
+    - core.paladin.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - transactioninvokes
+  sideEffects: None
