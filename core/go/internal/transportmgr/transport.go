@@ -198,7 +198,7 @@ func (t *transport) deliverMessage(ctx context.Context, p *peer, component proto
 			msg: msg,
 		})
 	case prototk.PaladinMsg_TRANSACTION_ENGINE:
-		t.tm.privateTxManager.HandlePaladinMsg(ctx, msg)
+		t.tm.distributedSequencerManager.HandlePaladinMsg(ctx, msg)
 	case prototk.PaladinMsg_IDENTITY_RESOLVER:
 		t.tm.identityResolver.HandlePaladinMsg(ctx, msg)
 	default:

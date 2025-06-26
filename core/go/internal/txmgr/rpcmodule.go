@@ -318,7 +318,8 @@ func (tm *txManager) rpcDebugTransactionStatus() rpcserver.RPCHandler {
 		contractAddress string,
 		id uuid.UUID,
 	) (components.PrivateTxStatus, error) {
-		return tm.privateTxMgr.GetTxStatus(ctx, contractAddress, id)
+		return components.PrivateTxStatus{}, nil // MRW TODO
+		//return tm.privateTxMgr.GetTxStatus(ctx, contractAddress, id)
 	})
 }
 

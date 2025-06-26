@@ -27,6 +27,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
@@ -104,6 +106,9 @@ type TransportWriter interface {
 	SendDelegationRequestAcknowledgment(ctx context.Context, delegatingNodeName string, delegationId string, delegateNodeName string, transactionID string) error
 	SendEndorsementRequest(ctx context.Context, idempotencyKey string, party string, targetNode string, contractAddress string, transactionID string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*components.FullState, outputStates []*components.FullState, infoStates []*components.FullState) error
 	SendAssembleRequest(ctx context.Context, assemblingNode string, assembleRequestID string, txID uuid.UUID, contractAddress string, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error
+	SendDispatchConfirmationRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error
+	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) error
+	SendHeartbeat(ctx context.Context, contractAddress *pldtypes.EthAddress, targetNode string, coordinatorSnapshot *common.CoordinatorSnapshot) error
 }
 
 type TransactionFlowStatus int

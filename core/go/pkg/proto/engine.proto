@@ -145,3 +145,13 @@ message AssembleError {
     string contract_address = 3;
     string error_message = 4;
 }
+
+message CoordinatorHeartbeatNotification {
+    string from = 1;
+    string contract_address = 2; // Represent as hex address?
+    bytes coordinator_snapshot = 3;
+}
+
+message HandoverRequest {
+    string contract_address = 1; // Represent as hex address?
+}

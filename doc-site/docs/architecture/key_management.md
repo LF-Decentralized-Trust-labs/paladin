@@ -2,7 +2,7 @@
 
 > TODO: Well established architecture already being brought across to Paladin here (Lead: Matt Clarke)
 
-![Key Management](../images/key_management.jpg)
+![Key Management](../images/key_management.jpg){.zoomable-image}
 
 Key management in Paladin is designed to meet a complex set of requirements for enterprise
 key management, spanning both the secure storage of key materials in advanced locations (HMS/SSM),

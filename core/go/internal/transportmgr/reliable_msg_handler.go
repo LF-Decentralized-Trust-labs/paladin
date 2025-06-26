@@ -110,7 +110,8 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX per
 			if err == nil && sd.NullifierAlgorithm != nil && sd.NullifierVerifierType != nil && sd.NullifierPayloadType != nil {
 				// We need to build any nullifiers that are required, before we dispatch to persistence
 				var nullifier *components.NullifierUpsert
-				nullifier, err = tm.privateTxManager.BuildNullifier(ctx, tm.keyManager.KeyResolverForDBTX(dbTX), sd)
+				// MRW TODO
+				//nullifier, err = tm.privateTxManager.BuildNullifier(ctx, tm.keyManager.KeyResolverForDBTX(dbTX), sd)
 				if err == nil {
 					nullifierUpserts[sd.Domain] = append(nullifierUpserts[sd.Domain], nullifier)
 				}

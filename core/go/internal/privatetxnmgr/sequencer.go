@@ -180,7 +180,6 @@ func NewSequencer(
 		// TODO: rotation
 		defaultSigner:  fmt.Sprintf("domains.%s.submit.%s", contractAddress, uuid.New()),
 		newBlockEvents: make(chan int64, 10), //TODO do we want to make the buffer size configurable? Or should we put in non blocking mode? Does it matter if we miss a block?
-
 	}
 
 	log.L(ctx).Debugf("NewSequencer for contract address %s created: %+v", newSequencer.contractAddress, newSequencer)

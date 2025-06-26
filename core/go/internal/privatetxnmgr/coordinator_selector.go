@@ -52,6 +52,7 @@ type CoordinatorSelectionMode int
 const (
 	BlockHeightRoundRobin CoordinatorSelectionMode = iota
 	HashedSelection       CoordinatorSelectionMode = iota
+	DistributedProtocol   CoordinatorSelectionMode = iota
 )
 
 // Override only intended for unit tests currently
@@ -84,7 +85,34 @@ func NewCoordinatorSelector(ctx context.Context, nodeName string, contractConfig
 				rangeSize: confutil.Int(sequencerConfig.RoundRobinCoordinatorBlockRangeSize, *pldconf.PrivateTxManagerDefaults.Sequencer.RoundRobinCoordinatorBlockRangeSize),
 			}, nil
 		}
-		// TODO: More work is required to perform leader election of an endorser, so right now a simple hash algorithm is used.
+
+		// Delegate coordinator selection to the distributed sequencer protocol
+		// if EndorsementCoordinatorSelectionMode == DistributedProtocol {
+		// 	var err error
+		// 	var engine common.EngineIntegration
+		// 	distributedCoordinator, _ := coordinator.NewCoordinator(ctx,
+		// 		sequencer.transportWriter,
+		// 		committee,
+		// 		common.RealClock(),
+		// 		func(event common.Event) {
+		// 			log.L(ctx).Debugf("Distributed coordinator event: %s", event)
+		// 		},
+		// 		engine,
+		// 		sequencer.requestTimeout, confutil.DurationMin(sequencerConfig.AssembleRequestTimeout, 1*time.Millisecond, *pldconf.PrivateTxManagerDefaults.Sequencer.AssembleRequestTimeout),
+		// 		confutil.Int64(sequencerConfig.BlockRangeSize, *pldconf.PrivateTxManagerDefaults.Sequencer.BlockRangeSize),
+		// 		&sequencer.contractAddress,
+		// 		10,
+		// 		10)
+		// 	if err != nil {
+		// 		log.L(ctx).Errorf("Failed to create distributed coordinator: %v", err)
+		// 		return nil, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, err)
+		// 	}
+		// 	coordinatorSelector := &distributedProtocolCoordinatorSelectorPolicy{
+		// 		coordinator: distributedCoordinator,
+		// 	}
+
+		// 	return coordinatorSelector, nil
+		// }
 		return &endorsementSetHashSelection{
 			localNode: nodeName,
 		}, nil
@@ -160,6 +188,31 @@ type roundRobinCoordinatorSelectorPolicy struct {
 	rangeSize      int
 }
 
+func GetTransactionEndorsers(ctx context.Context, transaction *components.PrivateTransaction, localNode string) ([]string, error) {
+	endorsers := make([]string, 0)
+	//use a map to dedupe as we go
+	candidateNodesMap := make(map[string]struct{})
+	for _, attestationPlan := range transaction.PostAssembly.AttestationPlan {
+		if attestationPlan.AttestationType == prototk.AttestationType_ENDORSE {
+			for _, party := range attestationPlan.Parties {
+				node, err := pldtypes.PrivateIdentityLocator(party).Node(ctx, true)
+				if err != nil {
+					log.L(ctx).Errorf("SelectCoordinatorNode: Error resolving node for transaction endorser %s: %s", party, err)
+					return nil, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, err)
+				}
+				if node == "" {
+					node = localNode
+				}
+				candidateNodesMap[node] = struct{}{}
+			}
+		}
+	}
+	for candidateNode := range candidateNodesMap {
+		endorsers = append(endorsers, candidateNode)
+	}
+	return endorsers, nil
+}
+
 func (s *roundRobinCoordinatorSelectorPolicy) SelectCoordinatorNode(ctx context.Context, transaction *components.PrivateTransaction, environment ptmgrtypes.SequencerEnvironment) (int64, string, error) {
 	blockHeight := environment.GetBlockHeight()
 
@@ -170,26 +223,12 @@ func (s *roundRobinCoordinatorSelectorPolicy) SelectCoordinatorNode(ctx context.
 			log.L(ctx).Debug("SelectCoordinatorNode: No candidate nodes, assuming local node is the coordinator")
 			return blockHeight, s.localNode, nil
 		} else {
-			//use a map to dedupe as we go
-			candidateNodesMap := make(map[string]struct{})
-			for _, attestationPlan := range transaction.PostAssembly.AttestationPlan {
-				if attestationPlan.AttestationType == prototk.AttestationType_ENDORSE {
-					for _, party := range attestationPlan.Parties {
-						node, err := pldtypes.PrivateIdentityLocator(party).Node(ctx, true)
-						if err != nil {
-							log.L(ctx).Errorf("SelectCoordinatorNode: Error resolving node for party %s: %s", party, err)
-							return -1, "", i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, err)
-						}
-						if node == "" {
-							node = s.localNode
-						}
-						candidateNodesMap[node] = struct{}{}
-					}
-				}
+			candidateNodes, err := GetTransactionEndorsers(ctx, transaction, s.localNode)
+			if err != nil {
+				log.L(ctx).Errorf("SelectCoordinatorNode: Error getting transaction endorsers: %s", err)
+				return -1, "", i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, err)
 			}
-			for candidateNode := range candidateNodesMap {
-				s.candidateNodes = append(s.candidateNodes, candidateNode)
-			}
+			s.candidateNodes = candidateNodes
 			slices.Sort(s.candidateNodes)
 		}
 	}
@@ -207,5 +246,18 @@ func (s *roundRobinCoordinatorSelectorPolicy) SelectCoordinatorNode(ctx context.
 	log.L(ctx).Debugf("SelectCoordinatorNode: selected coordinator node %s using round robin algorithm for blockHeight: %d and rangeSize %d ", coordinatorNode, blockHeight, s.rangeSize)
 
 	return blockHeight, coordinatorNode, nil
-
 }
+
+// type distributedProtocolCoordinatorSelectorPolicy struct {
+// 	coordinator coordinator.Coordinator
+// }
+
+// func (s *distributedProtocolCoordinatorSelectorPolicy) SelectCoordinatorNode(ctx context.Context, transaction *components.PrivateTransaction, environment ptmgrtypes.SequencerEnvironment) (int64, string, error) {
+// 	node := s.coordinator.GetActiveCoordinatorNode(ctx)
+// 	return environment.GetBlockHeight(), node, nil
+// }
+
+// func (s *distributedProtocolCoordinatorSelectorPolicy) HandleCoordinatorEvent(ctx context.Context, event common.Event) error {
+// 	_ = s.coordinator.HandleEvent(ctx, event)
+// 	return nil
+// }

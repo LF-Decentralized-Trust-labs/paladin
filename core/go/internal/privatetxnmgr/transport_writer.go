@@ -18,10 +18,13 @@ package privatetxnmgr
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
 	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	pb "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
@@ -237,4 +240,64 @@ func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNo
 		Payload:     assembleRequestBytes,
 	})
 	return err
+}
+
+func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) error {
+	if contractAddress == nil {
+		err := fmt.Errorf("Attempt to send handover request without specifying contract address")
+		log.L(ctx).Error(err.Error())
+		return err
+	}
+	handoverRequest := &engineProto.HandoverRequest{
+		ContractAddress: contractAddress.HexString(),
+	}
+	handoverRequestBytes, err := proto.Marshal(handoverRequest)
+	if err != nil {
+		log.L(ctx).Errorf("Error marshalling handoverRequest message: %s", err)
+		return err
+	}
+
+	if err = tw.transportManager.Send(ctx, &components.FireAndForgetMessageSend{
+		MessageType: transport.MessageType_HandoverRequest,
+		Payload:     handoverRequestBytes,
+		Component:   prototk.PaladinMsg_DISTRIBUTED_SEQUENCER,
+		Node:        activeCoordinator,
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (tw *transportWriter) SendHeartbeat(ctx context.Context, contractAddress *pldtypes.EthAddress, targetNode string, coordinatorSnapshot *common.CoordinatorSnapshot) error {
+
+	coordinatorSnapshotBytes, err := json.Marshal(coordinatorSnapshot)
+	if err != nil {
+		log.L(ctx).Error("Error marshalling preassembly", err)
+		return err
+	}
+
+	heartbeatRequest := &engineProto.CoordinatorHeartbeatNotification{
+		From:                tw.transportManager.LocalNodeName(),
+		ContractAddress:     contractAddress.HexString(),
+		CoordinatorSnapshot: coordinatorSnapshotBytes,
+	}
+	heartbeatRequestBytes, err := proto.Marshal(heartbeatRequest)
+	if err != nil {
+		log.L(ctx).Errorf("Error marshalling heartbeatRequest  message: %s", err)
+		return err
+	}
+
+	if err = tw.transportManager.Send(ctx, &components.FireAndForgetMessageSend{
+		MessageType: transport.MessageType_CoordinatorHeartbeatNotification,
+		Payload:     heartbeatRequestBytes,
+		Component:   prototk.PaladinMsg_DISTRIBUTED_SEQUENCER,
+		Node:        targetNode,
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (tw *transportWriter) SendDispatchConfirmationRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
+	return nil
 }
