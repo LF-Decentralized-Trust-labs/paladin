@@ -25,6 +25,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gormPostgres "gorm.io/driver/postgres"
@@ -172,4 +173,24 @@ func TestTakeNamedLockPassthrough(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, p.TakeNamedLock(context.Background(), nil, ""))
 	p.Close()
+}
+func TestUseAnyClause(t *testing.T) {
+	p, mdb := newMockGormPSQLPersistence(t)
+
+	// Test with small list (should use IN)
+	smallList := []int{1}
+	mdb.ExpectQuery(`SELECT .* WHERE .* IN`).WithArgs(1).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	db := p.DB()
+	UseAny(db)
+	db.Table("test").Where("id IN (?)", smallList).Find(&struct{}{})
+
+	// Test with large list (should use ANY)
+	largeList := make([]int, 100)
+	for i := range largeList {
+		largeList[i] = i
+	}
+	mdb.ExpectQuery(`SELECT .* WHERE .* = ANY`).WithArgs(pq.Array(largeList)).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	db.Table("test").Where("id IN (?)", largeList).Find(&struct{}{})
+
+	assert.NoError(t, mdb.ExpectationsWereMet())
 }
