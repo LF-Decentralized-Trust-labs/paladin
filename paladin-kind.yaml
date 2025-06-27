@@ -1,0 +1,83 @@
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+name: paladin
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: KubeletConfiguration
+    apiVersion: kubelet.config.k8s.io/v1beta1
+    containerLogMaxSize: "100Mi"
+  extraPortMappings:
+
+  # This Kind cluster configuration supports direct networking access
+  # to up to 3 Paladin + Besu nodes per the samples provided in the project,
+  # and the E2E tests.
+
+  # Open up ports on LOCALHOST only for the first Paladin node
+  - containerPort: 31545 # Besu1 - JSON/RPC HTTP
+    hostPort: 31545
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31546 # Besu1 - JSON/RPC WebSockets
+    hostPort: 31546
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31547 # Besu1 - GraphQL HTTP
+    hostPort: 31547
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31548 # Paladin1 - JSON/RPC HTTP
+    hostPort: 31548
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31549 # Paladin1 - JSON/RPC WebSockets
+    hostPort: 31549
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+
+  # Open up ports on LOCALHOST only for the second Paladin node
+  - containerPort: 31645 # Besu2 - JSON/RPC HTTP
+    hostPort: 31645
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31646 # Besu2 - JSON/RPC WebSockets
+    hostPort: 31646
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31647 # Besu2 - GraphQL HTTP
+    hostPort: 31647
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31648 # Paladin2 - JSON/RPC HTTP
+    hostPort: 31648
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31649 # Paladin2 - JSON/RPC WebSockets
+    hostPort: 31649
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+
+  # Open up ports on LOCALHOST only for the third Paladin node
+  - containerPort: 31745 # Besu3 - JSON/RPC HTTP
+    hostPort: 31745
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31746 # Besu3 - JSON/RPC WebSockets
+    hostPort: 31746
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31747 # Besu3 - GraphQL HTTP
+    hostPort: 31747
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31748 # Paladin3 - JSON/RPC HTTP
+    hostPort: 31748
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+  - containerPort: 31749 # Paladin3 - JSON/RPC WebSockets
+    hostPort: 31749
+    listenAddress: "127.0.0.1"
+    protocol: tcp
+
+- role: worker

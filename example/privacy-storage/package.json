@@ -6,6 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start": "ts-node ./src/index.ts",
+    "query": "ts-node ./src/query.ts",
+    "queryfull": "ts-node ./src/queryfull.ts",
     "start:prod": "node ./build/index.js",
     "update": "ts-node ./src/update.ts",
     "abi": "node scripts/abi.mjs"

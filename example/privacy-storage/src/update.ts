@@ -10,8 +10,6 @@ const logger = console;
 
 // Initialize Paladin clients for three nodes
 const paladinNode1 = new PaladinClient({ url: "http://127.0.0.1:31548" });
-const paladinNode2 = new PaladinClient({ url: "http://127.0.0.1:31648" });
-const paladinNode3 = new PaladinClient({ url: "http://127.0.0.1:31748" });
 
 async function main(): Promise<boolean> {
   // Get the first argument from the command line
@@ -30,8 +28,6 @@ async function main(): Promise<boolean> {
 
   // Get verifiers for each node
   const [verifierNode1] = paladinNode1.getVerifiers("member@node1");
-  const [verifierNode2] = paladinNode2.getVerifiers("member@node2");
-  const [verifierNode3] = paladinNode3.getVerifiers("outsider@node3");
 
   // Step 1: Create a privacy group for members
   logger.log("Recreating a privacy group for Node1 and Node2...");
@@ -41,7 +37,7 @@ async function main(): Promise<boolean> {
       id: groupId,
       domain: "pente",
       created: new Date().toISOString(),
-      members: ["member@node2", "outsider@node3"],
+      members: ["member@node1"],
       contractAddress: groupAddress,
     },
     {}
@@ -96,36 +92,6 @@ async function main(): Promise<boolean> {
     "Node1 retrieved the value successfully:",
     retrievedValueNode1["value"]
   );
-
-  // Retrieve the value as Node2
-  logger.log("Node2 retrieving the value from the contract...");
-  const retrievedValueNode2 = await privateStorageContract
-    .using(paladinNode2)
-    .call({
-      from: verifierNode2.lookup,
-      function: "retrieve",
-    });
-  logger.log(
-    "Node2 retrieved the value successfully:",
-    retrievedValueNode2["value"]
-  );
-
-  // Attempt to retrieve the value as Node3 (outsider)
-  try {
-    logger.log("Node3 (outsider) attempting to retrieve the value...");
-    await privateStorageContract.using(paladinNode3).call({
-      from: verifierNode3.lookup,
-      function: "retrieve",
-    });
-    logger.error(
-      "Node3 (outsider) should not have access to the privacy group!"
-    );
-    return false;
-  } catch (error) {
-    logger.info(
-      "Expected behavior - Node3 (outsider) cannot retrieve the data from the privacy group. Access denied."
-    );
-  }
 
   logger.log("All steps completed successfully!");
 

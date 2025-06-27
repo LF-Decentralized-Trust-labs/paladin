@@ -77,7 +77,7 @@ func NewCoordinator(
 	contractAddress *pldtypes.EthAddress,
 	blockHeightTolerance uint64,
 	closingGracePeriod int,
-) (SeqCoordinator, error) {
+) (*coordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
 		transactionsByID:                   make(map[uuid.UUID]*transaction.Transaction),

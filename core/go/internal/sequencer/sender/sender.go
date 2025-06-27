@@ -28,7 +28,7 @@ import (
 )
 
 type SeqSender interface {
-	GetThing() error
+	HandleEvent(ctx context.Context, event common.Event) error
 }
 
 type sender struct {
@@ -56,10 +56,6 @@ type sender struct {
 	emit              common.EmitEvent
 }
 
-func (s *sender) GetThing() error {
-	return nil
-}
-
 func NewSender(
 	ctx context.Context,
 	nodeName string,
@@ -72,7 +68,7 @@ func NewSender(
 	contractAddress *pldtypes.EthAddress,
 	heartbeatPeriodMs int,
 	heartbeatThresholdIntervals int,
-) (SeqSender, error) {
+) (*sender, error) {
 	s := &sender{
 		nodeName:                    nodeName,
 		transactionsByID:            make(map[uuid.UUID]*transaction.Transaction),
