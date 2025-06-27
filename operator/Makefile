@@ -218,7 +218,7 @@ helm-install: helm-install-dependencies ## Install operator using Helm.
 		--set operator.image.tag=${OPERATOR_IMAGE_TAG} \
 		--set paladin.image.repository=${PALADIN_IMAGE_NAME} \
 		--set paladin.image.tag=${PALADIN_IMAGE_TAG} \
-		--set paladin.image.pullPolicy=IfNotPresent \
+		--set paladin.image.pullPolicy=PullNever \
 		--set prometheus.enabled=false \
 		--set mode=${MODE}
 

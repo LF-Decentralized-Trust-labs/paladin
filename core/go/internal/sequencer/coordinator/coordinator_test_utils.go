@@ -63,7 +63,7 @@ func (r *SentMessageRecorder) HasSentHandoverRequest() bool {
 	return r.hasSentHandoverRequest
 }
 
-func (r *SentMessageRecorder) SendHeartbeat(ctx context.Context, coordinatorSnapshot *common.CoordinatorSnapshot) {
+func (r *SentMessageRecorder) SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot) {
 	r.hasSentHeartbeat = true
 }
 

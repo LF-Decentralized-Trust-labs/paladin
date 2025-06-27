@@ -26,5 +26,5 @@ import (
 type MessageSender interface {
 	transaction.MessageSender
 	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress)
-	SendHeartbeat(ctx context.Context, coordinatorSnapshot *common.CoordinatorSnapshot)
+	SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot)
 }

@@ -30,10 +30,10 @@ func action_SendHeartbeat(ctx context.Context, c *coordinator) error {
 
 func (c *coordinator) sendHeartbeat(ctx context.Context, contractAddress *pldtypes.EthAddress) error {
 	snapshot := c.getSnapshot(ctx)
-	//for node, _ := range c.committee {
-	// MRW TODO - still don't know where we're sending this
-	c.messageSender.SendHeartbeat(ctx, snapshot)
-	//}
+	for node, _ := range c.committee {
+		// MRW TODO - still don't know where we're sending this
+		c.messageSender.SendHeartbeat(ctx, node, contractAddress, snapshot)
+	}
 	return nil
 }
 

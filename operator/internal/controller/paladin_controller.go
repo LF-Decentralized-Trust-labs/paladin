@@ -374,7 +374,7 @@ func (r *PaladinReconciler) generateStatefulSetTemplate(node *corev1alpha1.Palad
 						{
 							Name:            "paladin",
 							Image:           r.config.Paladin.Image, // Use the image from the config
-							ImagePullPolicy: r.config.Paladin.ImagePullPolicy,
+							ImagePullPolicy: corev1.PullNever,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "config",
@@ -397,6 +397,11 @@ func (r *PaladinReconciler) generateStatefulSetTemplate(node *corev1alpha1.Palad
 								{
 									Name:          "rpc-ws",
 									ContainerPort: 8549,
+									Protocol:      corev1.ProtocolTCP,
+								},
+								{
+									Name:          "metrics",
+									ContainerPort: 9090,
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},

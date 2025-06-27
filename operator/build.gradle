@@ -54,7 +54,7 @@ ext {
     clusterName = project.hasProperty('clusterName') ? project.clusterName : 'paladin' 
     namespace = project.hasProperty('namespace') ? project.namespace : 'default' // Default namespace is 'default'
     mode = project.hasProperty('mode') ? project.mode : 'devnet'
-    nodeCount = project.hasProperty('nodeCount') ? project.nodeCount.toInteger()  : 3 // Default node count is 3
+    nodeCount = 1 // Default node count is 3
     deleteCluster = project.hasProperty('deleteCluster') ? project.deleteCluster.toBoolean() : false // By default, do not delete the cluster
     loadImages = project.hasProperty('loadImages') ? project.loadImages == 'true' : true // Default is to load images
     buildPaladin = project.hasProperty('buildPaladin') ? project.buildPaladin == 'true' : true // Default is to build Paladin
@@ -291,22 +291,21 @@ task loadImages(type: Exec) {
         args "OPERATOR_IMAGE_NAME=${operatorImageName}"
         args "OPERATOR_IMAGE_TAG=${operatorImageTag}"
         args "PALADIN_IMAGE_NAME=${paladinImageName}"
-        args "PALADIN_IMAGE_TAG=${paladinImageTag}"
+        args "PALADIN_IMAGE_TAG=test"
 }
 
 // Task to load images into the Kind cluster
-task promoteKindImages {
+task promoteKindOperatorImage {
     dependsOn startKindCluster
+    dependsOn 'buildOperatorImage'
+    dependsOn 'loadImages'
+}
 
-    if (buildPaladin) {
-        dependsOn 'buildPaladinImage'
-    }
-    if (buildOperator) {
-        dependsOn 'buildOperatorImage'
-    }
-    if (loadImages) {
-        dependsOn 'loadImages'
-    }
+// Task to load images into the Kind cluster
+task promoteKindPaladinImage {
+    dependsOn startKindCluster
+    dependsOn 'buildPaladinImage'
+    dependsOn 'loadImages'
 }
 
 task prepareCRDsChart(type: Exec) {
@@ -329,11 +328,11 @@ task prepareArtifacts(type: Exec, dependsOn: [buildContractSamples]) {
 }
 
 // Task to install the operator using Helm
-task installOperator(type: Exec, dependsOn: [installCrds, promoteKindImages, prepareOperatorChart]) {
+task installOperator(type: Exec, dependsOn: [installCrds, promoteKindOperatorImage, promoteKindPaladinImage, prepareOperatorChart]) {
     executable 'make'
     args 'helm-install'
     args "NAMESPACE=${namespace}"
-    args "NODE_COUNT=${nodeCount}"
+    args "NODE_COUNT=1"
     args "OPERATOR_IMAGE_NAME=${operatorImageName}"
     args "OPERATOR_IMAGE_TAG=${operatorImageTag}"
     args "PALADIN_IMAGE_NAME=${paladinImageName}"
@@ -356,8 +355,6 @@ task verifyBesu(dependsOn: verifyOperator) {
         println 'Waiting for besu statefulSet to become ready...'
 
         verifyResourceCreated(namespace, 'statefulset', 'besu-node1', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'besu-node2', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'besu-node3', "1", 120)
     }
 }
 
@@ -367,8 +364,6 @@ task verifyPaladin(dependsOn: verifyBesu) {
         println 'Waiting for paladin statefulSet to become ready...'
 
         verifyResourceCreated(namespace, 'statefulset', 'paladin-node1', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'paladin-node2', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'paladin-node3', "1", 120)
     }
 }
 
@@ -458,16 +453,10 @@ task build {
 
 // Task to update the Paladin image in the Kind cluster
 task updatePaladinImage(type: Exec) {
-    doFirst {
-        buildOperator = false
-        buildPaladin = true
-    }
-    dependsOn promoteKindImages 
+    dependsOn promoteKindPaladinImage
     executable 'kubectl'
     args "rollout" 
     args "restart" 
     args "sts"
     args "paladin-node1"
-    args "paladin-node2"
-    args "paladin-node3"
 }

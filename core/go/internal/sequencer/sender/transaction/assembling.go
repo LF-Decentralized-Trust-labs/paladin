@@ -73,7 +73,6 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 }
 
 func action_SendAssembleRevertResponse(ctx context.Context, txn *Transaction) error {
-
 	txn.messageSender.SendAssembleResponse(ctx, txn.latestFulfilledAssembleRequestID, txn.PostAssembly)
 	return nil
 }
