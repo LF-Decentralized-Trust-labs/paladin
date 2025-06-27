@@ -87,7 +87,7 @@ type DistributedSequencerManager interface {
 
 	// //TODO this is just a placeholder until we figure out the external interface for events
 	// // in the meantime, this is handy for some blackish box testing
-	// Subscribe(ctx context.Context, subscriber PrivateTxEventSubscriber)
+	Subscribe(ctx context.Context, subscriber PrivateTxEventSubscriber)
 
 	// NotifyFailedPublicTx(ctx context.Context, dbTX persistence.DBTX, confirms []*PublicTxMatch) error
 

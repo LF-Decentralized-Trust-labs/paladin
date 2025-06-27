@@ -33,6 +33,12 @@ func (tm *txManager) blockIndexerPreCommit(
 	transactions []*blockindexer.IndexedTransactionNotify,
 ) error {
 
+	// Log all the transactions we've been passed
+	for _, tx := range transactions {
+		log.L(ctx).Infof("Received block %d transaction %s hash=%s type=%s. Are we going to put it in the receipts table?",
+			tx.BlockNumber, tx.ContractAddress, tx.Hash, tx.Nonce)
+	}
+
 	// Pass the list of transactions to the public transaction manager, who will pass us back an
 	// ORDERED list of matches to transaction IDs based on the bindings.
 	txMatches, err := tm.publicTxMgr.MatchUpdateConfirmedTransactions(ctx, dbTX, transactions)
@@ -49,6 +55,7 @@ func (tm *txManager) blockIndexerPreCommit(
 	finalizeInfo := make([]*components.ReceiptInput, 0, len(txMatches))
 	failedForPrivateTx := make([]*components.PublicTxMatch, 0)
 	for _, match := range txMatches {
+		log.L(ctx).Infof("blockIndexerPreCommit: processing next TX match %+v", match)
 		switch match.TransactionType.V() {
 		case pldapi.TransactionTypePublic:
 			log.L(ctx).Infof("Writing receipt for transaction %s hash=%s block=%d result=%s",
@@ -60,6 +67,9 @@ func (tm *txManager) blockIndexerPreCommit(
 				log.L(ctx).Infof("Base ledger transaction for private transaction %s FAILED hash=%s block=%d result=%s",
 					match.TransactionID, match.Hash, match.BlockNumber, match.Result)
 				failedForPrivateTx = append(failedForPrivateTx, match)
+			} else {
+				log.L(ctx).Infof("Base ledger transaction for private transaction %s SUCCESS hash=%s block=%d result=%s",
+					match.TransactionID, match.Hash, match.BlockNumber, match.Result)
 			}
 		}
 	}

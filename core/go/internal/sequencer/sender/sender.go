@@ -27,6 +27,10 @@ import (
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
+type SeqSender interface {
+	GetThing() error
+}
+
 type sender struct {
 	/* State */
 	stateMachine                *StateMachine
@@ -52,6 +56,10 @@ type sender struct {
 	emit              common.EmitEvent
 }
 
+func (s *sender) GetThing() error {
+	return nil
+}
+
 func NewSender(
 	ctx context.Context,
 	nodeName string,
@@ -64,7 +72,7 @@ func NewSender(
 	contractAddress *pldtypes.EthAddress,
 	heartbeatPeriodMs int,
 	heartbeatThresholdIntervals int,
-) (*sender, error) {
+) (SeqSender, error) {
 	s := &sender{
 		nodeName:                    nodeName,
 		transactionsByID:            make(map[uuid.UUID]*transaction.Transaction),

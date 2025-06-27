@@ -28,7 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
-type Coordinator interface {
+type SeqCoordinator interface {
 	GetTransactionsReadyToDispatch(ctx context.Context) ([]*components.PrivateTransaction, error)
 	GetActiveCoordinatorNode(ctx context.Context) string
 	HandleEvent(ctx context.Context, event common.Event) error
@@ -77,7 +77,7 @@ func NewCoordinator(
 	contractAddress *pldtypes.EthAddress,
 	blockHeightTolerance uint64,
 	closingGracePeriod int,
-) (*coordinator, error) {
+) (SeqCoordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
 		transactionsByID:                   make(map[uuid.UUID]*transaction.Transaction),

@@ -414,10 +414,12 @@ func (tm *txManager) prepareTransactionsNewDBTX(ctx context.Context, txs []*plda
 }
 
 func (tm *txManager) PrepareTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error) {
+	log.L(ctx).Debugf("PrepareTransactions %+v", txs)
 	return tm.processNewTransactions(ctx, dbTX, txs, pldapi.SubmitModeExternal)
 }
 
 func (tm *txManager) processNewTransactions(ctx context.Context, dbTX persistence.DBTX, txs []*pldapi.TransactionInput, submitMode pldapi.SubmitMode) (txIDs []uuid.UUID, err error) {
+	log.L(ctx).Debugf("processNewTransactions %+v, submit mode %+v", txs, submitMode)
 
 	// Public transactions need a signing address resolution and nonce allocation trackers
 	// before we open the database transaction
@@ -466,6 +468,7 @@ func (tm *txManager) processNewTransactions(ctx context.Context, dbTX persistenc
 	}
 
 	// Now we're ready to insert into the database
+	log.L(ctx).Debugf("insertTransactions into DB")
 	_, err = tm.insertTransactions(ctx, dbTX, txis, false /* all must succeed on this path - we map idempotency errors below */)
 	if err != nil {
 		dbTX.AddPostRollback(func(txCtx context.Context, err error) error {
@@ -482,16 +485,15 @@ func (tm *txManager) processNewTransactions(ctx context.Context, dbTX persistenc
 		}
 	}
 
-	// MRW TODO - does this happen here any more?
 	// TODO: Integrate with private TX manager persistence when available, as it will follow the
 	// same pattern as public transactions above
-	// for _, txi := range txis {
-	// 	if txi.Transaction.Type.V() == pldapi.TransactionTypePrivate {
-	// 		if err := tm.privateTxMgr.HandleNewTx(ctx, dbTX, txi); err != nil {
-	// 			return nil, err
-	// 		}
-	// 	}
-	// }
+	for _, txi := range txis {
+		if txi.Transaction.Type.V() == pldapi.TransactionTypePrivate {
+			if err := tm.distributedSequencerMgr.HandleNewTx(ctx, dbTX, txi); err != nil {
+				return nil, err
+			}
+		}
+	}
 	return txIDs, err
 }
 
@@ -701,6 +703,7 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX persistence.DB
 		}
 	}
 
+	log.L(ctx).Debugf("insertTransactions to table 'transactions'")
 	insert := dbTX.DB().
 		WithContext(ctx).
 		Table("transactions").
@@ -711,12 +714,14 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX persistence.DB
 	txInsertResult := insert.Create(ptxs)
 	err := txInsertResult.Error
 	if err == nil {
+		log.L(ctx).Debugf("insertTransactions to table 'transaction_history'")
 		err = dbTX.DB().
 			Table("transaction_history").
 			Create(txhs).
 			Error
 	}
 	if err == nil && len(transactionDeps) > 0 {
+		log.L(ctx).Debugf("insertTransactions to table 'transaction_deps'")
 		err = dbTX.DB().
 			Table("transaction_deps").
 			Clauses(clause.OnConflict{DoNothing: true}). // for idempotency retry
