@@ -24,6 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/txmgr/metrics"
 
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
@@ -57,17 +58,17 @@ type txManager struct {
 	keyManager       components.KeyManager
 	publicTxMgr      components.PublicTxManager
 	// privateTxMgr         components.PrivateTxManager
-	distributedSequencer components.DistributedSequencerManager
-	domainMgr            components.DomainManager
-	stateMgr             components.StateManager
-	identityResolver     components.IdentityResolver
-	blockIndexer         blockindexer.BlockIndexer
-	rpcEventStreams      *rpcEventStreams
-	txCache              cache.Cache[uuid.UUID, *components.ResolvedTransaction]
-	abiCache             cache.Cache[pldtypes.Bytes32, *pldapi.StoredABI]
-	rpcModule            *rpcserver.RPCModule
-	debugRpcModule       *rpcserver.RPCModule
-	lastStateUpdateTime  atomic.Int64
+	distributedSequencerMgr components.DistributedSequencerManager
+	domainMgr               components.DomainManager
+	stateMgr                components.StateManager
+	identityResolver        components.IdentityResolver
+	blockIndexer            blockindexer.BlockIndexer
+	rpcEventStreams         *rpcEventStreams
+	txCache                 cache.Cache[uuid.UUID, *components.ResolvedTransaction]
+	abiCache                cache.Cache[pldtypes.Bytes32, *pldapi.StoredABI]
+	rpcModule               *rpcserver.RPCModule
+	debugRpcModule          *rpcserver.RPCModule
+	lastStateUpdateTime     atomic.Int64
 
 	receiptsRetry                *retry.Retry
 	receiptsReadPageSize         int
@@ -79,9 +80,11 @@ type txManager struct {
 	blockchainEventListenerLock          sync.Mutex
 	blockchainEventListeners             map[string]*blockchainEventListener
 	blockchainEventListenersLoadPageSize int
+	metrics                              metrics.TransactionManagerMetrics
 }
 
 func (tm *txManager) PreInit(c components.PreInitComponents) (*components.ManagerInitResult, error) {
+	tm.metrics = metrics.InitMetrics(tm.bgCtx, c.MetricsManager().Registry())
 	tm.buildRPCModule()
 	return &components.ManagerInitResult{
 		RPCModules:       []*rpcserver.RPCModule{tm.rpcModule, tm.debugRpcModule},
@@ -94,7 +97,7 @@ func (tm *txManager) PostInit(c components.AllComponents) error {
 	tm.ethClientFactory = c.EthClientFactory()
 	tm.keyManager = c.KeyManager()
 	tm.publicTxMgr = c.PublicTxManager()
-	tm.distributedSequencer = c.DistributedSequencerManager()
+	tm.distributedSequencerMgr = c.DistributedSequencerManager()
 	tm.domainMgr = c.DomainManager()
 	tm.stateMgr = c.StateManager()
 	tm.identityResolver = c.IdentityResolver()

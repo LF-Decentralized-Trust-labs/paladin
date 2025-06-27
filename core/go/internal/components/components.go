@@ -16,6 +16,7 @@
 package components
 
 import (
+	"github.com/kaleido-io/paladin/core/internal/metrics"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
@@ -31,6 +32,7 @@ type PreInitComponents interface {
 	Persistence() persistence.Persistence
 	BlockIndexer() blockindexer.BlockIndexer
 	RPCServer() rpcserver.RPCServer
+	MetricsManager() metrics.Metrics
 }
 
 // Managers are initialized after base components with access to them, and provide

@@ -20,6 +20,7 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/flushwriter"
+	"github.com/kaleido-io/paladin/core/internal/publictxmgr/metrics"
 
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
@@ -30,10 +31,12 @@ type noResult struct{}
 
 type submissionWriter struct {
 	flushwriter.Writer[*DBPubTxnSubmission, *noResult]
+	metrics metrics.PublicTransactionManagerMetrics
 }
 
-func newSubmissionWriter(bgCtx context.Context, p persistence.Persistence, conf *pldconf.PublicTxManagerConfig) *submissionWriter {
+func newSubmissionWriter(bgCtx context.Context, p persistence.Persistence, conf *pldconf.PublicTxManagerConfig, metrics metrics.PublicTransactionManagerMetrics) *submissionWriter {
 	sw := &submissionWriter{}
+	sw.metrics = metrics
 	sw.Writer = flushwriter.NewWriter(bgCtx, sw.runBatch, p, &conf.Manager.SubmissionWriter, &pldconf.PublicTxManagerDefaults.Manager.SubmissionWriter)
 	return sw
 }
@@ -50,6 +53,7 @@ func (sw *submissionWriter) runBatch(ctx context.Context, tx persistence.DBTX, v
 	if err != nil {
 		return nil, err
 	}
+	sw.metrics.IncSubmittedTransactions()
 	// We don't actually provide any result, so just build an array of nil results
 	return make([]flushwriter.Result[*noResult], len(values)), err
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -28,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/groupmgr"
 	"github.com/kaleido-io/paladin/core/internal/identityresolver"
 	"github.com/kaleido-io/paladin/core/internal/keymanager"
+	"github.com/kaleido-io/paladin/core/internal/metrics"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/plugins"
 	"github.com/kaleido-io/paladin/core/internal/publictxmgr"
@@ -37,12 +39,11 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/transportmgr"
 	"github.com/kaleido-io/paladin/core/internal/txmgr"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/httpserver"
+	"github.com/kaleido-io/paladin/toolkit/pkg/metricsserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 )
@@ -69,6 +70,8 @@ type componentManager struct {
 	persistence      persistence.Persistence
 	blockIndexer     blockindexer.BlockIndexer
 	rpcServer        rpcserver.RPCServer
+	metricsServer    metricsserver.MetricsServer
+	metricsManager   metrics.Metrics
 
 	// managers
 	stateManager                components.StateManager
@@ -138,6 +141,8 @@ func (cm *componentManager) startDebugServer() (httpserver.Server, error) {
 }
 
 func (cm *componentManager) Init() (err error) {
+	log.L(cm.bgCtx).Info("Initializing component manager")
+
 	// start the debug server as early as possible
 	if confutil.Bool(cm.conf.DebugServer.Enabled, *pldconf.DebugServerDefaults.Enabled) {
 		cm.debugServer, err = cm.startDebugServer()
@@ -159,6 +164,14 @@ func (cm *componentManager) Init() (err error) {
 	}
 	if err == nil {
 		cm.rpcServer, err = rpcserver.NewRPCServer(cm.bgCtx, &cm.conf.RPCServer)
+		err = cm.wrapIfErr(err, msgs.MsgComponentRPCServerInitError)
+	}
+	if err == nil {
+		cm.metricsManager = metrics.NewMetricsManager(cm.bgCtx)
+		err = cm.wrapIfErr(err, msgs.MsgComponentRPCServerInitError)
+	}
+	if err == nil {
+		cm.metricsServer, err = metricsserver.NewMetricsServer(cm.bgCtx, cm.metricsManager.Registry(), &cm.conf.RPCServer)
 		err = cm.wrapIfErr(err, msgs.MsgComponentRPCServerInitError)
 	}
 
@@ -204,6 +217,7 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	if err == nil {
+		log.L(cm.bgCtx).Info("Initializing distributed sequencer manager")
 		cm.distributedSequencerManager = sequencer.NewDistributedSequencerManager(cm.bgCtx, &cm.conf.DistributedSequencerManager)
 		cm.initResults["distributed_sequencer_manager"], err = cm.distributedSequencerManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentDistributedSequencerManagerInitError)
@@ -423,6 +437,8 @@ func (cm *componentManager) CompleteStart() error {
 		log.L(cm.bgCtx).Infof("RPC endpoints http=%s ws=%s", httpEndpoint, wsEndpoint)
 	}
 
+	cm.metricsServer.Start()
+
 	log.L(cm.bgCtx).Infof("Startup complete")
 
 	return err
@@ -551,4 +567,8 @@ func (cm *componentManager) GroupManager() components.GroupManager {
 
 func (cm *componentManager) IdentityResolver() components.IdentityResolver {
 	return cm.identityResolver
+}
+
+func (cm *componentManager) MetricsManager() metrics.Metrics {
+	return cm.metricsManager
 }
