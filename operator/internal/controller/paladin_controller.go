@@ -713,6 +713,14 @@ func (r *PaladinReconciler) generatePaladinConfig(ctx context.Context, node *cor
 		}
 	}
 
+	// Enable metrics server by default on localhost:6100
+	if pldConf.MetricsServer.Enabled == nil {
+		pldConf.MetricsServer.Enabled = confutil.P(true)
+		if pldConf.MetricsServer.Port == nil {
+			pldConf.MetricsServer.Port = confutil.P(6100)
+		}
+	}
+
 	// Node name can be overridden, but defaults to the CR name
 	if pldConf.NodeName == "" {
 		pldConf.NodeName = node.Name

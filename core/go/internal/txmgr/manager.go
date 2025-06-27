@@ -24,6 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/txmgr/metrics"
 
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
@@ -78,9 +79,11 @@ type txManager struct {
 	blockchainEventListenerLock          sync.Mutex
 	blockchainEventListeners             map[string]*blockchainEventListener
 	blockchainEventListenersLoadPageSize int
+	metrics                              metrics.TransactionManagerMetrics
 }
 
 func (tm *txManager) PreInit(c components.PreInitComponents) (*components.ManagerInitResult, error) {
+	tm.metrics = metrics.InitMetrics(tm.bgCtx, c.MetricsManager().Registry())
 	tm.buildRPCModule()
 	return &components.ManagerInitResult{
 		RPCModules:       []*rpcserver.RPCModule{tm.rpcModule, tm.debugRpcModule},

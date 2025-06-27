@@ -30,6 +30,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
+	"github.com/kaleido-io/paladin/core/internal/publictxmgr/metrics"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
@@ -123,6 +124,9 @@ type pubTxManager struct {
 	// updates
 	updates   []*transactionUpdate
 	updateMux sync.Mutex
+
+	// metrics
+	metrics metrics.PublicTransactionManagerMetrics
 }
 
 type txActivityRecords struct {
@@ -164,6 +168,7 @@ func NewPublicTransactionManager(ctx context.Context, conf *pldconf.PublicTxMana
 }
 
 func (ptm *pubTxManager) PreInit(pic components.PreInitComponents) (result *components.ManagerInitResult, err error) {
+	ptm.metrics = metrics.InitMetrics(ptm.ctx, pic.MetricsManager().Registry())
 	return &components.ManagerInitResult{}, nil
 }
 
@@ -176,7 +181,7 @@ func (ptm *pubTxManager) PostInit(pic components.AllComponents) error {
 	ptm.p = pic.Persistence()
 	ptm.bIndexer = pic.BlockIndexer()
 	ptm.rootTxMgr = pic.TxManager()
-	ptm.submissionWriter = newSubmissionWriter(ptm.ctx, ptm.p, ptm.conf)
+	ptm.submissionWriter = newSubmissionWriter(ptm.ctx, ptm.p, ptm.conf, ptm.metrics)
 	ptm.balanceManager = NewBalanceManagerWithInMemoryTracking(ctx, ptm.conf, ptm)
 
 	log.L(ctx).Debugf("Initialized public transaction manager")
@@ -802,6 +807,7 @@ func (ptm *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, d
 		if err != nil {
 			return nil, err
 		}
+		ptm.metrics.IncCompletedTransactions()
 	}
 
 	return results, nil

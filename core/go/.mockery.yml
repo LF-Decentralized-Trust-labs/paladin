@@ -1,7 +1,7 @@
 template: testify
-pkgname: '{{.SrcPackageName}}mocks'
-structname: '{{.InterfaceName}}'
-filename: '{{.SrcPackageName}}mocks.go'
+pkgname: "{{.SrcPackageName}}mocks"
+structname: "{{.InterfaceName}}"
+filename: "{{.SrcPackageName}}mocks.go"
 dir: "mocks/{{.SrcPackageName}}mocks"
 packages:
   github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient:
@@ -23,8 +23,11 @@ packages:
     config:
       all: true
     interfaces:
-      KeyManager:    
+      KeyManager:
   github.com/kaleido-io/paladin/core/internal/componentmgr:
+    config:
+      all: true
+  github.com/kaleido-io/paladin/core/internal/metrics:
     config:
       all: true
   github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes:
@@ -35,12 +38,11 @@ packages:
         config:
           dir: "{{.InterfaceDir}}"
           filename: "mock_transaction_flow.go"
-          pkgname: '{{.SrcPackageName}}'
-          structname: 'Mock{{.InterfaceName}}'
+          pkgname: "{{.SrcPackageName}}"
+          structname: "Mock{{.InterfaceName}}"
   github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints:
     config:
       all: true
   github.com/kaleido-io/paladin/core/internal/publictxmgr:
     interfaces:
       InFlightStageActionTriggers:
-
