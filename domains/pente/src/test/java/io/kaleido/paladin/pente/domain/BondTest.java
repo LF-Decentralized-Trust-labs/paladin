@@ -144,12 +144,12 @@ public class BondTest {
             );
             String atomFactoryBytecode = ResourceLoader.jsonResourceEntryText(
                     this.getClass().getClassLoader(),
-                    "contracts/shared/Atom.sol/AtomFactory.json",
+                    "contracts/shared/AtomFactory.sol/AtomFactory.json",
                     "bytecode"
             );
             JsonABI atomFactoryABI = JsonABI.fromJSONResourceEntry(
                     this.getClass().getClassLoader(),
-                    "contracts/shared/Atom.sol/AtomFactory.json",
+                    "contracts/shared/AtomFactory.sol/AtomFactory.json",
                     "abi"
             );
             JsonABI atomABI = JsonABI.fromJSONResourceEntry(

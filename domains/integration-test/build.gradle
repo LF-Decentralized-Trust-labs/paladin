@@ -68,7 +68,7 @@ task copySolidity(type: Copy) {
         include 'contracts/domains/noto/NotoFactory.sol/NotoFactory.json'
         include 'contracts/domains/zeto/ZetoFactory.sol/ZetoFactory.json'
         include 'contracts/shared/Atom.sol/Atom.json'
-        include 'contracts/shared/Atom.sol/AtomFactory.json'
+        include 'contracts/shared/AtomFactory.sol/AtomFactory.json'
         include 'contracts/private/Swap.sol/Swap.json'
         include 'contracts/testcontracts/NotoTrackerPublicERC20.sol/NotoTrackerPublicERC20.json'
     }
