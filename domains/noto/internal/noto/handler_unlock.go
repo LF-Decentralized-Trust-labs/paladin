@@ -299,6 +299,7 @@ func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepa
 		return nil, err
 	}
 	params := &types.UnlockPublicParams{
+		TxId:          req.Transaction.TransactionId,
 		LockedInputs:  endorsableStateIDs(lockedInputs),
 		LockedOutputs: endorsableStateIDs(lockedOutputs),
 		Outputs:       endorsableStateIDs(outputs),

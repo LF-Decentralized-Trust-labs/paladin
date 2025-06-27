@@ -31,7 +31,7 @@ describe("Atom", function () {
     const [f1txo1, f1txo2] = [fakeTXO(), fakeTXO()];
     await noto
       .connect(notary1)
-      .transfer([], [f1txo1, f1txo2], "0x", randomBytes32());
+      .transfer(randomBytes32(), [], [f1txo1, f1txo2], "0x", randomBytes32());
 
     await erc20.mint(notary2, 1000);
 
@@ -45,6 +45,7 @@ describe("Atom", function () {
       f1TxData
     );
     const encoded1 = noto.interface.encodeFunctionData("transferWithApproval", [
+      randomBytes32(),
       [f1txo1, f1txo2],
       [f1txo3, f1txo4],
       randomBytes32(),
@@ -77,7 +78,7 @@ describe("Atom", function () {
     // Do the delegation/approval transactions
     const f1tx = await noto
       .connect(notary1)
-      .approveTransfer(mcAddr, multiTXF1Part, "0x", "0x");
+      .approveTransfer(randomBytes32(), mcAddr, multiTXF1Part, "0x", "0x");
     const delegateResult1: ContractTransactionReceipt | null =
       await f1tx.wait();
     const delegateEvent1 = noto.interface.parseLog(
@@ -127,6 +128,7 @@ describe("Atom", function () {
     );
 
     const encoded1 = noto.interface.encodeFunctionData("transferWithApproval", [
+      randomBytes32(),
       [f1txo1, f1txo2],
       [f1txo3, f1txo4],
       randomBytes32(),

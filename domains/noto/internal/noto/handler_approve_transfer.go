@@ -156,6 +156,7 @@ func (h *approveHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedT
 		return nil, err
 	}
 	params := &NotoApproveTransferParams{
+		TxId:      req.Transaction.TransactionId,
 		Delegate:  inParams.Delegate,
 		TXHash:    pldtypes.Bytes32(transferHash),
 		Signature: sender.Payload,
