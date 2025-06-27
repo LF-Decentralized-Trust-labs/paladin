@@ -538,3 +538,29 @@ func (n *Noto) encodeDelegateLock(ctx context.Context, contract *ethtypes.Addres
 		},
 	})
 }
+
+func (n *Noto) getAccountBalance(ctx context.Context, stateQueryContext string, owner *pldtypes.EthAddress) (totalStates int, totalBalance *big.Int, overflow, revert bool, err error) {
+	totalBalance = big.NewInt(0)
+	queryBuilder := query.NewQueryBuilder().
+		Limit(1000).
+		Equal("owner", owner.String())
+
+	log.L(ctx).Debugf("State query: %s", queryBuilder.Query())
+	states, err := n.findAvailableStates(ctx, stateQueryContext, n.coinSchema.Id, queryBuilder.Query().String())
+	if err != nil {
+		return 0, nil, false, false, err
+	}
+	for _, state := range states {
+		coin, err := n.unmarshalCoin(state.DataJson)
+		if err != nil {
+			return 0, nil, false, false, i18n.NewError(ctx, msgs.MsgInvalidStateData, state.Id, err)
+		}
+		totalBalance = totalBalance.Add(totalBalance, coin.Amount.Int())
+	}
+	if len(states) == 1000 {
+		// We only return the first 1000 coins, so we warn that the balance may be higher
+		return len(states), totalBalance, true, false, nil
+	}
+
+	return len(states), totalBalance, false, false, nil
+}

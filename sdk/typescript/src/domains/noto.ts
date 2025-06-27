@@ -128,6 +128,16 @@ export interface NotoUnlockPublicParams {
   data: string;
 }
 
+export interface NotoBalanceOfParams {
+  account: string;
+}
+
+export interface NotoBalanceOfResult {
+  totalBalance: string;
+  totalStates: string;
+  overflow: boolean;
+}
+
 export class NotoFactory {
   private options: Required<NotoOptions>;
 
@@ -348,5 +358,17 @@ export class NotoInstance {
       data.signature,
       data.data,
     ]);
+  }
+
+  async balanceOf(from: PaladinVerifier, data: NotoBalanceOfParams): Promise<NotoBalanceOfResult> {
+    return await this.paladin.call({
+      type: TransactionType.PRIVATE,
+      domain: "noto",
+      abi: notoPrivateJSON.abi,
+      function: "balanceOf",
+      to: this.address,
+      from: from.lookup,
+      data,
+    });
   }
 }
