@@ -80,19 +80,20 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         _disableInitializers();
     }
 
-    function initialize(
-        address notaryAddress,
-        bytes calldata data
-    ) public virtual initializer returns (bytes memory) {
+    function initialize(address notaryAddress) public virtual initializer {
         __EIP712_init("noto", "0.0.1");
         _notary = notaryAddress;
+    }
 
+    function buildConfig(
+        bytes calldata data
+    ) external view returns (bytes memory) {
         return
             _encodeConfig(
                 NotoConfig_V0({
-                    notaryAddress: notaryAddress,
-                    data: data,
-                    variant: NotoVariantDefault
+                    notaryAddress: _notary,
+                    variant: NotoVariantDefault,
+                    data: data
                 })
             );
     }

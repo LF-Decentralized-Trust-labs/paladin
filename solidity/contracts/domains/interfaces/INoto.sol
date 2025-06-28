@@ -51,10 +51,11 @@ interface INoto {
         bytes data
     );
 
-    function initialize(
-        address notaryAddress,
+    function initialize(address notaryAddress) external;
+
+    function buildConfig(
         bytes calldata data
-    ) external returns (bytes memory);
+    ) external view returns (bytes memory);
 
     function mint(
         bytes32[] calldata outputs,
