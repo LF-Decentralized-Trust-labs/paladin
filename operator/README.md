@@ -157,7 +157,7 @@ paladin-operator-xxxxxxxxxx-xxxxx   1/1     Running   0          XXm
 
 Now that the operator is running, you can create the Paladin nodes.
 
-Create the nodes (Besu Node and Paladin Node):
+Create 3 nodes (3 Besu nodes and 3 Paladin nodes):
 
 ```sh
 make create-node
@@ -166,8 +166,8 @@ make create-node
 This command will:
 
 - Create a **Besu Genesis** ConfigMap.
-- Create a **Besu Node** instance and related resources.
-- Create a **Paladin Node** instance and related resources.
+- Create 3 **Besu Node** instances and related resources.
+- Create 3 **Paladin Node** instances and related resources.
 
 #### Step 8: Verify the Nodes are Running
 
@@ -181,8 +181,12 @@ You should see output similar to:
 
 ```
 NAME                                READY   STATUS    RESTARTS   AGE
-besu-node-xxxxxxxxxx-xxxxx          1/1     Running   0          XXm
-paladin-node-xxxxxxxxxx-xxxxx       1/1     Running   0          XXm
+besu-node1-xxxxxxxxxx-xxxxx          1/1     Running   0          XXm
+besu-node2-xxxxxxxxxx-xxxxx          1/1     Running   0          XXm
+besu-node3-xxxxxxxxxx-xxxxx          1/1     Running   0          XXm
+paladin-node1-xxxxxxxxxx-xxxxx       1/1     Running   0          XXm
+paladin-node2-xxxxxxxxxx-xxxxx       1/1     Running   0          XXm
+paladin-node3-xxxxxxxxxx-xxxxx       1/1     Running   0          XXm
 ```
 
 This confirms that the Paladin and Besu nodes are successfully deployed and running.
