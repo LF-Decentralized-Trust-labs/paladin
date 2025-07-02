@@ -35,6 +35,8 @@ async function main(): Promise<boolean> {
   logger.log("Deploying Noto cash token...");
   const notoFactory = new NotoFactory(paladin1, "noto");
   const notoCash = await notoFactory.newNoto(cashIssuer, {
+    name: "CASH",
+    symbol: "CASH",
     notary: cashIssuer,
     notaryMode: "basic",
   });
@@ -101,6 +103,8 @@ async function main(): Promise<boolean> {
   // Deploy Noto token to represent bond
   logger.log("Deploying Noto bond token...");
   const notoBond = await notoFactory.newNoto(bondIssuer, {
+    name: "BOND",
+    symbol: "BOND",
     notary: bondCustodian,
     notaryMode: "hooks",
     options: {

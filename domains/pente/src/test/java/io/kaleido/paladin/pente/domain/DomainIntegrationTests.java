@@ -15,21 +15,28 @@
 
 package io.kaleido.paladin.pente.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.kaleido.paladin.pente.domain.PenteConfiguration.GroupTupleJSON;
-import io.kaleido.paladin.testbed.Testbed;
-import io.kaleido.paladin.toolkit.*;
-import org.junit.jupiter.api.Test;
-
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.kaleido.paladin.pente.domain.PenteConfiguration.GroupTupleJSON;
+import io.kaleido.paladin.testbed.Testbed;
+import io.kaleido.paladin.toolkit.Algorithms;
+import io.kaleido.paladin.toolkit.JsonABI;
+import io.kaleido.paladin.toolkit.JsonHex;
+import io.kaleido.paladin.toolkit.ResourceLoader;
+import io.kaleido.paladin.toolkit.Verifiers;
 
 public class DomainIntegrationTests {
 
@@ -82,6 +89,10 @@ public class DomainIntegrationTests {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record NotoConstructorParamsJSON(
+            @JsonProperty
+            String name,
+            @JsonProperty
+            String symbol,
             @JsonProperty
             String notary,
             @JsonProperty
@@ -270,6 +281,8 @@ public class DomainIntegrationTests {
             String notoInstanceAddress = testbed.getRpcClient().request("testbed_deploy",
                     "noto", "notary",
                     new NotoConstructorParamsJSON(
+                            "NOTO",
+                            "NOTO",
                             "notary@node1",
                             "hooks",
                             new NotoOptionsJSON(

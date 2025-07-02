@@ -17,6 +17,8 @@ export const notoConstructorABI = (
 ): ethers.JsonFragment => ({
   type: "constructor",
   inputs: [
+    { name: "name", type: "string" },
+    { name: "symbol", type: "string" },
     { name: "notary", type: "string" },
     { name: "notaryMode", type: "string" },
     {
@@ -56,6 +58,8 @@ export const notoConstructorABI = (
 });
 
 export interface NotoConstructorParams {
+  name: string;
+  symbol: string;
   notary: PaladinVerifier;
   notaryMode: "basic" | "hooks";
   options?: {

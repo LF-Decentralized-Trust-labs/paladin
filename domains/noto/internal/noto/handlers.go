@@ -61,6 +61,12 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 
 func (n *Noto) GetCallHandler(method string) types.DomainCallHandler {
 	switch method {
+	case "name":
+		return &nameHandler{noto: n}
+	case "symbol":
+		return &symbolHandler{noto: n}
+	case "decimals":
+		return &decimalsHandler{noto: n}
 	case "balanceOf":
 		return &balanceOfHandler{noto: n}
 	default:
