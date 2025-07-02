@@ -15,17 +15,29 @@
 
 package io.kaleido.paladin.pente.domain;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.kaleido.paladin.testbed.Testbed;
-import io.kaleido.paladin.toolkit.*;
-import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
+import io.kaleido.paladin.toolkit.Algorithms;
+import io.kaleido.paladin.toolkit.JsonABI;
+import io.kaleido.paladin.toolkit.JsonHex;
+import io.kaleido.paladin.toolkit.ResourceLoader;
+import io.kaleido.paladin.toolkit.Verifiers;
 
 public class PenteDomainTests {
 
@@ -231,6 +243,26 @@ public class PenteDomainTests {
                             "set"
                     ), true);
 
+            // Set with an invalid input (should revert)
+            var ex = assertThrows(IOException.class, () -> {
+                testbed.getRpcClient().request("testbed_invoke",
+                        new Testbed.TransactionInput(
+                                "private",
+                                "",
+                                "simpleStorageDeployer",
+                                JsonHex.addressFrom(contractAddr),
+                                new HashMap<>() {{
+                                        put("group", groupInfo);
+                                        put("to", expectedContractAddress.toString());
+                                        put("inputs", new HashMap<>() {{
+                                                put("x", "-1");
+                                        }});
+                                }},
+                                simpleStorageABI,
+                                "set"
+                        ), true);
+            });
+            assertEquals("assemble result was REVERT", ex.getMessage());
         }
     }
 

@@ -16,6 +16,7 @@ package plugins
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -50,6 +51,22 @@ type pluginToManager[M any] interface {
 // each type of plugin implements a bridge that is just the specific set of operations mapped
 // down on the toPlugin and fromPlugin interfaces as appropriate
 type pluginBridgeFactory[M any] func(plugin *plugin[M], toPlugin managerToPlugin[M]) (fromPlugin pluginToManager[M], err error)
+
+type PluginError struct {
+	ErrorType prototk.Header_ErrorType
+	Cause     error
+}
+
+func (e *PluginError) Error() string {
+	return e.Cause.Error()
+}
+
+func NewPluginError(errorType prototk.Header_ErrorType, cause error) *PluginError {
+	return &PluginError{
+		ErrorType: errorType,
+		Cause:     cause,
+	}
+}
 
 type plugin[M any] struct {
 	pc   *pluginManager
@@ -260,6 +277,10 @@ func (ph *pluginHandler[M]) handleRequestFromPlugin(ctx context.Context, pi *plu
 		header.MessageType = prototk.Header_ERROR_RESPONSE
 		errorMessage := err.Error()
 		header.ErrorMessage = &errorMessage
+		var pluginError *PluginError
+		if errors.As(err, &pluginError) {
+			header.ErrorType = pluginError.ErrorType
+		}
 	} else {
 		log.L(ctx).Infof("[%s] <== [%s] %T [%s]", req.Header().MessageId, replyID, res.ResponseToPlugin(), startTime)
 		header.MessageType = prototk.Header_RESPONSE_TO_PLUGIN

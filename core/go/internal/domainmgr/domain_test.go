@@ -1016,6 +1016,12 @@ func TestDecodeABIDataFailCases(t *testing.T) {
 		Data:         []byte(``),
 	})
 	assert.Regexp(t, "PD011645", err)
+	_, err = d.DecodeData(ctx, &prototk.DecodeDataRequest{
+		EncodingType: prototk.EncodingType_ETH_TRANSACTION_SIGNED,
+		Definition:   "eip1559",
+		Data:         []byte{}, // Empty data to trigger decode error
+	})
+	assert.Regexp(t, "PD011646", err)
 }
 
 func TestRecoverSignerFailCases(t *testing.T) {

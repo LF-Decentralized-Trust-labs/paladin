@@ -32,6 +32,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/core/internal/plugins"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"golang.org/x/crypto/sha3"
@@ -363,27 +364,27 @@ func (d *domain) EncodeData(ctx context.Context, encRequest *prototk.EncodeDataR
 		var entry *abi.Entry
 		err := json.Unmarshal([]byte(encRequest.Definition), &entry)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid))
 		}
 		abiData, err = entry.EncodeCallDataJSONCtx(ctx, []byte(encRequest.Body))
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail))
 		}
 	case prototk.EncodingType_TUPLE:
 		var param *abi.Parameter
 		err := json.Unmarshal([]byte(encRequest.Definition), &param)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid))
 		}
 		abiData, err = param.Components.EncodeABIDataJSONCtx(ctx, []byte(encRequest.Body))
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail))
 		}
 	case prototk.EncodingType_ETH_TRANSACTION, prototk.EncodingType_ETH_TRANSACTION_SIGNED:
 		var tx *ethsigner.Transaction
 		err := json.Unmarshal([]byte(encRequest.Body), &tx)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid))
 		}
 		// We only support EIP-155 and EIP-1559 as they include the ChainID in the payload
 		var sigPayload *ethsigner.TransactionSignaturePayload
@@ -398,7 +399,7 @@ func (d *domain) EncodeData(ctx context.Context, encRequest *prototk.EncodeDataR
 				return tx.FinalizeLegacyEIP155WithSignature(signaturePayload, sig, d.dm.ethClientFactory.ChainID())
 			}
 		default:
-			return nil, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.Definition)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.Definition))
 		}
 		if encRequest.EncodingType == prototk.EncodingType_ETH_TRANSACTION_SIGNED {
 			sig, err := d.inlineEthSign(ctx, sigPayload.Bytes(), encRequest.KeyIdentifier)
@@ -415,14 +416,14 @@ func (d *domain) EncodeData(ctx context.Context, encRequest *prototk.EncodeDataR
 		var tdv4 *eip712.TypedData
 		err := json.Unmarshal([]byte(encRequest.Body), &tdv4)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataInvalid))
 		}
 		abiData, err = eip712.EncodeTypedDataV4(ctx, tdv4)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataFail))
 		}
 	default:
-		return nil, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.EncodingType)
+		return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.EncodingType))
 	}
 	return &prototk.EncodeDataResponse{
 		Data: abiData,
@@ -467,33 +468,33 @@ func (d *domain) DecodeData(ctx context.Context, decRequest *prototk.DecodeDataR
 		var entry *abi.Entry
 		err := json.Unmarshal([]byte(decRequest.Definition), &entry)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid))
 		}
 		cv, err := entry.DecodeCallDataCtx(ctx, decRequest.Data)
 		if err == nil {
 			body, err = cv.JSON()
 		}
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail))
 		}
 	case prototk.EncodingType_TUPLE:
 		var param *abi.Parameter
 		err := json.Unmarshal([]byte(decRequest.Definition), &param)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid))
 		}
 		cv, err := param.Components.DecodeABIDataCtx(ctx, []byte(decRequest.Data), 0)
 		if err == nil {
 			body, err = cv.JSON()
 		}
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail))
 		}
 	case prototk.EncodingType_EVENT_DATA:
 		var entry *abi.Entry
 		err := json.Unmarshal([]byte(decRequest.Definition), &entry)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid))
 		}
 		topics := make([]ethtypes.HexBytes0xPrefix, len(decRequest.Topics))
 		for i, topic := range decRequest.Topics {
@@ -504,7 +505,7 @@ func (d *domain) DecodeData(ctx context.Context, decRequest *prototk.DecodeDataR
 			body, err = cv.JSON()
 		}
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail))
 		}
 	case prototk.EncodingType_ETH_TRANSACTION:
 		// We support round tripping the same types as encode
@@ -514,7 +515,7 @@ func (d *domain) DecodeData(ctx context.Context, decRequest *prototk.DecodeDataR
 		case "", "eip1559", "eip-1559": // this is all we support currently
 			tx, err = ethsigner.DecodeEIP1559SignaturePayload(ctx, decRequest.Data, d.dm.ethClientFactory.ChainID())
 		default:
-			return nil, i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestEntryInvalid, decRequest.Definition)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestEntryInvalid, decRequest.Definition))
 		}
 		if err == nil {
 			body, err = json.Marshal(tx)
@@ -533,7 +534,7 @@ func (d *domain) DecodeData(ctx context.Context, decRequest *prototk.DecodeDataR
 		case "eip155", "eip-155":
 			from, tx, err = ethsigner.RecoverLegacyRawTransaction(ctx, decRequest.Data, d.dm.ethClientFactory.ChainID())
 		default:
-			err = i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestEntryInvalid, decRequest.Definition)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestEntryInvalid, decRequest.Definition))
 		}
 		if err == nil {
 			tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, from))
@@ -543,7 +544,7 @@ func (d *domain) DecodeData(ctx context.Context, decRequest *prototk.DecodeDataR
 			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail)
 		}
 	default:
-		return nil, i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestInvalidType, decRequest.EncodingType)
+		return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestInvalidType, decRequest.EncodingType))
 	}
 	return &prototk.DecodeDataResponse{
 		Body: string(body),

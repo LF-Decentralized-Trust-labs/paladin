@@ -22,6 +22,7 @@
  import com.fasterxml.jackson.databind.ObjectMapper;
  import com.fasterxml.jackson.databind.node.*;
  import com.google.protobuf.ByteString;
+
  import io.kaleido.paladin.logging.PaladinLogging;
  import io.kaleido.paladin.pente.evmrunner.EVMRunner;
  import io.kaleido.paladin.pente.evmstate.AccountLoader;
@@ -31,6 +32,7 @@
  import io.kaleido.paladin.toolkit.JsonHex.Address;
  import io.kaleido.paladin.toolkit.JsonHex.Bytes;
  import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
+
  import org.apache.logging.log4j.Logger;
  import org.apache.logging.log4j.message.FormattedMessage;
  import org.jetbrains.annotations.NotNull;
@@ -40,6 +42,7 @@
  import java.nio.charset.StandardCharsets;
  import java.util.*;
  import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
  public class PenteDomain extends DomainInstance {
      private static final Logger LOGGER = PaladinLogging.getLogger(PenteDomain.class);
@@ -235,6 +238,10 @@
                          parseExternalCalls(execResult.logs())));
      }
 
+     private boolean isPermanentFailure(ErrorResponseException ex) {
+         return ex.getErrorType() == Header.ErrorType.INVALID_INPUT;
+     }
+
      @Override
      protected CompletableFuture<AssembleTransactionResponse> assembleTransaction(AssembleTransactionRequest request) {
          try {
@@ -282,6 +289,17 @@
                      setAssemblyResult(AssembleTransactionResponse.Result.REVERT).
                      setRevertReason(e.getMessage()).
                      build());
+         } catch (ExecutionException e) {
+             if (e.getCause() instanceof ErrorResponseException && isPermanentFailure((ErrorResponseException) e.getCause())) {
+                // Any error response from a plugin during assembly is considered a revert.
+                // These can stem from things like an invalid ABI or inputs.
+                LOGGER.error(new FormattedMessage("Error response from plugin during assemble for TX {}", request.getTransaction().getTransactionId()), e);
+                return CompletableFuture.completedFuture(AssembleTransactionResponse.newBuilder().
+                        setAssemblyResult(AssembleTransactionResponse.Result.REVERT).
+                        setRevertReason(e.getMessage()).
+                        build());
+             }
+             return CompletableFuture.failedFuture(e);
          } catch (Exception e) {
              return CompletableFuture.failedFuture(e);
          }

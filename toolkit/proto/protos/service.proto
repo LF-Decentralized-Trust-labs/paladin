@@ -35,11 +35,16 @@ message Header {
     REQUEST_FROM_PLUGIN= 4;
     RESPONSE_TO_PLUGIN = 5;
   }
+  enum ErrorType {
+    UNKNOWN = 0;
+    INVALID_INPUT = 1;
+  }
   string plugin_id = 1; // unique runtime identifier for this domain
   string message_id = 2; // a unique identifier for this message
   optional string correlation_id = 3; // for replies the identifier of the request (for publications TBD)
   optional string error_message = 4;
   MessageType message_type = 5;
+  ErrorType error_type = 6;
 }
 
 message DomainMessage {
