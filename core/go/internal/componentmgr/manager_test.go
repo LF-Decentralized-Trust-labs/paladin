@@ -50,6 +50,7 @@ func TestInitOK(t *testing.T) {
 	l, err := net.Listen("tcp4", ":0")
 	require.NoError(t, err)
 	debugPort := l.Addr().(*net.TCPAddr).Port
+	metricsPort := 6100
 	require.NoError(t, l.Close())
 
 	// We build a config that allows us to get through init successfully, as should be possible
@@ -104,6 +105,12 @@ func TestInitOK(t *testing.T) {
 			Enabled: confutil.P(true),
 			HTTPServerConfig: pldconf.HTTPServerConfig{
 				Port: confutil.P(debugPort),
+			},
+		},
+		MetricsServer: pldconf.MetricsServerConfig{
+			Enabled: confutil.P(true),
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Port: confutil.P(metricsPort),
 			},
 		},
 	}

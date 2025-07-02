@@ -5,12 +5,12 @@ db:
     dsn: ':memory:'
     autoMigrate: true
     migrationsDir: '../../core/go/db/migrations/sqlite'
-# type: postgres
-# postgres:
-#   dsn: 'postgres://postgres:my-secret@localhost:5432/postgres?sslmode=disable'
-#   autoMigrate: true
-#   migrationsDir: '../../../core/go/db/migrations/postgres'
-#   debugQueries: false
+  # type: postgres
+  # postgres:
+  #   dsn: 'postgres://postgres:my-secret@localhost:5432/postgres?sslmode=disable'
+  #   autoMigrate: true
+  #   migrationsDir: '../../core/go/db/migrations/postgres'
+  #   debugQueries: false
 rpcServer:
   http:
     port: 0

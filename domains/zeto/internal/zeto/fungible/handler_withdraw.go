@@ -305,13 +305,21 @@ func (h *withdrawHandler) formatProvingRequest(ctx context.Context, inputCoins [
 
 	var extras []byte
 	if circuit.UsesNullifiers {
-		proofs, extrasObj, err := generateMerkleProofs(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, tokenName, stateQueryContext, contractAddress, inputCoins, false)
+		smtName := smt.MerkleTreeName(tokenName, contractAddress)
+		mt, err := common.NewMerkleTreeSpec(ctx, smtName, common.StatesTree, h.callbacks, h.stateSchemas.MerkleTreeRootSchema.Id, h.stateSchemas.MerkleTreeNodeSchema.Id, stateQueryContext)
+		if err != nil {
+			return nil, err
+		}
+		indexes, err := makeLeafIndexesFromCoins(ctx, inputCoins, mt.Tree)
+		if err != nil {
+			return nil, err
+		}
+		smtProof, err := generateMerkleProofs(ctx, mt, indexes, inputSize)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorGenerateMTP, err)
 		}
-		for i := len(proofs); i < inputSize; i++ {
-			extrasObj.MerkleProofs = append(extrasObj.MerkleProofs, &smt.Empty_Proof)
-			extrasObj.Enabled = append(extrasObj.Enabled, false)
+		extrasObj := &corepb.ProvingRequestExtras_Nullifiers{
+			SmtProof: smtProof,
 		}
 		protoExtras, err := proto.Marshal(extrasObj)
 		if err != nil {

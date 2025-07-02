@@ -83,7 +83,7 @@ func (tm *txManager) rpcSendTransaction() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		tx pldapi.TransactionInput,
 	) (*uuid.UUID, error) {
-		tm.metrics.IncRpc("prepareTransaction")
+		tm.metrics.IncRpc("sendTransaction")
 		return tm.sendTransactionNewDBTX(ctx, &tx)
 	})
 }
@@ -92,7 +92,7 @@ func (tm *txManager) rpcSendTransactions() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		txs []*pldapi.TransactionInput,
 	) ([]uuid.UUID, error) {
-		tm.metrics.IncRpc("prepareTransactions")
+		tm.metrics.IncRpc("sendTransactions")
 		return tm.sendTransactionsNewDBTX(ctx, txs)
 	})
 }
@@ -348,8 +348,7 @@ func (tm *txManager) rpcDebugTransactionStatus() rpcserver.RPCHandler {
 		id uuid.UUID,
 	) (components.PrivateTxStatus, error) {
 		tm.metrics.IncRpc("debugTransactionStatus")
-		return components.PrivateTxStatus{}, nil // MRW TODO
-		//return tm.privateTxMgr.GetTxStatus(ctx, contractAddress, id)
+		return tm.privateTxMgr.GetTxStatus(ctx, contractAddress, id)
 	})
 }
 

@@ -26,6 +26,18 @@
     "zeto_g16_anon_nullifier_transfer_batch": {
         "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonNullifierTransferBatch.json"
     },
+    "zeto_g16_anon_nullifier_kyc_transfer": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonNullifierKycTransfer.json"
+    },
+    "zeto_g16_anon_nullifier_kyc_transfer_batch": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonNullifierKycTransferBatch.json"
+    },
+    "zeto_g16_anon_nullifier_kyc_transfer_locked": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonNullifierKycTransferLocked.json"
+    },
+    "zeto_g16_anon_nullifier_kyc_transfer_locked_batch": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_AnonNullifierKycTransferLockedBatch.json"
+    },
     "zeto_g16_deposit": {
         "filename": "test/e2e/abis/zeto/Groth16Verifier_Deposit.json"
     },
@@ -63,6 +75,14 @@
     "zeto_impl_anon_nullifier": {
         "filename": "test/e2e/abis/zeto/Zeto_AnonNullifier.json",
         "linkedContracts": {
+            "PoseidonUnit3L": "zeto_poseidon_unit3l",
+            "SmtLib": "zeto_smt_lib"
+        }
+    },
+    "zeto_impl_anon_nullifier_kyc": {
+        "filename": "test/e2e/abis/zeto/Zeto_AnonNullifierKyc.json",
+        "linkedContracts": {
+            "PoseidonUnit2L": "zeto_poseidon_unit2l",
             "PoseidonUnit3L": "zeto_poseidon_unit3l",
             "SmtLib": "zeto_smt_lib"
         }

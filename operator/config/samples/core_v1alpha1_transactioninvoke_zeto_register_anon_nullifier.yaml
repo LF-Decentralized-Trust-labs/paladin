@@ -28,10 +28,12 @@ spec:
           "verifier":              "{{ index .status.resolvedContractAddresses "zeto-g16-anon-nullifier-transfer" }}",
           "depositVerifier":       "{{ index .status.resolvedContractAddresses "zeto-g16-deposit" }}",
           "withdrawVerifier":      "{{ index .status.resolvedContractAddresses "zeto-g16-withdraw-nullifier" }}",
+          "lockVerifier":          "0x0000000000000000000000000000000000000000",
+          "burnVerifier":          "0x0000000000000000000000000000000000000000",
           "batchVerifier":         "{{ index .status.resolvedContractAddresses "zeto-g16-anon-nullifier-transfer-batch" }}",
           "batchWithdrawVerifier": "{{ index .status.resolvedContractAddresses "zeto-g16-withdraw-nullifier-batch" }}",
-          "lockVerifier":          "0x0000000000000000000000000000000000000000",
-          "batchLockVerifier":     "0x0000000000000000000000000000000000000000"
+          "batchLockVerifier":     "0x0000000000000000000000000000000000000000",
+          "batchBurnVerifier":     "0x0000000000000000000000000000000000000000"
         }
       }
     }
@@ -72,6 +74,16 @@ spec:
                   },
                   {
                     "internalType": "address",
+                    "name": "lockVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "burnVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
                     "name": "batchVerifier",
                     "type": "address"
                   },
@@ -82,12 +94,12 @@ spec:
                   },
                   {
                     "internalType": "address",
-                    "name": "lockVerifier",
+                    "name": "batchLockVerifier",
                     "type": "address"
                   },
                   {
                     "internalType": "address",
-                    "name": "batchLockVerifier",
+                    "name": "batchBurnVerifier",
                     "type": "address"
                   }
                 ]

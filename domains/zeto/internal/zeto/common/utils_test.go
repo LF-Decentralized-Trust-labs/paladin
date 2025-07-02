@@ -11,7 +11,9 @@ import (
 
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -189,4 +191,28 @@ func TestCryptoRandBN254(t *testing.T) {
 		assert.Less(t, tokenValue.Cmp(fieldModulus), 0, "token value %s is not less than field modulus %s on iteration %d",
 			tokenValue.String(), fieldModulus.String(), i)
 	}
+}
+
+func TestNewMerkleTreeSpec(t *testing.T) {
+	ctx := context.Background()
+	testCallbacks := &domain.MockDomainCallbacks{
+		MockFindAvailableStates: func() (*pb.FindAvailableStatesResponse, error) {
+			return &pb.FindAvailableStatesResponse{}, nil
+		},
+	}
+
+	spec, err := NewMerkleTreeSpec(ctx, "testSmt", StatesTree, testCallbacks, "smt_root_schema", "smt_node_schema", "test_query_context")
+	require.NoError(t, err)
+	assert.Equal(t, StatesTree, spec.Type)
+
+	spec, err = NewMerkleTreeSpec(ctx, "testSmt", LockedStatesTree, testCallbacks, "smt_root_schema", "smt_node_schema", "test_query_context")
+	require.NoError(t, err)
+	assert.Equal(t, LockedStatesTree, spec.Type)
+
+	spec, err = NewMerkleTreeSpec(ctx, "testSmt", KycStatesTree, testCallbacks, "smt_root_schema", "smt_node_schema", "test_query_context")
+	require.NoError(t, err)
+	assert.Equal(t, KycStatesTree, spec.Type)
+
+	spec, err = NewMerkleTreeSpec(ctx, "testSmt", 3, testCallbacks, "smt_root_schema", "smt_node_schema", "test_query_context")
+	require.ErrorContains(t, err, "PD210140: Unknown states merkle tree type: 3")
 }

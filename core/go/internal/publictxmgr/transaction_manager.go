@@ -79,7 +79,7 @@ type pubTxManager struct {
 	ctxCancel context.CancelFunc
 
 	conf             *pldconf.PublicTxManagerConfig
-	thMetrics        *publicTxEngineMetrics
+	thMetrics        metrics.PublicTransactionManagerMetrics
 	p                persistence.Persistence
 	bIndexer         blockindexer.BlockIndexer
 	ethClient        ethclient.EthClient
@@ -124,9 +124,6 @@ type pubTxManager struct {
 	// updates
 	updates   []*transactionUpdate
 	updateMux sync.Mutex
-
-	// metrics
-	metrics metrics.PublicTransactionManagerMetrics
 }
 
 type txActivityRecords struct {
@@ -168,7 +165,7 @@ func NewPublicTransactionManager(ctx context.Context, conf *pldconf.PublicTxMana
 }
 
 func (ptm *pubTxManager) PreInit(pic components.PreInitComponents) (result *components.ManagerInitResult, err error) {
-	ptm.metrics = metrics.InitMetrics(ptm.ctx, pic.MetricsManager().Registry())
+	ptm.thMetrics = metrics.InitMetrics(ptm.ctx, pic.MetricsManager().Registry())
 	return &components.ManagerInitResult{}, nil
 }
 
@@ -181,7 +178,7 @@ func (ptm *pubTxManager) PostInit(pic components.AllComponents) error {
 	ptm.p = pic.Persistence()
 	ptm.bIndexer = pic.BlockIndexer()
 	ptm.rootTxMgr = pic.TxManager()
-	ptm.submissionWriter = newSubmissionWriter(ptm.ctx, ptm.p, ptm.conf, ptm.metrics)
+	ptm.submissionWriter = newSubmissionWriter(ptm.ctx, ptm.p, ptm.conf, ptm.thMetrics)
 	ptm.balanceManager = NewBalanceManagerWithInMemoryTracking(ctx, ptm.conf, ptm)
 
 	log.L(ctx).Debugf("Initialized public transaction manager")
@@ -816,7 +813,7 @@ func (ptm *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, d
 			log.L(ctx).Errorf("MatchUpdateConfirmedTransactions: error writing to `public_completions`: %s", err.Error())
 			return nil, err
 		}
-		ptm.metrics.IncCompletedTransactions()
+		ptm.thMetrics.IncCompletedTransactionsByN(uint64(len(completions)))
 	}
 
 	log.L(ctx).Debugf("MatchUpdateConfirmedTransactions: Returning %d results", len(results))

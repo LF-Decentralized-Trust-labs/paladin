@@ -49,11 +49,13 @@ func sampleTransferPayload() map[string]any {
 }
 
 func TestLockValidateParams(t *testing.T) {
-	h := lockHandler{
-		baseHandler: baseHandler{
-			name: "test1",
-		},
-	}
+	h := NewLockHandler(
+		"test1",
+		nil,
+		&prototk.StateSchema{Id: "coin"},
+		&prototk.StateSchema{Id: "merkle_tree_root"},
+		&prototk.StateSchema{Id: "merkle_tree_node"},
+	)
 	config := &types.DomainInstanceConfig{
 		TokenName: "test",
 		Circuits: &zetosignerapi.Circuits{

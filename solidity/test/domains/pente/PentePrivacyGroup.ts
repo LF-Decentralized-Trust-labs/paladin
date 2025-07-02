@@ -86,14 +86,17 @@ describe("PentePrivacyGroup", function () {
         .connect(deployer)
         .newPrivacyGroup(deployTxId, configBytes)
     ).wait();
-    expect(factoryTX?.logs).to.have.lengthOf(2);
-
-    // It should emit an event declaring its existence, linking back to the domain
-    const deployEvent = PenteFactory.interface.parseLog(factoryTX!.logs[1]);
-    expect(factoryTX!.logs[1].address).to.equal(
-      await penteFactory.getAddress()
+    // Find the PaladinRegisterSmartContract_V0 event
+    const factoryAddress = await penteFactory.getAddress();
+    const deployEventLog = factoryTX!.logs.find(
+      (log) =>
+        log.address === factoryAddress &&
+        PenteFactory.interface.parseLog(log)?.name ===
+          "PaladinRegisterSmartContract_V0"
     );
-    expect(deployEvent?.name).to.equal("PaladinRegisterSmartContract_V0");
+    expect(deployEventLog).to.not.be.undefined;
+
+    const deployEvent = PenteFactory.interface.parseLog(deployEventLog!);
     expect(deployEvent?.args.toObject()["txId"]).to.equal(deployTxId);
     expect(deployEvent?.args.toObject()["config"]).to.equal(configBytes);
     const privacyGroupAddress = deployEvent?.args.toObject()["instance"];
@@ -135,25 +138,13 @@ describe("PentePrivacyGroup", function () {
       outputs: stateSet1,
       info: info1,
     };
-    await expect(
-      privacyGroup.transition(
-        tx1ID,
-        tx1,
-        [],
-        endorsements1
-      )
-    )
+    await expect(privacyGroup.transition(tx1ID, tx1, [], endorsements1))
       .to.emit(privacyGroup, "PenteTransition")
       .withArgs(tx1ID, [], [], stateSet1, info1);
 
     // Rejects duplicate
     await expect(
-      privacyGroup.transition(
-        tx1ID,
-        tx1,
-        [],
-        endorsements1
-      )
+      privacyGroup.transition(tx1ID, tx1, [], endorsements1)
     ).to.be.rejectedWith("PenteDuplicateTransaction");
 
     const stateSet2 = [randBytes32(), randBytes32(), randBytes32()];

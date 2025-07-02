@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
@@ -116,14 +117,21 @@ func newTestClientAndServerHTTP(t *testing.T, methods ...testRPCMethod) (ctx con
 
 func newTestRPCServerWebSockets(t *testing.T, methods ...testRPCMethod) (ctx context.Context, url string, done func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
 
 	toServer, fromServer, url, close := wsclient.NewTestWSServer(func(req *http.Request) {})
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		listen := true
 		for listen {
 			select {
-			case msg := <-toServer:
+			case msg, ok := <-toServer:
+				if !ok {
+					listen = false
+					continue
+				}
 				var req rpcclient.RPCRequest
 				err := json.Unmarshal([]byte(msg), &req)
 				require.NoError(t, err)
@@ -141,17 +149,21 @@ func newTestRPCServerWebSockets(t *testing.T, methods ...testRPCMethod) (ctx con
 				}
 				b, err := json.Marshal(res)
 				require.NoError(t, err)
-				fromServer <- string(b)
+				select {
+				case fromServer <- string(b):
+				case <-ctx.Done():
+					listen = false
+				}
 
 			case <-ctx.Done():
 				listen = false
 			}
-
 		}
 	}()
 
 	return ctx, url, func() {
 		cancelCtx()
+		wg.Wait()
 		close()
 	}
 }

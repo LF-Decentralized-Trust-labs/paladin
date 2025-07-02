@@ -20,10 +20,11 @@ import (
 	"math/big"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/kaleido-io/paladin/core/internal/publictxmgr/metrics"
 )
 
 type inFlightTransactionState struct {
-	PublicTxManagerMetricsManager
+	metrics.PublicTransactionManagerMetrics
 	BalanceManager
 	InMemoryTxStateManager
 
@@ -60,7 +61,7 @@ func (iftxs *inFlightTransactionState) NewGeneration(ctx context.Context) {
 	iftxs.generations[len(iftxs.generations)-1].SetCurrent(ctx, false)
 	iftxs.generations[len(iftxs.generations)-1].Cancel(ctx)
 	iftxs.generations = append(iftxs.generations, NewInFlightTransactionStateGeneration(
-		iftxs.PublicTxManagerMetricsManager,
+		iftxs.PublicTransactionManagerMetrics,
 		iftxs.BalanceManager,
 		iftxs.InFlightStageActionTriggers,
 		iftxs.InMemoryTxStateManager,
@@ -96,7 +97,7 @@ func (iftxs *inFlightTransactionState) GetStage(ctx context.Context) InFlightTxS
 	return iftxs.GetCurrentGeneration(ctx).GetStage(ctx)
 }
 
-func NewInFlightTransactionStateManager(thm PublicTxManagerMetricsManager,
+func NewInFlightTransactionStateManager(thm metrics.PublicTransactionManagerMetrics,
 	bm BalanceManager,
 	ifsat InFlightStageActionTriggers,
 	imtxs InMemoryTxStateManager,
@@ -105,8 +106,8 @@ func NewInFlightTransactionStateManager(thm PublicTxManagerMetricsManager,
 	noEventMode bool,
 ) InFlightTransactionStateManager {
 	return &inFlightTransactionState{
-		PublicTxManagerMetricsManager: thm,
-		BalanceManager:                bm,
+		PublicTransactionManagerMetrics: thm,
+		BalanceManager:                  bm,
 		generations: []InFlightTransactionStateGeneration{
 			NewInFlightTransactionStateGeneration(thm, bm, ifsat, imtxs, statusUpdater, submissionWriter, noEventMode),
 		},

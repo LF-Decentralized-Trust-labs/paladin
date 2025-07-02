@@ -48,6 +48,14 @@ func decodeProvingRequest(ctx context.Context, payload []byte) (*pb.ProvingReque
 		}
 		return &inputs, &encExtras, nil
 	} else if inputs.Circuit.UsesNullifiers {
+		if inputs.Circuit.UsesKyc {
+			var kycExtras pb.ProvingRequestExtras_NullifiersKyc
+			err := proto.Unmarshal(inputs.Extras, &kycExtras)
+			if err != nil {
+				return nil, nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalProvingReqExtras, inputs.Circuit.Name, err)
+			}
+			return &inputs, &kycExtras, nil
+		}
 		var nullifierExtras pb.ProvingRequestExtras_Nullifiers
 		err := proto.Unmarshal(inputs.Extras, &nullifierExtras)
 		if err != nil {

@@ -27,6 +27,9 @@ packages:
   github.com/kaleido-io/paladin/core/internal/componentmgr:
     config:
       all: true
+  github.com/kaleido-io/paladin/core/internal/metrics:
+    config:
+      all: true
   github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes:
     config:
       all: true

@@ -51,6 +51,10 @@ async function main(): Promise<boolean> {
     ],
   });
   if (!checkReceipt(receipt)) return false;
+  let bank1Balance = await zetoCBDC1.using(paladin1).balanceOf(bank1, {account: bank1.lookup});
+  logger.log(`bank1 State: ${bank1Balance.totalBalance} units of cash, ${bank1Balance.totalStates} states, overflow: ${bank1Balance.overflow}`);
+  let bank2Balance = await zetoCBDC1.using(paladin2).balanceOf(bank2, {account: bank2.lookup});
+  logger.log(`bank2 State: ${bank2Balance.totalBalance} units of cash, ${bank2Balance.totalStates} states, overflow: ${bank2Balance.overflow}`);
 
   // TODO: remove
   await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -69,6 +73,10 @@ async function main(): Promise<boolean> {
     ],
   });
   if (!checkReceipt(receipt)) return false;
+  bank1Balance = await zetoCBDC1.using(paladin1).balanceOf(bank1, {account: bank1.lookup});
+  logger.log(`bank1 State: ${bank1Balance.totalBalance} units of cash, ${bank1Balance.totalStates} states, overflow: ${bank1Balance.overflow}`);
+  bank2Balance = await zetoCBDC1.using(paladin2).balanceOf(bank2, {account: bank2.lookup});
+  logger.log(`bank2 State: ${bank2Balance.totalBalance} units of cash, ${bank2Balance.totalStates} states, overflow: ${bank2Balance.overflow}`);
   logger.log("\nUse case #1 complete!\n");
 
   logger.log(
@@ -92,7 +100,6 @@ async function main(): Promise<boolean> {
 
   logger.log("- Issuing CBDC to bank1 with public minting in ERC20...");
   await mintERC20(paladin3, cbdcIssuer, bank1, erc20Address!, 100000);
-
   logger.log(
     "- Bank1 approve ERC20 balance for the Zeto token contract as spender, to prepare for deposit..."
   );
@@ -103,6 +110,8 @@ async function main(): Promise<boolean> {
     amount: 10000,
   });
   if (!checkReceipt(result4)) return false;
+  bank1Balance = await zetoCBDC2.using(paladin1).balanceOf(bank1, {account: bank1.lookup});
+  logger.log(`bank1 State: ${bank1Balance.totalBalance} units of cash, ${bank1Balance.totalStates} states, overflow: ${bank1Balance.overflow}`);
 
   // Transfer some cash from bank1 to bank2
   logger.log(
@@ -118,13 +127,16 @@ async function main(): Promise<boolean> {
     ],
   });
   if (!checkReceipt(receipt)) return false;
+  bank1Balance = await zetoCBDC2.using(paladin1).balanceOf(bank1, {account: bank1.lookup});
+  logger.log(`bank1 State: ${bank1Balance.totalBalance} units of cash, ${bank1Balance.totalStates} states, overflow: ${bank1Balance.overflow}`);
+  bank2Balance = await zetoCBDC2.using(paladin2).balanceOf(bank2, {account: bank2.lookup});
+  logger.log(`bank2 State: ${bank2Balance.totalBalance} units of cash, ${bank2Balance.totalStates} states, overflow: ${bank2Balance.overflow}`);
 
   logger.log("- Bank1 withdraws Zeto back to ERC20 balance ...");
   const result5 = await zetoCBDC2.using(paladin1).withdraw(bank1, {
     amount: 1000,
   });
   if (!checkReceipt(result5)) return false;
-
   logger.log("\nUse case #2 complete!");
 
   return true;

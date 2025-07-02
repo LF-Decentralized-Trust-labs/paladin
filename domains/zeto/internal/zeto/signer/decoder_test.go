@@ -94,13 +94,15 @@ func TestDecodeProvingRequest(t *testing.T) {
 			name:    "AnonNullifier With Extras",
 			circuit: &zetosignerapi.Circuit{Name: "anon_nullifier", UsesNullifiers: true},
 			extras: &pb.ProvingRequestExtras_Nullifiers{
-				Root: "123456",
-				MerkleProofs: []*pb.MerkleProof{
-					{
-						Nodes: []string{"1", "2", "3"},
+				SmtProof: &pb.MerkleProofObject{
+					Root: "123456",
+					MerkleProofs: []*pb.MerkleProof{
+						{
+							Nodes: []string{"1", "2", "3"},
+						},
 					},
+					Enabled: []bool{true},
 				},
-				Enabled: []bool{true},
 			},
 			expectValue: "123456",
 		},
@@ -114,13 +116,15 @@ func TestDecodeProvingRequest(t *testing.T) {
 			name:    "AnonNullifier valid Extras",
 			circuit: &zetosignerapi.Circuit{Name: "anon_nullifier", UsesNullifiers: true},
 			extras: &pb.ProvingRequestExtras_Nullifiers{
-				Root: "123456",
-				MerkleProofs: []*pb.MerkleProof{
-					{
-						Nodes: []string{"1", "2", "3"},
+				SmtProof: &pb.MerkleProofObject{
+					Root: "123456",
+					MerkleProofs: []*pb.MerkleProof{
+						{
+							Nodes: []string{"1", "2", "3"},
+						},
 					},
+					Enabled: []bool{true},
 				},
-				Enabled: []bool{true},
 			},
 			expectValue: "123456",
 		},
@@ -171,7 +175,7 @@ func TestDecodeProvingRequest(t *testing.T) {
 					case *pb.ProvingRequestExtras_Encryption:
 						assert.Equal(t, tt.expectValue, v.EncryptionNonce)
 					case *pb.ProvingRequestExtras_Nullifiers:
-						assert.Equal(t, tt.expectValue, v.Root)
+						assert.Equal(t, tt.expectValue, v.SmtProof.Root)
 					}
 				} else {
 					assert.Empty(t, extras)

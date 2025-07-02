@@ -215,6 +215,13 @@ task copyZetoZKPFiles(type: Copy) {
         include 'anon_nullifier_transfer_batch.zkey'
         include 'anon_nullifier_transfer_batch-vkey.json'
         include 'anon_nullifier_transfer_batch_js/anon_nullifier_transfer_batch.wasm'
+        // anon_nullifier_kyc
+        include 'anon_nullifier_kyc_transfer.zkey'
+        include 'anon_nullifier_kyc_transfer-vkey.json'
+        include 'anon_nullifier_kyc_transfer_js/anon_nullifier_kyc_transfer.wasm'
+        include 'anon_nullifier_kyc_transfer_batch.zkey'
+        include 'anon_nullifier_kyc_transfer_batch-vkey.json'
+        include 'anon_nullifier_kyc_transfer_batch_js/anon_nullifier_kyc_transfer_batch.wasm'
         // deposit
         include 'deposit.zkey'
         include 'deposit-vkey.json'

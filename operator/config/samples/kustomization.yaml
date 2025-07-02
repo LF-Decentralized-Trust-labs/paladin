@@ -18,6 +18,7 @@ resources:
   - core_v1alpha1_transactioninvoke_zeto_register_anon.yaml
   - core_v1alpha1_transactioninvoke_zeto_register_anon_enc.yaml
   - core_v1alpha1_transactioninvoke_zeto_register_anon_nullifier.yaml
+  - core_v1alpha1_transactioninvoke_zeto_register_anon_nullifier_kyc.yaml
   # Smart contracts - note these CRs are generate dynamically by the build
   - core_v1alpha1_smartcontractdeployment_registry.yaml
   - core_v1alpha1_smartcontractdeployment_noto_factory.yaml
@@ -34,9 +35,14 @@ resources:
   - core_v1alpha1_smartcontractdeployment_zeto_g16_anon_enc_batch.yaml
   - core_v1alpha1_smartcontractdeployment_zeto_g16_anon_nullifier_transfer.yaml
   - core_v1alpha1_smartcontractdeployment_zeto_g16_anon_nullifier_transfer_batch.yaml
+  - core_v1alpha1_smartcontractdeployment_zeto_g16_anon_nullifier_kyc_transfer.yaml
+  - core_v1alpha1_smartcontractdeployment_zeto_g16_anon_nullifier_kyc_transfer_batch.yaml
+  - core_v1alpha1_smartcontractdeployment_zeto_g16_anon_nullifier_kyc_transfer_locked.yaml
+  - core_v1alpha1_smartcontractdeployment_zeto_g16_anon_nullifier_kyc_transfer_locked_batch.yaml
   - core_v1alpha1_smartcontractdeployment_zeto_impl_anon.yaml
   - core_v1alpha1_smartcontractdeployment_zeto_impl_anon_enc.yaml
   - core_v1alpha1_smartcontractdeployment_zeto_impl_anon_nullifier.yaml
+  - core_v1alpha1_smartcontractdeployment_zeto_impl_anon_nullifier_kyc.yaml
   - core_v1alpha1_smartcontractdeployment_zeto_poseidon_unit2l.yaml
   - core_v1alpha1_smartcontractdeployment_zeto_poseidon_unit3l.yaml
   - core_v1alpha1_smartcontractdeployment_zeto_smt_lib.yaml

@@ -30,7 +30,11 @@ import (
 )
 
 func TestMintValidateParams(t *testing.T) {
-	h := mintHandler{}
+	h := NewMintHandler(
+		"test1",
+		&prototk.StateSchema{Id: "coin"},
+		&prototk.StateSchema{Id: "data"},
+	)
 	ctx := context.Background()
 	_, err := h.ValidateParams(ctx, nil, "bad json")
 	assert.EqualError(t, err, "invalid character 'b' looking for beginning of value")

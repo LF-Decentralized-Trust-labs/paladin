@@ -138,7 +138,7 @@ func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX per
 		defer p.sequencersLock.Unlock()
 		//double check in case another goroutine has created the sequencer while we were waiting for the write lock
 		if p.sequencers[contractAddr.String()] == nil {
-			transportWriter := NewTransportWriter(domainAPI.Domain().Name(), &contractAddr, p.nodeName, p.components.TransportManager())
+			_ = NewTransportWriter(domainAPI.Domain().Name(), &contractAddr, p.nodeName, p.components.TransportManager())
 			publisher := NewPublisher(p, contractAddr.String())
 
 			endorsementGatherer, err := p.getEndorsementGathererForContract(ctx, dbTX, contractAddr)
@@ -158,8 +158,8 @@ func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX per
 				endorsementGatherer,
 				publisher,
 				p.syncPoints,
-				p.components.IdentityResolver(),
-				transportWriter,
+				p.components.IdentityResolver(), nil,
+				// transportWriter, // MRW removed
 				confutil.DurationMin(p.config.RequestTimeout, 0, *pldconf.PrivateTxManagerDefaults.RequestTimeout),
 				p.blockHeight,
 			)

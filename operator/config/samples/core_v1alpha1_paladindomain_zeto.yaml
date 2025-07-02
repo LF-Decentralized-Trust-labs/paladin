@@ -71,6 +71,28 @@ spec:
                 "usesNullifiers": true
               }
             }
+          },
+          {
+            "name": "Zeto_AnonNullifierKyc",
+            "circuits": {
+              "deposit": {
+                "name": "deposit"
+              },
+              "withdraw": {
+                "name": "withdraw_nullifier",
+                "usesNullifiers": true
+              },
+              "transfer": {
+                "name": "anon_nullifier_kyc_transfer",
+                "usesNullifiers": true,
+                "usesKyc": true
+              },
+              "transferLocked": {
+                "name": "anon_nullifier_kyc_transferLocked",
+                "usesNullifiers": true,
+                "usesKyc": true
+              }
+            }
           }
         ]
       },

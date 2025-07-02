@@ -20,8 +20,10 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"testing"
 
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -36,6 +38,9 @@ var erc20ABI []byte
 
 //go:embed abis/Zeto_Anon.json
 var ZetoAnonABIJSON []byte
+
+//go:embed abis/Zeto_AnonNullifierKyc.json
+var ZetoAnonNullifierKycABIJSON []byte
 
 type ZetoHelper struct {
 	t       *testing.T
@@ -56,6 +61,8 @@ func DeployZetoFungible(ctx context.Context, t *testing.T, rpc rpcclient.Client,
 	var addr pldtypes.EthAddress
 	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deploy", domainName, controllerName, &types.InitializerParams{
 		TokenName: tokenName,
+		Name:      "Test Zeto",
+		Symbol:    "ZETO",
 	})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr)
@@ -120,6 +127,13 @@ func (z *ZetoHelperFungible) Transfer(ctx context.Context, to []string, amounts 
 	fn := types.ZetoFungibleABI.Functions()["transfer"]
 	return NewDomainTransactionHelper(ctx, z.t, z.rpc, z.Address, fn, toJSON(z.t, &types.FungibleTransferParams{
 		Transfers: entries,
+	}))
+}
+
+func (z *ZetoHelperFungible) BalanceOf(ctx context.Context, account string) *DomainTransactionHelper {
+	fn := types.ZetoFungibleABI.Functions()["balanceOf"]
+	return NewDomainTransactionHelper(ctx, z.t, z.rpc, z.Address, fn, toJSON(z.t, &types.FungibleBalanceOfParam{
+		Account: account,
 	}))
 }
 
@@ -223,6 +237,31 @@ func (z *ZetoHelper) Withdraw(ctx context.Context, amount int64) *DomainTransact
 	}
 	fn := types.ZetoFungibleABI.Functions()["withdraw"]
 	return NewDomainTransactionHelper(ctx, z.t, z.rpc, z.Address, fn, toJSON(z.t, &params))
+}
+
+func (z *ZetoHelper) Register(ctx context.Context, tb testbed.Testbed, sender string, publicKey []*big.Int) {
+	abi := abi.ABI{
+		&abi.Entry{
+			Type: abi.Function,
+			Name: "register",
+			Inputs: abi.ParameterArray{
+				{Name: "publicKey", Type: "uint256[2]"},
+				{Name: "data", Type: "bytes"},
+			},
+		},
+	}
+	paramsJson, _ := json.Marshal(&map[string]any{"publicKey": publicKey, "data": "0x"})
+	_, err := tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			Type:     pldapi.TransactionTypePublic.Enum(),
+			From:     sender,
+			To:       z.Address,
+			Function: "register",
+			Data:     paramsJson,
+		},
+		ABI: abi,
+	})
+	assert.NoError(z.t, err)
 }
 
 // =============================================================================

@@ -23,9 +23,10 @@ const (
 	CIRCUIT_NAME_WITHDRAW        = "withdraw"
 
 	// the names of the Zeto token implementations
-	TOKEN_ANON           = "Zeto_Anon"
-	TOKEN_ANON_ENC       = "Zeto_AnonEnc"
-	TOKEN_ANON_NULLIFIER = "Zeto_AnonNullifier"
+	TOKEN_ANON               = "Zeto_Anon"
+	TOKEN_ANON_ENC           = "Zeto_AnonEnc"
+	TOKEN_ANON_NULLIFIER     = "Zeto_AnonNullifier"
+	TOKEN_ANON_NULLIFIER_KYC = "Zeto_AnonNullifierKyc"
 
 	TOKEN_NF_ANON           = "Zeto_NfAnon"
 	TOKEN_NF_ANON_NULLIFIER = "Zeto_NfAnonNullifier"

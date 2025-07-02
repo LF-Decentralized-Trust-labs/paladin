@@ -61,6 +61,8 @@ type cloneableContract struct {
 	batchWithdrawVerifier string
 	lockVerifier          string
 	batchLockVerifier     string
+	burnVerifier          string
+	batchBurnVerifier     string
 }
 
 type zetoDomainContracts struct {
@@ -105,6 +107,8 @@ type verifiersInfo struct {
 	BatchWithdrawVerifier string `json:"batchWithdrawVerifier"`
 	LockVerifier          string `json:"lockVerifier"`
 	BatchLockVerifier     string `json:"batchLockVerifier"`
+	BurnVerifier          string `json:"burnVerifier"`
+	BatchBurnVerifier     string `json:"batchBurnVerifier"`
 }
 
 func DeployZetoContracts(t *testing.T, hdWalletSeed *testbed.UTInitFunction, configFile string, controller string) *ZetoDomainContracts {
@@ -287,6 +291,8 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 	batchWithdrawVerifierName := domainContracts.cloneableContracts[name].batchWithdrawVerifier
 	lockVerifierName := domainContracts.cloneableContracts[name].lockVerifier
 	batchLockVerifierName := domainContracts.cloneableContracts[name].batchLockVerifier
+	burnVerifierName := domainContracts.cloneableContracts[name].burnVerifier
+	batchBurnVerifierName := domainContracts.cloneableContracts[name].batchBurnVerifier
 
 	params := &setImplementationParams{
 		Name: name,
@@ -357,6 +363,22 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 			return fmt.Errorf("batch lock verifier contract not found among the deployed contracts")
 		}
 		params.Implementation.Verifiers.BatchLockVerifier = batchLockVerifierAddr.String()
+	}
+
+	if burnVerifierName != "" {
+		burnVerifierAddr, ok := domainContracts.deployedContracts[burnVerifierName]
+		if !ok {
+			return fmt.Errorf("lock verifier contract not found among the deployed contracts")
+		}
+		params.Implementation.Verifiers.BurnVerifier = burnVerifierAddr.String()
+	}
+
+	if batchBurnVerifierName != "" {
+		batchBurnVerifierAddr, ok := domainContracts.deployedContracts[batchBurnVerifierName]
+		if !ok {
+			return fmt.Errorf("batch lock verifier contract not found among the deployed contracts")
+		}
+		params.Implementation.Verifiers.BatchBurnVerifier = batchBurnVerifierAddr.String()
 	}
 
 	_, err := tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{

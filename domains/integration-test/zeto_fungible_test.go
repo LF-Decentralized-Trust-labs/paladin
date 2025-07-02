@@ -19,12 +19,15 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"math/big"
 	"testing"
+	"time"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
@@ -68,7 +71,15 @@ func (s *fungibleTestSuiteHelper) TestZeto_AnonNullifierBatch() {
 	s.testZeto(s.T(), constants.TOKEN_ANON_NULLIFIER, true, true)
 }
 
-func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBatch bool, isNullifiersToken bool) {
+func (s *fungibleTestSuiteHelper) TestZeto_AnonNullifierKyc() {
+	s.testZeto(s.T(), constants.TOKEN_ANON_NULLIFIER_KYC, false, true, true)
+}
+
+func (s *fungibleTestSuiteHelper) TestZeto_AnonNullifierKycBatch() {
+	s.testZeto(s.T(), constants.TOKEN_ANON_NULLIFIER_KYC, true, true, true)
+}
+
+func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBatch bool, isNullifiersToken bool, isKycToken ...bool) {
 	ctx := context.Background()
 	log.L(ctx).Info("*************************************")
 	log.L(ctx).Infof("Deploying an instance of the %s token", tokenName)
@@ -90,14 +101,45 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	log.L(ctx).Infof("Setting the ERC20 contract (%s) to the Zeto instance", erc20Address)
 	zeto.SetERC20(ctx, s.tb, controllerName, erc20Address)
 
+	var controllerAddr pldtypes.Bytes32
+	rpcerr = s.rpc.CallRPC(ctx, &controllerAddr, "ptx_resolveVerifier", controllerName, zetosignerapi.AlgoDomainZetoSnarkBJJ(s.domainName), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
+	require.Nil(t, rpcerr)
+
+	if len(isKycToken) > 0 && isKycToken[0] {
+		log.L(ctx).Infof("Registering participant %s in the KYC registry (pubKey=%s)", controllerName, controllerAddr.String())
+		pubKey, err := zetosigner.DecodeBabyJubJubPublicKey(controllerAddr.HexString())
+		require.NoError(t, err)
+		zeto.Register(ctx, s.tb, controllerName, []*big.Int{pubKey.X, pubKey.Y})
+
+		var recipientAddr pldtypes.Bytes32
+		rpcerr = s.rpc.CallRPC(ctx, &recipientAddr, "ptx_resolveVerifier", recipient1Name, zetosignerapi.AlgoDomainZetoSnarkBJJ(s.domainName), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
+		require.Nil(t, rpcerr)
+		log.L(ctx).Infof("Registering participant %s in the KYC registry", recipient1Name)
+		pubKey, err = zetosigner.DecodeBabyJubJubPublicKey(recipientAddr.HexString())
+		require.NoError(t, err)
+		zeto.Register(ctx, s.tb, controllerName, []*big.Int{pubKey.X, pubKey.Y})
+
+		rpcerr = s.rpc.CallRPC(ctx, &recipientAddr, "ptx_resolveVerifier", recipient2Name, zetosignerapi.AlgoDomainZetoSnarkBJJ(s.domainName), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
+		require.Nil(t, rpcerr)
+		log.L(ctx).Infof("Registering participant %s in the KYC registry", recipient2Name)
+		pubKey, err = zetosigner.DecodeBabyJubJubPublicKey(recipientAddr.HexString())
+		require.NoError(t, err)
+		zeto.Register(ctx, s.tb, controllerName, []*big.Int{pubKey.X, pubKey.Y})
+
+		rpcerr = s.rpc.CallRPC(ctx, &recipientAddr, "ptx_resolveVerifier", recipient3Name, zetosignerapi.AlgoDomainZetoSnarkBJJ(s.domainName), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
+		require.Nil(t, rpcerr)
+		log.L(ctx).Infof("Registering participant %s in the KYC registry", recipient3Name)
+		pubKey, err = zetosigner.DecodeBabyJubJubPublicKey(recipientAddr.HexString())
+		require.NoError(t, err)
+		zeto.Register(ctx, s.tb, controllerName, []*big.Int{pubKey.X, pubKey.Y})
+
+		time.Sleep(5 * time.Second) // wait for the KYC registry to be updated
+	}
+
 	log.L(ctx).Info("*************************************")
 	log.L(ctx).Infof("Mint two UTXOs (10, 20) from controller to controller")
 	log.L(ctx).Info("*************************************")
 	zeto.Mint(ctx, controllerName, []uint64{10, 20}).SignAndSend(controllerName, true).Wait()
-
-	var controllerAddr pldtypes.Bytes32
-	rpcerr = s.rpc.CallRPC(ctx, &controllerAddr, "ptx_resolveVerifier", controllerName, zetosignerapi.AlgoDomainZetoSnarkBJJ(s.domainName), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
-	require.Nil(t, rpcerr)
 
 	jq := query.NewQueryBuilder().Limit(100).Equal("locked", false).Query()
 	methodName := "pstate_queryContractStates"
@@ -114,12 +156,16 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	assert.Equal(t, int64(20), coins[1].Data.Amount.Int().Int64())
 	assert.Equal(t, controllerAddr.String(), coins[1].Data.Owner.String())
 
+	balanceOfResult := zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName).Wait()
+	assert.Equal(t, "30", balanceOfResult["totalBalance"].(string), "Balance of controller should be 30")
 	// for testing the batch circuits, we mint the 3rd UTXO
 	if useBatch {
 		log.L(ctx).Info("*************************************")
 		log.L(ctx).Infof("Mint 30 from controller to controller")
 		log.L(ctx).Info("*************************************")
 		zeto.Mint(ctx, controllerName, []uint64{30}).SignAndSend(controllerName, true).Wait()
+		balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName).Wait()
+		assert.Equal(t, "60", balanceOfResult["totalBalance"].(string), "Balance of controller should be 60")
 	}
 
 	if useBatch {
@@ -136,7 +182,10 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 		log.L(ctx).Infof("Transfer %d from controller to recipient1", amount)
 		log.L(ctx).Info("*************************************")
 		zeto.Transfer(ctx, []string{recipient1Name}, []uint64{uint64(amount)}).SignAndSend(controllerName, true).Wait()
+
 	}
+	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName).Wait()
+	assert.Equal(t, "5", balanceOfResult["totalBalance"].(string), "Balance of controller should be 5")
 
 	// check that we now only have one unspent coin, of value 5
 	// one for the controller from the successful transaction as change (value=5)
@@ -186,6 +235,9 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	log.L(ctx).Info("*************************************")
 	zeto.Deposit(ctx, 100).SignAndSend(controllerName, true).Wait()
 
+	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName).Wait()
+	assert.Equal(t, "105", balanceOfResult["totalBalance"].(string), "Balance of controller should be 105")
+
 	expectedCoins += 2 // the deposit call produces 2 output UTXOs for the receiver
 	coins = findAvailableCoins(t, ctx, s.rpc, s.domain.Name(), s.domain.CoinSchemaID(), methodName, zetoAddress, jq, func(coins []*types.ZetoCoinState) bool {
 		return len(coins) >= expectedCoins
@@ -202,6 +254,9 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 		return
 	}
 
+	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName).Wait()
+	assert.Equal(t, "5", balanceOfResult["totalBalance"].(string), "Balance of controller should be 5")
+
 	log.L(ctx).Info("*************************************")
 	log.L(ctx).Infof("Lock some UTXOs and delegate the lock to recipient1")
 	log.L(ctx).Info("*************************************")
@@ -213,6 +268,9 @@ func (s *fungibleTestSuiteHelper) testZeto(t *testing.T, tokenName string, useBa
 	recipient1EthAddr := pldtypes.MustEthAddress(recipient1EthAddrStr)
 	zeto.Lock(ctx, recipient1EthAddr, 1).SignAndSend(controllerName, true).Wait()
 	zeto.Lock(ctx, recipient1EthAddr, 1).SignAndSend(controllerName, true).Wait()
+
+	balanceOfResult = zeto.BalanceOf(ctx, controllerName).SignAndCall(controllerName).Wait()
+	assert.Equal(t, "3", balanceOfResult["totalBalance"].(string), "Balance of controller should be 3")
 
 	jq = query.NewQueryBuilder().Limit(100).Equal("locked", true).Query()
 	coins = findAvailableCoins(t, ctx, s.rpc, s.domain.Name(), s.domain.CoinSchemaID(), methodName, zetoAddress, jq, func(coins []*types.ZetoCoinState) bool {

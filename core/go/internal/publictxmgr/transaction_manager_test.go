@@ -33,6 +33,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/keymanager"
+	"github.com/kaleido-io/paladin/core/internal/metrics"
 	"github.com/kaleido-io/paladin/core/mocks/blockindexermocks"
 	"github.com/kaleido-io/paladin/core/mocks/componentsmocks"
 	"github.com/kaleido-io/paladin/core/mocks/ethclientmocks"
@@ -68,6 +69,7 @@ type mocksAndTestControl struct {
 // const testMainSigningAddress = testDestAddress
 
 func baseMocks(t *testing.T) *mocksAndTestControl {
+	mm := metrics.NewMetricsManager(context.Background())
 	mocks := &mocksAndTestControl{
 		allComponents:    componentsmocks.NewAllComponents(t),
 		ethClientFactory: ethclientmocks.NewEthClientFactory(t),
@@ -80,6 +82,8 @@ func baseMocks(t *testing.T) *mocksAndTestControl {
 	mocks.ethClientFactory.On("HTTPClient").Return(mocks.ethClient).Maybe()
 	mocks.allComponents.On("BlockIndexer").Return(mocks.blockIndexer).Maybe()
 	mocks.allComponents.On("TxManager").Return(mocks.txManager).Maybe()
+	mocks.allComponents.On("TxManager").Return(mocks.txManager).Maybe()
+	mocks.allComponents.On("MetricsManager").Return(mm).Maybe()
 	return mocks
 }
 

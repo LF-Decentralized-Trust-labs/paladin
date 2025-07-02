@@ -181,7 +181,7 @@ func (w *writer[T, R]) queue(ctx context.Context, value T, flush bool) *op[T, R]
 	h := fnv.New32a() // simple non-cryptographic hash algo
 	_, _ = h.Write([]byte(op.writeKey))
 	routine := h.Sum32() % uint32(w.workerCount)
-	log.L(ctx).Debugf("Queuing write operation %s to writer_%s_%.4d", w.writerId, op.id, routine)
+	log.L(ctx).Debugf("Queuing write operation %s to writer_%s_%.4d", op.id, w.writerId, routine)
 	select {
 	case w.workQueues[routine] <- op: // it's queued
 	case <-ctx.Done(): // timeout of caller context

@@ -20,6 +20,12 @@ contracts:
     - name: Groth16Verifier_WithdrawBatch
       abiAndBytecode:
         path: ./helpers/abis/Groth16Verifier_WithdrawBatch.json
+    - name: Groth16Verifier_Burn
+      abiAndBytecode:
+        path: ./helpers/abis/Groth16Verifier_Burn.json
+    - name: Groth16Verifier_BurnBatch
+      abiAndBytecode:
+        path: ./helpers/abis/Groth16Verifier_BurnBatch.json
     - name: Zeto_Anon
       verifier: Groth16Verifier_Anon
       batchVerifier: Groth16Verifier_AnonBatch
@@ -28,6 +34,8 @@ contracts:
       batchWithdrawVerifier: Groth16Verifier_WithdrawBatch
       lockVerifier: Groth16Verifier_Anon
       batchLockVerifier: Groth16Verifier_AnonBatch
+      burnVerifier: Groth16Verifier_Burn
+      batchBurnVerifier: Groth16Verifier_BurnBatch
       circuits:
         deposit:
           name: deposit
