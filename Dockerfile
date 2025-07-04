@@ -41,7 +41,7 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     xz-utils \
     && apt-get clean
-  
+
 # Install JDK
 RUN JAVA_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "aarch64"; else echo -n "x64"; fi ) && \
     curl -sLo - https://api.adoptium.net/v3/binary/version/jdk-${JAVA_VERSION}/${TARGETOS}/${JAVA_ARCH}/jdk/${JVM_TYPE}/${JVM_HEAP}/eclipse | \
@@ -57,7 +57,7 @@ RUN NODE_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "arm64"; else echo
 # Install Protoc
 RUN PROTO_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "aarch_64"; else echo -n "x86_64"; fi ) && \
     curl -sLo protoc-$PROTO_VERSION-${TARGETOS}-${PROTO_ARCH}.zip \
-      https://github.com/protocolbuffers/protobuf/releases/download/v$PROTO_VERSION/protoc-$PROTO_VERSION-${TARGETOS}-${PROTO_ARCH}.zip && \
+    https://github.com/protocolbuffers/protobuf/releases/download/v$PROTO_VERSION/protoc-$PROTO_VERSION-${TARGETOS}-${PROTO_ARCH}.zip && \
     unzip protoc-$PROTO_VERSION-${TARGETOS}-${PROTO_ARCH}.zip -d /usr/local/protoc && \
     rm protoc-$PROTO_VERSION-${TARGETOS}-${PROTO_ARCH}.zip
 
@@ -131,6 +131,7 @@ COPY domains/noto domains/noto
 COPY domains/integration-test domains/integration-test
 COPY registries/static registries/static
 COPY registries/evm registries/evm
+COPY signingmodules/example signingmodules/example
 COPY transports/grpc transports/grpc
 COPY ui/client ui/client
 # No build of these three, but we need to go.mod to make the go.work valid
@@ -202,4 +203,4 @@ ENTRYPOINT [                         \
     "-Djna.library.path=/app/jna",  \
     "-jar",                          \
     "/app/libs/paladin.jar"          \
-]
+    ]

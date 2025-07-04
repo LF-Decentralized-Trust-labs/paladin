@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -64,6 +64,7 @@ type testManagers struct {
 	testDomainManager    *testDomainManager
 	testTransportManager *testTransportManager
 	testRegistryManager  *testRegistryManager
+	testKeyManager       *testKeyManager
 }
 
 func (tm *testManagers) componentsmocks(t *testing.T) *componentsmocks.AllComponents {
@@ -81,7 +82,12 @@ func (tm *testManagers) componentsmocks(t *testing.T) *componentsmocks.AllCompon
 		tm.testRegistryManager = &testRegistryManager{}
 	}
 	mc.On("RegistryManager").Return(tm.testRegistryManager.mock(t)).Maybe()
+	if tm.testKeyManager == nil {
+		tm.testKeyManager = &testKeyManager{}
+	}
+	mc.On("KeyManager").Return(tm.testKeyManager.mock(t)).Maybe()
 	mc.On("MetricsManager").Return(mm).Maybe()
+
 	return mc
 }
 
@@ -90,11 +96,14 @@ func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
 	for name, td := range ts.testDomainManager.domains {
 		testPlugins[name] = td
 	}
-	for name, td := range ts.testTransportManager.transports {
-		testPlugins[name] = td
+	for name, tt := range ts.testTransportManager.transports {
+		testPlugins[name] = tt
 	}
-	for name, td := range ts.testRegistryManager.registries {
-		testPlugins[name] = td
+	for name, tr := range ts.testRegistryManager.registries {
+		testPlugins[name] = tr
+	}
+	for name, tsm := range ts.testKeyManager.signingModules {
+		testPlugins[name] = tsm
 	}
 	return testPlugins
 }
@@ -201,7 +210,13 @@ func TestNotifyPluginUpdateNotStarted(t *testing.T) {
 	err := pc.PostInit((&testManagers{}).componentsmocks(t))
 	require.NoError(t, err)
 
-	err = pc.WaitForInit(context.Background())
+	err = pc.WaitForInit(context.Background(), prototk.PluginInfo_DOMAIN)
+	require.NoError(t, err)
+	err = pc.WaitForInit(context.Background(), prototk.PluginInfo_REGISTRY)
+	require.NoError(t, err)
+	err = pc.WaitForInit(context.Background(), prototk.PluginInfo_SIGNING_MODULE)
+	require.NoError(t, err)
+	err = pc.WaitForInit(context.Background(), prototk.PluginInfo_TRANSPORT)
 	require.NoError(t, err)
 
 	err = pc.ReloadPluginList()
@@ -273,7 +288,7 @@ func TestLoaderErrors(t *testing.T) {
 	require.NoError(t, err)
 
 	// We should be notified of the error if we were waiting
-	err = pc.WaitForInit(ctx)
+	err = pc.WaitForInit(ctx, prototk.PluginInfo_DOMAIN)
 	assert.Regexp(t, "pop", err)
 
 	// Get a system command
@@ -294,7 +309,7 @@ func TestLoaderErrors(t *testing.T) {
 	// - check it times out context not an error on load
 	cancelled, cancelCtx := context.WithCancel(context.Background())
 	cancelCtx()
-	err = pc.WaitForInit(cancelled)
+	err = pc.WaitForInit(cancelled, prototk.PluginInfo_DOMAIN)
 	assert.Regexp(t, "PD010301", err)
 
 	err = loaderStream.CloseSend()

@@ -26,7 +26,7 @@ type PluginManager interface {
 	ManagerLifecycle
 	GRPCTargetURL() string
 	LoaderID() uuid.UUID
-	WaitForInit(ctx context.Context) error
+	WaitForInit(ctx context.Context, pluginType prototk.PluginInfo_PluginType) error
 	ReloadPluginList() error
 	SendSystemCommandToLoader(cmd prototk.PluginLoad_SysCommand)
 }

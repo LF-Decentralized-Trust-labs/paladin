@@ -351,7 +351,7 @@ func TestDomainRequestsOK(t *testing.T) {
 	// This is the point the domain manager would call us to say the domain is initialized
 	// (once it's happy it's updated its internal state)
 	domainAPI.Initialized()
-	require.NoError(t, pc.WaitForInit(ctx))
+	require.NoError(t, pc.WaitForInit(ctx, prototk.PluginInfo_DOMAIN))
 
 	idr, err := domainAPI.InitDeploy(ctx, &prototk.InitDeployRequest{
 		Transaction: &prototk.DeployTransactionSpecification{

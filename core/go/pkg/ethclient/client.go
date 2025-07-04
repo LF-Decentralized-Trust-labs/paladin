@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -33,6 +33,7 @@ import (
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
@@ -135,7 +136,7 @@ func (cr CallResult) JSON() (s string) {
 type KeyManager interface {
 	AddInMemorySigner(prefix string, signer signerapi.InMemorySigner) // should only be called on initialization routine
 	ResolveKey(ctx context.Context, identifier, algorithm, verifierType string) (keyHandle, verifier string, err error)
-	Sign(ctx context.Context, req *signerapi.SignRequest) (*signerapi.SignResponse, error)
+	Sign(ctx context.Context, req *prototk.SignWithKeyRequest) (*prototk.SignWithKeyResponse, error)
 	Close()
 }
 
@@ -364,7 +365,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	}
 	hash := sha3.NewLegacyKeccak256()
 	_, _ = hash.Write(sigPayload.Bytes())
-	signature, err := ec.keymgr.Sign(ctx, &signerapi.SignRequest{
+	signature, err := ec.keymgr.Sign(ctx, &prototk.SignWithKeyRequest{
 		Algorithm:   algorithms.ECDSA_SECP256K1,
 		PayloadType: signpayloads.OPAQUE_TO_RSV,
 		KeyHandle:   keyHandle,

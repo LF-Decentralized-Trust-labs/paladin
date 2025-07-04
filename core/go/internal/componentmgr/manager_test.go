@@ -39,6 +39,7 @@ import (
 
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -180,7 +181,8 @@ func TestStartOK(t *testing.T) {
 
 	mockPluginManager := componentsmocks.NewPluginManager(t)
 	mockPluginManager.On("Start").Return(nil)
-	mockPluginManager.On("WaitForInit", mock.Anything).Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_SIGNING_MODULE).Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_DOMAIN).Return(nil)
 	mockPluginManager.On("Stop").Return()
 
 	mockKeyManager := componentsmocks.NewKeyManager(t)

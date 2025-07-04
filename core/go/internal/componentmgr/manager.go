@@ -349,6 +349,17 @@ func (cm *componentManager) StartManagers() (err error) {
 
 	// start the managers
 	if err == nil {
+		err = cm.pluginManager.Start()
+		err = cm.addIfStarted("plugin_manager", cm.pluginManager, err, msgs.MsgComponentPluginStartError)
+	}
+
+	// Wait for signing module plugins to all start before starting the key manager
+	if err == nil {
+		err = cm.pluginManager.WaitForInit(cm.bgCtx, prototk.PluginInfo_SIGNING_MODULE)
+		err = cm.wrapIfErr(err, msgs.MsgComponentWaitPluginStartError)
+	}
+
+	if err == nil {
 		err = cm.keyManager.Start()
 		err = cm.addIfStarted("key_manager", cm.keyManager, err, msgs.MsgComponentKeyManagerStartError)
 	}
@@ -371,11 +382,6 @@ func (cm *componentManager) StartManagers() (err error) {
 	if err == nil {
 		err = cm.registryManager.Start()
 		err = cm.addIfStarted("registry_manager", cm.registryManager, err, msgs.MsgComponentRegistryStartError)
-	}
-
-	if err == nil {
-		err = cm.pluginManager.Start()
-		err = cm.addIfStarted("plugin_manager", cm.pluginManager, err, msgs.MsgComponentPluginStartError)
 	}
 
 	if err == nil {
@@ -409,8 +415,8 @@ func (cm *componentManager) StartManagers() (err error) {
 }
 
 func (cm *componentManager) CompleteStart() error {
-	// Wait for the plugins to all start
-	err := cm.pluginManager.WaitForInit(cm.bgCtx)
+	// Wait for the domain plugins to all start
+	err := cm.pluginManager.WaitForInit(cm.bgCtx, prototk.PluginInfo_DOMAIN)
 	err = cm.wrapIfErr(err, msgs.MsgComponentWaitPluginStartError)
 
 	// then start the block indexer

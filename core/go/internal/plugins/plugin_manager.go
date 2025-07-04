@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -64,6 +64,9 @@ type pluginManager struct {
 	registryManager components.RegistryManager
 	registryPlugins map[uuid.UUID]*plugin[prototk.RegistryMessage]
 
+	signingModuleManager components.KeyManager
+	signingModulePlugins map[uuid.UUID]*plugin[prototk.SigningModuleMessage]
+
 	notifyPluginsUpdated chan bool
 	notifySystemCommand  chan prototk.PluginLoad_SysCommand
 	pluginLoaderDone     chan struct{}
@@ -83,9 +86,10 @@ func NewPluginManager(bgCtx context.Context,
 		loaderID:        loaderID,
 		shutdownTimeout: confutil.DurationMin(conf.GRPC.ShutdownTimeout, 0, *pldconf.DefaultGRPCConfig.ShutdownTimeout),
 
-		domainPlugins:    make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
-		transportPlugins: make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
-		registryPlugins:  make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
+		domainPlugins:        make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
+		transportPlugins:     make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
+		registryPlugins:      make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
+		signingModulePlugins: make(map[uuid.UUID]*plugin[prototk.SigningModuleMessage]),
 
 		serverDone:           make(chan error),
 		notifyPluginsUpdated: make(chan bool, 1),
@@ -138,6 +142,7 @@ func (pm *pluginManager) PostInit(c components.AllComponents) error {
 	pm.domainManager = c.DomainManager()
 	pm.transportManager = c.TransportManager()
 	pm.registryManager = c.RegistryManager()
+	pm.signingModuleManager = c.KeyManager()
 
 	if err := pm.ReloadPluginList(); err != nil {
 		return err
@@ -208,6 +213,11 @@ func (pm *pluginManager) LoaderID() uuid.UUID {
 }
 
 func (pm *pluginManager) ReloadPluginList() (err error) {
+	for name, smp := range pm.signingModuleManager.ConfiguredSigningModules() {
+		if err == nil {
+			err = initPlugin(pm.bgCtx, pm, pm.signingModulePlugins, name, prototk.PluginInfo_SIGNING_MODULE, smp)
+		}
+	}
 	for name, dp := range pm.domainManager.ConfiguredDomains() {
 		if err == nil {
 			err = initPlugin(pm.bgCtx, pm, pm.domainPlugins, name, prototk.PluginInfo_DOMAIN, dp)
@@ -223,6 +233,7 @@ func (pm *pluginManager) ReloadPluginList() (err error) {
 			err = initPlugin(pm.bgCtx, pm, pm.registryPlugins, name, prototk.PluginInfo_REGISTRY, tp)
 		}
 	}
+
 	if err != nil {
 		return err
 	}
@@ -234,13 +245,35 @@ func (pm *pluginManager) ReloadPluginList() (err error) {
 	return nil
 }
 
-func (pm *pluginManager) WaitForInit(ctx context.Context) error {
+func (pm *pluginManager) WaitForInit(ctx context.Context, pluginType prototk.PluginInfo_PluginType) error {
 	for {
-		unloadedDomainPlugins, _ := unloadedPlugins(pm, pm.domainPlugins, prototk.PluginInfo_DOMAIN, false)
-		unloadedCount := len(unloadedDomainPlugins)
-		if unloadedCount == 0 {
-			return nil
+		switch pluginType {
+		case prototk.PluginInfo_DOMAIN:
+			unloadedPlugins, _ := unloadedPlugins(pm, pm.domainPlugins, pluginType, false)
+			unloadedCount := len(unloadedPlugins)
+			if unloadedCount == 0 {
+				return nil
+			}
+		case prototk.PluginInfo_REGISTRY:
+			unloadedPlugins, _ := unloadedPlugins(pm, pm.registryPlugins, pluginType, false)
+			unloadedCount := len(unloadedPlugins)
+			if unloadedCount == 0 {
+				return nil
+			}
+		case prototk.PluginInfo_SIGNING_MODULE:
+			unloadedPlugins, _ := unloadedPlugins(pm, pm.signingModulePlugins, pluginType, false)
+			unloadedCount := len(unloadedPlugins)
+			if unloadedCount == 0 {
+				return nil
+			}
+		case prototk.PluginInfo_TRANSPORT:
+			unloadedPlugins, _ := unloadedPlugins(pm, pm.transportPlugins, pluginType, false)
+			unloadedCount := len(unloadedPlugins)
+			if unloadedCount == 0 {
+				return nil
+			}
 		}
+
 		select {
 		case loadErrOrNil := <-pm.loadingProgressed:
 			if loadErrOrNil != nil {
@@ -370,6 +403,12 @@ func (pm *pluginManager) sendPluginsToLoader(stream prototk.PluginController_Ini
 	for {
 		// We send a load request for each plugin that isn't new - which should result in that plugin being loaded
 		// and resulting in a ConnectDomain bi-directional stream being set up.
+		_, notInitializingSigningModules := unloadedPlugins(pm, pm.signingModulePlugins, prototk.PluginInfo_SIGNING_MODULE, true)
+		for _, plugin := range notInitializingSigningModules {
+			if err == nil {
+				err = stream.Send(plugin.def)
+			}
+		}
 		_, notInitializingDomains := unloadedPlugins(pm, pm.domainPlugins, prototk.PluginInfo_DOMAIN, true)
 		for _, plugin := range notInitializingDomains {
 			if err == nil {
