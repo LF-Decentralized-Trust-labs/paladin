@@ -56,7 +56,11 @@ interface INoto {
         bytes data
     );
 
-    function initialize(address notaryAddress) external;
+    function initialize(
+        string memory name_,
+        string memory symbol_,
+        address notary
+    ) external;
 
     function buildConfig(
         bytes calldata data

@@ -64,7 +64,7 @@ export async function deployNotoInstance(
   notoFactory: NotoFactory,
   notary: string
 ) {
-  const deployTx = await notoFactory.deploy(randomBytes32(), notary, "0x");
+  const deployTx = await notoFactory.deploy(randomBytes32(), "NOTO", "NOTO", notary, "0x");
   const deployReceipt = await deployTx.wait();
   const deployEvent = deployReceipt?.logs.find(
     (l) =>

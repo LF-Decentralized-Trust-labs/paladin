@@ -19,10 +19,12 @@ contract NotoFactory is Ownable, IPaladinContractRegistry_V0 {
      */
     function deploy(
         bytes32 transactionId,
-        address notaryAddress,
+        string calldata name,
+        string calldata symbol,
+        address notary,
         bytes calldata data
     ) external {
-        _deploy(implementations["default"], transactionId, notaryAddress, data);
+        _deploy(implementations["default"], transactionId, name, symbol, notary, data);
     }
 
     /**
@@ -48,24 +50,27 @@ contract NotoFactory is Ownable, IPaladinContractRegistry_V0 {
      * Deploy an instance of Noto by cloning a specific implementation.
      */
     function deployImplementation(
-        string calldata name,
         bytes32 transactionId,
-        address notaryAddress,
+        string calldata name,
+        string calldata symbol,
+        address notary,
         bytes calldata data
     ) external {
-        _deploy(implementations[name], transactionId, notaryAddress, data);
+        _deploy(implementations[name], transactionId, name, symbol, notary, data);
     }
 
     function _deploy(
         address implementation,
         bytes32 transactionId,
-        address notaryAddress,
+        string calldata name,
+        string calldata symbol,
+        address notary,
         bytes calldata data
     ) internal {
         address instance = address(
             new ERC1967Proxy(
                 implementation,
-                abi.encodeCall(INoto.initialize, (notaryAddress))
+                abi.encodeCall(INoto.initialize, (name, symbol, notary))
             )
         );
 

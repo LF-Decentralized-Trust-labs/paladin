@@ -15,20 +15,30 @@
 
 package io.kaleido.paladin.pente.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.kaleido.paladin.pente.domain.PenteConfiguration.GroupTupleJSON;
-import io.kaleido.paladin.pente.domain.helpers.*;
-import io.kaleido.paladin.testbed.Testbed;
-import io.kaleido.paladin.toolkit.*;
-import org.junit.jupiter.api.Test;
-
 import java.util.HashMap;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.kaleido.paladin.pente.domain.PenteConfiguration.GroupTupleJSON;
+import io.kaleido.paladin.pente.domain.helpers.BondSubscriptionHelper;
+import io.kaleido.paladin.pente.domain.helpers.BondTrackerHelper;
+import io.kaleido.paladin.pente.domain.helpers.NotoHelper;
+import io.kaleido.paladin.pente.domain.helpers.PenteHelper;
+import io.kaleido.paladin.pente.domain.helpers.TestbedHelper;
+import io.kaleido.paladin.testbed.Testbed;
+import io.kaleido.paladin.toolkit.Algorithms;
+import io.kaleido.paladin.toolkit.JsonABI;
+import io.kaleido.paladin.toolkit.JsonHex;
+import io.kaleido.paladin.toolkit.ResourceLoader;
+import io.kaleido.paladin.toolkit.Verifiers;
 
 public class BondTest {
 
@@ -121,13 +131,10 @@ public class BondTest {
 
             List<HashMap<String, Object>> notoSchemas = testbed.getRpcClient().request("pstate_listSchemas", "noto");
             StateSchema coinSchema = null;
-            StateSchema lockedCoinSchema = null;
             for (var schemaJson : notoSchemas) {
                 var schema = mapper.convertValue(schemaJson, StateSchema.class);
                 if (schema.signature().startsWith("type=NotoCoin")) {
                     coinSchema = schema;
-                } else if (schema.signature().startsWith("type=NotoLockedCoin")) {
-                    lockedCoinSchema = schema;
                 }
             }
             assertNotNull(coinSchema);
@@ -174,6 +181,8 @@ public class BondTest {
             // Create Noto cash token
             var notoCash = NotoHelper.deploy("noto", cashIssuer, testbed,
                     new NotoHelper.ConstructorParams(
+                            "CASH",
+                            "CASH",
                             cashIssuer + "@node1",
                             "basic",
                             null));
@@ -203,6 +212,8 @@ public class BondTest {
             // Create Noto bond token
             var notoBond = NotoHelper.deploy("noto", bondCustodian, testbed,
                     new NotoHelper.ConstructorParams(
+                            "BOND",
+                            "BOND",
                             bondCustodian + "@node1",
                             "hooks",
                             new NotoHelper.OptionsParams(

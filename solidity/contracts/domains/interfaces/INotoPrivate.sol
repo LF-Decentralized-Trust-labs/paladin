@@ -51,7 +51,18 @@ interface INotoPrivate {
         bytes calldata data
     ) external;
 
-    function balanceOf(string memory account) external view returns (uint256 totalStates, uint256 totalBalance, bool overflow);
+    function name() external view returns (string memory);
+
+    function symbol() external view returns (string memory);
+
+    function decimals() external view returns (uint8);
+
+    function balanceOf(
+        string memory account
+    )
+        external
+        view
+        returns (uint256 totalStates, uint256 totalBalance, bool overflow);
 
     struct StateEncoded {
         bytes id;

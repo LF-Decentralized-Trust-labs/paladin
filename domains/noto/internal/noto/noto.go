@@ -28,6 +28,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -106,9 +107,10 @@ type Noto struct {
 }
 
 type NotoDeployParams struct {
-	Name          string              `json:"name,omitempty"`
 	TransactionID string              `json:"transactionId"`
-	NotaryAddress pldtypes.EthAddress `json:"notaryAddress"`
+	Name          string              `json:"name"`
+	Symbol        string              `json:"symbol"`
+	Notary        pldtypes.EthAddress `json:"notary"`
 	Data          pldtypes.HexBytes   `json:"data"`
 }
 
@@ -415,9 +417,10 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 	}
 	if err == nil {
 		paramsJSON, err = json.Marshal(&NotoDeployParams{
-			Name:          params.Implementation,
 			TransactionID: req.Transaction.TransactionId,
-			NotaryAddress: *notaryAddress,
+			Name:          params.Name,
+			Symbol:        params.Symbol,
+			Notary:        *notaryAddress,
 			Data:          deployDataJSON,
 		})
 	}
@@ -436,6 +439,7 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 	domainConfig, decodedData, err := n.decodeConfig(ctx, req.ContractConfig)
 	if err != nil {
 		// This on-chain contract has invalid configuration - not an error in our process
+		log.L(ctx).Errorf("Error decoding config: %s", err)
 		return &prototk.InitContractResponse{Valid: false}, nil
 	}
 
@@ -446,6 +450,9 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 	}
 
 	parsedConfig := &types.NotoParsedConfig{
+		Name:         domainConfig.Name,
+		Symbol:       domainConfig.Symbol,
+		Decimals:     domainConfig.Decimals,
 		NotaryMode:   types.NotaryModeBasic.Enum(),
 		Variant:      domainConfig.Variant,
 		NotaryLookup: decodedData.NotaryLookup,
@@ -511,19 +518,30 @@ func (n *Noto) PrepareTransaction(ctx context.Context, req *prototk.PrepareTrans
 	return handler.Prepare(ctx, tx, req)
 }
 
-func (n *Noto) decodeConfig(ctx context.Context, domainConfig []byte) (*types.NotoConfig_V0, *types.NotoConfigData_V0, error) {
+func (n *Noto) decodeConfig(ctx context.Context, domainConfig []byte) (*types.NotoConfig_V1, *types.NotoConfigData_V0, error) {
 	var configSelector ethtypes.HexBytes0xPrefix
 	if len(domainConfig) >= 4 {
 		configSelector = ethtypes.HexBytes0xPrefix(domainConfig[0:4])
 	}
-	if configSelector.String() != types.NotoConfigID_V0.String() {
+
+	var err error
+	var configValues *abi.ComponentValue
+	switch configSelector.String() {
+	case types.NotoConfigID_V0.String():
+		configValues, err = types.NotoConfigABI_V0.DecodeABIDataCtx(ctx, domainConfig[4:], 0)
+		if err != nil {
+			return nil, nil, err
+		}
+	case types.NotoConfigID_V1.String():
+		configValues, err = types.NotoConfigABI_V1.DecodeABIDataCtx(ctx, domainConfig[4:], 0)
+		if err != nil {
+			return nil, nil, err
+		}
+	default:
 		return nil, nil, i18n.NewError(ctx, msgs.MsgUnexpectedConfigType, configSelector)
 	}
-	configValues, err := types.NotoConfigABI_V0.DecodeABIDataCtx(ctx, domainConfig[4:], 0)
-	if err != nil {
-		return nil, nil, err
-	}
-	var config types.NotoConfig_V0
+
+	var config types.NotoConfig_V1
 	var decodedData types.NotoConfigData_V0
 	configJSON, err := pldtypes.StandardABISerializer().SerializeJSON(configValues)
 	if err == nil {
@@ -676,7 +694,6 @@ func (n *Noto) parseCoinList(ctx context.Context, label string, states []*protot
 				SchemaId: state.SchemaId,
 				Id:       state.Id,
 			})
-			break
 
 		case n.lockedCoinSchema.Id:
 			coin, err := n.unmarshalLockedCoin(state.StateDataJson)
@@ -689,7 +706,6 @@ func (n *Noto) parseCoinList(ctx context.Context, label string, states []*protot
 				SchemaId: state.SchemaId,
 				Id:       state.Id,
 			})
-			break
 
 		default:
 			return nil, i18n.NewError(ctx, msgs.MsgUnexpectedSchema, state.SchemaId)

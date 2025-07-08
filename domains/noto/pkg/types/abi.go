@@ -30,6 +30,8 @@ var notoPrivateJSON []byte
 var NotoABI = solutils.MustParseBuildABI(notoPrivateJSON)
 
 type ConstructorParams struct {
+	Name           string      `json:"name,omitempty"`           // Name of the token
+	Symbol         string      `json:"symbol,omitempty"`         // Symbol of the token
 	Notary         string      `json:"notary"`                   // Lookup string for the notary identity
 	NotaryMode     NotaryMode  `json:"notaryMode"`               // Notary mode (basic or hooks)
 	Implementation string      `json:"implementation,omitempty"` // Use a specific implementation of Noto that was registered to the factory (blank to use default)
