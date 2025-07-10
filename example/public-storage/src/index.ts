@@ -16,7 +16,7 @@ async function main(): Promise<boolean> {
 
   // Step 1: Deploy the Storage contract
   logger.log("Step 1: Deploying the Storage contract...");
-  const deploymentTxID = await paladin.sendTransaction({
+  const deploymentTxID = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     abi: storageJson.abi,
     bytecode: storageJson.bytecode,
@@ -35,7 +35,7 @@ async function main(): Promise<boolean> {
   // Step 3: Store a value in the contract
   const valueToStore = 125; // Example value to store
   logger.log(`Step 2: Storing value "${valueToStore}" in the contract...`);
-  const storeTxID = await paladin.sendTransaction({
+  const storeTxID = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     abi: storageJson.abi,
     function: "store",
@@ -54,7 +54,7 @@ async function main(): Promise<boolean> {
 
   // Step 4: Retrieve the stored value from the contract
   logger.log("Step 3: Retrieving the stored value...");
-  const retrieveResult = await paladin.call({
+  const retrieveResult = await paladin.ptx.call({
     type: TransactionType.PUBLIC,
     abi: storageJson.abi,
     function: "retrieve",

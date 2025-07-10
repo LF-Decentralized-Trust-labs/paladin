@@ -44,7 +44,7 @@ To address the PR comment and clarify the differences between **contract deploym
 ### Step 1: Deploy the Contract
 
 ```typescript
-const deploymentTxID = await paladin.sendTransaction({
+const deploymentTxID = await paladin.ptx.sendTransaction({
   type: TransactionType.PUBLIC,
   abi: helloWorldJson.abi,
   bytecode: helloWorldJson.bytecode,
@@ -96,7 +96,7 @@ logger.log(
 ```typescript
 const name = "Paladin User"; // Example name for the greeting
 
-const sayHelloTxID = await paladin.sendTransaction({
+const sayHelloTxID = await paladin.ptx.sendTransaction({
   type: TransactionType.PUBLIC,
   abi: helloWorldJson.abi,
   function: "sayHello",
@@ -138,7 +138,7 @@ logger.log("sayHello function executed successfully!");
 ### Step 5: Retrieve the Emitted Event
 
 ```typescript
-const events = await paladin.decodeTransactionEvents(
+const events = await paladin.bidx.decodeTransactionEvents(
   functionReceipt.transactionHash,
   helloWorldJson.abi,
   "pretty=true"

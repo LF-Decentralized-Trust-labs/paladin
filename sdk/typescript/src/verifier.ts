@@ -1,4 +1,4 @@
-import { Algorithms, JsonRpcResult, Verifiers } from "./interfaces";
+import { Algorithms, Verifiers } from "./interfaces";
 import PaladinClient from "./paladin";
 
 export class PaladinVerifier {
@@ -8,8 +8,17 @@ export class PaladinVerifier {
     return this.lookup;
   }
 
+  split() {
+    const [identity, node] = this.lookup.split("@");
+    return { 0: identity, 1: node, identity, node };
+  }
+
   resolve(algorithm: Algorithms, verifierType: Verifiers) {
-    return this.paladin.resolveVerifier(this.lookup, algorithm, verifierType);
+    return this.paladin.ptx.resolveVerifier(
+      this.lookup,
+      algorithm,
+      verifierType
+    );
   }
 
   address() {

@@ -24,7 +24,7 @@ const paladin3 = new PaladinClient({
 
 // TODO: eliminate the need for this call
 async function encodeZetoTransfer(preparedCashTransfer: IPreparedTransaction) {
-  const zetoTransferAbi = await paladin3.getStoredABI(
+  const zetoTransferAbi = await paladin3.ptx.getStoredABI(
     preparedCashTransfer.transaction.abiReference ?? ""
   );
   return new ethers.Interface(zetoTransferAbi.abi).encodeFunctionData(
@@ -135,7 +135,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt();
   if (!checkReceipt(receipt)) return false;
-  receipt = await paladin2.getTransactionReceipt(receipt.id, true);
+  receipt = await paladin2.ptx.getTransactionReceiptFull(receipt.id);
 
   let domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const lockId = domainReceipt?.lockInfo?.lockId;
@@ -156,7 +156,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt();
   if (!checkReceipt(receipt)) return false;
-  receipt = await paladin2.getTransactionReceipt(receipt.id, true);
+  receipt = await paladin2.ptx.getTransactionReceiptFull(receipt.id);
 
   domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const assetUnlockParams = domainReceipt?.lockInfo?.unlockParams;
@@ -177,7 +177,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt();
   if (!checkReceipt(receipt)) return false;
-  const lockedStates = await paladin3.getStateReceipt(receipt.id);
+  const lockedStates = await paladin3.ptx.getStateReceipt(receipt.id);
   let lockedStateId: string | undefined;
   lockedStates?.confirmed?.forEach((state) => {
     if (state.data["locked"]) {

@@ -1,10 +1,5 @@
-import { randomBytes } from "crypto";
 import { ethers } from "ethers";
-import {
-  IGroupInfo,
-  IGroupInfoUnresolved,
-  TransactionType,
-} from "../interfaces";
+import { TransactionType } from "../interfaces";
 import {
   IPrivacyGroup,
   IPrivacyGroupEVMCall,
@@ -12,9 +7,9 @@ import {
   IPrivacyGroupResume,
 } from "../interfaces/privacygroups";
 import PaladinClient from "../paladin";
+import { TransactionFuture } from "../transaction";
 import { PaladinVerifier } from "../verifier";
 import * as penteJSON from "./abis/PentePrivacyGroup.json";
-import { TransactionFuture } from "../transaction";
 
 export interface PenteGroupTransactionInput {
   from: string;
@@ -40,15 +35,6 @@ export interface PenteDeploy {
   inputs?: any;
 }
 
-export const penteGroupABI = {
-  name: "group",
-  type: "tuple",
-  components: [
-    { name: "salt", type: "bytes32" },
-    { name: "members", type: "string[]" },
-  ],
-};
-
 export interface PentePrivacyGroupParams {
   members: (string | PaladinVerifier)[];
   salt?: string;
@@ -66,23 +52,6 @@ export interface PenteApproveTransitionParams {
   transitionHash: string;
   signatures: string[];
 }
-
-export const newGroupSalt = () =>
-  "0x" + Buffer.from(randomBytes(32)).toString("hex");
-
-export const resolveGroup = (
-  group: IGroupInfo | IGroupInfoUnresolved
-): IGroupInfo => {
-  const members: string[] = [];
-  for (const member of group.members) {
-    if (typeof member === "string") {
-      members.push(member);
-    } else {
-      members.push(member.lookup);
-    }
-  }
-  return { members, salt: group.salt };
-};
 
 // Represents an in-flight Pente privacy group deployment
 export class PentePrivacyGroupFuture {

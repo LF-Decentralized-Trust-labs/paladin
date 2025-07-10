@@ -59,7 +59,7 @@ async function deployERC20(
   paladin: PaladinClient,
   issuer: PaladinVerifier
 ): Promise<string | undefined> {
-  const txId = await paladin.sendTransaction({
+  const txId = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     from: issuer.lookup,
     data: {
@@ -83,7 +83,7 @@ async function mintERC20(
   erc20Address: string,
   amount: number
 ): Promise<void> {
-  const txId = await paladin.sendTransaction({
+  const txId = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     from: issuer.lookup,
     to: erc20Address,
@@ -107,7 +107,7 @@ async function approveERC20(
   erc20Address: string,
   amount: number
 ): Promise<void> {
-  const txId = await paladin.sendTransaction({
+  const txId = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     abi: erc20Abi.abi,
     function: "approve",
@@ -129,7 +129,7 @@ async function getERC20Balance(
   // Note: For simplicity in this example, we'll use a simple approach
   // In production, you would use a proper balance query method
   try {
-    const result = await paladin.call({
+    const result = await paladin.ptx.call({
       type: TransactionType.PUBLIC,
       abi: erc20Abi.abi,
       function: "balanceOf",
@@ -211,7 +211,7 @@ async function main(): Promise<boolean> {
   // Register Financial Institution itself for KYC
   logger.log("   - Registering Financial Institution for KYC...");
   const bankPublicKey = await getBabyjubPublicKey(financialInstitution);
-  let kycTxId = await paladin1.sendTransaction({
+  let kycTxId = await paladin1.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     from: financialInstitution.lookup,
     to: privateStablecoin.address,
@@ -229,7 +229,7 @@ async function main(): Promise<boolean> {
   // Register Client A for KYC
   logger.log("   - Registering Client A for KYC...");
   const clientAPublicKey = await getBabyjubPublicKey(clientA);
-  kycTxId = await paladin1.sendTransaction({
+  kycTxId = await paladin1.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     from: financialInstitution.lookup,
     to: privateStablecoin.address,
@@ -247,7 +247,7 @@ async function main(): Promise<boolean> {
   // Register Client B for KYC
   logger.log("   - Registering Client B for KYC...");
   const clientBPublicKey = await getBabyjubPublicKey(clientB);
-  kycTxId = await paladin1.sendTransaction({
+  kycTxId = await paladin1.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     from: financialInstitution.lookup,
     to: privateStablecoin.address,

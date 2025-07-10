@@ -14,7 +14,7 @@ export const newAtomFactory = async (
   paladin: PaladinClient,
   from: PaladinVerifier
 ) => {
-  const txID = await paladin.sendTransaction({
+  const txID = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     abi: atomFactoryJson.abi,
     bytecode: atomFactoryJson.bytecode,
@@ -39,7 +39,7 @@ export class AtomFactory {
   }
 
   async create(from: PaladinVerifier, operations: AtomOperation[]) {
-    const txID = await this.paladin.sendTransaction({
+    const txID = await this.paladin.ptx.sendTransaction({
       type: TransactionType.PUBLIC,
       abi: atomFactoryJson.abi,
       function: "create",
@@ -49,7 +49,7 @@ export class AtomFactory {
     });
     const receipt = await this.paladin.pollForReceipt(txID, 10000);
     if (receipt) {
-      const events = await this.paladin.decodeTransactionEvents(
+      const events = await this.paladin.bidx.decodeTransactionEvents(
         receipt.transactionHash,
         atomFactoryJson.abi,
         ""
@@ -75,7 +75,7 @@ export class Atom {
   }
 
   async execute(from: PaladinVerifier) {
-    const txID = await this.paladin.sendTransaction({
+    const txID = await this.paladin.ptx.sendTransaction({
       type: TransactionType.PUBLIC,
       abi: atomJson.abi,
       function: "execute",

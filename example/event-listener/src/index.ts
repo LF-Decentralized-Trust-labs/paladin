@@ -48,11 +48,11 @@ async function main(): Promise<boolean> {
   // Create a new listener (deleting one if it already exists)
   logger.log("Creating a receipt listener...");
   try {
-    await paladin.deleteReceiptListener("example-event-listener");
+    await paladin.ptx.deleteReceiptListener("example-event-listener");
   } catch (err) {
     // do nothing
   }
-  await paladin.createReceiptListener({
+  await paladin.ptx.createReceiptListener({
     name: "example-event-listener",
     filters: {
       type: TransactionType.PRIVATE,
@@ -76,7 +76,7 @@ async function main(): Promise<boolean> {
     logger.log(
       `Processing receipt ${receipt.id} (sequence: ${receipt.sequence})`
     );
-    const domainReceipt = await paladin.getDomainReceipt(
+    const domainReceipt = await paladin.ptx.getDomainReceipt(
       receipt.domain,
       receipt.id
     );
@@ -92,7 +92,7 @@ async function main(): Promise<boolean> {
         `Processing contract receipt ${receipt.id} (to: ${domainReceipt.receipt.to})`
       );
       for (const log of domainReceipt.receipt.logs ?? []) {
-        const decoded = await paladin.decodeEvent(log.topics, log.data);
+        const decoded = await paladin.ptx.decodeEvent(log.topics, log.data);
         const message = decoded?.data?.message;
         if (message?.indexOf(name) !== -1) {
           logger.log(`Received event data: ${JSON.stringify(decoded?.data)}`);

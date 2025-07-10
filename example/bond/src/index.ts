@@ -76,7 +76,7 @@ async function main(): Promise<boolean> {
   logger.log("Creating public bond tracker...");
   const issueDate = Math.floor(Date.now() / 1000);
   const maturityDate = issueDate + 60 * 60 * 24;
-  let txID = await paladin1.sendTransaction({
+  let txID = await paladin1.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     abi: bondTrackerPublicJson.abi,
     bytecode: bondTrackerPublicJson.bytecode,
@@ -127,7 +127,7 @@ async function main(): Promise<boolean> {
 
   // Deploy the atom factory on the base ledger
   logger.log("Creating atom factory...");
-  txID = await paladin1.sendTransaction({
+  txID = await paladin1.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     abi: atomFactoryJson.abi,
     bytecode: atomFactoryJson.bytecode,
@@ -219,7 +219,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt();
   if (!checkReceipt(receipt)) return false;
-  receipt = await paladin3.getTransactionReceipt(receipt.id, true);
+  receipt = await paladin3.ptx.getTransactionReceiptFull(receipt.id);
   let domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const cashLockId = domainReceipt?.lockInfo?.lockId;
   if (cashLockId === undefined) {
@@ -327,7 +327,7 @@ async function main(): Promise<boolean> {
   if (!checkReceipt(receipt)) return false;
 
   // Extract the address of the created Atom
-  const events = await paladin2.decodeTransactionEvents(
+  const events = await paladin2.bidx.decodeTransactionEvents(
     receipt.transactionHash,
     atomFactoryJson.abi,
     ""
@@ -370,7 +370,7 @@ async function main(): Promise<boolean> {
 
   // Execute the atomic transfer
   logger.log("Distributing bond...");
-  txID = await paladin2.sendTransaction({
+  txID = await paladin2.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     abi: atomJson.abi,
     function: "execute",

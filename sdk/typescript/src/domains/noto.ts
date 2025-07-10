@@ -1,11 +1,10 @@
 import { ethers } from "ethers";
-import { IGroupInfo, IStateEncoded, TransactionType } from "../interfaces";
+import { IStateEncoded, TransactionType } from "../interfaces";
 import PaladinClient from "../paladin";
-import * as notoPrivateJSON from "./abis/INotoPrivate.json";
-import * as notoJSON from "./abis/INoto.json";
-import { penteGroupABI } from "./pente";
-import { PaladinVerifier } from "../verifier";
 import { TransactionFuture } from "../transaction";
+import { PaladinVerifier } from "../verifier";
+import * as notoJSON from "./abis/INoto.json";
+import * as notoPrivateJSON from "./abis/INotoPrivate.json";
 
 export const notoConstructorABI = (
   withHooks: boolean
@@ -27,7 +26,10 @@ export const notoConstructorABI = (
                   {
                     name: "privateGroup",
                     type: "tuple",
-                    components: penteGroupABI.components,
+                    components: [
+                      { name: "salt", type: "bytes32" },
+                      { name: "members", type: "string[]" },
+                    ],
                   },
                   { name: "publicAddress", type: "address" },
                   { name: "privateAddress", type: "address" },
@@ -49,6 +51,11 @@ export const notoConstructorABI = (
     },
   ],
 });
+
+export interface IGroupInfo {
+  salt: string;
+  members: string[];
+}
 
 export interface NotoConstructorParams {
   notary: PaladinVerifier;

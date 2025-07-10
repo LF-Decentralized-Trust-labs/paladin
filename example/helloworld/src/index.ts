@@ -16,7 +16,7 @@ async function main(): Promise<boolean> {
 
   // STEP 1: Deploy the HelloWorld contract
   logger.log("STEP 1: Deploying the HelloWorld contract...");
-  const deploymentTxID = await paladin.sendTransaction({
+  const deploymentTxID = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     abi: helloWorldJson.abi,
     bytecode: helloWorldJson.bytecode,
@@ -36,7 +36,7 @@ async function main(): Promise<boolean> {
   logger.log("STEP 2: Calling the sayHello function...");
   const name = "John"; // Example name for the greeting
 
-  const sayHelloTxID = await paladin.sendTransaction({
+  const sayHelloTxID = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     abi: helloWorldJson.abi,
     function: "sayHello",
@@ -62,7 +62,7 @@ async function main(): Promise<boolean> {
 
   // STEP 3: Retrieve and verify the emitted event
   logger.log("STEP 3: Retrieving and verifying emitted events...");
-  const events = await paladin.decodeTransactionEvents(
+  const events = await paladin.bidx.decodeTransactionEvents(
     functionReceipt.transactionHash,
     helloWorldJson.abi,
     "pretty=true",

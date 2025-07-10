@@ -69,7 +69,7 @@ Before any stablecoin operations, the financial institution registers all partic
 ```typescript
 // Financial institution registers itself
 const bankPublicKey = await getBabyjubPublicKey(financialInstitution);
-let kycTxId = await paladin1.sendTransaction({
+let kycTxId = await paladin1.ptx.sendTransaction({
   type: TransactionType.PUBLIC,
   from: financialInstitution.lookup,
   to: privateStablecoin.address,

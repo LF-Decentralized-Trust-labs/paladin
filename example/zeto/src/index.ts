@@ -194,7 +194,7 @@ async function deployERC20(
   paladin: PaladinClient,
   cbdcIssuer: PaladinVerifier
 ): Promise<string | undefined> {
-  const txId1 = await paladin3.sendTransaction({
+  const txId1 = await paladin3.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     from: cbdcIssuer.lookup,
     data: {
@@ -219,7 +219,7 @@ async function mintERC20(
   erc20Address: string,
   amount: number
 ): Promise<void> {
-  const txId2 = await paladin.sendTransaction({
+  const txId2 = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     from: cbdcIssuer.lookup,
     to: erc20Address,
@@ -244,7 +244,7 @@ async function approveERC20(
   amount: number
 ): Promise<void> {
   // first approve the Zeto contract to draw the amount from our balance in the ERC20
-  const txID1 = await paladin.sendTransaction({
+  const txID1 = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     abi: erc20Abi.abi,
     function: "approve",
