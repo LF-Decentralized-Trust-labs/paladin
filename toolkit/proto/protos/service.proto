@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -23,6 +23,8 @@ import "to_transport.proto";
 import "from_transport.proto";
 import "to_registry.proto";
 import "from_registry.proto";
+import "to_signing_module.proto";
+import "from_signing_module.proto";
 
 option java_multiple_files = true;
 
@@ -172,6 +174,35 @@ message RegistryMessage {
   }
 }
 
+message SigningModuleMessage {
+  Header header = 1;
+
+  oneof request_to_signing_module {
+    ConfigureSigningModuleRequest configure_signing_module =                 1010;
+    ResolveKeyRequest resolve_key =                                          1020;
+    SignWithKeyRequest sign =                                                1030;
+    ListKeysRequest list_keys =                                              1040;
+    CloseRequest close =                                                     1050;
+  }
+
+  oneof response_from_signing_module {
+    ConfigureSigningModuleResponse configure_signing_module_res =            1011;
+    ResolveKeyResponse resolve_key_res =                                     1021;
+    SignWithKeyResponse sign_res =                                           1031;
+    ListKeysResponse list_keys_res =                                         1041;
+    CloseResponse close_res =                                                1051;
+  }
+
+  // Request/reply exchanges initiated by the signing module, to the paladin node
+  oneof request_from_signing_module {
+    ReceiveSigningModuleMessageRequest receive_signing_module_message =      2010;
+  }
+
+  oneof response_to_signing_module {
+    ReceiveSigningModuleMessageResponse receive_signing_module_message_res = 2011;
+  }
+}
+
 // establishes the long-lived connection
 message PluginLoaderInit {
   string id = 1; // UUID that is unique the plugin loader that it shared with the controller out of band to start the channel
@@ -182,6 +213,7 @@ message PluginInfo {
     DOMAIN = 0;
     TRANSPORT = 1;
     REGISTRY = 2;
+    SIGNING_MODULE = 3;
   }
   string id = 1; // UUID that is unique to this runtime instance of the domain
   string name = 2; // The plugin manager ensures only once instance is loaded with this ID
@@ -226,4 +258,7 @@ service PluginController {
 
   // Connect as a registry plugin establishing the bidirectional stream of communications
   rpc ConnectRegistry(stream RegistryMessage) returns (stream RegistryMessage) {}
+
+  // Connect as a signing module plugin establishing the bidirectional stream of communications
+  rpc ConnectSigningModule(stream SigningModuleMessage) returns (stream SigningModuleMessage) {}
 }

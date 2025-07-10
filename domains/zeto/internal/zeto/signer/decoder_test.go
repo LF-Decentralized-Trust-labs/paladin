@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -21,7 +21,7 @@ import (
 
 	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -42,7 +42,7 @@ func TestDecodeProvingRequest_Fail(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	signReq := &signerapi.SignRequest{
+	signReq := &prototk.SignWithKeyRequest{
 		Payload: bytes,
 	}
 	_, _, err = decodeProvingRequest(ctx, signReq.Payload)
@@ -56,7 +56,7 @@ func TestDecodeProvingRequest_Fail(t *testing.T) {
 	bytes, err = proto.Marshal(req)
 	assert.NoError(t, err)
 
-	signReq = &signerapi.SignRequest{
+	signReq = &prototk.SignWithKeyRequest{
 		Payload: bytes,
 	}
 	_, _, err = decodeProvingRequest(ctx, signReq.Payload)

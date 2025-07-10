@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -154,6 +154,9 @@ var (
 	MsgKeyManagerIdentifierPathNotFound     = pde("PD010512", "Identifier path segment '%s' not found in database")
 	MsgKeyManagerExistingIdentifierNotFound = pde("PD010513", "Identifier '%s' not found in database")
 	MsgKeyManagerMissingDatabaseTxn         = pde("PD010514", "Missing database transaction context")
+	MsgKeyManagerSigningModuleNotFound      = pde("PD010515", "Signing module '%s' not found")
+	MsgKeyManagerPluginSignerEmptyName      = pde("PD010516", "Wallet '%s' signing module plugin name cannot be empty")
+	MsgKeyManagerPluginSignerFailInit       = pde("PD010517", "Initialization of plugin signer for wallet '%s' failed")
 
 	// Comms bus PD0106XX
 	MsgDestinationNotFound     = pde("PD010600", "Destination not found: %s")

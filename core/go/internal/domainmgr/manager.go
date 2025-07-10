@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -123,10 +123,6 @@ func (dm *domainManager) PostInit(c components.AllComponents) error {
 	dm.keyManager = c.KeyManager()
 	dm.transportMgr = c.TransportManager()
 
-	// Register ourselves as a signing on the key manager
-	dm.domainSigner = &domainSigner{dm: dm}
-	c.KeyManager().AddInMemorySigner("domain", dm.domainSigner)
-
 	for name, d := range dm.conf.Domains {
 		if _, err := pldtypes.ParseEthAddress(d.RegistryAddress); err != nil {
 			return i18n.WrapError(dm.bgCtx, err, msgs.MsgDomainRegistryAddressInvalid, d.RegistryAddress, name)
@@ -135,7 +131,13 @@ func (dm *domainManager) PostInit(c components.AllComponents) error {
 	return nil
 }
 
-func (dm *domainManager) Start() error { return nil }
+func (dm *domainManager) Start() error {
+	// Register ourselves as a signing module on the key manager after it has been started
+	dm.domainSigner = &domainSigner{dm: dm}
+	dm.keyManager.AddInMemorySigner("domain", dm.domainSigner)
+
+	return nil
+}
 
 func (dm *domainManager) Stop() {
 	dm.mux.Lock()

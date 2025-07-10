@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -35,9 +35,10 @@ type testController struct {
 	server     *grpc.Server
 	socketFile string
 
-	fakeDomainController    func(grpc.BidiStreamingServer[prototk.DomainMessage, prototk.DomainMessage]) error
-	fakeTransportController func(grpc.BidiStreamingServer[prototk.TransportMessage, prototk.TransportMessage]) error
-	fakeRegistryController  func(grpc.BidiStreamingServer[prototk.RegistryMessage, prototk.RegistryMessage]) error
+	fakeDomainController        func(grpc.BidiStreamingServer[prototk.DomainMessage, prototk.DomainMessage]) error
+	fakeTransportController     func(grpc.BidiStreamingServer[prototk.TransportMessage, prototk.TransportMessage]) error
+	fakeRegistryController      func(grpc.BidiStreamingServer[prototk.RegistryMessage, prototk.RegistryMessage]) error
+	fakeSigningModuleController func(grpc.BidiStreamingServer[prototk.SigningModuleMessage, prototk.SigningModuleMessage]) error
 }
 
 func newTestController(t *testing.T) (context.Context, *testController, func()) {
@@ -75,6 +76,10 @@ func (tc *testController) ConnectTransport(stream grpc.BidiStreamingServer[proto
 
 func (tc *testController) ConnectRegistry(stream grpc.BidiStreamingServer[prototk.RegistryMessage, prototk.RegistryMessage]) error {
 	return tc.fakeRegistryController(stream)
+}
+
+func (tc *testController) ConnectSigningModule(stream grpc.BidiStreamingServer[prototk.SigningModuleMessage, prototk.SigningModuleMessage]) error {
+	return tc.fakeSigningModuleController(stream)
 }
 
 func tempSocketFile(t *testing.T) string {

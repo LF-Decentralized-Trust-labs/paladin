@@ -158,7 +158,7 @@ func TestRegistryRequestsOK(t *testing.T) {
 	// This is the point the registry manager would call us to say the registry is initialized
 	// (once it's happy it's updated its internal state)
 	registryAPI.Initialized()
-	require.NoError(t, pc.WaitForInit(ctx))
+	require.NoError(t, pc.WaitForInit(ctx, prototk.PluginInfo_DOMAIN))
 
 	callbacks := <-waitForCallbacks
 

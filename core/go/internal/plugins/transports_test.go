@@ -197,7 +197,7 @@ func TestTransportRequestsOK(t *testing.T) {
 	// This is the point the transport manager would call us to say the transport is initialized
 	// (once it's happy it's updated its internal state)
 	transportAPI.Initialized()
-	require.NoError(t, pc.WaitForInit(ctx))
+	require.NoError(t, pc.WaitForInit(ctx, prototk.PluginInfo_DOMAIN))
 
 	callbacks := <-waitForCallbacks
 	rts, err := callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{

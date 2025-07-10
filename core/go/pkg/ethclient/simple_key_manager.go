@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -23,6 +23,7 @@ import (
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 )
@@ -70,9 +71,9 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier, algorith
 	km.lock.Lock()
 	defer km.lock.Unlock()
 
-	resolveRequest := &signerapi.ResolveKeyRequest{
+	resolveRequest := &prototk.ResolveKeyRequest{
 		Attributes: make(map[string]string),
-		RequiredIdentifiers: []*signerapi.PublicKeyIdentifierType{
+		RequiredIdentifiers: []*prototk.PublicKeyIdentifierType{
 			{
 				Algorithm:    algorithm,
 				VerifierType: verifierType,
@@ -96,7 +97,7 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier, algorith
 			loc.Children++ // increment for folders optimistically (and keys pessimistically below)
 		}
 		loc = folder
-		resolveRequest.Path = append(resolveRequest.Path, &signerapi.ResolveKeyPathSegment{
+		resolveRequest.Path = append(resolveRequest.Path, &prototk.ResolveKeyPathSegment{
 			Name:  folder.Name,
 			Index: folder.Index,
 		})
@@ -141,7 +142,7 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier, algorith
 	return key.KeyHandle, key.Identifiers[algoAndVerifierType], nil
 }
 
-func (km *simpleKeyManager) Sign(ctx context.Context, req *signerapi.SignRequest) (res *signerapi.SignResponse, err error) {
+func (km *simpleKeyManager) Sign(ctx context.Context, req *prototk.SignWithKeyRequest) (res *prototk.SignWithKeyResponse, err error) {
 	return km.signer.Sign(ctx, req)
 }
 

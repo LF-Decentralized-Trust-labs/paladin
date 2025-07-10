@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -17,6 +17,8 @@ package signerapi
 
 import (
 	"context"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type KeyStoreFactory[C ExtensibleConfig] interface {
@@ -31,7 +33,7 @@ type KeyStoreFactory[C ExtensibleConfig] interface {
 // keyHandle. If the implementation finds it does not exist, it can invoke the callback function to generate
 // a new suitable random string to encrypt and store.
 type KeyStore interface {
-	FindOrCreateLoadableKey(ctx context.Context, req *ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error)
+	FindOrCreateLoadableKey(ctx context.Context, req *prototk.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error)
 	LoadKeyMaterial(ctx context.Context, keyHandle string) ([]byte, error)
 	Close()
 }
@@ -51,7 +53,7 @@ type KeyStore interface {
 //
 // This behavior can be explicitly disabled in the configuration for any store type.
 type KeyStoreListable interface {
-	ListKeys(ctx context.Context, req *ListKeysRequest) (res *ListKeysResponse, err error)
+	ListKeys(ctx context.Context, req *prototk.ListKeysRequest) (res *prototk.ListKeysResponse, err error)
 }
 
 // Some cryptographic storage systems, in particular Hardware Security Modules (HSMs) and Cloud HSM systems,
@@ -68,6 +70,6 @@ type KeyStoreListable interface {
 //
 // See the Paladin architecture docs for more details.
 type KeyStoreSigner interface {
-	FindOrCreateInStoreSigningKey(ctx context.Context, req *ResolveKeyRequest) (res *ResolveKeyResponse, err error)
-	SignWithinKeystore(ctx context.Context, req *SignRequest) (res *SignResponse, err error)
+	FindOrCreateInStoreSigningKey(ctx context.Context, req *prototk.ResolveKeyRequest) (res *prototk.ResolveKeyResponse, err error)
+	SignWithinKeystore(ctx context.Context, req *prototk.SignWithKeyRequest) (res *prototk.SignWithKeyResponse, err error)
 }
