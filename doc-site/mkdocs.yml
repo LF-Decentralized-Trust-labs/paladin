@@ -126,6 +126,7 @@ nav:
     - Notarized Tokens: tutorials/notarized-tokens.md
     - Wholesale CBDC: tutorials/zkp-cbdc.md
     - Private Stablecoin with KYC: tutorials/private-stablecoin.md
+    - Atomic Swap: tutorials/atomic-swap.md
     - Bond Issuance: tutorials/bond-issuance.md
   - Reference:
     - APIs: reference/apis/*.md

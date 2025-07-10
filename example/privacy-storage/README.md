@@ -1,5 +1,7 @@
 # Example: Storage with Privacy Groups
 
+This example demonstrates private smart contract operations using Pente privacy groups. Each operation is validated on the base ledger, but the private EVM details are known only to members of the privacy group.
+
 See the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tutorials/private-storage/) for a detailed explanation.
 
 ## Pre-requisites

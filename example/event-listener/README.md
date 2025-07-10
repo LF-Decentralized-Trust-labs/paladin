@@ -1,51 +1,48 @@
 # Example: Event Listening
 
+This example demonstrates how to listen for events from Paladin smart contracts and domains.
+
 ## Pre-requisites
 
-Requires a local Paladin instance running on `localhost:31548`.
-Requires a local Paladin instance running on `localhost:31648`.
-Requires a local Paladin instance running on `localhost:31748`.
+Run the common [setup steps](../README.md) before running the example.
 
-## Run standalone
+## Running the example
 
-Compile [Solidity contracts](../../solidity):
+### Option 1 - `npm` with downloaded solidity contracts
 
-```shell
-cd ../../solidity
-npm install
-npm run compile
-```
+- **Extract contracts**
 
-Build [TypeScript SDK](../../sdk/typescript):
+  - Extract the `abis.tar.gz` file that was downloaded in the [setup steps](../README.md) and copy the `abis` directory to `src/`. (full path should be: `paladin/example/event-listener/src/abis`)
 
-```shell
-cd ../../sdk/typescript
-npm install
-npm run abi
-npm run build
-```
+- **Run the example**
 
-Build common utilities
+  ```shell
+  cd <paladin-root>/example/event-listener
+  npm install
+  npm run start
+  ```
 
-```shell
-cd ../common
-npm install
-npm run build
-```
+---
 
-Run example:
+### Option 2 - `npm` with locally built solidity contracts and ABIs
 
-```shell
-npm install
-npm run abi
-npm run start
-```
+- **Run the example**
 
-## Run with Gradle
+  ```shell
+  cd <paladin-root>/example/event-listener
+  npm install
+  npm run abi
+  npm run start
+  ```
 
-The following will perform all pre-requisites and then run the example:
+---
 
-```shell
-../../gradlew build
-npm run start
-```
+### Option 3 - Run with Gradle
+
+- **Run the gradle build task, then run the sample:**
+
+  ```shell
+  cd <paladin-root>/example/event-listener
+  ../../gradlew build
+  npm run start
+  ```

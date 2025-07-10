@@ -177,10 +177,9 @@ func TestRegistryRegisterFail(t *testing.T) {
 	tdm := &testRegistryManager{
 		registries: map[string]plugintk.Plugin{
 			"registry1": &mockPlugin[prototk.RegistryMessage]{
-				t:                   t,
-				allowRegisterErrors: true,
-				connectFactory:      registryConnectFactory,
-				headerAccessor:      registryHeaderAccessor,
+				t:              t,
+				connectFactory: registryConnectFactory,
+				headerAccessor: registryHeaderAccessor,
 				preRegister: func(registryID string) *prototk.RegistryMessage {
 					return &prototk.RegistryMessage{
 						Header: &prototk.Header{
@@ -191,7 +190,6 @@ func TestRegistryRegisterFail(t *testing.T) {
 					}
 				},
 				expectClose: func(err error) {
-					time.Sleep(100 * time.Millisecond)
 					waitForError <- err
 				},
 			},

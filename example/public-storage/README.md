@@ -1,4 +1,6 @@
-# Example: Public storage
+# Example: Public Storage
+
+This example demonstrates public smart contract operations on Paladin, which will be visible to any parties with access to the blockchain network.
 
 See the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tutorials/public-storage/) for a detailed explanation.
 

@@ -222,10 +222,9 @@ func TestTransportRegisterFail(t *testing.T) {
 	tdm := &testTransportManager{
 		transports: map[string]plugintk.Plugin{
 			"transport1": &mockPlugin[prototk.TransportMessage]{
-				t:                   t,
-				allowRegisterErrors: true,
-				connectFactory:      transportConnectFactory,
-				headerAccessor:      transportHeaderAccessor,
+				t:              t,
+				connectFactory: transportConnectFactory,
+				headerAccessor: transportHeaderAccessor,
 				preRegister: func(transportID string) *prototk.TransportMessage {
 					return &prototk.TransportMessage{
 						Header: &prototk.Header{
@@ -240,10 +239,9 @@ func TestTransportRegisterFail(t *testing.T) {
 				},
 			},
 			"transport2": &mockPlugin[prototk.TransportMessage]{
-				t:                   t,
-				allowRegisterErrors: true,
-				connectFactory:      transportConnectFactory,
-				headerAccessor:      transportHeaderAccessor,
+				t:              t,
+				connectFactory: transportConnectFactory,
+				headerAccessor: transportHeaderAccessor,
 				preRegister: func(transportID string) *prototk.TransportMessage {
 					return &prototk.TransportMessage{
 						Header: &prototk.Header{
@@ -304,6 +302,7 @@ func TestTransportRegisterPartialSuccess(t *testing.T) {
 	waitForError := make(chan error, 1)
 	waitForSuccess := make(chan components.TransportManagerToTransport, 1)
 	registrationCount := make(chan string, 2)
+	errorCallbackDone := make(chan struct{}, 1)
 
 	tdm := &testTransportManager{
 		transports: map[string]plugintk.Plugin{
@@ -317,10 +316,9 @@ func TestTransportRegisterPartialSuccess(t *testing.T) {
 				}
 			}),
 			"transport_fail": &mockPlugin[prototk.TransportMessage]{
-				t:                   t,
-				allowRegisterErrors: true,
-				connectFactory:      transportConnectFactory,
-				headerAccessor:      transportHeaderAccessor,
+				t:              t,
+				connectFactory: transportConnectFactory,
+				headerAccessor: transportHeaderAccessor,
 				preRegister: func(transportID string) *prototk.TransportMessage {
 					return &prototk.TransportMessage{
 						Header: &prototk.Header{
@@ -332,6 +330,7 @@ func TestTransportRegisterPartialSuccess(t *testing.T) {
 				},
 				expectClose: func(err error) {
 					waitForError <- err
+					errorCallbackDone <- struct{}{}
 				},
 			},
 		},
@@ -382,5 +381,12 @@ func TestTransportRegisterPartialSuccess(t *testing.T) {
 		assert.Contains(t, err.Error(), "transport_fail registration failed")
 	case <-time.After(3 * time.Second):
 		t.Fatal("transport failure callback never fired")
+	}
+
+	// Wait for the error callback to complete before test cleanup
+	select {
+	case <-errorCallbackDone:
+	case <-time.After(1 * time.Second):
+		t.Fatal("error callback did not complete in time")
 	}
 }

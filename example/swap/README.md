@@ -5,6 +5,8 @@ This example demonstrates an atomic swap scenario on Paladin. It performs a swap
 - a cash token implemented with Zeto
 - an asset token implemented with Noto, with private hooks implemented on Pente
 
+See the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tutorials/atomic-swap/) for a detailed explanation.
+
 ## Pre-requisites
 
 Run the common [setup steps](../README.md) before running the example.

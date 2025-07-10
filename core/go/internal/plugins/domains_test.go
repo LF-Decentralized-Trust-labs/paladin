@@ -523,10 +523,9 @@ func TestDomainRegisterFail(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
-				t:                   t,
-				allowRegisterErrors: true,
-				connectFactory:      domainConnectFactory,
-				headerAccessor:      domainHeaderAccessor,
+				t:              t,
+				connectFactory: domainConnectFactory,
+				headerAccessor: domainHeaderAccessor,
 				preRegister: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
 						Header: &prototk.Header{

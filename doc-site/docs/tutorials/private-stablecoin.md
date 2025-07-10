@@ -220,6 +220,6 @@ This showcases Paladin's unique capability to balance **privacy preservation** w
 
 ## Next Steps
 
-Explore how **Notarized Tokens** and **Privacy Groups** work together to create comprehensive financial solutions with controlled oversight and selective disclosure.
+Explore how **Notarized Tokens** and **ZKP Tokens** can be used together in an atomic swap scenario.
 
-[Continue to the Bond Issuance Tutorial →](./bond-issuance.md) 
+[Continue to the Atomic Swap Tutorial →](./atomic-swap.md)
