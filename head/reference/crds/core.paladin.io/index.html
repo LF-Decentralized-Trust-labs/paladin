@@ -4596,6 +4596,12 @@ Most common to use a simple one-reference-per-domain approach.</p>
 <td></td>
 </tr>
 <tr>
+<td><code>signingModules</code> <em><a href="#signingmoduleconfig">SigningModuleConfig</a> array</em></td>
+<td>A list of pluggable signing modules to merge into the configuration, and rebuild the config of paladin when this list changes</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
 <td><code>transports</code> <em><a href="#transportconfig">TransportConfig</a> array</em></td>
 <td>Transports are configured individually on each node, as they reference security details specific to that node</td>
 <td></td>
@@ -4607,6 +4613,7 @@ Most common to use a simple one-reference-per-domain approach.</p>
 <p><em>Appears in:</em>
 - <a href="#paladindomainspec">PaladinDomainSpec</a>
 - <a href="#paladinregistryspec">PaladinRegistrySpec</a>
+- <a href="#signingmoduleconfig">SigningModuleConfig</a>
 - <a href="#transportconfig">TransportConfig</a></p>
 <table>
 <thead>
@@ -4759,6 +4766,45 @@ Most common to use a simple one-reference-per-domain approach.</p>
 <td><code>keySelector</code> <em>string</em></td>
 <td>Wallets will be evaluated against new allocations of key identifiers in the order they are<br />defined. The key selector regular expression allows wallets to sub-select, with more specific<br />rules first on key matching and more generic rules (like the default of ".*") last.</td>
 <td>.*</td>
+<td></td>
+</tr>
+<tr>
+<td><code>keySelectorMustNotMatch</code> <em>boolean</em></td>
+<td>To instruct the key selector to behave in a non-matching mode whereby wallet selection applies when the<br />key identifier DOES NOT match against the given regular expression for the key selector.</td>
+<td>false</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="signingmoduleconfig">SigningModuleConfig<a class="headerlink" href="#signingmoduleconfig" title="Permanent link">&para;</a></h4>
+<p><em>Appears in:</em>
+- <a href="#paladinspec">PaladinSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>plugin</code> <em><a href="#pluginconfig">PluginConfig</a></em></td>
+<td>Plugin configuration for loading the signing module</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>configJSON</code> <em>string</em></td>
+<td>JSON configuration specific to the individual signing module.</td>
+<td></td>
 <td></td>
 </tr>
 </tbody>

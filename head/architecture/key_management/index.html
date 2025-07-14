@@ -3566,9 +3566,6 @@
 
 
 <h1 id="key-management">Key Management<a class="headerlink" href="#key-management" title="Permanent link">&para;</a></h1>
-<blockquote>
-<p>TODO: Well established architecture already being brought across to Paladin here (Lead: Matt Clarke)</p>
-</blockquote>
 <p><img alt="Key Management" src="../../images/key_management.jpg" /></p>
 <p>Key management in Paladin is designed to meet a complex set of requirements for enterprise
 key management, spanning both the secure storage of key materials in advanced locations (HMS/SSM),
@@ -3578,7 +3575,7 @@ a single algorithm (such as SECP256K1). Instead it must support multiple privacy
 approaches to signing - including the use of key materials directly during the formation of
 Zero Knowledge Proofs (ZKP).</p>
 <h2 id="choices-for-the-key-administrator">Choices for the key administrator<a class="headerlink" href="#choices-for-the-key-administrator" title="Permanent link">&para;</a></h2>
-<p>This leads to some key decisions that must be made by the administrator responsible for the 
+<p>This leads to some key decisions that must be made by the administrator responsible for the
 Paladin node on how keys are managed.</p>
 <h3 id="in-memory-vs-in-key-store-signing">In-memory vs in-key-store signing<a class="headerlink" href="#in-memory-vs-in-key-store-signing" title="Permanent link">&para;</a></h3>
 <p>Advanced cryptographic storage systems such as Hardware Security Modules (HSM) and Software
@@ -3587,10 +3584,10 @@ Security Modules (SSM) / Vault technologies, are built on one very important pri
 <p>There are two challenges to this in the Web3 domain:</p>
 <ol>
 <li><strong>Algorithm / ZKP support</strong> - HSM/SSM modules may not support all of the algorithms required
-for signing, or the ability to execute ZKP circuit provers natively.</li>
+   for signing, or the ability to execute ZKP circuit provers natively.</li>
 <li><strong>Numeracy of keys</strong> - HSM/SSM modules are commonly optimized for high value keys, and
-thus generating/storing millions of single-use keys for anonymous TX transaction submission 
-might be inefficient (on cost or performance)</li>
+   thus generating/storing millions of single-use keys for anonymous TX transaction submission
+   might be inefficient (on cost or performance)</li>
 </ol>
 <p>Paladin lets you choose <em>use case by use case</em> all within a single Paladin engine whether you
 delegate signing into your key store using its internal cryptography, or whether you allow the
@@ -3601,31 +3598,33 @@ cryptography.</p>
 you should be cautious about where the signing modules run that will hold those keys
 in volatile memory.</p>
 <ul>
-<li>You might choose to have that happen embedded into the Paladin node<ul>
+<li>You might choose to have that happen embedded into the Paladin node</li>
 <li>The shortest code path for performance</li>
 <li>The simplest deployment architecture</li>
-</ul>
-</li>
-<li>You might choose to run them on a completely separate infrastructure<ul>
-<li>In a more trusted network segment, with very limited secure key path for signing requests </li>
+<li>You might choose to run them on a completely separate infrastructure</li>
+<li>In a more trusted network segment, with very limited secure key path for signing requests</li>
 <li>Maybe co-located with your HSM with a local <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/squidfunk/PKCS/issues/11" title="GitHub Issue: squidfunk/PKCS #11">PKCS#11</a> interface</li>
 <li>Maybe runtime-embedded into your SSM / Vault technology as a code-module</li>
 </ul>
-</li>
-</ul>
-<p>Paladin packages the signing module for maximum flexibility. You will see all the quick start
+<p>Paladin packages the signing module for maximum flexibility. You will see the majority of the quick start
 setup guides, and kubernetes deployment samples, have it Paladin-embedded by default.</p>
 <p>However, the code is structured to make it very easy to run it remotely.</p>
 <p>You can extend it with code to support more key storage technologies, including proprietary
 technologies unique to your enterprise. The modular code design for extensibility, is combined
-with a set of options on remote connectivity:
-- HTTPS+JSON
-- gRPC+Protobuf
-- Both with mutual-TLS and additional session/JWT credentials</p>
+with a set of options on remote connectivity:</p>
+<ul>
+<li>HTTPS+JSON</li>
+<li>gRPC+Protobuf</li>
+<li>Both with mutual-TLS and additional session/JWT credentials</li>
+</ul>
 <blockquote>
 <p>Multiple signing-modules are supported by a single Paladin node, so you can use a mixture
 of embedded and remote signing modules in one node</p>
 </blockquote>
+<p>Alternatively you can choose to leverage the plugin ecosystem of Paladin and <em>bring-your-own</em> signing
+module implementation that gives you the freedom to achieve all of the above. (Refer to the paladin
+<a href="https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/signingmodules/example">example signing module</a>
+plugin as a starting point).</p>
 <h3 id="direct-key-mapping-vs-key-derivation">Direct key mapping vs. key derivation<a class="headerlink" href="#direct-key-mapping-vs-key-derivation" title="Permanent link">&para;</a></h3>
 <p>We discussed earlier that the numeracy of keys used by Web3 technologies (particularly with
 anonymity), and speed of key generation, is a challenge for some HSM/SSM technologies.</p>
@@ -3663,15 +3662,17 @@ efficient manner.</p>
 module, as only the <code>seed</code> is stored inside the HSM/SSM key storage module.</p>
 </blockquote>
 <p>Paladin supports a well established set of standards for the operation of this
-key derivation:
-- <a href="https://en.bitcoin.it/wiki/BIP_0032">BIP-32</a> defines the fundamental operation of the
-derivation algorithm for cryptographic keys
-- <a href="https://en.bitcoin.it/wiki/BIP_0039">BIP-39</a> allows mnemonic seed phrases to <em>optionally</em>
-be used (instead of a 32 byte private key) as the <code>seed</code>, or root, of the key hierarchy
-- <a href="https://en.bitcoin.it/wiki/BIP_0044">BIP-44</a> provides a string semantic for expressing
-a derivation path within a BIP-32 HD Wallet with a string pattern such as
-<code>m / 44' / 60' / 0' / 1 / 2 / 3</code>. This syntax is used in the signing module configuration
-for the prefix to use for keys, and as the way to refer uniquely to a key in the hierarchy.</p>
+key derivation:</p>
+<ul>
+<li><a href="https://en.bitcoin.it/wiki/BIP_0032">BIP-32</a> defines the fundamental operation of the
+  derivation algorithm for cryptographic keys</li>
+<li><a href="https://en.bitcoin.it/wiki/BIP_0039">BIP-39</a> allows mnemonic seed phrases to <em>optionally</em>
+  be used (instead of a 32 byte private key) as the <code>seed</code>, or root, of the key hierarchy</li>
+<li><a href="https://en.bitcoin.it/wiki/BIP_0044">BIP-44</a> provides a string semantic for expressing
+  a derivation path within a BIP-32 HD Wallet with a string pattern such as
+  <code>m / 44' / 60' / 0' / 1 / 2 / 3</code>. This syntax is used in the signing module configuration
+  for the prefix to use for keys, and as the way to refer uniquely to a key in the hierarchy.</li>
+</ul>
 <p>Some key storage systems internally use key derivation, similarly to that performed by
 the signing module. In these cases the signing module is configured for <code>direct</code> key mapping,
 and any key derivation is delegated down into the backing key store.</p>
@@ -3685,7 +3686,7 @@ in a single Paladin node.</p>
 <p>When applications and configuration refer to keys, they can do so via string identifiers.</p>
 <blockquote>
 <p>See <a href="../data_and_registry/">Data &amp; Registry</a> for details about the format of these identifiers
-and how they are resolved across separate Paladin runtimes. </p>
+and how they are resolved across separate Paladin runtimes.</p>
 </blockquote>
 <p>These identifiers can be human/application friendly strings describing the <strong>purpose</strong> of the key,
 rather than needing to be one of the public-key identifiers (like an Eth <code>address</code>) that
@@ -3711,11 +3712,13 @@ a <code>key identifier</code> to the <code>key handle</code> of that key in the 
 all the way up to a single root folder that is pre-created by the Paladin runtime.</p>
 <p>Key mappings also have <code>attributes</code> that can be specified when creating a key mapping explicitly
 over an API, and are passed to the signing module when resolving the key. This allows the behavior of
-the signing module when obtaining/creating key materials to be customized at runtime (within the 
+the signing module when obtaining/creating key materials to be customized at runtime (within the
 constraints of that signing module).</p>
-<p>Every <code>key mapping</code> and <code>folder</code> gets two attributes automatically:
-- <code>name</code>: the part of the <code>key identifier</code> representing this key / folder
-- <code>index</code>: a numeric identifier, assured to be unique at this folder level</p>
+<p>Every <code>key mapping</code> and <code>folder</code> gets two attributes automatically:</p>
+<ul>
+<li><code>name</code>: the part of the <code>key identifier</code> representing this key / folder</li>
+<li><code>index</code>: a numeric identifier, assured to be unique at this folder level</li>
+</ul>
 <h3 id="3-public-key-identifiers-or-verifiers-and-algorithms">3. Public key identifiers (or "verifiers") and algorithms<a class="headerlink" href="#3-public-key-identifiers-or-verifiers-and-algorithms" title="Permanent link">&para;</a></h3>
 <p>Cryptographic keys use public/private cryptography, meaning every key can be identified publicly in a way that does not leak the key information itself.</p>
 <p>Any party can <em>verify</em> that a transaction was signed with a particular private key, by <em>recovering</em> the public key used to sign that transaction.</p>
@@ -3751,6 +3754,7 @@ with convenient access to key materials and signing algorithms.</p>
 outside the core runtime connected of a mutual-TLS secure connection, supplemented
 with JWT credentials for each signing request that propagate context from the Paladin
 runtime on the context of the signing.</p>
+<p>Or it can achieve the same flexability as a pluggable component using Paladin's gRPC plugin framework.</p>
 <h3 id="5-key-resolution-and-creation-of-new-keys-on-demand">5. Key resolution and creation of new keys on-demand<a class="headerlink" href="#5-key-resolution-and-creation-of-new-keys-on-demand" title="Permanent link">&para;</a></h3>
 <p>The resolution from a <code>key identifier</code> to a <code>key handle</code> happens dynamically, when a
 suitable <code>key mapping</code> is not already found in the Paladin database.</p>
@@ -3758,14 +3762,16 @@ suitable <code>key mapping</code> is not already found in the Paladin database.<
 produces that uniquely identifies that key inside of the signing module's cryptographic
 storage (which is pluggable to many technologies).</p>
 <p>However, the resolution result might end up with many possible outcomes.</p>
-<p>For example:
-- Returning the identifier of a key that already was pre-created in the cryptographic
-  storage system, thus establishing a new <code>key mapping</code> to an existing <code>key handle</code>
-- Instructing the cryptographic storage system to generate a brand new key, thus 
-  on-demand creating a <code>key mapping</code> to a new unique key
-- Allocating a unique derivation path in a Hierarchical Deterministic (HD) derivation
+<p>For example:</p>
+<ul>
+<li>Returning the identifier of a key that already was pre-created in the cryptographic
+  storage system, thus establishing a new <code>key mapping</code> to an existing <code>key handle</code></li>
+<li>Instructing the cryptographic storage system to generate a brand new key, thus
+  on-demand creating a <code>key mapping</code> to a new unique key</li>
+<li>Allocating a unique derivation path in a Hierarchical Deterministic (HD) derivation
   path scheme like BIP32, that references a new unique key backed by an existing
-  seed/mnemonic stored in the cryptographic storage system</p>
+  seed/mnemonic stored in the cryptographic storage system</li>
+</ul>
 
 
 
