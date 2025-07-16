@@ -19,8 +19,10 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NotoMintDialog } from '../dialogs/domains/noto/NotoMint';
 import { NotoTransferDialog } from '../dialogs/domains/noto/NotoTransfer';
+import { NotoCheckBalanceDialog } from '../dialogs/domains/noto/NotoCheckBalance';
 import { ZetoMintDialog } from '../dialogs/domains/zeto/ZetoMint';
 import { ZetoTransferDialog } from '../dialogs/domains/zeto/ZetoTransfer';
+import { ZetoCheckBalanceDialog } from '../dialogs/domains/zeto/ZetoCheckBalance';
 
 type Props = {
   domainName: string;
@@ -40,8 +42,10 @@ export const DomainButtons: React.FC<Props> = ({
   const [buttons, setButtons] = useState<DomainButton[]>([]);
   const [notoMintDialogOpen, setNotoMintDialogOpen] = useState(false);
   const [notoTransferDialogOpen, setNotoTransferDialogOpen] = useState(false);
+  const [notoCheckBalanceDialogOpen, setNotoCheckBalanceDialogOpen] = useState(false);
   const [zetoMintDialogOpen, setZetoMintDialogOpen] = useState(false);
   const [zetoTransferDialogOpen, setZetoTransferDialogOpen] = useState(false);
+  const [zetoCheckBalanceDialogOpen, setZetoCheckBalanceDialogOpen] = useState(false);
 
   useEffect(() => {
     const tmpButtons: DomainButton[] = [];
@@ -57,6 +61,10 @@ export const DomainButtons: React.FC<Props> = ({
           name: 'transfer',
           action: () => setNotoTransferDialogOpen(true),
         });
+        tmpButtons.push({
+          name: 'checkBalance',
+          action: () => setNotoCheckBalanceDialogOpen(true),
+        });
         break;
       }
       case 'zeto': {
@@ -67,6 +75,10 @@ export const DomainButtons: React.FC<Props> = ({
         tmpButtons.push({
           name: 'transfer',
           action: () => setZetoTransferDialogOpen(true),
+        });
+        tmpButtons.push({
+          name: 'checkBalance',
+          action: () => setZetoCheckBalanceDialogOpen(true),
         });
         break;
       }
@@ -112,6 +124,18 @@ export const DomainButtons: React.FC<Props> = ({
       <ZetoTransferDialog
         dialogOpen={zetoTransferDialogOpen}
         setDialogOpen={setZetoTransferDialogOpen}
+        contractAddress={contractAddress}
+      />
+
+      <NotoCheckBalanceDialog
+        dialogOpen={notoCheckBalanceDialogOpen}
+        setDialogOpen={setNotoCheckBalanceDialogOpen}
+        contractAddress={contractAddress}
+      />
+
+      <ZetoCheckBalanceDialog
+        dialogOpen={zetoCheckBalanceDialogOpen}
+        setDialogOpen={setZetoCheckBalanceDialogOpen}
         contractAddress={contractAddress}
       />
     </>
