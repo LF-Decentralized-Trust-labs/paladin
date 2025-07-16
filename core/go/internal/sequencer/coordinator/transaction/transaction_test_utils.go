@@ -102,6 +102,8 @@ func (r *SentMessageRecorder) SendAssembleRequest(
 	transactionID uuid.UUID,
 	idempotencyKey uuid.UUID,
 	transactionPreassembly *components.TransactionPreAssembly,
+	stateLocksJSON []byte,
+	blockHeight int64,
 ) error {
 	r.hasSentAssembleRequest = true
 	r.sentAssembleRequestIdempotencyKey = idempotencyKey
@@ -323,7 +325,8 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		5,
 		b.grapher,
 		nil,
-		func(context.Context) {}, // onCleanup function, not used in tests
+		func(context.Context) {},               // onCleanup function, not used in tests
+		func(context.Context, *Transaction) {}, // onReadyForDispatch function, not used in tests
 	)
 	if err != nil {
 		panic(fmt.Sprintf("Error from NewTransaction: %v", err))

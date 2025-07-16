@@ -50,25 +50,24 @@ func NewTXManager(ctx context.Context, conf *pldconf.TxManagerConfig) components
 }
 
 type txManager struct {
-	bgCtx            context.Context
-	conf             *pldconf.TxManagerConfig
-	p                persistence.Persistence
-	localNodeName    string
-	ethClientFactory ethclient.EthClientFactory
-	keyManager       components.KeyManager
-	publicTxMgr      components.PublicTxManager
-	// privateTxMgr         components.PrivateTxManager
-	distributedSequencerMgr components.DistributedSequencerManager
-	domainMgr               components.DomainManager
-	stateMgr                components.StateManager
-	identityResolver        components.IdentityResolver
-	blockIndexer            blockindexer.BlockIndexer
-	rpcEventStreams         *rpcEventStreams
-	txCache                 cache.Cache[uuid.UUID, *components.ResolvedTransaction]
-	abiCache                cache.Cache[pldtypes.Bytes32, *pldapi.StoredABI]
-	rpcModule               *rpcserver.RPCModule
-	debugRpcModule          *rpcserver.RPCModule
-	lastStateUpdateTime     atomic.Int64
+	bgCtx               context.Context
+	conf                *pldconf.TxManagerConfig
+	p                   persistence.Persistence
+	localNodeName       string
+	ethClientFactory    ethclient.EthClientFactory
+	keyManager          components.KeyManager
+	publicTxMgr         components.PublicTxManager
+	sequencerMgr        components.SequencerManager
+	domainMgr           components.DomainManager
+	stateMgr            components.StateManager
+	identityResolver    components.IdentityResolver
+	blockIndexer        blockindexer.BlockIndexer
+	rpcEventStreams     *rpcEventStreams
+	txCache             cache.Cache[uuid.UUID, *components.ResolvedTransaction]
+	abiCache            cache.Cache[pldtypes.Bytes32, *pldapi.StoredABI]
+	rpcModule           *rpcserver.RPCModule
+	debugRpcModule      *rpcserver.RPCModule
+	lastStateUpdateTime atomic.Int64
 
 	receiptsRetry                *retry.Retry
 	receiptsReadPageSize         int
@@ -97,7 +96,7 @@ func (tm *txManager) PostInit(c components.AllComponents) error {
 	tm.ethClientFactory = c.EthClientFactory()
 	tm.keyManager = c.KeyManager()
 	tm.publicTxMgr = c.PublicTxManager()
-	tm.distributedSequencerMgr = c.DistributedSequencerManager()
+	tm.sequencerMgr = c.SequencerManager()
 	tm.domainMgr = c.DomainManager()
 	tm.stateMgr = c.StateManager()
 	tm.identityResolver = c.IdentityResolver()

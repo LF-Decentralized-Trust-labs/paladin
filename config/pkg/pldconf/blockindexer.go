@@ -23,14 +23,15 @@ import (
 )
 
 type BlockIndexerConfig struct {
-	FromBlock             json.RawMessage    `json:"fromBlock,omitempty"` // TODO: this should be a pldtypes.RawJSON but that's not possible right now because of a ciruclar dependency
-	CommitBatchSize       *int               `json:"commitBatchSize"`
-	CommitBatchTimeout    *string            `json:"commitBatchTimeout"`
-	RequiredConfirmations *int               `json:"requiredConfirmations"`
-	ChainHeadCacheLen     *int               `json:"chainHeadCacheLen"`
-	BlockPollingInterval  *string            `json:"blockPollingInterval"`
-	EventStreams          EventStreamsConfig `json:"eventStreams"`
-	Retry                 RetryConfig        `json:"retry"`
+	FromBlock               json.RawMessage    `json:"fromBlock,omitempty"` // TODO: this should be a pldtypes.RawJSON but that's not possible right now because of a ciruclar dependency
+	CommitBatchSize         *int               `json:"commitBatchSize"`
+	CommitBatchTimeout      *string            `json:"commitBatchTimeout"`
+	RequiredConfirmations   *int               `json:"requiredConfirmations"`
+	ChainHeadCacheLen       *int               `json:"chainHeadCacheLen"`
+	BlockPollingInterval    *string            `json:"blockPollingInterval"`
+	EventStreams            EventStreamsConfig `json:"eventStreams"`
+	Retry                   RetryConfig        `json:"retry"`
+	IgnoredTransactionTypes *[]int             `json:"ignoredTransactionTypes"`
 }
 
 type EventStreamsConfig struct {
@@ -44,10 +45,11 @@ var EventStreamDefaults = &EventStreamsConfig{
 }
 
 var BlockIndexerDefaults = &BlockIndexerConfig{
-	FromBlock:             json.RawMessage(`0`),
-	CommitBatchSize:       confutil.P(50),
-	CommitBatchTimeout:    confutil.P("100ms"),
-	RequiredConfirmations: confutil.P(0),
-	ChainHeadCacheLen:     confutil.P(50),
-	BlockPollingInterval:  confutil.P("10s"),
+	FromBlock:               json.RawMessage(`0`),
+	CommitBatchSize:         confutil.P(50),
+	CommitBatchTimeout:      confutil.P("100ms"),
+	RequiredConfirmations:   confutil.P(0),
+	ChainHeadCacheLen:       confutil.P(50),
+	BlockPollingInterval:    confutil.P("10s"),
+	IgnoredTransactionTypes: confutil.P([]int{0x7e}),
 }

@@ -227,7 +227,8 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		grapher,
 		func(ctx context.Context, txn *Transaction, from, to State) {
 		},
-		func(context.Context) {}, // onCleanup function, not used in tests
+		func(context.Context) {},               // onCleanup function, not used in tests
+		func(context.Context, *Transaction) {}, // onReadyForDispatch function, not used in tests
 	)
 	require.NoError(t, err)
 

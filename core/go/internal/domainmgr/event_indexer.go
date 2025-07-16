@@ -126,11 +126,11 @@ func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) 
 	for _, completion := range txCompletions {
 		// Private transaction manager needs to know about these to update its in-memory state
 		// MRW TODO - what's the interaction point between these and distributed sequencer manager?
-		//dm.distributedSequencerManager.HandleNewEvent() PrivateTransactionConfirmed(dm.bgCtx, completion)
+		dm.sequencerManager.ProcessPrivateTransactionConfirmed(dm.bgCtx, completion)
 
 		// We also provide a direct waiter that's used by the testbed
 		inflight := dm.privateTxWaiter.GetInflight(completion.TransactionID)
-		log.L(dm.bgCtx).Infof("Notifying for private deployment TransactionID %s (waiter=%t)", completion.TransactionID, inflight != nil)
+		log.L(dm.bgCtx).Infof("Notifying of completion for private deployment TransactionID %s (waiter=%t)", completion.TransactionID, inflight != nil)
 		if inflight != nil {
 			inflight.Complete(&completion.ReceiptInput)
 		}

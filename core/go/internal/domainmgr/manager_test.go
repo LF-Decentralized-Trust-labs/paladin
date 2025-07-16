@@ -48,7 +48,7 @@ type mockComponents struct {
 	blockIndexer     *blockindexermocks.BlockIndexer
 	keyManager       *componentsmocks.KeyManager
 	txManager        *componentsmocks.TXManager
-	privateTxManager *componentsmocks.PrivateTxManager
+	sequencerManager *componentsmocks.SequencerManager
 	transportMgr     *componentsmocks.TransportManager
 }
 
@@ -63,7 +63,7 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManager
 		ethClientFactory: ethclientmocks.NewEthClientFactory(t),
 		keyManager:       componentsmocks.NewKeyManager(t),
 		txManager:        componentsmocks.NewTXManager(t),
-		privateTxManager: componentsmocks.NewPrivateTxManager(t),
+		sequencerManager: componentsmocks.NewSequencerManager(t),
 		transportMgr:     componentsmocks.NewTransportManager(t),
 	}
 
@@ -76,7 +76,7 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManager
 	mc.keyManager.On("AddInMemorySigner", "domain", mock.Anything).Return().Maybe()
 	allComponents.On("KeyManager").Return(mc.keyManager)
 	allComponents.On("TxManager").Return(mc.txManager)
-	allComponents.On("PrivateTxManager").Return(mc.privateTxManager)
+	allComponents.On("SequencerManager").Return(mc.sequencerManager)
 	allComponents.On("TransportManager").Return(mc.transportMgr)
 	mc.transportMgr.On("LocalNodeName").Return("node1").Maybe()
 
@@ -183,7 +183,7 @@ func TestDomainMissingRegistryAddress(t *testing.T) {
 		ethClientFactory: ethclientmocks.NewEthClientFactory(t),
 		keyManager:       componentsmocks.NewKeyManager(t),
 		txManager:        componentsmocks.NewTXManager(t),
-		privateTxManager: componentsmocks.NewPrivateTxManager(t),
+		sequencerManager: componentsmocks.NewSequencerManager(t),
 		transportMgr:     componentsmocks.NewTransportManager(t),
 	}
 	componentsmocks := componentsmocks.NewAllComponents(t)
@@ -195,7 +195,7 @@ func TestDomainMissingRegistryAddress(t *testing.T) {
 	mc.keyManager.On("AddInMemorySigner", "domain", mock.Anything).Return().Maybe()
 	componentsmocks.On("KeyManager").Return(mc.keyManager)
 	componentsmocks.On("TxManager").Return(mc.txManager)
-	componentsmocks.On("PrivateTxManager").Return(mc.privateTxManager)
+	componentsmocks.On("SequencerManager").Return(mc.sequencerManager)
 	componentsmocks.On("TransportManager").Return(mc.transportMgr)
 
 	mp, err := mockpersistence.NewSQLMockProvider()

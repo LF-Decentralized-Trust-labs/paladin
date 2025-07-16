@@ -27,15 +27,22 @@ import (
 )
 
 func action_SendDelegationRequest(ctx context.Context, s *sender) error {
+	log.L(ctx).Infof("action_SendDelegationRequest")
 	transactions, err := s.transactionsOrderedByCreatedTime(ctx)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to get transactions ordered by created time: %v", err)
 		return err
 	}
-	privateTransactions := make([]*components.PrivateTransaction, len(transactions))
-	for i, txn := range transactions {
-		privateTransactions[i] = txn.PrivateTransaction
+
+	// Find pending transactions only (others don't need re-delegating)
+	// TODO - this is another place where we are checking state outside the state machine
+	privateTransactions := make([]*components.PrivateTransaction, 0)
+	for _, txn := range transactions {
+		if txn.GetCurrentState() == transaction.State_Pending {
+			privateTransactions = append(privateTransactions, txn.PrivateTransaction)
+		}
 	}
+
 	s.messageSender.SendDelegationRequest(ctx, s.activeCoordinator, privateTransactions, s.currentBlockHeight)
 	for _, txn := range transactions {
 		err := txn.HandleEvent(ctx, &transaction.DelegatedEvent{

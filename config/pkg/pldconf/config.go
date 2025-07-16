@@ -16,24 +16,24 @@
 package pldconf
 
 type PaladinConfig struct {
-	DomainManagerConfig         `json:",inline"`
-	PluginManagerConfig         `json:",inline"`
-	TransportManagerConfig      `json:",inline"`
-	RegistryManagerConfig       `json:",inline"`
-	KeyManagerConfig            `json:",inline"`
-	Startup                     StartupConfig                     `json:"startup"`
-	Log                         LogConfig                         `json:"log"`
-	Blockchain                  EthClientConfig                   `json:"blockchain"`
-	DB                          DBConfig                          `json:"db"`
-	RPCServer                   RPCServerConfig                   `json:"rpcServer"`
-	MetricsServer               MetricsServerConfig               `json:"metricsServer"`
-	DebugServer                 DebugServerConfig                 `json:"debugServer"`
-	StateStore                  StateStoreConfig                  `json:"statestore"`
-	BlockIndexer                BlockIndexerConfig                `json:"blockIndexer"`
-	TempDir                     *string                           `json:"tempDir"`
-	TxManager                   TxManagerConfig                   `json:"txManager"`
-	DistributedSequencerManager DistributedSequencerManagerConfig `json:"distributedSequencerManager"`
-	PublicTxManager             PublicTxManagerConfig             `json:"publicTxManager"`
-	IdentityResolver            IdentityResolverConfig            `json:"identityResolver"`
-	GroupManager                GroupManagerConfig                `json:"groupManager"`
+	DomainManagerConfig    `json:",inline"`
+	PluginManagerConfig    `json:",inline"`
+	TransportManagerConfig `json:",inline"`
+	RegistryManagerConfig  `json:",inline"`
+	KeyManagerConfig       `json:",inline"`
+	Startup                StartupConfig          `json:"startup"`
+	Log                    LogConfig              `json:"log"`
+	Blockchain             EthClientConfig        `json:"blockchain"`
+	DB                     DBConfig               `json:"db"`
+	RPCServer              RPCServerConfig        `json:"rpcServer"`
+	MetricsServer          MetricsServerConfig    `json:"metricsServer"`
+	DebugServer            DebugServerConfig      `json:"debugServer"`
+	StateStore             StateStoreConfig       `json:"statestore"`
+	BlockIndexer           BlockIndexerConfig     `json:"blockIndexer"`
+	TempDir                *string                `json:"tempDir"`
+	TxManager              TxManagerConfig        `json:"txManager"`
+	SequencerManager       SequencerManagerConfig `json:"sequencerManager"`
+	PublicTxManager        PublicTxManagerConfig  `json:"publicTxManager"`
+	IdentityResolver       IdentityResolverConfig `json:"identityResolver"`
+	GroupManager           GroupManagerConfig     `json:"groupManager"`
 }

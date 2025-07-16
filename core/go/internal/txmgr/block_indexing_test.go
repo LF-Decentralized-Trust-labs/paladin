@@ -210,7 +210,7 @@ func TestPrivateConfirmMatchPrivateFailures(t *testing.T) {
 
 			mc.db.ExpectBegin()
 			mc.db.ExpectCommit()
-			mc.privateTxMgr.On("NotifyFailedPublicTx", mock.Anything, mock.Anything, mock.MatchedBy(func(matches []*components.PublicTxMatch) bool {
+			mc.publicTxMgr.On("NotifyFailedPublicTx", mock.Anything, mock.Anything, mock.MatchedBy(func(matches []*components.PublicTxMatch) bool {
 				return len(matches) == 1 &&
 					matches[0].TransactionID == txID2
 			})).Return(nil)
@@ -290,7 +290,7 @@ func TestPrivateConfirmError(t *testing.T) {
 						IndexedTransactionNotify: txi,
 					},
 				}, nil)
-			mc.privateTxMgr.On("NotifyFailedPublicTx", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("pop"))
+			mc.publicTxMgr.On("NotifyFailedPublicTx", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("pop"))
 		})
 	defer done()
 

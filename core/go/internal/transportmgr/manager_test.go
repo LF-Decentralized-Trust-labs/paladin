@@ -36,17 +36,17 @@ import (
 )
 
 type mockComponents struct {
-	c                           *componentsmocks.AllComponents
-	db                          *mockpersistence.SQLMockProvider
-	p                           persistence.Persistence
-	registryManager             *componentsmocks.RegistryManager
-	stateManager                *componentsmocks.StateManager
-	domainManager               *componentsmocks.DomainManager
-	keyManager                  *componentsmocks.KeyManager
-	txManager                   *componentsmocks.TXManager
-	distributedSequencerManager *componentsmocks.DistributedSequencerManager
-	identityResolver            *componentsmocks.IdentityResolver
-	groupManager                *componentsmocks.GroupManager
+	c                *componentsmocks.AllComponents
+	db               *mockpersistence.SQLMockProvider
+	p                persistence.Persistence
+	registryManager  *componentsmocks.RegistryManager
+	stateManager     *componentsmocks.StateManager
+	domainManager    *componentsmocks.DomainManager
+	keyManager       *componentsmocks.KeyManager
+	txManager        *componentsmocks.TXManager
+	sequencerManager *componentsmocks.SequencerManager
+	identityResolver *componentsmocks.IdentityResolver
+	groupManager     *componentsmocks.GroupManager
 }
 
 func newMockComponents(t *testing.T, realDB bool) *mockComponents {
@@ -56,7 +56,7 @@ func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	mc.domainManager = componentsmocks.NewDomainManager(t)
 	mc.keyManager = componentsmocks.NewKeyManager(t)
 	mc.txManager = componentsmocks.NewTXManager(t)
-	mc.distributedSequencerManager = componentsmocks.NewDistributedSequencerManager(t)
+	mc.sequencerManager = componentsmocks.NewSequencerManager(t)
 	mc.identityResolver = componentsmocks.NewIdentityResolver(t)
 	mc.groupManager = componentsmocks.NewGroupManager(t)
 	if realDB {
@@ -76,7 +76,7 @@ func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	mc.c.On("DomainManager").Return(mc.domainManager).Maybe()
 	mc.c.On("KeyManager").Return(mc.keyManager).Maybe()
 	mc.c.On("TxManager").Return(mc.txManager).Maybe()
-	mc.c.On("DistributedSequencerManager").Return(mc.distributedSequencerManager).Maybe()
+	mc.c.On("SequencerManager").Return(mc.sequencerManager).Maybe()
 	mc.c.On("IdentityResolver").Return(mc.identityResolver).Maybe()
 	mc.c.On("GroupManager").Return(mc.groupManager).Maybe()
 	return mc

@@ -94,6 +94,50 @@ func (_c *MockSeqCoordinator_GetActiveCoordinatorNode_Call) RunAndReturn(run fun
 	return _c
 }
 
+// GetCurrentState provides a mock function for the type MockSeqCoordinator
+func (_mock *MockSeqCoordinator) GetCurrentState() common.CoordinatorState {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCurrentState")
+	}
+
+	var r0 common.CoordinatorState
+	if returnFunc, ok := ret.Get(0).(func() common.CoordinatorState); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(common.CoordinatorState)
+	}
+	return r0
+}
+
+// MockSeqCoordinator_GetCurrentState_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCurrentState'
+type MockSeqCoordinator_GetCurrentState_Call struct {
+	*mock.Call
+}
+
+// GetCurrentState is a helper method to define mock.On call
+func (_e *MockSeqCoordinator_Expecter) GetCurrentState() *MockSeqCoordinator_GetCurrentState_Call {
+	return &MockSeqCoordinator_GetCurrentState_Call{Call: _e.mock.On("GetCurrentState")}
+}
+
+func (_c *MockSeqCoordinator_GetCurrentState_Call) Run(run func()) *MockSeqCoordinator_GetCurrentState_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockSeqCoordinator_GetCurrentState_Call) Return(coordinatorState common.CoordinatorState) *MockSeqCoordinator_GetCurrentState_Call {
+	_c.Call.Return(coordinatorState)
+	return _c
+}
+
+func (_c *MockSeqCoordinator_GetCurrentState_Call) RunAndReturn(run func() common.CoordinatorState) *MockSeqCoordinator_GetCurrentState_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetTransactionsReadyToDispatch provides a mock function for the type MockSeqCoordinator
 func (_mock *MockSeqCoordinator) GetTransactionsReadyToDispatch(ctx context.Context) ([]*components.PrivateTransaction, error) {
 	ret := _mock.Called(ctx)
@@ -210,6 +254,39 @@ func (_c *MockSeqCoordinator_HandleEvent_Call) Return(err error) *MockSeqCoordin
 
 func (_c *MockSeqCoordinator_HandleEvent_Call) RunAndReturn(run func(ctx context.Context, event common.Event) error) *MockSeqCoordinator_HandleEvent_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// Stop provides a mock function for the type MockSeqCoordinator
+func (_mock *MockSeqCoordinator) Stop() {
+	_mock.Called()
+	return
+}
+
+// MockSeqCoordinator_Stop_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Stop'
+type MockSeqCoordinator_Stop_Call struct {
+	*mock.Call
+}
+
+// Stop is a helper method to define mock.On call
+func (_e *MockSeqCoordinator_Expecter) Stop() *MockSeqCoordinator_Stop_Call {
+	return &MockSeqCoordinator_Stop_Call{Call: _e.mock.On("Stop")}
+}
+
+func (_c *MockSeqCoordinator_Stop_Call) Run(run func()) *MockSeqCoordinator_Stop_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockSeqCoordinator_Stop_Call) Return() *MockSeqCoordinator_Stop_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockSeqCoordinator_Stop_Call) RunAndReturn(run func()) *MockSeqCoordinator_Stop_Call {
+	_c.Run(run)
 	return _c
 }
 
@@ -356,16 +433,16 @@ func (_m *MockMessageSender) EXPECT() *MockMessageSender_Expecter {
 }
 
 // SendAssembleRequest provides a mock function for the type MockMessageSender
-func (_mock *MockMessageSender) SendAssembleRequest(ctx context.Context, assemblingNode string, transactionID uuid.UUID, idempotencyID uuid.UUID, transactionPreassembly *components.TransactionPreAssembly) error {
-	ret := _mock.Called(ctx, assemblingNode, transactionID, idempotencyID, transactionPreassembly)
+func (_mock *MockMessageSender) SendAssembleRequest(ctx context.Context, assemblingNode string, transactionID uuid.UUID, idempotencyID uuid.UUID, transactionPreassembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error {
+	ret := _mock.Called(ctx, assemblingNode, transactionID, idempotencyID, transactionPreassembly, stateLocksJSON, blockHeight)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendAssembleRequest")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uuid.UUID, uuid.UUID, *components.TransactionPreAssembly) error); ok {
-		r0 = returnFunc(ctx, assemblingNode, transactionID, idempotencyID, transactionPreassembly)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uuid.UUID, uuid.UUID, *components.TransactionPreAssembly, []byte, int64) error); ok {
+		r0 = returnFunc(ctx, assemblingNode, transactionID, idempotencyID, transactionPreassembly, stateLocksJSON, blockHeight)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -383,11 +460,13 @@ type MockMessageSender_SendAssembleRequest_Call struct {
 //   - transactionID uuid.UUID
 //   - idempotencyID uuid.UUID
 //   - transactionPreassembly *components.TransactionPreAssembly
-func (_e *MockMessageSender_Expecter) SendAssembleRequest(ctx interface{}, assemblingNode interface{}, transactionID interface{}, idempotencyID interface{}, transactionPreassembly interface{}) *MockMessageSender_SendAssembleRequest_Call {
-	return &MockMessageSender_SendAssembleRequest_Call{Call: _e.mock.On("SendAssembleRequest", ctx, assemblingNode, transactionID, idempotencyID, transactionPreassembly)}
+//   - stateLocksJSON []byte
+//   - blockHeight int64
+func (_e *MockMessageSender_Expecter) SendAssembleRequest(ctx interface{}, assemblingNode interface{}, transactionID interface{}, idempotencyID interface{}, transactionPreassembly interface{}, stateLocksJSON interface{}, blockHeight interface{}) *MockMessageSender_SendAssembleRequest_Call {
+	return &MockMessageSender_SendAssembleRequest_Call{Call: _e.mock.On("SendAssembleRequest", ctx, assemblingNode, transactionID, idempotencyID, transactionPreassembly, stateLocksJSON, blockHeight)}
 }
 
-func (_c *MockMessageSender_SendAssembleRequest_Call) Run(run func(ctx context.Context, assemblingNode string, transactionID uuid.UUID, idempotencyID uuid.UUID, transactionPreassembly *components.TransactionPreAssembly)) *MockMessageSender_SendAssembleRequest_Call {
+func (_c *MockMessageSender_SendAssembleRequest_Call) Run(run func(ctx context.Context, assemblingNode string, transactionID uuid.UUID, idempotencyID uuid.UUID, transactionPreassembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64)) *MockMessageSender_SendAssembleRequest_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -409,12 +488,22 @@ func (_c *MockMessageSender_SendAssembleRequest_Call) Run(run func(ctx context.C
 		if args[4] != nil {
 			arg4 = args[4].(*components.TransactionPreAssembly)
 		}
+		var arg5 []byte
+		if args[5] != nil {
+			arg5 = args[5].([]byte)
+		}
+		var arg6 int64
+		if args[6] != nil {
+			arg6 = args[6].(int64)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
 			arg4,
+			arg5,
+			arg6,
 		)
 	})
 	return _c
@@ -425,7 +514,7 @@ func (_c *MockMessageSender_SendAssembleRequest_Call) Return(err error) *MockMes
 	return _c
 }
 
-func (_c *MockMessageSender_SendAssembleRequest_Call) RunAndReturn(run func(ctx context.Context, assemblingNode string, transactionID uuid.UUID, idempotencyID uuid.UUID, transactionPreassembly *components.TransactionPreAssembly) error) *MockMessageSender_SendAssembleRequest_Call {
+func (_c *MockMessageSender_SendAssembleRequest_Call) RunAndReturn(run func(ctx context.Context, assemblingNode string, transactionID uuid.UUID, idempotencyID uuid.UUID, transactionPreassembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error) *MockMessageSender_SendAssembleRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }

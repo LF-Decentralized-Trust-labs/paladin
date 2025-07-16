@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 )
@@ -30,13 +31,18 @@ func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uui
 
 func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error {
 
+	log.L(ctx).Debugf("Sending dispatch confirmation request for transaction %s", t.ID)
+
 	if t.pendingDispatchConfirmationRequest == nil {
 		hash, err := t.Hash(ctx)
 		if err != nil {
+			log.L(ctx).Debugf("Error hashing transaction for dispatch confirmation request: %s", err)
 			return err
 		}
+		log.L(ctx).Debug("Creating idempotent request for dispatch confirmation request")
 		t.pendingDispatchConfirmationRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
 
+			log.L(ctx).Debug("Calling SendDispatchConfirmationRequest")
 			return t.messageSender.SendDispatchConfirmationRequest(
 				ctx,
 				t.sender,

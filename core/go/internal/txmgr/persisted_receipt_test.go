@@ -160,7 +160,7 @@ func mockDomainContractResolve(t *testing.T, domainName string, contractAddrs ..
 func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 
 	ctx, txm, done := newTestTransactionManager(t, true, mockDomainContractResolve(t, "domain1"), func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.privateTxMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mc.sequencerMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	})
 	defer done()
 
@@ -204,7 +204,7 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 
 	ctx, txm, done := newTestTransactionManager(t, true, mockDomainContractResolve(t, "domain1"), func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.privateTxMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mc.sequencerMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		mc.stateMgr.On("GetTransactionStates", mock.Anything, mock.Anything, mock.Anything).Return(
 			&pldapi.TransactionStates{None: true}, nil,
