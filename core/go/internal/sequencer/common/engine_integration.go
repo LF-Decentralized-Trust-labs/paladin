@@ -45,6 +45,10 @@ type EngineIntegration interface {
 	// WriteLockAndDistributeStatesForTransaction is a method that writes a lock to the state and distributes the states for a transaction
 	WriteLockAndDistributeStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error
 
+	GetStateLocks(ctx context.Context) ([]byte, error)
+
+	GetBlockHeight(ctx context.Context) (int64, error)
+
 	//Assemble and sign is a single, synchronous operation that assembles a transaction using the domain smart contract
 	// and then fulfills any signature requests in the attestation plan
 	// there would be a benefit in separating this out to `assemble` and `sign` steps and to make then asynchronous
@@ -78,23 +82,25 @@ func (f *FakeEngineIntegrationForTesting) WriteLockAndDistributeStatesForTransac
 	return nil
 }
 
+func (f *FakeEngineIntegrationForTesting) GetStateLocks(ctx context.Context) ([]byte, error) {
+	return nil, nil
+}
+
+func (f *FakeEngineIntegrationForTesting) GetBlockHeight(ctx context.Context) (int64, error) {
+	return 0, nil
+}
+
 func (f *FakeEngineIntegrationForTesting) AssembleAndSign(ctx context.Context, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) (*components.TransactionPostAssembly, error) {
 	return f.Called(ctx, transactionID, preAssembly, stateLocksJSON, blockHeight).Get(0).(*components.TransactionPostAssembly), nil
 }
 
-// interface for existing implementation  in core/go/internal/privatetxnmgr/state_distribution_builder.go
-type StateDistributionBuilder interface {
-	Build(ctx context.Context, txn *components.PrivateTransaction) (sds *components.StateDistributionSet, err error)
-}
-
 type engineIntegration struct {
-	stateDistributer         StateDistributer
-	components               components.AllComponents
-	domainSmartContract      components.DomainSmartContract
-	domainContext            components.DomainContext
-	stateDistributionBuilder StateDistributionBuilder
-	nodeName                 string
-	environment              Hooks
+	stateDistributer    StateDistributer
+	components          components.AllComponents
+	domainSmartContract components.DomainSmartContract
+	domainContext       components.DomainContext
+	nodeName            string
+	environment         Hooks
 }
 
 func (s *engineIntegration) WriteLockAndDistributeStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
@@ -128,8 +134,15 @@ func (s *engineIntegration) WriteLockAndDistributeStatesForTransaction(ctx conte
 		}
 	}
 
+	// Log info states before distribution
+	for _, state := range txn.PostAssembly.InfoStates {
+		log.L(ctx).Debugf("Info states before distribution: %+v", state)
+	}
+
 	//Distribute states
-	sds, err := s.stateDistributionBuilder.Build(ctx, txn)
+
+	stateDistributionBuilder := NewStateDistributionBuilder(s.components, txn)
+	sds, err := stateDistributionBuilder.Build(ctx, txn)
 	if err != nil {
 		log.L(ctx).Errorf("Error getting state distributions: %s", err)
 	}
@@ -139,6 +152,14 @@ func (s *engineIntegration) WriteLockAndDistributeStatesForTransaction(ctx conte
 
 	return nil
 
+}
+
+func (s *engineIntegration) GetStateLocks(ctx context.Context) ([]byte, error) {
+	return s.domainContext.ExportSnapshot()
+}
+
+func (s *engineIntegration) GetBlockHeight(ctx context.Context) (int64, error) {
+	return s.environment.GetBlockHeight(), nil
 }
 
 // assemble a transaction that we are not coordinating, using the provided state locks
@@ -157,6 +178,26 @@ func (s *engineIntegration) AssembleAndSign(ctx context.Context, transactionID u
 	if err != nil {
 		log.L(ctx).Errorf("assembleForRemoteCoordinator: Error importing state locks: %s", err)
 		return nil, err
+	}
+
+	for _, v := range preAssembly.RequiredVerifiers {
+		log.L(ctx).Debugf("assembleForRemoteCoordinator: resolving required verifier %s", v.Lookup)
+		verifier, err := s.components.IdentityResolver().ResolveVerifier(
+			ctx,
+			v.Lookup,
+			v.Algorithm,
+			v.VerifierType,
+		)
+		if err != nil {
+			log.L(ctx).Errorf("assembleForRemoteCoordinator: Error resolving verifier %s: %s", v.Lookup, err)
+			return nil, err
+		}
+		preAssembly.Verifiers = append(preAssembly.Verifiers, &prototk.ResolvedVerifier{
+			Lookup:       v.Lookup,
+			Algorithm:    v.Algorithm,
+			VerifierType: v.VerifierType,
+			Verifier:     verifier,
+		})
 	}
 
 	postAssembly, err := s.assembleAndSign(ctx, transactionID, preAssembly, s.domainContext)
@@ -246,6 +287,7 @@ func (s *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 	 */
 	for _, attRequest := range transaction.PostAssembly.AttestationPlan {
 		if attRequest.AttestationType == prototk.AttestationType_SIGN {
+			log.L(ctx).Debugf("Attestation type is SIGN")
 			for _, partyName := range attRequest.Parties {
 				unqualifiedLookup, signerNode, err := pldtypes.PrivateIdentityLocator(partyName).Validate(ctx, s.nodeName, true)
 				if err != nil {
@@ -253,6 +295,7 @@ func (s *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 					return nil, err
 				}
 				if signerNode == s.nodeName {
+					log.L(ctx).Debugf("We're in the signing parties list - signing")
 
 					keyMgr := s.components.KeyManager()
 					resolvedKey, err := keyMgr.ResolveKeyNewDatabaseTX(ctx, unqualifiedLookup, attRequest.Algorithm, attRequest.VerifierType)

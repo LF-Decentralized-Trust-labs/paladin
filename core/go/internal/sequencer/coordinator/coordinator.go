@@ -32,6 +32,7 @@ type SeqCoordinator interface {
 	GetTransactionsReadyToDispatch(ctx context.Context) ([]*components.PrivateTransaction, error)
 	GetActiveCoordinatorNode(ctx context.Context) string
 	HandleEvent(ctx context.Context, event common.Event) error
+	GetCurrentState() common.CoordinatorState
 }
 
 type coordinator struct {
@@ -59,6 +60,7 @@ type coordinator struct {
 	clock             common.Clock
 	engineIntegration common.EngineIntegration
 	emit              common.EmitEvent
+	readyForDispatch  func(context.Context, *transaction.Transaction)
 
 	/*Algorithms*/
 	transactionSelector TransactionSelector
@@ -77,6 +79,9 @@ func NewCoordinator(
 	contractAddress *pldtypes.EthAddress,
 	blockHeightTolerance uint64,
 	closingGracePeriod int,
+	nodeName string,
+	readyForDispatch func(context.Context, *transaction.Transaction),
+
 ) (*coordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
@@ -92,6 +97,7 @@ func NewCoordinator(
 		assembleTimeout:                    assembleTimeout,
 		engineIntegration:                  engineIntegration,
 		emit:                               emit,
+		readyForDispatch:                   readyForDispatch,
 	}
 	c.committee = make(map[string][]string)
 	for _, member := range committeeMembers {
@@ -117,6 +123,9 @@ func NewCoordinator(
 	}
 	c.InitializeStateMachine(State_Idle)
 	c.transactionSelector = NewTransactionSelector(ctx, c)
+
+	// MRW TODO - what is the correct initial active coordinator?
+	c.activeCoordinator = nodeName
 	return c, nil
 
 }
@@ -177,7 +186,9 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 					log.L(ctx).Errorf("Error forgetting transaction %s: %v", txn.ID.String(), err)
 				}
 				log.L(ctx).Debugf("Transaction %s cleaned up", txn.ID.String())
-			})
+			},
+			c.readyForDispatch,
+		)
 		if err != nil {
 			log.L(ctx).Errorf("Error creating transaction: %v", err)
 			return err
@@ -265,6 +276,7 @@ func (c *coordinator) findTransactionBySignerNonce(ctx context.Context, signer *
 }
 
 func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, from *pldtypes.EthAddress, nonce uint64, hash pldtypes.Bytes32, revertReason pldtypes.HexBytes) (bool, error) {
+	log.L(ctx).Infof("confirmDispatchedTransaction - we currently have %d transactions to handle", len(c.transactionsByID))
 	// First check whether it is one that we have been coordinating
 	if dispatchedTransaction := c.findTransactionBySignerNonce(ctx, from, nonce); dispatchedTransaction != nil {
 		if dispatchedTransaction.GetLatestSubmissionHash() == nil || *(dispatchedTransaction.GetLatestSubmissionHash()) != hash {
@@ -285,6 +297,7 @@ func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, from *pl
 		}
 		return true, nil
 	}
+	log.L(ctx).Infof("confirmDispatchedTransaction - failed to find a transaction submitted by signer %s", from.String())
 	return false, nil
 
 }
@@ -304,6 +317,6 @@ func ptrTo[T any](v T) *T {
 //TODO the following getter methods are not safe to call on anything other than the sequencer goroutine because they are reading data structures that are being modified by the state machine.
 // We should consider making them safe to call from any goroutine by maintaining a copy of the data structures that are updated async from the sequencer thread under a mutex
 
-func (c *coordinator) GetCurrentState() State {
-	return c.stateMachine.currentState
+func (c *coordinator) GetCurrentState() common.CoordinatorState {
+	return common.CoordinatorState(c.stateMachine.currentState.String())
 }

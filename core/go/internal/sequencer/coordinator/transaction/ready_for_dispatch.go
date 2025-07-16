@@ -65,7 +65,11 @@ func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
 	return false
 }
 
-func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
+func (t *Transaction) notifyDependentsOfReadinessAndQueueForDispatch(ctx context.Context) error {
+
+	// Ask the distributed sequencer manager to add this TX to the queue for collection
+	t.onReadyForDispatch(ctx, t)
+
 	//this function is called when the transaction enters the ready for dispatch state
 	// and we have a duty to inform all the transactions that are dependent on us that we are ready in case they are otherwise ready and are blocked waiting for us
 	for _, dependentId := range t.dependencies.PrereqOf {
@@ -90,7 +94,7 @@ func (t *Transaction) notifyDependentsOfReadiness(ctx context.Context) error {
 }
 
 func action_NotifyDependentsOfReadiness(ctx context.Context, txn *Transaction) error {
-	return txn.notifyDependentsOfReadiness(ctx)
+	return txn.notifyDependentsOfReadinessAndQueueForDispatch(ctx)
 }
 
 // Function HasDependenciesNotIn checks if the transaction has any that are not in the provided ignoreList array.

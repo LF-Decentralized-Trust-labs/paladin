@@ -79,8 +79,8 @@ var (
 	MsgComponentMetricsServerInitError               = pde("PD010036", "Error initializing metrics server")
 	MsgComponentMetricsServerStartError              = pde("PD010037", "Error starting metrics server")
 	MsgComponentMetricsManagerInitError              = pde("PD010038", "Error initializing metrics manager")
-	MsgComponentDistributedSequencerManagerInitError = pde("PD010036", "Error initializing distributed sequencer manager")
-	MsgComponentDistributedSequencerStartError       = pde("PD010037", "Error starting distributed sequencer manager")
+	MsgComponentDistributedSequencerManagerInitError = pde("PD010039", "Error initializing distributed sequencer manager")
+	MsgComponentDistributedSequencerStartError       = pde("PD010040", "Error starting distributed sequencer manager")
 
 	// States PD0101XX
 	MsgStateInvalidLength             = pde("PD010101", "Invalid hash len expected=%d actual=%d")
@@ -303,7 +303,7 @@ var (
 	MsgPrivateTxManagerAssembleError             = pde("PD011802", "Error assembling transaction: %s")
 	MsgPrivateTxManagerParseFailed               = pde("PD011803", "Failed to parse message")
 	MsgPrivateTxManagerInvalidMessage            = pde("PD011804", "Invalid message received from transport")
-	MsgSequencerInternalError                    = pde("PD011805", "Sequencer internal error")
+	MsgSequencerInternalError                    = pde("PD011805", "Sequencer internal error: %s")
 	MsgKeyResolutionFailed                       = pde("PD011806", "Key resolution failed for key %s, algorithm %s, verifierType %s")
 	MsgDeployInitFailed                          = pde("PD011807", "Failed to initialise a deploy transaction")
 	MsgDeployPrepareFailed                       = pde("PD011808", "Failed to prepare a deploy transaction")
@@ -487,4 +487,7 @@ var (
 	MsgPGroupsJSONRPCSubscriptionNack       = pde("PD012521", "JSON/RPC subscription '%s' returned nack for message batch")
 	MsgPGroupsGenesisSaltUnset              = pde("PD012522", "Genesis salt must be set")
 	MsgPGroupsReceivedGenesisInvalid        = pde("PD012523", "Received genesis state is invalid")
+
+	// Distributed sequencer PD0126XX
+	MsgDistSeqInternalError = pde("PD012601", "Distributed sequencer internal error")
 )

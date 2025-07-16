@@ -29,6 +29,7 @@ import (
 
 type SeqSender interface {
 	HandleEvent(ctx context.Context, event common.Event) error
+	SetActiveCoordinator(ctx context.Context, coordinator string) error
 }
 
 type sender struct {
