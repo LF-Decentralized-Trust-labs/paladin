@@ -214,6 +214,10 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 }
 
 func (c *coordinator) HandleEvent(ctx context.Context, event common.Event) error {
+	log.L(ctx).Infof("Distributed coordinator handling new event (contract address %s, active coordinator %s, committee %+v)", c.contractAddress, c.activeCoordinator, c.committee)
+	for node, party := range c.committee {
+		log.L(ctx).Infof("Distributed coordinator handling new event: party %s = %s", node, party)
+	}
 
 	if transactionEvent, ok := event.(transaction.Event); ok {
 		return c.propagateEventToTransaction(ctx, transactionEvent)
@@ -262,14 +266,14 @@ func (c *coordinator) evaluateEvent(ctx context.Context, event common.Event) (*E
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the coordinator so we just ignore it and move on
-				log.L(ctx).Debugf("Event %s is not valid: %t", event.TypeString(), valid)
+				log.L(ctx).Debugf("Coordinator event %s is not valid for current state %s: %t", event.TypeString(), sm.currentState.String(), valid)
 				return nil, nil
 			}
 		}
 		return &eventHandler, nil
 	} else {
 		// no event handler defined for this event while in this state
-		log.L(ctx).Debugf("No event handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
+		log.L(ctx).Debugf("No coordinatorevent handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
 		return nil, nil
 	}
 }
@@ -349,7 +353,7 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 				err := rule.On(ctx, c)
 				if err != nil {
 					//any recoverable errors should have been handled by the action function
-					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("Error transitioning coordinator to state %v: %v", sm.currentState, err)
 					return err
 				}
 			}
@@ -359,7 +363,7 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 				err := newStateDefinition.OnTransitionTo(ctx, c)
 				if err != nil {
 					// any recoverable errors should have been handled by the OnTransitionTo function
-					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("Error transitioning coordinator to state %v: %v", sm.currentState, err)
 					return err
 				}
 			} else {
@@ -380,6 +384,10 @@ func action_SendHandoverRequest(ctx context.Context, c *coordinator) error {
 }
 
 func action_SelectTransaction(ctx context.Context, c *coordinator) error {
+	// Take the opportunity to inform the sequencer lifecycle manager that we have become active so it can decide if that has
+	// casued us to reach the node's limit on active coordinators.
+	c.coordinatorStarted(c.contractAddress)
+
 	return c.selectNextTransaction(ctx, nil)
 }
 

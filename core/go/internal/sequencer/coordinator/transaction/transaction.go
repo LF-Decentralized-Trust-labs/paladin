@@ -44,9 +44,9 @@ const (
 // Transaction represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
 type Transaction struct {
 	*components.PrivateTransaction
-	sender               string
-	senderIdentity       string
-	senderNode           string
+	sender               string // The member ID e.g. "member1"
+	senderNode           string // The node the sender is running on e.g. "node1"
+	senderIdentity       string // The fully qualified identity of the sender e.g. "member1@node1"
 	signerAddress        *pldtypes.EthAddress
 	latestSubmissionHash *pldtypes.Bytes32
 	nonce                *uint64
@@ -66,6 +66,7 @@ type Transaction struct {
 	dependencies                                     *pldapi.TransactionDependencies
 	previousTransaction                              *Transaction
 	nextTransaction                                  *Transaction
+	onReadyForDispatch                               func(context.Context, *Transaction)
 	// dependencies                                     []uuid.UUID //TODO figure out naming of these fields and their relationship with the PrivateTransaction fields
 	// dependents                                       []uuid.UUID
 
@@ -100,6 +101,7 @@ func NewTransaction(
 	grapher Grapher,
 	onStateTransition OnStateTransition,
 	onCleanup func(context.Context),
+	onReadyForDispatch func(context.Context, *Transaction),
 ) (*Transaction, error) {
 	senderIdentity, senderNode, err := pldtypes.PrivateIdentityLocator(sender).Validate(ctx, "", false)
 	if err != nil {
@@ -122,6 +124,7 @@ func NewTransaction(
 		onCleanup:             onCleanup,
 		emit:                  emit,
 		dependencies:          &pldapi.TransactionDependencies{},
+		onReadyForDispatch:    onReadyForDispatch,
 	}
 	txn.InitializeStateMachine(State_Initial)
 	grapher.Add(context.Background(), txn)
@@ -161,14 +164,24 @@ func (t *Transaction) Hash(ctx context.Context) (*pldtypes.Bytes32, error) {
 		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without PostAssembly")
 	}
 
-	if len(t.PostAssembly.Signatures) == 0 {
-		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without at least one Signature")
+	// MRW TODO - this was relying on only signatures being present, but Pente contracts reject transactions that have both signatures and endorsements.
+	if len(t.PostAssembly.Signatures) == 0 && len(t.PostAssembly.Endorsements) == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without at least one Signature or Endorsement")
 	}
 
 	hash := sha3.NewLegacyKeccak256()
-	for _, signature := range t.PostAssembly.Signatures {
-		hash.Write(signature.Payload)
+
+	if len(t.PostAssembly.Signatures) != 0 {
+		for _, signature := range t.PostAssembly.Signatures {
+			hash.Write(signature.Payload)
+		}
 	}
+	if len(t.PostAssembly.Endorsements) != 0 {
+		for _, endorsement := range t.PostAssembly.Endorsements {
+			hash.Write(endorsement.Payload)
+		}
+	}
+
 	var h32 pldtypes.Bytes32
 	_ = hash.Sum(h32[0:0])
 	return &h32, nil

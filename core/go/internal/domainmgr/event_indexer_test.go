@@ -271,7 +271,7 @@ func TestHandleEventBatch(t *testing.T) {
 			return true
 		})).Return(nil)
 
-		mc.privateTxManager.On("PrivateTransactionConfirmed", mock.Anything, mock.Anything).Return()
+		mc.sequencerManager.On("PrivateTransactionConfirmed", mock.Anything, mock.Anything).Return()
 
 		mc.txManager.On("SendTransactions", mock.Anything, mock.Anything, mock.Anything).Return([]uuid.UUID{txID}, nil)
 

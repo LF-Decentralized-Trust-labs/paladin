@@ -26,11 +26,18 @@ import (
 )
 
 const (
-	MessageType_TransactionRequest               = "TransactionRequest"
-	MessageType_HandoverRequest                  = "HandoverRequest"
+	MessageType_AssembleRequest                  = "AssembleRequest"
+	MessageType_AssembleResponse                 = "AssembleResponse"
+	MessageType_AssembleError                    = "AssembleError"
 	MessageType_CoordinatorHeartbeatNotification = "CoordinatorHeartbeatNotification"
+	MessageType_DelegationRequest                = "DelegationRequest"
+	MessageType_DelegationRequestAcknowledgment  = "DelegationRequestAcknowledgment"
 	MessageType_DispatchConfirmationRequest      = "DispatchConfirmationRequest"
 	MessageType_DispatchConfirmationResponse     = "DispatchConfirmationResponse"
+	MessageType_EndorsementRequest               = "EndorsementRequest"
+	MessageType_EndorsementResponse              = "EndorsementResponse"
+	MessageType_HandoverRequest                  = "HandoverRequest"
+	MessageType_TransactionRequest               = "TransactionRequest"
 )
 
 type CoordinatorHeartbeatNotification struct {

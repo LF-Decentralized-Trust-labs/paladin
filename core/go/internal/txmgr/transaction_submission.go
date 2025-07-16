@@ -294,13 +294,13 @@ func (tm *txManager) CallTransaction(ctx context.Context, dbTX persistence.DBTX,
 
 	// Do the call
 	// MRW TODO - how does calling a private smart contract interact with the distributed sequencer?
-	// cv, err := tm.privateTxMgr.CallPrivateSmartContract(ctx, &txi.ResolvedTransaction)
-	// if err != nil {
-	// 	return err
-	// }
+	cv, err := tm.sequencerMgr.CallPrivateSmartContract(ctx, &txi.ResolvedTransaction)
+	if err != nil {
+		return err
+	}
 
 	// Serialize the result
-	b, err := serializer.SerializeJSONCtx(ctx, nil) // MRW TODO - passing nil temporarily
+	b, err := serializer.SerializeJSONCtx(ctx, cv) // MRW TODO - passing nil temporarily
 	if err == nil {
 		err = json.Unmarshal(b, result)
 	}
@@ -489,7 +489,7 @@ func (tm *txManager) processNewTransactions(ctx context.Context, dbTX persistenc
 	// same pattern as public transactions above
 	for _, txi := range txis {
 		if txi.Transaction.Type.V() == pldapi.TransactionTypePrivate {
-			if err := tm.distributedSequencerMgr.HandleNewTx(ctx, dbTX, txi); err != nil {
+			if err := tm.sequencerMgr.HandleNewTx(ctx, dbTX, txi); err != nil {
 				return nil, err
 			}
 		}

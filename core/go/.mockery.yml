@@ -33,19 +33,6 @@ packages:
   github.com/kaleido-io/paladin/core/internal/metrics:
     config:
       all: true
-  github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes:
-    config:
-      all: true
-    interfaces:
-      TransactionFlow:
-        config:
-          dir: "{{.InterfaceDir}}"
-          filename: "mock_transaction_flow.go"
-          pkgname: "{{.SrcPackageName}}"
-          structname: "Mock{{.InterfaceName}}"
-  github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints:
-    config:
-      all: true
   github.com/kaleido-io/paladin/core/internal/publictxmgr:
     interfaces:
       InFlightStageActionTriggers:

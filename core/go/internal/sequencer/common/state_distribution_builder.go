@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package privatetxnmgr
+package common
 
 import (
 	"context"
@@ -26,7 +26,12 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-func newStateDistributionBuilder(c components.AllComponents, tx *components.PrivateTransaction) *stateDistributionBuilder {
+// interface for existing implementation  in core/go/internal/privatetxnmgr/state_distribution_builder.go
+type StateDistributionBuilder interface {
+	Build(ctx context.Context, txn *components.PrivateTransaction) (sds *components.StateDistributionSet, err error)
+}
+
+func NewStateDistributionBuilder(c components.AllComponents, tx *components.PrivateTransaction) *stateDistributionBuilder {
 	return &stateDistributionBuilder{
 		tx: tx,
 		StateDistributionSet: components.StateDistributionSet{
@@ -98,12 +103,12 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 		}
 
 		// Add it to the right list
-		if nodeName == sd.LocalNode {
+		if nodeName == sd.StateDistributionSet.LocalNode {
 			log.L(ctx).Debugf("new state %s will be written locally for recipient %s hasNullifier=%t", fullState.ID, recipient, matchedNullifier != nil)
-			sd.Local = append(sd.Local, distribution)
+			sd.StateDistributionSet.Local = append(sd.StateDistributionSet.Local, distribution)
 		} else {
 			log.L(ctx).Debugf("new state %s will be written distributed to recipient %s hasNullifier=%t", fullState.ID, recipient, matchedNullifier != nil)
-			sd.Remote = append(sd.Remote, distribution)
+			sd.StateDistributionSet.Remote = append(sd.StateDistributionSet.Remote, distribution)
 		}
 	}
 
@@ -123,7 +128,7 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 // This function is called by the coordinator to validate the new states produced in the postAssembly.
 // It knows who the local node is, and who the sender is.
 // It is aware of nullifiers and distribution lists, and produces a set of instructions for who needs what.
-func (sd *stateDistributionBuilder) Build(ctx context.Context) (sds *components.StateDistributionSet, err error) {
+func (sd *stateDistributionBuilder) Build(ctx context.Context, txn *components.PrivateTransaction) (sds *components.StateDistributionSet, err error) {
 
 	log.L(ctx).Debug("privateTxManager:ProcessTransactionStatesForDistribution")
 
@@ -131,7 +136,7 @@ func (sd *stateDistributionBuilder) Build(ctx context.Context) (sds *components.
 
 	// This code depends on the fact we ensure this gets fully qualified as the transaction comes into the system,
 	// on the sending node. So as the transaction flows around everyone knows who the originating node is.
-	sd.SenderNode, err = pldtypes.PrivateIdentityLocator(tx.PreAssembly.TransactionSpecification.From).Node(ctx, false)
+	sd.StateDistributionSet.SenderNode, err = pldtypes.PrivateIdentityLocator(tx.PreAssembly.TransactionSpecification.From).Node(ctx, false)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrFromNotResolvedDistroTime)
 	}

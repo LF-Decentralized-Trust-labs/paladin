@@ -16,6 +16,7 @@ package transaction
 
 import (
 	"context"
+	"strings"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
@@ -45,6 +46,7 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 
 	switch postAssembly.AssemblyResult {
 	case prototk.AssembleTransactionResponse_OK:
+		log.L(ctx).Debugf("Emitting AssembleAndSignSuccessEvent: %s", txn.ID.String())
 		txn.emit(&AssembleAndSignSuccessEvent{
 			BaseEvent: BaseEvent{
 				TransactionID: txn.ID,
@@ -53,6 +55,7 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 			PostAssembly: postAssembly,
 		})
 	case prototk.AssembleTransactionResponse_REVERT:
+		log.L(ctx).Debugf("Emitting AssembleRevertEvent: %s", txn.ID.String())
 		txn.emit(&AssembleRevertEvent{
 			BaseEvent: BaseEvent{
 				TransactionID: txn.ID,
@@ -61,6 +64,7 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 			PostAssembly: postAssembly,
 		})
 	case prototk.AssembleTransactionResponse_PARK:
+		log.L(ctx).Debugf("Emitting AssembleParkEvent: %s", txn.ID.String())
 		txn.emit(&AssembleParkEvent{
 			BaseEvent: BaseEvent{
 				TransactionID: txn.ID,
@@ -73,15 +77,25 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 }
 
 func action_SendAssembleRevertResponse(ctx context.Context, txn *Transaction) error {
-	txn.messageSender.SendAssembleResponse(ctx, txn.latestFulfilledAssembleRequestID, txn.PostAssembly)
+	// MRW TODO - currently not sure if I'm sourcing the recipient from the correct place
+	// Split the from address on the @ and take the first part
+	from := strings.Split(txn.PreAssembly.TransactionSpecification.From, "@")[1]
+	log.L(ctx).Debugf("Sending assemble revert response for transaction %s to %s", txn.ID.String(), from)
+	txn.messageSender.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, from)
 	return nil
 }
 func action_SendAssembleParkResponse(ctx context.Context, txn *Transaction) error {
-	txn.messageSender.SendAssembleResponse(ctx, txn.latestFulfilledAssembleRequestID, txn.PostAssembly)
+	// MRW TODO - currently not sure if I'm sourcing the recipient from the correct place
+	from := strings.Split(txn.PreAssembly.TransactionSpecification.From, "@")[1]
+	log.L(ctx).Debugf("Sending assemble park response for transaction %s to %s", txn.ID.String(), from)
+	txn.messageSender.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, from)
 	return nil
 }
 
 func action_SendAssembleSuccessResponse(ctx context.Context, txn *Transaction) error {
-	txn.messageSender.SendAssembleResponse(ctx, txn.latestFulfilledAssembleRequestID, txn.PostAssembly)
+	// MRW TODO - currently not sure if I'm sourcing the recipient from the correct place
+	from := strings.Split(txn.PreAssembly.TransactionSpecification.From, "@")[1]
+	log.L(ctx).Debugf("Sending assemble success response for transaction %s to %s", txn.ID.String(), from)
+	txn.messageSender.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, from)
 	return nil
 }

@@ -47,18 +47,18 @@ type transportManager struct {
 	cancelCtx context.CancelFunc
 	mux       sync.Mutex
 
-	rpcModule                   *rpcserver.RPCModule
-	conf                        *pldconf.TransportManagerConfig
-	localNodeName               string
-	registryManager             components.RegistryManager
-	stateManager                components.StateManager
-	domainManager               components.DomainManager
-	keyManager                  components.KeyManager
-	txManager                   components.TXManager
-	distributedSequencerManager components.DistributedSequencerManager
-	identityResolver            components.IdentityResolver
-	groupManager                components.GroupManager
-	persistence                 persistence.Persistence
+	rpcModule        *rpcserver.RPCModule
+	conf             *pldconf.TransportManagerConfig
+	localNodeName    string
+	registryManager  components.RegistryManager
+	stateManager     components.StateManager
+	domainManager    components.DomainManager
+	keyManager       components.KeyManager
+	txManager        components.TXManager
+	sequencerManager components.SequencerManager
+	identityResolver components.IdentityResolver
+	groupManager     components.GroupManager
+	persistence      persistence.Persistence
 
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
@@ -133,7 +133,7 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 	tm.domainManager = c.DomainManager()
 	tm.keyManager = c.KeyManager()
 	tm.txManager = c.TxManager()
-	tm.distributedSequencerManager = c.DistributedSequencerManager()
+	tm.sequencerManager = c.SequencerManager()
 	tm.identityResolver = c.IdentityResolver()
 	tm.groupManager = c.GroupManager()
 	tm.persistence = c.Persistence()
@@ -281,6 +281,8 @@ func (tm *transportManager) Send(ctx context.Context, send *components.FireAndFo
 }
 
 func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName string, msg *prototk.PaladinMsg) error {
+	log.L(ctx).Debugf("Queueing fire and forget message %s/%+v to node %s ", msg.MessageType, msg.MessageId, nodeName)
+
 	// Use or establish a p connection for the send
 	p, err := tm.getPeer(ctx, nodeName, true)
 	if err == nil {
@@ -309,6 +311,7 @@ func (tm *transportManager) SendReliable(ctx context.Context, dbTX persistence.D
 
 	peers := make(map[string]*peer)
 	for _, msg := range msgs {
+		log.L(ctx).Debugf("Sending reliable message %s/%+v to node %s", msg.MessageType, msg.ID, msg.Node)
 		var p *peer
 
 		msg.ID = uuid.New()

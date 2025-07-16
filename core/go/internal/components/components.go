@@ -48,7 +48,7 @@ type Managers interface {
 	TransportManager() TransportManager
 	RegistryManager() RegistryManager
 	PluginManager() PluginManager
-	DistributedSequencerManager() DistributedSequencerManager
+	SequencerManager() SequencerManager
 	PublicTxManager() PublicTxManager
 	TxManager() TXManager
 	StateManager() StateManager

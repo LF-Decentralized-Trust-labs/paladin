@@ -615,6 +615,128 @@ func (_c *MockEngineIntegration_AssembleAndSign_Call) RunAndReturn(run func(ctx 
 	return _c
 }
 
+// GetBlockHeight provides a mock function for the type MockEngineIntegration
+func (_mock *MockEngineIntegration) GetBlockHeight(ctx context.Context) (int64, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBlockHeight")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (int64, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) int64); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockEngineIntegration_GetBlockHeight_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBlockHeight'
+type MockEngineIntegration_GetBlockHeight_Call struct {
+	*mock.Call
+}
+
+// GetBlockHeight is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockEngineIntegration_Expecter) GetBlockHeight(ctx interface{}) *MockEngineIntegration_GetBlockHeight_Call {
+	return &MockEngineIntegration_GetBlockHeight_Call{Call: _e.mock.On("GetBlockHeight", ctx)}
+}
+
+func (_c *MockEngineIntegration_GetBlockHeight_Call) Run(run func(ctx context.Context)) *MockEngineIntegration_GetBlockHeight_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockEngineIntegration_GetBlockHeight_Call) Return(n int64, err error) *MockEngineIntegration_GetBlockHeight_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockEngineIntegration_GetBlockHeight_Call) RunAndReturn(run func(ctx context.Context) (int64, error)) *MockEngineIntegration_GetBlockHeight_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetStateLocks provides a mock function for the type MockEngineIntegration
+func (_mock *MockEngineIntegration) GetStateLocks(ctx context.Context) ([]byte, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStateLocks")
+	}
+
+	var r0 []byte
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]byte, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []byte); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockEngineIntegration_GetStateLocks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetStateLocks'
+type MockEngineIntegration_GetStateLocks_Call struct {
+	*mock.Call
+}
+
+// GetStateLocks is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockEngineIntegration_Expecter) GetStateLocks(ctx interface{}) *MockEngineIntegration_GetStateLocks_Call {
+	return &MockEngineIntegration_GetStateLocks_Call{Call: _e.mock.On("GetStateLocks", ctx)}
+}
+
+func (_c *MockEngineIntegration_GetStateLocks_Call) Run(run func(ctx context.Context)) *MockEngineIntegration_GetStateLocks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockEngineIntegration_GetStateLocks_Call) Return(bytes []byte, err error) *MockEngineIntegration_GetStateLocks_Call {
+	_c.Call.Return(bytes, err)
+	return _c
+}
+
+func (_c *MockEngineIntegration_GetStateLocks_Call) RunAndReturn(run func(ctx context.Context) ([]byte, error)) *MockEngineIntegration_GetStateLocks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // WriteLockAndDistributeStatesForTransaction provides a mock function for the type MockEngineIntegration
 func (_mock *MockEngineIntegration) WriteLockAndDistributeStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
 	ret := _mock.Called(ctx, txn)
@@ -668,101 +790,6 @@ func (_c *MockEngineIntegration_WriteLockAndDistributeStatesForTransaction_Call)
 }
 
 func (_c *MockEngineIntegration_WriteLockAndDistributeStatesForTransaction_Call) RunAndReturn(run func(ctx context.Context, txn *components.PrivateTransaction) error) *MockEngineIntegration_WriteLockAndDistributeStatesForTransaction_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// NewMockStateDistributionBuilder creates a new instance of MockStateDistributionBuilder. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
-// The first argument is typically a *testing.T value.
-func NewMockStateDistributionBuilder(t interface {
-	mock.TestingT
-	Cleanup(func())
-}) *MockStateDistributionBuilder {
-	mock := &MockStateDistributionBuilder{}
-	mock.Mock.Test(t)
-
-	t.Cleanup(func() { mock.AssertExpectations(t) })
-
-	return mock
-}
-
-// MockStateDistributionBuilder is an autogenerated mock type for the StateDistributionBuilder type
-type MockStateDistributionBuilder struct {
-	mock.Mock
-}
-
-type MockStateDistributionBuilder_Expecter struct {
-	mock *mock.Mock
-}
-
-func (_m *MockStateDistributionBuilder) EXPECT() *MockStateDistributionBuilder_Expecter {
-	return &MockStateDistributionBuilder_Expecter{mock: &_m.Mock}
-}
-
-// Build provides a mock function for the type MockStateDistributionBuilder
-func (_mock *MockStateDistributionBuilder) Build(ctx context.Context, txn *components.PrivateTransaction) (*components.StateDistributionSet, error) {
-	ret := _mock.Called(ctx, txn)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Build")
-	}
-
-	var r0 *components.StateDistributionSet
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *components.PrivateTransaction) (*components.StateDistributionSet, error)); ok {
-		return returnFunc(ctx, txn)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *components.PrivateTransaction) *components.StateDistributionSet); ok {
-		r0 = returnFunc(ctx, txn)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*components.StateDistributionSet)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *components.PrivateTransaction) error); ok {
-		r1 = returnFunc(ctx, txn)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockStateDistributionBuilder_Build_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Build'
-type MockStateDistributionBuilder_Build_Call struct {
-	*mock.Call
-}
-
-// Build is a helper method to define mock.On call
-//   - ctx context.Context
-//   - txn *components.PrivateTransaction
-func (_e *MockStateDistributionBuilder_Expecter) Build(ctx interface{}, txn interface{}) *MockStateDistributionBuilder_Build_Call {
-	return &MockStateDistributionBuilder_Build_Call{Call: _e.mock.On("Build", ctx, txn)}
-}
-
-func (_c *MockStateDistributionBuilder_Build_Call) Run(run func(ctx context.Context, txn *components.PrivateTransaction)) *MockStateDistributionBuilder_Build_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 *components.PrivateTransaction
-		if args[1] != nil {
-			arg1 = args[1].(*components.PrivateTransaction)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *MockStateDistributionBuilder_Build_Call) Return(sds *components.StateDistributionSet, err error) *MockStateDistributionBuilder_Build_Call {
-	_c.Call.Return(sds, err)
-	return _c
-}
-
-func (_c *MockStateDistributionBuilder_Build_Call) RunAndReturn(run func(ctx context.Context, txn *components.PrivateTransaction) (*components.StateDistributionSet, error)) *MockStateDistributionBuilder_Build_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -878,6 +905,101 @@ func (_c *MockEvent_TypeString_Call) Return(s string) *MockEvent_TypeString_Call
 }
 
 func (_c *MockEvent_TypeString_Call) RunAndReturn(run func() string) *MockEvent_TypeString_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockStateDistributionBuilder creates a new instance of MockStateDistributionBuilder. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockStateDistributionBuilder(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockStateDistributionBuilder {
+	mock := &MockStateDistributionBuilder{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockStateDistributionBuilder is an autogenerated mock type for the StateDistributionBuilder type
+type MockStateDistributionBuilder struct {
+	mock.Mock
+}
+
+type MockStateDistributionBuilder_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockStateDistributionBuilder) EXPECT() *MockStateDistributionBuilder_Expecter {
+	return &MockStateDistributionBuilder_Expecter{mock: &_m.Mock}
+}
+
+// Build provides a mock function for the type MockStateDistributionBuilder
+func (_mock *MockStateDistributionBuilder) Build(ctx context.Context, txn *components.PrivateTransaction) (*components.StateDistributionSet, error) {
+	ret := _mock.Called(ctx, txn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Build")
+	}
+
+	var r0 *components.StateDistributionSet
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *components.PrivateTransaction) (*components.StateDistributionSet, error)); ok {
+		return returnFunc(ctx, txn)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *components.PrivateTransaction) *components.StateDistributionSet); ok {
+		r0 = returnFunc(ctx, txn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*components.StateDistributionSet)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *components.PrivateTransaction) error); ok {
+		r1 = returnFunc(ctx, txn)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockStateDistributionBuilder_Build_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Build'
+type MockStateDistributionBuilder_Build_Call struct {
+	*mock.Call
+}
+
+// Build is a helper method to define mock.On call
+//   - ctx context.Context
+//   - txn *components.PrivateTransaction
+func (_e *MockStateDistributionBuilder_Expecter) Build(ctx interface{}, txn interface{}) *MockStateDistributionBuilder_Build_Call {
+	return &MockStateDistributionBuilder_Build_Call{Call: _e.mock.On("Build", ctx, txn)}
+}
+
+func (_c *MockStateDistributionBuilder_Build_Call) Run(run func(ctx context.Context, txn *components.PrivateTransaction)) *MockStateDistributionBuilder_Build_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *components.PrivateTransaction
+		if args[1] != nil {
+			arg1 = args[1].(*components.PrivateTransaction)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockStateDistributionBuilder_Build_Call) Return(sds *components.StateDistributionSet, err error) *MockStateDistributionBuilder_Build_Call {
+	_c.Call.Return(sds, err)
+	return _c
+}
+
+func (_c *MockStateDistributionBuilder_Build_Call) RunAndReturn(run func(ctx context.Context, txn *components.PrivateTransaction) (*components.StateDistributionSet, error)) *MockStateDistributionBuilder_Build_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -29,6 +29,8 @@ import (
 
 type SeqSender interface {
 	HandleEvent(ctx context.Context, event common.Event) error
+	SetActiveCoordinator(ctx context.Context, coordinator string) error
+	Stop()
 }
 
 type sender struct {
@@ -177,6 +179,12 @@ func (s *sender) getTransactionsNotInStates(ctx context.Context, states []transa
 
 func ptrTo[T any](v T) *T {
 	return &v
+}
+
+// A sequencer can be asked to page itself out at any time to make space for other sequencers.
+// This hook point provides a place to perform any tidy up actions needed in the sender
+func (s *sender) Stop() {
+	log.L(context.Background()).Infof("Stopping sender for contract %s", s.contractAddress.String())
 }
 
 //TODO the following getter methods are not safe to call on anything other than the sequencer goroutine because they are reading data structures that are being modified by the state machine.

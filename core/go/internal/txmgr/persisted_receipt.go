@@ -355,7 +355,7 @@ func (tm *txManager) GetTransactionReceiptByID(ctx context.Context, id uuid.UUID
 }
 
 func (tm *txManager) buildFullReceipt(ctx context.Context, receipt *pldapi.TransactionReceipt, domainReceipt bool) (fullReceipt *pldapi.TransactionReceiptFull, err error) {
-	log.L(ctx).Debugf("Building full transaction receipt by ID: %s")
+	log.L(ctx).Debugf("Building full transaction receipt by ID: %s", receipt.ID)
 	fullReceipt = &pldapi.TransactionReceiptFull{TransactionReceipt: receipt}
 	if receipt.Domain != "" {
 		fullReceipt.States, err = tm.stateMgr.GetTransactionStates(ctx, tm.p.NOTX(), fullReceipt.ID)

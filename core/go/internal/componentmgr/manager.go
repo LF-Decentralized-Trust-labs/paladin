@@ -74,16 +74,17 @@ type componentManager struct {
 	metricsManager   metrics.Metrics
 
 	// managers
-	stateManager                components.StateManager
-	domainManager               components.DomainManager
-	transportManager            components.TransportManager
-	registryManager             components.RegistryManager
-	pluginManager               components.PluginManager
-	publicTxManager             components.PublicTxManager
-	distributedSequencerManager components.DistributedSequencerManager
-	txManager                   components.TXManager
-	identityResolver            components.IdentityResolver
-	groupManager                components.GroupManager
+	stateManager             components.StateManager
+	domainManager            components.DomainManager
+	transportManager         components.TransportManager
+	loopbackTransportManager components.TransportManager
+	registryManager          components.RegistryManager
+	pluginManager            components.PluginManager
+	publicTxManager          components.PublicTxManager
+	sequencerManager         components.SequencerManager
+	txManager                components.TXManager
+	identityResolver         components.IdentityResolver
+	groupManager             components.GroupManager
 	// managers that are not a core part of the engine, but allow Paladin to operate in an extended mode - the testbed is an example.
 	// these cannot be queried by other components (no AdditionalManagers() function on AllComponents)
 	additionalManagers []components.AdditionalManager
@@ -220,8 +221,8 @@ func (cm *componentManager) Init() (err error) {
 
 	if err == nil {
 		log.L(cm.bgCtx).Info("Initializing distributed sequencer manager")
-		cm.distributedSequencerManager = sequencer.NewDistributedSequencerManager(cm.bgCtx, &cm.conf.DistributedSequencerManager)
-		cm.initResults["distributed_sequencer_manager"], err = cm.distributedSequencerManager.PreInit(cm)
+		cm.sequencerManager = sequencer.NewDistributedSequencerManager(cm.bgCtx, &cm.conf.SequencerManager)
+		cm.initResults["distributed_sequencer_manager"], err = cm.sequencerManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentDistributedSequencerManagerInitError)
 	}
 
@@ -288,7 +289,7 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	if err == nil {
-		err = cm.distributedSequencerManager.PostInit(cm)
+		err = cm.sequencerManager.PostInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentDistributedSequencerManagerInitError)
 	}
 
@@ -387,8 +388,8 @@ func (cm *componentManager) StartManagers() (err error) {
 	}
 
 	if err == nil {
-		err = cm.distributedSequencerManager.Start()
-		err = cm.addIfStarted("distributed_sequencer_manager", cm.distributedSequencerManager, err, msgs.MsgComponentDistributedSequencerStartError)
+		err = cm.sequencerManager.Start()
+		err = cm.addIfStarted("distributed_sequencer_manager", cm.sequencerManager, err, msgs.MsgComponentDistributedSequencerStartError)
 	}
 
 	if err == nil {
@@ -546,6 +547,10 @@ func (cm *componentManager) TransportManager() components.TransportManager {
 	return cm.transportManager
 }
 
+func (cm *componentManager) LoopbackTransportManager() components.TransportManager {
+	return cm.loopbackTransportManager
+}
+
 func (cm *componentManager) RegistryManager() components.RegistryManager {
 	return cm.registryManager
 }
@@ -558,8 +563,8 @@ func (cm *componentManager) PublicTxManager() components.PublicTxManager {
 	return cm.publicTxManager
 }
 
-func (cm *componentManager) DistributedSequencerManager() components.DistributedSequencerManager {
-	return cm.distributedSequencerManager
+func (cm *componentManager) SequencerManager() components.SequencerManager {
+	return cm.sequencerManager
 }
 
 func (cm *componentManager) TxManager() components.TXManager {

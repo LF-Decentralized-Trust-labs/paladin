@@ -80,17 +80,17 @@ type domainManager struct {
 	bgCtx context.Context
 	mux   sync.Mutex
 
-	conf                        *pldconf.DomainManagerConfig
-	persistence                 persistence.Persistence
-	stateStore                  components.StateManager
-	distributedSequencerManager components.DistributedSequencerManager
-	txManager                   components.TXManager
-	transportMgr                components.TransportManager
-	blockIndexer                blockindexer.BlockIndexer
-	keyManager                  components.KeyManager
-	ethClientFactory            ethclient.EthClientFactory
-	domainSigner                *domainSigner
-	rpcModule                   *rpcserver.RPCModule
+	conf             *pldconf.DomainManagerConfig
+	persistence      persistence.Persistence
+	stateStore       components.StateManager
+	sequencerManager components.SequencerManager
+	txManager        components.TXManager
+	transportMgr     components.TransportManager
+	blockIndexer     blockindexer.BlockIndexer
+	keyManager       components.KeyManager
+	ethClientFactory ethclient.EthClientFactory
+	domainSigner     *domainSigner
+	rpcModule        *rpcserver.RPCModule
 
 	domainsByName    map[string]*domain
 	domainsByAddress map[pldtypes.EthAddress]*domain
@@ -116,7 +116,7 @@ func (dm *domainManager) PreInit(c components.PreInitComponents) (*components.Ma
 func (dm *domainManager) PostInit(c components.AllComponents) error {
 	dm.stateStore = c.StateManager()
 	dm.txManager = c.TxManager()
-	dm.distributedSequencerManager = c.DistributedSequencerManager()
+	dm.sequencerManager = c.SequencerManager()
 	dm.persistence = c.Persistence()
 	dm.ethClientFactory = c.EthClientFactory()
 	dm.blockIndexer = c.BlockIndexer()

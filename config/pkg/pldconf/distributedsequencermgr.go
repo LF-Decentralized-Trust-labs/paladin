@@ -14,6 +14,6 @@
  */
 package pldconf
 
-type DistributedSequencerManagerConfig struct {
+type SequencerManagerConfig struct {
 	Writer FlushWriterConfig `json:"writer"`
 }

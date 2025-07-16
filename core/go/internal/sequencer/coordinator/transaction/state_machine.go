@@ -307,6 +307,7 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 
 func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error {
 
+	log.L(ctx).Infof("Distributed sender transaction handling new event (TX ID %s, TX sender %s, TX address %+v)", t.ID.String(), t.sender, t.Address.HexString())
 	//determine whether this event is valid for the current state
 	eventHandler, err := t.evaluateEvent(ctx, event)
 	if err != nil || eventHandler == nil {
@@ -350,14 +351,14 @@ func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*E
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the transaction so we just ignore it and move on
-				log.L(ctx).Debugf("Event %s is not valid: %t", event.TypeString(), valid)
+				log.L(ctx).Debugf("Coordinator transaction event %s is not valid for current state %s: %t", event.TypeString(), sm.currentState.String(), valid)
 				return nil, nil
 			}
 		}
 		return &eventHandler, nil
 	} else {
 		// no event handler defined for this event while in this state
-		log.L(ctx).Debugf("No event handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
+		log.L(ctx).Debugf("No coordinator transactionevent handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
 		return nil, nil
 	}
 
@@ -426,7 +427,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 				err := rule.On(ctx, t)
 				if err != nil {
 					//any recoverable errors should have been handled by the action function
-					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("Error transitioning coordinator transaction to state %v: %v", sm.currentState, err)
 					return err
 				}
 			}
@@ -436,7 +437,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 				err := newStateDefinition.OnTransitionTo(ctx, t)
 				if err != nil {
 					// any recoverable errors should have been handled by the OnTransitionTo function
-					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("Error transitioning coordinator transaction to state %v: %v", sm.currentState, err)
 					return err
 				}
 			} else {

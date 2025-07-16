@@ -237,10 +237,12 @@ func (dc *domainContract) AssembleTransaction(dCtx components.DomainContext, rea
 		// We hydrate the states on our side of the Manager<->Plugin divide at this point,
 		// which provides back to the engine the full sequence locking information of the
 		// states (inputs, and read)
+		log.L(dCtx.Ctx()).Info("Loading post-assembly input states from context")
 		postAssembly.InputStates, err = dc.loadStatesFromContext(dCtx, readTX, res.AssembledTransaction.InputStates)
 		if err != nil {
 			return err
 		}
+		log.L(dCtx.Ctx()).Info("Loading post-assembly read states from context")
 		postAssembly.ReadStates, err = dc.loadStatesFromContext(dCtx, readTX, res.AssembledTransaction.ReadStates)
 		if err != nil {
 			return err
@@ -250,11 +252,14 @@ func (dc *domainContract) AssembleTransaction(dCtx components.DomainContext, rea
 		// - Attestation plan identities
 		// - State distributions
 		// - Associated nullifier requests
+		log.L(dCtx.Ctx()).Info("Qualifying assembly identities")
 		dc.fullyQualifyAssemblyIdentities(res)
 
 		// Note the states at this point are just potential states - depending on the analysis
 		// of the result, and the locking on the input states, the engine might decide to
 		// abandon this attempt and just re-assemble later.
+		log.L(dCtx.Ctx()).Infof("Number of potential output states: %+v", len(res.AssembledTransaction.OutputStates))
+		log.L(dCtx.Ctx()).Infof("Number of potential info states: %+v", len(res.AssembledTransaction.InfoStates))
 		postAssembly.OutputStatesPotential = res.AssembledTransaction.OutputStates
 		postAssembly.InfoStatesPotential = res.AssembledTransaction.InfoStates
 		postAssembly.DomainData = res.AssembledTransaction.DomainData
@@ -283,16 +288,22 @@ func (dc *domainContract) WritePotentialStates(dCtx components.DomainContext, re
 	// Note: This only happens on the sequencer node - any endorsing nodes just take the Full states
 	//       and write them directly to the sequence prior to endorsement
 	postAssembly := tx.PostAssembly
+	log.L(dCtx.Ctx()).Debugf("WritePotentialStates: Writing %+v output states", len(postAssembly.OutputStatesPotential))
 	postAssembly.OutputStates, err = dc.upsertPotentialStates(dCtx, readTX, tx, postAssembly.OutputStatesPotential, true)
 	if err == nil {
+		log.L(dCtx.Ctx()).Debugf("WritePotentialStates: Writing %+v info potentialstates", len(postAssembly.InfoStatesPotential))
 		postAssembly.InfoStates, err = dc.upsertPotentialStates(dCtx, readTX, tx, postAssembly.InfoStatesPotential, false)
 	}
+
+	log.L(dCtx.Ctx()).Debugf("WritePotentialStates: %d post assembly output states", len(postAssembly.OutputStates))
+	log.L(dCtx.Ctx()).Debugf("WritePotentialStates: %d post assembly info states", len(postAssembly.InfoStates))
 	return err
 
 }
 
 func (dc *domainContract) upsertPotentialStates(dCtx components.DomainContext, readTX persistence.DBTX, tx *components.PrivateTransaction, potentialStates []*prototk.NewState, isOutput bool) (writtenStates []*components.FullState, err error) {
 	newStatesToWrite := make([]*components.StateUpsert, len(potentialStates))
+	log.L(dCtx.Ctx()).Debugf("upsertPotentialStates: %d states to write", len(potentialStates))
 	domain := dc.d
 	for i, s := range potentialStates {
 		schema := domain.schemasByID[s.SchemaId]
@@ -442,8 +453,49 @@ func (dc *domainContract) EndorseTransaction(dCtx components.DomainContext, read
 		req.InfoStates == nil ||
 		req.Endorsement == nil ||
 		req.Endorser == nil {
+		// Log transaction specification
+		log.L(dCtx.Ctx()).Infof("Transaction specification: %+v", req.TransactionSpecification)
+		// Log verifiers
+		log.L(dCtx.Ctx()).Infof("Verifiers: %+v", req.Verifiers)
+		// Log signatures
+		log.L(dCtx.Ctx()).Infof("Signatures: %+v", req.Signatures)
+		// Log input states
+		log.L(dCtx.Ctx()).Infof("Input states: %+v", req.InputStates)
+		// Log read states
+		log.L(dCtx.Ctx()).Infof("Read states: %+v", req.ReadStates)
+		// Log output states
+		log.L(dCtx.Ctx()).Infof("Output states: %+v", req.OutputStates)
+		// Log info states
+		log.L(dCtx.Ctx()).Infof("Info states: %+v", req.InfoStates)
+		// Log endorsement
+		log.L(dCtx.Ctx()).Infof("Endorsement: %+v", req.Endorsement)
+		// Log endorser
+		log.L(dCtx.Ctx()).Infof("Endorser: %+v", req.Endorser)
+		// Log all fields
+		log.L(dCtx.Ctx()).Infof("EndorseTransaction request is incomplete: %+v", req)
 		return nil, i18n.NewError(dCtx.Ctx(), msgs.MsgDomainReqIncompleteEndorseTransaction)
 	}
+
+	// Log transaction specification
+	log.L(dCtx.Ctx()).Infof("Transaction specification: %+v", req.TransactionSpecification)
+	// Log verifiers
+	log.L(dCtx.Ctx()).Infof("Verifiers: %+v", req.Verifiers)
+	// Log signatures
+	log.L(dCtx.Ctx()).Infof("Signatures: %+v", req.Signatures)
+	// Log input states
+	log.L(dCtx.Ctx()).Infof("Input states: %+v", req.InputStates)
+	// Log read states
+	log.L(dCtx.Ctx()).Infof("Read states: %+v", req.ReadStates)
+	// Log output states
+	log.L(dCtx.Ctx()).Infof("Output states: %+v", req.OutputStates)
+	// Log info states
+	log.L(dCtx.Ctx()).Infof("Info states: %+v", req.InfoStates)
+	// Log endorsement
+	log.L(dCtx.Ctx()).Infof("Endorsement: %+v", req.Endorsement)
+	// Log endorser
+	log.L(dCtx.Ctx()).Infof("Endorser: %+v", req.Endorser)
+	// Log all fields
+	log.L(dCtx.Ctx()).Infof("EndorseTransaction request: %+v", req)
 
 	c := dc.d.newInFlightDomainRequest(readTX, dCtx, true)
 	defer c.close()
@@ -477,12 +529,20 @@ func (dc *domainContract) EndorseTransaction(dCtx components.DomainContext, read
 	if err != nil {
 		return nil, err
 	}
-	return &components.EndorsementResult{
+	log.L(dCtx.Ctx()).Infof("Endorse transaction returning endorsement result with payload length %d: %+v", len(res.Payload), res.Payload)
+	endRes := &components.EndorsementResult{
 		Endorser:     req.Endorser,
 		Result:       res.EndorsementResult,
 		Payload:      res.Payload,
 		RevertReason: res.RevertReason,
-	}, nil
+	}
+	// MRW TODO - remove, used for debugging
+	string, err := json.Marshal(endRes)
+	if err != nil {
+		log.L(dCtx.Ctx()).Errorf("Error marshalling endorsement result: %s", err)
+	}
+	log.L(dCtx.Ctx()).Infof("Endorse transaction returning endorsement result with payload length %d: %+v", len(res.Payload), string)
+	return endRes, nil
 }
 
 func (dc *domainContract) PrepareTransaction(dCtx components.DomainContext, readTX persistence.DBTX, tx *components.PrivateTransaction) error {
@@ -662,6 +722,7 @@ func (dc *domainContract) loadStatesFromContext(dCtx components.DomainContext, r
 	}
 	statesByID := make(map[string]*pldapi.State)
 	for schemaID, stateIDs := range rawIDsBySchema {
+		log.L(dCtx.Ctx()).Infof("Finding available states for state IDs %+v", stateIDs)
 		_, statesForSchema, err := dCtx.FindAvailableStates(readTX, schemaID, &query.QueryJSON{
 			Statements: query.Statements{
 				Ops: query.Ops{
@@ -692,6 +753,7 @@ func (dc *domainContract) loadStatesFromContext(dCtx components.DomainContext, r
 			Data:   s.Data,
 		}
 	}
+	log.L(dCtx.Ctx()).Infof("Found available states %+v", states)
 	return states, nil
 
 }

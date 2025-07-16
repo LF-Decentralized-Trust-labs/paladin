@@ -17,7 +17,6 @@ package sequencer
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -29,40 +28,35 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/sequencer/metrics"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/syncpoints"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
 
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-type distributedSequencer struct {
-	sender      sender.SeqSender
-	coordinator coordinator.SeqCoordinator
-}
-
 type distributedSequencerManager struct {
-	ctx             context.Context
-	ctxCancel       func()
-	config          *pldconf.DistributedSequencerManagerConfig
-	components      components.AllComponents
-	nodeName        string
-	sequencersLock  sync.RWMutex
-	syncPoints      syncpoints.SyncPoints
-	subscribers     []components.PrivateTxEventSubscriber
-	subscribersLock sync.Mutex
-	metrics         metrics.DistributedSequencerMetrics
-	sequencers      map[string]*distributedSequencer
-	blockHeight     int64
+	ctx                           context.Context
+	ctxCancel                     func()
+	config                        *pldconf.SequencerManagerConfig
+	components                    components.AllComponents
+	nodeName                      string
+	sequencersLock                sync.RWMutex
+	syncPoints                    syncpoints.SyncPoints
+	subscribersLock               sync.Mutex
+	metrics                       metrics.DistributedSequencerMetrics
+	sequencers                    map[string]*distributedSequencer
+	blockHeight                   int64
+	engineIntegration             common.EngineIntegration
+	targetActiveCoordinatorsLimit int // Max number of contracts this node aims to concurrently act as coordinator for. It could still efficiently respond to dispatch requests from other coordinators because the sender will remain in memory.
+	targetActiveSequencersLimit   int // Max number of sequencers this node aims to retain in memory concurrently. Hitting this limit will cause an attempt to remove the lowest priority sequencer from memory, and hence require it to be recreated from persisted state if it is needed in the future
 }
 
 // Init implements Engine.
@@ -71,15 +65,15 @@ func (d *distributedSequencerManager) PreInit(c components.PreInitComponents) (*
 	d.metrics = metrics.InitMetrics(d.ctx, c.MetricsManager().Registry())
 
 	return &components.ManagerInitResult{
-		// PreCommitHandler: func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*blockindexer.IndexedTransactionNotify) error {
-		// 	log.L(ctx).Debug("PrivateTxManager PreCommitHandler")
-		// 	latestBlockNumber := blocks[len(blocks)-1].Number
-		// 	dbTX.AddPostCommit(func(ctx context.Context) {
-		// 		log.L(ctx).Debugf("PrivateTxManager PostCommitHandler: %d", latestBlockNumber)
-		// 		p.OnNewBlockHeight(ctx, latestBlockNumber)
-		// 	})
-		// 	return nil
-		// },
+		PreCommitHandler: func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*blockindexer.IndexedTransactionNotify) error {
+			log.L(ctx).Debug("SequencerMgr PreCommitHandler")
+			latestBlockNumber := blocks[len(blocks)-1].Number
+			dbTX.AddPostCommit(func(ctx context.Context) {
+				log.L(ctx).Debugf("SequencerMgr PostCommitHandler: %d", latestBlockNumber)
+				d.OnNewBlockHeight(ctx, latestBlockNumber)
+			})
+			return nil
+		},
 	}, nil
 }
 
@@ -102,10 +96,10 @@ func (d *distributedSequencerManager) Stop() {
 	log.L(d.ctx).Info("Stopping distributed sequencer manager")
 }
 
-func NewDistributedSequencerManager(ctx context.Context, config *pldconf.DistributedSequencerManagerConfig) components.DistributedSequencerManager {
+func NewDistributedSequencerManager(ctx context.Context, config *pldconf.SequencerManagerConfig) components.SequencerManager {
 	d := &distributedSequencerManager{
-		config:      config,
-		subscribers: make([]components.PrivateTxEventSubscriber, 0),
+		config:     config,
+		sequencers: make(map[string]*distributedSequencer),
 	}
 	d.ctx, d.ctxCancel = context.WithCancel(ctx)
 	return d
@@ -264,34 +258,7 @@ func (d *distributedSequencerManager) evaluateDeployment(ctx context.Context, do
 		return d.revertDeploy(ctx, tx, err)
 	}
 
-	// MRW TODO - publish local event
-	d.publishToSubscribers(ctx, &components.TransactionDispatchedEvent{
-		TransactionID:  tx.ID.String(),
-		Nonce:          uint64(0), /*TODO*/
-		SigningAddress: tx.Signer,
-	})
-
 	return nil
-}
-
-// For now, this is here to help with testing but it seems like it could be useful thing to have
-// in the future if we want to have an eventing interface but at such time we would need to put more effort
-// into the reliability of the event delivery or maybe there is only a consumer of the event and it is responsible
-// for managing multiple subscribers and durability etc...
-func (d *distributedSequencerManager) Subscribe(ctx context.Context, subscriber components.PrivateTxEventSubscriber) {
-	d.subscribersLock.Lock()
-	defer d.subscribersLock.Unlock()
-	//TODO implement this
-	d.subscribers = append(d.subscribers, subscriber)
-}
-
-func (d *distributedSequencerManager) publishToSubscribers(ctx context.Context, event components.PrivateTxEvent) {
-	log.L(ctx).Debugf("Publishing event to subscribers")
-	d.subscribersLock.Lock()
-	defer d.subscribersLock.Unlock()
-	for _, subscriber := range d.subscribers {
-		subscriber(event)
-	}
 }
 
 func (d *distributedSequencerManager) revertDeploy(ctx context.Context, tx *components.PrivateContractDeploy, err error) error {
@@ -343,6 +310,33 @@ func (d *distributedSequencerManager) HandleNewTx(ctx context.Context, dbTX pers
 	}, &txi.ResolvedTransaction)
 }
 
+func (d *distributedSequencerManager) ProcessPrivateTransactionConfirmed(ctx context.Context, confirmedTxn *components.TxCompletion) {
+	log.L(d.ctx).Infof("Distributed sequencer manager handling confirmed transaction %s", confirmedTxn.TransactionID)
+
+	contractAddress := pldtypes.EthAddress{}
+	if confirmedTxn.PSC != nil {
+		contractAddress = confirmedTxn.PSC.Address()
+	}
+
+	seq, err := d.getSequencerForContract(ctx, d.components.Persistence().NOTX(), contractAddress, nil, nil)
+	if err != nil {
+		// MRW TODO - deploys happen without a dedicated sequencer, so this isn't a hard error. We ought
+		// to validate if the transaction being confirmed is a deploy, but leaving as-is for now.
+		log.L(ctx).Warnf("failed to obtain sequencer to pass transaction confirmed event to %v:", err)
+		return
+	}
+
+	log.L(ctx).Infof("Handing off TX confirmed event to distributed sequencer coordinator")
+
+	confirmedEvent := &coordinator.TransactionConfirmedEvent{
+		From:         confirmedTxn.OnChain.Source,
+		Hash:         confirmedTxn.ReceiptInput.OnChain.TransactionHash,
+		RevertReason: confirmedTxn.ReceiptInput.RevertData,
+	}
+
+	seq.coordinator.HandleEvent(ctx, confirmedEvent)
+}
+
 // HandleNewTx synchronously receives a new transaction submission
 // TODO this should really be a 2 (or 3?) phase handshake with
 //   - Pre submit phase to validate the inputs
@@ -380,22 +374,48 @@ func (d *distributedSequencerManager) handleNewTx(ctx context.Context, dbTX pers
 		return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "PreAssembly is nil")
 	}
 
-	sequencer, err := d.startSequencerForContract(ctx, dbTX, contractAddr, domainAPI, tx)
+	sequencer, err := d.getSequencerForContract(ctx, dbTX, contractAddr, domainAPI, tx)
 	if err != nil {
 		return err
 	}
 
-	txEvent := &sender.TransactionCreatedEvent{
+	if tx.PostAssembly == nil {
+		// MRW TODO - adopted from private TX mgr behaviour. Is this suitable for distributed sequencer?
+		//if we don't know the candidate nodes, and the transaction hasn't been assembled yet, then we can't select a coordinator so just assume we are the coordinator
+		// until we get the transaction assembled and then re-evaluate
+		log.L(ctx).Debug("DistributedSequencerManager: handleNewTx assembly not yet completed - using local node for assembly")
+		sequencer.sender.SetActiveCoordinator(ctx, d.nodeName)
+	}
+
+	// txList := []*components.PrivateTransaction{tx}
+
+	// MRW TODO - determine our sender's identity?
+	// senderIdentity, _ := d.getTXCommittee(ctx, tx)
+
+	// log.L(ctx).Debugf("DistributedSequencerManager: delegating TX %s to ourselves %s", tx.ID, senderIdentity[0])
+	// txDelegatedEvent := &coordinator.TransactionsDelegatedEvent{
+	// 	Sender:             senderIdentity[0],
+	// 	Transactions:       txList,
+	// 	SendersBlockHeight: uint64(d.blockHeight),
+	// }
+	txCreatedEvent := &sender.TransactionCreatedEvent{
 		Transaction: tx,
 	}
 
-	sequencer.sender.HandleEvent(ctx, txEvent)
+	sequencer.sender.HandleEvent(ctx, txCreatedEvent)
 
 	return nil
 }
 
 func (d *distributedSequencerManager) getTXCommittee(ctx context.Context, tx *components.PrivateTransaction) ([]string, error) {
 	candidateNodesMap := make(map[string]struct{})
+
+	if tx.PostAssembly == nil || len(tx.PostAssembly.AttestationPlan) == 0 {
+		identities := make([]string, 0, 1)
+		identities = append(identities, "member@node1")
+		return identities, nil
+	}
+
 	identities := make([]string, 0, len(tx.PostAssembly.AttestationPlan))
 	for _, attestationPlan := range tx.PostAssembly.AttestationPlan {
 		if attestationPlan.AttestationType == prototk.AttestationType_ENDORSE {
@@ -417,10 +437,6 @@ func (d *distributedSequencerManager) getTXCommittee(ctx context.Context, tx *co
 	return candidateNodes, nil
 }
 
-func (d *distributedSequencerManager) eventHandler(event common.Event) {
-	log.L(d.ctx).Debugf("Distributed sequencer event: %+v", event)
-}
-
 func (d *distributedSequencerManager) DistributeStates(ctx context.Context, stateDistributions []*components.StateDistributionWithData) {
 	log.L(d.ctx).Debugf("Distributed sequencer distribute states request")
 }
@@ -433,93 +449,7 @@ func (d *distributedSequencerManager) GetNodeName() string {
 	return d.nodeName
 }
 
-func (d *distributedSequencerManager) startSequencerForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract, tx *components.PrivateTransaction) (*distributedSequencer, error) {
-
-	if domainAPI == nil {
-		domainAPI, err := d.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
-		if err != nil {
-			log.L(ctx).Errorf("Failed to get domain smart contract for contract address %s: %s", contractAddr, err)
-			return nil, err
-		}
-		log.L(ctx).Debugf("Domain API retrieved: %s", domainAPI.Domain().Name())
-	}
-
-	readlock := true
-	d.sequencersLock.RLock()
-	defer func() {
-		if readlock {
-			d.sequencersLock.RUnlock()
-		}
-	}()
-	if d.sequencers[contractAddr.String()] == nil {
-		//swap the read lock for a write lock
-		d.sequencersLock.RUnlock()
-		readlock = false
-		d.sequencersLock.Lock()
-		defer d.sequencersLock.Unlock()
-		//double check in case another goroutine has created the sequencer while we were waiting for the write lock
-		if d.sequencers[contractAddr.String()] == nil {
-			// Are we handing this off to the sequencer now?
-			// Locally we store mappings of contract address to sender/coordinator pair
-
-			committee, err := d.getTXCommittee(ctx, tx)
-			if err != nil {
-				log.L(ctx).Errorf("Failed to get transaction committee for contract %s: %s", contractAddr.String(), err)
-				return nil, err
-			}
-			dCtx := d.components.StateManager().NewDomainContext(d.ctx, domainAPI.Domain(), contractAddr)
-			transportWriter := transport.NewTransportWriter(domainAPI.Domain().Name(), &contractAddr, d.nodeName, d.components.TransportManager())
-			engineIntegration := common.NewEngineIntegration(d.ctx, d.components, domainAPI, dCtx, d, d)
-
-			sender, err := sender.NewSender(d.ctx, d.nodeName, transportWriter, committee, common.RealClock(), d.eventHandler, engineIntegration, 10, &contractAddr, 15000, 10)
-			if err != nil {
-				log.L(ctx).Errorf("Failed to create distributed sequencer sender for contract %s: %s", contractAddr.String(), err)
-				return nil, err
-			}
-
-			coordinator, err := coordinator.NewCoordinator(d.ctx, transportWriter, committee, common.RealClock(), d.eventHandler, engineIntegration, 60, 60, 10, &contractAddr, 50, 3)
-			if err != nil {
-				log.L(ctx).Errorf("Failed to create distributed sequencer coordinator for contract %s: %s", contractAddr.String(), err)
-				return nil, err
-			}
-
-			sequencer := &distributedSequencer{
-				sender:      sender,
-				coordinator: coordinator,
-			}
-			d.sequencers[contractAddr.String()] = sequencer
-			// publisher := NewPublisher(d, contractAddr.String())
-
-			// endorsementGatherer, err := p.getEndorsementGathererForContract(ctx, dbTX, contractAddr)
-			// if err != nil {
-			// 	log.L(ctx).Errorf("Failed to get endorsement gatherer for contract %s: %s", contractAddr.String(), err)
-			// 	return nil, err
-			// }
-
-			// newSequencer, err := NewSequencer(
-			// 	d.ctx,
-			// 	d,
-			// 	d.nodeName,
-			// 	contractAddr,
-			// 	&p.config.Sequencer,
-			// 	d.components,
-			// 	domainAPI,
-			// 	endorsementGatherer,
-			// 	publisher,
-			// 	d.syncPoints,
-			// 	d.components.IdentityResolver(),
-			// 	transportWriter,
-			// 	confutil.DurationMin(p.config.RequestTimeout, 0, *pldconf.PrivateTxManagerDefaults.RequestTimeout),
-			// 	d.blockHeight,
-			// )
-			if err != nil {
-				log.L(ctx).Errorf("Failed to create sequencer for contract %s: %s", contractAddr.String(), err)
-				return nil, err
-			}
-
-			return sequencer, nil
-		}
-	}
+func (d *distributedSequencerManager) getSequencerForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract, tx *components.PrivateTransaction) (*distributedSequencer, error) {
 	return nil, nil
 }
 
@@ -543,6 +473,7 @@ func (d *distributedSequencerManager) startSequencerForContract(ctx context.Cont
 // }
 
 func (d *distributedSequencerManager) HandleNewEvent(ctx context.Context, event string) error {
+	log.L(d.ctx).Debug("Distributed sequencer manager HandleNewEvent (currently not implemented)")
 	// d.sequencersLock.RLock()
 	// defer d.sequencersLock.RUnlock()
 	// targetSequencer := d.sequencers[event.GetContractAddress()]
@@ -552,6 +483,54 @@ func (d *distributedSequencerManager) HandleNewEvent(ctx context.Context, event 
 	// 	targetSequencer.HandleEvent(ctx, event)
 	// }
 	return nil
+}
+
+func (p *distributedSequencerManager) BuildNullifiers(ctx context.Context, stateDistributions []*components.StateDistributionWithData) (nullifiers []*components.NullifierUpsert, err error) {
+
+	nullifiers = []*components.NullifierUpsert{}
+	err = p.components.Persistence().Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		for _, s := range stateDistributions {
+			if s.NullifierAlgorithm == nil || s.NullifierVerifierType == nil || s.NullifierPayloadType == nil {
+				log.L(ctx).Debugf("No nullifier required for state %s on node %s", s.StateID, p.nodeName)
+				continue
+			}
+
+			nullifier, err := p.BuildNullifier(ctx, p.components.KeyManager().KeyResolverForDBTX(dbTX), s)
+			if err != nil {
+				return err
+			}
+
+			nullifiers = append(nullifiers, nullifier)
+		}
+		return nil
+	})
+	return nullifiers, err
+}
+
+func (p *distributedSequencerManager) BuildNullifier(ctx context.Context, kr components.KeyResolver, s *components.StateDistributionWithData) (*components.NullifierUpsert, error) {
+	// We need to call the signing engine with the local identity to build the nullifier
+	log.L(ctx).Infof("Generating nullifier for state %s on node %s (algorithm=%s,verifierType=%s,payloadType=%s)",
+		s.StateID, p.nodeName, *s.NullifierAlgorithm, *s.NullifierVerifierType, *s.NullifierPayloadType)
+
+	// We require a fully qualified identifier for the local node in this function
+	identifier, node, err := pldtypes.PrivateIdentityLocator(s.IdentityLocator).Validate(ctx, "", false)
+	if err != nil || node != p.nodeName {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgStateDistributorNullifierNotLocal)
+	}
+
+	// Call the signing engine to build the nullifier
+	var nulliferBytes []byte
+	mapping, err := kr.ResolveKey(ctx, identifier, *s.NullifierAlgorithm, *s.NullifierVerifierType)
+	if err == nil {
+		nulliferBytes, err = p.components.KeyManager().Sign(ctx, mapping, *s.NullifierPayloadType, s.StateData.Bytes())
+	}
+	if err != nil || len(nulliferBytes) == 0 {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgStateDistributorNullifierFail, s.StateID)
+	}
+	return &components.NullifierUpsert{
+		ID:    nulliferBytes,
+		State: pldtypes.MustParseHexBytes(s.StateID),
+	}, nil
 }
 
 func (d *distributedSequencerManager) CallPrivateSmartContract(ctx context.Context, call *components.ResolvedTransaction) (*abi.ComponentValue, error) {
@@ -598,49 +577,32 @@ func (d *distributedSequencerManager) CallPrivateSmartContract(ctx context.Conte
 	return psc.ExecCall(dCtx, d.components.Persistence().NOTX(), call, verifiers)
 }
 
-func (d *distributedSequencerManager) handleCoordinatorHeartbeatNotification(ctx context.Context, messagePayload []byte) {
-	log.L(d.ctx).Debug("Distributed sequencer handleCoordinatorHeartbeatNotification")
-
-	heartbeatNotification := &pbEngine.CoordinatorHeartbeatNotification{}
-	err := proto.Unmarshal(messagePayload, heartbeatNotification)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to unmarshal heartbeatNotification: %s", err)
-		return
+// MRW TODO - move to sequencer module?
+func mapPreparedTransaction(tx *components.PrivateTransaction) *components.PreparedTransactionWithRefs {
+	pt := &components.PreparedTransactionWithRefs{
+		PreparedTransactionBase: &pldapi.PreparedTransactionBase{
+			ID:       tx.ID,
+			Domain:   tx.Domain,
+			To:       &tx.Address,
+			Metadata: tx.PreparedMetadata,
+		},
 	}
-
-	from := heartbeatNotification.From
-	if from == "" {
-		log.L(ctx).Errorf("Failed to handle coordinator heartbeat - from field not set")
-		return
+	for _, s := range tx.PostAssembly.InputStates {
+		pt.StateRefs.Spent = append(pt.StateRefs.Spent, s.ID)
 	}
-
-	contractAddressString := heartbeatNotification.ContractAddress
-	contractAddress, err := pldtypes.ParseEthAddress(contractAddressString)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to parse contract address from coordinator heartbeat: %s", err)
-		return
+	for _, s := range tx.PostAssembly.ReadStates {
+		pt.StateRefs.Read = append(pt.StateRefs.Read, s.ID)
 	}
-
-	coordinatorSnapshot := &common.CoordinatorSnapshot{}
-	err = json.Unmarshal(heartbeatNotification.CoordinatorSnapshot, coordinatorSnapshot)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to unmarshal coordinatorSnapshot: %s", err)
-		return
+	for _, s := range tx.PostAssembly.OutputStates {
+		pt.StateRefs.Confirmed = append(pt.StateRefs.Confirmed, s.ID)
 	}
-
-	heartbeatEvent := &sender.HeartbeatReceivedEvent{}
-	heartbeatEvent.From = from
-	heartbeatEvent.ContractAddress = contractAddress
-	heartbeatEvent.CoordinatorSnapshot = *coordinatorSnapshot
-
-	fmt.Println(heartbeatEvent)
-
-	// _, err = d.getSequencerForContract(ctx, p.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	// if err != nil {
-	// 	log.L(ctx).Errorf("failed to obtain sequencer to pass heartbeat eventct %v:", err)
-	// 	return
-	// }
-
-	// MRW TODO - does event handling exist here?
-	// seq.coordinatorSelector.HandleCoordinatorEvent(ctx, heartbeatEvent)
+	for _, s := range tx.PostAssembly.InfoStates {
+		pt.StateRefs.Info = append(pt.StateRefs.Info, s.ID)
+	}
+	if tx.PreparedPublicTransaction != nil {
+		pt.Transaction = *tx.PreparedPublicTransaction
+	} else {
+		pt.Transaction = *tx.PreparedPrivateTransaction
+	}
+	return pt
 }

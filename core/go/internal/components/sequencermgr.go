@@ -18,23 +18,10 @@ package components
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
-
-type PrivateTxEventSubscriber func(event PrivateTxEvent)
-
-type PrivateTxEvent interface {
-}
-
-type TransactionDispatchedEvent struct {
-	TransactionID   string `json:"transactionId"`
-	ContractAddress string `json:"contractAddress"`
-	Nonce           uint64 `json:"nonce"`
-	SigningAddress  string `json:"signingAddress"`
-}
 
 type PrivateTxEndorsementStatus struct {
 	Party               string `json:"party"`
@@ -52,13 +39,6 @@ type PrivateTxStatus struct {
 	FailureMessage string                       `json:"failureMessage,omitempty"`
 }
 
-type StateDistributionSet struct {
-	LocalNode  string
-	SenderNode string
-	Remote     []*StateDistributionWithData
-	Local      []*StateDistributionWithData
-}
-
 type StateDistribution struct {
 	StateID               string  `json:"stateId"`
 	IdentityLocator       string  `json:"identityLocator"`
@@ -70,32 +50,36 @@ type StateDistribution struct {
 	NullifierPayloadType  *string `json:"nullifierPayloadType,omitempty"`
 }
 
+type StateDistributionSet struct {
+	LocalNode  string
+	SenderNode string
+	Remote     []*StateDistributionWithData
+	Local      []*StateDistributionWithData
+}
+
 // A StateDistributionWithData is an intent to send private data for a given state to a remote party
 type StateDistributionWithData struct {
 	StateDistribution
 	StateData pldtypes.RawJSON `json:"stateData"`
 }
 
-type PrivateTxManager interface {
+type SequencerManager interface {
 	ManagerLifecycle
 	TransportClient
 
 	//Synchronous functions to submit a new private transaction
 	HandleNewTx(ctx context.Context, dbTX persistence.DBTX, tx *ValidatedTransaction) error
-	GetTxStatus(ctx context.Context, domainAddress string, txID uuid.UUID) (status PrivateTxStatus, err error)
+	HandleNewEvent(ctx context.Context, event string) error
+	// GetTxStatus(ctx context.Context, domainAddress string, txID uuid.UUID) (status PrivateTxStatus, err error)
 
 	// Synchronous function to call an existing deployed smart contract
 	CallPrivateSmartContract(ctx context.Context, call *ResolvedTransaction) (*abi.ComponentValue, error)
 
-	//TODO this is just a placeholder until we figure out the external interface for events
-	// in the meantime, this is handy for some blackish box testing
-	Subscribe(ctx context.Context, subscriber PrivateTxEventSubscriber)
+	// NotifyFailedPublicTx(ctx context.Context, dbTX persistence.DBTX, confirms []*PublicTxMatch) error
 
-	NotifyFailedPublicTx(ctx context.Context, dbTX persistence.DBTX, confirms []*PublicTxMatch) error
+	ProcessPrivateTransactionConfirmed(ctx context.Context, receipt *TxCompletion)
 
-	PrivateTransactionConfirmed(ctx context.Context, receipt *TxCompletion)
-
-	BuildStateDistributions(ctx context.Context, tx *PrivateTransaction) (*StateDistributionSet, error)
+	// BuildStateDistributions(ctx context.Context, tx *PrivateTransaction) (*StateDistributionSet, error)
 	BuildNullifier(ctx context.Context, kr KeyResolver, s *StateDistributionWithData) (*NullifierUpsert, error)
 	BuildNullifiers(ctx context.Context, distributions []*StateDistributionWithData) (nullifiers []*NullifierUpsert, err error)
 }

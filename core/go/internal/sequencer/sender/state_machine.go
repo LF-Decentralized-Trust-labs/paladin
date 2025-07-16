@@ -18,7 +18,9 @@ package sender
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
 )
@@ -148,6 +150,11 @@ func (s *sender) InitializeStateMachine(initialState State) {
 
 func (s *sender) HandleEvent(ctx context.Context, event common.Event) error {
 
+	log.L(ctx).Infof("Distributed sender handling new event (contract address %s, node name %s, committee %+v)", s.contractAddress, s.nodeName, s.committee)
+	for node, party := range s.committee {
+		log.L(ctx).Infof("Distributed sender handling new event: party %s @ %s", party[0], node)
+	}
+
 	if transactionEvent, ok := event.(transaction.Event); ok {
 		return s.propagateEventToTransaction(ctx, transactionEvent)
 	}
@@ -177,6 +184,18 @@ func (s *sender) HandleEvent(ctx context.Context, event common.Event) error {
 
 }
 
+func (s *sender) SetActiveCoordinator(ctx context.Context, coordinator string) error {
+	if coordinator == "" {
+		return i18n.NewError(ctx, msgs.MsgDistSeqInternalError, "Cannot set active coordinator to an empty string")
+	}
+	if s.activeCoordinator != "" {
+		return i18n.NewError(ctx, msgs.MsgDistSeqInternalError, "SetActiveCoordinator should only be used when an active coordinator has not yet been set")
+	}
+	s.activeCoordinator = coordinator
+	log.L(ctx).Infof("Initial active coordinator set to %s", s.activeCoordinator)
+	return nil
+}
+
 // Function evaluateEvent evaluates whether the event is relevant given the current state of the coordinator
 func (s *sender) evaluateEvent(ctx context.Context, event common.Event) (*EventHandler, error) {
 	sm := s.stateMachine
@@ -195,14 +214,14 @@ func (s *sender) evaluateEvent(ctx context.Context, event common.Event) (*EventH
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the coordinator so we just ignore it and move on
-				log.L(ctx).Debugf("Event %s is not valid", event.TypeString())
+				log.L(ctx).Debugf("Sender event %s is not valid for current state %s", event.TypeString(), sm.currentState.String())
 				return nil, nil
 			}
 		}
 		return &eventHandler, nil
 	} else {
 		// no event handler defined for this event while in this state
-		log.L(ctx).Debugf("No event handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
+		log.L(ctx).Debugf("No sender event handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
 		return nil, nil
 	}
 }
@@ -250,6 +269,7 @@ func (s *sender) evaluateTransitions(ctx context.Context, event common.Event, ev
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, s) { //if there is no guard defined, or the guard returns true
 			log.L(ctx).Infof("Sender for address %s transitioning from %s to %s triggered by event %T", s.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
+			log.L(ctx).Infof("Sender state: active coordinator %s", s.activeCoordinator)
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first
@@ -257,7 +277,7 @@ func (s *sender) evaluateTransitions(ctx context.Context, event common.Event, ev
 				err := rule.On(ctx, s)
 				if err != nil {
 					//any recoverable errors should have been handled by the action function
-					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("Error transitioning sender to state %v: %v", sm.currentState, err)
 					return err
 				}
 			}
@@ -267,7 +287,7 @@ func (s *sender) evaluateTransitions(ctx context.Context, event common.Event, ev
 				err := newStateDefinition.OnTransitionTo(ctx, s)
 				if err != nil {
 					// any recoverable errors should have been handled by the OnTransitionTo function
-					log.L(ctx).Errorf("Error transitioning to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("Error transitioning sender to state %v: %v", sm.currentState, err)
 					return err
 				}
 			} else {

@@ -44,14 +44,16 @@ type CoordinatorSnapshot struct {
 
 type CoordinatorState string
 
+// MRW TODO - not sure I've understood the reason for these states + those in state_machine.go
 const (
-	CoordinatorState_Idle     CoordinatorState = "CoordinatorState_Idle"
-	CoordinatorState_Standby  CoordinatorState = "CoordinatorState_Standby"
-	CoordinatorState_Elect    CoordinatorState = "CoordinatorState_Elect"
-	CoordinatorState_Prepared CoordinatorState = "CoordinatorState_Prepared"
-	CoordinatorState_Active   CoordinatorState = "CoordinatorState_Active"
-	CoordinatorState_Flush    CoordinatorState = "CoordinatorState_Flush"
-	CoordinatorState_Closing  CoordinatorState = "CoordinatorState_Closing"
+	CoordinatorState_Idle      CoordinatorState = "CoordinatorState_Idle"
+	CoordinatorState_Observing CoordinatorState = "CoordinatorState_Observing"
+	CoordinatorState_Standby   CoordinatorState = "CoordinatorState_Standby"
+	CoordinatorState_Elect     CoordinatorState = "CoordinatorState_Elect"
+	CoordinatorState_Prepared  CoordinatorState = "CoordinatorState_Prepared"
+	CoordinatorState_Active    CoordinatorState = "CoordinatorState_Active"
+	CoordinatorState_Flush     CoordinatorState = "CoordinatorState_Flush"
+	CoordinatorState_Closing   CoordinatorState = "CoordinatorState_Closing"
 )
 
 type Transaction struct {

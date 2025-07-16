@@ -24,5 +24,5 @@ import (
 
 type MessageSender interface {
 	SendDispatchConfirmationResponse(ctx context.Context)
-	SendAssembleResponse(ctx context.Context, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly)
+	SendAssembleResponse(ctx context.Context, txID uuid.UUID, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, recipient string)
 }

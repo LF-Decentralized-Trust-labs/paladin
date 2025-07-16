@@ -41,7 +41,12 @@ func (t *Transaction) applyEndorsement(ctx context.Context, endorsement *prototk
 		if pendingRequest.IdempotencyKey() == requestID {
 			log.L(ctx).Infof("Endorsement received for transaction %s from %s", t.ID, endorsement.Verifier.Lookup)
 			delete(t.pendingEndorsementRequests[endorsement.Name], endorsement.Verifier.Lookup)
+			log.L(ctx).Infof("Applying endorsement. Appending %+v to list of endorsements received for transaction %s from %s", endorsement, t.ID, endorsement.Verifier.Lookup)
 			t.PostAssembly.Endorsements = append(t.PostAssembly.Endorsements, endorsement)
+
+			// MRW TODO - Hashing the TX for dispatch confirmation requires that there is > 0 signatures. Need to follow up where an endorsed TX populates the signatures. Temporarily put this workaround in.
+			// log.L(ctx).Infof("Applying endorsement. Appending %+v to list of endorsements received for transaction %s from %s", endorsement, t.ID, endorsement.Verifier.Lookup)
+			// t.PostAssembly.Signatures = append(t.PostAssembly.Signatures, endorsement)
 		} else {
 			log.L(ctx).Infof("Ignoring endorsement response for transaction %s from %s because idempotency key %s does not match expected %s ", t.ID, endorsement.Verifier.Lookup, requestID.String(), pendingRequest.IdempotencyKey().String())
 		}
@@ -73,6 +78,7 @@ func (d *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []
 		return unfulfilledEndorsementRequirements
 	}
 	for _, attRequest := range d.PostAssembly.AttestationPlan {
+		log.L(ctx).Debugf("unfulfilled endorsement plan - payload length = %d", len(attRequest.Payload))
 		if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
 			for _, party := range attRequest.Parties {
 				found := false
@@ -177,6 +183,7 @@ func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState
 }
 
 func action_SendEndorsementRequests(ctx context.Context, txn *Transaction) error {
+	log.L(ctx).Debugf("Sending endorsement requests for transaction %s. Post assembly info states: %+v", txn.ID, len(txn.PostAssembly.InfoStates))
 	return txn.sendEndorsementRequests(ctx)
 }
 
