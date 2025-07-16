@@ -77,6 +77,7 @@ func NewCoordinator(
 	contractAddress *pldtypes.EthAddress,
 	blockHeightTolerance uint64,
 	closingGracePeriod int,
+	nodeName string,
 ) (*coordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
@@ -117,6 +118,9 @@ func NewCoordinator(
 	}
 	c.InitializeStateMachine(State_Idle)
 	c.transactionSelector = NewTransactionSelector(ctx, c)
+
+	// MRW TODO - what is the correct initial active coordinator?
+	c.activeCoordinator = nodeName
 	return c, nil
 
 }

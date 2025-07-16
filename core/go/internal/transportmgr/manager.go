@@ -281,6 +281,8 @@ func (tm *transportManager) Send(ctx context.Context, send *components.FireAndFo
 }
 
 func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName string, msg *prototk.PaladinMsg) error {
+	log.L(ctx).Debugf("Queueing fire and forget message %s/%+v to node %s ", msg.MessageType, msg.MessageId, nodeName)
+
 	// Use or establish a p connection for the send
 	p, err := tm.getPeer(ctx, nodeName, true)
 	if err == nil {
@@ -309,6 +311,7 @@ func (tm *transportManager) SendReliable(ctx context.Context, dbTX persistence.D
 
 	peers := make(map[string]*peer)
 	for _, msg := range msgs {
+		log.L(ctx).Debugf("Sending reliable message %s/%+v to node %s", msg.MessageType, msg.ID, msg.Node)
 		var p *peer
 
 		msg.ID = uuid.New()

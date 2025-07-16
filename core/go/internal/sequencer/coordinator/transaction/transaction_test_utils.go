@@ -102,6 +102,8 @@ func (r *SentMessageRecorder) SendAssembleRequest(
 	transactionID uuid.UUID,
 	idempotencyKey uuid.UUID,
 	transactionPreassembly *components.TransactionPreAssembly,
+	stateLocksJSON []byte,
+	blockHeight int64,
 ) error {
 	r.hasSentAssembleRequest = true
 	r.sentAssembleRequestIdempotencyKey = idempotencyKey

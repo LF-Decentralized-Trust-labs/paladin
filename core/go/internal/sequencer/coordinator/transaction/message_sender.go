@@ -31,6 +31,8 @@ type MessageSender interface {
 		transactionID uuid.UUID,
 		idempotencyID uuid.UUID,
 		transactionPreassembly *components.TransactionPreAssembly,
+		stateLocksJSON []byte,
+		blockHeight int64,
 	) error
 
 	//SendEndorsementRequest to either a local or remote endorser

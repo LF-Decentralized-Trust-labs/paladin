@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -162,6 +163,7 @@ func (tm *txManager) QueryTransactionsResolved(ctx context.Context, jq *query.Qu
 	if err != nil {
 		return nil, err
 	}
+	log.L(ctx).Infof("QueryTransactionsResolved: %d transactions", len(ptxs))
 	return tm.resolveABIReferencesAndCache(ctx, dbTX, ptxs)
 }
 
@@ -252,6 +254,7 @@ func (tm *txManager) resolveABIReferencesAndCache(ctx context.Context, dbTX pers
 			if a, err = tm.getABIByHash(ctx, dbTX, *tx.Transaction.ABIReference); a == nil || err != nil {
 				return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrABIReferenceLookupFailed, tx.Transaction.ABIReference)
 			}
+			log.L(ctx).Infof("resolveABIReferencesAndCache: ABIReference: %+v", a)
 		}
 		resolvedFunction, err := tm.pickFunction(ctx, a, tx.Transaction.Function, tx.Transaction.To)
 		if err != nil {

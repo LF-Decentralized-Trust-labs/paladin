@@ -20,49 +20,65 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator"
+	coordTransaction "github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/metrics"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender"
+	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/syncpoints"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
+	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type distributedSequencer struct {
+	ctx         context.Context
 	sender      sender.SeqSender
 	coordinator coordinator.SeqCoordinator
 }
 
+func (d *distributedSequencer) senderEventHandler(event common.Event) {
+	log.L(d.ctx).Debugf("Handing off distributed sequencer sender event: %+v", event)
+	d.sender.HandleEvent(d.ctx, event)
+}
+
+func (d *distributedSequencer) coordinatorEventHandler(event common.Event) {
+	log.L(d.ctx).Debugf("Handing off distributed sequencer coordinator event: %+v", event)
+	d.coordinator.HandleEvent(d.ctx, event)
+}
+
 type distributedSequencerManager struct {
-	ctx             context.Context
-	ctxCancel       func()
-	config          *pldconf.DistributedSequencerManagerConfig
-	components      components.AllComponents
-	nodeName        string
-	sequencersLock  sync.RWMutex
-	syncPoints      syncpoints.SyncPoints
-	subscribers     []components.PrivateTxEventSubscriber
-	subscribersLock sync.Mutex
-	metrics         metrics.DistributedSequencerMetrics
-	sequencers      map[string]*distributedSequencer
-	blockHeight     int64
+	ctx               context.Context
+	ctxCancel         func()
+	config            *pldconf.DistributedSequencerManagerConfig
+	components        components.AllComponents
+	nodeName          string
+	sequencersLock    sync.RWMutex
+	syncPoints        syncpoints.SyncPoints
+	subscribers       []components.PrivateTxEventSubscriber
+	subscribersLock   sync.Mutex
+	metrics           metrics.DistributedSequencerMetrics
+	sequencers        map[string]*distributedSequencer
+	blockHeight       int64
+	engineIntegration common.EngineIntegration
 }
 
 // Init implements Engine.
@@ -105,6 +121,7 @@ func (d *distributedSequencerManager) Stop() {
 func NewDistributedSequencerManager(ctx context.Context, config *pldconf.DistributedSequencerManagerConfig) components.DistributedSequencerManager {
 	d := &distributedSequencerManager{
 		config:      config,
+		sequencers:  make(map[string]*distributedSequencer),
 		subscribers: make([]components.PrivateTxEventSubscriber, 0),
 	}
 	d.ctx, d.ctxCancel = context.WithCancel(ctx)
@@ -380,22 +397,48 @@ func (d *distributedSequencerManager) handleNewTx(ctx context.Context, dbTX pers
 		return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "PreAssembly is nil")
 	}
 
-	sequencer, err := d.startSequencerForContract(ctx, dbTX, contractAddr, domainAPI, tx)
+	sequencer, err := d.getSequencerForContract(ctx, dbTX, contractAddr, domainAPI, tx)
 	if err != nil {
 		return err
 	}
 
-	txEvent := &sender.TransactionCreatedEvent{
+	if tx.PostAssembly == nil {
+		// MRW TODO - adopted from private TX mgr behaviour. Is this suitable for distributed sequencer?
+		//if we don't know the candidate nodes, and the transaction hasn't been assembled yet, then we can't select a coordinator so just assume we are the coordinator
+		// until we get the transaction assembled and then re-evaluate
+		log.L(ctx).Debug("DistributedSequencerManager: handleNewTx assembly not yet completed - using local node for assembly")
+		sequencer.sender.SetActiveCoordinator(ctx, d.nodeName)
+	}
+
+	// txList := []*components.PrivateTransaction{tx}
+
+	// MRW TODO - determine our sender's identity?
+	// senderIdentity, _ := d.getTXCommittee(ctx, tx)
+
+	// log.L(ctx).Debugf("DistributedSequencerManager: delegating TX %s to ourselves %s", tx.ID, senderIdentity[0])
+	// txDelegatedEvent := &coordinator.TransactionsDelegatedEvent{
+	// 	Sender:             senderIdentity[0],
+	// 	Transactions:       txList,
+	// 	SendersBlockHeight: uint64(d.blockHeight),
+	// }
+	txCreatedEvent := &sender.TransactionCreatedEvent{
 		Transaction: tx,
 	}
 
-	sequencer.sender.HandleEvent(ctx, txEvent)
+	sequencer.sender.HandleEvent(ctx, txCreatedEvent)
 
 	return nil
 }
 
 func (d *distributedSequencerManager) getTXCommittee(ctx context.Context, tx *components.PrivateTransaction) ([]string, error) {
 	candidateNodesMap := make(map[string]struct{})
+
+	if tx.PostAssembly == nil || len(tx.PostAssembly.AttestationPlan) == 0 {
+		identities := make([]string, 0, 1)
+		identities = append(identities, "member@node1")
+		return identities, nil
+	}
+
 	identities := make([]string, 0, len(tx.PostAssembly.AttestationPlan))
 	for _, attestationPlan := range tx.PostAssembly.AttestationPlan {
 		if attestationPlan.AttestationType == prototk.AttestationType_ENDORSE {
@@ -417,10 +460,6 @@ func (d *distributedSequencerManager) getTXCommittee(ctx context.Context, tx *co
 	return candidateNodes, nil
 }
 
-func (d *distributedSequencerManager) eventHandler(event common.Event) {
-	log.L(d.ctx).Debugf("Distributed sequencer event: %+v", event)
-}
-
 func (d *distributedSequencerManager) DistributeStates(ctx context.Context, stateDistributions []*components.StateDistributionWithData) {
 	log.L(d.ctx).Debugf("Distributed sequencer distribute states request")
 }
@@ -433,7 +472,7 @@ func (d *distributedSequencerManager) GetNodeName() string {
 	return d.nodeName
 }
 
-func (d *distributedSequencerManager) startSequencerForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract, tx *components.PrivateTransaction) (*distributedSequencer, error) {
+func (d *distributedSequencerManager) getSequencerForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract, tx *components.PrivateTransaction) (*distributedSequencer, error) {
 
 	if domainAPI == nil {
 		domainAPI, err := d.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
@@ -459,34 +498,52 @@ func (d *distributedSequencerManager) startSequencerForContract(ctx context.Cont
 		defer d.sequencersLock.Unlock()
 		//double check in case another goroutine has created the sequencer while we were waiting for the write lock
 		if d.sequencers[contractAddr.String()] == nil {
+			log.L(ctx).Debugf("Creating sequencer for contract address %s", contractAddr.String())
 			// Are we handing this off to the sequencer now?
 			// Locally we store mappings of contract address to sender/coordinator pair
 
+			if tx == nil {
+				err := i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "No TX provided to create distributed sequencer")
+				log.L(ctx).Error(err)
+				return nil, err
+			}
 			committee, err := d.getTXCommittee(ctx, tx)
+
 			if err != nil {
 				log.L(ctx).Errorf("Failed to get transaction committee for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
-			dCtx := d.components.StateManager().NewDomainContext(d.ctx, domainAPI.Domain(), contractAddr)
-			transportWriter := transport.NewTransportWriter(domainAPI.Domain().Name(), &contractAddr, d.nodeName, d.components.TransportManager())
-			engineIntegration := common.NewEngineIntegration(d.ctx, d.components, domainAPI, dCtx, d, d)
 
-			sender, err := sender.NewSender(d.ctx, d.nodeName, transportWriter, committee, common.RealClock(), d.eventHandler, engineIntegration, 10, &contractAddr, 15000, 10)
+			if domainAPI == nil {
+				err := i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "No domain provided to create distributed sequencer")
+				log.L(ctx).Error(err)
+				return nil, err
+			}
+			dCtx := d.components.StateManager().NewDomainContext(d.ctx, domainAPI.Domain(), contractAddr)
+
+			transportWriter := transport.NewTransportWriter(domainAPI.Domain().Name(), &contractAddr, d.nodeName, d.components.TransportManager(), d.HandlePaladinMsg)
+			d.engineIntegration = common.NewEngineIntegration(d.ctx, d.components, domainAPI, dCtx, d, d)
+
+			sequencer := &distributedSequencer{
+				ctx: d.ctx,
+			}
+
+			sender, err := sender.NewSender(d.ctx, d.nodeName, transportWriter, committee, common.RealClock(), sequencer.senderEventHandler, d.engineIntegration, 10, &contractAddr, 15000, 10)
 			if err != nil {
 				log.L(ctx).Errorf("Failed to create distributed sequencer sender for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
 
-			coordinator, err := coordinator.NewCoordinator(d.ctx, transportWriter, committee, common.RealClock(), d.eventHandler, engineIntegration, 60, 60, 10, &contractAddr, 50, 3)
+			reqTimeout := time.Duration(60) * time.Second
+			assembleTimeout := time.Duration(60) * time.Second
+			coordinator, err := coordinator.NewCoordinator(d.ctx, transportWriter, committee, common.RealClock(), sequencer.coordinatorEventHandler, d.engineIntegration, reqTimeout, assembleTimeout, 10, &contractAddr, 50, 3, d.nodeName)
 			if err != nil {
 				log.L(ctx).Errorf("Failed to create distributed sequencer coordinator for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
 
-			sequencer := &distributedSequencer{
-				sender:      sender,
-				coordinator: coordinator,
-			}
+			sequencer.sender = sender
+			sequencer.coordinator = coordinator
 			d.sequencers[contractAddr.String()] = sequencer
 			// publisher := NewPublisher(d, contractAddr.String())
 
@@ -520,7 +577,7 @@ func (d *distributedSequencerManager) startSequencerForContract(ctx context.Cont
 			return sequencer, nil
 		}
 	}
-	return nil, nil
+	return d.sequencers[contractAddr.String()], nil
 }
 
 // func (d *distributedSequencerManager) GetTxStatus(ctx context.Context, domainAddress string, txID uuid.UUID) (status components.PrivateTxStatus, err error) { // MRW TODO - what type of TX status does this return?
@@ -543,6 +600,7 @@ func (d *distributedSequencerManager) startSequencerForContract(ctx context.Cont
 // }
 
 func (d *distributedSequencerManager) HandleNewEvent(ctx context.Context, event string) error {
+	log.L(d.ctx).Debug("Distributed sequencer manager HandleNewEvent (currently not implemented)")
 	// d.sequencersLock.RLock()
 	// defer d.sequencersLock.RUnlock()
 	// targetSequencer := d.sequencers[event.GetContractAddress()]
@@ -601,7 +659,7 @@ func (d *distributedSequencerManager) CallPrivateSmartContract(ctx context.Conte
 func (d *distributedSequencerManager) handleCoordinatorHeartbeatNotification(ctx context.Context, messagePayload []byte) {
 	log.L(d.ctx).Debug("Distributed sequencer handleCoordinatorHeartbeatNotification")
 
-	heartbeatNotification := &pbEngine.CoordinatorHeartbeatNotification{}
+	heartbeatNotification := &engineProto.CoordinatorHeartbeatNotification{}
 	err := proto.Unmarshal(messagePayload, heartbeatNotification)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to unmarshal heartbeatNotification: %s", err)
@@ -617,14 +675,14 @@ func (d *distributedSequencerManager) handleCoordinatorHeartbeatNotification(ctx
 	contractAddressString := heartbeatNotification.ContractAddress
 	contractAddress, err := pldtypes.ParseEthAddress(contractAddressString)
 	if err != nil {
-		log.L(ctx).Errorf("Failed to parse contract address from coordinator heartbeat: %s", err)
+		log.L(ctx).Errorf("Failed to parse contract address received in heartbeat notification: %s", err)
 		return
 	}
 
 	coordinatorSnapshot := &common.CoordinatorSnapshot{}
 	err = json.Unmarshal(heartbeatNotification.CoordinatorSnapshot, coordinatorSnapshot)
 	if err != nil {
-		log.L(ctx).Errorf("Failed to unmarshal coordinatorSnapshot: %s", err)
+		log.L(ctx).Errorf("Failed to unmarshal coordinator snapshot received in heartbeat notification: %s", err)
 		return
 	}
 
@@ -633,14 +691,416 @@ func (d *distributedSequencerManager) handleCoordinatorHeartbeatNotification(ctx
 	heartbeatEvent.ContractAddress = contractAddress
 	heartbeatEvent.CoordinatorSnapshot = *coordinatorSnapshot
 
-	fmt.Println(heartbeatEvent)
+	seq, err := d.getSequencerForContract(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("failed to obtain sequencer to pass heartbeat eventct %v:", err)
+		return
+	}
 
-	// _, err = d.getSequencerForContract(ctx, p.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	// if err != nil {
-	// 	log.L(ctx).Errorf("failed to obtain sequencer to pass heartbeat eventct %v:", err)
-	// 	return
-	// }
+	log.L(ctx).Infof("Handing off heartbeat event to distributed sequencer coordinator")
+	seq.coordinator.HandleEvent(ctx, heartbeatEvent)
+}
 
-	// MRW TODO - does event handling exist here?
-	// seq.coordinatorSelector.HandleCoordinatorEvent(ctx, heartbeatEvent)
+func (d *distributedSequencerManager) handleAssembleRequest(ctx context.Context, messagePayload []byte) {
+	log.L(d.ctx).Debug("Distributed sequencer handleAssembleRequest")
+
+	assembleRequest := &engineProto.AssembleRequest{}
+
+	err := proto.Unmarshal(messagePayload, assembleRequest)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to unmarshal assemble request: %s", err)
+		return
+	}
+
+	preAssembly := &components.TransactionPreAssembly{}
+	err = json.Unmarshal(assembleRequest.PreAssembly, preAssembly)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to unmarshal pre assembly: %s", err)
+		return
+	}
+
+	contractAddressString := assembleRequest.ContractAddress
+	contractAddress, err := pldtypes.ParseEthAddress(contractAddressString)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to parse contract address received in assemble request: %s", err)
+		return
+	}
+
+	seq, err := d.getSequencerForContract(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("failed to obtain sequencer to pass heartbeat eventct %v:", err)
+		return
+	}
+
+	assembleRequestEvent := &transaction.AssembleRequestReceivedEvent{}
+	assembleRequestEvent.TransactionID = uuid.MustParse(assembleRequest.TransactionId)
+	assembleRequestEvent.RequestID = uuid.MustParse(assembleRequest.AssembleRequestId)
+	assembleRequestEvent.Coordinator = seq.coordinator.GetActiveCoordinatorNode(ctx)
+	assembleRequestEvent.CoordinatorsBlockHeight = assembleRequest.BlockHeight
+	assembleRequestEvent.StateLocksJSON = assembleRequest.StateLocks
+
+	log.L(ctx).Infof("Handing off assemble request event to distributed sequencer sender")
+	seq.sender.HandleEvent(ctx, assembleRequestEvent)
+}
+
+func (d *distributedSequencerManager) handleAssembleResponse(ctx context.Context, messagePayload []byte) {
+	log.L(d.ctx).Debug("Distributed sequencer handleAssembleResponse")
+
+	assembleResponse := &engineProto.AssembleResponse{}
+
+	err := proto.Unmarshal(messagePayload, assembleResponse)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to unmarshal assemble response: %s", err)
+		return
+	}
+
+	postAssembly := &components.TransactionPostAssembly{}
+	err = json.Unmarshal(assembleResponse.PostAssembly, postAssembly)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to unmarshal pre assembly: %s", err)
+		return
+	}
+
+	contractAddressString := assembleResponse.ContractAddress
+	contractAddress, err := pldtypes.ParseEthAddress(contractAddressString)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to parse contract address received in assemble response: %s", err)
+		return
+	}
+
+	seq, err := d.getSequencerForContract(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("failed to obtain sequencer to pass assemble response event %v:", err)
+		return
+	}
+
+	switch postAssembly.AssemblyResult {
+	case prototk.AssembleTransactionResponse_OK:
+		log.L(ctx).Infof("Handing off assemble request and sign success event to distributed sequencer coordinator")
+		assembleResponseEvent := &transaction.AssembleAndSignSuccessEvent{}
+		assembleResponseEvent.TransactionID = uuid.MustParse(assembleResponse.TransactionId)
+		assembleResponseEvent.RequestID = uuid.MustParse(assembleResponse.AssembleRequestId)
+		seq.coordinator.HandleEvent(ctx, assembleResponseEvent)
+	case prototk.AssembleTransactionResponse_PARK:
+		log.L(ctx).Infof("Handing off assemble park event to distributed sequencer coordinator")
+		assembleResponseEvent := &transaction.AssembleParkEvent{}
+		assembleResponseEvent.TransactionID = uuid.MustParse(assembleResponse.TransactionId)
+		assembleResponseEvent.RequestID = uuid.MustParse(assembleResponse.AssembleRequestId)
+		seq.coordinator.HandleEvent(ctx, assembleResponseEvent)
+	case prototk.AssembleTransactionResponse_REVERT:
+		log.L(ctx).Infof("Handing off assemble revert event to distributed sequencer coordinator")
+		assembleResponseEvent := &transaction.AssembleRevertEvent{}
+		assembleResponseEvent.TransactionID = uuid.MustParse(assembleResponse.TransactionId)
+		assembleResponseEvent.RequestID = uuid.MustParse(assembleResponse.AssembleRequestId)
+		seq.coordinator.HandleEvent(ctx, assembleResponseEvent)
+	default:
+		log.L(ctx).Errorf("Received unexpected assemble response type %s", postAssembly.AssemblyResult)
+	}
+	log.L(ctx).Errorf("Received unexpected assemble response type %s", postAssembly.AssemblyResult)
+}
+
+func (d *distributedSequencerManager) handleAssembleError(ctx context.Context, messagePayload []byte) {
+	log.L(d.ctx).Debug("Distributed sequencer handleAssembleError")
+
+	assembleError := &engineProto.AssembleError{}
+
+	err := proto.Unmarshal(messagePayload, assembleError)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to unmarshal assemble error: %s", err)
+		return
+	}
+	assembleErrorEvent := &transaction.AssembleErrorEvent{}
+	assembleErrorEvent.TransactionID = uuid.MustParse(assembleError.TransactionId)
+
+	contractAddressString := assembleError.ContractAddress
+	contractAddress, err := pldtypes.ParseEthAddress(contractAddressString)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to parse contract address received in assemble error: %s", err)
+		return
+	}
+
+	errorString := assembleError.ErrorMessage
+	log.L(ctx).Infof("Assemble error for TX %s: %s", assembleError.TransactionId, errorString)
+
+	seq, err := d.getSequencerForContract(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("failed to obtain sequencer to pass assemble error event %v:", err)
+		return
+	}
+	log.L(ctx).Infof("Handing off assemble error event to distributed sequencer coordinator")
+	seq.coordinator.HandleEvent(ctx, assembleErrorEvent)
+}
+
+func (d *distributedSequencerManager) handleEndorsementRequest(ctx context.Context, messagePayload []byte, fromNode string) {
+	log.L(d.ctx).Debug("Distributed sequencer handleEndorsementRequest")
+
+	endorsementRequest := &engineProto.EndorsementRequest{}
+
+	err := proto.Unmarshal(messagePayload, endorsementRequest)
+	if err != nil {
+		log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal endorsement request: %s", err)
+		return
+	}
+
+	contractAddressString := endorsementRequest.ContractAddress
+	contractAddress, err := pldtypes.ParseEthAddress(contractAddressString)
+	if err != nil {
+		log.L(ctx).Errorf("handleEndorsementRequest failed to parse contract address received in endorsement request: %s", err)
+		return
+	}
+
+	psc, err := d.components.DomainManager().GetSmartContractByAddress(ctx, d.components.Persistence().NOTX(), *contractAddress)
+	if err != nil {
+		log.L(ctx).Errorf("handleEndorsementRequest failed to get domain for endorsement request: %s", err)
+		return
+	}
+
+	transactionSpecification := &prototk.TransactionSpecification{}
+	transactionVerifiers := make([]*prototk.ResolvedVerifier, len(endorsementRequest.Verifiers))
+	for _, r := range endorsementRequest.Verifiers {
+		nextVerifier := &prototk.ResolvedVerifier{}
+		err = proto.Unmarshal(r.Value, nextVerifier)
+		if err != nil {
+			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal verifier %s for endorsement request: %s", r.String(), err)
+			return
+		}
+	}
+
+	transactionSignatures := make([]*prototk.AttestationResult, len(endorsementRequest.Signatures))
+	for _, s := range endorsementRequest.Signatures {
+		nextSignature := &prototk.AttestationResult{}
+		err = proto.Unmarshal(s.Value, nextSignature)
+		if err != nil {
+			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal signature %s for endorsement request: %s", s.String(), err)
+			return
+		}
+	}
+
+	transactionInputStates := make([]*prototk.EndorsableState, len(endorsementRequest.InputStates))
+	for _, s := range endorsementRequest.InputStates {
+		nextState := &prototk.EndorsableState{}
+		err = proto.Unmarshal(s.Value, nextState)
+		if err != nil {
+			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal input state %s for endorsement request: %s", s.String(), err)
+			return
+		}
+	}
+
+	transactionReadStates := make([]*prototk.EndorsableState, len(endorsementRequest.ReadStates))
+	for _, s := range endorsementRequest.ReadStates {
+		nextState := &prototk.EndorsableState{}
+		err = proto.Unmarshal(s.Value, nextState)
+		if err != nil {
+			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal read state %s for endorsement request: %s", s.String(), err)
+			return
+		}
+	}
+
+	transactionOutputStates := make([]*prototk.EndorsableState, len(endorsementRequest.OutputStates))
+	for _, s := range endorsementRequest.OutputStates {
+		nextState := &prototk.EndorsableState{}
+		err = proto.Unmarshal(s.Value, nextState)
+		if err != nil {
+			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal output state %s for endorsement request: %s", s.String(), err)
+			return
+		}
+	}
+
+	transactionInfoStates := make([]*prototk.EndorsableState, len(endorsementRequest.InfoStates))
+	for _, s := range endorsementRequest.InfoStates {
+		nextState := &prototk.EndorsableState{}
+		err = proto.Unmarshal(s.Value, nextState)
+		if err != nil {
+			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal info state %s for endorsement request: %s", s.String(), err)
+			return
+		}
+	}
+
+	transactionEndorsement := &prototk.AttestationRequest{}
+	err = proto.Unmarshal(endorsementRequest.AttestationRequest.Value, transactionEndorsement)
+	if err != nil {
+		log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal endorsement request: %s", err)
+		return
+	}
+
+	privateEndorsementRequest := &components.PrivateTransactionEndorseRequest{}
+	privateEndorsementRequest.TransactionSpecification = transactionSpecification
+	privateEndorsementRequest.Verifiers = transactionVerifiers
+	privateEndorsementRequest.Signatures = transactionSignatures
+	privateEndorsementRequest.InputStates = transactionInputStates
+	privateEndorsementRequest.ReadStates = transactionReadStates
+	privateEndorsementRequest.OutputStates = transactionOutputStates
+	privateEndorsementRequest.InfoStates = transactionInfoStates
+	privateEndorsementRequest.Endorsement = transactionEndorsement
+
+	// Create a throwaway domain context for this call
+	dCtx := d.components.StateManager().NewDomainContext(ctx, psc.Domain(), psc.Address())
+	defer dCtx.Close()
+	endorseRes, err := psc.EndorseTransaction(dCtx, d.components.Persistence().NOTX(), privateEndorsementRequest)
+	if err != nil {
+		log.L(ctx).Errorf("handleEndorsementRequest failed to endorse transaction: %s", err)
+		return
+	}
+
+	seq, err := d.getSequencerForContract(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("handleEndorsementRequest failed to obtain sequencer to pass endorsement event %v:", err)
+		return
+	}
+
+	result := &prototk.AttestationResult{
+		Name:            transactionEndorsement.Name,
+		AttestationType: transactionEndorsement.AttestationType,
+		Verifier:        endorseRes.Endorser,
+	}
+	switch endorseRes.Result {
+	case prototk.EndorseTransactionResponse_REVERT:
+		revertReason := "(no revert reason)"
+		if endorseRes.RevertReason != nil {
+			revertReason = *endorseRes.RevertReason
+		}
+		endorseRejectedEvent := &coordTransaction.EndorsedRejectedEvent{}
+		endorseRejectedEvent.RevertReason = revertReason
+		endorseRejectedEvent.Party = endorsementRequest.Party
+		endorseRejectedEvent.AttestationRequestName = transactionEndorsement.Name
+		endorseRejectedEvent.RequestID = uuid.MustParse(endorsementRequest.IdempotencyKey)
+		seq.coordinator.HandleEvent(ctx, endorseRejectedEvent)
+	case prototk.EndorseTransactionResponse_SIGN:
+		for _, partyName := range transactionEndorsement.Parties {
+			unqualifiedLookup, signerNode, err := pldtypes.PrivateIdentityLocator(partyName).Validate(ctx, d.nodeName, true)
+			if err != nil {
+				log.L(ctx).Errorf("handleEndorsementRequest failed to validate identity locator for signing party %s: %s", partyName, err)
+				return
+			}
+			if signerNode == d.nodeName {
+
+				keyMgr := d.components.KeyManager()
+				resolvedKey, err := keyMgr.ResolveKeyNewDatabaseTX(ctx, unqualifiedLookup, transactionEndorsement.Algorithm, transactionEndorsement.VerifierType)
+				if err != nil {
+					log.L(ctx).Errorf("handleEndorsementRequest ailed to resolve local signer for %s (algorithm=%s): %s", unqualifiedLookup, transactionEndorsement.Algorithm, err)
+					return
+				}
+
+				signaturePayload, err := keyMgr.Sign(ctx, resolvedKey, transactionEndorsement.PayloadType, transactionEndorsement.Payload)
+				if err != nil {
+					log.L(ctx).Errorf("handleEndorsementRequest failed to sign for party %s (verifier=%s,algorithm=%s): %s", unqualifiedLookup, resolvedKey.Verifier.Verifier, transactionEndorsement.Algorithm, err)
+					return
+				}
+				log.L(ctx).Debugf("handleEndorsementRequest payload %x signed %x by %s (%s)", transactionEndorsement.Payload, signaturePayload, unqualifiedLookup, resolvedKey.Verifier.Verifier)
+
+				result.Constraints = append(result.Constraints, prototk.AttestationResult_ENDORSER_MUST_SUBMIT)
+				endorsedEvent := &coordTransaction.EndorsedEvent{}
+				endorsedEvent.TransactionID = uuid.MustParse(endorsementRequest.TransactionId)
+				endorsedEvent.RequestID = uuid.MustParse(endorsementRequest.IdempotencyKey)
+				endorsedEvent.Endorsement = result
+				seq.coordinator.HandleEvent(ctx, endorsedEvent)
+			} else {
+				log.L(ctx).Warnf("handleEndorsementRequest ignoring signature request of transaction %s for remote party %s ", endorsementRequest.TransactionId, partyName)
+			}
+		}
+	case prototk.EndorseTransactionResponse_ENDORSER_SUBMIT:
+		result.Constraints = append(result.Constraints, prototk.AttestationResult_ENDORSER_MUST_SUBMIT)
+		endorsedEvent := &coordTransaction.EndorsedEvent{}
+		endorsedEvent.TransactionID = uuid.MustParse(endorsementRequest.TransactionId)
+		endorsedEvent.RequestID = uuid.MustParse(endorsementRequest.IdempotencyKey)
+		endorsedEvent.Endorsement = result
+		seq.coordinator.HandleEvent(ctx, endorsedEvent)
+	default:
+		endorsedEvent := &coordTransaction.EndorsedEvent{}
+		endorsedEvent.TransactionID = uuid.MustParse(endorsementRequest.TransactionId)
+		endorsedEvent.RequestID = uuid.MustParse(endorsementRequest.IdempotencyKey)
+		endorsedEvent.Endorsement = result
+		seq.coordinator.HandleEvent(ctx, endorsedEvent)
+	}
+}
+
+// func (d *distributedSequencerManager) handleEndorsementResponse(ctx context.Context, messagePayload []byte) {
+// 	log.L(ctx).Infof("handleEndorsementResponse not implemented")
+
+// 	endorsementResponse := &engineProto.EndorsementResponse{}
+// 	err := proto.Unmarshal(messagePayload, endorsementResponse)
+// 	if err != nil {
+// 		log.L(ctx).Errorf("handleEndorsementResponse failed to unmarshal endorsement response: %s", err)
+// 		return
+// 	}
+
+// 	endorsement := &prototk.AttestationResult{}
+// 	err = proto.Unmarshal(endorsementResponse.Endorsement.Value, endorsement)
+// 	if err != nil {
+// 		log.L(ctx).Errorf("handleEndorsementResponse failed to unmarshal endorsement: %s", err)
+// 		return
+// 	}
+
+// 	contractAddressString := endorsementResponse.ContractAddress
+// 	contractAddress, err := pldtypes.ParseEthAddress(contractAddressString)
+// 	if err != nil {
+// 		log.L(ctx).Errorf("handleEndorsementResponse failed to parse contract address received in endorsement response: %s", err)
+// 		return
+// 	}
+
+// 	endorsementResponseEvent := &coordTransaction.EndorsedResponseEvent{}
+// 	endorsementResponseEvent.TransactionID = uuid.MustParse(endorsementResponse.TransactionId)
+// 	endorsementResponseEvent.RequestID = uuid.MustParse(endorsementResponse.IdempotencyKey)
+// 	endorsementResponseEvent.Endorsement = endorsement
+
+// 	seq, err := d.getSequencerForContract(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+// 	if err != nil {
+// 		log.L(ctx).Errorf("handleEndorsementRequest failed to obtain sequencer to pass endorsement event %v:", err)
+// 		return
+// 	}
+// 	seq.coordinator.HandleEvent(ctx, endorsementResponseEvent)
+
+// }
+
+func (d *distributedSequencerManager) handleDelegationRequest(ctx context.Context, messagePayload []byte, fromNode string) {
+	log.L(d.ctx).Debugf("Distributed sequencer handleDelegationRequest from %s", fromNode)
+	delegationRequest := &engineProto.DelegationRequest{}
+	err := proto.Unmarshal(messagePayload, delegationRequest)
+	if err != nil {
+		log.L(ctx).Errorf("handleDelegationRequest failed to unmarshal delegation request: %s", err)
+		return
+	}
+
+	privateTransaction := &components.PrivateTransaction{}
+	err = json.Unmarshal(delegationRequest.PrivateTransaction, privateTransaction)
+	if err != nil {
+		log.L(ctx).Errorf("handleDelegationRequest failed to unmarshal private transaction received in delegation request: %s", err)
+		return
+	}
+
+	contractAddressString := privateTransaction.PreAssembly.TransactionSpecification.ContractInfo.ContractAddress
+	contractAddress, err := pldtypes.ParseEthAddress(contractAddressString)
+	if err != nil {
+		log.L(ctx).Errorf("handleDelegationRequest failed to parse contract address received in delegation request: %s", err)
+		return
+	}
+
+	transactionDelegatedEvent := &coordinator.TransactionsDelegatedEvent{}
+	log.L(d.ctx).Debugf("handleDelegationRequest transaction specific from: %s", privateTransaction.PreAssembly.TransactionSpecification.From)
+	transactionDelegatedEvent.Sender = privateTransaction.PreAssembly.TransactionSpecification.From
+
+	transactionDelegatedEvent.Transactions = append(transactionDelegatedEvent.Transactions, privateTransaction)
+	transactionDelegatedEvent.SendersBlockHeight = uint64(d.blockHeight) // MRW TODO - which is the senders block height here?
+
+	seq, err := d.getSequencerForContract(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("handleDelegationRequest failed to obtain sequencer to pass endorsement event %v:", err)
+		return
+	}
+
+	seq.coordinator.HandleEvent(ctx, transactionDelegatedEvent)
+}
+
+func (d *distributedSequencerManager) handleDelegationRequestAcknowledgment(ctx context.Context, messagePayload []byte) {
+	log.L(ctx).Infof("handleDelegationRequestAcknowledgment not implemented")
+
+	delegationRequestAcknowledgment := &engineProto.DelegationRequestAcknowledgment{}
+	err := proto.Unmarshal(messagePayload, delegationRequestAcknowledgment)
+	if err != nil {
+		log.L(ctx).Errorf("handleDelegationRequestAcknowledgment failed to unmarshal delegation request acknowledgment: %s", err)
+		return
+	}
+
+	// MRW TODO - is any action required here?
+	log.L(ctx).Infof("handleDelegationRequestAcknowledgment received for transaction ID %s", delegationRequestAcknowledgment.TransactionId)
 }

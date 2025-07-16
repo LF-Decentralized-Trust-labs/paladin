@@ -177,6 +177,7 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		b.contractAddress,          // Contract address,
 		5,                          // Block height tolerance
 		5,                          // Closing grace period (measured in number of heartbeat intervals)
+		"node1",
 	)
 	if err != nil {
 		panic(err)

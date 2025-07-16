@@ -45,6 +45,10 @@ type EngineIntegration interface {
 	// WriteLockAndDistributeStatesForTransaction is a method that writes a lock to the state and distributes the states for a transaction
 	WriteLockAndDistributeStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error
 
+	GetStateLocks(ctx context.Context) ([]byte, error)
+
+	GetBlockHeight(ctx context.Context) (int64, error)
+
 	//Assemble and sign is a single, synchronous operation that assembles a transaction using the domain smart contract
 	// and then fulfills any signature requests in the attestation plan
 	// there would be a benefit in separating this out to `assemble` and `sign` steps and to make then asynchronous
@@ -76,6 +80,14 @@ type FakeEngineIntegrationForTesting struct {
 
 func (f *FakeEngineIntegrationForTesting) WriteLockAndDistributeStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
 	return nil
+}
+
+func (f *FakeEngineIntegrationForTesting) GetStateLocks(ctx context.Context) ([]byte, error) {
+	return nil, nil
+}
+
+func (f *FakeEngineIntegrationForTesting) GetBlockHeight(ctx context.Context) (int64, error) {
+	return 0, nil
 }
 
 func (f *FakeEngineIntegrationForTesting) AssembleAndSign(ctx context.Context, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) (*components.TransactionPostAssembly, error) {
@@ -141,6 +153,14 @@ func (s *engineIntegration) WriteLockAndDistributeStatesForTransaction(ctx conte
 
 }
 
+func (s *engineIntegration) GetStateLocks(ctx context.Context) ([]byte, error) {
+	return s.domainContext.ExportSnapshot()
+}
+
+func (s *engineIntegration) GetBlockHeight(ctx context.Context) (int64, error) {
+	return s.environment.GetBlockHeight(), nil
+}
+
 // assemble a transaction that we are not coordinating, using the provided state locks
 // all errors are assumed to be transient and the request should be retried
 // if the domain as deemed the request as invalid then it will communicate the `revert` directive via the AssembleTransactionResponse_REVERT result without any error
@@ -157,6 +177,26 @@ func (s *engineIntegration) AssembleAndSign(ctx context.Context, transactionID u
 	if err != nil {
 		log.L(ctx).Errorf("assembleForRemoteCoordinator: Error importing state locks: %s", err)
 		return nil, err
+	}
+
+	for _, v := range preAssembly.RequiredVerifiers {
+		log.L(ctx).Debugf("assembleForRemoteCoordinator: resolving required verifier %s", v.Lookup)
+		verifier, err := s.components.IdentityResolver().ResolveVerifier(
+			ctx,
+			v.Lookup,
+			v.Algorithm,
+			v.VerifierType,
+		)
+		if err != nil {
+			log.L(ctx).Errorf("assembleForRemoteCoordinator: Error resolving verifier %s: %s", v.Lookup, err)
+			return nil, err
+		}
+		preAssembly.Verifiers = append(preAssembly.Verifiers, &prototk.ResolvedVerifier{
+			Lookup:       v.Lookup,
+			Algorithm:    v.Algorithm,
+			VerifierType: v.VerifierType,
+			Verifier:     verifier,
+		})
 	}
 
 	postAssembly, err := s.assembleAndSign(ctx, transactionID, preAssembly, s.domainContext)

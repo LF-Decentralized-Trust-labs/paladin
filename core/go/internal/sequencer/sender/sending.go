@@ -27,6 +27,7 @@ import (
 )
 
 func action_SendDelegationRequest(ctx context.Context, s *sender) error {
+	log.L(ctx).Infof("action_SendDelegationRequest")
 	transactions, err := s.transactionsOrderedByCreatedTime(ctx)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to get transactions ordered by created time: %v", err)

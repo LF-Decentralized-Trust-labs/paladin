@@ -77,6 +77,7 @@ type componentManager struct {
 	stateManager                components.StateManager
 	domainManager               components.DomainManager
 	transportManager            components.TransportManager
+	loopbackTransportManager    components.TransportManager
 	registryManager             components.RegistryManager
 	pluginManager               components.PluginManager
 	publicTxManager             components.PublicTxManager
@@ -544,6 +545,10 @@ func (cm *componentManager) DomainManager() components.DomainManager {
 
 func (cm *componentManager) TransportManager() components.TransportManager {
 	return cm.transportManager
+}
+
+func (cm *componentManager) LoopbackTransportManager() components.TransportManager {
+	return cm.loopbackTransportManager
 }
 
 func (cm *componentManager) RegistryManager() components.RegistryManager {

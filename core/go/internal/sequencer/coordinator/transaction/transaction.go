@@ -44,9 +44,9 @@ const (
 // Transaction represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
 type Transaction struct {
 	*components.PrivateTransaction
-	sender               string
-	senderIdentity       string
-	senderNode           string
+	sender               string // The member ID e.g. "member1"
+	senderNode           string // The node the sender is running on e.g. "node1"
+	senderIdentity       string // The fully qualified identity of the sender e.g. "member1@node1"
 	signerAddress        *pldtypes.EthAddress
 	latestSubmissionHash *pldtypes.Bytes32
 	nonce                *uint64

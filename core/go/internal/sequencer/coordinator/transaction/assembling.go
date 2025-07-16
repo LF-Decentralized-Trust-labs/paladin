@@ -46,6 +46,7 @@ func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *compo
 	return t.calculatePostAssembleDependencies(ctx)
 }
 
+// MRW TODO what's the destination for the assemble request?
 func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 	//assemble requests have a short and long timeout
 	// the short timeout is for toleration of unreliable networks whereby the action is to retry the request with the same idempotency key
@@ -56,7 +57,18 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 	// we and nudge the request every requestTimeout event implement the short retry.
 	// the state machine will deal with the long timeout via the guard assembleTimeoutExpired
 	t.pendingAssembleRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
-		return t.messageSender.SendAssembleRequest(ctx, t.sender, t.ID, idempotencyKey, t.PreAssembly)
+		stateLocks, err := t.engineIntegration.GetStateLocks(ctx)
+		if err != nil {
+			log.L(ctx).Errorf("sendAssembleRequest failed to get engine state locks: %s", err)
+			return err
+		}
+		blockHeight, err := t.engineIntegration.GetBlockHeight(ctx)
+		if err != nil {
+			log.L(ctx).Errorf("sendAssembleRequest failed to get engine block height: %s", err)
+			return err
+		}
+
+		return t.messageSender.SendAssembleRequest(ctx, t.senderNode, t.ID, idempotencyKey, t.PreAssembly, stateLocks, blockHeight)
 	})
 	t.cancelAssembleTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
 		t.emit(&RequestTimeoutIntervalEvent{

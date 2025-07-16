@@ -156,8 +156,8 @@ func (_m *MockMessageSender) EXPECT() *MockMessageSender_Expecter {
 }
 
 // SendAssembleResponse provides a mock function for the type MockMessageSender
-func (_mock *MockMessageSender) SendAssembleResponse(ctx context.Context, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly) {
-	_mock.Called(ctx, requestID, postAssembly)
+func (_mock *MockMessageSender) SendAssembleResponse(ctx context.Context, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, recipient string) {
+	_mock.Called(ctx, requestID, postAssembly, recipient)
 	return
 }
 
@@ -170,11 +170,12 @@ type MockMessageSender_SendAssembleResponse_Call struct {
 //   - ctx context.Context
 //   - requestID uuid.UUID
 //   - postAssembly *components.TransactionPostAssembly
-func (_e *MockMessageSender_Expecter) SendAssembleResponse(ctx interface{}, requestID interface{}, postAssembly interface{}) *MockMessageSender_SendAssembleResponse_Call {
-	return &MockMessageSender_SendAssembleResponse_Call{Call: _e.mock.On("SendAssembleResponse", ctx, requestID, postAssembly)}
+//   - recipient string
+func (_e *MockMessageSender_Expecter) SendAssembleResponse(ctx interface{}, requestID interface{}, postAssembly interface{}, recipient interface{}) *MockMessageSender_SendAssembleResponse_Call {
+	return &MockMessageSender_SendAssembleResponse_Call{Call: _e.mock.On("SendAssembleResponse", ctx, requestID, postAssembly, recipient)}
 }
 
-func (_c *MockMessageSender_SendAssembleResponse_Call) Run(run func(ctx context.Context, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly)) *MockMessageSender_SendAssembleResponse_Call {
+func (_c *MockMessageSender_SendAssembleResponse_Call) Run(run func(ctx context.Context, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, recipient string)) *MockMessageSender_SendAssembleResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -188,10 +189,15 @@ func (_c *MockMessageSender_SendAssembleResponse_Call) Run(run func(ctx context.
 		if args[2] != nil {
 			arg2 = args[2].(*components.TransactionPostAssembly)
 		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -202,7 +208,7 @@ func (_c *MockMessageSender_SendAssembleResponse_Call) Return() *MockMessageSend
 	return _c
 }
 
-func (_c *MockMessageSender_SendAssembleResponse_Call) RunAndReturn(run func(ctx context.Context, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly)) *MockMessageSender_SendAssembleResponse_Call {
+func (_c *MockMessageSender_SendAssembleResponse_Call) RunAndReturn(run func(ctx context.Context, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, recipient string)) *MockMessageSender_SendAssembleResponse_Call {
 	_c.Run(run)
 	return _c
 }
@@ -332,46 +338,116 @@ func (_m *MockSeqSender) EXPECT() *MockSeqSender_Expecter {
 	return &MockSeqSender_Expecter{mock: &_m.Mock}
 }
 
-// GetThing provides a mock function for the type MockSeqSender
-func (_mock *MockSeqSender) GetThing() error {
-	ret := _mock.Called()
+// HandleEvent provides a mock function for the type MockSeqSender
+func (_mock *MockSeqSender) HandleEvent(ctx context.Context, event common.Event) error {
+	ret := _mock.Called(ctx, event)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetThing")
+		panic("no return value specified for HandleEvent")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func() error); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context, common.Event) error); ok {
+		r0 = returnFunc(ctx, event)
 	} else {
 		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// MockSeqSender_GetThing_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetThing'
-type MockSeqSender_GetThing_Call struct {
+// MockSeqSender_HandleEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HandleEvent'
+type MockSeqSender_HandleEvent_Call struct {
 	*mock.Call
 }
 
-// GetThing is a helper method to define mock.On call
-func (_e *MockSeqSender_Expecter) GetThing() *MockSeqSender_GetThing_Call {
-	return &MockSeqSender_GetThing_Call{Call: _e.mock.On("GetThing")}
+// HandleEvent is a helper method to define mock.On call
+//   - ctx context.Context
+//   - event common.Event
+func (_e *MockSeqSender_Expecter) HandleEvent(ctx interface{}, event interface{}) *MockSeqSender_HandleEvent_Call {
+	return &MockSeqSender_HandleEvent_Call{Call: _e.mock.On("HandleEvent", ctx, event)}
 }
 
-func (_c *MockSeqSender_GetThing_Call) Run(run func()) *MockSeqSender_GetThing_Call {
+func (_c *MockSeqSender_HandleEvent_Call) Run(run func(ctx context.Context, event common.Event)) *MockSeqSender_HandleEvent_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 common.Event
+		if args[1] != nil {
+			arg1 = args[1].(common.Event)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
 
-func (_c *MockSeqSender_GetThing_Call) Return(err error) *MockSeqSender_GetThing_Call {
+func (_c *MockSeqSender_HandleEvent_Call) Return(err error) *MockSeqSender_HandleEvent_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockSeqSender_GetThing_Call) RunAndReturn(run func() error) *MockSeqSender_GetThing_Call {
+func (_c *MockSeqSender_HandleEvent_Call) RunAndReturn(run func(ctx context.Context, event common.Event) error) *MockSeqSender_HandleEvent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetActiveCoordinator provides a mock function for the type MockSeqSender
+func (_mock *MockSeqSender) SetActiveCoordinator(ctx context.Context, coordinator string) error {
+	ret := _mock.Called(ctx, coordinator)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetActiveCoordinator")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, coordinator)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockSeqSender_SetActiveCoordinator_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetActiveCoordinator'
+type MockSeqSender_SetActiveCoordinator_Call struct {
+	*mock.Call
+}
+
+// SetActiveCoordinator is a helper method to define mock.On call
+//   - ctx context.Context
+//   - coordinator string
+func (_e *MockSeqSender_Expecter) SetActiveCoordinator(ctx interface{}, coordinator interface{}) *MockSeqSender_SetActiveCoordinator_Call {
+	return &MockSeqSender_SetActiveCoordinator_Call{Call: _e.mock.On("SetActiveCoordinator", ctx, coordinator)}
+}
+
+func (_c *MockSeqSender_SetActiveCoordinator_Call) Run(run func(ctx context.Context, coordinator string)) *MockSeqSender_SetActiveCoordinator_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockSeqSender_SetActiveCoordinator_Call) Return(err error) *MockSeqSender_SetActiveCoordinator_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockSeqSender_SetActiveCoordinator_Call) RunAndReturn(run func(ctx context.Context, coordinator string) error) *MockSeqSender_SetActiveCoordinator_Call {
 	_c.Call.Return(run)
 	return _c
 }

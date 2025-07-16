@@ -29,13 +29,26 @@ func (d *distributedSequencerManager) HandlePaladinMsg(ctx context.Context, mess
 
 	//Send the event to the sequencer for the contract and any transaction manager for the signing key
 	messagePayload := message.Payload
-	// fromNode := message.FromNode // MRW TODO - do we need this here?
+	fromNode := message.FromNode
 
 	switch message.MessageType {
 	case transport.MessageType_CoordinatorHeartbeatNotification:
 		go d.handleCoordinatorHeartbeatNotification(d.ctx, messagePayload)
+	case "EndorsementRequest":
+		go d.handleEndorsementRequest(d.ctx, messagePayload, fromNode)
+	// case "EndorsementResponse":
+	// 	go d.handleEndorsementResponse(d.ctx, messagePayload)
+	case "DelegationRequest":
+		go d.handleDelegationRequest(d.ctx, messagePayload, fromNode)
+	case "DelegationRequestAcknowledgment":
+		go d.handleDelegationRequestAcknowledgment(d.ctx, messagePayload)
+	case "AssembleRequest":
+		go d.handleAssembleRequest(d.ctx, messagePayload)
+	case "AssembleResponse":
+		go d.handleAssembleResponse(d.ctx, messagePayload)
+	case "AssembleError":
+		go d.handleAssembleError(d.ctx, messagePayload)
 	default:
 		log.L(ctx).Errorf("Unknown message type: %s", message.MessageType)
 	}
-
 }
