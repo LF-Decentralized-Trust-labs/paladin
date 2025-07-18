@@ -22,6 +22,7 @@ jobs:
     outputs:
       tag: ${{ steps.set-vars.outputs.tag }}
       latest: ${{ steps.set-vars.outputs.latest }}
+      sdk_tag: ${{ steps.set-vars.outputs.sdk_tag }}
     steps:
       - id: set-vars
         shell: bash
@@ -45,8 +46,16 @@ jobs:
               LATEST="false"
             fi
           fi
+
+          if [[ "$LATEST" ==  "true" ]]; then
+            SDK_TAG="stable"
+          else
+            SDK_TAG="latest"
+          fi
+
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "sdk_tag=$SDK_TAG" >> $GITHUB_OUTPUT
       
       - id: new-tag
         name: Validate new tag follows semver versioning
@@ -168,5 +177,6 @@ jobs:
     uses: ./.github/workflows/release-typescript-sdk.yaml
     with:
       sdk_version: ${{ needs.set-variables.outputs.tag }}
+      sdk_tag: ${{ needs.set-variables.outputs.sdk_tag }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }} 

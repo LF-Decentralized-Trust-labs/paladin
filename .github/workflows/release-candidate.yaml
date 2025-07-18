@@ -74,9 +74,18 @@ jobs:
 
   release-solidity-contracts:
     uses: ./.github/workflows/release-solidity-contracts.yaml
+  
+  release-typescript-sdk:
+    needs: [set-variables]
+    uses: ./.github/workflows/release-typescript-sdk.yaml
+    with:
+      sdk_version: ${{ needs.set-variables.outputs.tag }}
+      sdk_tag: "rc"
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }} 
 
   release:
-    needs: [set-variables, release-charts, release-solidity-contracts]
+    needs: [set-variables, release-charts, release-solidity-contracts, release-typescript-sdk]
     runs-on: ubuntu-latest
     steps:
       - name: Download Helm artifacts

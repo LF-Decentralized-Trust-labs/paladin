@@ -1,0 +1,127 @@
+name: 'Test Examples with SDK'
+on:
+  push:
+    paths:
+      - 'scripts/**'
+      - 'sdk/typescript/**'
+      - 'example/**'
+      - '.github/workflows/test-rollout.yaml'
+  workflow_dispatch: 
+    inputs:
+      build_local_sdk:
+        description: 'Build local TypeScript SDK instead of using published package'
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      build_local_sdk:
+        description: 'Build local TypeScript SDK instead of using published package'
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  run-examples:
+    # here are the steps:
+    # 1. create a cluster with kind
+    # 2. install the helm charts (latest version)
+    # 3. run the examples as the user will run them
+        # 3.1. Download the solidity files
+        # 3.2. Run the examples
+    # 7. destroy the cluster
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Kind
+        uses: helm/kind-action@v1
+        with:
+          install_only: true # only install kind, the cluster creation is managed by the next step
+          ignore_failed_clean: true
+
+      - name: Create cluster
+        run: |
+          # Download the kind configuration
+          curl https://raw.githubusercontent.com/LF-Decentralized-Trust-labs/paladin/refs/heads/main/operator/paladin-kind.yaml -L -O
+          
+          # Create the cluster
+          kind create cluster --name paladin --config paladin-kind.yaml
+          
+          # Wait for cluster to be ready
+          kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+      - name: Install latest Paladin charts
+        run: |
+          # Step 1: Install the CRD Chart
+          helm repo add paladin https://LF-Decentralized-Trust-labs.github.io/paladin --force-update
+          helm upgrade --install paladin-crds paladin/paladin-operator-crd
+          
+          # Step 2: Install cert-manager CRDs
+          helm repo add jetstack https://charts.jetstack.io --force-update
+          helm install cert-manager --namespace cert-manager --version v1.16.1 jetstack/cert-manager --create-namespace --set crds.enabled=true
+          
+          # Wait for cert-manager to be ready
+          kubectl wait --for=condition=Ready pods --all -n cert-manager --timeout=300s
+          
+          # Step 3: Install the Paladin Operator Chart
+          helm upgrade --install paladin paladin/paladin-operator -n paladin --create-namespace
+
+      - name: Validate installation
+        run: |
+          # Run the validation script with explicit namespace
+          ./scripts/default-installation-validation.sh paladin
+
+      - name: Download Solidity contracts
+        run: |
+          # Download the latest stable solidity contracts
+          curl -L -o abis.tar.gz https://github.com/LF-Decentralized-Trust-labs/paladin/releases/latest/download/abis.tar.gz
+          
+          # Extract contracts to a central location
+          mkdir -p contracts
+          tar -xzf abis.tar.gz -C contracts/
+
+      - name: Build example/common with published TypeScript SDK
+        if: ${{ !inputs.build_local_sdk }}
+        run: |
+          echo "Using published SDK: @lfdecentralizedtrust-labs/paladin-sdk"
+          echo "Latest version: $(npm view @lfdecentralizedtrust-labs/paladin-sdk version)"
+          
+          # Update common utilities to use published SDK
+          cd example/common
+          npm uninstall @lfdecentralizedtrust-labs/paladin-sdk
+          npm install @lfdecentralizedtrust-labs/paladin-sdk@latest
+          npm run build
+
+      - name: Build example/common with local TypeScript SDK
+        if: ${{ inputs.build_local_sdk }}
+        run: |
+          echo "Building local TypeScript SDK..."
+          cd sdk/typescript
+          npm install
+          npm run abi
+          npm run build
+          
+          # Update common utilities to use local SDK
+          cd ../../example/common
+          npm uninstall @lfdecentralizedtrust-labs/paladin-sdk
+          npm install ../../sdk/typescript
+          npm run build
+
+      - name: Run all examples
+        env:
+          USE_PUBLISHED_SDK: ${{ !inputs.build_local_sdk }}
+        run: |
+          # Run the examples script
+          ./scripts/run-examples.sh
+
+      - name: Cleanup cluster
+        if: always()
+        run: |
+          kind delete cluster --name paladin
+      

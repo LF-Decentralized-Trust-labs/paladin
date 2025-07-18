@@ -60,3 +60,6 @@ bin/
 
 ### Proto ###
 *.pb.go
+
+
+contracts/

@@ -7,13 +7,21 @@ on:
         required: true
     inputs:
       sdk_version:
-        description: 'The version to publish'
+        description: 'The version to publish (e.g. 1.0.0)'
+        required: true
+        type: string
+      sdk_tag:
+        description: 'The tag to publish (e.g. latest, rc, stable)'
         required: true
         type: string
   workflow_dispatch:
     inputs:
       sdk_version:
-        description: 'The version to publish'
+        description: 'The version to publish (e.g. 1.0.0)'
+        required: true
+        type: string
+      sdk_tag:
+        description: 'The tag to publish (e.g. latest, rc, stable)'
         required: true
         type: string
 
@@ -53,7 +61,7 @@ jobs:
         run: |
           set -e
           ../../gradlew build
-          npm publish --provenance --access public
+          npm publish --provenance --access public --tag ${{ inputs.sdk_tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           
