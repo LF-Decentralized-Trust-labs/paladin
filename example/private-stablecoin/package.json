@@ -19,7 +19,7 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@lfdecentralizedtrust-labs/paladin-sdk": "file:../../sdk/typescript",
+    "@lfdecentralizedtrust-labs/paladin-sdk": "^0.9.0",
     "circomlibjs": "^0.1.7",
     "paladin-example-common": "file:../common"
   }
