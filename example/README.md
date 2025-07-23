@@ -24,49 +24,11 @@ paladin-node3-0                    2/2     Running   0          17m
 paladin-operator-bc788db4f-mzbs7   1/1     Running   0          19m
 ```
 
-### Option 1 - npm (downloading the latest stable smart contracts and ABIs)
+### Build the common package
 
-1. **Download the contracts**
-
-   - Download the [latest solidity contracts](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/latest/download/abis.tar.gz) to the paladin root directory.
-   - ~~Download the [latest zeto solidity contracts](https://github.com/LF-Decentralized-Trust-labs/paladin/releases/latest/download/zeto-abis.tar.gz) to the paladin root directory.~~ (should be available from version `v0.10.0`)
-   - Download the [latest zeto solidity contracts](https://github.com/hyperledger-labs/zeto/releases/download/v0.2.0/zeto-contracts-v0.2.0.tar.gz) to the paladin root directory.
-
-2. **Build common utilities**
-
-   ```shell
-   cd <paladin-root>/example/common
-   npm install
-   npm run build
-   ```
-
-### Option 2 - npm (building contracts, ABIs, and paladin SDK locally)
-
-1. **Compile Solidity contracts**
-
-   ```shell
-   cd <paladin-root>/solidity
-   npm install
-   npm run compile
-   ```
-
-2. **Build TypeScript SDK**
-
-   ```shell
-   cd <paladin-root>/sdk/typescript
-   npm install
-   npm run abi
-   npm run build
-   ```
-
-3. **Build common utilities**
-
-   ```shell
-   cd <paladin-root>/example/common
-   npm install
-   npm run build
-   ```
-
-### Option 3 - Gradle
-
-If you are using gradle, every example provides a gradle task that completes the setup steps ready to run the example.
+```shell
+cd <paladin-root>/example/common
+npm install
+npm run contracts
+npm run build
+```
