@@ -32,7 +32,7 @@ type BlockIndexerConfig struct {
 	EventStreams            EventStreamsConfig `json:"eventStreams"`
 	Retry                   RetryConfig        `json:"retry"`
 	IgnoredTransactionTypes []int64            `json:"ignoredTransactionTypes"`
-	InsertDBBatchSize     	*int               `json:"insertDBBatchSize"` // Amount of tx and events to insert in a single DB transaction
+	InsertDBBatchSize       *int               `json:"insertDBBatchSize"` // Amount of tx and events to insert in a single DB transaction
 }
 
 type EventStreamsConfig struct {
@@ -46,7 +46,6 @@ var EventStreamDefaults = &EventStreamsConfig{
 }
 
 var BlockIndexerDefaults = &BlockIndexerConfig{
-<<<<<<< HEAD
 	FromBlock:               json.RawMessage(`0`),
 	CommitBatchSize:         confutil.P(50),
 	CommitBatchTimeout:      confutil.P("100ms"),
@@ -54,13 +53,5 @@ var BlockIndexerDefaults = &BlockIndexerConfig{
 	ChainHeadCacheLen:       confutil.P(50),
 	BlockPollingInterval:    confutil.P("10s"),
 	IgnoredTransactionTypes: []int64{0x7e},
-=======
-	FromBlock:             json.RawMessage(`0`),
-	CommitBatchSize:       confutil.P(50),
-	InsertDBBatchSize:     confutil.P(5000),
-	CommitBatchTimeout:    confutil.P("100ms"),
-	RequiredConfirmations: confutil.P(0),
-	ChainHeadCacheLen:     confutil.P(50),
-	BlockPollingInterval:  confutil.P("10s"),
->>>>>>> 752a72b1f (Make the batch size configurable)
+	InsertDBBatchSize:       confutil.P(5000),
 }
