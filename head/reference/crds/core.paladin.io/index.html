@@ -4584,7 +4584,7 @@ Most common to use a simple one-reference-per-domain approach.</p>
 </tr>
 <tr>
 <td><code>besuNode</code> <em>string</em></td>
-<td>Deprecated: Use 'baseLedgerEndpoint' instead. Example:<br />{ "baseLedgerEndpoint": {"type": "local", "local": {"nodeName": "node-name"}} }<br /><br />Optionally bind to a local Besu node deployed with this operator<br />(vs. configuring a connection to a production blockchain network).</td>
+<td>Deprecated: Use 'baseLedgerEndpoint' instead. Example:<br />{ "baseLedgerEndpoint": {"type": "local", "local": {"nodeName": "node-name"}} }<br />Optionally bind to a local Besu node deployed with this operator<br />(vs. configuring a connection to a production blockchain network).</td>
 <td></td>
 <td></td>
 </tr>
@@ -4724,7 +4724,7 @@ Most common to use a simple one-reference-per-domain approach.</p>
 </tr>
 <tr>
 <td><code>propertyRegexp</code> <em>string</em></td>
-<td>If a node is found, then each property name will be applied to this<br />regular expression, and if it matches then the value of the property<br />will be considered a set of transport details.<br /><br />The transport name must be extracted as a match group.<br /><br />For example the default is:<br />  propertyRegexp: "^transport.(.*)$"<br /><br />This will match a property called "transport.grpc" as the transport<br />details for the grpc transport.</td>
+<td>If a node is found, then each property name will be applied to this<br />regular expression, and if it matches then the value of the property<br />will be considered a set of transport details.<br />The transport name must be extracted as a match group.<br />For example the default is:<br />  propertyRegexp: "^transport.(.*)$"<br />This will match a property called "transport.grpc" as the transport<br />details for the grpc transport.</td>
 <td></td>
 <td></td>
 </tr>
@@ -4980,7 +4980,7 @@ Most common to use a simple one-reference-per-domain approach.</p>
 </tr>
 <tr>
 <td><code>linkedContracts</code> <em>object (keys:string, values:string)</em></td>
-<td>If the bytecode is unlinked, then this map will be used to resolve the dependencies.<br />The keys in the map are the library name, which can be optionally fully qualified<br />with the syntax FileName.sol:LibName. An entry must be provided for every<br />unlinked dependency, or the CR will not perform a deployment.<br /><br />The values are evaluated as go templates, with access to the CR.<br />So you can refer to .status.resolvedContractAddresses in the values via go templating.<br />See <a href="https://docs.soliditylang.org/en/latest/using-the-compiler.html#library-linking">https://docs.soliditylang.org/en/latest/using-the-compiler.html#library-linking</a> for detail</td>
+<td>If the bytecode is unlinked, then this map will be used to resolve the dependencies.<br />The keys in the map are the library name, which can be optionally fully qualified<br />with the syntax FileName.sol:LibName. An entry must be provided for every<br />unlinked dependency, or the CR will not perform a deployment.<br />The values are evaluated as go templates, with access to the CR.<br />So you can refer to .status.resolvedContractAddresses in the values via go templating.<br />See <a href="https://docs.soliditylang.org/en/latest/using-the-compiler.html#library-linking">https://docs.soliditylang.org/en/latest/using-the-compiler.html#library-linking</a> for detail</td>
 <td></td>
 <td></td>
 </tr>
@@ -5155,7 +5155,7 @@ Most common to use a simple one-reference-per-domain approach.</p>
 <tbody>
 <tr>
 <td><code>requiredContractDeployments</code> <em>string array</em></td>
-<td>A list of pre-requisite smart contract deployments that must be resolved<br />to contract addresses before the transaction can be built+submitted.<br />The set of smart contracts is built one-by-one as the smart contract deployments<br />complete, and once set a dependency does not change if the deployment CR<br />is deleted and re-created. So it is important to delete+recreate all<br />inter-related SmartContractDeployment and TransactionInvoke CRs in a set<br />when they are being used as a deployment engine for test infrastructure.<br /><br />This is not intended as substitute to proper smart contract management<br />in production. Instead it is an excellent tool for rapid re-deployment<br />of test infrastructure.</td>
+<td>A list of pre-requisite smart contract deployments that must be resolved<br />to contract addresses before the transaction can be built+submitted.<br />The set of smart contracts is built one-by-one as the smart contract deployments<br />complete, and once set a dependency does not change if the deployment CR<br />is deleted and re-created. So it is important to delete+recreate all<br />inter-related SmartContractDeployment and TransactionInvoke CRs in a set<br />when they are being used as a deployment engine for test infrastructure.<br />This is not intended as substitute to proper smart contract management<br />in production. Instead it is an excellent tool for rapid re-deployment<br />of test infrastructure.</td>
 <td></td>
 <td></td>
 </tr>
