@@ -202,6 +202,7 @@ const (
 )
 
 var AllInFlightStages = []string{
+	string(InFlightTxStageStatusUpdate),
 	string(InFlightTxStageRetrieveGasPrice),
 	string(InFlightTxStageSigning),
 	string(InFlightTxStageSubmitting),
