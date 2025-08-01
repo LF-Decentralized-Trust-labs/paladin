@@ -156,7 +156,10 @@ func testBlockArray(t *testing.T, l int, knownAddress ...ethtypes.Address0xHex) 
 
 func testBlockArrayWithTXType(t *testing.T, l int, transactionType string, knownAddress ...ethtypes.Address0xHex) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
 
-	txType, _ := new(big.Int).SetString(strings.TrimPrefix(transactionType, "0x"), 16) // Set whatever TX type has been provided by the test
+	var txType *big.Int
+	if transactionType != "" {
+		txType, _ = new(big.Int).SetString(strings.TrimPrefix(transactionType, "0x"), 16) // Set whatever TX type has been provided by the test
+	}
 
 	blocks := make([]*BlockInfoJSONRPC, l)
 	receipts := make(map[string][]*TXReceiptJSONRPC, l)
@@ -177,7 +180,10 @@ func testBlockArrayWithTXType(t *testing.T, l int, transactionType string, known
 			Hash:  txHash,
 			From:  ethtypes.MustNewAddress(pldtypes.RandHex(20)),
 			Nonce: ethtypes.HexUint64(i),
-			Type:  (*ethtypes.HexInteger)(txType),
+		}
+		// Some tests don't set TX type to emulate pre-EIP2718 transactions
+		if txType != nil {
+			tx.Type = (*ethtypes.HexInteger)(txType)
 		}
 		blocks[i] = &BlockInfoJSONRPC{
 			Number:       ethtypes.HexUint64(i),
@@ -1230,6 +1236,59 @@ func TestValidTransactionTypesArePersisted(t *testing.T) {
 	expectedTransactions := 10
 	// Persisted transactions. All of the test transactions should be persisted because
 	// we've set their TX type to something that doesn't match any entries in the (configurable) ignore list.
+	persistedTransactions := 0
+
+	bi.fromBlock = nil
+	bi.nextBlock = nil
+	bi.requiredConfirmations = 0
+
+	// simulate the highest block being known. We're going from 5->14
+	bi.blockListener.highestBlock = 5
+	close(bi.blockListener.initialBlockHeightObtained)
+
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
+
+	txNotify := make(chan []*IndexedTransactionNotify)
+	addBlockPostCommitTx(bi, func(transactions []*IndexedTransactionNotify) {
+		txNotify <- transactions
+	})
+
+	// do not start block listener
+	bi.startOrReset()
+
+	// Notify starting at block 5
+	for i := 5; i < len(blocks); i++ {
+		bi.blockListener.notifyBlock(blocks[i])
+	}
+
+	for i := 5; i < len(blocks)-bi.requiredConfirmations; i++ {
+		notifiedBlocks := <-utBatchNotify
+		persistedTransactions += len(<-txNotify)
+		assert.Len(t, notifiedBlocks, 1) // We should get one block per batch
+		checkIndexedBlockEqual(t, blocks[i], notifiedBlocks[0])
+	}
+
+	assert.Equal(t, expectedTransactions, persistedTransactions)
+}
+
+func TestValidTransactionsWithoutTypeArePersisted(t *testing.T) {
+	_, bi, mRPC, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	// Configure ignored (typically L2) transaction types. This test won't provide a TX type
+	// so all transactions should be included/persisted
+	bi.ignoredTransactionTypes = []int64{34, 46, 57}
+
+	blocks, receipts := testBlockArrayWithTXType(t, 15, "") // Don't set a TX type on the sample transactions (i.e. pre-EIP2718)
+
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+
+	// 1 TX per block, 10 blocks (5->14)
+	expectedTransactions := 10
+	// Persisted transactions. All of the test transactions should be persisted because
+	// they simulate pre-EIP2718 transactions which don't set TX type, and we can't ignore
+	// transactions by type if they don't have one
 	persistedTransactions := 0
 
 	bi.fromBlock = nil
