@@ -116,7 +116,15 @@ jobs:
           echo "PROCESSED_TAG=${PROCESSED_TAG}" >> $GITHUB_ENV
 
       # Override the chart version in the Chart.yaml file
-      - name: Override chart version
+      - name: paladin-operator-crd chart version
+        uses: ./.github/actions/update-yaml
+        with:
+          file: 'operator/charts/paladin-operator-crd/Chart.yaml'
+          updates: |
+            version: ${{ env.PROCESSED_TAG }}
+            appVersion: ${{ inputs.chart_tag }}
+
+      - name: paladin-operator chart version
         uses: ./.github/actions/update-yaml
         with:
           file: 'operator/charts/paladin-operator/Chart.yaml'
