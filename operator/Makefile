@@ -214,7 +214,8 @@ helm-install-dependencies: ## Install operator using Helm.
 	$(HELM) repo update
 	$(HELM) dependency update ${CHART_PATH_OPERATOR} || true
 	$(HELM) dependency build ${CHART_PATH_OPERATOR} || true
-	$(HELM) upgrade --install cert-manager --namespace cert-manager --version v1.16.1 jetstack/cert-manager --create-namespace --set crds.enabled=true
+	$(HELM) upgrade --install cert-manager --namespace cert-manager --version v1.16.1 jetstack/cert-manager --create-namespace --set crds.enabled=true --wait
+	$(HELM) upgrade --install paladin-crds charts/paladin-operator-crd
 
 .PHONY: helm-install
 helm-install: helm-install-dependencies ## Install operator using Helm.

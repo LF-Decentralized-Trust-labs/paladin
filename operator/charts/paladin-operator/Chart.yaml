@@ -11,11 +11,6 @@ version: 0.0.0
 appVersion: "0.0.0"
 
 dependencies:
-  - name: paladin-operator-crd
-    version: 0.0.3
-    repository: "file://../paladin-operator-crd/"
-    condition: installCRDs
-
 # install prometheus dependencies if prometheus is enabled
   - name: prometheus-namespace
     version: 0.0.0

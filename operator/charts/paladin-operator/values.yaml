@@ -121,8 +121,8 @@ smartContractsReferences:
 
     
 # Install CRDs as part of the chart installation
-# When this is set to false, the CRDs are expected to be installed separately
-installCRDs: false
+# DEPRECATED: This is no longer used, the CRDs are expected to be installed separately
+# installCRDs: false
 
 # Setting for devnet mode 
 paladin:
