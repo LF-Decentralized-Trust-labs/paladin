@@ -5,6 +5,7 @@ import { PublicTxOptions } from ".";
 export interface IPrivacyGroupInput {
   domain: string;
   members: string[];
+  name?: string;
   configuration?: Record<string, string | undefined>;
   properties?: Record<string, string | undefined>;
   transactionOptions?: IPrivacyGroupTXOptions;
@@ -22,7 +23,10 @@ export interface IPrivacyGroup {
   id: string;
   domain: string;
   created: string;
+  name: string;
   members: string[];
+  properties: Record<string, string>;
+  configuration: Record<string, string>;
   contractAddress?: string;
   genesisTransaction?: string;
   genesisSchema?: string;
@@ -50,4 +54,33 @@ export interface IPrivacyGroupEVMCall extends IPrivacyGroupEVMTX {
   domain: string;
   group: string;
   dataFormat?: string;
+}
+
+export interface IPrivacyGroupMessageListener {
+  name: string;
+  filters?: {
+    sequenceAbove?: number;
+    domain?: string;
+    group?: string;
+    topic?: string;
+  };
+  options?: {
+    excludeLocal?: boolean;
+  };
+}
+
+export interface IPrivacyGroupMessageInput {
+  correlationId?: string;
+  domain: string;
+  group: string;
+  topic: string;
+  data: any;
+}
+
+export interface IPrivacyGroupMessage extends IPrivacyGroupMessageInput {
+  id: string;
+  localSequence: number;
+  sent: string;
+  received: string;
+  node: string;
 }
