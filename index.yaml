@@ -14,6 +14,29 @@ entries:
     version: 0.0.0
   paladin-operator:
   - apiVersion: v2
+    appVersion: v0.10.0-rc.3
+    created: "2025-08-05T18:18:40.699776703Z"
+    dependencies:
+    - condition: installCRDs
+      name: paladin-operator-crd
+      repository: file://../paladin-operator-crd/
+      version: 0.10.0-rc.3
+    - condition: prometheus.enabled
+      name: prometheus-namespace
+      repository: file://../prometheus-namespace/
+      version: 0.0.0
+    - condition: prometheus.enabled
+      name: prometheus
+      repository: https://prometheus-community.github.io/helm-charts
+      version: 15.8.0
+    description: A Helm chart for Kubernetes
+    digest: 4f83b0333a38d979f0d94c42874aa058402005fd15960c2429ea4823fb163cbd
+    name: paladin-operator
+    type: application
+    urls:
+    - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-0.10.0-rc.3/paladin-operator-0.10.0-rc.3.tgz
+    version: 0.10.0-rc.3
+  - apiVersion: v2
     appVersion: v0.9.0
     created: "2025-07-16T16:32:12.823881114Z"
     dependencies:
@@ -414,6 +437,16 @@ entries:
     version: 0.0.0
   paladin-operator-crd:
   - apiVersion: v2
+    appVersion: v0.10.0-rc.3
+    created: "2025-08-05T18:18:40.934739566Z"
+    description: A Helm chart for Kubernetes
+    digest: 5f13420016943643128754bde285ebc9a8226758123d3531657cfefb0465148d
+    name: paladin-operator-crd
+    type: application
+    urls:
+    - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-crd-0.10.0-rc.3/paladin-operator-crd-0.10.0-rc.3.tgz
+    version: 0.10.0-rc.3
+  - apiVersion: v2
     appVersion: 0.0.3
     created: "2024-11-26T18:59:43.036297229Z"
     description: A Helm chart for Kubernetes
@@ -465,4 +498,4 @@ entries:
     urls:
     - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/prometheus-namespace-0.0.0/prometheus-namespace-0.0.0.tgz
     version: 0.0.0
-generated: "2025-07-16T16:32:12.824032667Z"
+generated: "2025-08-05T18:18:40.934947983Z"
