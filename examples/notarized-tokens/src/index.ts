@@ -9,8 +9,22 @@ import assert from "assert";
 
 const logger = console;
 
+// ASCII art for Noto
+const notoArt = `
+███╗   ██╗  ██████╗  ████████╗  ██████╗ 
+████╗  ██║ ██╔═══██╗ ╚══██╔══╝ ██╔═══██╗
+██╔██╗ ██║ ██║   ██║    ██║    ██║   ██║
+██║╚██╗██║ ██║   ██║    ██║    ██║   ██║
+██║ ╚████║ ╚██████╔╝    ██║    ╚██████╔╝
+╚═╝  ╚═══╝  ╚═════╝     ╚═╝     ╚═════╝ 
+`;
+
 async function main(): Promise<boolean> {
   // --- Initialization from Imported Config ---
+  logger.log(notoArt);
+  logger.log("==================================================================================");
+  logger.log("🛡️  Initializing Paladin Clients for Notarized Token Demonstration 🛡️");
+  logger.log("==================================================================================");
   if (nodeConnections.length < 3) {
     logger.error("The environment config must provide at least 3 nodes for this scenario.");
     return false;
@@ -29,7 +43,9 @@ async function main(): Promise<boolean> {
   const transferToNode3Amount = 800;
 
   // Step 1: Deploy a Noto token to represent cash
-  logger.log("Step 1: Deploying a Noto cash token...");
+  logger.log("\n==================================================================================");
+  logger.log("📜 Step 1: Deploying a Noto cash token...");
+  logger.log("==================================================================================");
   const notoFactory = new NotoFactory(paladinClientNode1, "noto");
   const cashToken = await notoFactory
     .newNoto(verifierNode1, {
@@ -41,12 +57,13 @@ async function main(): Promise<boolean> {
     logger.error("Failed to deploy the Noto cash token!");
     return false;
   }
-  logger.log("Noto cash token deployed successfully!");
-
- 
+  logger.log("✅ Noto cash token deployed successfully!");
+  logger.log(`Token Address: ${cashToken.address}`);
 
   // Step 2: Mint cash tokens
-  logger.log(`Step 2: Minting ${mintAmount} units of cash to Node1...`);
+  logger.log("\n==================================================================================");
+  logger.log(`💰 Step 2: Minting ${mintAmount} units of cash to Node1...`);
+  logger.log("==================================================================================");
   const mintReceipt = await cashToken
     .mint(verifierNode1, {
       to: verifierNode1,
@@ -66,7 +83,7 @@ async function main(): Promise<boolean> {
   logger.log(`Balance of the token: ${balance.totalBalance}`);
   assert(balance.totalBalance === mintAmount.toString(), `Balance of the token should be ${mintAmount}`);
 
-  logger.log(`Successfully minted ${mintAmount} units of cash to Node1!`);
+  logger.log(`✅ Successfully minted ${mintAmount} units of cash to Node1!`);
   let balanceNode1 = await cashToken.balanceOf(verifierNode1, {
     account: verifierNode1.lookup,
   });
@@ -75,7 +92,9 @@ async function main(): Promise<boolean> {
   );
 
   // Step 3: Transfer cash to Node2
-  logger.log("Step 3: Transferring 1000 units of cash from Node1 to Node2...");
+  logger.log("\n==================================================================================");
+  logger.log("💸 Step 3: Transferring 1000 units of cash from Node1 to Node2...");
+  logger.log("==================================================================================");
   const transferToNode2 = await cashToken
     .transfer(verifierNode1, {
       to: verifierNode2,
@@ -88,7 +107,7 @@ async function main(): Promise<boolean> {
     return false;
   }
  
-  logger.log(`Successfully transferred ${transferToNode2Amount} units of cash to Node2!`);
+  logger.log(`✅ Successfully transferred ${transferToNode2Amount} units of cash to Node2!`);
   let balanceNode2 = await cashToken.balanceOf(verifierNode1, {
     account: verifierNode2.lookup,
   });
@@ -99,7 +118,9 @@ async function main(): Promise<boolean> {
   );
 
   // Step 4: Transfer cash to Node3 from Node2
-  logger.log("Step 4: Transferring 800 units of cash from Node2 to Node3...");
+  logger.log("\n==================================================================================");
+  logger.log("💸 Step 4: Transferring 800 units of cash from Node2 to Node3...");
+  logger.log("==================================================================================");
   const transferToNode3 = await cashToken
     .using(paladinClientNode2)
     .transfer(verifierNode2, {
@@ -112,7 +133,7 @@ async function main(): Promise<boolean> {
     logger.error("Failed to transfer cash to Node3!");
     return false;
   }
-  logger.log(`Successfully transferred ${transferToNode3Amount} units of cash to Node3!`);
+  logger.log(`✅ Successfully transferred ${transferToNode3Amount} units of cash to Node3!`);
   let balanceNode3 = await cashToken.balanceOf(verifierNode1, {
     account: verifierNode3.lookup,
   });
@@ -121,7 +142,9 @@ async function main(): Promise<boolean> {
     `Node3 State: ${balanceNode3.totalBalance} units of cash, ${balanceNode3.totalStates} states, overflow: ${balanceNode3.overflow}`
   );
 
-
+  logger.log("\n==================================================================================");
+  logger.log("🧮 Final Balances");
+  logger.log("==================================================================================");
   const finalBalanceNode1 = await cashToken.balanceOf(verifierNode1, {
     account: verifierNode1.lookup,
   });
@@ -131,9 +154,11 @@ async function main(): Promise<boolean> {
   const finalBalanceNode3 = await cashToken.balanceOf(verifierNode1, {
     account: verifierNode3.lookup,
   });
+  logger.log(`Node1: ${finalBalanceNode1.totalBalance} units`);
+  logger.log(`Node2: ${finalBalanceNode2.totalBalance} units`);
+  logger.log(`Node3: ${finalBalanceNode3.totalBalance} units`);
 
   // Save contract data to file for later use
-  // should be of type
   const contractData : ContractData =  { 
     tokenAddress: cashToken.address,
     notary: verifierNode1.lookup,
@@ -175,10 +200,12 @@ async function main(): Promise<boolean> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dataFile = path.join(dataDir, `contract-data-${timestamp}.json`);
   fs.writeFileSync(dataFile, JSON.stringify(contractData, null, 2));
-  logger.log(`Contract data saved to ${dataFile}`);
+  logger.log(`\n💾 Contract data saved to ${dataFile}`);
 
   // All steps completed successfully
-  logger.log("All operations completed successfully!");
+  logger.log("\n==================================================================================");
+  logger.log("🎉 All operations completed successfully!");
+  logger.log("==================================================================================");
   return true;
 }
 
