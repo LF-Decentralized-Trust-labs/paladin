@@ -6,13 +6,9 @@ import storageJson from "./abis/Storage.json";
 import { PrivateStorage } from "./helpers/storage";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
-
-// Initialize Paladin clients for three nodes
-const paladinNode1 = new PaladinClient({ url: "http://127.0.0.1:31548" });
-const paladinNode2 = new PaladinClient({ url: "http://127.0.0.1:31648" });
-const paladinNode3 = new PaladinClient({ url: "http://127.0.0.1:31748" });
 
 interface ContractData {
   privacyGroupId: string;
@@ -41,6 +37,19 @@ function findLatestContractDataFile(dataDir: string): string | null {
 }
 
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const [paladinNode1, paladinNode2, paladinNode3] = clients;
+  const [verifierNode1] = paladinNode1.getVerifiers(`member@${nodeConnections[0].id}`);
+  const [verifierNode2] = paladinNode2.getVerifiers(`member@${nodeConnections[1].id}`);
+  const [verifierNode3] = paladinNode3.getVerifiers(`outsider@${nodeConnections[2].id}`);
+
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
   const dataDir = path.join(__dirname, '..', 'data');
@@ -63,9 +72,6 @@ async function main(): Promise<boolean> {
 
   // STEP 2: Get verifiers and recreate privacy group connection
   logger.log("STEP 2: Recreating privacy group connection...");
-  const [verifierNode1] = paladinNode1.getVerifiers("member@node1");
-  const [verifierNode2] = paladinNode2.getVerifiers("member@node2");
-  const [verifierNode3] = paladinNode3.getVerifiers("outsider@node3");
 
   const penteFactory = new PenteFactory(paladinNode1, "pente");
   const memberPrivacyGroup = await penteFactory.resumePrivacyGroup({

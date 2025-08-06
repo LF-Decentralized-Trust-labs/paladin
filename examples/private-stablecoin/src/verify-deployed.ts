@@ -4,18 +4,9 @@ import PaladinClient, {
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
-
-const paladin1 = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-const paladin2 = new PaladinClient({
-  url: "http://127.0.0.1:31648",
-});
-const paladin3 = new PaladinClient({
-  url: "http://127.0.0.1:31748",
-});
 
 export interface ContractData {
   runId: string;
@@ -114,6 +105,18 @@ async function getERC20Balance(
 }
 
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const verifiers = clients.map((client, i) => client.getVerifiers(`user@${nodeConnections[i].id}`)[0]);
+
+  const [paladin1, paladin2, paladin3] = clients;
+
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
   const dataDir = path.join(__dirname, '..', 'data');
@@ -137,9 +140,9 @@ async function main(): Promise<boolean> {
 
   // STEP 2: Get verifiers and recreate contract connections
   logger.log("STEP 2: Recreating contract connections...");
-  const [financialInstitution] = paladin1.getVerifiers(`bank-${contractData.runId}@node1`);
-  const [clientA] = paladin2.getVerifiers(`client-a-${contractData.runId}@node2`);
-  const [clientB] = paladin3.getVerifiers(`client-b-${contractData.runId}@node3`);
+  const [financialInstitution] = paladin1.getVerifiers(`bank-${contractData.runId}@${nodeConnections[0].id}`);
+  const [clientA] = paladin2.getVerifiers(`client-a-${contractData.runId}@${nodeConnections[1].id}`);
+  const [clientB] = paladin3.getVerifiers(`client-b-${contractData.runId}@${nodeConnections[2].id}`);
 
   // Import necessary classes from the SDK
   const { ZetoInstance } = await import("@lfdecentralizedtrust-labs/paladin-sdk");

@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Node 1",
+    "id": "node1",
+    "client": {
+      "url": "http://127.0.0.1:31548"
+    }
+  },
+  {
+    "name": "Node 2",
+    "id": "node2",
+    "client": {
+      "url": "http://127.0.0.1:31648"
+    }
+  },
+  {
+    "name": "Node 3",
+    "id": "node3",
+    "client": {
+      "url": "http://127.0.0.1:31748"
+    }
+  }
+] 

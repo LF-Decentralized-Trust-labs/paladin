@@ -4,17 +4,22 @@ import PaladinClient, {
 import helloWorldJson from "./abis/HelloWorld.json";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
 
-// Instantiate Paladin client (e.g., connecting to "node1")
-const paladin = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 1) {
+    logger.error("The environment config must provide at least 1 node for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin client from the environment configuration...");
+  const paladin = new PaladinClient(nodeConnections[0].clientOptions);
+  const [owner] = paladin.getVerifiers(`owner@${nodeConnections[0].id}`);
+
   // Retrieve the verifier for the owner account
-  const [owner] = paladin.getVerifiers("owner@node1");
 
   // STEP 1: Deploy the HelloWorld contract
   logger.log("STEP 1: Deploying the HelloWorld contract...");

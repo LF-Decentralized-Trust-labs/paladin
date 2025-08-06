@@ -3,13 +3,9 @@ import PaladinClient, {
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
-
-// Initialize Paladin clients for three nodes
-const paladinClientNode1 = new PaladinClient({ url: "http://127.0.0.1:31548" });
-const paladinClientNode2 = new PaladinClient({ url: "http://127.0.0.1:31648" });
-const paladinClientNode3 = new PaladinClient({ url: "http://127.0.0.1:31748" });
 
 export interface ContractData {
   tokenAddress: string;
@@ -58,6 +54,19 @@ function findLatestContractDataFile(dataDir: string): string | null {
 }
 
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const verifiers = clients.map((client, i) => client.getVerifiers(`user@${nodeConnections[i].id}`)[0]);
+
+  const [paladinClientNode1, paladinClientNode2, paladinClientNode3] = clients;
+  const [verifierNode1, verifierNode2, verifierNode3] = verifiers;
+
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
   const dataDir = path.join(__dirname, '..', 'data');
@@ -80,10 +89,6 @@ async function main(): Promise<boolean> {
 
   // STEP 2: Get verifiers and recreate token connection
   logger.log("STEP 2: Recreating token connection...");
-  const [verifierNode1] = paladinClientNode1.getVerifiers("user@node1");
-  const [verifierNode2] = paladinClientNode2.getVerifiers("user@node2");
-  const [verifierNode3] = paladinClientNode3.getVerifiers("user@node3");
-
   // Import NotoInstance from the SDK
   const { NotoInstance } = await import("@lfdecentralizedtrust-labs/paladin-sdk");
   const cashToken = new NotoInstance(paladinClientNode1, contractData.tokenAddress);

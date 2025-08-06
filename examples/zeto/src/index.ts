@@ -8,23 +8,24 @@ import erc20Abi from "./zeto-abis/SampleERC20.json";
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContractData } from "./verify-deployed";
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
 
-const paladin1 = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-const paladin2 = new PaladinClient({
-  url: "http://127.0.0.1:31648",
-});
-const paladin3 = new PaladinClient({
-  url: "http://127.0.0.1:31748",
-});
-
 async function main(): Promise<boolean> {
-  const [cbdcIssuer] = paladin1.getVerifiers("centralbank@node3");
-  const [bank1] = paladin2.getVerifiers("bank1@node1");
-  const [bank2] = paladin3.getVerifiers("bank2@node2");
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const [paladin1, paladin2, paladin3] = clients;
+
+  const [cbdcIssuer] = paladin1.getVerifiers(`centralbank@${nodeConnections[2].id}`);
+  const [bank1] = paladin2.getVerifiers(`bank1@${nodeConnections[0].id}`);
+  const [bank2] = paladin3.getVerifiers(`bank2@${nodeConnections[1].id}`);
 
   const mintAmounts = [100000, 100000];
   const transferAmount = 1000;
@@ -280,7 +281,7 @@ async function deployERC20(
   paladin: PaladinClient,
   cbdcIssuer: PaladinVerifier
 ): Promise<string | undefined> {
-  const txId1 = await paladin3.ptx.sendTransaction({
+  const txId1 = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     from: cbdcIssuer.lookup,
     data: {

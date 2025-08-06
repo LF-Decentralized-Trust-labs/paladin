@@ -2,13 +2,9 @@ import PaladinClient from "@lfdecentralizedtrust-labs/paladin-sdk";
 import helloWorldJson from "./abis/HelloWorld.json";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
-
-// Instantiate Paladin client (e.g., connecting to "node1")
-const paladin = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
 
 interface ContractData {
   contractAddress: string;
@@ -31,6 +27,17 @@ function findLatestContractDataFile(dataDir: string): string | null {
 }
 
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 1) {
+    logger.error("The environment config must provide at least 1 node for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin client from the environment configuration...");
+  const paladin = new PaladinClient(nodeConnections[0].clientOptions);
+  const owner = paladin.getVerifiers(`owner@${nodeConnections[0].id}`)[0];
+
+
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
   const dataDir = path.join(__dirname, '..', 'data');
@@ -116,7 +123,6 @@ async function main(): Promise<boolean> {
 
     // STEP 6: Verify we can still call the contract (test callability)
     logger.log("STEP 6: Verifying contract is still callable...");
-    const [owner] = paladin.getVerifiers("owner@node1");
     
     try {
       // Try to call the sayHello function again with a different name
