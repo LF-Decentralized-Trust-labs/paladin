@@ -10,8 +10,23 @@ import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
 
+// ASCII art for Pente
+const penteArt = `
+██████╗   ███████╗  ███╗   ██╗  ████████╗  ███████╗
+██╔══██╗  ██╔════╝  ████╗  ██║  ╚══██╔══╝  ██╔════╝
+██████╔╝  █████╗    ██╔██╗ ██║     ██║     █████╗  
+██╔═══╝   ██╔══╝    ██║╚██╗██║     ██║     ██╔══╝  
+██║       ███████╗  ██║ ╚████║     ██║     ███████╗
+╚═╝       ╚══════╝  ╚═╝  ╚═══╝     ╚═╝     ╚══════╝
+`;
+
 async function main(): Promise<boolean> {
   // --- Initialization from Imported Config ---
+  logger.log(penteArt);
+  logger.log("==================================================================================");
+  logger.log("🛡️  Initializing Paladin Clients for Private Storage Demonstration 🛡️");
+  logger.log("==================================================================================");
+
   if (nodeConnections.length < 3) {
     logger.error("The environment config must provide at least 3 nodes for this scenario.");
     return false;
@@ -26,7 +41,9 @@ async function main(): Promise<boolean> {
   const [verifierNode3] = paladinNode3.getVerifiers(`outsider@${nodeConnections[2].id}`);
 
   // Step 1: Create a privacy group for members
-  logger.log("Creating a privacy group for Node1 and Node2...");
+  logger.log("\n==================================================================================");
+  logger.log("🤫 Step 1: Creating a privacy group for Node1 and Node2...");
+  logger.log("==================================================================================");
   const penteFactory = new PenteFactory(paladinNode1, "pente");
   const memberPrivacyGroup = await penteFactory.newPrivacyGroup({
     members: [verifierNode1, verifierNode2],
@@ -35,10 +52,12 @@ async function main(): Promise<boolean> {
   }).waitForDeploy();
   if (!checkDeploy(memberPrivacyGroup)) return false;
 
-  logger.log(`Privacy group created, ID: ${memberPrivacyGroup?.group.id}`);
+  logger.log(`✅ Privacy group created, ID: ${memberPrivacyGroup?.group.id}`);
 
   // Step 2: Deploy a smart contract within the privacy group
-  logger.log("Deploying a smart contract to the privacy group...");
+  logger.log("\n==================================================================================");
+  logger.log("📜 Step 2: Deploying a smart contract to the privacy group...");
+  logger.log("==================================================================================");
   const contractAddress = await memberPrivacyGroup.deploy({
     abi: storageJson.abi,
     bytecode: storageJson.bytecode,
@@ -49,9 +68,12 @@ async function main(): Promise<boolean> {
     return false;
   }
 
-  logger.log(`Contract deployed successfully! Address: ${contractAddress}`);
+  logger.log(`✅ Contract deployed successfully! Address: ${contractAddress}`);
 
   // Step 3: Use the deployed contract for private storage
+  logger.log("\n==================================================================================");
+  logger.log("🔐 Step 3: Using the deployed contract for private storage");
+  logger.log("==================================================================================");
   const privateStorageContract = new PrivateStorage(
     memberPrivacyGroup,
     contractAddress
@@ -66,23 +88,23 @@ async function main(): Promise<boolean> {
     data: { num: valueToStore },
   }).waitForReceipt(10000);
   logger.log(
-    "Value stored successfully! Transaction hash:",
-    storeReceipt?.transactionHash
+    `✅ Value stored successfully! Transaction hash: ${storeReceipt?.transactionHash}`
   );
 
   // Retrieve the value as Node1
-  logger.log("Node1 retrieving the value from the contract...");
+  logger.log("\n----------------------------------------------------------------------------------");
+  logger.log("🔍 Node1 retrieving the value from the contract...");
   const retrievedValueNode1 = await privateStorageContract.call({
     from: verifierNode1.lookup,
     function: "retrieve",
   });
   logger.log(
-    "Node1 retrieved the value successfully:",
-    retrievedValueNode1["value"]
+    `✅ Node1 retrieved the value successfully: ${retrievedValueNode1["value"]}`
   );
 
   // Retrieve the value as Node2
-  logger.log("Node2 retrieving the value from the contract...");
+  logger.log("\n----------------------------------------------------------------------------------");
+  logger.log("🔍 Node2 retrieving the value from the contract...");
   const retrievedValueNode2 = await privateStorageContract
     .using(paladinNode2)
     .call({
@@ -90,24 +112,24 @@ async function main(): Promise<boolean> {
       function: "retrieve",
     });
   logger.log(
-    "Node2 retrieved the value successfully:",
-    retrievedValueNode2["value"]
+    `✅ Node2 retrieved the value successfully: ${retrievedValueNode2["value"]}`
   );
 
   // Attempt to retrieve the value as Node3 (outsider)
+  logger.log("\n----------------------------------------------------------------------------------");
+  logger.log("🚫 Node3 (outsider) attempting to retrieve the value...");
   try {
-    logger.log("Node3 (outsider) attempting to retrieve the value...");
     await privateStorageContract.using(paladinNode3).call({
       from: verifierNode3.lookup,
       function: "retrieve",
     });
     logger.error(
-      "Node3 (outsider) should not have access to the privacy group!"
+      "❌ Node3 (outsider) should not have access to the privacy group!"
     );
     return false;
   } catch (error) {
     logger.log(
-      "Node3 (outsider) correctly denied access to the privacy group!"
+      "✅ Node3 (outsider) correctly denied access to the privacy group!"
     );
   }
 
@@ -133,9 +155,11 @@ async function main(): Promise<boolean> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dataFile = path.join(dataDir, `contract-data-${timestamp}.json`);
   fs.writeFileSync(dataFile, JSON.stringify(contractData, null, 2));
-  logger.log(`Contract data saved to ${dataFile}`);
+  logger.log(`\n💾 Contract data saved to ${dataFile}`);
 
-  logger.log("All steps completed successfully!");
+  logger.log("\n==================================================================================");
+  logger.log("🎉 All steps completed successfully!");
+  logger.log("==================================================================================");
 
   return true;
 }
