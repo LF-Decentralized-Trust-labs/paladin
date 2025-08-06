@@ -14,6 +14,29 @@ entries:
     version: 0.0.0
   paladin-operator:
   - apiVersion: v2
+    appVersion: v0.10.0-rc.4
+    created: "2025-08-06T23:48:36.939883806Z"
+    dependencies:
+    - condition: installCRDs
+      name: paladin-operator-crd
+      repository: file://../paladin-operator-crd/
+      version: 0.10.0-rc.4
+    - condition: prometheus.enabled
+      name: prometheus-namespace
+      repository: file://../prometheus-namespace/
+      version: 0.0.0
+    - condition: prometheus.enabled
+      name: prometheus
+      repository: https://prometheus-community.github.io/helm-charts
+      version: 15.8.0
+    description: A Helm chart for Kubernetes
+    digest: 8b67110ac1f9caffb99a6bd84ad964f003c41d853f8f54ed41b963c0d5fbceaa
+    name: paladin-operator
+    type: application
+    urls:
+    - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-0.10.0-rc.4/paladin-operator-0.10.0-rc.4.tgz
+    version: 0.10.0-rc.4
+  - apiVersion: v2
     appVersion: v0.10.0-rc.3
     created: "2025-08-05T18:18:40.699776703Z"
     dependencies:
@@ -437,6 +460,16 @@ entries:
     version: 0.0.0
   paladin-operator-crd:
   - apiVersion: v2
+    appVersion: v0.10.0-rc.4
+    created: "2025-08-06T23:48:37.110573724Z"
+    description: A Helm chart for Kubernetes
+    digest: 3a4a9f10d3b946458fe3381c55ef986c578283a13cb58f2bfb0c7082de8f7f98
+    name: paladin-operator-crd
+    type: application
+    urls:
+    - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-crd-0.10.0-rc.4/paladin-operator-crd-0.10.0-rc.4.tgz
+    version: 0.10.0-rc.4
+  - apiVersion: v2
     appVersion: v0.10.0-rc.3
     created: "2025-08-05T18:18:40.934739566Z"
     description: A Helm chart for Kubernetes
@@ -498,4 +531,4 @@ entries:
     urls:
     - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/prometheus-namespace-0.0.0/prometheus-namespace-0.0.0.tgz
     version: 0.0.0
-generated: "2025-08-05T18:18:40.934947983Z"
+generated: "2025-08-06T23:48:37.110790406Z"
