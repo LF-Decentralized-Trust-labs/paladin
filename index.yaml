@@ -15,6 +15,29 @@ entries:
   paladin-operator:
   - apiVersion: v2
     appVersion: v0.10.0-rc.4
+    created: "2025-08-07T03:18:16.693914184Z"
+    dependencies:
+    - condition: installCRDs
+      name: paladin-operator-crd
+      repository: file://../paladin-operator-crd/
+      version: 0.10.0-rc.4
+    - condition: prometheus.enabled
+      name: prometheus-namespace
+      repository: file://../prometheus-namespace/
+      version: 0.0.0
+    - condition: prometheus.enabled
+      name: prometheus
+      repository: https://prometheus-community.github.io/helm-charts
+      version: 15.8.0
+    description: A Helm chart for Kubernetes
+    digest: 298020c205d89d5eeb2251126582b35a105221101a860003e2f17114e1e0296b
+    name: paladin-operator
+    type: application
+    urls:
+    - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-0.10.0-rc.4/paladin-operator-0.10.0-rc.4.tgz
+    version: 0.10.0-rc.4
+  - apiVersion: v2
+    appVersion: v0.10.0-rc.4
     created: "2025-08-06T23:48:36.939883806Z"
     dependencies:
     - condition: installCRDs
@@ -470,6 +493,16 @@ entries:
     - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-crd-0.10.0-rc.4/paladin-operator-crd-0.10.0-rc.4.tgz
     version: 0.10.0-rc.4
   - apiVersion: v2
+    appVersion: v0.10.0-rc.4
+    created: "2025-08-07T03:18:16.879685697Z"
+    description: A Helm chart for Kubernetes
+    digest: d1f36f3a93667af2bc3b418e90a53eee704b8ff37278243bda96ec8e23fe3a76
+    name: paladin-operator-crd
+    type: application
+    urls:
+    - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-crd-0.10.0-rc.4/paladin-operator-crd-0.10.0-rc.4.tgz
+    version: 0.10.0-rc.4
+  - apiVersion: v2
     appVersion: v0.10.0-rc.3
     created: "2025-08-05T18:18:40.934739566Z"
     description: A Helm chart for Kubernetes
@@ -531,4 +564,4 @@ entries:
     urls:
     - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/prometheus-namespace-0.0.0/prometheus-namespace-0.0.0.tgz
     version: 0.0.0
-generated: "2025-08-06T23:48:37.110790406Z"
+generated: "2025-08-07T03:18:16.879857976Z"
