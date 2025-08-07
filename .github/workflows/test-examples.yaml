@@ -20,6 +20,11 @@ on:
         required: false
         type: string
         default: 'start'
+      chart_tag:
+        description: 'The tag of the chart to install'
+        required: false
+        type: string
+        default: 'latest'
   workflow_call:
     inputs:
       build_local_sdk:
@@ -37,6 +42,11 @@ on:
         required: false
         type: string
         default: 'start'
+      chart_tag:
+        description: 'The tag of the chart to install'
+        required: false
+        type: string
+        default: 'latest'
 
 jobs:
   run-examples:
@@ -84,9 +94,14 @@ jobs:
           helm repo add paladin https://LF-Decentralized-Trust-labs.github.io/paladin --force-update
           helm repo add jetstack https://charts.jetstack.io --force-update
           helm repo update
-          
+
+          # add version if not latest
+          if [ "${{ inputs.chart_tag }}" != "latest" ] && [ "${{ inputs.chart_tag }}" != "" ]; then
+            version_flag="--version ${{ inputs.chart_tag }}"
+          fi
+
           # Step 2: Install the CRD Chart
-          helm upgrade --install paladin-crds paladin/paladin-operator-crd
+          helm upgrade --install paladin-crds paladin/paladin-operator-crd $version_flag
           
           # Step 3: Install cert-manager CRDs
           helm install cert-manager --namespace cert-manager --version v1.16.1 jetstack/cert-manager --create-namespace --set crds.enabled=true
@@ -95,7 +110,7 @@ jobs:
           kubectl wait --for=condition=Ready pods --all -n cert-manager --timeout=300s
           
           # Step 4: Install the Paladin Operator Chart
-          helm upgrade --install paladin paladin/paladin-operator -n paladin --create-namespace --set besuNodeCount=1  --wait
+          helm upgrade --install paladin paladin/paladin-operator -n paladin --create-namespace --set besuNodeCount=1 --wait $version_flag
 
       - name: Validate installation
         run: |

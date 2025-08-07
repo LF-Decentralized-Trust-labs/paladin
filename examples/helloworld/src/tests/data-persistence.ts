@@ -1,5 +1,5 @@
 import PaladinClient from "@lfdecentralizedtrust-labs/paladin-sdk";
-import helloWorldJson from "./abis/HelloWorld.json";
+import helloWorldJson from "../abis/HelloWorld.json";
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -33,7 +33,8 @@ function findLatestContractDataFile(dataDir: string): string | null {
 async function main(): Promise<boolean> {
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', '..', 'data');
   const dataFile = findLatestContractDataFile(dataDir);
   
   if (!dataFile) {

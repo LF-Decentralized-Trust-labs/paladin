@@ -17,7 +17,8 @@ on:
         description: 'Release tag (chart and images)'
 
 jobs:
-  set-variables:
+  # ================================ SETUP ================================
+  setup:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.set-vars.outputs.tag }}
@@ -116,32 +117,46 @@ jobs:
           fi
 
           echo "Valid tag: $NEW_TAG_VERSION"
+
+  # ================================ RELEASE ================================
   release-images:
-    needs: set-variables
+    needs: setup
     uses: ./.github/workflows/release-images.yaml
     with:
-      tag: ${{ needs.set-variables.outputs.tag }}
-      latest: '${{ fromJSON(needs.set-variables.outputs.latest) }}'
+      tag: ${{ needs.setup.outputs.tag }}
+      latest: '${{ fromJSON(needs.setup.outputs.latest) }}'
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   release-charts:
-    needs: [set-variables, release-images]
+    needs: [setup, release-images]
     uses: ./.github/workflows/release-charts.yaml
     with:
-      chart_tag: ${{ needs.set-variables.outputs.tag }}
-      images_tag: ${{ needs.set-variables.outputs.tag }}
+      chart_tag: ${{ needs.setup.outputs.tag }}
+      images_tag: ${{ needs.setup.outputs.tag }}
       registry: docker.io
     secrets:
       CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-solidity-contracts:
-    needs: [set-variables]
+    needs: [setup, release-charts]
     uses: ./.github/workflows/release-solidity-contracts.yaml
+    with:
+      tag: ${{ needs.setup.outputs.tag }}
 
+  release-typescript-sdk:
+    needs: [setup, release-charts]
+    uses: ./.github/workflows/release-typescript-sdk.yaml
+    with:
+      sdk_version: ${{ needs.setup.outputs.tag }}
+      sdk_tag: ${{ needs.setup.outputs.sdk_tag }}
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }} 
+
+  # ================================ FINAL RELEASE ================================
   release:
-    needs: [set-variables, release-charts, release-solidity-contracts]
+    needs: [setup, release-solidity-contracts, release-typescript-sdk]
     runs-on: ubuntu-latest
     steps:
       - name: Download Helm artifacts
@@ -163,10 +178,10 @@ jobs:
       - name: Create release with all artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.set-variables.outputs.tag }}
-          body: "Release ${{ needs.set-variables.outputs.tag }}"
+          tag_name: ${{ needs.setup.outputs.tag }}
+          body: "Release ${{ needs.setup.outputs.tag }}"
           generate_release_notes: true
-          make_latest: '${{ fromJSON(needs.set-variables.outputs.latest) }}'
+          make_latest: '${{ fromJSON(needs.setup.outputs.latest) }}'
           files: |
             helm-artifacts/basenet.yaml
             helm-artifacts/devnet.yaml
@@ -178,11 +193,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  release-typescript-sdk:
-    needs: [set-variables, release]
-    uses: ./.github/workflows/release-typescript-sdk.yaml
-    with:
-      sdk_version: ${{ needs.set-variables.outputs.tag }}
-      sdk_tag: ${{ needs.set-variables.outputs.sdk_tag }}
-    secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }} 

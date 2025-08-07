@@ -18,7 +18,8 @@ Every example must have the following structure:
 examples/your-example/
 ├── src/
 │   ├── index.ts              # Main example implementation
-│   ├── verify-deployed.ts    # Verification script (REQUIRED)
+│   ├── tests/
+│   │   └── data-persistence.ts    # Data persistence verification script (REQUIRED)
 │   └── abis/                 # Contract ABIs
 ├── package.json              # Required scripts
 ├── README.md                 # Clear instruction for running the example
@@ -35,7 +36,7 @@ Every example's `package.json` should include these scripts:
     "build": "tsc",
     "start": "ts-node ./src/index.ts",
     "start:prod": "node ./build/index.js",
-    "verify": "ts-node ./src/verify-deployed.ts",
+    "verify": "ts-node ./src/tests/data-persistence.ts",
     "abi": "node scripts/abi.mjs",
     "copy-abi": "node scripts/contracts.mjs"
   }

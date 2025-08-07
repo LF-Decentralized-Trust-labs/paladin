@@ -1,8 +1,18 @@
 name: Upload Solidity Artifacts
 on:
   workflow_call:
+    inputs:
+      tag:
+        description: 'The tag of the release'
+        required: true
+        type: string
        
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The tag of the release'
+        required: true
+        type: string
 
   pull_request:
     paths:
@@ -21,7 +31,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    uses: ./.github/workflows/test-examples.yaml
+    with:
+      build_local_abi: true
+      build_local_sdk: false
+      chart_tag: ${{ inputs.tag }}
   upload:
+    needs: test
     permissions:
       contents: read
       id-token: write

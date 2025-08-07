@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "ts-node ./src/index.ts",
     "start:prod": "node ./build/index.js",
-    "verify": "ts-node ./src/verify-deployed.ts",
+    "verify": "ts-node ./src/tests/data-persistence.ts",
     "copy-abi": "echo 'No contracts to copy'",
     "abi": "echo 'No abi to copy'"
   },

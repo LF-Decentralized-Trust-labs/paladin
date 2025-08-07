@@ -9,7 +9,7 @@ import { checkDeploy } from "paladin-example-common";
 import helloWorldJson from "./abis/HelloWorld.json";
 import * as fs from 'fs';
 import * as path from 'path';
-import { ContractData } from "./verify-deployed";
+import { ContractData } from "./tests/data-persistence";
 
 const logger = console;
 
@@ -233,7 +233,8 @@ async function main(): Promise<boolean> {
     timestamp: new Date().toISOString()
   };
 
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
