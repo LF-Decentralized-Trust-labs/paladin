@@ -61,6 +61,4 @@ bin/
 ### Proto ###
 *.pb.go
 
-contracts/
-
 **.tar.gz
