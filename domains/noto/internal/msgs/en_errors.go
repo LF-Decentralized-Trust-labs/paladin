@@ -63,6 +63,8 @@ var (
 	MsgInvalidDelegate                    = pde("PD200023", "Invalid delegate: %s")
 	MsgNoDomainReceipt                    = pde("PD200024", "Not implemented. See state receipt for coin transfers")
 	MsgBurnNotAllowed                     = pde("PD200025", "Burn is not enabled")
+	MsgBurnFromNotAllowed                 = pde("PD200036", "BurnFrom is not enabled")
+	MsgTransferFromNotAllowed             = pde("PD200037", "TransferFrom is not enabled")
 	MsgNoStatesSpecified                  = pde("PD200026", "No states were specified")
 	MsgUnlockNotAllowed                   = pde("PD200027", "Cannot unlock states owned by '%s'")
 	MsgLockIDNotFound                     = pde("PD200028", "Lock ID not found")

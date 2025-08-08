@@ -91,8 +91,34 @@ new UTXO states will be created, in order to facilitate the requested transfer o
 }
 ```
 
+* **to** - lookup string for the identity that will receive transferred value
+* **amount** - amount of value to transfer
+* **data** - user/application data to include with the transaction (will be accessible from an "info" state in the state receipt)
+
+### transferFrom
+
+Transfer value from a specified account to another recipient. Available UTXO states will be selected for spending, and
+new UTXO states will be created, in order to facilitate the requested transfer of value.
+
+!!! important
+    This method is only available in hooks mode. It is disabled in basic mode.
+
+```json
+{
+    "name": "transferFrom",
+    "type": "function",
+    "inputs": [
+        {"name": "from", "type": "string"},
+        {"name": "to", "type": "string"},
+        {"name": "amount", "type": "uint256"},
+        {"name": "data", "type": "bytes"}
+    ]
+}
+```
+
 Inputs:
 
+* **from** - lookup string for the identity whose tokens will be transferred
 * **to** - lookup string for the identity that will receive transferred value
 * **amount** - amount of value to transfer
 * **data** - user/application data to include with the transaction (will be accessible from an "info" state in the state receipt)
@@ -147,12 +173,31 @@ Inputs:
 * **amount** - amount of value to burn
 * **data** - user/application data to include with the transaction (will be accessible from an "info" state in the state receipt)
 
+### burnFrom
+
+Burn value from a specified account. Available UTXO states will be selected for burning, and new UTXO
+states will be created for the remaining amount (if any).
+
+!!! important
+    This method is only available in hooks mode. It is disabled in basic mode.
+
+```json
+{
+    "name": "burnFrom",
+    "type": "function",
+    "inputs": [
+        {"name": "from", "type": "string"},
+        {"name": "amount", "type": "uint256"},
+        {"name": "data", "type": "bytes"}
+    ]
+}
+```
+
 Inputs:
 
-* **inputs** - input states that will be spent
-* **outputs** - output states that will be created
-* **data** - encoded Paladin and/or user data
-* **delegate** - address of the delegate party that will be able to execute this transaction once approved
+* **from** - lookup string for the identity whose tokens will be burned
+* **amount** - amount of value to burn
+* **data** - user/application data to include with the transaction (will be accessible from an "info" state in the state receipt)
 
 ### lock
 
@@ -557,7 +602,9 @@ When a Noto contract is constructed with notary mode `basic`, the following nota
 
 In addition, the following restrictions will always be enforced, and cannot be disabled in `basic` mode:
 
-- **Unlock:** Only the creator of a lock may unlock it.
+- **unlock:** Only the creator of a lock may unlock it.
+- **burnFrom:** This method is disabled and will always revert.
+- **transferFrom:** This method is disabled and will always revert.
 
 ### Notary mode: hooks
 

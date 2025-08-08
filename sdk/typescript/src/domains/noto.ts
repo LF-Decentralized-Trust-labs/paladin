@@ -80,13 +80,26 @@ export interface NotoMintParams {
   data: string;
 }
 
+export interface NotoBurnParams {
+  amount: string | number;
+  data: string;
+}
+
+export interface NotoBurnFromParams {
+  from: PaladinVerifier;
+  amount: string | number;
+  data: string;
+}
+
 export interface NotoTransferParams {
   to: PaladinVerifier;
   amount: string | number;
   data: string;
 }
 
-export interface NotoBurnParams {
+export interface NotoTransferFromParams {
+  from: PaladinVerifier;
+  to: PaladinVerifier;
   amount: string | number;
   data: string;
 }
@@ -229,6 +242,20 @@ export class NotoInstance {
     );
   }
 
+  transferFrom(from: PaladinVerifier, data: NotoTransferFromParams) {
+    return new TransactionFuture(
+      this.paladin,
+      this.paladin.sendTransaction({
+        type: TransactionType.PRIVATE,
+        abi: notoPrivateJSON.abi,
+        function: "transferFrom",
+        to: this.address,
+        from: from.lookup,
+        data,
+      })
+    );
+  }
+
   prepareTransfer(from: PaladinVerifier, data: NotoTransferParams) {
     return this.paladin.prepareTransaction({
       type: TransactionType.PRIVATE,
@@ -264,6 +291,20 @@ export class NotoInstance {
         type: TransactionType.PRIVATE,
         abi: notoPrivateJSON.abi,
         function: "burn",
+        to: this.address,
+        from: from.lookup,
+        data,
+      })
+    );
+  }
+
+  burnFrom(from: PaladinVerifier, data: NotoBurnFromParams) {
+    return new TransactionFuture(
+      this.paladin,
+      this.paladin.sendTransaction({
+        type: TransactionType.PRIVATE,
+        abi: notoPrivateJSON.abi,
+        function: "burnFrom",
         to: this.address,
         from: from.lookup,
         data,
