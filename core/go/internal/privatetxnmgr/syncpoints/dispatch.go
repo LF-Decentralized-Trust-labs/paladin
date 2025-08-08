@@ -30,7 +30,7 @@ import (
 
 type dispatchOperation struct {
 	publicDispatches     []*PublicDispatch
-	privateDispatches    []*components.ValidatedTransaction
+	privateDispatches    []*components.ChainedPrivateTransaction
 	localPreparedTxns    []*components.PreparedTransactionWithRefs
 	preparedReliableMsgs []*pldapi.ReliableMessage
 }
@@ -52,7 +52,7 @@ type PublicDispatch struct {
 // purely for a database performance reason, they are included in the same transaction
 type DispatchBatch struct {
 	PublicDispatches     []*PublicDispatch
-	PrivateDispatches    []*components.ValidatedTransaction
+	PrivateDispatches    []*components.ChainedPrivateTransaction
 	PreparedTransactions []*components.PreparedTransactionWithRefs
 }
 
@@ -174,7 +174,7 @@ func (s *syncPoints) writeDispatchOperations(ctx context.Context, dbTX persisten
 		}
 
 		if len(op.privateDispatches) > 0 {
-			err := s.txMgr.UpsertInternalPrivateTxsFinalizeIDs(ctx, dbTX, op.privateDispatches)
+			err := s.txMgr.ChainPrivateTransactions(ctx, dbTX, op.privateDispatches)
 			if err != nil {
 				log.L(ctx).Errorf("Error persisting private dispatches: %s", err)
 				return err

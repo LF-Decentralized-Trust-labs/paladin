@@ -75,7 +75,12 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 				})
 			case preparedTransaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && hasPrivateTransaction && !hasPublicTransaction:
 				log.L(ctx).Infof("Result of transaction %s is a chained private transaction", preparedTransaction.ID)
-				validatedPrivateTx, err := s.components.TxManager().PrepareInternalPrivateTransaction(ctx, s.components.Persistence().NOTX(), preparedTransaction.PreparedPrivateTransaction, pldapi.SubmitModeAuto)
+				tx := transactionFlow.PrivateTransaction()
+				senderLocator := tx.PreAssembly.TransactionSpecification.From
+				validatedPrivateTx, err := s.components.TxManager().
+					PrepareChainedPrivateTransaction(ctx, s.components.Persistence().NOTX(),
+						senderLocator, tx.ID, tx.Domain,
+						preparedTransaction.PreparedPrivateTransaction, pldapi.SubmitModeAuto)
 				if err != nil {
 					log.L(ctx).Errorf("Error preparing transaction %s: %s", preparedTransaction.ID, err)
 					// TODO: this is just an error situation for one transaction - this function is a batch function
@@ -189,8 +194,8 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 	}
 
 	// We also need to trigger ourselves for any private TX we chained
-	for _, tx := range dispatchBatch.PrivateDispatches {
-		if err := s.privateTxManager.HandleNewTx(ctx, s.components.Persistence().NOTX(), tx); err != nil {
+	for _, dispatch := range dispatchBatch.PrivateDispatches {
+		if err := s.privateTxManager.HandleNewTx(ctx, s.components.Persistence().NOTX(), dispatch.NewTransaction); err != nil {
 			log.L(ctx).Errorf("Sequencer failed to notify private TX manager for chained transaction")
 		}
 	}

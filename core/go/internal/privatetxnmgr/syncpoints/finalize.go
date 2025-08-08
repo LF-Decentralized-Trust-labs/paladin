@@ -67,29 +67,42 @@ func (s *syncPoints) writeFailureOperations(ctx context.Context, dbTX persistenc
 	//
 	// However, a syncpoint gets triggered for every finalize so that we can flush the Domain Context to the DB
 	// so that all states are stored, before we clear out the transaction from the in-memory Domain Context.
-	//
+	receiptsToDistribute := make([]*components.ReceiptInputWithOriginator, 0, len(finalizeOperations))
+	for _, op := range finalizeOperations {
+		if op.FailureMessage != "" {
+			receiptsToDistribute = append(receiptsToDistribute, &components.ReceiptInputWithOriginator{
+				Originator: op.Originator,
+				ReceiptInput: components.ReceiptInput{
+					ReceiptType:    components.RT_FailedWithMessage,
+					Domain:         op.Domain,
+					TransactionID:  op.TransactionID,
+					FailureMessage: op.FailureMessage,
+				},
+			})
+		}
+	}
+	return s.WriteOrDistributeReceipts(ctx, dbTX, receiptsToDistribute)
+
+}
+
+func (s *syncPoints) WriteOrDistributeReceipts(ctx context.Context, dbTX persistence.DBTX, receipts []*components.ReceiptInputWithOriginator) error {
+
 	// Receipts need to go back to their originator, so we either store the receive ourselves locally - or
 	// push it in a reliable message back to the sender.
 	localFailureReceipts := make([]*components.ReceiptInput, 0)
 	remoteSends := make([]*pldapi.ReliableMessage, 0)
-	for _, op := range finalizeOperations {
-		if op.FailureMessage != "" {
-			receipt := &components.ReceiptInput{
-				ReceiptType:    components.RT_FailedWithMessage,
-				Domain:         op.Domain,
-				TransactionID:  op.TransactionID,
-				FailureMessage: op.FailureMessage,
-			}
-			node, _ := pldtypes.PrivateIdentityLocator(op.Originator).Node(ctx, true)
-			log.L(ctx).Warnf("Failure receipt %s for node %s: %s", receipt.TransactionID, node, receipt.FailureMessage)
+	for _, r := range receipts {
+		if r.FailureMessage != "" {
+			node, _ := pldtypes.PrivateIdentityLocator(r.Originator).Node(ctx, true)
+			log.L(ctx).Warnf("Failure receipt %s for node %s: %s", r.TransactionID, node, r.FailureMessage)
 			if node != "" && node != s.transportMgr.LocalNodeName() {
 				remoteSends = append(remoteSends, &pldapi.ReliableMessage{
 					Node:        node,
 					MessageType: pldapi.RMTReceipt.Enum(),
-					Metadata:    pldtypes.JSONString(receipt),
+					Metadata:    pldtypes.JSONString(&r.ReceiptInput),
 				})
 			} else {
-				localFailureReceipts = append(localFailureReceipts, receipt)
+				localFailureReceipts = append(localFailureReceipts, &r.ReceiptInput)
 			}
 		}
 	}

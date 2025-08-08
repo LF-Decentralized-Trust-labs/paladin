@@ -509,7 +509,7 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 
 	// Mock a gas price
 	chainID, _ := rand.Int(rand.Reader, big.NewInt(100000000000000))
-	m.ethClient.On("ChainID").Return(chainID.Int64())
+	m.ethClient.On("ChainID").Return(chainID.Int64()).Maybe()
 	m.ethClient.On("GasPrice", mock.Anything).Return(pldtypes.MustParseHexUint256("1000000000000000"), nil)
 
 	pubTx := &components.PublicTxSubmission{

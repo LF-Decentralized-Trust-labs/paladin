@@ -208,3 +208,7 @@ func (tf *transactionFlow) ID(_ context.Context) uuid.UUID {
 
 	return tf.transaction.ID
 }
+
+func (tf *transactionFlow) PrivateTransaction() *components.PrivateTransaction {
+	return tf.transaction
+}

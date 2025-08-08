@@ -60,6 +60,9 @@ type SyncPoints interface {
 	// the onCommit and onRollback callbacks are called, on a separate goroutine when the transaction is committed or rolled back
 	QueueTransactionFinalize(ctx context.Context, domain string, contractAddress pldtypes.EthAddress, originator string, transactionID uuid.UUID, failureMessage string, onCommit func(context.Context), onRollback func(context.Context, error))
 
+	// This is a recursive callback between syncpoints when flushing receipts, and FinalizeTransactions on txMgr
+	WriteOrDistributeReceipts(ctx context.Context, dbTX persistence.DBTX, receipts []*components.ReceiptInputWithOriginator) error
+
 	Close()
 }
 

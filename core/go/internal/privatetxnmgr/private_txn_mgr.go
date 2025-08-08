@@ -1038,3 +1038,7 @@ func (p *privateTxManager) CallPrivateSmartContract(ctx context.Context, call *c
 func (p *privateTxManager) BuildStateDistributions(ctx context.Context, tx *components.PrivateTransaction) (*components.StateDistributionSet, error) {
 	return newStateDistributionBuilder(p.components, tx).Build(ctx)
 }
+
+func (p *privateTxManager) WriteOrDistributeReceipts(ctx context.Context, dbTX persistence.DBTX, receipts []*components.ReceiptInputWithOriginator) error {
+	return p.syncPoints.WriteOrDistributeReceipts(ctx, dbTX, receipts)
+}

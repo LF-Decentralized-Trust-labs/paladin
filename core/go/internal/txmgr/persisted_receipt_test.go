@@ -127,6 +127,32 @@ func TestFinalizeTransactionsInsertFail(t *testing.T) {
 
 }
 
+func TestFinalizeTransactionsChainedLookupFail(t *testing.T) {
+
+	txID := uuid.New()
+	ctx, txm, done := newTestTransactionManager(t, false,
+		mockEmptyReceiptListeners,
+		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+			mc.db.ExpectBegin()
+			mc.db.ExpectQuery("INSERT.*transaction_receipts").WillReturnRows(sqlmock.NewRows([]string{}))
+			mc.db.ExpectQuery("SELECT.*chained_private_txns").WillReturnError(fmt.Errorf("pop"))
+		})
+	defer done()
+
+	err := txm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		return txm.FinalizeTransactions(ctx, dbTX, []*components.ReceiptInput{
+			{
+				TransactionID:  txID,
+				Domain:         "domain1",
+				ReceiptType:    components.RT_FailedWithMessage,
+				FailureMessage: "something went wrong",
+			},
+		})
+	})
+	assert.Regexp(t, "pop", err)
+
+}
+
 func mockKeyResolver(t *testing.T, mc *mockComponents) *componentsmocks.KeyResolver {
 	kr := componentsmocks.NewKeyResolver(t)
 	mc.keyManager.On("KeyResolverForDBTX", mock.Anything).Return(kr)
@@ -159,8 +185,17 @@ func mockDomainContractResolve(t *testing.T, domainName string, contractAddrs ..
 
 func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 
+	upstreamTXID := uuid.New()
 	ctx, txm, done := newTestTransactionManager(t, true, mockDomainContractResolve(t, "domain1"), func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
 		mc.privateTxMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mc.privateTxMgr.On("WriteOrDistributeReceipts", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).
+			Run(func(args mock.Arguments) {
+				receipts := args[2].([]*components.ReceiptInputWithOriginator)
+				require.Len(t, receipts, 1)
+				require.Equal(t, upstreamTXID, receipts[0].TransactionID)
+				require.Equal(t, "domain2", receipts[0].Domain)
+			})
 	})
 	defer done()
 
@@ -172,6 +207,7 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 		TransactionBase: pldapi.TransactionBase{
 			From:     "me",
 			Type:     pldapi.TransactionTypePrivate.Enum(),
+			Domain:   "domain1",
 			Function: "doIt",
 			To:       pldtypes.MustEthAddress(pldtypes.RandHex(20)),
 			Data:     pldtypes.JSONString(pldtypes.HexBytes(callData)),
@@ -181,9 +217,21 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 	require.NoError(t, err)
 
 	err = txm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
+		// Simulate a chaining record to another TX that is on a remote node
+		err = txm.writeChainingRecords(ctx, dbTX, []*persistedChainedPrivateTxn{
+			{
+				Sender:             "them@remote.node",
+				Transaction:        upstreamTXID,
+				Domain:             "domain2",
+				ChainedTransaction: *txID,
+			},
+		})
+		require.NoError(t, err)
+
 		return txm.FinalizeTransactions(ctx, dbTX, []*components.ReceiptInput{
 			{
 				TransactionID: *txID,
+				Domain:        "domain1",
 				ReceiptType:   components.RT_FailedOnChainWithRevertData,
 			},
 		})
@@ -196,6 +244,7 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 	require.JSONEq(t, fmt.Sprintf(`{
 		"id":"%s",
 		"sequence":%d,
+		"domain": "domain1",
 		"failureMessage":"PD012214: Unable to decode revert data (no revert data available)"
 	}`, txID, receipt.Sequence), string(pldtypes.JSONString(receipt)))
 

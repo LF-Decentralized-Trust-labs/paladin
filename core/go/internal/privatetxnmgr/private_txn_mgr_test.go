@@ -2811,6 +2811,11 @@ type privateTransactionMgrForPackageTestingStruct struct {
 	t                *testing.T
 }
 
+// WriteOrDistributeReceipts implements privateTransactionMgrForPackageTesting.
+func (p *privateTransactionMgrForPackageTestingStruct) WriteOrDistributeReceipts(ctx context.Context, dbTX persistence.DBTX, receipts []*components.ReceiptInputWithOriginator) error {
+	panic("unimplemented")
+}
+
 func (p *privateTransactionMgrForPackageTestingStruct) PreCommitHandler(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*blockindexer.IndexedTransactionNotify) error {
 	return p.preCommitHandler(ctx, dbTX, blocks, transactions)
 }
