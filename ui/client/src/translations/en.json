@@ -80,6 +80,7 @@
 	"errorFetchingTransportPeers": "Error fetching transport peers",
 	"errorFetchingResolveVerifier": "Error fetching resolve verifier",
 	"errorFetchingReverseKeyLookup": "Error fetching reverse key lookup",
+	"errorFetchingBalance": "Error fetching balance",
 	"errorSendingTransaction": "Error sending transaction",
 	"equal": "Equal",
 	"ethereum": "Ethereum",
@@ -211,5 +212,13 @@
 	"verifiers": "Verifiers",
 	"verifierNotFound": "Verifier not found",
 	"viewDetails": "View Details",
-	"wallet": "Wallet"
+	"wallet": "Wallet",
+	"checkBalance": "Check Balance",
+	"balance": "Balance",
+	"totalBalance": "Total Balance",
+	"totalStates": "Total States",
+	"overflow": "Overflow",
+	"balanceResult": "Balance Result",
+	"failedToCheckBalance": "Failed to check balance",
+	"account": "Account"
 }
