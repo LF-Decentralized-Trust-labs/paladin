@@ -91,10 +91,24 @@ jobs:
           echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
 
       - name: Set sanitized artifact name
-        run: echo "IMAGE_NAME_SANITIZED=${IMAGE//\//-}" >> $GITHUB_ENV
+        id: image-name-sanitizer
+        run: |
+          echo "IMAGE_NAME_SANITIZED=${IMAGE//\//-}" >> $GITHUB_OUTPUT
         env:
           IMAGE: ${{ inputs.image }}
+          
+      - name: cache image
+        id: image-cache
+        run: |
+          if [ "${{ inputs.push }}" = "false" ]; then
+            echo "IMAGE_CACHE_FROM=type=gha" >> $GITHUB_OUTPUT
+            echo "IMAGE_CACHE_TO=type=gha,mode=max" >> $GITHUB_OUTPUT
+          else
+            echo "IMAGE_CACHE_FROM=type=registry,ref=${{ inputs.registry }}/${{ inputs.image }}:cache" >> $GITHUB_OUTPUT
+            echo "IMAGE_CACHE_TO=type=registry,ref=${{ inputs.registry }}/${{ inputs.image }}:cache,mode=max" >> $GITHUB_OUTPUT
+          fi
 
+      # cache the image in the registry
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -108,14 +122,14 @@ jobs:
             commit=${{ github.sha }}
             build_date=${{ steps.build_tag_generator.outputs.BUILD_DATE }}
             tag=${{ steps.build_tag_generator.outputs.BUILD_TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          outputs: type=docker,dest=/tmp/${{ env.IMAGE_NAME_SANITIZED }}-${{ github.sha }}.tar
+          cache-from: ${{ steps.image-cache.outputs.IMAGE_CACHE_FROM }}
+          cache-to: ${{ steps.image-cache.outputs.IMAGE_CACHE_TO }}
+          outputs: type=docker,dest=/tmp/${{ steps.image-name-sanitizer.outputs.IMAGE_NAME_SANITIZED }}-${{ github.sha }}.tar
 
       - name: Upload artifact
         if: ${{ inputs.upload-artifact }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.image }}-${{ github.sha }}
-          path: /tmp/${{ env.IMAGE_NAME_SANITIZED }}-${{ github.sha }}.tar
+          path: /tmp/${{ steps.image-name-sanitizer.outputs.IMAGE_NAME_SANITIZED }}-${{ github.sha }}.tar
           retention-days: 1

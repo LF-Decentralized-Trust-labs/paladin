@@ -22,7 +22,7 @@ import (
 	"os"
 	"runtime/debug"
 
-	"github.com/kaleido-io/paladin/core/pkg/bootstrap"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/bootstrap"
 )
 
 // Runs until an error occurs, or interrupted via a signal, or calling of the Stop() function

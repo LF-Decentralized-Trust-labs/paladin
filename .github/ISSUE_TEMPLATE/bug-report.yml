@@ -11,7 +11,7 @@ body:
         _The more information you share, the faster we can help you._
         Prior to opening the issue, please make sure that you:
         - Use English (EN/US) to communicate.
-        - Search the [open issues](https://github.com/kaleido-io/paladin/issues) to avoid duplicating the issue.
+        - Search the [open issues](https://github.com/LF-Decentralized-Trust-labs/paladin/issues) to avoid duplicating the issue.
 
   - type: textarea
     id: problem

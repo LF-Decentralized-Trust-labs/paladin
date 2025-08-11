@@ -20,15 +20,16 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/mocks/blockindexermocks"
-	"github.com/kaleido-io/paladin/core/mocks/componentsmocks"
-	"github.com/kaleido-io/paladin/core/mocks/ethclientmocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/blockindexermocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/ethclientmocks"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence/mockpersistence"
 	"github.com/stretchr/testify/require"
 )
 
@@ -70,6 +71,7 @@ func newTestTransactionManager(t *testing.T, realDB bool, init ...func(conf *pld
 	}
 
 	txm := NewTXManager(ctx, conf).(*txManager)
+	mm := metrics.NewMetricsManager(ctx)
 
 	componentsmocks := mc.c
 	componentsmocks.On("TxManager").Return(txm).Maybe()
@@ -82,8 +84,8 @@ func newTestTransactionManager(t *testing.T, realDB bool, init ...func(conf *pld
 	componentsmocks.On("IdentityResolver").Return(mc.identityResolver).Maybe()
 	componentsmocks.On("EthClientFactory").Return(mc.ethClientFactory).Maybe()
 	componentsmocks.On("TransportManager").Return(mc.transportManager).Maybe()
+	componentsmocks.On("MetricsManager").Return(mm).Maybe()
 	mc.transportManager.On("LocalNodeName").Return("node1").Maybe()
-
 	var p persistence.Persistence
 	var err error
 	var pDone func()

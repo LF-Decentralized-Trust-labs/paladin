@@ -3,13 +3,13 @@ package nonfungible
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
-	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/common"
+	corepb "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/proto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/domain"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 )
 
 var (

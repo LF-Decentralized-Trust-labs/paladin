@@ -1,0 +1,1187 @@
+suite: Devnet mode tests
+templates:
+  - operator/**
+  - nodes/**
+  - samples/**
+values:
+- "../values.yaml"
+tests:
+  # Basic devnet tests with default settings
+  - it: devnet default (nodeCount=3) - all resources
+    templates:
+      - nodes/besu.yaml
+      - nodes/paladin.yaml
+      - nodes/paladinregistrations.yaml
+      - nodes/besugenesis.yaml
+    asserts:
+      - hasDocuments:
+          count: 3
+        template: nodes/besu.yaml
+      - hasDocuments:
+          count: 3
+        template: nodes/paladin.yaml
+      - hasDocuments:
+          count: 3
+        template: nodes/paladinregistrations.yaml
+      - hasDocuments:
+          count: 1
+        template: nodes/besugenesis.yaml
+
+
+  # Tests with different nodeCount values (affects both Paladin and Besu)
+  - it: devnet with nodeCount=5
+    templates:
+      - nodes/besu.yaml
+      - nodes/paladin.yaml
+      - nodes/paladinregistrations.yaml
+      - nodes/besugenesis.yaml
+    set:
+      nodeCount: 5
+    asserts:
+      - hasDocuments:
+          count: 3
+        template: nodes/besu.yaml
+      - hasDocuments:
+          count: 5
+        template: nodes/paladin.yaml
+      - hasDocuments:
+          count: 5
+        template: nodes/paladinregistrations.yaml
+      - hasDocuments:
+          count: 1
+        template: nodes/besugenesis.yaml
+
+  # Tests with different nodeCount values
+  - it: devnet with nodeCount=2
+    templates:
+      - nodes/besu.yaml
+      - nodes/paladin.yaml
+      - nodes/paladinregistrations.yaml
+    set:
+      nodeCount: 2
+    asserts:
+      - hasDocuments:
+          count: 3
+        template: nodes/besu.yaml
+      - hasDocuments:
+          count: 2
+        template: nodes/paladin.yaml
+      - hasDocuments:
+          count: 2
+        template: nodes/paladinregistrations.yaml
+
+  # Tests with independent nodeCount and besuNodeCount
+  - it: devnet with nodeCount=3, besuNodeCount=2
+    templates:
+      - nodes/besu.yaml
+      - nodes/paladin.yaml
+      - nodes/paladinregistrations.yaml
+    set:
+      nodeCount: 3
+      besuNodeCount: 2
+    asserts:
+      - hasDocuments:
+          count: 2
+        template: nodes/besu.yaml
+      - hasDocuments:
+          count: 3
+        template: nodes/paladin.yaml
+      - hasDocuments:
+          count: 3
+        template: nodes/paladinregistrations.yaml
+
+  # Tests with custom prefixes
+  - it: devnet with custom paladin prefix
+    templates:
+      - nodes/paladin.yaml
+    set:
+      paladin:
+        nodeNamePrefix: "paladin"
+      nodeCount: 2
+    asserts:
+      - equal:
+          path: 'metadata.name'
+          value: 'paladin1'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.name'
+          value: 'paladin2'
+        documentIndex: 1
+
+  - it: devnet with custom besu prefix
+    templates:
+      - nodes/besu.yaml
+    set:
+      besu:
+        nodeNamePrefix: "besu"
+      nodeCount: 2
+    asserts:
+      - equal:
+          path: 'metadata.name'
+          value: 'besu1'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.name'
+          value: 'besu2'
+        documentIndex: 1
+
+  - it: besugenesis with custom besu prefix
+    templates:
+      - nodes/besugenesis.yaml
+    set:
+      besu:
+        nodeNamePrefix: "besu"
+      nodeCount: 3
+    asserts:
+      - equal:
+          path: 'spec.initialValidators'
+          value: ['besu1', 'besu2', 'besu3']
+        documentIndex: 0
+
+  - it: besugenesis with custom besu prefix and nodeCount=2
+    templates:
+      - nodes/besugenesis.yaml
+    set:
+      besu:
+        nodeNamePrefix: "besu"
+      besuNodeCount: 2
+      nodeCount: 2
+    asserts:
+      - equal:
+          path: 'spec.initialValidators'
+          value: ['besu1', 'besu2']
+        documentIndex: 0
+
+  # Tests for paladin baseLedgerEndpoint configuration
+  - it: paladin baseLedgerEndpoint.local.nodeName with nodeCount=1
+    templates:
+      - nodes/paladin.yaml
+    set:
+      nodeCount: 1
+    asserts:
+      - equal:
+          path: 'spec.baseLedgerEndpoint.type'
+          value: 'local'
+        documentIndex: 0
+      - equal:
+          path: 'spec.baseLedgerEndpoint.local.nodeName'
+          value: 'node1'
+        documentIndex: 0
+
+  - it: paladin baseLedgerEndpoint.local.nodeName with nodeCount=3, besuNodeCount=1
+    templates:
+      - nodes/paladin.yaml
+    set:
+      nodeCount: 3
+      besuNodeCount: 1
+    asserts:
+      - equal:
+          path: 'spec.baseLedgerEndpoint.local.nodeName'
+          value: 'node1'
+        documentIndex: 0
+      - equal:
+          path: 'spec.baseLedgerEndpoint.local.nodeName'
+          value: 'node1'
+        documentIndex: 1
+      - equal:
+          path: 'spec.baseLedgerEndpoint.local.nodeName'
+          value: 'node1'
+        documentIndex: 2
+
+  - it: paladin baseLedgerEndpoint.local.nodeName with nodeCount=3, besuNodeCount=3 (1:1 mapping)
+    templates:
+      - nodes/paladin.yaml
+    set:
+      nodeCount: 3
+      besuNodeCount: 3
+    asserts:
+      - equal:
+          path: 'spec.baseLedgerEndpoint.local.nodeName'
+          value: 'node1'
+        documentIndex: 0
+      - equal:
+          path: 'spec.baseLedgerEndpoint.local.nodeName'
+          value: 'node2'
+        documentIndex: 1
+      - equal:
+          path: 'spec.baseLedgerEndpoint.local.nodeName'
+          value: 'node3'
+        documentIndex: 2
+
+  - it: paladin baseLedgerEndpoint.local.nodeName with nodeCount=3, besuNodeCount=2 (modulo distribution)
+    templates:
+      - nodes/paladin.yaml
+    set:
+      nodeCount: 3
+      besuNodeCount: 2
+    asserts:
+      - equal:
+          path: 'spec.baseLedgerEndpoint.local.nodeName'
+          value: 'node1'
+        documentIndex: 0
+      - equal:
+          path: 'spec.baseLedgerEndpoint.local.nodeName'
+          value: 'node2'
+        documentIndex: 1
+      - equal:
+          path: 'spec.baseLedgerEndpoint.local.nodeName'
+          value: 'node1'
+        documentIndex: 2
+
+  # Tests for port calculations
+  - it: paladin nodePort calculation with default baseNodePort
+    templates:
+      - nodes/paladin.yaml
+    set:
+      nodeCount: 3
+    asserts:
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 31548
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 31648
+        documentIndex: 1
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 31748
+        documentIndex: 2
+      - equal:
+          path: 'spec.service.ports[1].nodePort'
+          value: 31549
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[1].nodePort'
+          value: 31649
+        documentIndex: 1
+      - equal:
+          path: 'spec.service.ports[1].nodePort'
+          value: 31749
+        documentIndex: 2
+
+  - it: paladin nodePort calculation with custom baseNodePort
+    templates:
+      - nodes/paladin.yaml
+    set:
+      paladin:
+        baseNodePort: 32000
+      nodeCount: 3
+    asserts:
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 32000
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 32100
+        documentIndex: 1
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 32200
+        documentIndex: 2
+
+  - it: besu nodePort calculation with default baseNodePort
+    templates:
+      - nodes/besu.yaml
+    set:
+      nodeCount: 3
+    asserts:
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 31545
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 31645
+        documentIndex: 1
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 31745
+        documentIndex: 2
+      - equal:
+          path: 'spec.service.ports[1].nodePort'
+          value: 31546
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[1].nodePort'
+          value: 31646
+        documentIndex: 1
+      - equal:
+          path: 'spec.service.ports[1].nodePort'
+          value: 31746
+        documentIndex: 2
+      - equal:
+          path: 'spec.service.ports[2].nodePort'
+          value: 31547
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[2].nodePort'
+          value: 31647
+        documentIndex: 1
+      - equal:
+          path: 'spec.service.ports[2].nodePort'
+          value: 31747
+        documentIndex: 2
+
+  - it: besu nodePort calculation with custom baseNodePort
+    templates:
+      - nodes/besu.yaml
+    set:
+      besu:
+        baseNodePort: 32000
+      nodeCount: 3
+    asserts:
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 32000
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 32100
+        documentIndex: 1
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 32200
+        documentIndex: 2
+
+  # Tests for paladin configuration
+  - it: paladin service configuration
+    templates:
+      - nodes/paladin.yaml
+    set:
+      nodeCount: 1
+    asserts:
+      - equal:
+          path: 'spec.service.type'
+          value: 'NodePort'
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[0].name'
+          value: 'rpc-http'
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[0].port'
+          value: 8548
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[1].name'
+          value: 'rpc-ws'
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[1].port'
+          value: 8549
+        documentIndex: 0
+
+  - it: paladin database configuration
+    templates:
+      - nodes/paladin.yaml
+    set:
+      nodeCount: 1
+    asserts:
+      - equal:
+          path: 'spec.database.mode'
+          value: 'sidecarPostgres'
+        documentIndex: 0
+      - equal:
+          path: 'spec.database.migrationMode'
+          value: 'auto'
+        documentIndex: 0
+
+  - it: paladin domains configuration
+    templates:
+      - nodes/paladin.yaml
+    set:
+      nodeCount: 1
+    asserts:
+      - equal:
+          path: 'spec.domains[0].labelSelector.matchLabels'
+          value: {'paladin.io/domain-name': 'noto'}
+        documentIndex: 0
+      - equal:
+          path: 'spec.domains[1].labelSelector.matchLabels'
+          value: {'paladin.io/domain-name': 'zeto'}
+        documentIndex: 0
+      - equal:
+          path: 'spec.domains[2].labelSelector.matchLabels'
+          value: {'paladin.io/domain-name': 'pente'}
+        documentIndex: 0
+
+  - it: paladin registries configuration
+    templates:
+      - nodes/paladin.yaml
+    set:
+      nodeCount: 1
+    asserts:
+      - equal:
+          path: 'spec.registries[0].labelSelector.matchLabels'
+          value: {'paladin.io/registry-name': 'evm-registry'}
+        documentIndex: 0
+
+  # Tests for besu configuration
+  - it: besu service configuration
+    templates:
+      - nodes/besu.yaml
+    set:
+      nodeCount: 1
+    asserts:
+      - equal:
+          path: 'spec.service.type'
+          value: 'NodePort'
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[0].name'
+          value: 'rpc-http'
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[0].port'
+          value: 8545
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[1].name'
+          value: 'rpc-ws'
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[1].port'
+          value: 8546
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[2].name'
+          value: 'graphql-http'
+        documentIndex: 0
+      - equal:
+          path: 'spec.service.ports[2].port'
+          value: 8547
+        documentIndex: 0
+
+  - it: besu genesis configuration
+    templates:
+      - nodes/besu.yaml
+    set:
+      nodeCount: 1
+    asserts:
+      - equal:
+          path: 'spec.genesis'
+          value: 'testnet'
+        documentIndex: 0
+
+  # Tests for paladinregistrations configuration
+  - it: paladinregistrations configuration
+    templates:
+      - nodes/paladinregistrations.yaml
+    set:
+      nodeCount: 2
+    asserts:
+      - equal:
+          path: 'spec.registry'
+          value: 'evm-registry'
+        documentIndex: 0
+      - equal:
+          path: 'spec.registryAdminNode'
+          value: 'node1'
+        documentIndex: 0
+      - equal:
+          path: 'spec.registryAdminKey'
+          value: 'registry.operator'
+        documentIndex: 0
+      - equal:
+          path: 'spec.node'
+          value: 'node1'
+        documentIndex: 0
+      - equal:
+          path: 'spec.nodeAdminKey'
+          value: 'registry.node1'
+        documentIndex: 0
+      - equal:
+          path: 'spec.transports[0]'
+          value: 'grpc'
+        documentIndex: 0
+
+  # Tests for besugenesis configuration
+  - it: besugenesis configuration
+    templates:
+      - nodes/besugenesis.yaml
+    asserts:
+      - equal:
+          path: 'metadata.name'
+          value: 'testnet'
+        documentIndex: 0
+      - equal:
+          path: 'spec.chainID'
+          value: 1337
+        documentIndex: 0
+      - equal:
+          path: 'spec.consensus'
+          value: 'qbft'
+        documentIndex: 0
+      - equal:
+          path: 'spec.blockPeriod'
+          value: '100ms'
+        documentIndex: 0
+      - equal:
+          path: 'spec.emptyBlockPeriod'
+          value: '10s'
+        documentIndex: 0
+
+  # Tests for operator resources (should always be present)
+  - it: operator deployment present
+    templates:
+      - operator/deployment.yaml
+    asserts:
+      - equal:
+          path: 'metadata.name'
+          value: 'paladin-operator'
+        documentIndex: 0
+      - equal:
+          path: 'kind'
+          value: 'Deployment'
+        documentIndex: 0
+
+  - it: operator service present
+    templates:
+      - operator/service.yaml
+    asserts:
+      - equal:
+          path: 'metadata.name'
+          value: 'paladin-operator'
+        documentIndex: 0
+      - equal:
+          path: 'kind'
+          value: 'Service'
+        documentIndex: 0
+
+  - it: operator serviceaccount present
+    templates:
+      - operator/serviceaccount.yaml
+    asserts:
+      - equal:
+          path: 'metadata.name'
+          value: 'paladin-operator'
+        documentIndex: 0
+      - equal:
+          path: 'kind'
+          value: 'ServiceAccount'
+        documentIndex: 0
+
+  - it: operator configmap present
+    templates:
+      - operator/configmap.yaml
+    asserts:
+      - equal:
+          path: 'metadata.name'
+          value: 'paladin-operator'
+        documentIndex: 0
+      - equal:
+          path: 'kind'
+          value: 'ConfigMap'
+        documentIndex: 0
+
+  - it: operator role present
+    templates:
+      - operator/role.yaml
+    asserts:
+      - equal:
+          path: 'metadata.name'
+          value: 'paladin-operator'
+        documentIndex: 0
+      - equal:
+          path: 'kind'
+          value: 'Role'
+        documentIndex: 0
+
+  - it: operator rolebinding present
+    templates:
+      - operator/rolebinding.yaml
+    asserts:
+      - equal:
+          path: 'metadata.name'
+          value: 'paladin-operator'
+        documentIndex: 0
+      - equal:
+          path: 'kind'
+          value: 'RoleBinding'
+        documentIndex: 0
+
+  # Tests for samples loaded in devnet mode
+  - it: devnet samples - PaladinDomains present
+    templates:
+      - samples/core_v1alpha1_paladindomain_noto.yaml
+      - samples/core_v1alpha1_paladindomain_zeto.yaml
+      - samples/core_v1alpha1_paladindomain_pente.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_paladindomain_noto.yaml
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_paladindomain_zeto.yaml
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_paladindomain_pente.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'noto'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_noto.yaml
+      - matchSnapshot:
+          path: 'metadata.labels'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_noto.yaml
+      - equal:
+          path: 'spec.smartContractDeployment'
+          value: 'noto-factory'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_noto.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'zeto'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_zeto.yaml
+      - matchSnapshot:
+          path: 'metadata.labels'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_zeto.yaml
+      - equal:
+          path: 'spec.smartContractDeployment'
+          value: 'zeto-factory'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_zeto.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'pente'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_pente.yaml
+      - matchSnapshot:
+          path: 'metadata.labels'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_pente.yaml
+      - equal:
+          path: 'spec.smartContractDeployment'
+          value: 'pente-factory'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_pente.yaml
+
+  - it: devnet samples - PaladinRegistry present
+    templates:
+      - samples/core_v1alpha1_paladinregistry.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_paladinregistry.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'evm-registry'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladinregistry.yaml
+      - matchSnapshot:
+          path: 'metadata.labels'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladinregistry.yaml
+      - equal:
+          path: 'spec.type'
+          value: 'evm'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladinregistry.yaml
+      - equal:
+          path: 'spec.evm.smartContractDeployment'
+          value: 'registry'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladinregistry.yaml
+
+  - it: devnet samples - SmartContractDeployments present
+    templates:
+      - samples/core_v1alpha1_smartcontractdeployment_registry.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_noto_factory.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_zeto_factory.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_pente_factory.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_smartcontractdeployment_registry.yaml
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_smartcontractdeployment_noto_factory.yaml
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_smartcontractdeployment_zeto_factory.yaml
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_smartcontractdeployment_pente_factory.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'registry'
+        documentIndex: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_registry.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'noto-factory'
+        documentIndex: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_noto_factory.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'zeto-factory'
+        documentIndex: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_zeto_factory.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'pente-factory'
+        documentIndex: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_pente_factory.yaml
+
+  # Tests for image and tag configuration
+  - it: operator image and tag configuration
+    templates:
+      - operator/deployment.yaml
+    set:
+      operator:
+        image:
+          repository: "custom-repo/paladin-operator"
+          tag: "v1.2.3"
+          pullPolicy: "IfNotPresent"
+    asserts:
+      - equal:
+          path: 'spec.template.spec.containers[0].image'
+          value: 'custom-repo/paladin-operator:v1.2.3'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].imagePullPolicy'
+          value: 'IfNotPresent'
+        documentIndex: 0
+
+  # Tests for resources
+  - it: operator resources configuration
+    templates:
+      - operator/deployment.yaml
+    set:
+      operator:
+        resources:
+          limits:
+            cpu: "1000m"
+            memory: "512Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+    asserts:
+      - equal:
+          path: 'spec.template.spec.containers[0].resources.limits.cpu'
+          value: '1000m'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].resources.limits.memory'
+          value: '512Mi'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].resources.requests.cpu'
+          value: '100m'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].resources.requests.memory'
+          value: '128Mi'
+        documentIndex: 0
+
+  # Tests for labels and annotations
+  - it: operator deployment labels and annotations
+    templates:
+      - operator/deployment.yaml
+    set:
+      operator:
+        labels:
+          custom-label: "operator-value"
+          environment: "production"
+          team: "platform"
+        annotations:
+          custom-annotation: "operator-annotation"
+          another-annotation: "another-value"
+          deployment-revision: "1"
+          change-cause: "helm upgrade"
+          prometheus-scrape: "true"
+          prometheus-port: "8080"
+    asserts:
+      # Deployment-level labels
+      - equal:
+          path: 'metadata.labels.custom-label'
+          value: 'operator-value'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.labels.environment'
+          value: 'production'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.labels.team'
+          value: 'platform'
+        documentIndex: 0
+      # Deployment-level annotations
+      - equal:
+          path: 'metadata.annotations.custom-annotation'
+          value: 'operator-annotation'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.another-annotation'
+          value: 'another-value'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.deployment-revision'
+          value: '1'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.change-cause'
+          value: 'helm upgrade'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.prometheus-scrape'
+          value: 'true'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.prometheus-port'
+          value: '8080'
+        documentIndex: 0
+      # Pod template labels (should be the same as deployment labels)
+      - equal:
+          path: 'spec.template.metadata.labels.custom-label'
+          value: 'operator-value'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.labels.environment'
+          value: 'production'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.labels.team'
+          value: 'platform'
+        documentIndex: 0
+      # Pod template annotations (should include both custom and auto-generated)
+      - equal:
+          path: 'spec.template.metadata.annotations.custom-annotation'
+          value: 'operator-annotation'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.annotations.another-annotation'
+          value: 'another-value'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.annotations.deployment-revision'
+          value: '1'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.annotations.change-cause'
+          value: 'helm upgrade'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.annotations.prometheus-scrape'
+          value: 'true'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.annotations.prometheus-port'
+          value: '8080'
+        documentIndex: 0
+
+  - it: operator minimal labels and annotations
+    templates:
+      - operator/deployment.yaml
+    set:
+      operator:
+        labels:
+          simple-label: "simple-value"
+        annotations:
+          simple-annotation: "simple-value"
+    asserts:
+      - equal:
+          path: 'metadata.labels.simple-label'
+          value: 'simple-value'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.simple-annotation'
+          value: 'simple-value'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.labels.simple-label'
+          value: 'simple-value'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.annotations.simple-annotation'
+          value: 'simple-value'
+        documentIndex: 0
+
+  - it: operator complex labels and annotations
+    templates:
+      - operator/deployment.yaml
+    set:
+      operator:
+        labels:
+          tier: "backend"
+          region: "us-west-2"
+          zone: "us-west-2a"
+          instance-type: "production"
+          cost-center: "platform-team"
+          owner: "devops"
+          backup: "true"
+          monitoring: "enabled"
+          security: "high"
+          compliance: "pci-dss"
+        annotations:
+          backup-volumes: "data"
+          sidecar-inject: "true"
+          vault-agent-inject: "true"
+          vault-secret-db-creds: "database/creds/my-role"
+          fluentbit-parser: "json"
+          elasticsearch-indices: "logs-*"
+          grafana-dashboard: "operator-metrics"
+          alertmanager-severity: "warning"
+          cert-manager-issuer: "letsencrypt-prod"
+          external-dns-hostname: "operator.example.com"
+    asserts:
+      # Test a subset of the complex labels
+      - equal:
+          path: 'metadata.labels.tier'
+          value: 'backend'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.labels.region'
+          value: 'us-west-2'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.labels.zone'
+          value: 'us-west-2a'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.labels.instance-type'
+          value: 'production'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.labels.cost-center'
+          value: 'platform-team'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.labels.owner'
+          value: 'devops'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.labels.backup'
+          value: 'true'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.labels.monitoring'
+          value: 'enabled'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.labels.security'
+          value: 'high'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.labels.compliance'
+          value: 'pci-dss'
+        documentIndex: 0
+      # Test a subset of the complex annotations
+      - equal:
+          path: 'metadata.annotations.backup-volumes'
+          value: 'data'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.sidecar-inject'
+          value: 'true'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.vault-agent-inject'
+          value: 'true'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.vault-secret-db-creds'
+          value: 'database/creds/my-role'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.fluentbit-parser'
+          value: 'json'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.elasticsearch-indices'
+          value: 'logs-*'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.grafana-dashboard'
+          value: 'operator-metrics'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.alertmanager-severity'
+          value: 'warning'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.cert-manager-issuer'
+          value: 'letsencrypt-prod'
+        documentIndex: 0
+      - equal:
+          path: 'metadata.annotations.external-dns-hostname'
+          value: 'operator.example.com'
+        documentIndex: 0
+      # Verify pod template has the same labels and annotations
+      - equal:
+          path: 'spec.template.metadata.labels.tier'
+          value: 'backend'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.labels.region'
+          value: 'us-west-2'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.annotations.backup-volumes'
+          value: 'data'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.metadata.annotations.sidecar-inject'
+          value: 'true'
+        documentIndex: 0
+
+  # Tests for securityContext
+  - it: operator securityContext configuration
+    templates:
+      - operator/deployment.yaml
+    set:
+      operator:
+        podSecurityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          fsGroup: 1000
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+    asserts:
+      - equal:
+          path: 'spec.template.spec.securityContext.runAsNonRoot'
+          value: true
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.securityContext.runAsUser'
+          value: 1000
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.securityContext.runAsGroup'
+          value: 1000
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.securityContext.fsGroup'
+          value: 1000
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation'
+          value: false
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].securityContext.capabilities.drop[0]'
+          value: 'ALL'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem'
+          value: true
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].securityContext.runAsNonRoot'
+          value: true
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].securityContext.runAsUser'
+          value: 1000
+        documentIndex: 0
+
+  # Tests for environment variables
+  - it: operator environment variables
+    templates:
+      - operator/deployment.yaml
+    set:
+      operator:
+        env:
+          - name: "CONFIG_PATH"
+            value: "/etc/config"
+          - name: "CUSTOM_ENV"
+            value: "custom-value"
+          - name: "ANOTHER_ENV"
+            value: "another-value"
+    asserts:
+      - equal:
+          path: 'spec.template.spec.containers[0].env[1].name'
+          value: 'CONFIG_PATH'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].env[1].value'
+          value: '/etc/config'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].env[2].name'
+          value: 'CUSTOM_ENV'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].env[2].value'
+          value: 'custom-value'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].env[3].name'
+          value: 'ANOTHER_ENV'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].env[3].value'
+          value: 'another-value'
+        documentIndex: 0
+
+  # Tests for volumes and volumeMounts
+  - it: operator volumes and volumeMounts
+    templates:
+      - operator/deployment.yaml
+    set:
+      operator:
+        volumes:
+          - name: "config"
+            configMap:
+              name: "paladin-operator"
+          - name: "custom-config"
+            configMap:
+              name: "custom-config"
+        volumeMounts:
+          - name: "config"
+            mountPath: "/etc/config/config.json"
+            subPath: "config.json"
+          - name: "custom-config"
+            mountPath: "/etc/custom"
+            subPath: "config.yaml"
+    asserts:
+      - equal:
+          path: 'spec.template.spec.volumes[0].name'
+          value: 'config'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.volumes[0].configMap.name'
+          value: 'paladin-operator'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.volumes[1].name'
+          value: 'custom-config'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.volumes[1].configMap.name'
+          value: 'custom-config'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].volumeMounts[0].name'
+          value: 'config'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].volumeMounts[0].mountPath'
+          value: '/etc/config/config.json'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].volumeMounts[0].subPath'
+          value: 'config.json'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].volumeMounts[1].name'
+          value: 'custom-config'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].volumeMounts[1].mountPath'
+          value: '/etc/custom'
+        documentIndex: 0
+      - equal:
+          path: 'spec.template.spec.containers[0].volumeMounts[1].subPath'
+          value: 'config.yaml'
+        documentIndex: 0

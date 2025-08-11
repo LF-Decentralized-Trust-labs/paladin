@@ -21,8 +21,8 @@ import (
 	"database/sql/driver"
 	"math/big"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type Uint256Field string

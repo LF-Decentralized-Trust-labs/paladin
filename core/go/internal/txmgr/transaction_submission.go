@@ -22,19 +22,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"gorm.io/gorm/clause"
 )
 
@@ -87,6 +87,18 @@ type persistedTransactionHistory struct {
 
 func (persistedTransactionHistory) TableName() string {
 	return "transaction_history"
+}
+
+type persistedChainedPrivateTxn struct {
+	ChainedTransaction uuid.UUID `gorm:"column:chained_transaction;primaryKey"`
+	Transaction        uuid.UUID `gorm:"column:transaction;primaryKey"`
+	Sender             string    `gorm:"column:sender;primaryKey"`
+	Domain             string    `gorm:"column:domain;primaryKey"`
+	ContractAddress    string    `gorm:"column:contract_address;primaryKey"`
+}
+
+func (persistedChainedPrivateTxn) TableName() string {
+	return "chained_private_txns"
 }
 
 var defaultConstructor = &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{}}
@@ -336,16 +348,42 @@ func (tm *txManager) callTransactionPublic(ctx context.Context, result any, call
 	return err
 }
 
-func (tm *txManager) PrepareInternalPrivateTransaction(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (*components.ValidatedTransaction, error) {
+func (tm *txManager) PrepareChainedPrivateTransaction(ctx context.Context, dbTX persistence.DBTX, origSender string, origTxID uuid.UUID, origDomain string, origDomainAddress *pldtypes.EthAddress, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (chained *components.ChainedPrivateTransaction, err error) {
 	tx.Type = pldapi.TransactionTypePrivate.Enum()
 	if tx.IdempotencyKey == "" {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrPrivateChainedTXIdemKey)
 	}
-	return tm.resolveNewTransaction(ctx, dbTX, tx, submitMode)
+	newTX, err := tm.resolveNewTransaction(ctx, dbTX, tx, submitMode)
+	if err == nil {
+		chained = &components.ChainedPrivateTransaction{
+			OriginalSenderLocator: origSender,
+			OriginalTransaction:   origTxID,
+			OriginalDomain:        origDomain,
+			NewTransaction:        newTX,
+		}
+		if origDomainAddress != nil {
+			chained.OriginalContractAddress = origDomainAddress.String()
+		}
+	}
+	return chained, err
 }
 
-func (tm *txManager) UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, dbTX persistence.DBTX, txis []*components.ValidatedTransaction) error {
-	// On this path we handle the idempotency key matching - noting that we validate the existence of an idempotency key in PrepareInternalPrivateTransaction
+func (tm *txManager) ChainPrivateTransactions(ctx context.Context, dbTX persistence.DBTX, chainedTxns []*components.ChainedPrivateTransaction) error {
+
+	txis := make([]*components.ValidatedTransaction, len(chainedTxns))
+	chainingRecords := make([]*persistedChainedPrivateTxn, len(chainedTxns))
+	for i, chainedTxn := range chainedTxns {
+		txis[i] = chainedTxn.NewTransaction
+		chainingRecords[i] = &persistedChainedPrivateTxn{
+			Sender:             chainedTxn.OriginalSenderLocator,
+			Transaction:        chainedTxn.OriginalTransaction,
+			Domain:             chainedTxn.OriginalDomain,
+			ContractAddress:    chainedTxn.OriginalContractAddress,
+			ChainedTransaction: *chainedTxn.NewTransaction.Transaction.ID,
+		}
+	}
+
+	// On this path we handle the idempotency key matching - noting that we validate the existence of an idempotency key in PrepareChainedPrivateTransaction
 	insertCount, err := tm.insertTransactions(ctx, dbTX, txis, true /* on conflict do nothing */)
 	if err != nil {
 		return err
@@ -385,10 +423,19 @@ func (tm *txManager) UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, db
 		}
 	}
 
+	// Insert the chaining records which allow us to correlate the completion of the chained transaction, back
+	// to the completion of the original transaction in the case of a failure in particular.
+	return tm.writeChainingRecords(ctx, dbTX, chainingRecords)
+
 	// Note deliberately no notification to private TX manager here, as this function is for it to call us.
 	// So when it's flushed its internal transaction, it notifies itself.
+}
 
-	return nil
+func (tm *txManager) writeChainingRecords(ctx context.Context, dbTX persistence.DBTX, chainingRecords []*persistedChainedPrivateTxn) error {
+	return dbTX.DB().
+		Clauses(clause.OnConflict{DoNothing: true}).
+		WithContext(ctx).
+		Create(chainingRecords).Error
 }
 
 func (tm *txManager) SendTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error) {
@@ -567,7 +614,7 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX persistence
 		return nil, err
 	}
 	// Update to normalized JSON in what we store
-	tx.TransactionBase.Data = normalizedJSON
+	tx.Data = normalizedJSON
 
 	var localFrom string
 	bypassFromCheck := submitMode == pldapi.SubmitModePrepare || /* no checking on from for prepare */

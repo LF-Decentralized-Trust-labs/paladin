@@ -5,11 +5,11 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/signer/common"
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/proto"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/core"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/signer/common"
-	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 )
 
 type FungibleNullifierWitnessInputs struct {
@@ -52,12 +52,12 @@ func (inputs *FungibleNullifierWitnessInputs) prepareInputsForNullifiers(ctx con
 		}
 		nullifiers[i] = nullifier
 	}
-	root, ok := new(big.Int).SetString(extras.Root, 16)
+	root, ok := new(big.Int).SetString(extras.SmtProof.Root, 16)
 	if !ok {
 		return nil, nil, nil, nil, nil, i18n.NewError(ctx, msgs.MsgErrorDecodeRootExtras)
 	}
 	var proofs [][]*big.Int
-	for _, proof := range extras.MerkleProofs {
+	for _, proof := range extras.SmtProof.MerkleProofs {
 		var mp []*big.Int
 		for _, node := range proof.Nodes {
 			n, ok := new(big.Int).SetString(node, 16)
@@ -68,8 +68,8 @@ func (inputs *FungibleNullifierWitnessInputs) prepareInputsForNullifiers(ctx con
 		}
 		proofs = append(proofs, mp)
 	}
-	enabled := make([]*big.Int, len(extras.Enabled))
-	for i, e := range extras.Enabled {
+	enabled := make([]*big.Int, len(extras.SmtProof.Enabled))
+	for i, e := range extras.SmtProof.Enabled {
 		if e {
 			enabled[i] = big.NewInt(1)
 		} else {

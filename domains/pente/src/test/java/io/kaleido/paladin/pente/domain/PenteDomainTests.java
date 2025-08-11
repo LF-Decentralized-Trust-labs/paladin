@@ -15,17 +15,29 @@
 
 package io.kaleido.paladin.pente.domain;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.kaleido.paladin.testbed.Testbed;
-import io.kaleido.paladin.toolkit.*;
-import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
+import io.kaleido.paladin.toolkit.Algorithms;
+import io.kaleido.paladin.toolkit.JsonABI;
+import io.kaleido.paladin.toolkit.JsonHex;
+import io.kaleido.paladin.toolkit.ResourceLoader;
+import io.kaleido.paladin.toolkit.Verifiers;
 
 public class PenteDomainTests {
 
@@ -105,6 +117,21 @@ public class PenteDomainTests {
                             JsonABI.newTuple("inputs", "", JsonABI.newParameters(
                                     JsonABI.newParameter("linked", "address")
                             ))
+                    ),
+                    JsonABI.newParameters()
+            )
+    ));
+
+    static final JsonABI timestampTestABI = new JsonABI(List.of(
+            JsonABI.newFunction(
+                    "deploy",
+                    JsonABI.newParameters(
+                            JsonABI.newTuple("group", "Group", JsonABI.newParameters(
+                                    JsonABI.newParameter("salt", "bytes32"),
+                                    JsonABI.newParameter("members", "string[]")
+                            )),
+                            JsonABI.newParameter("bytecode", "bytes"),
+                            JsonABI.newTuple("inputs", "", JsonABI.newParameters())
                     ),
                     JsonABI.newParameters()
             )
@@ -216,6 +243,26 @@ public class PenteDomainTests {
                             "set"
                     ), true);
 
+            // Set with an invalid input (should revert)
+            var ex = assertThrows(IOException.class, () -> {
+                testbed.getRpcClient().request("testbed_invoke",
+                        new Testbed.TransactionInput(
+                                "private",
+                                "",
+                                "simpleStorageDeployer",
+                                JsonHex.addressFrom(contractAddr),
+                                new HashMap<>() {{
+                                        put("group", groupInfo);
+                                        put("to", expectedContractAddress.toString());
+                                        put("inputs", new HashMap<>() {{
+                                                put("x", "-1");
+                                        }});
+                                }},
+                                simpleStorageABI,
+                                "set"
+                        ), true);
+            });
+            assertEquals("assemble result was REVERT", ex.getMessage());
         }
     }
 
@@ -417,6 +464,57 @@ public class PenteDomainTests {
                             simpleStorageABI,
                             "set"
                     ), true);
+        }
+    }
+
+    @Test
+    void testBlockTimestamp() throws Exception {
+        JsonHex.Address address = deployFactory();
+        JsonHex.Bytes32 groupSalt = JsonHex.randomBytes32();
+        try (Testbed testbed = new Testbed(testbedSetup, new Testbed.ConfigDomain(
+                "pente", address, new Testbed.ConfigPlugin("jar", "", PenteDomainFactory.class.getName()), new HashMap<>()
+        ))) {
+            PenteConfiguration.GroupTupleJSON groupInfo = new PenteConfiguration.GroupTupleJSON(
+                    groupSalt,
+                    new String[]{"member1", "member2"}
+            );
+
+            // Create the privacy group
+            String penteAddr = testbed.getRpcClient().request("testbed_deploy",
+                    "pente", "member1",
+                    new PenteConfiguration.PrivacyGroupConstructorParamsJSON(
+                            groupInfo,
+                            "shanghai",
+                            PenteConfiguration.ENDORSEMENT_TYPE__GROUP_SCOPED_IDENTITIES,
+                            true
+                    ));
+            assertFalse(penteAddr.isBlank());
+
+            // Deploy TimestampTest to the privacy group
+            String timestampTestBytecode = ResourceLoader.jsonResourceEntryText(
+                    this.getClass().getClassLoader(),
+                    "contracts/testcontracts/TimestampTest.sol/TimestampTest.json",
+                    "bytecode"
+            );
+            var mapper = new ObjectMapper();
+            var tx = getTransactionInfo(
+                    testbed.getRpcClient().request("testbed_invoke",
+                            new Testbed.TransactionInput(
+                                    "private",
+                                    "",
+                                    "deployer",
+                                    JsonHex.addressFrom(penteAddr),
+                                    new HashMap<>() {{
+                                        put("group", groupInfo);
+                                        put("bytecode", timestampTestBytecode);
+                                        put("inputs", new String[]{});
+                                    }},
+                                    timestampTestABI,
+                                    "deploy"
+                            ), true));
+            var domainReceipt = mapper.convertValue(tx.domainReceipt(), PenteEVMTransaction.JSONReceipt.class);
+            var timestampTestAddr = domainReceipt.receipt().contractAddress();
+            assertFalse(timestampTestAddr.toString().isBlank());
         }
     }
 }

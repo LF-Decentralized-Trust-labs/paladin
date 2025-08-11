@@ -1,6 +1,6 @@
 # Bond Issuance
 
-The code for this tutorial can be found in [example/bond](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/bond).
+The code for this tutorial can be found in [examples/bond](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/bond).
 
 This shows how to leverage the [Noto](../../architecture/noto/) and [Pente](../../architecture/pente/) domains together in order to build a bond issuance process, illustrating multiple aspects of Paladin's privacy capabilities.
 
@@ -9,7 +9,7 @@ This shows how to leverage the [Noto](../../architecture/noto/) and [Pente](../.
 ## Running the example
 
 Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paladin environment, and
-then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/bond/README.md)
+then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/bond/README.md)
 to run the code.
 
 ## Explanation
@@ -22,10 +22,12 @@ Below is a walkthrough of each step in the example, with an explanation of what 
 
 ```typescript
 const notoFactory = new NotoFactory(paladin1, "noto");
-const notoCash = await notoFactory.newNoto(cashIssuer, {
-  notary: cashIssuer,
-  notaryMode: "basic",
-});
+const notoCash = await notoFactory
+  .newNoto(cashIssuer, {
+    notary: cashIssuer,
+    notaryMode: "basic",
+  })
+  .waitForDeploy();
 ```
 
 This creates a new instance of the Noto domain, which will translate to a new cloned contract
@@ -41,11 +43,13 @@ Minting is restricted to be requested only by the notary.
 #### Issue cash
 
 ```typescript
-await notoCash.mint(cashIssuer, {
-  to: investor,
-  amount: 100000,
-  data: "0x",
-});
+await notoCash
+  .mint(cashIssuer, {
+    to: investor,
+    amount: 100000,
+    data: "0x",
+  })
+  .waitForReceipt();
 ```
 
 The cash issuer mints cash to the investor party. As the notary of the cash token, they are
@@ -57,11 +61,13 @@ allowed to do this.
 
 ```typescript
 const penteFactory = new PenteFactory(paladin1, "pente");
-const issuerCustodianGroup = await penteFactory.newPrivacyGroup({
-  members: [bondIssuer, bondCustodian],
-  evmVersion: "shanghai",
-  externalCallsEnabled: true,
-});
+const issuerCustodianGroup = await penteFactory
+  .newPrivacyGroup({
+    members: [bondIssuer, bondCustodian],
+    evmVersion: "shanghai",
+    externalCallsEnabled: true,
+  })
+  .waitForDeploy();
 ```
 
 This creates a new instance of the Pente domain, which will be a private EVM group shared by the
@@ -101,7 +107,7 @@ events throughout the bond's lifetime.
 #### Create private bond tracker
 
 ```typescript
-await newBondTracker(issuerCustodianGroup, bondIssuer, {
+const bondTracker = await newBondTracker(issuerCustodianGroup, bondIssuer, {
   name: "BOND",
   symbol: "BOND",
   custodian: await bondCustodian.address(),
@@ -121,17 +127,19 @@ visible to the bond issuer and custodian, but will be atomically linked to the N
 #### Deploy bond token
 
 ```typescript
-const notoBond = await notoFactory.newNoto(bondIssuer, {
-  notary: bondCustodian,
-  notaryMode: "hooks",
-  options: {
-    hooks: {
-      privateGroup: issuerCustodianGroup.group,
-      publicAddress: issuerCustodianGroup.address,
-      privateAddress: bondTracker.address,
+const notoBond = await notoFactory
+  .newNoto(bondIssuer, {
+    notary: bondCustodian,
+    notaryMode: "hooks",
+    options: {
+      hooks: {
+        privateGroup: issuerCustodianGroup,
+        publicAddress: issuerCustodianGroup.address,
+        privateAddress: bondTracker.address,
+      },
     },
-  },
-});
+  })
+  .waitForDeploy();
 ```
 
 Now that the public and private tracking contracts have been deployed, the actual Noto token for the bond can be created.
@@ -164,11 +172,13 @@ note that this same factory contract can be reused for atomic transactions of an
 #### Issue bond to custodian
 
 ```typescript
-await notoBond.mint(bondIssuer, {
-  to: bondCustodian,
-  amount: 1000,
-  data: "0x",
-});
+await notoBond
+  .mint(bondIssuer, {
+    to: bondCustodian,
+    amount: 1000,
+    data: "0x",
+  })
+  .waitForReceipt();
 ```
 
 This issues the bond to the bond custodian.
@@ -180,14 +190,18 @@ on the base ledger: 1) to perform the Noto mint, and 2) to notify the public bon
 #### Begin distribution of bond
 
 ```typescript
-await bondTracker.using(paladin2).beginDistribution(bondCustodian, {
-  discountPrice: 1,
-  minimumDenomination: 1,
-});
+await bondTracker
+  .using(paladin2)
+  .beginDistribution(bondCustodian, {
+    discountPrice: 1,
+    minimumDenomination: 1,
+  })
+  .waitForReceipt();
 const investorList = await bondTracker.investorList(bondIssuer);
 await investorList
   .using(paladin2)
-  .addInvestor(bondCustodian, { addr: await investor.address() });
+  .addInvestor(bondCustodian, { addr: await investor.address() })
+  .waitForReceipt();
 ```
 
 This allows the bond custodian to begin distributing the bond to potential investors. Each investor must be added
@@ -207,7 +221,8 @@ const investorCustodianGroup = await penteFactory
     members: [investor, bondCustodian],
     evmVersion: "shanghai",
     externalCallsEnabled: true,
-  });
+  })
+  .waitForDeploy();
 ```
 
 This creates another instance of the Pente domain, scoped to only the investor and the custodian.
@@ -233,23 +248,28 @@ in their private EVM with the bond custodian.
 #### Prepare cash transfer
 
 ```typescript
-receipt = await notoCash.using(paladin3).lock(investor, {
-  amount: 100,
-  data: "0x",
-});
+receipt = await notoCash
+  .using(paladin3)
+  .lock(investor, {
+    amount: 100,
+    data: "0x",
+  })
+  .waitForReceipt();
 
 receipt = await paladin3.getTransactionReceipt(receipt.id, true);
 let domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
 const cashLockId = domainReceipt?.lockInfo?.lockId;
 
-receipt = await notoCash.using(paladin3).prepareUnlock(investor, {
-  lockId: cashLockId,
-  from: investor,
-  recipients: [{ to: bondCustodian, amount: 100 }],
-  data: "0x",
-});
+receipt = await notoCash
+  .using(paladin3)
+  .prepareUnlock(investor, {
+    lockId: cashLockId,
+    from: investor,
+    recipients: [{ to: bondCustodian, amount: 100 }],
+    data: "0x",
+  })
+  .waitForReceipt(5000, true);
 
-receipt = await paladin3.getTransactionReceipt(receipt.id, true);
 domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
 const cashUnlockParams = domainReceipt?.lockInfo?.unlockParams;
 const cashUnlockCall = domainReceipt?.lockInfo?.unlockCall;
@@ -264,23 +284,28 @@ to allow them to execute the payment transfer.
 #### Prepare bond transfer
 
 ```typescript
-receipt = await notoBond.using(paladin2).lock(bondCustodian, {
-  amount: 100,
-  data: "0x",
-});
+receipt = await notoBond
+  .using(paladin2)
+  .lock(bondCustodian, {
+    amount: 100,
+    data: "0x",
+  })
+  .waitForReceipt(5000, true);
 
 receipt = await paladin2.getTransactionReceipt(receipt.id, true);
 domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
 const bondLockId = domainReceipt?.lockInfo?.lockId;
 
-receipt = await notoBond.using(paladin2).prepareUnlock(bondCustodian, {
-  lockId: bondLockId,
-  from: bondCustodian,
-  recipients: [{ to: investor, amount: 100 }],
-  data: "0x",
-});
+receipt = await notoBond
+  .using(paladin2)
+  .prepareUnlock(bondCustodian, {
+    lockId: bondLockId,
+    from: bondCustodian,
+    recipients: [{ to: investor, amount: 100 }],
+    data: "0x",
+  })
+  .waitForReceipt(5000, true);
 
-receipt = await paladin2.getTransactionReceipt(receipt.id, true);
 domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
 const assetUnlockParams = domainReceipt?.lockInfo?.unlockParams;
 const assetUnlockCall = domainReceipt?.lockInfo?.unlockCall;
@@ -292,15 +317,21 @@ The bond custodian prepares a similar transaction for the bond, using the same
 #### Share the prepared transactions with the private contract
 
 ```typescript
-await bondSubscription.using(paladin3).preparePayment(investor, {
-  to: notoCash.address,
-  encodedCall: cashUnlockCall,
-});
+await bondSubscription
+  .using(paladin3)
+  .preparePayment(investor, {
+    to: notoCash.address,
+    encodedCall: cashUnlockCall,
+  })
+  .waitForReceipt();
 
-await bondSubscription.using(paladin2).prepareBond(bondCustodian, {
-  to: notoBond.address,
-  encodedCall: assetUnlockCall,
-});
+await bondSubscription
+  .using(paladin2)
+  .prepareBond(bondCustodian, {
+    to: notoBond.address,
+    encodedCall: assetUnlockCall,
+  })
+  .waitForReceipt();
 ```
 
 The `preparePayment` and `prepareBond` methods on the bond subscription contract allow the
@@ -310,7 +341,10 @@ atomic DvP (delivery vs. payment).
 #### Prepare the atomic transaction for the swap
 
 ```typescript
-await bondSubscription.using(paladin2).distribute(bondCustodian);
+await bondSubscription
+  .using(paladin2)
+  .distribute(bondCustodian)
+  .waitForReceipt();
 ```
 
 When both parties have prepared their individual transactions, they can be combined into a
@@ -324,22 +358,25 @@ contains. It can never be changed, executed partially, or executed more than onc
 #### Approve delegation via the private contract
 
 ```typescript
-await notoCash.using(paladin3).approveTransfer(investor, {
-  inputs: encodeStates(paymentTransfer.states.spent ?? []),
-  outputs: encodeStates(paymentTransfer.states.confirmed ?? []),
-  data: paymentTransfer.metadata.approvalParams.data,
-  delegate: atomAddress,
-});
-
-await issuerCustodianGroup.approveTransition(
-  bondCustodianUnqualified,
-  {
-    txId: newTransactionId(),
-    transitionHash: bondTransfer2.metadata.approvalParams.transitionHash,
-    signatures: bondTransfer2.metadata.approvalParams.signatures,
+await notoCash
+  .using(paladin3)
+  .delegateLock(investor, {
+    lockId: cashLockId,
+    unlock: cashUnlockParams,
     delegate: atomAddress,
-  }
-);
+    data: "0x",
+  })
+  .waitForReceipt();
+
+await notoBond
+  .using(paladin2)
+  .delegateLock(bondCustodian, {
+    lockId: bondLockId,
+    unlock: assetUnlockParams,
+    delegate: atomAddress,
+    data: "0x",
+  })
+  .waitForReceipt();
 ```
 
 Once the `Atom` is deployed, it must be designated as the approved delegate for both

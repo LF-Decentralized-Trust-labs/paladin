@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 )
 
 func (s *Sequencer) evaluationLoop() {

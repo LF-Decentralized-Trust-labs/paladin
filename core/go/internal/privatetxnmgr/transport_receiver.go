@@ -18,8 +18,8 @@ package privatetxnmgr
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 )
 
 func (p *privateTxManager) HandlePaladinMsg(ctx context.Context, message *components.ReceivedMessage) {

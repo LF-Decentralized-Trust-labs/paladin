@@ -34,12 +34,12 @@ ext {
     targetCoverage = 94.4
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
-        'github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes/mock_transaction_flow.go',
-        'github.com/kaleido-io/paladin/core/pkg/proto',
-        'github.com/kaleido-io/paladin/core/pkg/proto/transaction',
-        'github.com/kaleido-io/paladin/toolkit/prototk',
-        'github.com/kaleido-io/paladin/core/internal/plugins/loader',
-        'github.com/kaleido-io/paladin/core/pkg/testbed',
+        'github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr/ptmgrtypes/mock_transaction_flow.go',
+        'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto',
+        'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto/transaction',
+        'github.com/LF-Decentralized-Trust-labs/paladin/toolkit/prototk',
+        'github.com/LF-Decentralized-Trust-labs/paladin/core/internal/plugins/loader',
+        'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/testbed',
     ]
 }
 
@@ -197,6 +197,7 @@ task lint(type: Exec, dependsOn:[
     args '-v'
     args '--color=always'
     args '--timeout', '5m'
+    args '--tests=false'
 }
 
 task buildSharedLibrary(type:GoLib, dependsOn:[goGet]) {
@@ -283,7 +284,7 @@ abstract class ComponentTest extends Exec {
         args 'test'
         args './componenttest', './pkg/testbed'
         args '-cover'
-        args "-coverpkg=github.com/kaleido-io/paladin/core/..." // toolkit handled seperately
+        args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..." // toolkit handled seperately
         args '-covermode=atomic'
         args '-timeout=120s'
         if (project.findProperty('verboseTests') == 'true') {

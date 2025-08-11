@@ -20,8 +20,8 @@ import (
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 )
 
 type starter struct {

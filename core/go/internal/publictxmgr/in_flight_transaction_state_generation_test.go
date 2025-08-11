@@ -21,10 +21,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/core/mocks/publictxmgrmocks"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/publictxmgrmocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -37,10 +39,11 @@ type testInFlightTransactionStateVersionWithMocks struct {
 func newTestInFlightTransactionStateVersion(t *testing.T) (*testInFlightTransactionStateVersionWithMocks, *mocksAndTestControl, func()) {
 	_, balanceManager, ptm, m, done := newTestBalanceManager(t)
 
+	metrics := metrics.InitMetrics(context.Background(), prometheus.NewRegistry())
 	mockInMemoryState := NewTestInMemoryTxState(t)
 	mockActionTriggers := publictxmgrmocks.NewInFlightStageActionTriggers(t)
 
-	v := NewInFlightTransactionStateGeneration(&publicTxEngineMetrics{}, balanceManager, mockActionTriggers, mockInMemoryState, ptm, ptm.submissionWriter, false)
+	v := NewInFlightTransactionStateGeneration(metrics, balanceManager, mockActionTriggers, mockInMemoryState, ptm, ptm.submissionWriter, false)
 	return &testInFlightTransactionStateVersionWithMocks{
 		v,
 		mockActionTriggers,

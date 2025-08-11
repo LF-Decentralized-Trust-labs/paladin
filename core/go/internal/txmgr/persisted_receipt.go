@@ -19,18 +19,18 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/filters"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"gorm.io/gorm/clause"
 )
 
@@ -101,6 +101,7 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 		return nil
 	}
 
+	possibleChainingRecordIDs := make([]uuid.UUID, 0, len(info))
 	receiptsToInsert := make([]*transactionReceipt, 0, len(info))
 	for _, ri := range info {
 		receipt := &transactionReceipt{
@@ -148,6 +149,9 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 		}
 		log.L(ctx).Infof("Inserting receipt txId=%s success=%t failure=%s txHash=%v", receipt.TransactionID, receipt.Success, failureMsg, receipt.TransactionHash)
 		receiptsToInsert = append(receiptsToInsert, receipt)
+		if receipt.Domain != "" {
+			possibleChainingRecordIDs = append(possibleChainingRecordIDs, receipt.TransactionID)
+		}
 	}
 
 	if len(receiptsToInsert) > 0 {
@@ -159,12 +163,46 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 		err := tm.p.TakeNamedLock(ctx, dbTX, "transaction_receipts")
 		if err == nil {
 			err = dbTX.DB().Table("transaction_receipts").
+				WithContext(ctx).
 				Clauses(clause.OnConflict{
 					Columns:   []clause.Column{{Name: "transaction"}},
 					DoNothing: true, // once inserted, the receipt is immutable
 				}).
 				Create(receiptsToInsert).
 				Error
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(possibleChainingRecordIDs) > 0 {
+		var chainingRecords []*persistedChainedPrivateTxn
+		err := dbTX.DB().
+			Where(`"chained_transaction" IN ?`, possibleChainingRecordIDs).
+			Find(&chainingRecords).
+			Error
+		// Recurse into PrivateTXManager, who will call us back, or send via the transport mgr
+		if err == nil {
+			receiptsToWrite := make([]*components.ReceiptInputWithOriginator, 0, len(chainingRecords))
+			for _, cr := range chainingRecords {
+				for _, receipt := range info {
+					if receipt.TransactionID == cr.ChainedTransaction {
+						log.L(ctx).Infof("Propagating chained transaction receipt from %s to %s", receipt.TransactionID, cr.Transaction)
+						upstreamReceipt := &components.ReceiptInputWithOriginator{
+							Originator:            cr.Sender,
+							DomainContractAddress: cr.ContractAddress,
+							ReceiptInput:          *receipt, // note copy by value
+						}
+						upstreamReceipt.TransactionID = cr.Transaction
+						upstreamReceipt.Domain = cr.Domain
+						receiptsToWrite = append(receiptsToWrite, upstreamReceipt)
+					}
+				}
+			}
+			if len(receiptsToWrite) > 0 {
+				err = tm.privateTxMgr.WriteChainedReceipts(ctx, dbTX, receiptsToWrite)
+			}
 		}
 		if err != nil {
 			return err

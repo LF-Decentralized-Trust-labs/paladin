@@ -1,0 +1,36 @@
+# This workflow tests the TypeScript SDK ensuring it does not break the examples
+name: Test TypeScript SDK changes
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'sdk/typescript/**'
+      - 'scripts/**'
+      - '.github/workflows/on-pr-push-ts-sdk.yaml'
+      - '.github/workflows/test-examples.yaml'
+
+  pull_request:
+    paths:
+      - 'sdk/typescript/**'
+      - 'scripts/**'
+      - '.github/workflows/on-pr-push-ts-sdk.yaml'
+      - '.github/workflows/test-examples.yaml'
+
+# Ensure this workflow only runs for the most recent commit of a pull-request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-sdk:
+    uses: ./.github/workflows/test-examples.yaml
+    with:
+      build_local_abi: false # this workflow is meant to test the examples with the published solidity contracts
+      build_local_sdk: true  # this workflow is meant to test the examples with the local (modified) SDK
+      run_commands: start,verify # run the start and validate to ensure the sdk is not broken

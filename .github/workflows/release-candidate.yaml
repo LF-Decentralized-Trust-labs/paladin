@@ -1,0 +1,145 @@
+name: Release Candidate
+
+on:
+  push:
+    tags:
+      - 'v*.*.*-rc.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+        type: string
+        description: 'Release candidate tag (e.g., v0.1.0-rc.1)'
+
+jobs:
+  set-variables:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.set-vars.outputs.tag }}
+      previous_tag: ${{ steps.get-latest-tag.outputs.previous_tag }}
+      npm_prerelease_tag: ${{ steps.parse-rc-tags.outputs.prerelease_tag }}
+      npm_rc_number: ${{ steps.parse-rc-tags.outputs.rc_number }}
+    steps:
+      - id: set-vars
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          if [[ "$EVENT_NAME" == "push" && "$REF" == refs/tags/v* ]]; then
+            echo "Tag push event"
+            TAG="${REF##*/}"
+          else
+            echo "Workflow dispatch or other event"
+            TAG="$INPUT_TAG"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - id: get-latest-tag
+        name: Get latest tag
+        run: |
+          # get the latest github tag of this repository
+          RELEASE_TAG=$(curl https://api.github.com/repos/${{ github.repository }}/releases/latest -s | jq .tag_name -r)
+          echo "previous_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+      - id: ref-tag
+        name: Validate ref tag follows semver versioning
+        uses: matt-usurp/validate-semver@v2
+        with:
+          version: ${{ steps.set-vars.outputs.tag }}
+
+      - id: parse-rc-tags
+        name: Parse RC tags for NPM
+        shell: bash
+        run: |
+          PRERELEASE_TAG="${{ steps.ref-tag.outputs.prerelease }}"
+          RC_NUMBER=$(echo "$PRERELEASE_TAG" | cut -d '.' -f 2)
+          echo "prerelease_tag=$PRERELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "rc_number=$RC_NUMBER" >> $GITHUB_OUTPUT
+          
+      - name: Validate workflow triggered from RC tag only
+        shell: bash
+        env:
+          REF_TAG_PRERELEASE: ${{ steps.ref-tag.outputs.prerelease }}
+          REF_TAG_VERSION: ${{ steps.ref-tag.outputs.version }}
+          REF: ${{ steps.set-vars.outputs.tag }}
+        run: |
+          if [[ -z "$REF_TAG_PRERELEASE" ]]; then
+            echo "This workflow can only be triggered from an RC tag (e.g., v1.2.3-rc1)."
+            echo "Current ref: $REF"
+            exit 1
+          fi
+          echo "Valid RC tag: $REF_TAG_VERSION"
+  release-images:
+    needs: set-variables
+    uses: ./.github/workflows/release-images.yaml
+    with:
+      tag: ${{ needs.set-variables.outputs.tag }}
+      latest: false
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  release-charts:
+    needs: [set-variables, release-images]
+    uses: ./.github/workflows/release-charts.yaml
+    with:
+      chart_tag: ${{ needs.set-variables.outputs.tag }}
+      images_tag: ${{ needs.set-variables.outputs.tag }}
+      registry: docker.io
+    secrets:
+      CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-solidity-contracts:
+    needs: [set-variables]
+    uses: ./.github/workflows/release-solidity-contracts.yaml
+  
+  release-typescript-sdk:
+    needs: [set-variables]
+    uses: ./.github/workflows/release-typescript-sdk.yaml
+    with:
+      sdk_version: ${{ needs.set-variables.outputs.tag }}
+      # Construct the semicolon-separated string.
+      # For a tag like 'v0.1.0-rc.1', this will become "rc;rc.1;1"
+      sdk_tag: "rc;${{ needs.set-variables.outputs.npm_prerelease_tag }};${{ needs.set-variables.outputs.npm_rc_number }}"
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+  
+  release:
+    needs: [set-variables, release-charts, release-solidity-contracts, release-typescript-sdk]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Helm artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: helm-artifacts
+          path: helm-artifacts/
+
+      - name: Download Solidity artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: contracts
+          path: contracts/
+
+      - name: List downloaded artifacts
+        run: |
+          ls -R
+
+      - name: Create release candidate with all artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.set-variables.outputs.tag }}
+          body: "Release Candidate ${{ needs.set-variables.outputs.tag }}"
+          generate_release_notes: true
+          make_latest: "false" # RC releases are never marked as latest
+          prerelease: true
+          files: |
+            helm-artifacts/basenet.yaml
+            helm-artifacts/customnet.yaml
+            helm-artifacts/attach.yaml
+            helm-artifacts/devnet.yaml
+            helm-artifacts/artifacts.tar.gz
+            contracts/abis.tar.gz
+            contracts/zeto-abis.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

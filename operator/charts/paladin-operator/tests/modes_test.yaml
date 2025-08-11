@@ -1,0 +1,774 @@
+suite: Mode tests
+templates:
+  - operator/**
+  - nodes/**
+  - customnodes/**
+  - samples/**
+values:
+- "../values.yaml"
+tests:
+  # Basenet mode tests
+  - it: basenet mode - no paladin nodes
+    templates:
+      - nodes/paladin.yaml
+    set:
+      mode: basenet
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: basenet mode - no besu nodes
+    templates:
+      - nodes/besu.yaml
+    set:
+      mode: basenet
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: basenet mode - no paladinregistrations
+    templates:
+      - nodes/paladinregistrations.yaml
+    set:
+      mode: basenet
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: basenet mode - no besugenesis
+    templates:
+      - nodes/besugenesis.yaml
+    set:
+      mode: basenet
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: basenet mode - operator still present
+    templates:
+      - operator/deployment.yaml
+      - operator/service.yaml
+      - operator/serviceaccount.yaml
+      - operator/configmap.yaml
+      - operator/role.yaml
+      - operator/rolebinding.yaml
+    set:
+      mode: basenet
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: operator/deployment.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/service.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/serviceaccount.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/configmap.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/role.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/rolebinding.yaml
+
+  # None mode tests
+  - it: none mode - no paladin nodes
+    templates:
+      - nodes/paladin.yaml
+    set:
+      mode: none
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: none mode - no besu nodes
+    templates:
+      - nodes/besu.yaml
+    set:
+      mode: none
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: none mode - no paladinregistrations
+    templates:
+      - nodes/paladinregistrations.yaml
+    set:
+      mode: none
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: none mode - no besugenesis
+    templates:
+      - nodes/besugenesis.yaml
+    set:
+      mode: none
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: none mode - operator still present
+    templates:
+      - operator/deployment.yaml
+      - operator/service.yaml
+      - operator/serviceaccount.yaml
+      - operator/configmap.yaml
+      - operator/role.yaml
+      - operator/rolebinding.yaml
+    set:
+      mode: none
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: operator/deployment.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/service.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/serviceaccount.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/configmap.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/role.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/rolebinding.yaml
+
+  # Operator-only mode tests
+  - it: operator-only mode - no paladin nodes
+    templates:
+      - nodes/paladin.yaml
+    set:
+      mode: operator-only
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: operator-only mode - no besu nodes
+    templates:
+      - nodes/besu.yaml
+    set:
+      mode: operator-only
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: operator-only mode - no paladinregistrations
+    templates:
+      - nodes/paladinregistrations.yaml
+    set:
+      mode: operator-only
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: operator-only mode - no besugenesis
+    templates:
+      - nodes/besugenesis.yaml
+    set:
+      mode: operator-only
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: operator-only mode - operator still present
+    templates:
+      - operator/deployment.yaml
+      - operator/service.yaml
+      - operator/serviceaccount.yaml
+      - operator/configmap.yaml
+      - operator/role.yaml
+      - operator/rolebinding.yaml
+    set:
+      mode: operator-only
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: operator/deployment.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/service.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/serviceaccount.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/configmap.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/role.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/rolebinding.yaml
+
+  # Customnet mode tests
+  - it: customnet mode - no default paladin nodes
+    templates:
+      - customnodes/paladin.yaml
+    set:
+      mode: customnet
+      paladin:
+        nodeNamePrefix: node
+      paladinNodes:
+        - name: "dummy-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://dummy.rpc"
+              ws: "wss://dummy.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: dummy-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: dummy-node
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'dummy-node'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+
+  - it: customnet mode - no default besu nodes
+    templates:
+      - nodes/besu.yaml
+    set:
+      mode: customnet
+      paladin:
+        nodeNamePrefix: node
+      paladinNodes:
+        - name: "dummy-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://dummy.rpc"
+              ws: "wss://dummy.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: dummy-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: dummy-node
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: nodes/besu.yaml
+
+  - it: customnet mode - no default paladinregistrations
+    templates:
+      - customnodes/paladinregistration.yaml
+    set:
+      mode: customnet
+      paladin:
+        nodeNamePrefix: node
+      paladinNodes:
+        - name: "dummy-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://dummy.rpc"
+              ws: "wss://dummy.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: dummy-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: dummy-node
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: customnodes/paladinregistration.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'dummy-node'
+        documentIndex: 0
+        template: customnodes/paladinregistration.yaml
+
+  - it: customnet mode - no default besugenesis
+    templates:
+      - nodes/besugenesis.yaml
+    set:
+      mode: customnet
+      paladin:
+        nodeNamePrefix: node
+      paladinNodes:
+        - name: "dummy-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://dummy.rpc"
+              ws: "wss://dummy.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: dummy-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: dummy-node
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: nodes/besugenesis.yaml
+
+  - it: customnet mode - operator still present
+    templates:
+      - operator/deployment.yaml
+      - operator/service.yaml
+      - operator/serviceaccount.yaml
+      - operator/configmap.yaml
+      - operator/role.yaml
+      - operator/rolebinding.yaml
+    set:
+      mode: customnet
+      paladin:
+        nodeNamePrefix: node
+      paladinNodes:
+        - name: "dummy-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://dummy.rpc"
+              ws: "wss://dummy.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: dummy-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: dummy-node
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: operator/deployment.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/service.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/serviceaccount.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/configmap.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/role.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/rolebinding.yaml
+
+  # Attach mode tests
+  - it: attach mode - no default paladin nodes
+    templates:
+      - nodes/paladin.yaml
+    set:
+      mode: attach
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: attach mode - no default besu nodes
+    templates:
+      - nodes/besu.yaml
+    set:
+      mode: attach
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: attach mode - no default paladinregistrations
+    templates:
+      - nodes/paladinregistrations.yaml
+    set:
+      mode: attach
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: attach mode - no default besugenesis
+    templates:
+      - nodes/besugenesis.yaml
+    set:
+      mode: attach
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: attach mode - operator still present
+    templates:
+      - operator/deployment.yaml
+      - operator/service.yaml
+      - operator/serviceaccount.yaml
+      - operator/configmap.yaml
+      - operator/role.yaml
+      - operator/rolebinding.yaml
+    set:
+      mode: attach
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: operator/deployment.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/service.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/serviceaccount.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/configmap.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/role.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/rolebinding.yaml
+
+  # Edge case tests for modes
+  - it: invalid mode - should not generate devnet resources
+    templates:
+      - nodes/paladin.yaml
+      - nodes/besu.yaml
+    set:
+      mode: invalid-mode
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: nodes/paladin.yaml
+      - hasDocuments:
+          count: 0
+        template: nodes/besu.yaml
+
+  - it: empty mode - should not generate devnet resources
+    templates:
+      - nodes/paladin.yaml
+      - nodes/besu.yaml
+    set:
+      mode: ""
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: nodes/paladin.yaml
+      - hasDocuments:
+          count: 0
+        template: nodes/besu.yaml 
+
+  # Tests to verify samples are NOT loaded in certain modes
+  - it: basenet mode - no samples loaded
+    templates:
+      - samples/core_v1alpha1_paladindomain_noto.yaml
+      - samples/core_v1alpha1_paladindomain_zeto.yaml
+      - samples/core_v1alpha1_paladindomain_pente.yaml
+      - samples/core_v1alpha1_paladinregistry.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_registry.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_noto_factory.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_zeto_factory.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_pente_factory.yaml
+    set:
+      mode: basenet
+      paladin:
+        nodeNamePrefix: node
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladindomain_noto.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladindomain_zeto.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladindomain_pente.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladinregistry.yaml
+      # SmartContractDeployments ARE loaded in basenet mode
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_smartcontractdeployment_registry.yaml
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_smartcontractdeployment_noto_factory.yaml
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_smartcontractdeployment_zeto_factory.yaml
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_smartcontractdeployment_pente_factory.yaml
+
+  - it: none mode - no samples loaded
+    templates:
+      - samples/core_v1alpha1_paladindomain_noto.yaml
+      - samples/core_v1alpha1_paladindomain_zeto.yaml
+      - samples/core_v1alpha1_paladindomain_pente.yaml
+      - samples/core_v1alpha1_paladinregistry.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_registry.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_noto_factory.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_zeto_factory.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_pente_factory.yaml
+    set:
+      mode: none
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladindomain_noto.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladindomain_zeto.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladindomain_pente.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladinregistry.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_registry.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_noto_factory.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_zeto_factory.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_pente_factory.yaml
+
+  - it: operator-only mode - no samples loaded
+    templates:
+      - samples/core_v1alpha1_paladindomain_noto.yaml
+      - samples/core_v1alpha1_paladindomain_zeto.yaml
+      - samples/core_v1alpha1_paladindomain_pente.yaml
+      - samples/core_v1alpha1_paladinregistry.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_registry.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_noto_factory.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_zeto_factory.yaml
+      - samples/core_v1alpha1_smartcontractdeployment_pente_factory.yaml
+    set:
+      mode: operator-only
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladindomain_noto.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladindomain_zeto.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladindomain_pente.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_paladinregistry.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_registry.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_noto_factory.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_zeto_factory.yaml
+      - hasDocuments:
+          count: 0
+        template: samples/core_v1alpha1_smartcontractdeployment_pente_factory.yaml 

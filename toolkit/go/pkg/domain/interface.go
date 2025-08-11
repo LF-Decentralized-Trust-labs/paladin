@@ -18,9 +18,9 @@ package domain
 import (
 	"context"
 
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type ParsedTransaction[C any] struct {
@@ -37,4 +37,10 @@ type DomainHandler[C any] interface {
 	Assemble(ctx context.Context, tx *ParsedTransaction[C], req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error)
 	Endorse(ctx context.Context, tx *ParsedTransaction[C], req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error)
 	Prepare(ctx context.Context, tx *ParsedTransaction[C], req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error)
+}
+
+type DomainCallHandler[C any] interface {
+	ValidateParams(ctx context.Context, config *C, params string) (interface{}, error)
+	InitCall(ctx context.Context, tx *ParsedTransaction[C], req *pb.InitCallRequest) (*pb.InitCallResponse, error)
+	ExecCall(ctx context.Context, tx *ParsedTransaction[C], req *pb.ExecCallRequest) (*pb.ExecCallResponse, error)
 }

@@ -19,19 +19,20 @@ import (
 	"context"
 	"sync"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/registrymgr/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/cache"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
 )
 
 type registryManager struct {
@@ -53,6 +54,7 @@ type registryManager struct {
 
 	registriesByID   map[uuid.UUID]*registry
 	registriesByName map[string]*registry
+	metrics          metrics.RegistryManagerMetrics
 }
 
 func NewRegistryManager(bgCtx context.Context, conf *pldconf.RegistryManagerConfig) components.RegistryManager {
@@ -68,6 +70,7 @@ func NewRegistryManager(bgCtx context.Context, conf *pldconf.RegistryManagerConf
 
 func (rm *registryManager) PreInit(pic components.PreInitComponents) (_ *components.ManagerInitResult, err error) {
 	rm.p = pic.Persistence()
+	rm.metrics = metrics.InitMetrics(rm.bgCtx, pic.MetricsManager().Registry())
 
 	// For each of the registries, parse the transport lookup semantics
 	for regName, regConf := range rm.conf.Registries {
@@ -145,6 +148,7 @@ func (rm *registryManager) RegistryRegistered(name string, id uuid.UUID, toRegis
 	rm.registriesByID[id] = t
 	rm.registriesByName[name] = t
 	go t.init()
+	rm.metrics.IncRegistries()
 	return t, nil
 }
 

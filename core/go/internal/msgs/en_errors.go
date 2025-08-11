@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -21,7 +21,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"golang.org/x/text/language"
 )
 
@@ -75,7 +75,10 @@ var (
 	MsgComponentAdditionalMgrStartError    = pde("PD010032", "Error initializing %s manager")
 	MsgComponentDebugServerStartError      = pde("PD010033", "Error starting debug server")
 	MsgComponentGroupManagerInitError      = pde("PD010034", "Error initializing privacy group manager")
-	MsgComponentGroupManagerStartError     = pde("PD010035", "Error starting group manager ")
+	MsgComponentGroupManagerStartError     = pde("PD010035", "Error starting group manager")
+	MsgComponentMetricsServerInitError     = pde("PD010036", "Error initializing metrics server")
+	MsgComponentMetricsServerStartError    = pde("PD010037", "Error starting metrics server")
+	MsgComponentMetricsManagerInitError    = pde("PD010038", "Error initializing metrics manager")
 
 	// States PD0101XX
 	MsgStateInvalidLength             = pde("PD010101", "Invalid hash len expected=%d actual=%d")
@@ -151,6 +154,9 @@ var (
 	MsgKeyManagerIdentifierPathNotFound     = pde("PD010512", "Identifier path segment '%s' not found in database")
 	MsgKeyManagerExistingIdentifierNotFound = pde("PD010513", "Identifier '%s' not found in database")
 	MsgKeyManagerMissingDatabaseTxn         = pde("PD010514", "Missing database transaction context")
+	MsgKeyManagerSigningModuleNotFound      = pde("PD010515", "Signing module '%s' not found")
+	MsgKeyManagerPluginSignerEmptyName      = pde("PD010516", "Wallet '%s' signing module plugin name cannot be empty")
+	MsgKeyManagerPluginSignerFailInit       = pde("PD010517", "Initialization of plugin signer for wallet '%s' failed")
 
 	// Comms bus PD0106XX
 	MsgDestinationNotFound     = pde("PD010600", "Destination not found: %s")

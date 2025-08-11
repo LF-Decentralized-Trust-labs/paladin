@@ -13,13 +13,26 @@ interface INotoPrivate {
         bytes calldata data
     ) external;
 
+    function burn(uint256 amount, bytes calldata data) external;
+
+    function burnFrom(
+        string calldata from,
+        uint256 amount,
+        bytes calldata data
+    ) external;
+
     function transfer(
         string calldata to,
         uint256 amount,
         bytes calldata data
     ) external;
 
-    function burn(uint256 amount, bytes calldata data) external;
+    function transferFrom(
+        string calldata from,
+        string calldata to,
+        uint256 amount,
+        bytes calldata data
+    ) external;
 
     function approveTransfer(
         StateEncoded[] calldata inputs,
@@ -50,6 +63,8 @@ interface INotoPrivate {
         address delegate,
         bytes calldata data
     ) external;
+
+    function balanceOf(string memory account) external view returns (uint256 totalStates, uint256 totalBalance, bool overflow);
 
     struct StateEncoded {
         bytes id;

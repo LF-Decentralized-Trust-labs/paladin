@@ -1,0 +1,44 @@
+# This workflow tests the examples ensuring they are aligned with the latest SDK
+name: Test Examples changes
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/**'
+      - 'examples/**'
+      - '.github/workflows/on-pr-push-examples.yaml'
+      - '.github/workflows/test-examples.yaml'
+
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'examples/**'
+      - '.github/workflows/on-pr-push-examples.yaml'
+      - '.github/workflows/test-examples.yaml'
+
+# Ensure this workflow only runs for the most recent commit of a pull-request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-examples-backwards-compatibility:
+    uses: ./.github/workflows/test-examples.yaml
+    with:
+      build_local_sdk: false # this workflow is meant to test the examples with the published SDK
+      build_local_abi: false # this workflow is meant to test the examples with the published solidity contracts
+      run_commands: start,verify # run the start and validate to ensure the examples are not broken
+
+  test-examples-forward-compatibility:
+    uses: ./.github/workflows/test-examples.yaml
+    with:
+      build_local_sdk: true
+      build_local_abi: true
+      run_commands: start,verify
+    

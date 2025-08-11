@@ -5,11 +5,11 @@ import { HardhatUserConfig } from "hardhat/config";
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.27",
+    version: "0.8.30",
     settings: {
-      evmVersion: "paris",
+      evmVersion: "shanghai",
       optimizer: {
-        enabled: true,
+        enabled: false,
         runs: 1000,
       },
     },

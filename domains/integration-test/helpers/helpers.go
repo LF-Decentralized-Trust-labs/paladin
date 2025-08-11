@@ -22,13 +22,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/testbed"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/pkg/testbed"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -122,6 +122,23 @@ func (dth *DomainTransactionHelper) SignAndSend(signer string, confirm ...bool) 
 	go func() {
 		var result any
 		rpcerr := dth.rpc.CallRPC(dth.ctx, &result, "testbed_invoke", dth.tx, confirmEvents)
+		if rpcerr != nil {
+			tx.result <- rpcerr.Error()
+		}
+		tx.result <- result
+	}()
+	return tx
+}
+
+func (dth *DomainTransactionHelper) SignAndCall(signer string) *SentDomainTransaction {
+	tx := &SentDomainTransaction{
+		t:      dth.t,
+		result: make(chan any),
+	}
+	dth.tx.From = signer
+	go func() {
+		var result any
+		rpcerr := dth.rpc.CallRPC(dth.ctx, &result, "testbed_call", dth.tx, pldtypes.JSONFormatOptions(""))
 		if rpcerr != nil {
 			tx.result <- rpcerr.Error()
 		}

@@ -23,6 +23,7 @@ message Circuit {
   string type = 2;
   bool usesNullifiers = 3;
   bool usesEncryption = 4;
+  bool usesKyc = 5;
 }
 
 message ProvingRequest {
@@ -62,10 +63,20 @@ message ProvingRequestExtras_Encryption {
 }
 
 message ProvingRequestExtras_Nullifiers {
+  MerkleProofObject smtProof = 1;
+  string delegate = 2;
+}
+
+message ProvingRequestExtras_NullifiersKyc {
+  MerkleProofObject smtUtxoProof = 1;
+  MerkleProofObject smtKycProof = 2;
+  string delegate = 3;
+}
+
+message MerkleProofObject {
   string root = 1;
   repeated MerkleProof merkleProofs = 2;
   repeated bool enabled = 3;
-  string delegate = 4;
 }
 
 message MerkleProof {

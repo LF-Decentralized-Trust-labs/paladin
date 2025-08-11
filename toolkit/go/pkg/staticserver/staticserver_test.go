@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 )
 
 // Helper to create a temporary UI directory with files for testing

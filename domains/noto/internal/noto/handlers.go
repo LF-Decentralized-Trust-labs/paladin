@@ -21,15 +21,15 @@ import (
 
 	"encoding/json"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/domain"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
-	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 func (n *Noto) GetHandler(method string) types.DomainHandler {
@@ -37,23 +37,32 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 	case "mint":
 		return &mintHandler{noto: n}
 	case "transfer":
-		return &transferHandler{noto: n}
+		return &transferHandler{transferCommon: transferCommon{noto: n}}
+	case "transferFrom":
+		return &transferFromHandler{transferCommon: transferCommon{noto: n}}
 	case "burn":
-		return &burnHandler{noto: n}
+		return &burnHandler{burnCommon: burnCommon{noto: n}}
+	case "burnFrom":
+		return &burnFromHandler{burnCommon: burnCommon{noto: n}}
 	case "approveTransfer":
 		return &approveHandler{noto: n}
 	case "lock":
 		return &lockHandler{noto: n}
 	case "unlock":
-		return &unlockHandler{
-			unlockCommon: unlockCommon{noto: n},
-		}
+		return &unlockHandler{unlockCommon: unlockCommon{noto: n}}
 	case "prepareUnlock":
-		return &prepareUnlockHandler{
-			unlockCommon: unlockCommon{noto: n},
-		}
+		return &prepareUnlockHandler{unlockCommon: unlockCommon{noto: n}}
 	case "delegateLock":
 		return &delegateLockHandler{noto: n}
+	default:
+		return nil
+	}
+}
+
+func (n *Noto) GetCallHandler(method string) types.DomainCallHandler {
+	switch method {
+	case "balanceOf":
+		return &balanceOfHandler{noto: n}
 	default:
 		return nil
 	}

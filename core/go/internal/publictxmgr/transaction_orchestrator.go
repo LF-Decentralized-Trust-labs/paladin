@@ -21,15 +21,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/retry"
 )
 
 const (
@@ -243,6 +243,8 @@ func (oc *orchestrator) handleUpdates(ctx context.Context) {
 }
 
 // Used in unit tests
+//
+//nolint:unused // Used in unit tests
 func (oc *orchestrator) getFirstInFlight() (ift *inFlightTransactionStageController) {
 	oc.inFlightTxsMux.Lock()
 	defer oc.inFlightTxsMux.Unlock()
@@ -496,13 +498,14 @@ func (oc *orchestrator) ProcessInFlightTransactions(ctx context.Context, its []*
 		addressAccount, err = oc.balanceManager.GetAddressBalance(oc.ctx, oc.signingAddress)
 		if err != nil {
 			log.L(ctx).Errorf("Failed to retrieve balance for address %s due to %+v", oc.signingAddress, err)
-			if oc.unavailableBalanceHandlingStrategy == OrchestratorBalanceCheckUnavailableBalanceHandlingStrategyWait {
+			switch oc.unavailableBalanceHandlingStrategy {
+			case OrchestratorBalanceCheckUnavailableBalanceHandlingStrategyWait:
 				// wait till next retry
 				return true, nil
-			} else if oc.unavailableBalanceHandlingStrategy == OrchestratorBalanceCheckUnavailableBalanceHandlingStrategyStop {
+			case OrchestratorBalanceCheckUnavailableBalanceHandlingStrategyStop:
 				oc.Stop()
 				return true, nil
-			} else {
+			default:
 				// just continue without any balance check
 				skipBalanceCheck = true
 			}

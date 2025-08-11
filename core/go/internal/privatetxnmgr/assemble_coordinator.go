@@ -19,11 +19,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr/ptmgrtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type assembleCoordinator struct {
@@ -129,7 +129,7 @@ out:
 		case <-timeoutTimer.C:
 			log.L(ac.ctx).Errorf("AssembleCoordinator:waitForDone request timeout for request %s", requestID)
 			//sequencer event loop is responsible for requesting a new assemble
-			break
+			break out
 		}
 	}
 	log.L(ac.ctx).Debugf("AssembleCoordinator:waitForDone done %s", requestID)

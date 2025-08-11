@@ -22,14 +22,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/mocks/componentsmocks"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -158,7 +158,7 @@ func TestRegistryRequestsOK(t *testing.T) {
 	// This is the point the registry manager would call us to say the registry is initialized
 	// (once it's happy it's updated its internal state)
 	registryAPI.Initialized()
-	require.NoError(t, pc.WaitForInit(ctx))
+	require.NoError(t, pc.WaitForInit(ctx, prototk.PluginInfo_DOMAIN))
 
 	callbacks := <-waitForCallbacks
 
@@ -177,10 +177,9 @@ func TestRegistryRegisterFail(t *testing.T) {
 	tdm := &testRegistryManager{
 		registries: map[string]plugintk.Plugin{
 			"registry1": &mockPlugin[prototk.RegistryMessage]{
-				t:                   t,
-				allowRegisterErrors: true,
-				connectFactory:      registryConnectFactory,
-				headerAccessor:      registryHeaderAccessor,
+				t:              t,
+				connectFactory: registryConnectFactory,
+				headerAccessor: registryHeaderAccessor,
 				preRegister: func(registryID string) *prototk.RegistryMessage {
 					return &prototk.RegistryMessage{
 						Header: &prototk.Header{
@@ -191,7 +190,6 @@ func TestRegistryRegisterFail(t *testing.T) {
 					}
 				},
 				expectClose: func(err error) {
-					time.Sleep(100 * time.Millisecond)
 					waitForError <- err
 				},
 			},

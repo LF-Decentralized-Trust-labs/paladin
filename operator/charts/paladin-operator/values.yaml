@@ -5,8 +5,11 @@
 # - none / operator-only (or leave empty): Deploys only the Paladin operator without additional resources.
 mode: devnet
 
-# Number of Paladin and Besu nodes to deploy. Relevant only when mode is set to "devnet".
+# Number of Paladin to deploy. Relevant only when mode is set to "devnet".
 nodeCount: 3
+
+# Number of besu nodes to deploy. When not set, defaults to 1.
+besuNodeCount: 3
 
 # Default values for paladin-operator
 operator:

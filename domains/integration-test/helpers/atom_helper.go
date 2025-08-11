@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/testbed"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/solutils"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/core/pkg/testbed"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -134,7 +134,7 @@ func (a *AtomHelper) GetOperations(ctx context.Context) []map[string]any {
 			BuildTX().
 			Call()
 		require.NoError(a.t, err)
-		operations = append(operations, jsonOutput["0"].(map[string]any))
+		operations = append(operations, jsonOutput["operation"].(map[string]any))
 	}
 	return operations
 }

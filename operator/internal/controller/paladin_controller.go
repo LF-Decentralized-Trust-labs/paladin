@@ -1,5 +1,5 @@
 /*
-Copyright 2024.
+Copyright 2025.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,9 +29,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	"github.com/Masterminds/sprig/v3"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/tyler-smith/go-bip39"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -52,8 +52,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 
-	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/operator/pkg/config"
+	corev1alpha1 "github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1"
+	"github.com/LF-Decentralized-Trust-labs/paladin/operator/pkg/config"
 
 	_ "embed"
 )
@@ -381,6 +381,10 @@ func (r *PaladinReconciler) generateStatefulSetTemplate(node *corev1alpha1.Palad
 									MountPath: "/app/config",
 									ReadOnly:  true,
 								},
+								{
+									Name:      "appjna",
+									MountPath: "/app/jna",
+								},
 							},
 							Args: []string{
 								"/app/config/pldconf.paladin.yaml",
@@ -440,6 +444,12 @@ func (r *PaladinReconciler) generateStatefulSetTemplate(node *corev1alpha1.Palad
 										Name: name,
 									},
 								},
+							},
+						},
+						{
+							Name: "appjna",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
 						},
 					},
@@ -703,6 +713,14 @@ func (r *PaladinReconciler) generatePaladinConfig(ctx context.Context, node *cor
 		}
 	}
 
+	// Enable metrics server by default on localhost:6100
+	if pldConf.MetricsServer.Enabled == nil {
+		pldConf.MetricsServer.Enabled = confutil.P(true)
+		if pldConf.MetricsServer.Port == nil {
+			pldConf.MetricsServer.Port = confutil.P(6100)
+		}
+	}
+
 	// Node name can be overridden, but defaults to the CR name
 	if pldConf.NodeName == "" {
 		pldConf.NodeName = node.Name
@@ -749,6 +767,9 @@ func (r *PaladinReconciler) generatePaladinConfig(ctx context.Context, node *cor
 	if err := r.generatePaladinRegistries(ctx, node, &pldConf); err != nil {
 		return "", nil, err
 	}
+
+	// Add any provided signing modules into the supplied config
+	r.generatePaladinSigningModules(ctx, node, &pldConf)
 
 	tlsSecrets, err := r.generatePaladinTransports(ctx, node, &pldConf)
 	if err != nil {
@@ -931,10 +952,11 @@ func (r *PaladinReconciler) generatePaladinSigners(ctx context.Context, node *co
 		}
 
 		wallet := &pldconf.WalletConfig{
-			Name:        s.Name,
-			SignerType:  pldconf.WalletSignerTypeEmbedded,
-			KeySelector: s.KeySelector,
-			Signer:      &pldconf.SignerConfig{},
+			Name:                    s.Name,
+			SignerType:              pldconf.WalletSignerTypeEmbedded,
+			KeySelector:             s.KeySelector,
+			KeySelectorMustNotMatch: s.KeySelectorMustNotMatch,
+			Signer:                  &pldconf.SignerConfig{},
 		}
 
 		// Upsert a secret if we've been asked to. We use a mnemonic in this case (rather than directly generating a 32byte seed)
@@ -1067,6 +1089,25 @@ func (r *PaladinReconciler) generatePaladinRegistries(ctx context.Context, node 
 	}
 
 	return nil
+}
+
+func (r *PaladinReconciler) generatePaladinSigningModules(ctx context.Context, node *corev1alpha1.Paladin, pldConf *pldconf.PaladinConfig) {
+	for _, signingModule := range node.Spec.SigningModules {
+		var signingModuleConf map[string]any
+		if err := json.Unmarshal([]byte(signingModule.ConfigJSON), &signingModuleConf); err != nil {
+			log.FromContext(ctx).Error(err, fmt.Sprintf("configJSON for signing module '%s' cannot be parsed (skipping)", signingModule.Name))
+			continue // skip it - but continue trying others
+		}
+
+		// It's available, add it to our config
+		if pldConf.SigningModules == nil {
+			pldConf.SigningModules = make(map[string]*pldconf.SigningModuleConfig)
+		}
+		pldConf.SigningModules[signingModule.Name] = &pldconf.SigningModuleConfig{
+			Plugin: r.mapPluginConfig(signingModule.Plugin),
+			Config: signingModuleConf,
+		}
+	}
 }
 
 func (r *PaladinReconciler) generatePaladinTransports(ctx context.Context, node *corev1alpha1.Paladin, pldConf *pldconf.PaladinConfig) ([]string, error) {

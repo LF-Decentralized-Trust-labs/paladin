@@ -5,14 +5,14 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
-	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/constants"
+	corepb "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/proto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/domain"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -180,7 +180,7 @@ func TestWithdrawAssemble(t *testing.T) {
 		},
 	}
 	_, err = h.Assemble(ctx, tx, req)
-	require.ErrorContains(t, err, "PD210042: Failed to format proving request. PD210052: Failed to generate merkle proofs.")
+	require.ErrorContains(t, err, "PD210042: Failed to format proving request. PD210055: Failed to query the smt DB for leaf node")
 
 	called = 0
 	h.callbacks = &testDomainCallbacks{

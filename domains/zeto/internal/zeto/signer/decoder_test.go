@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -19,9 +19,9 @@ import (
 	"context"
 	"testing"
 
-	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/proto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -42,7 +42,7 @@ func TestDecodeProvingRequest_Fail(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	signReq := &signerapi.SignRequest{
+	signReq := &prototk.SignWithKeyRequest{
 		Payload: bytes,
 	}
 	_, _, err = decodeProvingRequest(ctx, signReq.Payload)
@@ -56,7 +56,7 @@ func TestDecodeProvingRequest_Fail(t *testing.T) {
 	bytes, err = proto.Marshal(req)
 	assert.NoError(t, err)
 
-	signReq = &signerapi.SignRequest{
+	signReq = &prototk.SignWithKeyRequest{
 		Payload: bytes,
 	}
 	_, _, err = decodeProvingRequest(ctx, signReq.Payload)
@@ -94,13 +94,15 @@ func TestDecodeProvingRequest(t *testing.T) {
 			name:    "AnonNullifier With Extras",
 			circuit: &zetosignerapi.Circuit{Name: "anon_nullifier", UsesNullifiers: true},
 			extras: &pb.ProvingRequestExtras_Nullifiers{
-				Root: "123456",
-				MerkleProofs: []*pb.MerkleProof{
-					{
-						Nodes: []string{"1", "2", "3"},
+				SmtProof: &pb.MerkleProofObject{
+					Root: "123456",
+					MerkleProofs: []*pb.MerkleProof{
+						{
+							Nodes: []string{"1", "2", "3"},
+						},
 					},
+					Enabled: []bool{true},
 				},
-				Enabled: []bool{true},
 			},
 			expectValue: "123456",
 		},
@@ -114,13 +116,15 @@ func TestDecodeProvingRequest(t *testing.T) {
 			name:    "AnonNullifier valid Extras",
 			circuit: &zetosignerapi.Circuit{Name: "anon_nullifier", UsesNullifiers: true},
 			extras: &pb.ProvingRequestExtras_Nullifiers{
-				Root: "123456",
-				MerkleProofs: []*pb.MerkleProof{
-					{
-						Nodes: []string{"1", "2", "3"},
+				SmtProof: &pb.MerkleProofObject{
+					Root: "123456",
+					MerkleProofs: []*pb.MerkleProof{
+						{
+							Nodes: []string{"1", "2", "3"},
+						},
 					},
+					Enabled: []bool{true},
 				},
-				Enabled: []bool{true},
 			},
 			expectValue: "123456",
 		},
@@ -171,7 +175,7 @@ func TestDecodeProvingRequest(t *testing.T) {
 					case *pb.ProvingRequestExtras_Encryption:
 						assert.Equal(t, tt.expectValue, v.EncryptionNonce)
 					case *pb.ProvingRequestExtras_Nullifiers:
-						assert.Equal(t, tt.expectValue, v.Root)
+						assert.Equal(t, tt.expectValue, v.SmtProof.Root)
 					}
 				} else {
 					assert.Empty(t, extras)

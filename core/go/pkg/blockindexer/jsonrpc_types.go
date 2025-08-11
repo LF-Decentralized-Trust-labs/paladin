@@ -33,6 +33,7 @@ type PartialTransactionInfo struct {
 	Hash  ethtypes.HexBytes0xPrefix `json:"hash"`
 	From  *ethtypes.Address0xHex    `json:"from"`
 	Nonce ethtypes.HexUint64        `json:"nonce"`
+	Type  *ethtypes.HexInteger      `json:"type,omitempty"`
 }
 
 type TXReceiptJSONRPC struct {
@@ -48,6 +49,7 @@ type TXReceiptJSONRPC struct {
 	TransactionHash   ethtypes.HexBytes0xPrefix `json:"transactionHash"`
 	TransactionIndex  *ethtypes.HexInteger      `json:"transactionIndex"`
 	RevertReason      ethtypes.HexBytes0xPrefix `json:"revertReason"`
+	Type              *ethtypes.HexInteger      `json:"type,omitempty"`
 }
 
 type LogJSONRPC struct {

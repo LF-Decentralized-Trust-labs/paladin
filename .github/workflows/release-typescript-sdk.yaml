@@ -1,4 +1,8 @@
 name: TypeScript SDK Release
+
+permissions:
+  contents: read
+  id-token: write
 on:
   workflow_call:
     secrets:
@@ -7,21 +11,33 @@ on:
         required: true
     inputs:
       sdk_version:
-        description: 'The version to publish'
+        description: 'The version to publish (e.g. v1.0.0)'
+        required: true
+        type: string
+      sdk_tag:
+        description: 'Semicolon-separated list of tags (e.g., "rc;rc.1"). First tag is primary.'
         required: true
         type: string
   workflow_dispatch:
     inputs:
       sdk_version:
-        description: 'The version to publish'
+        description: 'The version to publish (e.g. v1.0.0)'
+        required: true
+        type: string
+      sdk_tag:
+        description: 'Semicolon-separated list of tags (e.g., "rc;rc.1"). First tag is primary.'
         required: true
         type: string
 
 jobs:
+  test:
+    # make sure the released candidate SDK is not breaking the examples
+    uses: ./.github/workflows/test-examples.yaml
+    with:
+      build_local_abi: false # we are using the published abi
+      build_local_sdk: true # we are using the local sdk
   publish:
-    permissions:
-      contents: read
-      id-token: write
+    needs: test
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     runs-on: ubuntu-latest
@@ -34,26 +50,68 @@ jobs:
         with:
           node-version: '18.x'
           registry-url: 'https://registry.npmjs.org'
-
       - name: Install pre-requisites
         uses: ./.github/actions/setup
+      
+      - name: Prepare Clean Version Number
+        id: prep_version
+        shell: bash
+        run: |
+          echo "clean_version=$(echo "${{ inputs.sdk_version }}" | sed 's/^v//')" >> $GITHUB_OUTPUT
 
-      # Override package.json version
       - name: Override SDK version
         uses: ./.github/actions/update-json
         with:
           file: 'sdk/typescript/package.json'
           key: 'version'
-          value: ${{ inputs.sdk_version }}
+          value: ${{ steps.prep_version.outputs.clean_version }}
+      
+      - name: Parse NPM tags
+        id: parse_tags
+        shell: bash
+        run: |
+          TAG_LIST="${{ inputs.sdk_tag }}"
+          
+          # Group all writes to the GITHUB_OUTPUT file
+          {
+            # The first tag in the list is the primary one
+            PRIMARY_TAG=$(echo "$TAG_LIST" | cut -d';' -f1)
+            echo "primary_tag=$PRIMARY_TAG"
 
-      - name: Publish to npm
-        continue-on-error: true # this can fail if the version is already published
+            # The rest of the tags are additional
+            ADDITIONAL_TAGS=$(echo "$TAG_LIST" | cut -d';' -f2-)
+            echo "additional_tags<<EOF"
+            echo "$ADDITIONAL_TAGS" | tr ';' '\n'
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Publish to npm with primary tag
+        continue-on-error: true
         working-directory: sdk/typescript
         shell: bash
         run: |
           set -e
           ../../gradlew build
-          npm publish --provenance --access public
+          npm publish --provenance --access public --tag ${{ steps.parse_tags.outputs.primary_tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Add additional dist-tags
+        if: steps.parse_tags.outputs.additional_tags != ''
+        shell: bash
+        run: |
+          # The version for `dist-tag add` must not have the 'v' prefix
+          PACKAGE_SPEC="@lfdecentralizedtrust-labs/paladin-sdk@${{ steps.prep_version.outputs.clean_version }}"
           
+          echo "Adding tags for $PACKAGE_SPEC..."
+          
+          # Loop through the newline-separated list of additional tags
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              echo "Adding tag: $tag"
+              npm dist-tag add "$PACKAGE_SPEC" "$tag"
+            fi
+          done <<< "${{ steps.parse_tags.outputs.additional_tags }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+  

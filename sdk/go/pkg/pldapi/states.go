@@ -21,10 +21,10 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/pldmsgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type SchemaType string

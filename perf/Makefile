@@ -23,9 +23,9 @@ LINT := $(GOBIN)/golangci-lint
 
 all: build
 build: ## Builds all go code
-		cd pldperf && go build -ldflags="-X 'github.com/kaleido-io/paladin/perf/internal/version.Version=$(VERSION)' -X 'github.com/kaleido-io/paladin/perf/internal/version.Date=$(DATE)' -X 'github.com/kaleido-io/paladin/perf/internal/version.Commit=$(GITREF)'"
+		cd pldperf && go build -ldflags="-X 'github.com/LF-Decentralized-Trust-labs/paladin/perf/internal/version.Version=$(VERSION)' -X 'github.com/LF-Decentralized-Trust-labs/paladin/perf/internal/version.Date=$(DATE)' -X 'github.com/LF-Decentralized-Trust-labs/paladin/perf/internal/version.Commit=$(GITREF)'"
 install: ## Installs the package
-		cd pldperf && go install -ldflags="-X 'github.com/kaleido-io/paladin/perf/internal/version.Version=$(VERSION)' -X 'github.com/kaleido-io/paladin/perf/internal/version.Date=$(DATE)' -X 'github.com/kaleido-io/paladin/perf/internal/version.Commit=$(GITREF)'"
+		cd pldperf && go install -ldflags="-X 'github.com/LF-Decentralized-Trust-labs/paladin/perf/internal/version.Version=$(VERSION)' -X 'github.com/LF-Decentralized-Trust-labs/paladin/perf/internal/version.Date=$(DATE)' -X 'github.com/LF-Decentralized-Trust-labs/paladin/perf/internal/version.Commit=$(GITREF)'"
 # TODO: what should the tag be
 docker:
 	docker build --platform linux/amd64 --build-arg BUILD_VERSION=$(VERSION) . -t ghcr.io/lf-decentralized-trust-labs/paladin-perf-cli

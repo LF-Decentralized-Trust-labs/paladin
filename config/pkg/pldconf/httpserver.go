@@ -17,7 +17,7 @@
 package pldconf
 
 import (
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 )
 
 type HTTPServerConfig struct {
@@ -61,5 +61,14 @@ type DebugServerConfig struct {
 }
 
 var DebugServerDefaults = &DebugServerConfig{
+	Enabled: confutil.P(false),
+}
+
+type MetricsServerConfig struct {
+	Enabled *bool `json:"enabled"`
+	HTTPServerConfig
+}
+
+var MetricsServerDefaults = &MetricsServerConfig{
 	Enabled: confutil.P(false),
 }

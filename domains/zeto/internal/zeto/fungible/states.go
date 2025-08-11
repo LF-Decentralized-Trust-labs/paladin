@@ -21,19 +21,19 @@ import (
 	"math/big"
 	"math/rand/v2"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/domain"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 var MAX_INPUT_COUNT = 10
@@ -141,6 +141,7 @@ func buildInputsForExpectedTotal(ctx context.Context, callbacks plugintk.DomainC
 				Id:       state.Id,
 			})
 			coins = append(coins, coin)
+			//TODO: a complete algorithm to select coins https://github.com/LF-Decentralized-Trust-labs/paladin/issues/669
 			if total.Cmp(expectedTotal) >= 0 {
 				return &preparedInputs{
 					coins:  coins,
@@ -214,4 +215,41 @@ func findAvailableStates(ctx context.Context, callbacks plugintk.DomainCallbacks
 
 func randomSlot(size int) int {
 	return rand.IntN(size)
+}
+
+func getAccountBalance(
+	ctx context.Context,
+	callbacks plugintk.DomainCallbacks,
+	coinSchema *pb.StateSchema,
+	useNullifiers bool,
+	stateQueryContext, accountKey string,
+) (int, *big.Int, bool, error) {
+	total := big.NewInt(0)
+
+	queryBuilder := query.NewQueryBuilder().
+		Limit(1000).
+		Equal("owner", accountKey).
+		Equal("locked", false)
+
+	states, err := findAvailableStates(
+		ctx, callbacks, coinSchema,
+		useNullifiers, stateQueryContext, queryBuilder.Query().String(),
+	)
+	if err != nil {
+		return 0, nil, false, i18n.NewError(ctx, msgs.MsgErrorQueryAvailCoins, err)
+	}
+
+	for _, state := range states {
+		coin, err := makeCoin(state.DataJson)
+		if err != nil {
+			return 0, nil, false, i18n.NewError(ctx, msgs.MsgInvalidCoin, state.Id, err)
+		}
+		total.Add(total, coin.Amount.Int())
+	}
+
+	if len(states) == 1000 {
+		return len(states), total, true, nil
+	}
+
+	return len(states), total, false, nil
 }

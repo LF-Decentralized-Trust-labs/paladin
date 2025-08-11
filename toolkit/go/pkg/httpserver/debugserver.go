@@ -20,9 +20,9 @@ import (
 	"context"
 	"net/http/pprof"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	"github.com/gorilla/mux"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 )
 
 type DebugServer interface {

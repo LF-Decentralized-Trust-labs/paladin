@@ -16,9 +16,9 @@
 package zetosignerapi
 
 import (
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/proto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
 )
 
 // StaticKeyEntryConfig is the configuration for a ZK prover
@@ -44,6 +44,7 @@ type Circuit struct {
 	Type           CircuitType `yaml:"type" json:"type"`
 	UsesNullifiers bool        `yaml:"usesNullifiers" json:"usesNullifiers"`
 	UsesEncryption bool        `yaml:"usesEncryption" json:"usesEncryption"`
+	UsesKyc        bool        `yaml:"usesKyc" json:"usesKyc"`
 }
 
 func (c *Circuit) ToProto() *proto.Circuit {
@@ -52,6 +53,7 @@ func (c *Circuit) ToProto() *proto.Circuit {
 		Type:           string(c.Type),
 		UsesNullifiers: c.UsesNullifiers,
 		UsesEncryption: c.UsesEncryption,
+		UsesKyc:        c.UsesKyc,
 	}
 }
 
@@ -69,6 +71,7 @@ func NewCircuitFromProto(pb *proto.Circuit) *Circuit {
 		Type:           CircuitType(pb.Type),
 		UsesNullifiers: pb.UsesNullifiers,
 		UsesEncryption: pb.UsesEncryption,
+		UsesKyc:        pb.UsesKyc,
 	}
 }
 

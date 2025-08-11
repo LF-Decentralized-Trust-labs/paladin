@@ -1,0 +1,116 @@
+name: 'Run the examples'
+
+permissions:
+  contents: read
+on:
+  workflow_dispatch: 
+    inputs:
+      build_local_sdk:
+        description: 'Build local TypeScript SDK instead of using published package'
+        required: false
+        type: boolean
+        default: false
+      build_local_abi:
+        description: 'Build the abi contracts locally'
+        required: false
+        type: boolean
+        default: false
+      run_commands:
+        description: 'Comma-separated list of commands to run (e.g., start,verify)'
+        required: false
+        type: string
+        default: 'start'
+  workflow_call:
+    inputs:
+      build_local_sdk:
+        description: 'Build local TypeScript SDK instead of using published package'
+        required: false
+        type: boolean
+        default: true
+      build_local_abi:
+        description: 'Build the abi contracts'
+        required: false
+        type: boolean
+        default: false
+      run_commands:
+        description: 'Comma-separated list of commands to run (e.g., start,verify)'
+        required: false
+        type: string
+        default: 'start'
+
+jobs:
+  run-examples:
+    # here are the steps for this job:
+    # 1. create a cluster with kind
+    # 2. install the helm charts (latest version)
+    # 3. validate the installation
+    # 4. run the examples
+    # 5. destroy the cluster
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Kind
+        uses: helm/kind-action@v1
+        with:
+          install_only: true # only install kind, the cluster creation is managed by the next step
+          ignore_failed_clean: true
+
+      - name: Create cluster
+        run: |
+          # Download the kind configuration
+          curl https://raw.githubusercontent.com/LF-Decentralized-Trust-labs/paladin/refs/heads/main/operator/paladin-kind.yaml -L -O
+          
+          # Create the cluster
+          kind create cluster --name paladin --config paladin-kind.yaml
+          
+          # Wait for cluster to be ready
+          kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+      - name: Cache Helm repositories
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/helm
+            ~/.config/helm
+          key: ${{ runner.os }}-helm-repos-${{ hashFiles('**/helm-repos.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-helm-repos-
+
+      - name: Install latest Paladin charts
+        run: |
+          # Step 1: Add the charts
+          helm repo add paladin https://LF-Decentralized-Trust-labs.github.io/paladin --force-update
+          helm repo add jetstack https://charts.jetstack.io --force-update
+          helm repo update
+          
+          # Step 2: Install the CRD Chart
+          helm upgrade --install paladin-crds paladin/paladin-operator-crd
+          
+          # Step 3: Install cert-manager CRDs
+          helm install cert-manager --namespace cert-manager --version v1.16.1 jetstack/cert-manager --create-namespace --set crds.enabled=true
+          
+          # Wait for cert-manager to be ready
+          kubectl wait --for=condition=Ready pods --all -n cert-manager --timeout=300s
+          
+          # Step 4: Install the Paladin Operator Chart
+          helm upgrade --install paladin paladin/paladin-operator -n paladin --create-namespace --set besuNodeCount=1  --wait
+
+      - name: Validate installation
+        run: |
+          # Run the validation script
+          ./scripts/default-installation-validation.sh paladin
+
+      - name: Run all examples
+        env:
+          BUILD_PALADIN_SDK: ${{ inputs.build_local_sdk }}
+          BUILD_PALADIN_ABI: ${{ inputs.build_local_abi }}
+          RUN_COMMANDS: ${{ inputs.run_commands }}
+        run: |
+          ./scripts/run-examples.sh
+
+      - name: Cleanup cluster
+        if: always()
+        run: |
+          kind delete cluster --name paladin

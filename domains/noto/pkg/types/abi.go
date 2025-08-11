@@ -18,10 +18,10 @@ package types
 import (
 	_ "embed"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/solutils"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 )
 
 //go:embed abis/INotoPrivate.json
@@ -60,13 +60,26 @@ type MintParams struct {
 	Data   pldtypes.HexBytes    `json:"data"`
 }
 
+type BurnParams struct {
+	Amount *pldtypes.HexUint256 `json:"amount"`
+	Data   pldtypes.HexBytes    `json:"data"`
+}
+
+type BurnFromParams struct {
+	From   string               `json:"from"`
+	Amount *pldtypes.HexUint256 `json:"amount"`
+	Data   pldtypes.HexBytes    `json:"data"`
+}
+
 type TransferParams struct {
 	To     string               `json:"to"`
 	Amount *pldtypes.HexUint256 `json:"amount"`
 	Data   pldtypes.HexBytes    `json:"data"`
 }
 
-type BurnParams struct {
+type TransferFromParams struct {
+	From   string               `json:"from"`
+	To     string               `json:"to"`
 	Amount *pldtypes.HexUint256 `json:"amount"`
 	Data   pldtypes.HexBytes    `json:"data"`
 }
@@ -103,6 +116,7 @@ type UnlockRecipient struct {
 }
 
 type UnlockPublicParams struct {
+	TxId          string            `json:"txId"`
 	LockedInputs  []string          `json:"lockedInputs"`
 	LockedOutputs []string          `json:"lockedOutputs"`
 	Outputs       []string          `json:"outputs"`
@@ -123,4 +137,14 @@ type NotoPublicTransaction struct {
 type NotoTransferMetadata struct {
 	ApprovalParams       ApproveExtraParams    `json:"approvalParams"`       // Partial set of params that can be passed to the "approveTransfer" method to approve another party to perform this transfer
 	TransferWithApproval NotoPublicTransaction `json:"transferWithApproval"` // The public transaction that would need to be submitted by an approved party to perform this transfer
+}
+
+type BalanceOfParam struct {
+	Account string `json:"account"`
+}
+
+type BalanceOfResult struct {
+	TotalBalance *pldtypes.HexUint256 `json:"totalBalance"`
+	TotalStates  *pldtypes.HexUint256 `json:"totalStates"`
+	Overflow     bool                 `json:"overflow"`
 }

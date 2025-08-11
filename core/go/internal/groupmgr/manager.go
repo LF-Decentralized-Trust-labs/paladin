@@ -21,22 +21,23 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/filters"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
-	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/retry"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/cache"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
 )
 
 var groupDBOnlyFilters = filters.FieldMap{
@@ -187,7 +188,13 @@ func (gm *groupManager) insertGroup(ctx context.Context, dbTX persistence.DBTX, 
 		Configuration: pldtypes.JSONString(pgGenesis.Configuration.Map()),
 		GenesisTX:     genesisTx,
 	}
-	err := dbTX.DB().WithContext(ctx).Create(pg).Error
+	err := dbTX.DB().
+		WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "domain"}, {Name: "id"}},
+			DoNothing: true,
+		}).
+		Create(pg).Error
 	if err == nil {
 		pgms := make([]*persistedGroupMember, len(pgGenesis.Members))
 		for i, identity := range pgGenesis.Members {
@@ -199,6 +206,10 @@ func (gm *groupManager) insertGroup(ctx context.Context, dbTX persistence.DBTX, 
 			}
 		}
 		err = dbTX.DB().WithContext(ctx).
+			Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "domain"}, {Name: "group"}, {Name: "idx"}},
+				DoNothing: true,
+			}).
 			Create(pgms).
 			Error
 	}

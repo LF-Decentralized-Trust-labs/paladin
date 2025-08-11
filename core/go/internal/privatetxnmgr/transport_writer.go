@@ -19,13 +19,12 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto/engine"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
-	pb "github.com/kaleido-io/paladin/core/pkg/proto/engine"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -181,7 +180,7 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, idempoten
 		infoStatesAny[i] = infoStateAny
 	}
 
-	endorsementRequest := &engineProto.EndorsementRequest{
+	endorsementRequest := &pb.EndorsementRequest{
 		IdempotencyKey:           idempotencyKey,
 		ContractAddress:          contractAddress,
 		TransactionId:            transactionID,
@@ -217,7 +216,7 @@ func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNo
 		return err
 	}
 
-	assembleRequest := &engineProto.AssembleRequest{
+	assembleRequest := &pb.AssembleRequest{
 		TransactionId:     txID.String(),
 		AssembleRequestId: assembleRequestID,
 		ContractAddress:   contractAddress,

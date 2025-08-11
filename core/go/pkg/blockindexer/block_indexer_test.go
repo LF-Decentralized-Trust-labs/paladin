@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -25,19 +26,19 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/rpcclientmocks"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/mocks/rpcclientmocks"
 
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence/mockpersistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -150,6 +151,16 @@ func newMockBlockIndexer(t *testing.T, config *pldconf.BlockIndexerConfig) (cont
 }
 
 func testBlockArray(t *testing.T, l int, knownAddress ...ethtypes.Address0xHex) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
+	return testBlockArrayWithTXType(t, l, "0x2", knownAddress...) // Valid EIP1559 TX type
+}
+
+func testBlockArrayWithTXType(t *testing.T, l int, transactionType string, knownAddress ...ethtypes.Address0xHex) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
+
+	var txType *big.Int
+	if transactionType != "" {
+		txType, _ = new(big.Int).SetString(strings.TrimPrefix(transactionType, "0x"), 16) // Set whatever TX type has been provided by the test
+	}
+
 	blocks := make([]*BlockInfoJSONRPC, l)
 	receipts := make(map[string][]*TXReceiptJSONRPC, l)
 	for i := 0; i < l; i++ {
@@ -169,6 +180,10 @@ func testBlockArray(t *testing.T, l int, knownAddress ...ethtypes.Address0xHex) 
 			Hash:  txHash,
 			From:  ethtypes.MustNewAddress(pldtypes.RandHex(20)),
 			Nonce: ethtypes.HexUint64(i),
+		}
+		// Some tests don't set TX type to emulate pre-EIP2718 transactions
+		if txType != nil {
+			tx.Type = (*ethtypes.HexInteger)(txType)
 		}
 		blocks[i] = &BlockInfoJSONRPC{
 			Number:       ethtypes.HexUint64(i),
@@ -192,6 +207,7 @@ func testBlockArray(t *testing.T, l int, knownAddress ...ethtypes.Address0xHex) 
 				TransactionHash: txHash,
 				From:            tx.From,
 				To:              to,
+				Type:            (*ethtypes.HexInteger)(txType),
 				ContractAddress: contractAddress,
 				BlockNumber:     blocks[i].Number,
 				BlockHash:       blocks[i].Hash,
@@ -310,6 +326,13 @@ func checkIndexedBlockEqual(t *testing.T, expected *BlockInfoJSONRPC, indexed *p
 func addBlockPostCommit(bi *blockIndexer, postCommit func([]*pldapi.IndexedBlock)) {
 	bi.preCommitHandlers = append(bi.preCommitHandlers, func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) error {
 		dbTX.AddPostCommit(func(txCtx context.Context) { postCommit(blocks) })
+		return nil
+	})
+}
+
+func addBlockPostCommitTx(bi *blockIndexer, postCommit func([]*IndexedTransactionNotify)) {
+	bi.preCommitHandlers = append(bi.preCommitHandlers, func(ctx context.Context, dbTX persistence.DBTX, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) error {
+		dbTX.AddPostCommit(func(txCtx context.Context) { postCommit(transactions) })
 		return nil
 	})
 }
@@ -1196,4 +1219,213 @@ func TestGetFromBlock(t *testing.T) {
 	v, err = bi.getFromBlock(ctx, nil, pldconf.BlockIndexerDefaults.FromBlock)
 	require.NoError(t, err)
 	assert.Equal(t, ethtypes.HexUint64(0), *v)
+}
+
+func TestValidTransactionTypesArePersisted(t *testing.T) {
+	_, bi, mRPC, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	// Configure ignored (typically L2) transaction types, but our test transaction types won't be in that list
+	bi.ignoredTransactionTypes = []int64{34, 46, 57}
+
+	blocks, receipts := testBlockArrayWithTXType(t, 15, "0xbe") // A custom but not-invalid TX type
+
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+
+	// 1 TX per block, 10 blocks (5->14)
+	expectedTransactions := 10
+	// Persisted transactions. All of the test transactions should be persisted because
+	// we've set their TX type to something that doesn't match any entries in the (configurable) ignore list.
+	persistedTransactions := 0
+
+	bi.fromBlock = nil
+	bi.nextBlock = nil
+	bi.requiredConfirmations = 0
+
+	// simulate the highest block being known. We're going from 5->14
+	bi.blockListener.highestBlock = 5
+	close(bi.blockListener.initialBlockHeightObtained)
+
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
+
+	txNotify := make(chan []*IndexedTransactionNotify)
+	addBlockPostCommitTx(bi, func(transactions []*IndexedTransactionNotify) {
+		txNotify <- transactions
+	})
+
+	// do not start block listener
+	bi.startOrReset()
+
+	// Notify starting at block 5
+	for i := 5; i < len(blocks); i++ {
+		bi.blockListener.notifyBlock(blocks[i])
+	}
+
+	for i := 5; i < len(blocks)-bi.requiredConfirmations; i++ {
+		notifiedBlocks := <-utBatchNotify
+		persistedTransactions += len(<-txNotify)
+		assert.Len(t, notifiedBlocks, 1) // We should get one block per batch
+		checkIndexedBlockEqual(t, blocks[i], notifiedBlocks[0])
+	}
+
+	assert.Equal(t, expectedTransactions, persistedTransactions)
+}
+
+func TestValidTransactionsWithoutTypeArePersisted(t *testing.T) {
+	_, bi, mRPC, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	// Configure ignored (typically L2) transaction types. This test won't provide a TX type
+	// so all transactions should be included/persisted
+	bi.ignoredTransactionTypes = []int64{34, 46, 57}
+
+	blocks, receipts := testBlockArrayWithTXType(t, 15, "") // Don't set a TX type on the sample transactions (i.e. pre-EIP2718)
+
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+
+	// 1 TX per block, 10 blocks (5->14)
+	expectedTransactions := 10
+	// Persisted transactions. All of the test transactions should be persisted because
+	// they simulate pre-EIP2718 transactions which don't set TX type, and we can't ignore
+	// transactions by type if they don't have one
+	persistedTransactions := 0
+
+	bi.fromBlock = nil
+	bi.nextBlock = nil
+	bi.requiredConfirmations = 0
+
+	// simulate the highest block being known. We're going from 5->14
+	bi.blockListener.highestBlock = 5
+	close(bi.blockListener.initialBlockHeightObtained)
+
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
+
+	txNotify := make(chan []*IndexedTransactionNotify)
+	addBlockPostCommitTx(bi, func(transactions []*IndexedTransactionNotify) {
+		txNotify <- transactions
+	})
+
+	// do not start block listener
+	bi.startOrReset()
+
+	// Notify starting at block 5
+	for i := 5; i < len(blocks); i++ {
+		bi.blockListener.notifyBlock(blocks[i])
+	}
+
+	for i := 5; i < len(blocks)-bi.requiredConfirmations; i++ {
+		notifiedBlocks := <-utBatchNotify
+		persistedTransactions += len(<-txNotify)
+		assert.Len(t, notifiedBlocks, 1) // We should get one block per batch
+		checkIndexedBlockEqual(t, blocks[i], notifiedBlocks[0])
+	}
+
+	assert.Equal(t, expectedTransactions, persistedTransactions)
+}
+
+func TestDefaultInvalidTransactionTypesAreIgnored(t *testing.T) {
+	_, bi, mRPC, blDone := newTestBlockIndexerConf(t, &pldconf.BlockIndexerConfig{
+		CommitBatchSize: confutil.P(1), // makes testing simpler
+		FromBlock:       json.RawMessage(`0`),
+		// IgnoredTransactionTypes: confutil.P([]int64{0x7e}), <<-- Paladin defaults to this list. Purposefully commented here to check default behaviour
+	})
+	defer blDone()
+
+	blocks, receipts := testBlockArrayWithTXType(t, 15, "0x7e")
+
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+
+	// 1 TX per block, 10 blocks (5->14), but each TX is invalid and hence shuld be ignored
+	expectedTransactions := 0
+	// Persisted transactions. None of the test transactions should be persisted because
+	// we've set their TX type to match an entry in the (configurable) ignore list.
+	persistedTransactions := 0
+
+	bi.fromBlock = nil
+	bi.nextBlock = nil
+	bi.requiredConfirmations = 0
+
+	// simulate the highest block being known. We're going from 5->14
+	bi.blockListener.highestBlock = 5
+	close(bi.blockListener.initialBlockHeightObtained)
+
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
+
+	txNotify := make(chan []*IndexedTransactionNotify)
+	addBlockPostCommitTx(bi, func(transactions []*IndexedTransactionNotify) {
+		txNotify <- transactions
+	})
+
+	// do not start block listener
+	bi.startOrReset()
+
+	// Notify starting at block 5
+	for i := 5; i < len(blocks); i++ {
+		bi.blockListener.notifyBlock(blocks[i])
+	}
+
+	for i := 5; i < len(blocks)-bi.requiredConfirmations; i++ {
+		notifiedBlocks := <-utBatchNotify
+		persistedTransactions += len(<-txNotify)
+		assert.Len(t, notifiedBlocks, 1) // We should get one block per batch
+		checkIndexedBlockEqual(t, blocks[i], notifiedBlocks[0])
+	}
+
+	assert.Equal(t, expectedTransactions, persistedTransactions)
+}
+
+func TestCustomInvalidTransactionTypesAreIgnored(t *testing.T) {
+	_, bi, mRPC, blDone := newTestBlockIndexerConf(t, &pldconf.BlockIndexerConfig{
+		CommitBatchSize:         confutil.P(1), // makes testing simpler
+		FromBlock:               json.RawMessage(`0`),
+		IgnoredTransactionTypes: []int64{0x12, 0x23, 0x34}, // Custom list of invalid TX types
+	})
+	defer blDone()
+
+	blocks, receipts := testBlockArrayWithTXType(t, 15, "0x7e")
+
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+
+	// 1 TX per block, 10 blocks (5->14), but each TX is invalid and hence shuld be ignored
+	expectedTransactions := 10
+	// Persisted transactions. None of the test transactions should be persisted because
+	// we've set their TX type to match an entry in the (configurable) ignore list.
+
+	persistedTransactions := 0
+
+	bi.fromBlock = nil
+	bi.nextBlock = nil
+	bi.requiredConfirmations = 0
+
+	// simulate the highest block being known. We're going from 5->14
+	bi.blockListener.highestBlock = 5
+	close(bi.blockListener.initialBlockHeightObtained)
+
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
+
+	txNotify := make(chan []*IndexedTransactionNotify)
+	addBlockPostCommitTx(bi, func(transactions []*IndexedTransactionNotify) {
+		txNotify <- transactions
+	})
+
+	// do not start block listener
+	bi.startOrReset()
+
+	// Notify starting at block 5
+	for i := 5; i < len(blocks); i++ {
+		bi.blockListener.notifyBlock(blocks[i])
+	}
+
+	for i := 5; i < len(blocks)-bi.requiredConfirmations; i++ {
+		notifiedBlocks := <-utBatchNotify
+		persistedTransactions += len(<-txNotify)
+		assert.Len(t, notifiedBlocks, 1) // We should get one block per batch
+		checkIndexedBlockEqual(t, blocks[i], notifiedBlocks[0])
+	}
+
+	assert.Equal(t, expectedTransactions, persistedTransactions)
 }

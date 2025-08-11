@@ -16,9 +16,9 @@
 package types
 
 import (
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/domain"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 )
 
 type DomainConfig struct {
@@ -96,6 +96,7 @@ var NotoTransactionDataABI_V0 = &abi.ParameterArray{
 }
 
 type DomainHandler = domain.DomainHandler[NotoParsedConfig]
+type DomainCallHandler = domain.DomainCallHandler[NotoParsedConfig]
 type ParsedTransaction = domain.ParsedTransaction[NotoParsedConfig]
 
 const (

@@ -43,7 +43,7 @@ GOLANGCI_LINT_VERSION ?= v1.57.2
 CHART_PATH_CRD = charts/paladin-operator-crd
 CHART_NAME_CRD = paladin-crds
 CHART_PATH_OPERATOR = charts/paladin-operator
-CHART_NAME_OPERATOR = paladin-ci
+CHART_NAME_OPERATOR = paladin
 VALUES_FILE ?= charts/paladin-operator/values.yaml
 
 # SHELL setup to allow bash commands
@@ -188,7 +188,7 @@ install-crds: prepare-crd-chart ## Install CRDs using Helm.
 .PHONY: uninstall-crds
 uninstall-crds: ## Uninstall CRDs.
 	@if $(KUBECTL) version --client=false > /dev/null 2>&1; then \
-		$(HELM) uninstall ${CHART_NAME_CRD} > /dev/null 2>&1 || true; \
+		$(HELM) uninstall ${CHART_NAME_CRD} --wait > /dev/null 2>&1 || true; \
 	else \
 		echo "No Kubernetes cluster detected. Skipping CRD uninstallation."; \
 	fi
@@ -197,6 +197,15 @@ uninstall-crds: ## Uninstall CRDs.
 .PHONY: helm-template
 helm-template: ## Install operator using Helm.
 	$(HELM) template ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} --values ${VALUES_FILE} --namespace=${NAMESPACE} --set mode=${MODE}
+
+# install helm unittest
+.PHONY: helm-unittest-install
+helm-unittest-install: ## Install helm unittest.
+	$(HELM) plugin install https://github.com/helm-unittest/helm-unittest.git || true
+
+.PHONY: helm-unittest
+helm-unittest: helm-unittest-install ## Test operator using Helm.
+	$(HELM) unittest ${CHART_PATH_OPERATOR}
 
 .PHONY: helm-install-dependencies
 helm-install-dependencies: ## Install operator using Helm.
@@ -212,21 +221,21 @@ helm-install: helm-install-dependencies ## Install operator using Helm.
 	$(HELM) upgrade --install ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} \
 		-n ${NAMESPACE} --create-namespace \
 		--values ${VALUES_FILE} \
-		--set nodeCount=${NODE_COUNT} \
 		--set operator.image.repository=${OPERATOR_IMAGE_NAME} \
 		--set operator.image.pullPolicy=IfNotPresent \
 		--set operator.image.tag=${OPERATOR_IMAGE_TAG} \
 		--set paladin.image.repository=${PALADIN_IMAGE_NAME} \
 		--set paladin.image.tag=${PALADIN_IMAGE_TAG} \
-		--set paladin.image.pullPolicy=IfNotPresent \
-		--set prometheus.enabled=false \
-		--set mode=${MODE}
+		--set paladin.image.pullPolicy=IfNotPresent
 
 .PHONY: helm-uninstall-dependencies
+UNINSTALL_DEPENDENCIES ?= true  # default to uninstall dependencies
 helm-uninstall-dependencies:
 	@if $(KUBECTL) version --client=false > /dev/null 2>&1; then \
-		$(HELM) uninstall cert-manager --namespace cert-manager > /dev/null 2>&1 || true; \
-		$(KUBECTL) delete namespace cert-manager > /dev/null 2>&1 || true; \
+		if [ "$(UNINSTALL_DEPENDENCIES)" = "true" ]; then \
+			$(HELM) uninstall cert-manager --namespace cert-manager > /dev/null 2>&1 || true; \
+			$(KUBECTL) delete namespace cert-manager > /dev/null 2>&1 || true; \
+		fi \
 	else \
 		echo "No Kubernetes cluster detected. Skipping dependencies uninstallation."; \
 	fi
@@ -234,7 +243,7 @@ helm-uninstall-dependencies:
 .PHONY: helm-uninstall
 helm-uninstall: helm-uninstall-dependencies ## Uninstall operator using Helm.
 	@if $(KUBECTL) version --client=false > /dev/null 2>&1; then \
-		$(HELM) uninstall ${CHART_NAME_OPERATOR} -n ${NAMESPACE} > /dev/null 2>&1 || true; \
+		$(HELM) uninstall ${CHART_NAME_OPERATOR} -n ${NAMESPACE} --wait > /dev/null 2>&1 || true; \
 		$(KUBECTL) delete namespace ${NAMESPACE} > /dev/null 2>&1 || true; \
 		$(KUBECTL) delete namespace prometheus > /dev/null 2>&1 || true; \
 	else \

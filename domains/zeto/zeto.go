@@ -18,8 +18,8 @@ import (
 	"C"
 )
 import (
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zeto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
 )
 
 var ple = plugintk.NewPluginLibraryEntrypoint(func() plugintk.PluginBase {

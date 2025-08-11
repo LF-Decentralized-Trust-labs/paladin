@@ -29,7 +29,7 @@ This tutorial will cover:
 2. **Minting Tokens** – Issuing new tokens into circulation.
 3. **Transferring Tokens** – Simulating payments by moving tokens between nodes.
 
-💡 **The complete example code is available in the [Paladin example repository](https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/example/notarized-tokens).**
+💡 **The complete example code is available in the [Paladin example repository](https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/examples/notarized-tokens).**
 
 ---
 
@@ -40,10 +40,12 @@ First, create a **Noto Factory** instance and deploy a new token. **Node1** will
 ```typescript
 logger.log("Step 1: Deploying a Noto cash token...");
 const notoFactory = new NotoFactory(paladinClientNode1, "noto");
-const cashToken = await notoFactory.newNoto(verifierNode1, {
-  notary: verifierNode1,
-  notaryMode: "basic",
-});
+const cashToken = await notoFactory
+  .newNoto(verifierNode1, {
+    notary: verifierNode1,
+    notaryMode: "basic",
+  })
+  .waitForDeploy();
 if (!cashToken) {
   logger.error("Failed to deploy the Noto cash token!");
   return false;
@@ -68,11 +70,13 @@ With the token contract deployed, let’s **mint** an initial supply of tokens f
 
 ```typescript
 logger.log("Step 2: Minting 2000 units of cash to Node1...");
-const mintReceipt = await cashToken.mint(verifierNode1, {
-  to: verifierNode1,
-  amount: 2000,
-  data: "0x",
-});
+const mintReceipt = await cashToken
+  .mint(verifierNode1, {
+    to: verifierNode1,
+    amount: 2000,
+    data: "0x",
+  })
+  .waitForReceipt();
 if (!mintReceipt) {
   logger.error("Failed to mint cash tokens!");
   return false;
@@ -102,11 +106,13 @@ Now that Node1 has tokens, let’s **transfer some to Node2**. This works simila
 
 ```typescript
 logger.log("Step 3: Transferring 1000 units of cash from Node1 to Node2...");
-const transferToNode2 = await cashToken.transfer(verifierNode1, {
-  to: verifierNode2,
-  amount: 1000,
-  data: "0x",
-});
+const transferToNode2 = await cashToken
+  .transfer(verifierNode1, {
+    to: verifierNode2,
+    amount: 1000,
+    data: "0x",
+  })
+  .waitForReceipt();
 if (!transferToNode2) {
   logger.error("Failed to transfer cash to Node2!");
   return false;
@@ -122,11 +128,14 @@ Now let’s see how **Node2** transfers tokens to **Node3**. Since Node2 is init
 
 ```typescript
 logger.log("Step 4: Transferring 800 units of cash from Node2 to Node3...");
-const transferToNode3 = await cashToken.using(paladinClientNode2).transfer(verifierNode2, {
-  to: verifierNode3,
-  amount: 800,
-  data: "0x",
-});
+const transferToNode3 = await cashToken
+  .using(paladinClientNode2)
+  .transfer(verifierNode2, {
+    to: verifierNode3,
+    amount: 800,
+    data: "0x",
+  })
+  .waitForReceipt();
 if (!transferToNode3) {
   logger.error("Failed to transfer cash to Node3!");
   return false;

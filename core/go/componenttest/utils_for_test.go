@@ -35,20 +35,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/componenttest/domains"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/componentmgr"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/plugins"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/config"
+	"github.com/LF-Decentralized-Trust-labs/paladin/registries/static/pkg/static"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/transports/grpc/pkg/grpc"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/componenttest/domains"
-	"github.com/kaleido-io/paladin/core/internal/componentmgr"
-	"github.com/kaleido-io/paladin/core/internal/plugins"
-	"github.com/kaleido-io/paladin/core/pkg/config"
-	"github.com/kaleido-io/paladin/registries/static/pkg/static"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/transports/grpc/pkg/grpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -356,7 +356,7 @@ func initPostgres(t *testing.T, ctx context.Context) (dns string, cleanup func()
 		adminDB, err := sql.Open("postgres", dbDSN("postgres"))
 		if err == nil {
 			_, _ = adminDB.Exec(fmt.Sprintf(`DROP DATABASE "%s" WITH(FORCE);`, componentTestdbName))
-			adminDB.Close()
+			_ = adminDB.Close()
 		}
 	}
 }
@@ -421,7 +421,9 @@ func getFreePort() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	port := listener.Addr().(*net.TCPAddr).Port
 	return port, nil

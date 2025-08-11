@@ -21,21 +21,21 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/smt"
+	corepb "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/proto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/domain"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
-	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -305,13 +305,21 @@ func (h *withdrawHandler) formatProvingRequest(ctx context.Context, inputCoins [
 
 	var extras []byte
 	if circuit.UsesNullifiers {
-		proofs, extrasObj, err := generateMerkleProofs(ctx, h.callbacks, h.stateSchemas.MerkleTreeRootSchema, h.stateSchemas.MerkleTreeNodeSchema, tokenName, stateQueryContext, contractAddress, inputCoins, false)
+		smtName := smt.MerkleTreeName(tokenName, contractAddress)
+		mt, err := common.NewMerkleTreeSpec(ctx, smtName, common.StatesTree, h.callbacks, h.stateSchemas.MerkleTreeRootSchema.Id, h.stateSchemas.MerkleTreeNodeSchema.Id, stateQueryContext)
+		if err != nil {
+			return nil, err
+		}
+		indexes, err := makeLeafIndexesFromCoins(ctx, inputCoins, mt.Tree)
+		if err != nil {
+			return nil, err
+		}
+		smtProof, err := generateMerkleProofs(ctx, mt, indexes, inputSize)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorGenerateMTP, err)
 		}
-		for i := len(proofs); i < inputSize; i++ {
-			extrasObj.MerkleProofs = append(extrasObj.MerkleProofs, &smt.Empty_Proof)
-			extrasObj.Enabled = append(extrasObj.Enabled, false)
+		extrasObj := &corepb.ProvingRequestExtras_Nullifiers{
+			SmtProof: smtProof,
 		}
 		protoExtras, err := proto.Marshal(extrasObj)
 		if err != nil {

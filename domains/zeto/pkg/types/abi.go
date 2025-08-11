@@ -18,8 +18,8 @@ package types
 import (
 	_ "embed"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/solutils"
 )
 
 //go:embed abis/IZetoFungible.json
@@ -39,9 +39,12 @@ const (
 	METHOD_LOCK            = "lock"
 	METHOD_DEPOSIT         = "deposit"
 	METHOD_WITHDRAW        = "withdraw"
+	METHOD_BALANCE_OF      = "balanceOf"
 )
 
 type InitializerParams struct {
+	Name      string `json:"name"`
+	Symbol    string `json:"symbol"`
 	TokenName string `json:"tokenName"`
 	// InitialOwner string `json:"initialOwner"` // TODO: allow the initial owner to be specified by the deploy request
 }
@@ -50,6 +53,8 @@ type DeployParams struct {
 	TransactionID string            `json:"transactionId"`
 	Data          pldtypes.HexBytes `json:"data"`
 	TokenName     string            `json:"tokenName"`
+	Name          string            `json:"name"`
+	Symbol        string            `json:"symbol"`
 	InitialOwner  string            `json:"initialOwner"`
 	IsNonFungible bool              `json:"isNonFungible"`
 }
@@ -99,4 +104,14 @@ type DepositParams struct {
 
 type WithdrawParams struct {
 	Amount *pldtypes.HexUint256 `json:"amount"`
+}
+
+type FungibleBalanceOfParam struct {
+	Account string `json:"account"`
+}
+
+type BalanceOfResult struct {
+	TotalBalance *pldtypes.HexUint256 `json:"totalBalance"`
+	TotalStates  *pldtypes.HexUint256 `json:"totalStates"`
+	Overflow     bool                 `json:"overflow"`
 }

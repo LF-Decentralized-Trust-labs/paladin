@@ -19,24 +19,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/signer/common"
+	wtns "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/signer/witness"
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/proto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/cache"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
 	"github.com/iden3/go-rapidsnark/prover"
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/witness/v2"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/signer/common"
-	wtns "github.com/kaleido-io/paladin/domains/zeto/internal/zeto/signer/witness"
-	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -81,14 +82,25 @@ func (sp *snarkProver) GetVerifier(ctx context.Context, algorithm, verifierType 
 	if !zetosignerapi.ALGO_DOMAIN_ZETO_SNARK_BJJ_REGEXP.MatchString(algorithm) {
 		return "", i18n.NewError(ctx, msgs.MsgErrorSignAlgoMismatch, algorithm, zetosignerapi.ALGO_DOMAIN_ZETO_SNARK_BJJ_REGEXP)
 	}
-	if verifierType != zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X {
-		return "", i18n.NewError(ctx, msgs.MsgErrorVerifierTypeMismatch, algorithm, zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X)
+	if err := checkVerifierType(ctx, verifierType); err != nil {
+		return "", err
 	}
 	pk, err := common.NewBabyJubJubPrivateKey(privateKey)
 	if err != nil {
-		return "", err
+		return "", i18n.NewError(ctx, msgs.MsgErrorDecodePrivateKey, err)
 	}
-	return common.EncodeBabyJubJubPublicKey(pk.Public()), nil
+	pubKey := pk.Public()
+	if verifierType == zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X {
+		compressedPubkey := common.EncodeBabyJubJubPublicKey(pubKey)
+		return compressedPubkey, nil
+	} else {
+		pubKeyComp := pubKey.Compress()
+		uncompressedPubkey, err := pubKeyComp.Decompress()
+		if err != nil {
+			return "", i18n.NewError(ctx, msgs.MsgErrorDecodePublicKeyFromHex, err)
+		}
+		return strings.Join([]string{"0x" + uncompressedPubkey.X.Text(16), "0x" + uncompressedPubkey.Y.Text(16)}, ","), nil
+	}
 }
 
 func (sp *snarkProver) GetMinimumKeyLen(ctx context.Context, algorithm string) (int, error) {
@@ -316,6 +328,15 @@ func newWitnessInputs(tokenType pb.TokenType, circuit *zetosignerapi.Circuit, ex
 				}
 				return &wtns.FungibleEncWitnessInputs{Enc: encExtras}, nil
 			} else if circuit.UsesNullifiers {
+				if circuit.UsesKyc {
+					nullifierKycExtras, ok := extras.(*pb.ProvingRequestExtras_NullifiersKyc)
+					if !ok {
+						return nil, fmt.Errorf("unexpected extras type for anon nullifier kyc circuit")
+					}
+					return &wtns.FungibleNullifierKycWitnessInputs{
+						Extras: nullifierKycExtras,
+					}, nil
+				}
 				nullifierExtras, ok := extras.(*pb.ProvingRequestExtras_Nullifiers)
 				if !ok {
 					return nil, fmt.Errorf("unexpected extras type for anon nullifier circuit")
@@ -342,4 +363,15 @@ func generateProof(ctx context.Context, wtns, provingKey []byte) (*types.ZKProof
 		return nil, i18n.NewError(ctx, msgs.MsgErrorGenerateProof, err)
 	}
 	return proof, nil
+}
+
+func checkVerifierType(ctx context.Context, verifierType string) error {
+	supportedVerifierTypes := []string{
+		zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X,
+		zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_UNCOMPRESSED_0X,
+	}
+	if slices.Contains(supportedVerifierTypes, verifierType) {
+		return nil
+	}
+	return i18n.NewError(ctx, msgs.MsgErrorVerifierTypeMismatch, verifierType, strings.Join(supportedVerifierTypes, ", "))
 }

@@ -32,6 +32,7 @@ on:
     inputs:
       latest:
         required: false
+        description: 'Whether to mark the release as latest'
         type: boolean
         default: false
       registry:

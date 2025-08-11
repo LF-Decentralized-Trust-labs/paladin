@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/pldmsgs"
 )
 
 // HexBytes is byte slice that is formatted in JSON with an 0x prefix, and stored in the DB as hex

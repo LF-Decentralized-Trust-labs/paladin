@@ -20,11 +20,11 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/cache"
 )
 
 // Balance manager is a component that provides the following services

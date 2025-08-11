@@ -16,10 +16,11 @@
 package components
 
 import (
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
 )
 
 // PreInitComponents are ones that are initialized before managers.
@@ -31,6 +32,7 @@ type PreInitComponents interface {
 	Persistence() persistence.Persistence
 	BlockIndexer() blockindexer.BlockIndexer
 	RPCServer() rpcserver.RPCServer
+	MetricsManager() metrics.Metrics
 }
 
 // Managers are initialized after base components with access to them, and provide

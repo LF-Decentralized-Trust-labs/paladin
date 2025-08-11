@@ -1,0 +1,1110 @@
+suite: Attach mode tests
+templates:
+  - customnodes/**
+  - operator/**
+  - samples/**
+values:
+- "../values.yaml"
+tests:
+  # Basic attach test with smartContractsReferences
+  - it: attach basic single node with smartContractsReferences
+    templates:
+      - customnodes/paladin.yaml
+      - customnodes/paladinregistration.yaml
+    set:
+      mode: attach
+      smartContractsReferences:
+        notoFactory:
+          address: "0xd93630936d854fb718b89537cce4acc97fd50463"
+        zetoFactory:
+          address: "0xc29ed8a902ff787445bdabee9ae5e2380089959d"
+        penteFactory:
+          address: "0x48c11bbb7caa77329d53b89235fec64733a24ca1"
+        registry:
+          address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
+      paladinNodes:
+        - name: "bank-a"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://mychain.rpc"
+              ws: "wss://mychain.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+            - zeto
+            - pente
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: central-bank.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: central-bank
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+            publicTxManager:
+              gasLimit:
+                gasEstimateFactor: 2.0
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: customnodes/paladin.yaml
+      - hasDocuments:
+          count: 1
+        template: customnodes/paladinregistration.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'bank-a'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.baseLedgerEndpoint.type'
+          value: 'endpoint'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.baseLedgerEndpoint.endpoint.jsonrpc'
+          value: 'https://mychain.rpc'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.baseLedgerEndpoint.endpoint.ws'
+          value: 'wss://mychain.ws'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.type'
+          value: 'NodePort'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[0].name'
+          value: 'rpc-http'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[0].port'
+          value: 8548
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 31748
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[1].name'
+          value: 'rpc-ws'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[1].port'
+          value: 8549
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[1].nodePort'
+          value: 31749
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.database.mode'
+          value: 'sidecarPostgres'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.database.migrationMode'
+          value: 'auto'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.secretBackedSigners[0].name'
+          value: 'signer-auto-wallet'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.secretBackedSigners[0].secret'
+          value: 'central-bank.keys'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.secretBackedSigners[0].type'
+          value: 'autoHDWallet'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.secretBackedSigners[0].keySelector'
+          value: '.*'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.transports[0].name'
+          value: 'grpc'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.transports[0].plugin.type'
+          value: 'c-shared'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.transports[0].plugin.library'
+          value: '/app/transports/libgrpc.so'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.transports[0].ports[0].name'
+          value: 'transport-grpc'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.transports[0].ports[0].port'
+          value: 9000
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.transports[0].ports[0].targetPort'
+          value: 9000
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.transports[0].tls.secretName'
+          value: 'paladin-mtls'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.transports[0].tls.certName'
+          value: 'paladin-mtls'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      # Test PaladinRegistration
+      - equal:
+          path: 'metadata.name'
+          value: 'bank-a'
+        documentIndex: 0
+        template: customnodes/paladinregistration.yaml
+      - equal:
+          path: 'spec.registry'
+          value: 'evm-registry'
+        documentIndex: 0
+        template: customnodes/paladinregistration.yaml
+      - equal:
+          path: 'spec.registryAdminNode'
+          value: 'central-bank'
+        documentIndex: 0
+        template: customnodes/paladinregistration.yaml
+      - equal:
+          path: 'spec.registryAdminKey'
+          value: 'registry.operator'
+        documentIndex: 0
+        template: customnodes/paladinregistration.yaml
+      - equal:
+          path: 'spec.node'
+          value: 'bank-a'
+        documentIndex: 0
+        template: customnodes/paladinregistration.yaml
+      - equal:
+          path: 'spec.nodeAdminKey'
+          value: 'registry.bank-a'
+        documentIndex: 0
+        template: customnodes/paladinregistration.yaml
+      - equal:
+          path: 'spec.transports[0]'
+          value: 'grpc'
+        documentIndex: 0
+        template: customnodes/paladinregistration.yaml
+
+  # Test attach with authentication enabled
+  - it: attach with authentication enabled
+    templates:
+      - customnodes/paladin.yaml
+      - customnodes/paladinregistration.yaml
+    set:
+      mode: attach
+      smartContractsReferences:
+        notoFactory:
+          address: "0xd93630936d854fb718b89537cce4acc97fd50463"
+        registry:
+          address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
+      paladinNodes:
+        - name: "auth-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://secure-chain.rpc"
+              ws: "wss://secure-chain.ws"
+              auth:
+                enabled: true
+                secretName: "auth-node-secret"
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: auth-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: central-bank
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - equal:
+          path: 'spec.baseLedgerEndpoint.endpoint.auth.type'
+          value: 'secret'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.baseLedgerEndpoint.endpoint.auth.secret.name'
+          value: 'auth-node-secret'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+
+  # Test attach with preConfigured signers
+  - it: attach with preConfigured signers
+    templates:
+      - customnodes/paladin.yaml
+      - customnodes/paladinregistration.yaml
+    set:
+      mode: attach
+      smartContractsReferences:
+        notoFactory:
+          address: "0xd93630936d854fb718b89537cce4acc97fd50463"
+        registry:
+          address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
+      paladinNodes:
+        - name: "preconfigured-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://chain.rpc"
+              ws: "wss://chain.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-pre-configured
+              secret: preconfigured-node.keys
+              type: preConfigured
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: central-bank
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - equal:
+          path: 'spec.secretBackedSigners[0].name'
+          value: 'signer-pre-configured'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.secretBackedSigners[0].type'
+          value: 'preConfigured'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+
+  # Test attach with custom PVC template
+  - it: attach with custom PVC template
+    templates:
+      - customnodes/paladin.yaml
+      - customnodes/paladinregistration.yaml
+    set:
+      mode: attach
+      smartContractsReferences:
+        notoFactory:
+          address: "0xd93630936d854fb718b89537cce4acc97fd50463"
+        registry:
+          address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
+      paladinNodes:
+        - name: "pvc-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://chain.rpc"
+              ws: "wss://chain.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+            pvcTemplate:
+              storageClassName: "my-storage"
+              accessModes:
+                - ReadWriteOnce
+              capacity:
+                storage: 10Gi
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: pvc-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: central-bank
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - equal:
+          path: 'spec.database.pvcTemplate.storageClassName'
+          value: 'my-storage'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.database.pvcTemplate.accessModes[0]'
+          value: 'ReadWriteOnce'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.database.pvcTemplate.capacity.storage'
+          value: '10Gi'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+
+  # Test attach with multiple nodes
+  - it: attach with multiple nodes
+    templates:
+      - customnodes/paladin.yaml
+      - customnodes/paladinregistration.yaml
+    set:
+      mode: attach
+      smartContractsReferences:
+        notoFactory:
+          address: "0xd93630936d854fb718b89537cce4acc97fd50463"
+        zetoFactory:
+          address: "0xc29ed8a902ff787445bdabee9ae5e2380089959d"
+        registry:
+          address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
+      paladinNodes:
+        - name: "node1"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://chain1.rpc"
+              ws: "wss://chain1.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: node1.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: central-bank
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+        - name: "node2"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://chain2.rpc"
+              ws: "wss://chain2.ws"
+              auth:
+                enabled: false
+          domains:
+            - zeto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31750
+              rpcWs:
+                port: 8549
+                nodePort: 31751
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: node2.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: central-bank
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: info
+    asserts:
+      - hasDocuments:
+          count: 2
+        template: customnodes/paladin.yaml
+      - hasDocuments:
+          count: 2
+        template: customnodes/paladinregistration.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'node1'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'node2'
+        documentIndex: 1
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 31748
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[0].nodePort'
+          value: 31750
+        documentIndex: 1
+        template: customnodes/paladin.yaml
+
+  # Test attach with ClusterIP service type
+  - it: attach with ClusterIP service type
+    templates:
+      - customnodes/paladin.yaml
+      - customnodes/paladinregistration.yaml
+    set:
+      mode: attach
+      smartContractsReferences:
+        notoFactory:
+          address: "0xd93630936d854fb718b89537cce4acc97fd50463"
+        registry:
+          address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
+      paladinNodes:
+        - name: "clusterip-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://chain.rpc"
+              ws: "wss://chain.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: ClusterIP
+            ports:
+              rpcHttp:
+                port: 8548
+              rpcWs:
+                port: 8549
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: clusterip-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: central-bank
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - equal:
+          path: 'spec.service.type'
+          value: 'ClusterIP'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[0].name'
+          value: 'rpc-http'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[0].port'
+          value: 8548
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[1].name'
+          value: 'rpc-ws'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.service.ports[1].port'
+          value: 8549
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+
+  # Test attach with embeddedSQLite database
+  - it: attach with embeddedSQLite database
+    templates:
+      - customnodes/paladin.yaml
+      - customnodes/paladinregistration.yaml
+    set:
+      mode: attach
+      smartContractsReferences:
+        notoFactory:
+          address: "0xd93630936d854fb718b89537cce4acc97fd50463"
+        registry:
+          address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
+      paladinNodes:
+        - name: "sqlite-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://chain.rpc"
+              ws: "wss://chain.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: embeddedSQLite
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: sqlite-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: central-bank
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - equal:
+          path: 'spec.database.mode'
+          value: 'embeddedSQLite'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+      - equal:
+          path: 'spec.database.migrationMode'
+          value: 'auto'
+        documentIndex: 0
+        template: customnodes/paladin.yaml
+
+  # Test that operator resources are still present in attach mode
+  - it: attach operator resources present
+    templates:
+      - operator/deployment.yaml
+      - operator/service.yaml
+      - operator/serviceaccount.yaml
+      - operator/configmap.yaml
+      - operator/role.yaml
+      - operator/rolebinding.yaml
+    set:
+      mode: attach
+      smartContractsReferences:
+        notoFactory:
+          address: "0xd93630936d854fb718b89537cce4acc97fd50463"
+        registry:
+          address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
+      paladinNodes:
+        - name: "test-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://chain.rpc"
+              ws: "wss://chain.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: test-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: central-bank
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: operator/deployment.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/service.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/serviceaccount.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/configmap.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/role.yaml
+      - hasDocuments:
+          count: 1
+        template: operator/rolebinding.yaml
+
+  # Tests for samples loaded in attach mode with addresses
+  - it: attach samples - PaladinDomains present with addresses
+    templates:
+      - samples/core_v1alpha1_paladindomain_noto.yaml
+      - samples/core_v1alpha1_paladindomain_zeto.yaml
+      - samples/core_v1alpha1_paladindomain_pente.yaml
+    set:
+      mode: attach
+      smartContractsReferences:
+        notoFactory:
+          address: "0xd93630936d854fb718b89537cce4acc97fd50463"
+          deployment: ""
+        zetoFactory:
+          address: "0xc29ed8a902ff787445bdabee9ae5e2380089959d"
+          deployment: ""
+        penteFactory:
+          address: "0x48c11bbb7caa77329d53b89235fec64733a24ca1"
+          deployment: ""
+        registry:
+          address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
+          deployment: ""
+      paladinNodes:
+        - name: "test-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://chain.rpc"
+              ws: "wss://chain.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: test-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: central-bank
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_paladindomain_noto.yaml
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_paladindomain_zeto.yaml
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_paladindomain_pente.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'noto'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_noto.yaml
+      - matchSnapshot:
+          path: 'metadata.labels'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_noto.yaml
+      - equal:
+          path: 'spec.registryAddress'
+          value: '0xd93630936d854fb718b89537cce4acc97fd50463'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_noto.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'zeto'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_zeto.yaml
+      - matchSnapshot:
+          path: 'metadata.labels'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_zeto.yaml
+      - equal:
+          path: 'spec.registryAddress'
+          value: '0xc29ed8a902ff787445bdabee9ae5e2380089959d'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_zeto.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'pente'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_pente.yaml
+      - matchSnapshot:
+          path: 'metadata.labels'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_pente.yaml
+      - equal:
+          path: 'spec.registryAddress'
+          value: '0x48c11bbb7caa77329d53b89235fec64733a24ca1'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladindomain_pente.yaml
+
+  - it: attach samples - PaladinRegistry present with address
+    templates:
+      - samples/core_v1alpha1_paladinregistry.yaml
+    set:
+      mode: attach
+      smartContractsReferences:
+        notoFactory:
+          address: "0xd93630936d854fb718b89537cce4acc97fd50463"
+          deployment: ""
+        zetoFactory:
+          address: "0xc29ed8a902ff787445bdabee9ae5e2380089959d"
+          deployment: ""
+        penteFactory:
+          address: "0x48c11bbb7caa77329d53b89235fec64733a24ca1"
+          deployment: ""
+        registry:
+          address: "0x4456307ef3f119dac17a5e974d2640f714e6edb0"
+          deployment: ""
+      paladinNodes:
+        - name: "test-node"
+          baseLedgerEndpoint:
+            type: endpoint
+            endpoint:
+              jsonrpc: "https://chain.rpc"
+              ws: "wss://chain.ws"
+              auth:
+                enabled: false
+          domains:
+            - noto
+          registries:
+            - evm-reg
+          transports:
+            - name: grpc
+              plugin:
+                type: c-shared
+                library: /app/transports/libgrpc.so
+              config:
+                port: 9000
+                address: 0.0.0.0
+              ports:
+                transportGrpc:
+                  port: 9000
+                  targetPort: 9000
+              tls:
+                secretName: paladin-mtls
+                certName: paladin-mtls
+          service:
+            type: NodePort
+            ports:
+              rpcHttp:
+                port: 8548
+                nodePort: 31748
+              rpcWs:
+                port: 8549
+                nodePort: 31749
+          database:
+            mode: sidecarPostgres
+            migrationMode: auto
+          secretBackedSigners:
+            - name: signer-auto-wallet
+              secret: test-node.keys
+              type: autoHDWallet
+              keySelector: ".*"
+          paladinRegistration:
+            registryAdminNode: central-bank
+            registryAdminKey: registry.operator
+            registry: evm-registry
+          config: |
+            log:
+              level: debug
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: samples/core_v1alpha1_paladinregistry.yaml
+      - equal:
+          path: 'metadata.name'
+          value: 'evm-registry'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladinregistry.yaml
+      - matchSnapshot:
+          path: 'metadata.labels'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladinregistry.yaml
+      - equal:
+          path: 'spec.type'
+          value: 'evm'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladinregistry.yaml
+      - equal:
+          path: 'spec.evm.contractAddress'
+          value: '0x4456307ef3f119dac17a5e974d2640f714e6edb0'
+        documentIndex: 0
+        template: samples/core_v1alpha1_paladinregistry.yaml
+
+  # Note: SmartContractDeployments are NOT loaded in attach mode when addresses are provided
+  # because attach mode is for connecting to existing contracts, not deploying new ones 

@@ -23,23 +23,24 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/retry"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
 )
 
 // blockListener has two functions:
 // 1) To establish and keep track of what the head block height of the blockchain is, so event streams know how far from the head they are
 // 2) To feed new block information to any registered consumers
 type blockListener struct {
-	ctx                        context.Context
-	wsConn                     rpcclient.WSClient // if configured the getting the blockheight will not complete until WS connects, overrides backend once connected
+	ctx    context.Context
+	wsConn rpcclient.WSClient // if configured the getting the blockheight will not complete until WS connects, overrides backend once connected
+	//nolint:unused // May be used in future
 	wsConnClosed               bool
 	listenLoopDone             chan struct{}
 	initialBlockHeightObtained chan struct{}
@@ -486,6 +487,8 @@ func (bl *blockListener) getHighestBlock(ctx context.Context) (uint64, error) {
 	log.L(bl.ctx).Debugf("ChainHead=%d", highestBlock)
 	return highestBlock, nil
 }
+
+//nolint:unused // May be used in future
 func (bl *blockListener) waitClosed() {
 	bl.wsMux.Lock()
 	listenLoopDone := bl.listenLoopDone

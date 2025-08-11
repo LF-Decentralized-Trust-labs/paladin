@@ -17,8 +17,8 @@ package evm
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/registries/evm/internal/evmregistry"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/registries/evm/internal/evmregistry"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
 )
 
 func NewPlugin(ctx context.Context) plugintk.PluginBase {

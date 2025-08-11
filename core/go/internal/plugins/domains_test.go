@@ -21,16 +21,16 @@ import (
 	"runtime/debug"
 	"testing"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/mocks/componentsmocks"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -351,7 +351,7 @@ func TestDomainRequestsOK(t *testing.T) {
 	// This is the point the domain manager would call us to say the domain is initialized
 	// (once it's happy it's updated its internal state)
 	domainAPI.Initialized()
-	require.NoError(t, pc.WaitForInit(ctx))
+	require.NoError(t, pc.WaitForInit(ctx, prototk.PluginInfo_DOMAIN))
 
 	idr, err := domainAPI.InitDeploy(ctx, &prototk.InitDeployRequest{
 		Transaction: &prototk.DeployTransactionSpecification{
@@ -523,10 +523,9 @@ func TestDomainRegisterFail(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
-				t:                   t,
-				allowRegisterErrors: true,
-				connectFactory:      domainConnectFactory,
-				headerAccessor:      domainHeaderAccessor,
+				t:              t,
+				connectFactory: domainConnectFactory,
+				headerAccessor: domainHeaderAccessor,
 				preRegister: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
 						Header: &prototk.Header{

@@ -50,7 +50,7 @@ Before you begin, ensure you have the following installed:
 For convenience, you can run the entire setup with a single Gradle command:
 
 ```sh
-gradle deploy
+../gradlew deploy
 ```
 
 This command performs all the necessary steps to deploy the Paladin Operator and create a functional Paladin node:
@@ -68,7 +68,7 @@ This command performs all the necessary steps to deploy the Paladin Operator and
 **Cleanup**
 
 ```
-gradle clean
+../gradlew clean
 ```
 
 > This will not delete the cluster. Delete the cluster by running `make kind-delete`
@@ -84,7 +84,7 @@ Alternatively, you can follow these steps to build and deploy the Paladin Operat
 Navigate to the **parent directory** of the project (where the `build.gradle` file is located) and run:
 
 ```sh
-gradle docker
+../gradlew docker
 ```
 
 This command will:
@@ -157,7 +157,7 @@ paladin-operator-xxxxxxxxxx-xxxxx   1/1     Running   0          XXm
 
 Now that the operator is running, you can create the Paladin nodes.
 
-Create the nodes (Besu Node and Paladin Node):
+Create 3 nodes (3 Besu nodes and 3 Paladin nodes):
 
 ```sh
 make create-node
@@ -166,8 +166,8 @@ make create-node
 This command will:
 
 - Create a **Besu Genesis** ConfigMap.
-- Create a **Besu Node** instance and related resources.
-- Create a **Paladin Node** instance and related resources.
+- Create 3 **Besu Node** instances and related resources.
+- Create 3 **Paladin Node** instances and related resources.
 
 #### Step 8: Verify the Nodes are Running
 
@@ -181,8 +181,12 @@ You should see output similar to:
 
 ```
 NAME                                READY   STATUS    RESTARTS   AGE
-besu-node-xxxxxxxxxx-xxxxx          1/1     Running   0          XXm
-paladin-node-xxxxxxxxxx-xxxxx       1/1     Running   0          XXm
+besu-node1-xxxxxxxxxx-xxxxx          1/1     Running   0          XXm
+besu-node2-xxxxxxxxxx-xxxxx          1/1     Running   0          XXm
+besu-node3-xxxxxxxxxx-xxxxx          1/1     Running   0          XXm
+paladin-node1-xxxxxxxxxx-xxxxx       1/1     Running   0          XXm
+paladin-node2-xxxxxxxxxx-xxxxx       1/1     Running   0          XXm
+paladin-node3-xxxxxxxxxx-xxxxx       1/1     Running   0          XXm
 ```
 
 This confirms that the Paladin and Besu nodes are successfully deployed and running.
@@ -194,7 +198,7 @@ This confirms that the Paladin and Besu nodes are successfully deployed and runn
 To remove the operator and clean up all resources from your cluster, run:
 
 ```sh
-gradle clean
+../gradlew clean
 ```
 
 This command will:

@@ -110,3 +110,50 @@ func TestNewBabyJubJubPrivateKey(t *testing.T) {
 		})
 	}
 }
+
+func TestEncodeBabyJubJubPublicKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		pubKey   *babyjub.PublicKey
+		expected string
+	}{
+		{
+			name:     "mock public key",
+			pubKey:   mockPubKey(),
+			expected: "0x51fa904bb6142e89f85aebb2a933a879e2efd5b682021deec4f717a8dbcbbd8e",
+		},
+		{
+			name: "zero public key",
+			pubKey: &babyjub.PublicKey{
+				X: big.NewInt(0),
+				Y: big.NewInt(1),
+			},
+			expected: "0x0100000000000000000000000000000000000000000000000000000000000000",
+		},
+		{
+			name: "generated key pair",
+			pubKey: func() *babyjub.PublicKey {
+				privKey := babyjub.NewRandPrivKey()
+				return privKey.Public()
+			}(),
+			expected: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			encoded := EncodeBabyJubJubPublicKey(tc.pubKey)
+
+			assert.Len(t, encoded, 66, "encoded key should be 66 characters")
+
+			if tc.expected != "" {
+				assert.Equal(t, tc.expected, encoded)
+			}
+
+			decoded, err := DecodeBabyJubJubPublicKey(encoded)
+			require.NoError(t, err)
+			assert.Equal(t, tc.pubKey.X.String(), decoded.X.String())
+			assert.Equal(t, tc.pubKey.Y.String(), decoded.Y.String())
+		})
+	}
+}

@@ -24,22 +24,23 @@ import (
 	"os"
 	"testing"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/blockindexermocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/ethclientmocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/rpcservermocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence/mockpersistence"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/mocks/blockindexermocks"
-	"github.com/kaleido-io/paladin/core/mocks/componentsmocks"
-	"github.com/kaleido-io/paladin/core/mocks/ethclientmocks"
-	"github.com/kaleido-io/paladin/core/mocks/rpcservermocks"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -50,6 +51,7 @@ func TestInitOK(t *testing.T) {
 	l, err := net.Listen("tcp4", ":0")
 	require.NoError(t, err)
 	debugPort := l.Addr().(*net.TCPAddr).Port
+	metricsPort := 6100
 	require.NoError(t, l.Close())
 
 	// We build a config that allows us to get through init successfully, as should be possible
@@ -104,6 +106,12 @@ func TestInitOK(t *testing.T) {
 			Enabled: confutil.P(true),
 			HTTPServerConfig: pldconf.HTTPServerConfig{
 				Port: confutil.P(debugPort),
+			},
+		},
+		MetricsServer: pldconf.MetricsServerConfig{
+			Enabled: confutil.P(true),
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Port: confutil.P(metricsPort),
 			},
 		},
 	}
@@ -173,7 +181,8 @@ func TestStartOK(t *testing.T) {
 
 	mockPluginManager := componentsmocks.NewPluginManager(t)
 	mockPluginManager.On("Start").Return(nil)
-	mockPluginManager.On("WaitForInit", mock.Anything).Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_SIGNING_MODULE).Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_DOMAIN).Return(nil)
 	mockPluginManager.On("Stop").Return()
 
 	mockKeyManager := componentsmocks.NewKeyManager(t)

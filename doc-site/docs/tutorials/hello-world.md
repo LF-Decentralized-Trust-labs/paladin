@@ -12,11 +12,11 @@ This tutorial demonstrates how traditional, non-private Ethereum smart contract 
 
 ## Running the Example
 
-The example code can be found in the [Paladin example repository](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/helloworld).
+The example code can be found in the [Paladin example repository](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/helloworld).
 
 The HelloWorld solidity contract can be found [here](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/tutorials/HelloWorld.sol).
 
-Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paladin environment. Then, follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/helloworld/README.md) to run the code.
+Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paladin environment. Then, follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/helloworld/README.md) to run the code.
 
 ---
 
@@ -44,7 +44,7 @@ To address the PR comment and clarify the differences between **contract deploym
 ### Step 1: Deploy the Contract
 
 ```typescript
-const deploymentTxID = await paladin.sendTransaction({
+const deploymentTxID = await paladin.ptx.sendTransaction({
   type: TransactionType.PUBLIC,
   abi: helloWorldJson.abi,
   bytecode: helloWorldJson.bytecode,
@@ -96,7 +96,7 @@ logger.log(
 ```typescript
 const name = "Paladin User"; // Example name for the greeting
 
-const sayHelloTxID = await paladin.sendTransaction({
+const sayHelloTxID = await paladin.ptx.sendTransaction({
   type: TransactionType.PUBLIC,
   abi: helloWorldJson.abi,
   function: "sayHello",
@@ -138,7 +138,7 @@ logger.log("sayHello function executed successfully!");
 ### Step 5: Retrieve the Emitted Event
 
 ```typescript
-const events = await paladin.decodeTransactionEvents(
+const events = await paladin.bidx.decodeTransactionEvents(
   functionReceipt.transactionHash,
   helloWorldJson.abi,
   "pretty=true"

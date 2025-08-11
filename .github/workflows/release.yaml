@@ -3,13 +3,14 @@ name: Release
 on:
   push:
     tags:
-      - v*
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       latest:
         required: false
         type: boolean
-        default: false
+        default: true
+        description: 'Whether to mark this as the latest release'
       tag:
         required: true
         type: string
@@ -21,6 +22,7 @@ jobs:
     outputs:
       tag: ${{ steps.set-vars.outputs.tag }}
       latest: ${{ steps.set-vars.outputs.latest }}
+      sdk_tag: ${{ steps.set-vars.outputs.sdk_tag }}
     steps:
       - id: set-vars
         shell: bash
@@ -44,9 +46,76 @@ jobs:
               LATEST="false"
             fi
           fi
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "latest=$LATEST" >> $GITHUB_OUTPUT
 
+          if [[ "$LATEST" ==  "true" ]]; then
+            SDK_TAG="latest"
+          else
+            SDK_TAG="stable"
+          fi
+
+          {
+            echo "tag=$TAG"
+            echo "latest=$LATEST"
+            echo "sdk_tag=$SDK_TAG"
+          } >> $GITHUB_OUTPUT
+      
+      - id: new-tag
+        name: Validate new tag follows semver versioning
+        uses: matt-usurp/validate-semver@v2
+        with:
+          version: ${{ steps.set-vars.outputs.tag }}
+      
+      - id: ref-tag
+        name: Validate ref tag follows semver versioning
+        uses: matt-usurp/validate-semver@v2
+        with:
+          version: ${{ github.ref }}
+          
+      - name: Validate workflow triggered from RC tag only
+        shell: bash
+        env:
+          REF_TAG_PRERELEASE: ${{ steps.ref-tag.outputs.prerelease }}
+          REF_TAG_VERSION: ${{ steps.ref-tag.outputs.version }}
+        run: |
+          if [[ -z "$REF_TAG_PRERELEASE" ]]; then
+            echo "This workflow can only be triggered from an RC tag (e.g., v1.2.3-rc1)."
+            echo "Current ref: $REF"
+            exit 1
+          fi
+          echo "Valid RC tag: $REF_TAG_VERSION"
+
+      - name: Validate tag is final and RC exists
+        shell: bash
+        env:
+          NEW_TAG_PRERELEASE: ${{ steps.new-tag.outputs.prerelease }}
+          NEW_TAG_MAJOR: ${{ steps.new-tag.outputs.major }}
+          NEW_TAG_MINOR: ${{ steps.new-tag.outputs.minor }}
+          NEW_TAG_PATCH: ${{ steps.new-tag.outputs.patch }}
+          NEW_TAG_VERSION: ${{ steps.new-tag.outputs.version }}
+          REF_TAG_MAJOR: ${{ steps.ref-tag.outputs.major }}
+          REF_TAG_MINOR: ${{ steps.ref-tag.outputs.minor }}
+          REF_TAG_PATCH: ${{ steps.ref-tag.outputs.patch }}
+        run: |
+          # Ensure the tag is NOT an RC
+          if [[ -n "$NEW_TAG_PRERELEASE" ]]; then
+            echo "Final releases must NOT be RC tags. Got: $TAG"
+            exit 1
+          fi
+
+          if [[ "$REF_TAG_MAJOR" != "$NEW_TAG_MAJOR" ]]; then
+            echo "New tag major version does not match ref tag major version $REF_TAG_MAJOR != $NEW_TAG_MAJOR"
+            exit 1
+          fi
+          if [[ "$REF_TAG_MINOR" != "$NEW_TAG_MINOR" ]]; then
+            echo "New tag minor version does not match ref tag minor version $REF_TAG_MINOR != $NEW_TAG_MINOR"
+            exit 1
+          fi
+          if [[ "$REF_TAG_PATCH" != "$NEW_TAG_PATCH" ]]; then
+            echo "New tag patch version does not match ref tag patch version $REF_TAG_PATCH != $NEW_TAG_PATCH"
+            exit 1
+          fi
+
+          echo "Valid tag: $NEW_TAG_VERSION"
   release-images:
     needs: set-variables
     uses: ./.github/workflows/release-images.yaml
@@ -68,6 +137,7 @@ jobs:
       CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-solidity-contracts:
+    needs: [set-variables]
     uses: ./.github/workflows/release-solidity-contracts.yaml
 
   release:
@@ -100,7 +170,10 @@ jobs:
           files: |
             helm-artifacts/basenet.yaml
             helm-artifacts/devnet.yaml
+            helm-artifacts/customnet.yaml
+            helm-artifacts/attach.yaml
             helm-artifacts/artifacts.tar.gz
+            contracts/zeto-abis.tar.gz
             contracts/abis.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -110,5 +183,6 @@ jobs:
     uses: ./.github/workflows/release-typescript-sdk.yaml
     with:
       sdk_version: ${{ needs.set-variables.outputs.tag }}
+      sdk_tag: ${{ needs.set-variables.outputs.sdk_tag }}
     secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }} 

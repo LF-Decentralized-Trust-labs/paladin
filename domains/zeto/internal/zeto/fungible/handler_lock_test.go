@@ -21,13 +21,13 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
-	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/common"
+	corepb "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/proto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/domain"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 )
@@ -49,11 +49,13 @@ func sampleTransferPayload() map[string]any {
 }
 
 func TestLockValidateParams(t *testing.T) {
-	h := lockHandler{
-		baseHandler: baseHandler{
-			name: "test1",
-		},
-	}
+	h := NewLockHandler(
+		"test1",
+		nil,
+		&prototk.StateSchema{Id: "coin"},
+		&prototk.StateSchema{Id: "merkle_tree_root"},
+		&prototk.StateSchema{Id: "merkle_tree_node"},
+	)
 	config := &types.DomainInstanceConfig{
 		TokenName: "test",
 		Circuits: &zetosignerapi.Circuits{

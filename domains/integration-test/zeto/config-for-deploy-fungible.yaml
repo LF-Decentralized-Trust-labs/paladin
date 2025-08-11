@@ -24,6 +24,12 @@ contracts:
     - name: Groth16Verifier_AnonBatch
       abiAndBytecode:
         path: ./helpers/abis/Groth16Verifier_AnonBatch.json
+    - name: Groth16Verifier_Burn
+      abiAndBytecode:
+        path: ./helpers/abis/Groth16Verifier_Burn.json
+    - name: Groth16Verifier_BurnBatch
+      abiAndBytecode:
+        path: ./helpers/abis/Groth16Verifier_BurnBatch.json
     - name: Zeto_Anon
       verifier: Groth16Verifier_Anon
       batchVerifier: Groth16Verifier_AnonBatch
@@ -133,3 +139,44 @@ contracts:
       cloneable: true
       abiAndBytecode:
         path: ./helpers/abis/Zeto_AnonNullifier.json
+    # for the Zeto_AnonNullifierKyc token
+    - name: Groth16Verifier_AnonNullifierKycTransfer
+      abiAndBytecode:
+        path: ./helpers/abis/Groth16Verifier_AnonNullifierKycTransfer.json
+    - name: Groth16Verifier_AnonNullifierKycTransferBatch
+      abiAndBytecode:
+        path: ./helpers/abis/Groth16Verifier_AnonNullifierKycTransferBatch.json
+    - name: Groth16Verifier_AnonNullifierKycTransferLocked
+      abiAndBytecode:
+        path: ./helpers/abis/Groth16Verifier_AnonNullifierKycTransferLocked.json
+    - name: Groth16Verifier_AnonNullifierKycTransferLockedBatch
+      abiAndBytecode:
+        path: ./helpers/abis/Groth16Verifier_AnonNullifierKycTransferLockedBatch.json
+    - name: Zeto_AnonNullifierKyc
+      verifier: Groth16Verifier_AnonNullifierKycTransfer
+      batchVerifier: Groth16Verifier_AnonNullifierKycTransferBatch
+      depositVerifier: Groth16Verifier_Deposit
+      withdrawVerifier: Groth16Verifier_WithdrawNullifier
+      batchWithdrawVerifier: Groth16Verifier_WithdrawNullifierBatch
+      lockVerifier: Groth16Verifier_AnonNullifierKycTransferLocked
+      batchLockVerifier: Groth16Verifier_AnonNullifierKycTransferLockedBatch
+      circuits:
+        deposit:
+          name: deposit
+        withdraw:
+          name: withdraw_nullifier
+          usesNullifiers: true
+          fungible: true
+        transfer:
+          name: anon_nullifier_kyc_transfer
+          usesNullifiers: true
+          usesKyc: true
+          fungible: true
+        transferLocked:
+          name: anon_nullifier_kyc_transferLocked
+          usesNullifiers: true
+          usesKyc: true
+          fungible: true
+      cloneable: true
+      abiAndBytecode:
+        path: ./helpers/abis/Zeto_AnonNullifierKyc.json

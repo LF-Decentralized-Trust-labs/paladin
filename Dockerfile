@@ -2,7 +2,7 @@
 ARG JAVA_VERSION=21.0.4+7
 ARG NODE_VERSION=20.17.0
 ARG PROTO_VERSION=28.2
-ARG GO_VERSION=1.23.10
+ARG GO_VERSION=1.24.3
 ARG GO_MIGRATE_VERSION=4.18.3
 ARG GRADLE_VERSION=8.5
 ARG WASMER_VERSION=4.3.7
@@ -41,7 +41,7 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     xz-utils \
     && apt-get clean
-  
+
 # Install JDK
 RUN JAVA_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "aarch64"; else echo -n "x64"; fi ) && \
     curl -sLo - https://api.adoptium.net/v3/binary/version/jdk-${JAVA_VERSION}/${TARGETOS}/${JAVA_ARCH}/jdk/${JVM_TYPE}/${JVM_HEAP}/eclipse | \
@@ -57,7 +57,7 @@ RUN NODE_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "arm64"; else echo
 # Install Protoc
 RUN PROTO_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "aarch_64"; else echo -n "x86_64"; fi ) && \
     curl -sLo protoc-$PROTO_VERSION-${TARGETOS}-${PROTO_ARCH}.zip \
-      https://github.com/protocolbuffers/protobuf/releases/download/v$PROTO_VERSION/protoc-$PROTO_VERSION-${TARGETOS}-${PROTO_ARCH}.zip && \
+    https://github.com/protocolbuffers/protobuf/releases/download/v$PROTO_VERSION/protoc-$PROTO_VERSION-${TARGETOS}-${PROTO_ARCH}.zip && \
     unzip protoc-$PROTO_VERSION-${TARGETOS}-${PROTO_ARCH}.zip -d /usr/local/protoc && \
     rm protoc-$PROTO_VERSION-${TARGETOS}-${PROTO_ARCH}.zip
 
@@ -131,6 +131,7 @@ COPY domains/noto domains/noto
 COPY domains/integration-test domains/integration-test
 COPY registries/static registries/static
 COPY registries/evm registries/evm
+COPY signingmodules/example signingmodules/example
 COPY transports/grpc transports/grpc
 COPY ui/client ui/client
 # No build of these three, but we need to go.mod to make the go.work valid
@@ -175,9 +176,6 @@ RUN apt-get update && apt-get install -y \
 ENV LANG=C.UTF-8
 ENV LD_LIBRARY_PATH=/app/libs:/usr/local/wasmer/lib
 
-# Set the working directory
-WORKDIR /app
-
 # Install JRE
 RUN JAVA_ARCH=$( if [ "$TARGETARCH" = "arm64" ]; then echo -n "aarch64"; else echo -n "x64"; fi ) && \
     curl -sLo - https://api.adoptium.net/v3/binary/version/jdk-${JAVA_VERSION}/${TARGETOS}/${JAVA_ARCH}/jre/${JVM_TYPE}/${JVM_HEAP}/eclipse | \
@@ -193,11 +191,18 @@ COPY --from=full-builder /usr/local/wasmer/lib/libwasmer.so /usr/local/wasmer/li
 # Copy the build artifacts from the builder stage
 COPY --from=full-builder /app/build /app
 
+RUN mkdir /app/jna && chmod -R g+rwx /app/jna && chown -R 1001:1001 /app/jna
+
+USER 1001:1001
+# Set the working directory
+WORKDIR /app
+
 # Copy the db migration files
 COPY --from=full-builder /app/core/go/db /app/db
 
 # Add tools we installed to the path
-ENV PATH=$PATH:/usr/local/java/bin
+ENV PATH=$PATH:/usr/local/java/bin:/app/jna
+ENV LD_LIBRARY_PATH=/app/jna:$LD_LIBRARY_PATH
 
 # Define the entry point for running the application
 ENTRYPOINT [                         \
@@ -206,7 +211,8 @@ ENTRYPOINT [                         \
     "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED", \
     "--add-opens", "java.base/java.nio=ALL-UNNAMED", \
     "-Dio.netty.tryReflectionSetAccessible=true", \
-    "-Djna.library.path=/app/libs",  \
+    "-Djava.io.tmpdir=/app/jna", \
+    "-Djna.library.path=/app/jna",  \
     "-jar",                          \
     "/app/libs/paladin.jar"          \
-]
+    ]

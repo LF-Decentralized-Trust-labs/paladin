@@ -25,9 +25,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type EndorsementRequest struct {
@@ -128,6 +128,7 @@ type TransactionFlow interface {
 	ReadyForSequencing(ctx context.Context) bool
 	Dispatched(ctx context.Context) bool
 	ID(ctx context.Context) uuid.UUID
+	PrivateTransaction() *components.PrivateTransaction
 	IsEndorsed(ctx context.Context) bool
 	InputStateIDs(ctx context.Context) []string
 	OutputStateIDs(ctx context.Context) []string

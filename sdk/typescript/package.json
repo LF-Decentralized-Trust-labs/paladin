@@ -5,7 +5,8 @@
   "main": "build/index.js",
   "scripts": {
     "build": "tsc",
-    "abi": "node scripts/abi.mjs"
+    "abi": "node scripts/abi.mjs",
+    "download-abi": "node scripts/contracts.mjs"
   },
   "author": "",
   "license": "Apache-2.0",

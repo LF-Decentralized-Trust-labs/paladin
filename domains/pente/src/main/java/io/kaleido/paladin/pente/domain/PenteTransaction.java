@@ -108,7 +108,6 @@
      private final String jsonParams;
      private final long baseBlock;
      private Values values;
-     private PenteDomain.AssemblyAccountLoader accountLoader;
  
      PenteTransaction(PenteDomain domain, TransactionSpecification tx) throws IOException, IllegalArgumentException {
          this.domain = domain;
@@ -203,10 +202,6 @@
          return this.contractConfig;
      }
  
-     boolean requiresABIEncoding() {
-         return (abiEntryType == ABIEntryType.DEPLOY || abiEntryType == ABIEntryType.CUSTOM_FUNCTION);
-     }
- 
      byte[] getEncodedCallData() throws IOException, IllegalStateException, ExecutionException, InterruptedException {
          String paramsJSON = new ObjectMapper().writeValueAsString(getValues().inputs);
          EncodeDataRequest request;
@@ -275,10 +270,6 @@
              throw new IllegalArgumentException("ABI param 'group' must be a tuple with two components - 'salt' (bytes32) and 'members' (string[])");
          }
          return param;
-     }
- 
-     ABIDefinitions getABIDefinitions() {
-         return defs;
      }
  
      Address getFromVerifier(List<ResolvedVerifier> verifiers) {

@@ -22,14 +22,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/mocks/componentsmocks"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -197,7 +197,7 @@ func TestTransportRequestsOK(t *testing.T) {
 	// This is the point the transport manager would call us to say the transport is initialized
 	// (once it's happy it's updated its internal state)
 	transportAPI.Initialized()
-	require.NoError(t, pc.WaitForInit(ctx))
+	require.NoError(t, pc.WaitForInit(ctx, prototk.PluginInfo_DOMAIN))
 
 	callbacks := <-waitForCallbacks
 	rts, err := callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
@@ -222,10 +222,9 @@ func TestTransportRegisterFail(t *testing.T) {
 	tdm := &testTransportManager{
 		transports: map[string]plugintk.Plugin{
 			"transport1": &mockPlugin[prototk.TransportMessage]{
-				t:                   t,
-				allowRegisterErrors: true,
-				connectFactory:      transportConnectFactory,
-				headerAccessor:      transportHeaderAccessor,
+				t:              t,
+				connectFactory: transportConnectFactory,
+				headerAccessor: transportHeaderAccessor,
 				preRegister: func(transportID string) *prototk.TransportMessage {
 					return &prototk.TransportMessage{
 						Header: &prototk.Header{
@@ -240,10 +239,9 @@ func TestTransportRegisterFail(t *testing.T) {
 				},
 			},
 			"transport2": &mockPlugin[prototk.TransportMessage]{
-				t:                   t,
-				allowRegisterErrors: true,
-				connectFactory:      transportConnectFactory,
-				headerAccessor:      transportHeaderAccessor,
+				t:              t,
+				connectFactory: transportConnectFactory,
+				headerAccessor: transportHeaderAccessor,
 				preRegister: func(transportID string) *prototk.TransportMessage {
 					return &prototk.TransportMessage{
 						Header: &prototk.Header{
@@ -304,6 +302,7 @@ func TestTransportRegisterPartialSuccess(t *testing.T) {
 	waitForError := make(chan error, 1)
 	waitForSuccess := make(chan components.TransportManagerToTransport, 1)
 	registrationCount := make(chan string, 2)
+	errorCallbackDone := make(chan struct{}, 1)
 
 	tdm := &testTransportManager{
 		transports: map[string]plugintk.Plugin{
@@ -317,10 +316,9 @@ func TestTransportRegisterPartialSuccess(t *testing.T) {
 				}
 			}),
 			"transport_fail": &mockPlugin[prototk.TransportMessage]{
-				t:                   t,
-				allowRegisterErrors: true,
-				connectFactory:      transportConnectFactory,
-				headerAccessor:      transportHeaderAccessor,
+				t:              t,
+				connectFactory: transportConnectFactory,
+				headerAccessor: transportHeaderAccessor,
 				preRegister: func(transportID string) *prototk.TransportMessage {
 					return &prototk.TransportMessage{
 						Header: &prototk.Header{
@@ -332,6 +330,7 @@ func TestTransportRegisterPartialSuccess(t *testing.T) {
 				},
 				expectClose: func(err error) {
 					waitForError <- err
+					errorCallbackDone <- struct{}{}
 				},
 			},
 		},
@@ -382,5 +381,12 @@ func TestTransportRegisterPartialSuccess(t *testing.T) {
 		assert.Contains(t, err.Error(), "transport_fail registration failed")
 	case <-time.After(3 * time.Second):
 		t.Fatal("transport failure callback never fired")
+	}
+
+	// Wait for the error callback to complete before test cleanup
+	select {
+	case <-errorCallbackDone:
+	case <-time.After(1 * time.Second):
+		t.Fatal("error callback did not complete in time")
 	}
 }

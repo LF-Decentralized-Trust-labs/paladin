@@ -4,13 +4,14 @@ description: 'Install pre-requisites for building paladin'
 runs:
   using: 'composite'
   steps:
-  - name: Install protoc
+ 
+  - name: Install protoc if not cached
     shell: bash
     run: |
-      PB_REL="https://github.com/protocolbuffers/protobuf/releases"
-      curl -LO $PB_REL/download/v25.1/protoc-25.1-linux-x86_64.zip
+      curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v25.1/protoc-25.1-linux-x86_64.zip
       unzip protoc-25.1-linux-x86_64.zip -d protoc
       echo "${PWD}/protoc/bin" >> $GITHUB_PATH
+      rm protoc-25.1-linux-x86_64.zip
 
   # Set up Java
   - name: Setup Java
@@ -23,7 +24,7 @@ runs:
   - name: Set up Go
     uses: actions/setup-go@v5
     with:
-      go-version: '1.23'
+      go-version: '1.24'
       check-latest: true
       cache-dependency-path: |
         **/*.sum

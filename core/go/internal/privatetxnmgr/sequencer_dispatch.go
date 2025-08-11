@@ -19,16 +19,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
-	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr/ptmgrtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr/syncpoints"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 )
 
 // synchronously prepare and dispatch all given transactions to their associated signing address / or deliver prepared transaction to their custodian
@@ -68,14 +68,19 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 			hasPrivateTransaction := preparedTransaction.PreparedPrivateTransaction != nil
 			switch {
 			case preparedTransaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && hasPublicTransaction && !hasPrivateTransaction:
-				log.L(ctx).Infof("Result of transaction %s is a public transaction (gas=%d)", preparedTransaction.ID, *preparedTransaction.PreparedPublicTransaction.PublicTxOptions.Gas)
+				log.L(ctx).Infof("Result of transaction %s is a public transaction (gas=%d)", preparedTransaction.ID, *preparedTransaction.PreparedPublicTransaction.Gas)
 				publicTransactionsToSend = append(publicTransactionsToSend, preparedTransaction)
 				sequence.PrivateTransactionDispatches = append(sequence.PrivateTransactionDispatches, &syncpoints.DispatchPersisted{
 					PrivateTransactionID: transactionFlow.ID(ctx).String(),
 				})
 			case preparedTransaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && hasPrivateTransaction && !hasPublicTransaction:
 				log.L(ctx).Infof("Result of transaction %s is a chained private transaction", preparedTransaction.ID)
-				validatedPrivateTx, err := s.components.TxManager().PrepareInternalPrivateTransaction(ctx, s.components.Persistence().NOTX(), preparedTransaction.PreparedPrivateTransaction, pldapi.SubmitModeAuto)
+				tx := transactionFlow.PrivateTransaction()
+				senderLocator := tx.PreAssembly.TransactionSpecification.From
+				validatedPrivateTx, err := s.components.TxManager().
+					PrepareChainedPrivateTransaction(ctx, s.components.Persistence().NOTX(),
+						senderLocator, tx.ID, tx.Domain, &s.contractAddress,
+						preparedTransaction.PreparedPrivateTransaction, pldapi.SubmitModeAuto)
 				if err != nil {
 					log.L(ctx).Errorf("Error preparing transaction %s: %s", preparedTransaction.ID, err)
 					// TODO: this is just an error situation for one transaction - this function is a batch function
@@ -189,8 +194,8 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 	}
 
 	// We also need to trigger ourselves for any private TX we chained
-	for _, tx := range dispatchBatch.PrivateDispatches {
-		if err := s.privateTxManager.HandleNewTx(ctx, s.components.Persistence().NOTX(), tx); err != nil {
+	for _, dispatch := range dispatchBatch.PrivateDispatches {
+		if err := s.privateTxManager.HandleNewTx(ctx, s.components.Persistence().NOTX(), dispatch.NewTransaction); err != nil {
 			log.L(ctx).Errorf("Sequencer failed to notify private TX manager for chained transaction")
 		}
 	}

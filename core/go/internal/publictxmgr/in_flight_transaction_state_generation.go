@@ -20,19 +20,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
 
 type inFlightTransactionStateGeneration struct {
 	current             bool
 	testOnlyNoEventMode bool
 
-	PublicTxManagerMetricsManager
+	metrics.PublicTransactionManagerMetrics
 	InFlightStageActionTriggers
 	InMemoryTxStateManager
 
@@ -68,7 +69,7 @@ type inFlightTransactionStateGeneration struct {
 }
 
 func NewInFlightTransactionStateGeneration(
-	thm PublicTxManagerMetricsManager,
+	thm metrics.PublicTransactionManagerMetrics,
 	bm BalanceManager,
 	ifsat InFlightStageActionTriggers,
 	imtxs InMemoryTxStateManager,
@@ -76,16 +77,16 @@ func NewInFlightTransactionStateGeneration(
 	submissionWriter *submissionWriter,
 	noEventMode bool) InFlightTransactionStateGeneration {
 	return &inFlightTransactionStateGeneration{
-		current:                       true,
-		bufferedStageOutputs:          make([]*StageOutput, 0),
-		cancel:                        make(chan bool, 1),
-		testOnlyNoEventMode:           noEventMode,
-		txLevelStageStartTime:         time.Now(),
-		statusUpdater:                 statusUpdater,
-		submissionWriter:              submissionWriter,
-		PublicTxManagerMetricsManager: thm,
-		InFlightStageActionTriggers:   ifsat,
-		InMemoryTxStateManager:        imtxs,
+		current:                         true,
+		bufferedStageOutputs:            make([]*StageOutput, 0),
+		cancel:                          make(chan bool, 1),
+		testOnlyNoEventMode:             noEventMode,
+		txLevelStageStartTime:           time.Now(),
+		statusUpdater:                   statusUpdater,
+		submissionWriter:                submissionWriter,
+		PublicTransactionManagerMetrics: thm,
+		InFlightStageActionTriggers:     ifsat,
+		InMemoryTxStateManager:          imtxs,
 	}
 }
 
@@ -168,12 +169,12 @@ func (v *inFlightTransactionStateGeneration) StartNewStageContext(ctx context.Co
 		log.L(ctx).Tracef("Transaction with ID %s, triggering sign tx", rsc.InMemoryTx.GetSignerNonce())
 		v.stageTriggerError = v.TriggerSignTx(ctx)
 	case InFlightTxStageSubmitting:
-		log.L(ctx).Tracef("Transaction with ID %s, triggering submission, signed message not nil: %t", rsc.InMemoryTx.GetSignerNonce(), v.TransientPreviousStageOutputs != nil && v.TransientPreviousStageOutputs.SignedMessage != nil)
+		log.L(ctx).Tracef("Transaction with ID %s, triggering submission, signed message not nil: %t", rsc.InMemoryTx.GetSignerNonce(), v.TransientPreviousStageOutputs != nil && v.SignedMessage != nil)
 		var signedMessage []byte
 		var calculatedTxHash *pldtypes.Bytes32
 		if v.TransientPreviousStageOutputs != nil {
-			signedMessage = v.TransientPreviousStageOutputs.SignedMessage
-			calculatedTxHash = v.TransientPreviousStageOutputs.TransactionHash
+			signedMessage = v.SignedMessage
+			calculatedTxHash = v.TransactionHash
 		}
 		v.stageTriggerError = v.TriggerSubmitTx(ctx, signedMessage, calculatedTxHash)
 	case InFlightTxStageStatusUpdate:

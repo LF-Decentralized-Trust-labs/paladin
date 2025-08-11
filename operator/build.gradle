@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -53,8 +53,6 @@ dependencies {
 ext {
     clusterName = project.hasProperty('clusterName') ? project.clusterName : 'paladin' 
     namespace = project.hasProperty('namespace') ? project.namespace : 'default' // Default namespace is 'default'
-    mode = project.hasProperty('mode') ? project.mode : 'devnet'
-    nodeCount = project.hasProperty('nodeCount') ? project.nodeCount.toInteger()  : 3 // Default node count is 3
     deleteCluster = project.hasProperty('deleteCluster') ? project.deleteCluster.toBoolean() : false // By default, do not delete the cluster
     loadImages = project.hasProperty('loadImages') ? project.loadImages == 'true' : true // Default is to load images
     buildPaladin = project.hasProperty('buildPaladin') ? project.buildPaladin == 'true' : true // Default is to build Paladin
@@ -207,6 +205,58 @@ def waitForAllSuccess(String namespace, String kind, int timeoutSeconds = 180) {
     throw new Exception("Not all scd resources have status 'Success' within ${timeoutSeconds} seconds.")
 }
 
+def installOperator(String namespace, String valuesFile) {
+    def command = [
+        "make",
+        "helm-install",
+        "NAMESPACE=${namespace}",
+        "OPERATOR_IMAGE_NAME=${operatorImageName}",
+        "OPERATOR_IMAGE_TAG=${operatorImageTag}",
+        "PALADIN_IMAGE_NAME=${paladinImageName}",
+        "PALADIN_IMAGE_TAG=${paladinImageTag}",
+        "VALUES_FILE=${valuesFile}"
+    ]
+    println "Installing operator in namespace ${namespace} with values file ${valuesFile}..."
+    def process = command.execute(null, project.projectDir)
+    process.waitFor()
+    if (process.exitValue() != 0) {
+        throw new Exception("Failed to install operator: ${process.err.text}")
+    }
+    println "Operator installed successfully in namespace ${namespace}."
+}
+
+def uninstallOperator(String namespace) {
+    def command = [
+        "make",
+        "helm-uninstall",
+        "NAMESPACE=${namespace}",
+        "UNINSTALL_DEPENDENCIES=false"
+    ]
+    def process = command.execute(null, project.projectDir)
+    process.waitFor()
+    if (process.exitValue() != 0) {
+        throw new Exception("Failed to uninstall operator: ${process.err.text}")
+    }
+    println "Operator uninstalled successfully in namespace ${namespace}."
+}
+
+// Task to verify the operator is running in the 'paladin' namespace
+def waitForOperatorRunning(String namespace, String name="paladin-operator") {
+    println 'Waiting for operator deployment to become ready...'
+    verifyResourceCreated(namespace, 'deployment', name, "1", 120)
+}
+
+// Task to verify the besu statefulSet
+def waitForBesuRunning(String namespace, Integer counter, String prefix) {
+    for (i in 1..counter) {
+        verifyResourceCreated(namespace, 'statefulset', "besu-"+prefix+"${i}", "1", 120)
+    }
+}
+def waitForPaladinRunning(String namespace, Integer counter, String prefix) {
+    for (i in 1..counter) {
+        verifyResourceCreated(namespace, 'statefulset', "paladin-"+prefix+"${i}", "1", 120)
+    }
+}
 
 task copySolidity(type: Copy) {
     inputs.files(configurations.contractCompile)
@@ -219,7 +269,7 @@ task copySolidity(type: Copy) {
         include 'contracts/private/InvestorList.sol/InvestorList.json'
         include 'contracts/private/NotoTrackerERC20.sol/NotoTrackerERC20.json'
         include 'contracts/shared/BondTrackerPublic.sol/BondTrackerPublic.json'
-        include 'contracts/shared/Atom.sol/AtomFactory.json'
+        include 'contracts/shared/AtomFactory.sol/AtomFactory.json'
         include 'contracts/testcontracts/ERC20Simple.sol/ERC20Simple.json'
     }
     into 'test/e2e/abis'
@@ -327,85 +377,84 @@ task prepareArtifacts(type: Exec, dependsOn: [buildContractSamples]) {
     commandLine "go", "run", "./contractpkg", "artifacts", "config/samples", "${artifactDir}"
 }
 
-// Task to install the operator using Helm
-task installOperator(type: Exec, dependsOn: [installCrds, promoteKindImages, prepareOperatorChart]) {
+task helmUnitTest(type: Exec, dependsOn: [prepareOperatorChart]) {
     executable 'make'
-    args 'helm-install'
-    args "NAMESPACE=${namespace}"
-    args "NODE_COUNT=${nodeCount}"
-    args "OPERATOR_IMAGE_NAME=${operatorImageName}"
-    args "OPERATOR_IMAGE_TAG=${operatorImageTag}"
-    args "PALADIN_IMAGE_NAME=${paladinImageName}"
-    args "PALADIN_IMAGE_TAG=${paladinImageTag}"
-    args "MODE=${mode}"
+    args 'helm-unittest'
 }
 
-
-// Task to verify the operator is running in the 'paladin' namespace
-task verifyOperator(dependsOn: installOperator) {
+// Task to install the operator using Helm
+task installOperatorDefault(dependsOn: [installCrds, promoteKindImages, helmUnitTest]) {
     doLast {
+        installOperator(namespace, 'charts/paladin-operator/values.yaml')
+        
         println 'Waiting for operator deployment to become ready...'
-        verifyResourceCreated(namespace, 'deployment', 'paladin-operator', "1")
-    }
-}
-
-// Task to verify the besu statefulSet
-task verifyBesu(dependsOn: verifyOperator) {
-    doLast {
-        println 'Waiting for besu statefulSet to become ready...'
-
-        verifyResourceCreated(namespace, 'statefulset', 'besu-node1', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'besu-node2', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'besu-node3', "1", 120)
-    }
-}
-
-// Task to verify the paladin statefulSet
-task verifyPaladin(dependsOn: verifyBesu) {
-    doLast {
-        println 'Waiting for paladin statefulSet to become ready...'
-
-        verifyResourceCreated(namespace, 'statefulset', 'paladin-node1', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'paladin-node2', "1", 120)
-        verifyResourceCreated(namespace, 'statefulset', 'paladin-node3', "1", 120)
-    }
-}
-
-
-
-// Task to verify all scd resources have status 'Success'
-task verifyAllScdSuccess(dependsOn: verifyPaladin ) {
-    doLast {
+        waitForOperatorRunning(namespace)
+        
+        println 'Waiting for besu statefulSets to become ready...'
+        waitForBesuRunning(namespace, 3, "node")
+        
+        println 'Waiting for paladin statefulSets to become ready...'
+        waitForPaladinRunning(namespace, 3, "node")
+        
         println 'Verifying all scd resources have status "Success"...'
         waitForAllSuccess(namespace, "scd", 120)
-    }
-}
-
-// Task to verify all txn resources have status 'Success'
-task verifyAllTxnSuccess(dependsOn: verifyAllScdSuccess ) {
-    doLast {
+        
         println 'Verifying all txn resources have status "Success"...'
         waitForAllSuccess(namespace, "txn", 60)
-    }
-} 
-
-// Task to verify all nodes are published
-task verifyAllRegistriesPublished(dependsOn: verifyAllTxnSuccess) {
-    doLast {
-        // println 'Restarting the Operator...'
-        // restartOperator(namespace)
-
+        
         println 'Verifying all registries are published...'
         waitForAllRegistriesPublished(namespace, 120)
+
+        printClusterStatus(namespace)
     }
 }
 
-
-// The 'deplay' runs the whole flow
-task deploy(dependsOn: [copySolidity, copyZetoSolidity, verifyAllRegistriesPublished]) {
+task installOperatorDevnet(dependsOn: [installCrds, promoteKindImages, prepareOperatorChart]) {
     doLast {
-        println 'Deploy setup completed. Operator is running in the paladin namespace.'
+        def namespace = "ci-devnet"
+        installOperator(namespace, 'charts/paladin-operator/ci/values-devnet.yaml')
+        
+        println 'Waiting for operator deployment to become ready...'
+        waitForOperatorRunning(namespace)
+        
+        println 'Waiting for besu statefulSets to become ready...'
+        waitForBesuRunning(namespace, 1, "evm")
+        
+        println 'Waiting for paladin statefulSets to become ready...'
+        waitForPaladinRunning(namespace, 2, "worker")
+        
+        println 'Verifying all scd resources have status "Success"...'
+        waitForAllSuccess(namespace, "scd", 120)
+        
+        println 'Verifying all txn resources have status "Success"...'
+        waitForAllSuccess(namespace, "txn", 60)
+        
+        println 'Verifying all registries are published...'
+        waitForAllRegistriesPublished(namespace, 120)
+
         printClusterStatus(namespace)
+    }
+}
+
+// Task to deploy the operator and the Paladin nodes
+task deploy(dependsOn: [installOperatorDefault]) {
+}
+
+// Task to run the e2e tests for the default installation
+// we broke it down to two tasks to allow default installation without tearing down the environment at the end of the test
+task ciOperatorDefault(dependsOn: [deploy]) {
+    doLast {
+        println 'Uninstalling operator...'
+        uninstallOperator(namespace)
+    }
+}
+
+task ciOperatorDevnet(dependsOn: [installOperatorDevnet]) {
+    def namespace = "ci-devnet"
+    
+    doLast {
+        println 'Uninstalling operator...'
+        uninstallOperator(namespace)
     }
 }
  
@@ -424,8 +473,15 @@ task clean {
     delete 'charts/paladin-operator/templates/samples'
 }
 
-// The 'e2e' task runs the whole flow
-task e2e(type: Exec, dependsOn: [deploy]) {
+// The CI task runs the different CI permutations of the chart installation
+task ci(dependsOn: [ciOperatorDevnet]) {
+    // This is a grouping task, so it doesn't need a body.
+}
+
+// The 'e2e' task runs the whole flow.
+// It depends on both 'ci' and 'deploy' to ensure they are part of the execution plan.
+task e2e(type: Exec, dependsOn: [ci, deploy]) {
+
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.notoGo)
     inputs.files(configurations.zetoGo)
@@ -440,6 +496,11 @@ task e2e(type: Exec, dependsOn: [deploy]) {
         finalizedBy cleanCluster
     }
 }
+ 
+// This rule enforces that IF both 'ci' and 'deploy' are scheduled to run
+// (which happens when you run 'e2e'), 'deploy' must wait for 'ci' to finish.
+// This does NOT create a dependency. Running 'gradle deploy' alone will NOT trigger 'ci'.
+deploy.mustRunAfter(ci)
 
 // Existing 'make' task
 task make(type: Exec, dependsOn: [copySolidity, copyZetoSolidity]) {
