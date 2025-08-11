@@ -25,12 +25,12 @@ configurations {
         canBeResolved = false
     }
 }
-
+ 
 dependencies {
     buildSDK project(path: ':sdk:typescript', configuration: 'buildSDK')
 }
 
-task install_sdk(type: Exec) {
+task npm_install_sdk(type: Exec) {
     executable 'npm'
     args 'install' 
     args 'file:../../sdk/typescript' // use local sdk
@@ -41,7 +41,7 @@ task install_sdk(type: Exec) {
     outputs.dir('node_modules')
 }
 
-task install(type: Exec, dependsOn: install_sdk) {
+task npm_install(type: Exec, dependsOn: npm_install_sdk) {
     executable 'npm'
     args 'install' 
 
@@ -51,13 +51,34 @@ task install(type: Exec, dependsOn: install_sdk) {
     outputs.dir('node_modules')
 }
 
-task build(type: Exec, dependsOn: install) {
+// Task to revert SDK to published version
+task revert_sdk(type: Exec) {
+    executable 'npm'
+    args 'install' 
+    args '@lfdecentralizedtrust-labs/paladin-sdk@latest'
+
+    inputs.files(configurations.buildSDK)
+    inputs.files('package.json')
+    outputs.files('package-lock.json')
+    outputs.dir('node_modules')
+    
+    description = 'Revert SDK to published version to prevent git changes'
+}
+
+task npm_build(type: Exec, dependsOn: npm_install) {
     executable 'npm'
     args 'run'
     args 'build'
 
     inputs.files('*.ts')
     outputs.dir('build')
+}
+
+task build(dependsOn: [npm_build]) {
+    finalizedBy revert_sdk
+}
+
+task build_without_cleanup(dependsOn: [npm_build]) {
 }
 
 task clean(type: Delete) {
@@ -67,5 +88,5 @@ task clean(type: Delete) {
 }
 
 dependencies {
-    buildCommon files(build)
+    buildCommon files(build_without_cleanup)
 }
