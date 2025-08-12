@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: besu-standalone-besu-node
+  labels:
+    app.kubernetes.io/name: standalone-besu
+    app.kubernetes.io/component: service
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: standalone-besu
+    app.kubernetes.io/component: node
+  ports:
+  - name: rpc-http
+    port: 32645
+    targetPort: 8545
+    protocol: TCP
+  - name: rpc-ws
+    port: 32646
+    targetPort: 8546
+    protocol: TCP
+  - name: graphql-http
+    port: 32647
+    targetPort: 8547
+    protocol: TCP
+  - name: p2p-tcp
+    port: 32603
+    targetPort: 30303
+    protocol: TCP
+  - name: p2p-udp
+    port: 32604
+    targetPort: 30303
+    protocol: UDP

@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: besu-standalone-besu-node
+  labels:
+    app.kubernetes.io/name: standalone-besu
+    app.kubernetes.io/component: config
+data:
+  pldconf.besu.toml: |
+    data-path = "/data"
+    discovery-enabled = false
+    genesis-file = "/genesis/genesis.json"
+    graphql-http-enabled = true
+    graphql-http-host = "0.0.0.0"
+    graphql-http-port = "8547"
+    host-allowlist = ["*"]
+    logging = "DEBUG"
+    min-gas-price = 0
+    node-private-key-file = "/nodeid/key"
+    p2p-host = "0.0.0.0"
+    p2p-port = "30303"
+    revert-reason-enabled = true
+    rpc-http-api = ["ETH", "NET", "QBFT", "WEB3", "ADMIN", "DEBUG", "TXPOOL"]
+    rpc-http-enabled = true
+    rpc-http-host = "0.0.0.0"
+    rpc-http-port = "8545"
+    rpc-ws-api = ["ETH", "NET", "QBFT", "WEB3", "ADMIN", "DEBUG", "TXPOOL"]
+    rpc-ws-enabled = true
+    rpc-ws-host = "0.0.0.0"
+    rpc-ws-port = "8546"
+    static-nodes-file = "/config/static-nodes.json"
+    tx-pool = "SEQUENCED"
+    tx-pool-limit-by-account-percentage = 1.0
+    Xdns-enabled = true
+    Xdns-update-enabled = true
+    # Authentication configuration - temporarily disabled for testing
+    # rpc-http-authentication-enabled = true
+    # rpc-http-authentication-credentials-file = "/auth/credentials.txt"
+    # rpc-ws-authentication-enabled = true
+    # rpc-ws-authentication-credentials-file = "/auth/credentials.txt"
+  static-nodes.json: |
+    [
+      "enode://7ef6ad53db14fa6c805848e4c8834aba0fb1fd29c3c439e572c7712fb2a9a57c62219f1e36911fe1f17bd981e7653a59b6fd6d9cb8db121ab4b53548dc099c12@besu-standalone-besu-node.ci-customnet.svc.cluster.local:30303"
+    ]
