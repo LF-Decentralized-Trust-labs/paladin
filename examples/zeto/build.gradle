@@ -15,7 +15,7 @@
 
 configurations {
     // Resolvable configurations
-    buildSDK {
+    linkSDK {
         canBeConsumed = false
         canBeResolved = true
     }
@@ -26,7 +26,7 @@ configurations {
 }
 
 dependencies {
-    buildSDK project(path: ':sdk:typescript', configuration: 'buildSDK')
+    linkSDK project(path: ':sdk:typescript', configuration: 'linkSDK')
     buildCommon project(path: ':examples:common', configuration: 'buildCommon')
 }
 
@@ -41,30 +41,29 @@ task copyContracts(type: Copy, dependsOn: [":domains:zeto:extractZetoArtifacts"]
     includeEmptyDirs = false
 }
 
-task npm_install_sdk(type: Exec) {
+task install(type: Exec ) {
     executable 'npm'
     args 'install' 
-    args 'file:../../sdk/typescript' // use local sdk
 
-    inputs.files(configurations.buildSDK)
+    inputs.files(configurations.linkSDK)
     inputs.files(configurations.buildCommon)
     inputs.files('package.json')
     outputs.files('package-lock.json')
     outputs.dir('node_modules')
 }
 
-task npm_install(type: Exec, dependsOn: npm_install_sdk) {
+task link(type: Exec, dependsOn: install) {
     executable 'npm'
-    args 'install' 
+    args 'link'
+    args '@lfdecentralizedtrust-labs/paladin-sdk' // use local sdk
 
-    inputs.files(configurations.buildSDK)
+    inputs.files(configurations.linkSDK)
     inputs.files(configurations.buildCommon)
     inputs.files('package.json')
-    outputs.files('package-lock.json')
     outputs.dir('node_modules')
 }
 
-task npm_build(type: Exec, dependsOn: [npm_install, copyContracts]) {
+task build(type: Exec, dependsOn: [link, copyContracts]) {
     executable 'npm'
     args 'run'
     args 'build'
@@ -73,30 +72,7 @@ task npm_build(type: Exec, dependsOn: [npm_install, copyContracts]) {
     outputs.dir('build')
 }
 
-// Task to revert SDK to published version
-task revert_sdk(type: Exec, dependsOn: ':examples:common:revert_sdk') {
-    executable 'npm'
-    args 'install' 
-    args '@lfdecentralizedtrust-labs/paladin-sdk@latest'
-
-    inputs.files(configurations.buildSDK)
-    inputs.files(configurations.buildCommon)
-    inputs.files('package.json')
-    outputs.files('package-lock.json')
-    outputs.dir('node_modules')
-    
-    description = 'Revert SDK to published version to prevent git changes'
-}
-
-// Main build task that includes cleanup
-task build(dependsOn: [npm_build]) {
-    finalizedBy revert_sdk
-}
-
-task buildWithoutCleanup(type: Exec, dependsOn: [npm_build]) {
-}
-
-task npm_start(type: Exec, dependsOn: [npm_build]) {
+task start(type: Exec, dependsOn: [build]) {
     dependsOn ':operator:e2e'
 
     executable 'npm'
@@ -104,9 +80,7 @@ task npm_start(type: Exec, dependsOn: [npm_build]) {
     args 'start'
 }
 
-task e2e(type: Exec, dependsOn: [npm_start]) {
-    finalizedBy revert_sdk
-
+task e2e(type: Exec, dependsOn: [start]) {
     executable 'npm'
     args 'run'
     args 'verify'

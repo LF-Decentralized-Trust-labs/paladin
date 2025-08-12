@@ -15,7 +15,7 @@
 
 configurations {
     // Resolvable configurations
-    buildSDK {
+    linkSDK {
         canBeConsumed = false
         canBeResolved = true
     }
@@ -27,58 +27,37 @@ configurations {
 }
  
 dependencies {
-    buildSDK project(path: ':sdk:typescript', configuration: 'buildSDK')
+    linkSDK project(path: ':sdk:typescript', configuration: 'linkSDK')
 }
 
-task npm_install_sdk(type: Exec) {
+
+task install(type: Exec) {
     executable 'npm'
     args 'install' 
-    args 'file:../../sdk/typescript' // use local sdk
 
-    inputs.files(configurations.buildSDK)
+    inputs.files(configurations.linkSDK)
     inputs.files('package.json')
     outputs.files('package-lock.json')
     outputs.dir('node_modules')
 }
 
-task npm_install(type: Exec, dependsOn: npm_install_sdk) {
+task link(type: Exec, dependsOn: install) {
     executable 'npm'
-    args 'install' 
+    args 'link' 
+    args '@lfdecentralizedtrust-labs/paladin-sdk' // use local sdk
 
-    inputs.files(configurations.buildSDK)
+    inputs.files(configurations.linkSDK)
     inputs.files('package.json')
-    outputs.files('package-lock.json')
     outputs.dir('node_modules')
 }
 
-// Task to revert SDK to published version
-task revert_sdk(type: Exec) {
-    executable 'npm'
-    args 'install' 
-    args '@lfdecentralizedtrust-labs/paladin-sdk@latest'
-
-    inputs.files(configurations.buildSDK)
-    inputs.files('package.json')
-    outputs.files('package-lock.json')
-    outputs.dir('node_modules')
-    
-    description = 'Revert SDK to published version to prevent git changes'
-}
-
-task npm_build(type: Exec, dependsOn: npm_install) {
+task build(type: Exec, dependsOn: link) {
     executable 'npm'
     args 'run'
     args 'build'
 
     inputs.files('*.ts')
     outputs.dir('build')
-}
-
-task build(dependsOn: [npm_build]) {
-    finalizedBy revert_sdk
-}
-
-task build_without_cleanup(dependsOn: [npm_build]) {
 }
 
 task clean(type: Delete) {
@@ -88,5 +67,5 @@ task clean(type: Delete) {
 }
 
 dependencies {
-    buildCommon files(build_without_cleanup)
+    buildCommon files(build)
 }

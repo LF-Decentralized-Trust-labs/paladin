@@ -93,22 +93,25 @@ fi
 print_status "Prerequisites check passed"
 
 # switch paladin sdk version
-switch_paladin_sdk_version() {
+change_paladin_sdk_version() {
     local name="$1"
-    if [ "$BUILD_PALADIN_SDK" = "true" ]; then
-        print_status "Running $name with local paladin SDK..."
-        npm uninstall @lfdecentralizedtrust-labs/paladin-sdk 2>/dev/null || true
-        if ! npm install file:../../sdk/typescript; then
-            print_error "Failed to install local SDK for $name"
-            exit 1
-        fi
-    fi
-
     if [ "$PALADIN_SDK_VERSION" != "" ]; then
         print_status "Running $name with paladin SDK version $PALADIN_SDK_VERSION..."
         npm uninstall @lfdecentralizedtrust-labs/paladin-sdk 2>/dev/null || true
         if ! npm install @lfdecentralizedtrust-labs/paladin-sdk@$PALADIN_SDK_VERSION; then
             print_error "Failed to install SDK version $PALADIN_SDK_VERSION for $name"
+            exit 1
+        fi
+    fi
+}
+
+# link paladin sdk version
+link_paladin_sdk() {
+    local name="$1"
+    if [ "$BUILD_PALADIN_SDK" = "true" ]; then
+        print_status "Running $name with local paladin SDK..."
+        if ! npm link @lfdecentralizedtrust-labs/paladin-sdk; then
+            print_error "Failed to link local SDK for $name"
             exit 1
         fi
     fi
@@ -157,18 +160,24 @@ install_prerequisites() {
             print_error "Failed to build paladin SDK"
             exit 1
         fi
+        if ! npm link; then
+            print_error "Failed to link paladin SDK"
+            exit 1
+        fi
         cd ../..
     fi
 
     # build common
     cd $EXAMPLES_DIR/common
 
-    switch_paladin_sdk_version "common"
+    change_paladin_sdk_version "common"
 
     if ! npm install; then
         print_error "Failed to install dependencies for common"
         exit 1
     fi
+
+    link_paladin_sdk "common"
 
     if ! npm run $DOWNLOAD_CONTRACTS_CMD; then
         print_error "Failed to copy contracts for common using `$DOWNLOAD_CONTRACTS_CMD`"
@@ -198,13 +207,15 @@ run_example() {
     print_status "Installing dependencies for $example_name..."
 
     # switch to the correct paladin sdk version
-    switch_paladin_sdk_version "$example_name"
+    change_paladin_sdk_version "$example_name"
 
     if ! npm install; then
         print_error "Failed to install dependencies for $example_name"
         cd ../..
         return 1
     fi
+
+    link_paladin_sdk "$example_name"
 
     if ! npm run $COPY_CONTRACTS_CMD; then
         print_error "Failed to run 'npm run $COPY_CONTRACTS_CMD' for $example_name"

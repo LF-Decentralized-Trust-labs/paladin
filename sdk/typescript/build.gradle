@@ -29,6 +29,10 @@ configurations {
         canBeConsumed = true
         canBeResolved = false
     }
+    linkSDK {
+        canBeConsumed = true
+        canBeResolved = false
+    }
 }
 
 dependencies {
@@ -64,6 +68,16 @@ task build(type: Exec, dependsOn: [install, copyABI]) {
     outputs.dir("build")
 }
 
+
+task link(type: Exec, dependsOn: [build]) {
+    executable 'npm'
+    args 'link'
+    outputs.dir("build")
+}
+
+// run link after build
+build.finalizedBy(link)
+
 task clean(type: Delete) {
     delete "node_modules"
     delete "build"
@@ -72,4 +86,5 @@ task clean(type: Delete) {
 
 dependencies {
     buildSDK files(build)
+    linkSDK files(link)
 }
