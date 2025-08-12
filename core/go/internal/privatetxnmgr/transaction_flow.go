@@ -131,7 +131,7 @@ func (tf *transactionFlow) IsComplete(_ context.Context) bool {
 }
 
 func (tf *transactionFlow) ReadyForSequencing(ctx context.Context) bool {
-	return tf.transaction.PostAssembly != nil
+	return tf.transaction.PostAssembly != nil && tf.transaction.PostAssembly.AssemblyResult == prototk.AssembleTransactionResponse_OK
 }
 
 func (tf *transactionFlow) Dispatched(_ context.Context) bool {

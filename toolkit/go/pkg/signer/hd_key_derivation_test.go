@@ -272,6 +272,9 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 
 	testSign, err := testKeyPair.SignDirect(([]byte)("some data"))
 	require.NoError(t, err)
+	// signature from firefly signer will have 27/28 V value. Paladin signing module converts it to 0/1. So we need to convert one
+	// of them to accurately compare
+	testSign.V.SetInt64(testSign.V.Int64() - 27)
 	assert.Equal(t, testSign.CompactRSV(), resSign.Payload)
 	sig, err := secp256k1.DecodeCompactRSV(ctx, resSign.Payload)
 	require.NoError(t, err)

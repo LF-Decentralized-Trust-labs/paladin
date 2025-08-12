@@ -82,7 +82,7 @@ func TestECDSASigning_secp256k1(t *testing.T) {
 
 	sig, err := secp256k1.DecodeCompactRSV(ctx, signatureRSV)
 	require.NoError(t, err)
-	assert.True(t, sig.V.Int64() == 27 || sig.V.Int64() == 28)
+	assert.True(t, sig.V.Int64() == 0 || sig.V.Int64() == 1)
 
 	anyChainID, _ := rand.Int(rand.Reader, big.NewInt(1122334455))
 	recovered, err := sig.RecoverDirect(testData,
