@@ -115,6 +115,10 @@ contract NotoTrackerERC20 is INotoHooks, ERC20 {
         PreparedTransaction calldata prepared
     ) external virtual override onlyNotary(sender) {
         _onMint(sender, to, amount, data, prepared);
+
+        if (amount > 1000000) {
+            revert("Amount too large");
+        }
     }
 
     function onTransfer(
