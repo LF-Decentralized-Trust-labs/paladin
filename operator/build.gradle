@@ -258,6 +258,46 @@ def waitForPaladinRunning(String namespace, Integer counter, String prefix) {
     }
 }
 
+def uninstallBesuNode() {
+    def command = [
+        "bash",
+        "charts/paladin-operator/ci/standalone-besu/cleanup-besu-e2e.sh"
+    ]
+    def process = command.execute(null, project.projectDir)
+    process.waitFor()
+    if (process.exitValue() != 0) {
+        throw new Exception("Failed to uninstall Besu node: ${process.err.text}")
+    }
+    println "Besu node uninstalled successfully."
+}
+
+def createBesuSecret(namespace) {
+    // create namespace and ignore error if it already exists
+    def command = [
+        "kubectl",
+        "create",
+        "namespace",
+        namespace
+    ]
+    def process = command.execute(null, project.projectDir)
+    process.waitFor()
+    
+    def command2 = [
+        "kubectl",
+        "apply",
+        "-f",
+        "charts/paladin-operator/ci/standalone-besu/11-besu-auth-secret.yaml",
+        "-n",
+        namespace
+    ]
+    def process2 = command2.execute(null, project.projectDir)
+    process2.waitFor()
+    if (process2.exitValue() != 0) {
+        throw new Exception("Failed to create Besu secret: ${process2.err.text}")
+    }
+    println "Besu secret created successfully in namespace ${namespace}."
+}
+
 task copySolidity(type: Copy) {
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
@@ -415,26 +455,10 @@ task installBesuNode(type: Exec) {
     args 'charts/paladin-operator/ci/standalone-besu/deploy-besu-for-e2e.sh'
 }
 
-task createCiCustomenetNamespace(type: Exec) {
-    executable 'kubectl'
-    args 'create'
-    args 'namespace'
-    args 'ci-customnet'
-}
-
-task createBesuSecret(type: Exec, dependsOn: [createCiCustomenetNamespace]) {
-    executable 'kubectl'
-    args 'apply'
-    args '-f'
-    args 'charts/paladin-operator/ci/standalone-besu/11-besu-auth-secret.yaml'
-    args '-n'
-    args 'ci-customnet'
-}
-
-
 task installOperatorDevnet(dependsOn: [installCrds, promoteKindImages, prepareOperatorChart]) {
     doLast {
         def namespace = "ci-devnet"
+
         installOperator(namespace, 'charts/paladin-operator/ci/values-devnet.yaml')
         
         println 'Waiting for operator deployment to become ready...'
@@ -459,16 +483,12 @@ task installOperatorDevnet(dependsOn: [installCrds, promoteKindImages, prepareOp
     }
 }
 
-task installOperatorCustomnet(dependsOn: [
-        installCrds, 
-        promoteKindImages, 
-        prepareOperatorChart, 
-        installBesuNode, 
-        createBesuSecret,
-        createCiCustomenetNamespace
-    ]) {
+task installOperatorCustomnet(dependsOn: [installCrds, promoteKindImages, prepareOperatorChart, installBesuNode]) {
     doLast {
         def namespace = "ci-customnet"
+        
+        createBesuSecret(namespace)
+
         installOperator(namespace, 'charts/paladin-operator/ci/values-customnet.yaml')
 
         println 'Waiting for operator deployment to become ready...'
@@ -512,12 +532,14 @@ task ciOperatorDevnet(dependsOn: [installOperatorDevnet]) {
     }
 }
 
+
 task ciOperatorCustomnet(dependsOn: [installOperatorCustomnet]) {
     def namespace = "ci-customnet"
     
     doLast {
         println 'Uninstalling operator...'
         uninstallOperator(namespace)
+        uninstallBesuNode()
     }
 }
  

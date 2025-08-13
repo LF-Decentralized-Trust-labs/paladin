@@ -1,38 +1,22 @@
 # values.yaml
 
-# Installation mode
-# Options:
-# - customnet: Installs a custom Paladin network with related Domains and Smart Contracts CRs.
 mode: customnet
 
 # List of Paladin nodes to install
 paladinNodes:
 
-  # Example Paladin node
-  - name: "bank"  # Unique node identifier within the Paladin network
+  # Paladin node
+  - name: "bank1"
 
     # ======== Base Ledger Endpoint Configuration ========
     baseLedgerEndpoint:
-
-      # Choose only ONE type below: "local" or "endpoint"
-
-      # Option 1: Local Besu node
-      # Uncomment the following lines if using a local Besu node
-      # type: local
-      # local:
-      #   nodeName: standalone-besu-node  # Name of the local Besu node (matches the Besu CR)
-
-      # Option 2: Remote blockchain endpoint
-      # Uncomment and fill the details if connecting to an external blockchain endpoint
       type: endpoint
       endpoint:
-        jsonrpc: "http://besu-standalone-besu-node.ci-customnet.svc.cluster.local:32645"  # Use internal service name
-        ws: "ws://besu-standalone-besu-node.ci-customnet.svc.cluster.local:32646"          # Use internal service name
+        jsonrpc: "http://besu-standalone-besu-node.ci-besu.svc.cluster.local:32645"  
+        ws: "ws://besu-standalone-besu-node.ci-besu.svc.cluster.local:32646"         
         auth:
           enabled: true
           secretName: "besu-auth-credentials"  # Kubernetes Secret containing auth credentials (if required)
-
-        # If authentication is required, provide a Kubernetes Secret:
 
     # ======== Domains ========
     # List of domain names this node participates in. Must match labels on domain CRs.
@@ -66,14 +50,12 @@ paladinNodes:
 
     # ======== Service ========
     service:
-      type: NodePort  # Options: NodePort | ClusterIP | LoadBalancer
+      type: ClusterIP  # Options: NodePort | ClusterIP | LoadBalancer
       ports:
         rpcHttp:
           port: 8548
-          nodePort: 31548
         rpcWs:
           port: 8549
-          nodePort: 31549
 
     # ======== Database ========
     database:
@@ -107,7 +89,7 @@ paladinNodes:
     # Inline Paladin configuration; CR fields take precedence if duplicated
     config: |
       log:
-        level: debug  # Log levels: debug, info, warn, error
+        level: warn
       publicTxManager:
         gasLimit:
           gasEstimateFactor: 2.0
@@ -128,6 +110,108 @@ paladinNodes:
     # ======== Paladin Registration ========
     # Register Paladin node to the network
     paladinRegistration:
-      registryAdminNode: bank  # The admin node that manages the registry
+      registryAdminNode: bank1  # The admin node that manages the registry
+      registryAdminKey: registry.operator
+      registry: evm-registry
+
+  # Paladin node
+  - name: "bank2"
+
+    # ======== Base Ledger Endpoint Configuration ========
+    baseLedgerEndpoint:
+      type: endpoint
+      endpoint:
+        jsonrpc: "http://besu-standalone-besu-node.ci-besu.svc.cluster.local:32645" 
+        ws: "ws://besu-standalone-besu-node.ci-besu.svc.cluster.local:32646"          
+        auth:
+          enabled: true
+          secretName: "besu-auth-credentials"  # Kubernetes Secret containing auth credentials (if required)
+
+    # ======== Domains ========
+    # List of domain names this node participates in. Must match labels on domain CRs.
+    domains:
+      - noto
+      - zeto
+      - pente
+
+    # ======== Registries ========
+    # Registry names this node interacts with. Must match labels on registry CRs.
+    registries:
+      - evm-reg
+
+    # ======== Transports ========
+    transports:
+      - name: grpc
+        plugin:
+          type: c-shared
+          library: /app/transports/libgrpc.so
+        config:
+          port: 9000
+          address: 0.0.0.0
+          externalHostname: ""  # External hostname if accessible outside cluster; leave empty if not required
+        ports:
+          transportGrpc:
+            port: 9000
+            targetPort: 9000
+        tls:
+          secretName: paladin-mtls  # Kubernetes Secret for TLS
+          certName: paladin-mtls    # Certificate name within the Secret
+
+    # ======== Service ========
+    service:
+      type: ClusterIP 
+      ports:
+        rpcHttp:
+          port: 8648
+        rpcWs:
+          port: 8649
+
+    # ======== Database ========
+    database:
+      mode: sidecarPostgres  # Options: sidecarPostgres | embeddedSQLite
+      migrationMode: auto    # Options: auto | manual
+      # pvcTemplate:         # Optional - Use a custom PVC for the DB
+      #   storageClassName: ""
+      #   accessModes:
+      #   - ReadWriteOnce
+      #   capacity:
+      #     storage: 10Gi
+
+    # ======== Secret Backed Signers ========
+    secretBackedSigners:
+
+      # Scenario 1 (default): Auto-generate an HD wallet seed phrase
+      # Operator generates and stores the seed phrase in the specified secret
+      - name: signer-auto-wallet
+        secret: bank.keys  # Name of the secret (should not already exist)
+        type: autoHDWallet
+        keySelector: .*     # Select all keys
+
+    # ======== Additional Config ========
+    # Inline Paladin configuration; CR fields take precedence if duplicated
+    config: |
+      log:
+        level: warn
+      publicTxManager:
+        gasLimit:
+          gasEstimateFactor: 2.0
+      besu:
+        auth:
+          enabled: true
+          secretName: besu-auth-credentials
+          usernameKey: username
+          passwordKey: password
+        rpc:
+          http:
+            port: 32645  # Besu HTTP RPC port
+          ws:
+            port: 32646  # Besu WebSocket RPC port
+          graphql:
+            port: 32647  # Besu GraphQL port
+
+    # ======== Paladin Registration ========
+    # Register Paladin node to the network
+    paladinRegistration:
+      registryAdminNode: bank1  # The admin node that manages the registry
       registryAdminKey: registry.operator
       registry: evm-registry
