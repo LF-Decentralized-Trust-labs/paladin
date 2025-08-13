@@ -409,6 +409,29 @@ task installOperatorDefault(dependsOn: [installCrds, promoteKindImages, helmUnit
     }
 }
 
+task installBesuNode(type: Exec) {
+    executable 'bash'
+    args '-c'
+    args 'charts/paladin-operator/ci/standalone-besu/deploy-besu-for-e2e.sh'
+}
+
+task createCiCustomenetNamespace(type: Exec) {
+    executable 'kubectl'
+    args 'create'
+    args 'namespace'
+    args 'ci-customnet'
+}
+
+task createBesuSecret(type: Exec, dependsOn: [createCiCustomenetNamespace]) {
+    executable 'kubectl'
+    args 'apply'
+    args '-f'
+    args 'charts/paladin-operator/ci/standalone-besu/11-besu-auth-secret.yaml'
+    args '-n'
+    args 'ci-customnet'
+}
+
+
 task installOperatorDevnet(dependsOn: [installCrds, promoteKindImages, prepareOperatorChart]) {
     doLast {
         def namespace = "ci-devnet"
@@ -422,6 +445,37 @@ task installOperatorDevnet(dependsOn: [installCrds, promoteKindImages, prepareOp
         
         println 'Waiting for paladin statefulSets to become ready...'
         waitForPaladinRunning(namespace, 2, "worker")
+        
+        println 'Verifying all scd resources have status "Success"...'
+        waitForAllSuccess(namespace, "scd", 120)
+        
+        println 'Verifying all txn resources have status "Success"...'
+        waitForAllSuccess(namespace, "txn", 60)
+        
+        println 'Verifying all registries are published...'
+        waitForAllRegistriesPublished(namespace, 120)
+
+        printClusterStatus(namespace)
+    }
+}
+
+task installOperatorCustomnet(dependsOn: [
+        installCrds, 
+        promoteKindImages, 
+        prepareOperatorChart, 
+        installBesuNode, 
+        createBesuSecret,
+        createCiCustomenetNamespace
+    ]) {
+    doLast {
+        def namespace = "ci-customnet"
+        installOperator(namespace, 'charts/paladin-operator/ci/values-customnet.yaml')
+
+        println 'Waiting for operator deployment to become ready...'
+        waitForOperatorRunning(namespace)
+        
+        println 'Waiting for paladin statefulSets to become ready...'
+        waitForPaladinRunning(namespace, 1, "bank")
         
         println 'Verifying all scd resources have status "Success"...'
         waitForAllSuccess(namespace, "scd", 120)
@@ -457,6 +511,16 @@ task ciOperatorDevnet(dependsOn: [installOperatorDevnet]) {
         uninstallOperator(namespace)
     }
 }
+
+task ciOperatorCustomnet(dependsOn: [installOperatorCustomnet]) {
+    def namespace = "ci-customnet"
+    
+    doLast {
+        println 'Uninstalling operator...'
+        uninstallOperator(namespace)
+    }
+}
+ 
  
 // Task to clean up resources
 task cleanCluster(type: Exec) {
@@ -474,7 +538,7 @@ task clean {
 }
 
 // The CI task runs the different CI permutations of the chart installation
-task ci(dependsOn: [ciOperatorDevnet]) {
+task ci(dependsOn: [ciOperatorDevnet, ciOperatorCustomnet]) {
     // This is a grouping task, so it doesn't need a body.
 }
 

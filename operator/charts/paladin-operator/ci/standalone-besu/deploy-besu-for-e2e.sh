@@ -4,7 +4,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NAMESPACE="ci-customnet"
+NAMESPACE="ci-besu"
 
 echo "🚀 Deploying Besu infrastructure for Paladin e2e tests..."
 
@@ -19,13 +19,13 @@ kubectl apply -f $SCRIPT_DIR -n $NAMESPACE
 echo "⏳ Waiting for Besu node to be ready..."
 
 # Wait for the Besu StatefulSet to be ready
-kubectl wait --for=condition=ready pod/besu-standalone-besu-node-0 -n $NAMESPACE --timeout=30s
+kubectl wait --for=condition=ready pod/besu-standalone-besu-node-0 -n $NAMESPACE --timeout=120s
 
 echo "✅ Besu node is ready!"
 
 # Get the NodePort for RPC HTTP access
-NODE_PORT=$(kubectl get svc besu-standalone-besu-node -n $NAMESPACE -o jsonpath='{.spec.ports[?(@.name=="rpc-http")].nodePort}')
-echo "🌐 Besu RPC HTTP accessible on NodePort: $NODE_PORT"
+NODE_PORT=$(kubectl get svc besu-standalone-besu-node -n $NAMESPACE -o jsonpath='{.spec.ports[?(@.name=="rpc-http")].port}')
+echo "🌐 Besu RPC HTTP accessible on Port: $NODE_PORT"
 
 # Test the connection (optional)
 echo "🧪 Testing Besu connection..."
