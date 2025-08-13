@@ -3,7 +3,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NAMESPACE="ci-customnet"
+NAMESPACE="ci-besu"
 
 echo "Cleaning up Besu infrastructure for Paladin e2e tests..."
 
