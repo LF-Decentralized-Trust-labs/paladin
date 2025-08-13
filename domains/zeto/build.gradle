@@ -13,6 +13,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+plugins {
+    id "de.undercouch.download" version "5.6.0"
+}
+
 ext {
     goFiles = fileTree(".") {
         include "internal/**/*.go"
@@ -71,37 +75,28 @@ dependencies {
     coreGo project(path: ":core:go", configuration: "goSource")
 }
 
-task downloadZetoProver() {
+task downloadZetoProver(type: Download) {
     def outname = "zeto-wasm-${zetoVersion}.tar.gz"
-    def url = "https://github.com/${zetoHost}/zeto/releases/download/${zetoVersion}/${outname}"
-    def f = new File(toolsOut, outname)
-    doFirst {
-        mkdir(f.parent)
-        new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
-    }
-    outputs.file(f)
+    src "https://github.com/${zetoHost}/zeto/releases/download/${zetoVersion}/${outname}"
+    dest new File(toolsOut, outname)
+    overwrite false
+    onlyIfModified true
 }
 
-task downloadZetoTestProvingKeys() {
+task downloadZetoTestProvingKeys(type: Download) {
     def outname = "zeto-test-proving-keys-${zetoVersion}.tar.gz"
-    def url = "https://github.com/${zetoHost}/zeto/releases/download/${zetoVersion}/${outname}"
-    def f = new File(toolsOut, outname)
-    doFirst {
-        mkdir(f.parent)
-        new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
-    }
-    outputs.file(f)
+    src "https://github.com/${zetoHost}/zeto/releases/download/${zetoVersion}/${outname}"
+    dest new File(toolsOut, outname)
+    overwrite false
+    onlyIfModified true
 }
 
-task downloadZetoCompiledContracts() {
+task downloadZetoCompiledContracts(type: Download) {
     def outname = "zeto-contracts-${zetoVersion}.tar.gz"
-    def url = "https://github.com/${zetoHost}/zeto/releases/download/${zetoVersion}/${outname}"
-    def f = new File(toolsOut, outname)
-    doFirst {
-        mkdir(f.parent)
-        new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
-    }
-    outputs.file(f)
+    src "https://github.com/${zetoHost}/zeto/releases/download/${zetoVersion}/${outname}"
+    dest new File(toolsOut, outname)
+    overwrite false
+    onlyIfModified true
 }
 
 task installPoseidonDependencies(type: Exec) {
