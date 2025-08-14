@@ -4,18 +4,9 @@ import PaladinClient, {
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
-
-const paladin1 = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-const paladin2 = new PaladinClient({
-  url: "http://127.0.0.1:31648",
-});
-const paladin3 = new PaladinClient({
-  url: "http://127.0.0.1:31748",
-});
 
 export interface ContractData {
   zetoCBDC1Address: string;
@@ -77,6 +68,18 @@ function findLatestContractDataFile(dataDir: string): string | null {
 }
 
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const [paladin1, paladin2, paladin3] = clients;
+  const [bank1] = paladin2.getVerifiers(`bank1@${nodeConnections[0].id}`);
+  const [bank2] = paladin3.getVerifiers(`bank2@${nodeConnections[1].id}`);
+
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
   const dataDir = path.join(__dirname, '..', 'data');
@@ -97,9 +100,6 @@ async function main(): Promise<boolean> {
 
   // STEP 2: Get verifiers and recreate token connections
   logger.log("STEP 2: Recreating token connections...");
-  const [cbdcIssuer] = paladin1.getVerifiers("centralbank@node3");
-  const [bank1] = paladin2.getVerifiers("bank1@node1");
-  const [bank2] = paladin3.getVerifiers("bank2@node2");
 
   const zetoFactory = new ZetoFactory(paladin3, "zeto");
   
@@ -301,4 +301,4 @@ if (require.main === module) {
       console.error(err);
       process.exit(1);
     });
-} 
+}

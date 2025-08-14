@@ -2,13 +2,9 @@ import PaladinClient from "@lfdecentralizedtrust-labs/paladin-sdk";
 import storageJson from "./abis/Storage.json";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
-
-// Instantiate Paladin client
-const paladin = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
 
 interface ContractData {
   contractAddress: string;
@@ -32,6 +28,17 @@ function findLatestContractDataFile(dataDir: string): string | null {
 }
 
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 1) {
+    logger.error("The environment config must provide at least 1 node for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin client from the environment configuration...");
+  const paladin = new PaladinClient(nodeConnections[0].clientOptions);
+  const owner = paladin.getVerifiers(`owner@${nodeConnections[0].id}`)[0];
+
+
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
   const dataDir = path.join(__dirname, '..', 'data');
@@ -52,7 +59,6 @@ async function main(): Promise<boolean> {
 
   // STEP 2: Verify the stored value is still accessible
   logger.log("STEP 2: Verifying the stored value is still accessible...");
-  const [owner] = paladin.getVerifiers("owner@node1");
   
   try {
     const retrieveResult = await paladin.ptx.call({
