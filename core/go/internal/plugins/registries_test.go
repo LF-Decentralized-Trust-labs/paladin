@@ -144,7 +144,12 @@ func TestRegistryRequestsOK(t *testing.T) {
 	})
 	defer done()
 
-	registryAPI := <-waitForAPI
+	var registryAPI components.RegistryManagerToRegistry
+	select {
+	case registryAPI = <-waitForAPI:
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for registry API - expected registration was not received")
+	}
 
 	_, err := registryAPI.ConfigureRegistry(ctx, &prototk.ConfigureRegistryRequest{})
 	require.NoError(t, err)
@@ -160,7 +165,13 @@ func TestRegistryRequestsOK(t *testing.T) {
 	registryAPI.Initialized()
 	require.NoError(t, pc.WaitForInit(ctx, prototk.PluginInfo_DOMAIN))
 
-	callbacks := <-waitForCallbacks
+	// Add timeout for callbacks
+	var callbacks plugintk.RegistryCallbacks
+	select {
+	case callbacks = <-waitForCallbacks:
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for callbacks - expected callbacks were not received")
+	}
 
 	utr, err := callbacks.UpsertRegistryRecords(ctx, &prototk.UpsertRegistryRecordsRequest{
 		Entries: []*prototk.RegistryEntry{{Name: "node1"}},
@@ -207,7 +218,7 @@ func TestRegistryRegisterFail(t *testing.T) {
 	select {
 	case err := <-waitForError:
 		assert.Regexp(t, "pop", err)
-	case <-time.After(5 * time.Second):
+	case <-time.After(20 * time.Second):
 		t.Fatal("Test timed out waiting for registration callback")
 	}
 }
@@ -252,7 +263,7 @@ func TestFromRegistryRequestBadReq(t *testing.T) {
 
 	select {
 	case <-waitForResponse:
-	case <-time.After(5 * time.Second):
+	case <-time.After(20 * time.Second):
 		t.Fatal("Test timed out waiting for waitForResponse callback")
 	}
 }

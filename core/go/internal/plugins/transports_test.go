@@ -169,8 +169,13 @@ func TestTransportRequestsOK(t *testing.T) {
 	})
 	defer done()
 
-	transportAPI := <-waitForAPI
-
+	var transportAPI components.TransportManagerToTransport
+	select {
+	case transportAPI = <-waitForAPI:
+		// Received transport API
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for transport API - expected registration was not received")
+	}
 	_, err := transportAPI.ConfigureTransport(ctx, &prototk.ConfigureTransportRequest{})
 	require.NoError(t, err)
 
@@ -199,7 +204,13 @@ func TestTransportRequestsOK(t *testing.T) {
 	transportAPI.Initialized()
 	require.NoError(t, pc.WaitForInit(ctx, prototk.PluginInfo_DOMAIN))
 
-	callbacks := <-waitForCallbacks
+	// Add timeout for callbacks
+	var callbacks plugintk.TransportCallbacks
+	select {
+	case callbacks = <-waitForCallbacks:
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for callbacks - expected callbacks were not received")
+	}
 	rts, err := callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
 		Node: "node1",
 	})
