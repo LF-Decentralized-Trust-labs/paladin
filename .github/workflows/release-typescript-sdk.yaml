@@ -28,12 +28,12 @@ on:
         description: 'Semicolon-separated list of tags (e.g., "rc;rc.1"). First tag is primary.'
         required: true
         type: string
-
 jobs:
   test:
     # make sure the released candidate SDK is not breaking the examples
     uses: ./.github/workflows/test-examples.yaml
     with:
+      chart_tag: ${{ inputs.sdk_version }}
       build_local_abi: false # we are using the published abi
       build_local_sdk: true # we are using the local sdk
   publish:

@@ -9,7 +9,7 @@
     "start:prod": "node ./build/index.js",
     "abi": "node scripts/abi.mjs",
     "copy-abi": "node scripts/contracts.mjs",
-    "verify": "ts-node ./src/verify-deployed.ts"
+    "verify": "ts-node ./src/tests/data-persistence.ts"
   },
   "author": "",
   "license": "Apache-2.0",

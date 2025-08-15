@@ -1,3 +1,17 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   PaladinVerifier,
   ZetoFactory,
@@ -79,7 +93,8 @@ function findLatestContractDataFile(dataDir: string): string | null {
 async function main(): Promise<boolean> {
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', '..', 'data');
   const dataFile = findLatestContractDataFile(dataDir);
   
   if (!dataFile) {
@@ -90,10 +105,23 @@ async function main(): Promise<boolean> {
 
   const contractData: ContractData = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
   logger.log(`STEP 1: Loaded contract data from ${dataFile}`);
+
+  // Print cached data summary
+  logger.log("\n=== CACHED DATA SUMMARY ===");
+  logger.log(`Data File: ${dataFile}`);
+  logger.log(`Timestamp: ${contractData.timestamp}`);
   logger.log(`Zeto CBDC1 Address: ${contractData.zetoCBDC1Address}`);
   logger.log(`Zeto CBDC2 Address: ${contractData.zetoCBDC2Address}`);
   logger.log(`ERC20 Address: ${contractData.erc20Address}`);
   logger.log(`Token Name: ${contractData.tokenName}`);
+  logger.log(`CBDC Issuer: ${contractData.cbdcIssuer}`);
+  logger.log(`Bank1: ${contractData.bank1}`);
+  logger.log(`Bank2: ${contractData.bank2}`);
+  logger.log(`Use Case 1 - Transfer Amount: ${contractData.useCase1.transferAmount}`);
+  logger.log(`Use Case 2 - Deposit Amount: ${contractData.useCase2.depositAmount}`);
+  logger.log(`Use Case 2 - Transfer Amount: ${contractData.useCase2.transferAmount}`);
+  logger.log(`Use Case 2 - Withdraw Amount: ${contractData.useCase2.withdrawAmount}`);
+  logger.log("=============================\n");
 
   // STEP 2: Get verifiers and recreate token connections
   logger.log("STEP 2: Recreating token connections...");
