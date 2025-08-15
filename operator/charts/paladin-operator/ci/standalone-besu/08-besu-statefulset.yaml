@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: besu-standalone-besu-node
+  labels:
+    app.kubernetes.io/name: standalone-besu
+    app.kubernetes.io/component: node
+  annotations:
+    kubectl.kubernetes.io/default-container: besu
+spec:
+  serviceName: besu-standalone-besu-node
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: standalone-besu
+      app.kubernetes.io/component: node
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: standalone-besu
+        app.kubernetes.io/component: node
+    spec:
+      containers:
+      - name: besu
+        image: hyperledger/besu:latest
+        imagePullPolicy: Always
+        args:
+        - "--config-file"
+        - "/config/pldconf.besu.toml"
+        ports:
+        - name: rpc-http
+          containerPort: 8545
+          protocol: TCP
+        - name: rpc-ws
+          containerPort: 8546
+          protocol: TCP
+        - name: graphql-http
+          containerPort: 8547
+          protocol: TCP
+        - name: p2p-tcp
+          containerPort: 30303
+          protocol: TCP
+        - name: p2p-udp
+          containerPort: 30303
+          protocol: UDP
+        volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+        - name: nodeid
+          mountPath: /nodeid
+          readOnly: true
+        - name: genesis
+          mountPath: /genesis
+          readOnly: true
+        - name: data
+          mountPath: /data
+        - name: auth
+          mountPath: /auth
+          readOnly: true
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pidof java
+          initialDelaySeconds: 3
+          timeoutSeconds: 1
+          periodSeconds: 2
+        readinessProbe:
+          tcpSocket:
+            port: 8545
+          initialDelaySeconds: 5
+          timeoutSeconds: 2
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: besu-standalone-besu-node
+      - name: nodeid
+        secret:
+          secretName: besu-standalone-besu-node-id
+      - name: genesis
+        configMap:
+          name: besu-standalone-testnet-genesis
+      - name: data
+        persistentVolumeClaim:
+          claimName: besu-standalone-besu-node-data
+      - name: auth
+        configMap:
+          name: besu-standalone-besu-node-auth
