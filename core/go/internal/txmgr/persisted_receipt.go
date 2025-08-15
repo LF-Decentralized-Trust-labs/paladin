@@ -149,9 +149,7 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 		}
 		log.L(ctx).Infof("Inserting receipt txId=%s success=%t failure=%s txHash=%v", receipt.TransactionID, receipt.Success, failureMsg, receipt.TransactionHash)
 		receiptsToInsert = append(receiptsToInsert, receipt)
-		if receipt.Domain != "" {
-			possibleChainingRecordIDs = append(possibleChainingRecordIDs, receipt.TransactionID)
-		}
+		possibleChainingRecordIDs = append(possibleChainingRecordIDs, receipt.TransactionID)
 	}
 
 	if len(receiptsToInsert) > 0 {

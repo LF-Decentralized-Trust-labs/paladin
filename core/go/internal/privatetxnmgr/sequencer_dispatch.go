@@ -143,9 +143,10 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 				publicTXs[i] = &components.PublicTxSubmission{
 					Bindings: []*components.PaladinTXReference{
 						{
-							TransactionID:   pt.ID,
-							TransactionType: pldapi.TransactionTypePrivate.Enum(),
-							Sender:          pt.PreAssembly.TransactionSpecification.From,
+							TransactionID:              pt.ID,
+							TransactionType:            pldapi.TransactionTypePrivate.Enum(),
+							TransactionSender:          pt.PreAssembly.TransactionSpecification.From,
+							TransactionContractAddress: s.contractAddress.String(),
 						},
 					},
 					PublicTxInput: pldapi.PublicTxInput{

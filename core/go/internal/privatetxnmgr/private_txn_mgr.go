@@ -430,9 +430,10 @@ func (p *privateTxManager) evaluateDeployment(ctx context.Context, domain compon
 		{
 			Bindings: []*components.PaladinTXReference{
 				{
-					TransactionID:   tx.ID,
-					TransactionType: pldapi.TransactionTypePrivate.Enum(),
-					Sender:          tx.From,
+					TransactionID:              tx.ID,
+					TransactionType:            pldapi.TransactionTypePrivate.Enum(),
+					TransactionSender:          tx.From,
+					TransactionContractAddress: "", // no contract address for deployment transactions
 				},
 			},
 			PublicTxInput: pldapi.PublicTxInput{
@@ -971,9 +972,10 @@ func (p *privateTxManager) NotifyFailedPublicTx(ctx context.Context, dbTX persis
 	// TODO: We have processing we need to do here to resubmit
 	privateFailureReceipts := make([]*components.ReceiptInputWithOriginator, len(failures))
 	for i, tx := range failures {
+		// We calculate the failure message - all errors handled mapped internally here
 		privateFailureReceipts[i] = &components.ReceiptInputWithOriginator{
-			Originator:            tx.Sender,
-			DomainContractAddress: tx.ContractAddress.String(),
+			Originator:            tx.TransactionSender,
+			DomainContractAddress: tx.TransactionContractAddress,
 			ReceiptInput: components.ReceiptInput{
 				ReceiptType:   components.RT_FailedOnChainWithRevertData,
 				TransactionID: tx.TransactionID,
@@ -1067,7 +1069,7 @@ func (p *privateTxManager) WriteOrDistributeReceiptsPostSubmit(ctx context.Conte
 		if r.ReceiptType != components.RT_Success && r.DomainContractAddress != "" {
 			seq := p.getSequencerIfActive(ctx, r.DomainContractAddress)
 			if seq != nil {
-				log.L(ctx).Errorf("Due to chained transaction error the sequencer for smart contract %s in domain %s is STOPPING", seq.contractAddress, r.Domain)
+				log.L(ctx).Errorf("Due to transaction error the sequencer for smart contract %s in domain %s is STOPPING", seq.contractAddress, r.Domain)
 				seq.Stop()
 			}
 		}

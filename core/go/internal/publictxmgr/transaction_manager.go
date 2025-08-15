@@ -328,7 +328,8 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 				publicTxBindings = append(publicTxBindings, &DBPublicTxnBinding{
 					Transaction:     bnd.TransactionID,
 					TransactionType: bnd.TransactionType,
-					Sender:          bnd.Sender,
+					Sender:          bnd.TransactionSender,
+					ContractAddress: bnd.TransactionContractAddress,
 					PublicTxnID:     pubTxnID,
 				})
 			}
@@ -756,7 +757,7 @@ func (ptm *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, d
 	var lookups []*bindingsMatchingSubmission
 	err := dbTX.DB().
 		Table("public_txn_bindings").
-		Select(`"transaction"`, `"tx_type"`, `"Submission"."pub_txn_id"`, `"Submission"."tx_hash"`).
+		Select(`"transaction"`, "sender", "contract_address", `"tx_type"`, `"Submission"."pub_txn_id"`, `"Submission"."tx_hash"`).
 		Joins("Submission").
 		Where(`"Submission"."tx_hash" IN (?)`, txHashes).
 		Find(&lookups).
@@ -773,10 +774,13 @@ func (ptm *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, d
 		for _, match := range lookups {
 			if txi.Hash.Equals(&match.Submission.TransactionHash) {
 				// matched results in the order of the inputs
+				log.L(ctx).Debugf("Matched on-chain transaction %s (result=%s): %+v", txi.Hash, txi.Result.V(), match)
 				results = append(results, &components.PublicTxMatch{
 					PaladinTXReference: components.PaladinTXReference{
-						TransactionID:   match.Transaction,
-						TransactionType: match.TransactionType,
+						TransactionID:              match.Transaction,
+						TransactionType:            match.TransactionType,
+						TransactionSender:          match.Sender,
+						TransactionContractAddress: match.ContractAddress,
 					},
 					IndexedTransactionNotify: txi,
 				})

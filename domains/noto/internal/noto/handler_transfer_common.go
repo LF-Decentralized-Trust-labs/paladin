@@ -211,6 +211,10 @@ func (h *transferCommon) baseLedgerInvokeTransfer(ctx context.Context, req *prot
 }
 
 func (h *transferCommon) hookInvokeTransfer(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper, from, to string, amount *pldtypes.HexUint256, data pldtypes.HexBytes) (*TransactionWrapper, error) {
+	senderAddress, err := h.noto.findEthAddressVerifier(ctx, "sender", req.Transaction.From, req.ResolvedVerifiers)
+	if err != nil {
+		return nil, err
+	}
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", from, req.ResolvedVerifiers)
 	if err != nil {
 		return nil, err
@@ -225,7 +229,7 @@ func (h *transferCommon) hookInvokeTransfer(ctx context.Context, tx *types.Parse
 		return nil, err
 	}
 	params := &TransferHookParams{
-		Sender: fromAddress,
+		Sender: senderAddress,
 		From:   fromAddress,
 		To:     toAddress,
 		Amount: amount,
