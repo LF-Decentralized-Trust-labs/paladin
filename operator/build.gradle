@@ -53,7 +53,8 @@ dependencies {
 ext {
     clusterName = project.hasProperty('clusterName') ? project.clusterName : 'paladin' 
     namespace = project.hasProperty('namespace') ? project.namespace : 'default' // Default namespace is 'default'
-    deleteCluster = project.hasProperty('deleteCluster') ? project.deleteCluster.toBoolean() : false // By default, do not delete the cluster
+    deleteCluster = project.hasProperty('deleteCluster') ? project.deleteCluster.toBoolean() : false // delete the kind cluster after the run. Default is false.
+    uninstallChart = project.hasProperty('uninstallChart') ? project.uninstallChart.toBoolean() : false // uninstall paladin chart after the run. Default is false.
     loadImages = project.hasProperty('loadImages') ? project.loadImages == 'true' : true // Default is to load images
     buildPaladin = project.hasProperty('buildPaladin') ? project.buildPaladin == 'true' : true // Default is to build Paladin
     buildOperator = project.hasProperty('buildOperator') ? project.buildOperator == 'true' : true // Default is to build the operator
@@ -473,14 +474,8 @@ task clean {
     delete 'charts/paladin-operator/templates/samples'
 }
 
-// The CI task runs the different CI permutations of the chart installation
-task ci(dependsOn: [ciOperatorDevnet]) {
-    // This is a grouping task, so it doesn't need a body.
-}
-
 // The 'e2e' task runs the whole flow.
-// It depends on both 'ci' and 'deploy' to ensure they are part of the execution plan.
-task e2e(type: Exec, dependsOn: [ci, deploy]) {
+task e2e(type: Exec, dependsOn: [deploy]) {
 
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.notoGo)
@@ -497,10 +492,15 @@ task e2e(type: Exec, dependsOn: [ci, deploy]) {
     }
 }
  
-// This rule enforces that IF both 'ci' and 'deploy' are scheduled to run
-// (which happens when you run 'e2e'), 'deploy' must wait for 'ci' to finish.
-// This does NOT create a dependency. Running 'gradle deploy' alone will NOT trigger 'ci'.
-deploy.mustRunAfter(ci)
+// The CI task runs the different CI permutations of the chart installation
+task ci() {
+    doFirst {
+        project.ext.uninstallChart = true // no need for the chart to run after the tests
+        project.ext.deleteCluster = false // deleting the cluster can effect other CI flows
+    }
+    dependsOn e2e
+    dependsOn ciOperatorDevnet
+}
 
 // Existing 'make' task
 task make(type: Exec, dependsOn: [copySolidity, copyZetoSolidity]) {

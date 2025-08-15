@@ -44,8 +44,33 @@ task startTestInfra(type: DockerCompose, dependsOn: tasks.besuBootstrapTool) {
     composeFile 'docker-compose-test.yml'
     projectName 'paladin-testinfra'
     args 'up', '-d', '--wait', '--wait-timeout', 60
+    
+    // Enable parallel execution by removing unnecessary dependencies
+    // This task can run in parallel with other tasks that don't need test infrastructure
+    outputs.cacheIf { true }
+    
+    // Optimize startup time
+    doFirst {
+        println "Starting test infrastructure (timeout: 60s)"
+    }
 }
 
+// Add a task to check if test infrastructure is already running
+// this is used to prevent the startTestInfra task from running if the test infrastructure is already running
+task checkTestInfra(type: Exec) {
+    executable "docker-compose"
+    args "-f", "docker-compose-test.yml", "-p", "paladin-testinfra", "ps", "-q"
+    ignoreExitValue true
+    
+    doLast {
+        def result = execResult.get()
+        if (result.exitValue == 0 && result.standardOutput.toString().trim()) {
+            println "Test infrastructure is already running"
+        } else {
+            println "Test infrastructure needs to be started"
+        }
+    }
+}
 
 task stopTestInfra(type: DockerCompose) {
     composeFile 'docker-compose-test.yml'

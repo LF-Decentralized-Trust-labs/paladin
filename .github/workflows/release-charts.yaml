@@ -133,17 +133,16 @@ jobs:
           rm Chart.lock
 
       # e2e tests 
-      - name: E2E Test
+      - name: CI (e2e) Test
         run: |
-          ./gradlew e2e \
+          ./gradlew ci \
             -PloadImages=false \
             -PbuildOperator=false \
             -PbuildPaladin=false \
             -PoperatorImageName=${{ env.IMG_OPERATOR }} \
             -PoperatorImageTag=${{ inputs.images_tag }} \
             -PpaladinImageName=${{ env.IMG_PALADIN }} \
-            -PpaladinImageTag=${{ inputs.images_tag }} \
-            -PdeleteCluster=false
+            -PpaladinImageTag=${{ inputs.images_tag }}
 
       # set CR_TOKEN env with the GitHub token secret when it is workflow_dispatch action
       - name: Set CR_TOKEN

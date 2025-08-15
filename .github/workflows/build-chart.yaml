@@ -83,9 +83,9 @@ jobs:
       # The makefile uses kustomize
       - uses: imranismail/setup-kustomize@v2
 
-      - name: E2E Test
+      - name: CI (e2e) Test
         run: |
-          ./gradlew --no-daemon e2e \
+          ./gradlew --no-daemon ci \
             -PclusterName=${{ env.CLUSTER_NAME }} \
             -Pnamespace=${{ env.NAMESPACE }} \
             -PbuildOperator=${{ inputs.build-operator }} \
@@ -93,8 +93,7 @@ jobs:
             -PoperatorImageName=${{ inputs.operator-image }} \
             -PoperatorImageTag=${{ inputs.operator-image-tag }} \
             -PpaladinImageName=${{ inputs.paladin-image }} \
-            -PpaladinImageTag=${{ inputs.paladin-image-tag }} \
-            -PdeleteCluster=false
+            -PpaladinImageTag=${{ inputs.paladin-image-tag }}
 
       - name: Port-forward pprof endpoints
         if: failure()

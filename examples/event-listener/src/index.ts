@@ -5,7 +5,7 @@ import PaladinClient, {
   TransactionType,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import { nanoid } from "nanoid";
-import { checkDeploy } from "paladin-example-common";
+import { checkDeploy, waitForDomainReceipt } from "paladin-example-common";
 import helloWorldJson from "./abis/HelloWorld.json";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -87,11 +87,19 @@ async function main(): Promise<boolean> {
     logger.log(
       `Processing receipt ${receipt.id} (sequence: ${receipt.sequence})`
     );
-    const domainReceipt = await paladin.ptx.getDomainReceipt(
-      receipt.domain,
-      receipt.id
-    );
-    if (domainReceipt !== undefined && "receipt" in domainReceipt) {
+    
+    // Use the common helper to wait for domain receipt
+    const domainReceipt = await waitForDomainReceipt(paladin, receipt.domain, receipt.id, {
+      logger: logger,
+      maxAttempts: 20,
+      baseDelay: 500
+    });
+    
+    if (!domainReceipt) {
+      return; // Helper already logged the failure
+    }
+    
+    if ("receipt" in domainReceipt) {
       // Skip if this receipt is not for our contract
       if (domainReceipt.receipt.to !== contractAddress) {
         logger.log(

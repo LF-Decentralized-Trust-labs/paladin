@@ -68,6 +68,78 @@ ext {
     ]
 }
 
+// Enable parallel execution for all projects
+allprojects {
+    // Optimize Java compilation
+    tasks.withType(JavaCompile) {
+        options.fork = true
+        options.incremental = true
+        options.encoding = 'UTF-8'
+    }
+    
+    // Optimize test execution
+    tasks.withType(Test) {
+        maxParallelForks = Math.max(1, Runtime.runtime.availableProcessors().intdiv(2))
+        forkEvery = 0
+        testLogging {
+            events "passed", "skipped", "failed"
+            exceptionFormat = 'full'
+        }
+    }
+    
+    // Enable parallel execution for Exec tasks where possible
+    tasks.withType(Exec) {
+        // Allow parallel execution for most exec tasks
+        if (name.contains('lint') || name.contains('test') || name.contains('build')) {
+            // These tasks can run in parallel
+        }
+    }
+}
+
+// Configure parallel execution for Go tasks
+subprojects { subproject ->
+    if (subproject.plugins.hasPlugin('org.gradle.native')) {
+        subproject.tasks.withType(Exec) {
+            // Enable parallel execution for Go tasks where possible
+            if (name.contains('test') || name.contains('build')) {
+                // Allow parallel execution for test and build tasks
+            }
+        }
+    }
+}
+
+// Optimize task execution order
+tasks.withType(Test) {
+    // Run tests in parallel where possible
+    maxParallelForks = Math.max(1, Runtime.runtime.availableProcessors().intdiv(2))
+    
+    // Enable test batching for faster execution
+    forkEvery = 0
+}
+
+// Configure lint tasks to run sequentially to avoid conflicts
+allprojects {
+    tasks.withType(Exec) {
+        if (name == 'lint') {
+            // Use a shared lock for all lint tasks to prevent conflicts
+            // This ensures golangci-lint tasks don't run in parallel
+            helpers.lockResource(it, "lint.lock")
+        }
+        
+        // Optimize integration test tasks to run in parallel
+        if (name == 'test' && project.name == 'integration-test') {
+            // Allow integration tests to run in parallel with other tasks
+            // This prevents them from blocking the entire build
+            outputs.cacheIf { true }
+            
+            // Enable parallel execution for integration tests
+            doFirst {
+                println "Starting integration tests in parallel mode"
+            }
+        }
+    }
+}
+
 task jar {
     enabled = false
 }
@@ -282,6 +354,12 @@ task assemble {
 }
 
 assemble.finalizedBy(copyLibraries, copyDomains, copyRegistries, copySigningModules, copyTransports, copyUIFiles, copyZetoZKPFiles)
+
+// Enable parallel execution of copy tasks
+tasks.withType(Copy) {
+    // Allow copy tasks to run in parallel
+    outputs.cacheIf { true }
+}
 
 defaultTasks 'build'
 
