@@ -60,6 +60,29 @@ entries:
     - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-0.10.0-rc.6/paladin-operator-0.10.0-rc.6.tgz
     version: 0.10.0-rc.6
   - apiVersion: v2
+    appVersion: v0.10.0-rc.6
+    created: "2025-08-15T17:12:56.419216113Z"
+    dependencies:
+    - condition: installCRDs
+      name: paladin-operator-crd
+      repository: file://../paladin-operator-crd/
+      version: 0.10.0-rc.6
+    - condition: prometheus.enabled
+      name: prometheus-namespace
+      repository: file://../prometheus-namespace/
+      version: 0.0.0
+    - condition: prometheus.enabled
+      name: prometheus
+      repository: https://prometheus-community.github.io/helm-charts
+      version: 15.8.0
+    description: A Helm chart for Kubernetes
+    digest: 7b73eac62b4ebb6dc7611819612ab38bd02c943415a93c6edad73b1b1cdafcc2
+    name: paladin-operator
+    type: application
+    urls:
+    - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-0.10.0-rc.6/paladin-operator-0.10.0-rc.6.tgz
+    version: 0.10.0-rc.6
+  - apiVersion: v2
     appVersion: v0.10.0-rc.5
     created: "2025-08-11T19:19:14.626002695Z"
     dependencies:
@@ -572,6 +595,16 @@ entries:
     - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-crd-0.10.0-rc.6/paladin-operator-crd-0.10.0-rc.6.tgz
     version: 0.10.0-rc.6
   - apiVersion: v2
+    appVersion: v0.10.0-rc.6
+    created: "2025-08-15T17:12:56.661809008Z"
+    description: A Helm chart for Kubernetes
+    digest: 1629fab7c5bed8922751497873199ec4a625be686f979c6cde580e778a6f8adf
+    name: paladin-operator-crd
+    type: application
+    urls:
+    - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-crd-0.10.0-rc.6/paladin-operator-crd-0.10.0-rc.6.tgz
+    version: 0.10.0-rc.6
+  - apiVersion: v2
     appVersion: v0.10.0-rc.5
     created: "2025-08-11T19:19:14.800096718Z"
     description: A Helm chart for Kubernetes
@@ -663,4 +696,4 @@ entries:
     urls:
     - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/prometheus-namespace-0.0.0/prometheus-namespace-0.0.0.tgz
     version: 0.0.0
-generated: "2025-08-14T20:19:02.958141859Z"
+generated: "2025-08-15T17:12:56.66206771Z"
