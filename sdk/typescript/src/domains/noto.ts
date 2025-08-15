@@ -251,7 +251,11 @@ export class NotoInstance {
         function: "transferFrom",
         to: this.address,
         from: from.lookup,
-        data,
+        data: {
+          ...data,
+          from: data.from.lookup,
+          to: data.to.lookup,
+        },
       })
     );
   }
@@ -307,7 +311,10 @@ export class NotoInstance {
         function: "burnFrom",
         to: this.address,
         from: from.lookup,
-        data,
+        data: {
+          ...data,
+          from: data.from.lookup,
+        }
       })
     );
   }

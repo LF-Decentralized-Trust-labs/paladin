@@ -92,9 +92,10 @@ func (s *syncPoints) WriteOrDistributeReceipts(ctx context.Context, dbTX persist
 	localFailureReceipts := make([]*components.ReceiptInput, 0)
 	remoteSends := make([]*pldapi.ReliableMessage, 0)
 	for _, r := range receipts {
-		if r.FailureMessage != "" {
+		if r.ReceiptType != components.RT_Success {
 			node, _ := pldtypes.PrivateIdentityLocator(r.Originator).Node(ctx, true)
-			log.L(ctx).Warnf("Failure receipt %s for node %s: %s", r.TransactionID, node, r.FailureMessage)
+			log.L(ctx).Warnf("Failure receipt %s with sender %s (node='%s') and address %v: %s",
+				r.TransactionID, r.Originator, node, r.DomainContractAddress, r.FailureMessage)
 			if node != "" && node != s.transportMgr.LocalNodeName() {
 				remoteSends = append(remoteSends, &pldapi.ReliableMessage{
 					Node:        node,

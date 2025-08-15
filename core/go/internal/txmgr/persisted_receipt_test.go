@@ -188,7 +188,7 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 	upstreamTXID := uuid.New()
 	ctx, txm, done := newTestTransactionManager(t, true, mockDomainContractResolve(t, "domain1"), func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
 		mc.privateTxMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mc.privateTxMgr.On("WriteChainedReceipts", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		mc.privateTxMgr.On("WriteOrDistributeReceiptsPostSubmit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Run(func(args mock.Arguments) {
 				receipts := args[2].([]*components.ReceiptInputWithOriginator)
