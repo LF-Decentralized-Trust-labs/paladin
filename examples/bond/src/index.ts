@@ -372,6 +372,19 @@ async function main(): Promise<boolean> {
     .waitForReceipt(10000);
   if (!checkReceipt(receipt)) return false;
 
+  // Approve the bond transfer
+  logger.log("Approving bond transfer AGAIN to cause cHaOs...");
+  receipt = await notoBond
+    .using(paladin2)
+    .delegateLock(bondCustodian, {
+      lockId: bondLockId,
+      unlock: assetUnlockParams,
+      delegate: atomAddress,
+      data: "0x",
+    })
+    .waitForReceipt(10000);
+  if (!checkReceipt(receipt)) return false;
+
   // Execute the atomic transfer
   logger.log("Distributing bond...");
   txID = await paladin2.ptx.sendTransaction({
