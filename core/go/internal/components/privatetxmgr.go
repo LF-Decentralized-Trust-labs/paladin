@@ -92,7 +92,7 @@ type PrivateTxManager interface {
 	Subscribe(ctx context.Context, subscriber PrivateTxEventSubscriber)
 
 	NotifyFailedPublicTx(ctx context.Context, dbTX persistence.DBTX, confirms []*PublicTxMatch) error
-	WriteChainedReceipts(ctx context.Context, dbTX persistence.DBTX, receipts []*ReceiptInputWithOriginator) error
+	WriteOrDistributeReceiptsPostSubmit(ctx context.Context, dbTX persistence.DBTX, receipts []*ReceiptInputWithOriginator) error
 
 	PrivateTransactionConfirmed(ctx context.Context, receipt *TxCompletion)
 
