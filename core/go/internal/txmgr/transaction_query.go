@@ -73,7 +73,6 @@ func (tm *txManager) mapPersistedTXFull(pt *persistedTransaction) *pldapi.Transa
 	for _, dep := range pt.TransactionDeps {
 		res.DependsOn = append(res.DependsOn, dep.DependsOn)
 	}
-
 	return res
 }
 

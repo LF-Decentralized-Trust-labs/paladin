@@ -133,7 +133,6 @@ type TransactionFull struct {
 	Receipt   *TransactionReceiptData `docstruct:"TransactionFull" json:"receipt"`             // available if the transaction has reached a final state
 	Public    []*PublicTx             `docstruct:"TransactionFull" json:"public"`              // list of public transactions associated
 	History   []*TransactionHistory   `docstruct:"TransactionFull" json:"history,omitempty"`   // list of values previously provided for this transaction
-	// TODO: PrivateTransactions object list
 }
 
 type ABIDecodedData struct {

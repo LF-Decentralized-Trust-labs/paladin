@@ -407,6 +407,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
          try {
              var signatures = request.getAttestationResultList().stream().
                      filter(r -> r.getAttestationType() == AttestationType.ENDORSE).
+                     map(r -> {
+                         byte[] payload = r.getPayload().toByteArray();
+                         if (payload.length == 65) {
+                             payload[64] += 27;
+                         }
+                         return JsonHex.wrap(payload);
+                     }).
                      toList();
              List<PenteConfiguration.TransactionExternalCall> externalCalls;
              if (request.getDomainData().isEmpty()) {
@@ -425,7 +432,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
                      put("info", request.getInfoStatesList().stream().map(EndorsableState::getId).toList());
                  }});
                  put("externalCalls", externalCalls);
-                 put("signatures", signatures.stream().map(r -> JsonHex.wrap(r.getPayload().toByteArray())).toList());
+                 put("signatures", signatures);
              }};
 
              var transitionABI = config.getPrivacyGroupABI().getABIEntry("function", "transition").toJSON(false);
@@ -464,7 +471,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
                  var metadata = new PenteConfiguration.PenteTransitionMetadata(
                          new PenteConfiguration.PenteApprovalParams(
                                  new JsonHex.Bytes32(transitionHash),
-                                 signatures.stream().map(r -> JsonHex.wrap(r.getPayload().toByteArray())).toList()),
+                                 signatures),
                          new PenteConfiguration.PentePublicTransaction(
                                  transitionWithApprovalABI,
                                  transitionWithApprovalParamsJSON,

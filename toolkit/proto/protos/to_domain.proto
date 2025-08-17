@@ -31,7 +31,7 @@ message ConfigureDomainRequest {
 }
 
 message ConfigureDomainResponse {
-  DomainConfig domain_config = 1; // Information that Paladin will use to govern its behavior with repspect to this domain
+  DomainConfig domain_config = 1; // Information that Paladin will use to govern its behavior with respect to this domain
 }
 
 // **INIT** happens once when the domain is loaded into Paladin, after the result of ConfigureDomain has been processed

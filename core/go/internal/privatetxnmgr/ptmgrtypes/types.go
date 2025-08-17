@@ -128,6 +128,7 @@ type TransactionFlow interface {
 	ReadyForSequencing(ctx context.Context) bool
 	Dispatched(ctx context.Context) bool
 	ID(ctx context.Context) uuid.UUID
+	PrivateTransaction() *components.PrivateTransaction
 	IsEndorsed(ctx context.Context) bool
 	InputStateIDs(ctx context.Context) []string
 	OutputStateIDs(ctx context.Context) []string

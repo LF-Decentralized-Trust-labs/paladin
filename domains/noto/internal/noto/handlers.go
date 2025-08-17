@@ -37,21 +37,21 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 	case "mint":
 		return &mintHandler{noto: n}
 	case "transfer":
-		return &transferHandler{noto: n}
+		return &transferHandler{transferCommon: transferCommon{noto: n}}
+	case "transferFrom":
+		return &transferFromHandler{transferCommon: transferCommon{noto: n}}
 	case "burn":
-		return &burnHandler{noto: n}
+		return &burnHandler{burnCommon: burnCommon{noto: n}}
+	case "burnFrom":
+		return &burnFromHandler{burnCommon: burnCommon{noto: n}}
 	case "approveTransfer":
 		return &approveHandler{noto: n}
 	case "lock":
 		return &lockHandler{noto: n}
 	case "unlock":
-		return &unlockHandler{
-			unlockCommon: unlockCommon{noto: n},
-		}
+		return &unlockHandler{unlockCommon: unlockCommon{noto: n}}
 	case "prepareUnlock":
-		return &prepareUnlockHandler{
-			unlockCommon: unlockCommon{noto: n},
-		}
+		return &prepareUnlockHandler{unlockCommon: unlockCommon{noto: n}}
 	case "delegateLock":
 		return &delegateLockHandler{noto: n}
 	default:

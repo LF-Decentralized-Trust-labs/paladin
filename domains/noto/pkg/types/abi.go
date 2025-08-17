@@ -60,13 +60,26 @@ type MintParams struct {
 	Data   pldtypes.HexBytes    `json:"data"`
 }
 
+type BurnParams struct {
+	Amount *pldtypes.HexUint256 `json:"amount"`
+	Data   pldtypes.HexBytes    `json:"data"`
+}
+
+type BurnFromParams struct {
+	From   string               `json:"from"`
+	Amount *pldtypes.HexUint256 `json:"amount"`
+	Data   pldtypes.HexBytes    `json:"data"`
+}
+
 type TransferParams struct {
 	To     string               `json:"to"`
 	Amount *pldtypes.HexUint256 `json:"amount"`
 	Data   pldtypes.HexBytes    `json:"data"`
 }
 
-type BurnParams struct {
+type TransferFromParams struct {
+	From   string               `json:"from"`
+	To     string               `json:"to"`
 	Amount *pldtypes.HexUint256 `json:"amount"`
 	Data   pldtypes.HexBytes    `json:"data"`
 }

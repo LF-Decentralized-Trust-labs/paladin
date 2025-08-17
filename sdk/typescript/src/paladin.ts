@@ -16,6 +16,8 @@ import {
   IPrivacyGroupEVMCall,
   IPrivacyGroupEVMTXInput,
   IPrivacyGroupInput,
+  IPrivacyGroupMessageInput,
+  IPrivacyGroupMessageListener,
   IQuery,
   IRegistryEntry,
   IRegistryEntryWithProperties,
@@ -967,7 +969,7 @@ export default class PaladinClient {
       return res.data.result;
     },
 
-    sendMessage: async (msg: any) => {
+    sendMessage: async (msg: IPrivacyGroupMessageInput) => {
       const res = await this.post<JsonRpcResult<string>>("pgroup_sendMessage", [
         msg,
       ]);
@@ -991,7 +993,7 @@ export default class PaladinClient {
       return res.data.result;
     },
 
-    createMessageListener: async (listener: any) => {
+    createMessageListener: async (listener: IPrivacyGroupMessageListener) => {
       const res = await this.post<JsonRpcResult<boolean>>(
         "pgroup_createMessageListener",
         [listener]
@@ -1000,7 +1002,7 @@ export default class PaladinClient {
     },
 
     queryMessageListeners: async (query: IQuery) => {
-      const res = await this.post<JsonRpcResult<any[]>>(
+      const res = await this.post<JsonRpcResult<IPrivacyGroupMessageListener[]>>(
         "pgroup_queryMessageListeners",
         [query]
       );
@@ -1008,7 +1010,7 @@ export default class PaladinClient {
     },
 
     getMessageListener: async (name: string) => {
-      const res = await this.post<JsonRpcResult<any>>(
+      const res = await this.post<JsonRpcResult<IPrivacyGroupMessageListener>>(
         "pgroup_getMessageListener",
         [name],
         { validateStatus: (status) => status < 300 || status === 404 }

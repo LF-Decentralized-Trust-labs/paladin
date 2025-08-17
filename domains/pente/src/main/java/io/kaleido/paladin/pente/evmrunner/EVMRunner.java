@@ -31,6 +31,7 @@
  import org.hyperledger.besu.datatypes.Wei;
  import org.hyperledger.besu.evm.Code;
  import org.hyperledger.besu.evm.frame.MessageFrame;
+ import org.hyperledger.besu.evm.log.LogTopic;
  import org.hyperledger.besu.evm.precompile.PrecompileContractRegistry;
  import org.hyperledger.besu.evm.processor.ContractCreationProcessor;
  import org.hyperledger.besu.evm.processor.MessageCallProcessor;
@@ -46,6 +47,7 @@
  import org.web3j.rlp.RlpString;
  
  import java.nio.charset.StandardCharsets;
+ import java.util.ArrayList;
  import java.util.Arrays;
  import java.util.Deque;
  import java.util.List;
@@ -233,7 +235,7 @@
              JsonHex.Bytes data
      ) {}
  
-     public void runFrame(MessageFrame initialFrame, List<JsonEVMLog> logAccumulator) {
+     public void runFrame(MessageFrame initialFrame, List<JsonEVMLog> logAccumulator)  {
          final OperationTracer tracer = new DebugEVMTracer();
          Deque<MessageFrame> messageFrameStack = initialFrame.getMessageFrameStack();
          final PrecompileContractRegistry precompileContractRegistry = new PrecompileContractRegistry();
@@ -245,9 +247,10 @@
                          false,
                          List.of(),
                          0);
- 
+
+         MessageFrame messageFrame = null;
          while (!messageFrameStack.isEmpty()) {
-             final MessageFrame messageFrame = messageFrameStack.peek();
+             messageFrame = messageFrameStack.peek();
              switch (messageFrame.getType()) {
                  case CONTRACT_CREATION -> ccp.process(messageFrame, tracer);
                  case MESSAGE_CALL -> mcp.process(messageFrame, tracer);
@@ -263,15 +266,18 @@
                          new String(
                                  messageFrame.getRevertReason().get().toArrayUnsafe(), StandardCharsets.UTF_8));
              }
- 
+         }
+
+         if (messageFrame != null) {
              var frameLogs = messageFrame.getLogs();
              if (frameLogs != null) {
+                 var addr = new JsonHex.Address(messageFrame.getContractAddress().toArray());
                  logAccumulator.addAll(
-                     frameLogs.stream().map(l -> new JsonEVMLog(
-                         new JsonHex.Address(messageFrame.getContractAddress().toArray()),
-                         l.getTopics().stream().map(t -> new JsonHex.Bytes32(t.toArray())).toList(),
-                         new JsonHex.Bytes(l.getData().toArray())
-                     )).toList()
+                         frameLogs.stream().map(l -> new JsonEVMLog(
+                                 addr,
+                                 l.getTopics().stream().map(t -> new JsonHex.Bytes32(t.toArray())).toList(),
+                                 new JsonHex.Bytes(l.getData().toArray())
+                         )).toList()
                  );
              }
          }

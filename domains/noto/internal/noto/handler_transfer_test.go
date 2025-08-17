@@ -301,7 +301,9 @@ func TestTransferAssembleMissingFrom(t *testing.T) {
 		coinSchema: &prototk.StateSchema{Id: "coin"},
 		dataSchema: &prototk.StateSchema{Id: "data"},
 	}
-	h := transferHandler{noto: n}
+	handler := &transferHandler{
+		transferCommon: transferCommon{noto: n},
+	}
 	ctx := context.Background()
 
 	fn := types.NotoABI.Functions()["transfer"]
@@ -323,7 +325,7 @@ func TestTransferAssembleMissingFrom(t *testing.T) {
 		ResolvedVerifiers: []*prototk.ResolvedVerifier{},
 	}
 
-	_, err := h.Assemble(ctx, parsedTx, req)
+	_, err := handler.Assemble(ctx, parsedTx, req)
 	assert.Regexp(t, "PD200011.*'from'", err)
 }
 
@@ -333,7 +335,9 @@ func TestTransferAssembleMissingTo(t *testing.T) {
 		coinSchema: &prototk.StateSchema{Id: "coin"},
 		dataSchema: &prototk.StateSchema{Id: "data"},
 	}
-	h := transferHandler{noto: n}
+	handler := &transferHandler{
+		transferCommon: transferCommon{noto: n},
+	}
 	ctx := context.Background()
 
 	fn := types.NotoABI.Functions()["transfer"]
@@ -362,6 +366,6 @@ func TestTransferAssembleMissingTo(t *testing.T) {
 		},
 	}
 
-	_, err := h.Assemble(ctx, parsedTx, req)
+	_, err := handler.Assemble(ctx, parsedTx, req)
 	assert.Regexp(t, "PD200011.*'to'", err)
 }

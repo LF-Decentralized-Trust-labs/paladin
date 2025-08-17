@@ -3,6 +3,7 @@ import WebSocket from "ws";
 import { IEventWithData } from "./blockindex";
 import { Logger } from "./logger";
 import { ITransactionReceipt } from "./transaction";
+import { IPrivacyGroupMessage } from "./privacygroups";
 
 export interface WebSocketSender {
   send: (json: object) => void;
@@ -13,15 +14,15 @@ export interface WebSocketConnectCallback {
   (sender: WebSocketSender): void | Promise<void>;
 }
 
-export interface WebSocketEventCallback {
-  (sender: WebSocketSender, event: WebSocketEvent): void | Promise<void>;
+export interface WebSocketEventCallback<TEvent> {
+  (sender: WebSocketSender, event: TEvent): void | Promise<void>;
 }
 
-export interface WebSocketClientOptions {
+export interface WebSocketClientOptions<TMessageTypes extends string> {
   url: string;
   username?: string;
   password?: string;
-  subscriptions?: string[] | WebSocketSubscription[]; // TODO: deprecate string[]
+  subscriptions?: WebSocketSubscription<TMessageTypes>[];
   logger?: Logger;
   heartbeatInterval?: number;
   reconnectDelay?: number;
@@ -29,8 +30,8 @@ export interface WebSocketClientOptions {
   socketOptions?: WebSocket.ClientOptions | http.ClientRequestArgs;
 }
 
-export interface WebSocketSubscription {
-  type: "receipts" | "blockchainevents";
+export interface WebSocketSubscription<TMessageTypes extends string> {
+  type: TMessageTypes;
   name: string;
 }
 
@@ -50,4 +51,17 @@ export interface TransactionReceiptBatch {
 export interface TransactionEventBatch {
   batchId: number;
   events: IEventWithData[];
+}
+
+export interface PrivacyGroupWebSocketEvent {
+  method: "pgroup_subscription" | undefined;
+  params: {
+    subscription: string;
+    result: IPrivacyGroupMessageBatch;
+  };
+}
+
+export interface IPrivacyGroupMessageBatch {
+  batchId: number;
+  messages: IPrivacyGroupMessage[];
 }

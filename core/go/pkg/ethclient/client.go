@@ -381,8 +381,13 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 		case EIP1559:
 			rawTX, err = tx.FinalizeEIP1559WithSignature(sigPayload, sig)
 		case LEGACY_EIP155:
+			// sig will have a 0/1 V value as that is the contract with Paladin key manager but firefly-signer library specifies
+			// "starting point must be legacy 27/28" for EIP-155 so we need to convert
+			sig.V.SetInt64(sig.V.Int64() + 27)
 			rawTX, err = tx.FinalizeLegacyEIP155WithSignature(sigPayload, sig, ec.chainID)
 		case LEGACY_ORIGINAL:
+			// sig will have a 0/1 V value as that is the contract with Paladin key manager but legacy is 27/28 so we need to convert
+			sig.V.SetInt64(sig.V.Int64() + 27)
 			rawTX, err = tx.FinalizeLegacyOriginalWithSignature(sigPayload, sig)
 		}
 	}

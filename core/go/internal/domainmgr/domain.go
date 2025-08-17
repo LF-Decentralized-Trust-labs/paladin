@@ -396,6 +396,9 @@ func (d *domain) EncodeData(ctx context.Context, encRequest *prototk.EncodeDataR
 		case "eip155", "eip-155":
 			sigPayload = tx.SignaturePayloadLegacyEIP155(d.dm.ethClientFactory.ChainID())
 			finalizer = func(signaturePayload *ethsigner.TransactionSignaturePayload, sig *secp256k1.SignatureData) ([]byte, error) {
+				// sig will have a 0/1 V value as that is the contract with Paladin key manager but firefly-signer library specifies
+				// "starting point must be legacy 27/28" for EIP-155 so we need to convert
+				sig.V.SetInt64(sig.V.Int64() + 27)
 				return tx.FinalizeLegacyEIP155WithSignature(signaturePayload, sig, d.dm.ethClientFactory.ChainID())
 			}
 		default:

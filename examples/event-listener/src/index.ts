@@ -122,7 +122,7 @@ async function main(): Promise<boolean> {
   const wsClient = new PaladinWebSocketClient(
     {
       url: "ws://127.0.0.1:31549",
-      subscriptions: ["example-event-listener"],
+      subscriptions: [{ type: "receipts", name: "example-event-listener" }],
     },
     async (sender, event) => {
       if (
