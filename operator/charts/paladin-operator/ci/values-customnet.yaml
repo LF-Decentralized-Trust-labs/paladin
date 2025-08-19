@@ -93,6 +93,13 @@ paladinNodes:
       publicTxManager:
         gasLimit:
           gasEstimateFactor: 2.0
+        gasPrice:
+          fixedGasPrice:
+            maxFeePerGas: 0x15580CC4
+            maxPriorityFeePerGas: 0x15580CC4
+        blockIndexer:
+          commitBatchSize: 5
+
       besu:
         auth:
           enabled: true
@@ -195,6 +202,12 @@ paladinNodes:
       publicTxManager:
         gasLimit:
           gasEstimateFactor: 2.0
+      gasPrice:
+        fixedGasPrice:
+          maxFeePerGas: 0x15580CC4
+          maxPriorityFeePerGas: 0x15580CC4
+      blockIndexer:
+        commitBatchSize: 5
       besu:
         auth:
           enabled: true

@@ -449,7 +449,7 @@ task installOperatorDefault(dependsOn: [installCrds, promoteKindImages, helmUnit
     }
 }
 
-task installBesuNode(type: Exec) {
+task installBesuNode(type: Exec, dependsOn: [startKindCluster]) {
     executable 'bash'
     args '-c'
     args 'charts/paladin-operator/ci/standalone-besu/deploy-besu-for-e2e.sh'
@@ -532,7 +532,6 @@ task ciOperatorDevnet(dependsOn: [installOperatorDevnet]) {
     }
 }
 
-
 task ciOperatorCustomnet(dependsOn: [installOperatorCustomnet]) {
     def namespace = "ci-customnet"
     
@@ -546,6 +545,11 @@ task ciOperatorCustomnet(dependsOn: [installOperatorCustomnet]) {
  
 // Task to clean up resources
 task cleanCluster(type: Exec) {
+    doFirst {
+        uninstallOperator('ci-customnet')
+        uninstallBesuNode()
+    }
+
     executable 'make'
     args 'clean'
     args "NAMESPACE=${namespace}"
@@ -555,8 +559,12 @@ task cleanCluster(type: Exec) {
 
 task clean {
     dependsOn cleanCluster
+
     delete 'test/e2e/abis'
     delete 'charts/paladin-operator/templates/samples'
+
+    def namespace = "ci-customnet"
+    
 }
 
 // The CI task runs the different CI permutations of the chart installation
