@@ -239,6 +239,7 @@ type InMemoryTxStateReadOnly interface {
 	GetSignerNonce() string
 	GetGasLimit() uint64
 	IsReadyToExit() bool
+	IsGasPricingFixed() bool
 }
 
 type InMemoryTxStateManager interface {
@@ -250,6 +251,7 @@ type InMemoryTxStateSetters interface {
 	ApplyInMemoryUpdates(ctx context.Context, txUpdates *BaseTXUpdates)
 	UpdateTransaction(newPtx *DBPublicTxn)
 	ResetTransactionHash()
+	ResetGasPricing() bool
 }
 
 type StageOutput struct {

@@ -505,3 +505,189 @@ func TestTriggerSubmitTx(t *testing.T) {
 	assert.NotEmpty(t, currentGeneration.bufferedStageOutputs[0].SubmitOutput.SubmissionTime)
 	assert.Equal(t, SubmissionOutcomeFailedRequiresRetry, currentGeneration.bufferedStageOutputs[0].SubmitOutput.SubmissionOutcome)
 }
+
+func TestProcessSubmittingStageOutputGasPricingResetOnUnderpricedError(t *testing.T) {
+	ctx, o, _, done := newTestOrchestrator(t)
+	defer done()
+	it, mTS := newInflightTransaction(o, 1)
+	it.testOnlyNoActionMode = true
+
+	// Set up transaction with retrieved gas pricing (not fixed)
+	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
+		GasPricing: &pldapi.PublicTxGasPricing{
+			GasPrice: pldtypes.Uint64ToUint256(10),
+		},
+	})
+
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
+	rsc := NewRunningStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived, currentGeneration.InMemoryTxStateManager)
+	currentGeneration.runningStageContext = rsc
+
+	// Verify gas pricing is not fixed
+	assert.False(t, mTS.IsGasPricingFixed())
+
+	// Set up stage output with underpriced error in the running stage context
+	rsc.StageOutput = &StageOutput{
+		SubmitOutput: &SubmitOutputs{
+			SubmissionOutcome: SubmissionOutcomeFailedRequiresRetry,
+			ErrorReason:       string(ethclient.ErrorReasonTransactionUnderpriced),
+			Err:               fmt.Errorf("transaction underpriced"),
+		},
+	}
+
+	// Clear buffered outputs to ensure we process the stage output
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+
+	// Add persistence output to trigger the processSubmittingStageOutput method
+	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageSubmitting, time.Now(), nil)
+
+	// Process the stage context
+	it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
+		AvailableToSpend:         nil,
+		PreviousNonceCostUnknown: false,
+	})
+
+	// Verify that gas pricing and transaction hash were reset
+	assert.Nil(t, mTS.GetGasPriceObject())
+	assert.Nil(t, mTS.GetTransactionHash())
+}
+
+func TestProcessSubmittingStageOutputGasPricingResetOnRevertedError(t *testing.T) {
+	ctx, o, _, done := newTestOrchestrator(t)
+	defer done()
+	it, mTS := newInflightTransaction(o, 1)
+	it.testOnlyNoActionMode = true
+
+	// Set up transaction with retrieved gas pricing (not fixed)
+	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
+		GasPricing: &pldapi.PublicTxGasPricing{
+			GasPrice: pldtypes.Uint64ToUint256(15),
+		},
+	})
+
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
+	rsc := NewRunningStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived, currentGeneration.InMemoryTxStateManager)
+	currentGeneration.runningStageContext = rsc
+
+	// Verify gas pricing is not fixed
+	assert.False(t, mTS.IsGasPricingFixed())
+
+	// Set up stage output with reverted error in the running stage context
+	rsc.StageOutput = &StageOutput{
+		SubmitOutput: &SubmitOutputs{
+			SubmissionOutcome: SubmissionOutcomeFailedRequiresRetry,
+			ErrorReason:       string(ethclient.ErrorReasonTransactionReverted),
+			Err:               fmt.Errorf("execution reverted"),
+		},
+	}
+
+	// Clear buffered outputs to ensure we process the stage output
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+
+	// Add persistence output to trigger the processSubmittingStageOutput method
+	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageSubmitting, time.Now(), nil)
+
+	// Process the stage context
+	it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
+		AvailableToSpend:         nil,
+		PreviousNonceCostUnknown: false,
+	})
+
+	// Verify that gas pricing and transaction hash were reset
+	assert.Nil(t, mTS.GetGasPriceObject())
+	assert.Nil(t, mTS.GetTransactionHash())
+}
+
+func TestProcessSubmittingStageOutputGasPricingPreservedOnFixedGasPricing(t *testing.T) {
+	ctx, o, _, done := newTestOrchestrator(t)
+	defer done()
+	it, mTS := newInflightTransaction(o, 1, func(tx *DBPublicTxn) {
+		// Set fixed gas pricing on the transaction
+		tx.FixedGasPricing = pldtypes.JSONString(pldapi.PublicTxGasPricing{
+			GasPrice: pldtypes.Int64ToInt256(20),
+		})
+	})
+	it.testOnlyNoActionMode = true
+
+	// Set up transaction with the fixed gas pricing
+	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
+		GasPricing: &pldapi.PublicTxGasPricing{
+			GasPrice: pldtypes.Uint64ToUint256(20),
+		},
+	})
+
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
+	rsc := NewRunningStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived, currentGeneration.InMemoryTxStateManager)
+	currentGeneration.runningStageContext = rsc
+
+	// Verify gas pricing is fixed
+	assert.True(t, mTS.IsGasPricingFixed())
+
+	// Set up stage output with underpriced error in the running stage context
+	rsc.StageOutput = &StageOutput{
+		SubmitOutput: &SubmitOutputs{
+			SubmissionOutcome: SubmissionOutcomeFailedRequiresRetry,
+			ErrorReason:       string(ethclient.ErrorReasonTransactionUnderpriced),
+			Err:               fmt.Errorf("transaction underpriced"),
+		},
+	}
+
+	// Clear buffered outputs to ensure we process the stage output
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+
+	// Add persistence output to trigger the processSubmittingStageOutput method
+	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageSubmitting, time.Now(), nil)
+
+	// Process the stage context
+	it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
+		AvailableToSpend:         nil,
+		PreviousNonceCostUnknown: false,
+	})
+
+	// Verify that gas pricing was NOT reset (preserved)
+	assert.NotNil(t, mTS.GetGasPriceObject())
+	assert.Equal(t, int64(20), mTS.GetGasPriceObject().GasPrice.Int().Int64())
+}
+
+func TestProcessSubmittingStageOutputNoResetOnOtherErrors(t *testing.T) {
+	ctx, o, _, done := newTestOrchestrator(t)
+	defer done()
+	it, mTS := newInflightTransaction(o, 1)
+	it.testOnlyNoActionMode = true
+
+	// Set up transaction with retrieved gas pricing
+	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
+		GasPricing: &pldapi.PublicTxGasPricing{
+			GasPrice: pldtypes.Uint64ToUint256(25),
+		},
+	})
+
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
+	rsc := NewRunningStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived, currentGeneration.InMemoryTxStateManager)
+	currentGeneration.runningStageContext = rsc
+
+	// Set up stage output with insufficient funds error in the running stage context (not the target errors)
+	rsc.StageOutput = &StageOutput{
+		SubmitOutput: &SubmitOutputs{
+			SubmissionOutcome: SubmissionOutcomeFailedRequiresRetry,
+			ErrorReason:       string(ethclient.ErrorReasonInsufficientFunds),
+			Err:               fmt.Errorf("insufficient funds"),
+		},
+	}
+
+	// Clear buffered outputs to ensure we process the stage output
+	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+
+	// Add persistence output to trigger the processSubmittingStageOutput method
+	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageSubmitting, time.Now(), nil)
+
+	// Process the stage context
+	it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
+		AvailableToSpend:         nil,
+		PreviousNonceCostUnknown: false,
+	})
+
+	// Verify that gas pricing was NOT reset (preserved)
+	assert.NotNil(t, mTS.GetGasPriceObject())
+	assert.Equal(t, int64(25), mTS.GetGasPriceObject().GasPrice.Int().Int64())
+}

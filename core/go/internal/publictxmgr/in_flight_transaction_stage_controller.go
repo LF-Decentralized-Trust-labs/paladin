@@ -404,9 +404,22 @@ func (it *inFlightTransactionStageController) processSubmittingStageOutput(ctx c
 	// first check whether we've already completed the action and just waiting for required persistence to go to the next stage
 	if stageOutput.PersistenceOutput != nil {
 		if rsc.StageOutput.SubmitOutput.Err != nil {
+			if (rsc.StageOutput.SubmitOutput.ErrorReason == string(ethclient.ErrorReasonTransactionUnderpriced) ||
+				rsc.StageOutput.SubmitOutput.ErrorReason == string(ethclient.ErrorReasonTransactionReverted)) &&
+				!rsc.InMemoryTx.IsGasPricingFixed() {
+				// Force transaction with gas price retrieved from node back to retrieve gas price stage by clearing state
+				// This will also happen if there's a fixed gas price set on the public transaction manager. The gas price isn't going to change in this case but it keeps the code more simple to let it go down this path until I've fixed retrieving gas price from node
+				log.L(ctx).Debugf("Transaction with ID %s forcing back to retrieve gas price stage due to error reason: %s", rsc.InMemoryTx.GetSignerNonce(), rsc.StageOutput.SubmitOutput.ErrorReason)
+				generation.ClearRunningStageContext(ctx)
+				it.stateManager.ResetGasPricing()
+				it.stateManager.ResetTransactionHash()
+				return
+			}
+
 			if rsc.StageOutput.SubmitOutput.ErrorReason == string(ethclient.ErrorReasonInsufficientFunds) {
 				it.balanceManager.NotifyAddressBalanceChanged(ctx, it.signingAddress)
 			}
+
 			// wait for the stale transaction timeout to re-trigger the submission provided this is the current generation
 			rsc.StageErrored = true
 		} else if stageOutput.PersistenceOutput.PersistenceError == nil {

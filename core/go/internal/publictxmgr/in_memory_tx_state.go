@@ -166,6 +166,23 @@ func (imtxs *inMemoryTxState) ResetTransactionHash() {
 	imtxs.mtx.TransactionHash = nil
 }
 
+// IsGasPricingFixed returns true if the current gas pricing was explicitly set on the transaction
+func (imtxs *inMemoryTxState) IsGasPricingFixed() bool {
+	// If there's fixed gas pricing set in the persisted transaction, then we're using fixed pricing
+	fixedGPO := recoverGasPriceOptions(imtxs.mtx.ptx.FixedGasPricing)
+	return gasPricingSet(fixedGPO)
+}
+
+// ResetGasPricing resets the gas pricing only if it's not fixed (i.e., it was retrieved from the nide)
+// Returns true if the reset was performed, false if the gas pricing is fixed and cannot be reset
+func (imtxs *inMemoryTxState) ResetGasPricing() bool {
+	if imtxs.IsGasPricingFixed() {
+		return false
+	}
+	imtxs.mtx.GasPricing = pldapi.PublicTxGasPricing{}
+	return true
+}
+
 func (imtxs *inMemoryTxState) GetNonce() uint64 {
 	return *imtxs.mtx.ptx.Nonce
 }
