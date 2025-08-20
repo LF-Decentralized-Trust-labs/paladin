@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../commands/">
+        <link rel="prev" href="../user-interface/">
       
       
-        <link rel="next" href="../../contributing/how-to-contribute/">
+        <link rel="next" href="../troubleshooting/">
       
       
       <link rel="icon" href="../../assets/paladin-icon-light.png">
@@ -20,7 +20,7 @@
     
     
       
-        <title>Roadmap - Paladin</title>
+        <title>L1 and L2 Chains - Paladin</title>
       
     
     
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#roadmap" class="md-skip">
+        <a href="#running-paladin-with-a-public-l1-or-l2-chain-as-the-base-ledger" class="md-skip">
           Skip to content
         </a>
       
@@ -196,7 +196,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Roadmap
+              L1 and L2 Chains
             
           </span>
         </div>
@@ -335,17 +335,21 @@
         
   
   
+    
+  
   
     
     
       
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../getting-started/installation/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../installation/" class="md-tabs__link">
           
   
     
@@ -384,21 +388,17 @@
         
   
   
-    
-  
   
     
     
       
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../apis/bidx/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../reference/apis/bidx/" class="md-tabs__link">
           
   
     
@@ -1051,8 +1051,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -1067,19 +1069,20 @@
     
     
       
+        
+        
+      
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -1090,7 +1093,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Getting Started
@@ -1152,7 +1155,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/installation/" class="md-nav__link">
+      <a href="../installation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1173,7 +1176,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/installation-advanced/" class="md-nav__link">
+      <a href="../installation-advanced/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1194,7 +1197,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/installation-manual/" class="md-nav__link">
+      <a href="../installation-manual/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1223,7 +1226,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/user-interface/" class="md-nav__link">
+      <a href="../user-interface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1241,10 +1244,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../getting-started/l1-and-l2-chains/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    L1 and L2 Chains
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -1253,6 +1276,101 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Introduction
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Indexing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gas-price" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas price
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Gas price">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-gas-price-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      Automatic gas price retrieval
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Examples
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#funding-signing-addresses-with-gas-tokens-eg-eth" class="md-nav__link">
+    <span class="md-ellipsis">
+      Funding signing addresses with gas tokens e.g. ETH
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Funding signing addresses with gas tokens e.g. ETH">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-funding-of-addresses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Automatic funding of addresses
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1265,7 +1383,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/troubleshooting/" class="md-nav__link">
+      <a href="../troubleshooting/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1537,10 +1655,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -1559,20 +1675,19 @@
     
     
       
-        
-        
-      
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -1583,7 +1698,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Reference
@@ -1653,7 +1768,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../apis/bidx/" class="md-nav__link">
+      <a href="../../reference/apis/bidx/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1674,7 +1789,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../apis/keymgr/" class="md-nav__link">
+      <a href="../../reference/apis/keymgr/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1695,7 +1810,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../apis/pgroup/" class="md-nav__link">
+      <a href="../../reference/apis/pgroup/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1716,7 +1831,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../apis/pstate/" class="md-nav__link">
+      <a href="../../reference/apis/pstate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1737,7 +1852,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../apis/ptx/" class="md-nav__link">
+      <a href="../../reference/apis/ptx/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1758,7 +1873,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../apis/reg/" class="md-nav__link">
+      <a href="../../reference/apis/reg/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1779,7 +1894,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../apis/transport/" class="md-nav__link">
+      <a href="../../reference/apis/transport/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1950,7 +2065,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/abidecodeddata/" class="md-nav__link">
+      <a href="../../reference/types/abidecodeddata/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1971,7 +2086,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/blockchaineventlistener/" class="md-nav__link">
+      <a href="../../reference/types/blockchaineventlistener/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1992,7 +2107,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/blockchaineventlistenercheckpoint/" class="md-nav__link">
+      <a href="../../reference/types/blockchaineventlistenercheckpoint/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2013,7 +2128,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/blockchaineventlisteneroptions/" class="md-nav__link">
+      <a href="../../reference/types/blockchaineventlisteneroptions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2034,7 +2149,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/blockchaineventlistenersource/" class="md-nav__link">
+      <a href="../../reference/types/blockchaineventlistenersource/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2055,7 +2170,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/blockchaineventlistenerstatus/" class="md-nav__link">
+      <a href="../../reference/types/blockchaineventlistenerstatus/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2076,7 +2191,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/eventwithdata/" class="md-nav__link">
+      <a href="../../reference/types/eventwithdata/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2097,7 +2212,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/indexedblock/" class="md-nav__link">
+      <a href="../../reference/types/indexedblock/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2118,7 +2233,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/indexedevent/" class="md-nav__link">
+      <a href="../../reference/types/indexedevent/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2139,7 +2254,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/indexedtransaction/" class="md-nav__link">
+      <a href="../../reference/types/indexedtransaction/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2160,7 +2275,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/jsonformatoptions/" class="md-nav__link">
+      <a href="../../reference/types/jsonformatoptions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2181,7 +2296,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/keymappingandverifier/" class="md-nav__link">
+      <a href="../../reference/types/keymappingandverifier/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2202,7 +2317,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/onchainlocation/" class="md-nav__link">
+      <a href="../../reference/types/onchainlocation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2223,7 +2338,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/peerinfo/" class="md-nav__link">
+      <a href="../../reference/types/peerinfo/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2244,7 +2359,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/preparedtransaction/" class="md-nav__link">
+      <a href="../../reference/types/preparedtransaction/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2265,7 +2380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/privacygroup/" class="md-nav__link">
+      <a href="../../reference/types/privacygroup/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2286,7 +2401,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/privacygroupevmcall/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupevmcall/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2307,7 +2422,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/privacygroupevmtxinput/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupevmtxinput/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2328,7 +2443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/privacygroupinput/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupinput/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2349,7 +2464,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/privacygroupmessage/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupmessage/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2370,7 +2485,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/privacygroupmessageinput/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupmessageinput/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2391,7 +2506,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/privacygroupmessagelistener/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupmessagelistener/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2412,7 +2527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/privacygroupwithabi/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupwithabi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2433,7 +2548,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/publictx/" class="md-nav__link">
+      <a href="../../reference/types/publictx/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2454,7 +2569,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/queryjson/" class="md-nav__link">
+      <a href="../../reference/types/queryjson/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2475,7 +2590,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/registryentry/" class="md-nav__link">
+      <a href="../../reference/types/registryentry/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2496,7 +2611,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/registryentrywithproperties/" class="md-nav__link">
+      <a href="../../reference/types/registryentrywithproperties/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2517,7 +2632,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/registryproperty/" class="md-nav__link">
+      <a href="../../reference/types/registryproperty/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2538,7 +2653,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/reliablemessage/" class="md-nav__link">
+      <a href="../../reference/types/reliablemessage/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2559,7 +2674,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/reliablemessageack/" class="md-nav__link">
+      <a href="../../reference/types/reliablemessageack/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2580,7 +2695,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/schema/" class="md-nav__link">
+      <a href="../../reference/types/schema/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2601,7 +2716,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/simpletypes/" class="md-nav__link">
+      <a href="../../reference/types/simpletypes/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2622,7 +2737,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/state/" class="md-nav__link">
+      <a href="../../reference/types/state/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2643,7 +2758,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/stateconfirm/" class="md-nav__link">
+      <a href="../../reference/types/stateconfirm/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2664,7 +2779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/stateconfirmrecord/" class="md-nav__link">
+      <a href="../../reference/types/stateconfirmrecord/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2685,7 +2800,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/statelock/" class="md-nav__link">
+      <a href="../../reference/types/statelock/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2706,7 +2821,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/statespend/" class="md-nav__link">
+      <a href="../../reference/types/statespend/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2727,7 +2842,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/statespendrecord/" class="md-nav__link">
+      <a href="../../reference/types/statespendrecord/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2748,7 +2863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/statestatusqualifier/" class="md-nav__link">
+      <a href="../../reference/types/statestatusqualifier/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2769,7 +2884,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/storedabi/" class="md-nav__link">
+      <a href="../../reference/types/storedabi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2790,7 +2905,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/transaction/" class="md-nav__link">
+      <a href="../../reference/types/transaction/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2811,7 +2926,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/transactioncall/" class="md-nav__link">
+      <a href="../../reference/types/transactioncall/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2832,7 +2947,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/transactionfull/" class="md-nav__link">
+      <a href="../../reference/types/transactionfull/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2853,7 +2968,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/transactioninput/" class="md-nav__link">
+      <a href="../../reference/types/transactioninput/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2874,7 +2989,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/transactionreceipt/" class="md-nav__link">
+      <a href="../../reference/types/transactionreceipt/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2895,7 +3010,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/transactionreceiptfilters/" class="md-nav__link">
+      <a href="../../reference/types/transactionreceiptfilters/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2916,7 +3031,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/transactionreceiptfull/" class="md-nav__link">
+      <a href="../../reference/types/transactionreceiptfull/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2937,7 +3052,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/transactionreceiptlistener/" class="md-nav__link">
+      <a href="../../reference/types/transactionreceiptlistener/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2958,7 +3073,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/transactionreceiptlisteneroptions/" class="md-nav__link">
+      <a href="../../reference/types/transactionreceiptlisteneroptions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2979,7 +3094,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../types/transactionstates/" class="md-nav__link">
+      <a href="../../reference/types/transactionstates/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3052,7 +3167,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../crds/core.paladin.io/" class="md-nav__link">
+      <a href="../../reference/crds/core.paladin.io/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3081,7 +3196,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../architecture/" class="md-nav__link">
+      <a href="../../reference/architecture/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3102,7 +3217,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../commands/" class="md-nav__link">
+      <a href="../../reference/commands/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3120,19 +3235,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../reference/roadmap/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3141,7 +3247,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -3355,6 +3460,89 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Introduction
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Indexing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gas-price" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas price
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Gas price">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-gas-price-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      Automatic gas price retrieval
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Examples
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#funding-signing-addresses-with-gas-tokens-eg-eth" class="md-nav__link">
+    <span class="md-ellipsis">
+      Funding signing addresses with gas tokens e.g. ETH
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Funding signing addresses with gas tokens e.g. ETH">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-funding-of-addresses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Automatic funding of addresses
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -3371,9 +3559,58 @@
   
 
 
-<h1 id="roadmap">Roadmap<a class="headerlink" href="#roadmap" title="Permanent link">&para;</a></h1>
-<p>Provide details on the roadmap for the project.</p>
-<p>If you would like to see something added to the roadmap, please see <a href="../../contributing/requesting-a-change/">"Requesting a Change"</a>.</p>
+<h1 id="running-paladin-with-a-public-l1-or-l2-chain-as-the-base-ledger">Running Paladin with a public L1 or L2 chain as the base ledger<a class="headerlink" href="#running-paladin-with-a-public-l1-or-l2-chain-as-the-base-ledger" title="Permanent link">&para;</a></h1>
+<h2 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h2>
+<p>Paladin supports any EVM compatible chain as the base ledger for public transactions. This includes using public chains that use paid gas, such as Ethereum Mainnet L1 chain or the Linea Mainnet L2 chain. There
+are certain considerations needed to run Paladin using a paid gas base ledger.</p>
+<h2 id="indexing">Indexing<a class="headerlink" href="#indexing" title="Permanent link">&para;</a></h2>
+<p>A public chain will have a long chain history. Paladin indexes the base ledger in order to confirm new transactions have been included in blocks. By default Paladin indexes the base ledger from block <code>0</code>. For a public
+chain this could take many days to index. Paladin only requires block history from the point at which Paladin tranasctions and contracts were deployed. To reduce the time to index the chain, use the <code>fromBlock</code> configuration
+option under the <code>blockIndexer</code> configuration section. For example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>blockIndexer:
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    fromBlock: 9024200
+</code></pre></div>
+<p>Set the <code>fromBlock</code> to a recent block near the head of the base ledger chain you are using. Indexing should complete within a few minutes and Paladin can then confirm any new Paladin transactions that are mined into blocks.</p>
+<h2 id="gas-price">Gas price<a class="headerlink" href="#gas-price" title="Permanent link">&para;</a></h2>
+<p>Most public chains, whether they are an L1 or an L2, will use paid gas for all transactions. Paladin uses EIP1559 transactions and must set a suitable <code>maxBaseFeePerGas</code> and <code>maxPriorityFeePerGas</code> value in those transactions
+in order for them to be mined into blocks. Currently this must be configured on the Paladin node, for example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>publicTxManager:
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  gasPrice:
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    fixedGasPrice:
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>      maxFeePerGas: 0xdd71e69a
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>      maxPriorityFeePerGas: 0x307f4e
+</code></pre></div>
+<p>The gas prices must be set according to the following rules:</p>
+<ul>
+<li><code>maxPriorityFeePerGas</code> &gt;= the current value returned by <code>eth_maxPriorityFeePerGas</code><ul>
+<li>To accommodate fluctuations in the priority fee it may be necessary to set a value that is 10-50% higher than the current priority fee for the chain.</li>
+</ul>
+</li>
+<li><code>maxFeePerGas</code> &gt;= <code>maxPriorityFeePerGas</code></li>
+<li><code>maxFeePerGas</code> &gt;= <code>baseFeePerGas</code> returned from <code>eth_getBlockByNumber</code> for a recent block</li>
+<li><code>maxFeePerGas</code> &gt;= the minimum transaction pool gas fee for the chain</li>
+</ul>
+<p>Note: setting the fixed gas price values too high could result in paying more gas tokens (e.g. ETH) than necessary for transactions.</p>
+<h3 id="automatic-gas-price-retrieval">Automatic gas price retrieval<a class="headerlink" href="#automatic-gas-price-retrieval" title="Permanent link">&para;</a></h3>
+<p>TBC</p>
+<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
+<p>The examples deploy contracts and invoke transactions before waiting for receipts to confirm they have succeesfully been mined. The default wait time in the Paladin Node SDK is 5 seconds. For many
+public chains this will need increasing to a suitable value, based on the block period of the chain. The following is an example of a modification to a <code>waitForReceipt()</code> call:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>const cashToken = await notoFactory
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    .newNoto(verifierNode1, {
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>      notary: verifierNode1,
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>      notaryMode: &quot;basic&quot;,
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    })
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    .waitForDeploy(20000);  // Allow 20 seconds for the contract deploy to complete
+</code></pre></div>
+<p>Note: the example code won't wait the full 20 seconds if the contract deploy completes early, so setting a large value won't increase the example run time unncessarily.</p>
+<h2 id="funding-signing-addresses-with-gas-tokens-eg-eth">Funding signing addresses with gas tokens e.g. ETH<a class="headerlink" href="#funding-signing-addresses-with-gas-tokens-eg-eth" title="Permanent link">&para;</a></h2>
+<p>Paladin uses a number of signing keys for the different domains and for initial deployment of the Paladin contracts. It also uses a new signing key for every public transaction as part of its approach to
+preventing transactions on the base ledger from being correlated with each other.</p>
+<p>A Paladin node can be configured to use predetermined signing keys, for example by using a pre-configured HD wallet mnemonic from which all signing keys are derived.</p>
+<p>It is necessary to ensure the addresses used by Paladin have sufficient gas tokens to fund transactions.</p>
+<h3 id="automatic-funding-of-addresses">Automatic funding of addresses<a class="headerlink" href="#automatic-funding-of-addresses" title="Permanent link">&para;</a></h3>
+<p>TBC</p>
 
 
 
@@ -3405,7 +3642,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../commands/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Commands">
+          <a href="../user-interface/" class="md-footer__link md-footer__link--prev" aria-label="Previous: User Interface">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3415,20 +3652,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Commands
+                User Interface
               </div>
             </div>
           </a>
         
         
           
-          <a href="../../contributing/how-to-contribute/" class="md-footer__link md-footer__link--next" aria-label="Next: How to Contribute">
+          <a href="../troubleshooting/" class="md-footer__link md-footer__link--next" aria-label="Next: Troubleshooting">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                How to Contribute
+                Troubleshooting
               </div>
             </div>
             <div class="md-footer__button md-icon">
