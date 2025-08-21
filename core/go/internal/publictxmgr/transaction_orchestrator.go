@@ -464,6 +464,12 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 		if queueUpdated {
 			oc.lastQueueUpdate = time.Now()
 		}
+
+		if waitingForBalance {
+			// the balance will be retrieved in the next orchestrator loop
+			oc.balanceManager.NotifyRetrieveAddressBalance(ctx, oc.signingAddress)
+		}
+
 		if time.Since(oc.lastQueueUpdate) > oc.staleTimeout && oc.state != OrchestratorStateStale {
 			oc.state = OrchestratorStateStale
 			oc.stateEntryTime = time.Now()
