@@ -39,6 +39,7 @@ import {
   StateStatus,
   Verifiers,
 } from "./interfaces";
+import { TransactionFuture } from "./transaction";
 import { PaladinVerifier } from "./verifier";
 
 const POLL_INTERVAL_MS = 100;
@@ -101,7 +102,7 @@ export default class PaladinClient {
 
   async pollForReceipt(txID: string, waitMs: number, full?: boolean) {
     for (let i = 0; i < waitMs; i += POLL_INTERVAL_MS) {
-      var receipt = full 
+      var receipt = full
         ? await this.ptx.getTransactionReceiptFull(txID)
         : await this.ptx.getTransactionReceipt(txID);
       if (receipt != undefined) {
@@ -432,7 +433,7 @@ export default class PaladinClient {
         [transaction],
         undefined
       );
-      return res.data.result;
+      return new TransactionFuture(this, res.data.result);
     },
 
     sendTransactions: async (transactions: ITransactionInput[]) => {
@@ -441,7 +442,7 @@ export default class PaladinClient {
         [transactions],
         undefined
       );
-      return res.data.result;
+      return res.data.result.map((tx) => new TransactionFuture(this, tx));
     },
 
     prepareTransaction: async (transaction: ITransactionInput) => {
@@ -1002,10 +1003,9 @@ export default class PaladinClient {
     },
 
     queryMessageListeners: async (query: IQuery) => {
-      const res = await this.post<JsonRpcResult<IPrivacyGroupMessageListener[]>>(
-        "pgroup_queryMessageListeners",
-        [query]
-      );
+      const res = await this.post<
+        JsonRpcResult<IPrivacyGroupMessageListener[]>
+      >("pgroup_queryMessageListeners", [query]);
       return res.data.result;
     },
 
