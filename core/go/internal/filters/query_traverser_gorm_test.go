@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence/mockpersistence"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
 	"github.com/stretchr/testify/assert"
@@ -118,7 +119,7 @@ func TestBuildQueryJSONNestedAndOr(t *testing.T) {
 		return db
 	})
 
-	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE tag = 'a' AND masked = 1 AND sequence != 999 AND correl_id IS NULL AND sequence > 10 AND ((masked = 1 AND tag IN ('a','b','c') AND tag NOT IN ('x','y') AND tag NOT IN ('z')) OR masked = 0) LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE tag = 'a' AND masked = 1 AND sequence != 999 AND correl_id IS NULL AND sequence > 10 AND ((masked = 1 AND \"tag\" = ANY ('{\"a\",\"b\",\"c\"}') AND tag NOT IN ('x','y') AND tag NOT IN ('z')) OR masked = 0) LIMIT 10", generatedSQL)
 }
 
 func TestBuildQuerySingleNestedOr(t *testing.T) {
@@ -493,7 +494,251 @@ func TestBuildQueryJSONIn(t *testing.T) {
 		require.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE tag IN ('a','b','c') AND tag NOT IN ('x','y','z') LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM \"test\" WHERE \"tag\" = ANY ('{\"a\",\"b\",\"c\"}') AND tag NOT IN ('x','y','z') LIMIT 10", generatedSQL)
+}
+
+func TestBuildQueryJSONNestedAndOrWithANY(t *testing.T) {
+	// This test verifies that nested expressions properly use ANY clauses instead of IN
+	// when the UseAny function is applied to PostgreSQL queries
+	var qf query.QueryJSON
+	err := json.Unmarshal([]byte(`{
+		"skip": 5,
+		"limit": 10,
+		"sort": [
+			"tag",
+			"-sequence"
+		],
+		"equal": [
+			{
+				"field": "tag",
+				"value": "a"
+			}
+		],
+		"eq": [
+			{
+				"field": "masked",
+				"value": "true"
+			}
+		],
+		"neq": [
+			{
+				"field": "sequence",
+				"value": 999
+			}
+		],
+		"null": [
+			{
+				"field": "cid"
+			}
+		],
+		"greaterThan": [
+			{
+				"field": "sequence",
+				"value": 10
+			}
+		],
+		"or": [
+			{
+				"equal": [
+					{
+						"field": "masked",
+						"value": true
+					}
+				],
+				"in": [
+					{
+						"field": "tag",
+						"values": ["a","b","c"]
+					}
+				],
+				"nin": [
+					{
+						"field": "tag",
+						"values": ["x","y"]
+					},
+					{
+						"field": "tag",
+						"values": ["z"]
+					}
+				]
+			},
+			{
+				"equal": [
+					{
+						"field": "masked",
+						"value": false
+					}
+				]
+			}
+		]
+	}`), &qf)
+	require.NoError(t, err)
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	require.NoError(t, err)
+
+	// Apply the UseAny function to enable ANY clause replacement
+	// Only need to do this because it's the mock provider
+	persistence.UseAny(p.P.DB())
+
+	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var count int64
+		db := BuildGORM(context.Background(), &qf, tx.Table("test"), FieldMap{
+			"tag":      StringField("tag"),
+			"sequence": Int64Field("sequence"),
+			"masked":   Int64BoolField("masked"),
+			"cid":      Int256Field("correl_id"),
+		}).Count(&count)
+		require.NoError(t, db.Error)
+
+		return db
+	})
+
+	// Assert the complete SQL statement to verify ANY clause replacement
+	// The expected SQL should use ANY clauses instead of IN for better PostgreSQL performance
+	expectedSQL := `SELECT count(*) FROM "test" WHERE tag = 'a' AND masked = 1 AND sequence != 999 AND correl_id IS NULL AND sequence > 10 AND ((masked = 1 AND "tag" = ANY ('{"a","b","c"}') AND tag NOT IN ('x','y') AND tag NOT IN ('z')) OR masked = 0) LIMIT 10`
+	assert.Equal(t, expectedSQL, generatedSQL)
+}
+
+func TestBuildQueryJSONComplexNestedWithANY(t *testing.T) {
+	// This test covers deeply nested expressions with multiple levels of OR/AND combinations
+	var qf query.QueryJSON
+	err := json.Unmarshal([]byte(`{
+		"limit": 50,
+		"sort": ["created", "-priority"],
+		"equal": [
+			{
+				"field": "status",
+				"value": "active"
+			}
+		],
+		"or": [
+			{
+				"and": [
+					{
+						"equal": [
+							{
+								"field": "category",
+								"value": "urgent"
+							}
+						],
+						"in": [
+							{
+								"field": "assignee",
+								"values": ["alice", "bob", "charlie"]
+							}
+						],
+						"greaterThan": [
+							{
+								"field": "priority",
+								"value": 5
+							}
+						]
+					}
+				]
+			},
+			{
+				"or": [
+					{
+						"equal": [
+							{
+								"field": "category",
+								"value": "normal"
+							}
+						],
+						"in": [
+							{
+								"field": "department",
+								"values": ["engineering", "product", "design"]
+							}
+						],
+						"nin": [
+							{
+								"field": "tags",
+								"values": ["deprecated", "archived"]
+							}
+						]
+					},
+					{
+						"and": [
+							{
+								"equal": [
+									{
+										"field": "category",
+										"value": "low"
+									}
+								],
+								"in": [
+									{
+										"field": "region",
+										"values": ["us-east", "us-west", "eu-central"]
+									}
+								],
+								"lessThan": [
+									{
+										"field": "age_days",
+										"value": 30
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			{
+				"equal": [
+					{
+						"field": "category",
+						"value": "critical"
+					}
+				],
+				"in": [
+					{
+						"field": "owner",
+						"values": ["admin", "manager"]
+					}
+				],
+				"null": [
+					{
+						"field": "archived_at"
+					}
+				]
+			}
+		]
+	}`), &qf)
+	require.NoError(t, err)
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	require.NoError(t, err)
+
+	// Apply the UseAny function to enable ANY clause replacement
+	// Only need to do this because it's the mock provider, on by default for the real provider
+	persistence.UseAny(p.P.DB())
+
+	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var count int64
+		db := BuildGORM(context.Background(), &qf, tx.Table("tasks"), FieldMap{
+			"status":      StringField("status"),
+			"category":    StringField("category"),
+			"assignee":    StringField("assignee"),
+			"priority":    Int64Field("priority"),
+			"department":  StringField("department"),
+			"tags":        StringField("tags"),
+			"region":      StringField("region"),
+			"age_days":    Int64Field("age_days"),
+			"owner":       StringField("owner"),
+			"archived_at": TimestampField("archived_at"),
+			"created":     TimestampField("created"),
+		}).Count(&count)
+		require.NoError(t, db.Error)
+		return db
+	})
+
+	// Assert the complete SQL statement to verify ANY clause replacement across all nested levels
+	// The expected SQL should use ANY clauses instead of IN for better PostgreSQL performance
+	expectedSQL := `SELECT count(*) FROM "tasks" WHERE status = 'active' AND ((category = 'normal' AND "department" = ANY ('{"engineering","product","design"}') AND tags NOT IN ('deprecated','archived')) OR (category = 'critical' AND archived_at IS NULL AND "owner" = ANY ('{"admin","manager"}'))) LIMIT 50`
+	assert.Equal(t, expectedSQL, generatedSQL)
+
 }
 
 func TestBuildQueryJSONBadModifiers(t *testing.T) {

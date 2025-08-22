@@ -1,4 +1,4 @@
-// Copyright 2019 Kaleido
+// Copyright 2025 Kaleido
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -150,6 +150,52 @@ func newMockBlockIndexer(t *testing.T, config *pldconf.BlockIndexerConfig) (cont
 
 }
 
+func testBlockWithManyTXAndEvents(t *testing.T, txL int, eventL int, knownAddress ...ethtypes.Address0xHex) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
+	block, receipts := testBlockArray(t, 1)
+	for receiptIndex := 0; receiptIndex < txL; receiptIndex++ {
+		// Generate unique hashes for each transaction
+		txHash := ethtypes.MustNewHexBytes0xPrefix(pldtypes.RandHex(32))
+		tx := &PartialTransactionInfo{
+			Hash:  txHash,
+			From:  ethtypes.MustNewAddress(pldtypes.RandHex(20)),
+			Nonce: ethtypes.HexUint64(receiptIndex),
+		}
+		block[0].Transactions = append(block[0].Transactions, tx)
+
+		// Create receipt with events
+		receipt := &TXReceiptJSONRPC{
+			TransactionHash: txHash,
+			From:            tx.From,
+			BlockNumber:     block[0].Number,
+			BlockHash:       block[0].Hash,
+			Status:          ethtypes.NewHexInteger64(1),
+			Logs:            make([]*LogJSONRPC, 0, eventL),
+		}
+
+		// Add events to receipt
+		for eventIndex := 3; eventIndex < eventL-3; eventIndex++ {
+			emitAddr := ethtypes.MustNewAddress(pldtypes.RandHex(20))
+			if len(knownAddress) > 0 {
+				emitAddr = &knownAddress[0]
+			}
+
+			log := &LogJSONRPC{
+				Address:          emitAddr,
+				BlockNumber:      block[0].Number,
+				LogIndex:         ethtypes.HexUint64(eventIndex),
+				TransactionIndex: ethtypes.HexUint64(receiptIndex),
+				TransactionHash:  txHash,
+				Topics:           []ethtypes.HexBytes0xPrefix{topicA},
+			}
+			receipt.Logs = append(receipt.Logs, log)
+		}
+
+		receipts[block[0].Hash.String()] = append(receipts[block[0].Hash.String()], receipt)
+	}
+
+	return block, receipts
+}
+
 func testBlockArray(t *testing.T, l int, knownAddress ...ethtypes.Address0xHex) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
 	return testBlockArrayWithTXType(t, l, "0x2", knownAddress...) // Valid EIP1559 TX type
 }
@@ -220,6 +266,7 @@ func testBlockArrayWithTXType(t *testing.T, l int, transactionType string, known
 				},
 			},
 		}
+
 		if i == 0 {
 			blocks[i].ParentHash = ethtypes.MustNewHexBytes0xPrefix(pldtypes.RandHex(32))
 		} else {
@@ -1428,4 +1475,97 @@ func TestCustomInvalidTransactionTypesAreIgnored(t *testing.T) {
 	}
 
 	assert.Equal(t, expectedTransactions, persistedTransactions)
+}
+
+// This is to test that we can store more than 65k events in a single DB TX
+func TestBlockIndexerManyEventsWaitForTransactionSuccess(t *testing.T) {
+	ctx, bi, mRPC, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	// For SQLite the limit is 999, setting something lower
+	bi.insertDBBatchSize = 500
+
+	// 20000 events in a single tx
+	blocks, receipts := testBlockWithManyTXAndEvents(t, 1, 20000)
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+
+	txHash := pldtypes.Bytes32(receipts[blocks[0].Hash.String()][1].TransactionHash)
+	gotTX := make(chan struct{})
+	go func() {
+		defer close(gotTX)
+		tx, err := bi.WaitForTransactionSuccess(ctx, txHash, nil)
+		require.NoError(t, err)
+		assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[0].Number)
+		assert.Equal(t, txHash, tx.Hash)
+	}()
+
+	// Wait for initial query to fail
+	for bi.txWaiters.InFlightCount() == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
+
+	bi.startOrReset() // do not start block listener
+
+	for i := 0; i < len(blocks); i++ {
+		notifiedBlocks := <-utBatchNotify
+		assert.Len(t, notifiedBlocks, 1) // We should get one block per batch
+		checkIndexedBlockEqual(t, blocks[i], notifiedBlocks[0])
+	}
+
+	<-gotTX
+
+	tx, err := bi.WaitForTransactionAnyResult(ctx, txHash)
+	require.NoError(t, err)
+	assert.Equal(t, pldapi.TXResult_SUCCESS, tx.Result.V())
+	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[0].Number)
+	assert.Equal(t, txHash, tx.Hash)
+}
+
+func TestBlockIndexerManyTXsWaitForTransactionSuccess(t *testing.T) {
+	ctx, bi, mRPC, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	// For SQLite the limit is 999, setting something lower
+	bi.insertDBBatchSize = 500
+
+	// 20000 transactions in a block
+	blocks, receipts := testBlockWithManyTXAndEvents(t, 20000, 0)
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+
+	txHash := pldtypes.Bytes32(receipts[blocks[0].Hash.String()][1].TransactionHash)
+	gotTX := make(chan struct{})
+	go func() {
+		defer close(gotTX)
+		tx, err := bi.WaitForTransactionSuccess(ctx, txHash, nil)
+		require.NoError(t, err)
+		assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[0].Number)
+		assert.Equal(t, txHash, tx.Hash)
+	}()
+
+	// Wait for initial query to fail
+	for bi.txWaiters.InFlightCount() == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
+
+	bi.startOrReset() // do not start block listener
+
+	for i := 0; i < len(blocks); i++ {
+		notifiedBlocks := <-utBatchNotify
+		assert.Len(t, notifiedBlocks, 1) // We should get one block per batch
+		checkIndexedBlockEqual(t, blocks[i], notifiedBlocks[0])
+	}
+
+	<-gotTX
+
+	tx, err := bi.WaitForTransactionAnyResult(ctx, txHash)
+	require.NoError(t, err)
+	assert.Equal(t, pldapi.TXResult_SUCCESS, tx.Result.V())
+	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[0].Number)
+	assert.Equal(t, txHash, tx.Hash)
 }
