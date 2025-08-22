@@ -15,6 +15,11 @@
 #   RUN_COMMANDS=start ./scripts/run-examples.sh
 #   RUN_COMMANDS=verify ./scripts/run-examples.sh
 #   RUN_COMMANDS=start,verify ./scripts/run-examples.sh
+#   IGNORE_EXAMPLES=event-listener,private-stablecoin,bond,helloworld,swap,zeto ./scripts/run-examples.sh # ignore examples
+#
+# Cache directory arguments:
+#   ./scripts/run-examples.sh [base_cache_dir] [version_tag]
+#   ./scripts/run-examples.sh /tmp/cache v0.10.0 # specify cache directory and version
 RUN_COMMANDS=${RUN_COMMANDS:-"start"}
 BUILD_PALADIN_SDK=${BUILD_PALADIN_SDK:-"false"} # build the paladin SDK locally
 BUILD_PALADIN_ABI=${BUILD_PALADIN_ABI:-"false"} # build the paladin solidity contracts locally
@@ -22,6 +27,12 @@ BUILD_PALADIN_ABI=${BUILD_PALADIN_ABI:-"false"} # build the paladin solidity con
 PALADIN_SDK_VERSION=${PALADIN_SDK_VERSION:-""} # download the paladin SDK from npm (default is latest)
 PALADIN_ABI_VERSION=${PALADIN_ABI_VERSION:-""} # download the paladin solidity contracts from npm (default is latest)   
 ZETO_ABI_VERSION=${ZETO_ABI_VERSION:-"v0.2.0"} # download the zeto solidity contracts from npm (default is v0.2.0)
+
+IGNORE_EXAMPLES=${IGNORE_EXAMPLES:-""} # ignore examples (; separated list of example names)
+
+# Command line arguments for cache directory
+BASE_CACHE_DIR=${1:-""} # first argument: base cache directory
+VERSION_TAG_ARG=${2:-""} # second argument: version tag
 
 # Colors for output
 RED='\033[0;31m'
@@ -214,15 +225,25 @@ run_example() {
     
     mkdir -p logs
     
+    # Construct cache directory path if provided
+    # default is <example_dir>/data
+    local example_cache_path=""
+    if [ -n "$BASE_CACHE_DIR" ] && [ -n "$VERSION_TAG_ARG" ]; then
+        example_cache_path="$BASE_CACHE_DIR/$VERSION_TAG_ARG/$example_name"
+        print_status "Using cache path: $example_cache_path"
+        mkdir -p "$example_cache_path"
+    fi
+    
     # Split RUN_COMMANDS by comma and run each command
     IFS=',' read -ra COMMANDS <<< "$RUN_COMMANDS"
     
     for command in "${COMMANDS[@]}"; do
         command=$(echo "$command" | xargs) # trim whitespace
         
-        # Run the example command
-        print_status "Running $example_name with 'npm run $command'..."
-        if ! npm run $command; then
+        # Run the example command, passing the cache path as an argument.
+        # The '--' tells npm to pass the argument to the script, not to npm itself.
+        print_status "Running $example_name with 'npm run $command'"
+        if ! npm run $command -- "$example_cache_path"; then
             print_error "Example $example_name failed to run command '$command'"
             exit_code=1
             break
@@ -285,6 +306,15 @@ main() {
                     continue
                 fi
             fi
+
+            # ignore examples if IGNORE_EXAMPLES is set
+            if [ "$IGNORE_EXAMPLES" != "" ]; then
+                if [[ "$IGNORE_EXAMPLES" == *$example_name* ]]; then
+                    print_status "Skipping example $example_name (IGNORE_EXAMPLES)"
+                    skipped_examples+=("$example_name")
+                    continue
+                fi
+            fi
  
             run_example "$examples_dir"
             exit_code=$?
@@ -305,6 +335,13 @@ main() {
     print_status "BUILD_PALADIN_ABI: $BUILD_PALADIN_ABI"
     print_status "PALADIN_SDK_VERSION: $PALADIN_SDK_VERSION"
     print_status "RUN_COMMANDS: $RUN_COMMANDS"
+    
+    # Display cache configuration in summary
+    local version_tag_to_use="${VERSION_TAG_ARG:-$VERSION_TAG}"
+    if [ "$BASE_CACHE_DIR" != "" ] && [ "$version_tag_to_use" != "" ]; then
+        print_status "BASE_CACHE_DIR: $BASE_CACHE_DIR"
+        print_status "VERSION_TAG: $version_tag_to_use"
+    fi
 
     # Summary
     echo "=========================================="
