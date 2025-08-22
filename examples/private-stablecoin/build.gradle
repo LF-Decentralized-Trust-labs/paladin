@@ -15,7 +15,7 @@
 
 configurations {
     // Resolvable configurations
-    buildSDK {
+    linkSDK {
         canBeConsumed = false
         canBeResolved = true
     }
@@ -26,7 +26,7 @@ configurations {
 }
 
 dependencies {
-    buildSDK project(path: ':sdk:typescript', configuration: 'buildSDK')
+    linkSDK project(path: ':sdk:typescript', configuration: 'linkSDK')
     buildCommon project(path: ':examples:common', configuration: 'buildCommon')
 }
 
@@ -42,30 +42,29 @@ task copyContracts(type: Copy, dependsOn: [":domains:zeto:extractZetoArtifacts"]
     includeEmptyDirs = false
 }
 
-task install_sdk(type: Exec) {
+task install(type: Exec) {
     executable 'npm'
     args 'install' 
-    args 'file:../../sdk/typescript' // use local sdk
 
-    inputs.files(configurations.buildSDK)
+    inputs.files(configurations.linkSDK)
     inputs.files(configurations.buildCommon)
     inputs.files('package.json')
     outputs.files('package-lock.json')
     outputs.dir('node_modules')
 }
 
-task install(type: Exec, dependsOn: install_sdk) {
+task link(type: Exec, dependsOn: install) {
     executable 'npm'
-    args 'install' 
+    args 'link'
+    args '@lfdecentralizedtrust-labs/paladin-sdk' // use local sdk
 
-    inputs.files(configurations.buildSDK)
+    inputs.files(configurations.linkSDK)
     inputs.files(configurations.buildCommon)
     inputs.files('package.json')
-    outputs.files('package-lock.json')
     outputs.dir('node_modules')
 }
 
-task build(type: Exec, dependsOn: [install, copyContracts]) {
+task build(type: Exec, dependsOn: [link, copyContracts]) {
     executable 'npm'
     args 'run'
     args 'build'
@@ -83,7 +82,6 @@ task start(type: Exec, dependsOn: [build]) {
 }
 
 task e2e(type: Exec, dependsOn: [start]) {
-
     executable 'npm'
     args 'run'
     args 'verify'
@@ -96,4 +94,4 @@ task clean(type: Delete) {
     delete 'src/zeto-abis'
     delete 'data'
     delete 'logs'
-} 
+}

@@ -1,6 +1,6 @@
 {
   "name": "@lfdecentralizedtrust-labs/paladin-sdk",
-  "version": "0.0.0",
+  "version": "0.9.0",
   "description": "",
   "main": "build/index.js",
   "scripts": {

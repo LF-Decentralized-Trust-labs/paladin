@@ -19,7 +19,7 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
-    buildSDK {
+    linkSDK {
         canBeConsumed = false
         canBeResolved = true
     }
@@ -31,34 +31,33 @@ configurations {
 
 dependencies {
     contractCompile project(path: ':solidity', configuration: 'compiledContracts')
-    buildSDK project(path: ':sdk:typescript', configuration: 'buildSDK')
+    linkSDK project(path: ':sdk:typescript', configuration: 'linkSDK')
     buildCommon project(path: ':examples:common', configuration: 'buildCommon')
 }
 
-task install_sdk(type: Exec) {
+task install(type: Exec ) {
     executable 'npm'
     args 'install' 
-    args 'file:../../sdk/typescript' // use local sdk
 
-    inputs.files(configurations.buildSDK)
+    inputs.files(configurations.linkSDK)
     inputs.files(configurations.buildCommon)
     inputs.files('package.json')
     outputs.files('package-lock.json')
     outputs.dir('node_modules')
 }
 
-task install(type: Exec, dependsOn: install_sdk) {
+task link(type: Exec, dependsOn: install) {
     executable 'npm'
-    args 'install' 
+    args 'link'
+    args '@lfdecentralizedtrust-labs/paladin-sdk' // use local sdk
 
-    inputs.files(configurations.buildSDK)
+    inputs.files(configurations.linkSDK)
     inputs.files(configurations.buildCommon)
     inputs.files('package.json')
-    outputs.files('package-lock.json')
     outputs.dir('node_modules')
 }
 
-task copyABI(type: Exec, dependsOn: install) {
+task copyABI(type: Exec, dependsOn: link) {
     executable 'npm'
     args 'run'
     args 'abi'
@@ -68,7 +67,7 @@ task copyABI(type: Exec, dependsOn: install) {
     outputs.dir('src/abis')
 }
 
-task build(type: Exec, dependsOn: [install, copyABI]) {
+task build(type: Exec, dependsOn: [copyABI]) {
     executable 'npm'
     args 'run'
     args 'build'
@@ -86,7 +85,6 @@ task start(type: Exec, dependsOn: [build]) {
 }
 
 task e2e(type: Exec, dependsOn: [start]) {
-
     executable 'npm'
     args 'run'
     args 'verify'
