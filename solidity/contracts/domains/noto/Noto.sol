@@ -37,7 +37,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
     // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
     bytes4 public constant NotoConfigID_V1 = 0x00020000;
 
-    uint64 public constant NotoVariantDefault = 0x0000;
+    uint64 public constant NotoVariantDefault = 0x0001;
 
     bytes32 private constant UNLOCK_TYPEHASH =
         keccak256(
