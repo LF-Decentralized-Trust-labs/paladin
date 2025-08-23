@@ -145,6 +145,7 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 		return nil, err
 	}
 	params := &NotoSetLockOptionsParams{
+		TxId:         req.Transaction.TransactionId,
 		LockID:       inParams.LockID,
 		LockedInputs: endorsableStateIDs(lockedInputs),
 		Options:      lockOptionsEncoded,

@@ -220,7 +220,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         bytes32[] calldata outputs,
         bytes calldata signature,
         bytes calldata data
-    ) external virtual override onlyNotary {
+    ) external virtual override onlyNotary txIdNotUsed(txId) {
         _transfer(txId, inputs, outputs, signature, data);
     }
 
@@ -234,7 +234,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         bytes32[] calldata outputs,
         bytes calldata signature,
         bytes calldata data
-    ) external virtual override onlyNotary {
+    ) external virtual override onlyNotary txIdNotUsed(txId) {
         _transfer(txId, new bytes32[](0), outputs, signature, data);
     }
 
@@ -244,7 +244,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         bytes32[] memory outputs,
         bytes calldata signature,
         bytes calldata data
-    ) internal virtual txIdNotUsed(txId) {
+    ) internal virtual {
         _processInputs(inputs);
         _processOutputs(outputs);
         emit Transfer(txId, msg.sender, inputs, outputs, signature, data);
@@ -331,7 +331,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         bytes calldata options,
         bytes calldata signature,
         bytes calldata data
-    ) external virtual override onlyNotary {
+    ) external virtual override onlyNotary txIdNotUsed(txId) {
         _lock(
             txId,
             lockId,
@@ -472,7 +472,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         bytes calldata options,
         bytes calldata signature,
         bytes calldata data
-    ) external virtual override onlyNotary {
+    ) external virtual override onlyNotary txIdNotUsed(txId) {
         if (_lockDelegates[lockId] != address(0)) {
             revert NotoAlreadyPrepared(lockId);
         }
