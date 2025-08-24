@@ -74,6 +74,7 @@ func TestBurn(t *testing.T) {
 			ContractAddress: contractAddress,
 			ContractConfigJson: mustParseJSON(&types.NotoParsedConfig{
 				NotaryLookup: "notary@node1",
+				Variant:      types.NotoVariantDefault,
 			}),
 		},
 		FunctionAbiJson:   mustParseJSON(fn),
@@ -210,6 +211,7 @@ func TestBurn(t *testing.T) {
 	tx.ContractInfo.ContractConfigJson = mustParseJSON(&types.NotoParsedConfig{
 		NotaryLookup: "notary@node1",
 		NotaryMode:   types.NotaryModeHooks.Enum(),
+		Variant:      types.NotoVariantDefault,
 		Options: types.NotoOptions{
 			Hooks: &types.NotoHooksOptions{
 				PublicAddress:     pldtypes.MustEthAddress(hookAddress),

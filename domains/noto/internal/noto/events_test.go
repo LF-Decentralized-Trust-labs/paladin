@@ -53,6 +53,9 @@ func TestHandleEventBatch_NotoTransfer(t *testing.T) {
 				DataJson:          string(notoEventJson),
 			},
 		},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: `{"variant": "0x0001"}`,
+		},
 	}
 
 	res, err := n.HandleEventBatch(ctx, req)
@@ -79,6 +82,9 @@ func TestHandleEventBatch_NotoTransferBadData(t *testing.T) {
 				SoliditySignature: eventSignatures[EventTransfer],
 				DataJson:          "!!wrong",
 			}},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: `{"variant": "0x0001"}`,
+		},
 	}
 
 	res, err := n.HandleEventBatch(ctx, req)
@@ -109,6 +115,9 @@ func TestHandleEventBatch_NotoTransferBadTransactionData(t *testing.T) {
 				SoliditySignature: eventSignatures[EventTransfer],
 				DataJson:          string(notoEventJson),
 			}},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: `{"variant": "0x0001"}`,
+		},
 	}
 
 	_, err = n.HandleEventBatch(ctx, req)
@@ -146,6 +155,9 @@ func TestHandleEventBatch_NotoLock(t *testing.T) {
 				DataJson:          string(notoEventJson),
 			},
 		},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: `{"variant": "0x0001"}`,
+		},
 	}
 
 	res, err := n.HandleEventBatch(ctx, req)
@@ -173,6 +185,9 @@ func TestHandleEventBatch_NotoLockBadData(t *testing.T) {
 				SoliditySignature: eventSignatures[EventLocked],
 				DataJson:          "!!wrong",
 			}},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: `{"variant": "0x0001"}`,
+		},
 	}
 
 	res, err := n.HandleEventBatch(ctx, req)
@@ -203,6 +218,9 @@ func TestHandleEventBatch_NotoLockBadTransactionData(t *testing.T) {
 				SoliditySignature: eventSignatures[EventLocked],
 				DataJson:          string(notoEventJson),
 			}},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: `{"variant": "0x0001"}`,
+		},
 	}
 
 	_, err = n.HandleEventBatch(ctx, req)
@@ -239,7 +257,7 @@ func TestHandleEventBatch_NotoUnlock(t *testing.T) {
 			},
 		},
 		ContractInfo: &prototk.ContractInfo{
-			ContractConfigJson: `{}`,
+			ContractConfigJson: `{"variant": "0x0001"}`,
 		},
 	}
 
@@ -268,6 +286,9 @@ func TestHandleEventBatch_NotoUnlockBadData(t *testing.T) {
 				SoliditySignature: eventSignatures[EventTransferLocked],
 				DataJson:          "!!wrong",
 			}},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: `{"variant": "0x0001"}`,
+		},
 	}
 
 	res, err := n.HandleEventBatch(ctx, req)
@@ -298,6 +319,9 @@ func TestHandleEventBatch_NotoUnlockBadTransactionData(t *testing.T) {
 				SoliditySignature: eventSignatures[EventTransferLocked],
 				DataJson:          string(notoEventJson),
 			}},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: `{"variant": "0x0001"}`,
+		},
 	}
 
 	_, err = n.HandleEventBatch(ctx, req)

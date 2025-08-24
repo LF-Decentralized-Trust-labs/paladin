@@ -37,6 +37,7 @@ var pTrue = true
 var notoBasicConfig = &types.NotoParsedConfig{
 	NotaryMode:   types.NotaryModeBasic.Enum(),
 	NotaryLookup: "notary@node1",
+	Variant:      types.NotoVariantDefault,
 	Options: types.NotoOptions{
 		Basic: &types.NotoBasicOptions{
 			RestrictMint: &pTrue,

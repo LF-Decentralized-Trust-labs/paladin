@@ -29,6 +29,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signpayloads"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 )
 
 type lockHandler struct {
@@ -198,7 +199,7 @@ func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *lockHandler) baseLedgerInvoke(ctx context.Context, lockID pldtypes.Bytes32, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *lockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, lockID pldtypes.Bytes32, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inputs := req.InputStates
 	outputs, lockedOutputs := h.noto.splitStates(req.OutputStates)
 
@@ -213,25 +214,47 @@ func (h *lockHandler) baseLedgerInvoke(ctx context.Context, lockID pldtypes.Byte
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoLockParams{
-		TxId:   req.Transaction.TransactionId,
-		LockID: lockID,
-		States: LockStatesInput{
+
+	var interfaceABI abi.ABI
+	var functionName string
+	var paramsJSON []byte
+
+	switch tx.DomainConfig.Variant {
+	case types.NotoVariantDefault:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
+		functionName = "lock"
+		params := &NotoLockParams{
+			TxId:   req.Transaction.TransactionId,
+			LockID: lockID,
+			States: LockStatesInput{
+				Inputs:        endorsableStateIDs(inputs),
+				Outputs:       endorsableStateIDs(outputs),
+				LockedOutputs: endorsableStateIDs(lockedOutputs),
+			},
+			Delegate: &pldtypes.EthAddress{},
+			Options:  nil,
+			Proof:    lockSignature.Payload,
+			Data:     data,
+		}
+		paramsJSON, err = json.Marshal(params)
+	default:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
+		functionName = "lock"
+		params := &NotoLock_V0_Params{
+			TxId:          req.Transaction.TransactionId,
 			Inputs:        endorsableStateIDs(inputs),
 			Outputs:       endorsableStateIDs(outputs),
 			LockedOutputs: endorsableStateIDs(lockedOutputs),
-		},
-		Delegate: &pldtypes.EthAddress{},
-		Options:  nil,
-		Proof:    lockSignature.Payload,
-		Data:     data,
+			Signature:     lockSignature.Payload,
+			Data:          data,
+		}
+		paramsJSON, err = json.Marshal(params)
 	}
-	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()["lock"],
+		functionABI: interfaceABI.Functions()[functionName],
 		paramsJSON:  paramsJSON,
 	}, nil
 }
@@ -300,7 +323,7 @@ func (h *lockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "notary")
 	}
 
-	baseTransaction, err := h.baseLedgerInvoke(ctx, lockID, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, lockID, req)
 	if err != nil {
 		return nil, err
 	}

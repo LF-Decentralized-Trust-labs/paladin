@@ -29,6 +29,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signpayloads"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 )
 
 type unlockCommon struct {
@@ -300,21 +301,43 @@ func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTr
 	if err != nil {
 		return nil, err
 	}
-	params := &types.TransferLockedPublicParams{
-		TxId:          req.Transaction.TransactionId,
-		LockID:        inParams.LockID,
-		LockedInputs:  endorsableStateIDs(lockedInputs),
-		LockedOutputs: endorsableStateIDs(lockedOutputs),
-		Outputs:       endorsableStateIDs(outputs),
-		Proof:         unlockSignature.Payload,
-		Data:          data,
+
+	var interfaceABI abi.ABI
+	var functionName string
+	var paramsJSON []byte
+
+	switch tx.DomainConfig.Variant {
+	case types.NotoVariantDefault:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
+		functionName = "transferLocked"
+		params := &types.TransferLockedPublicParams{
+			TxId:          req.Transaction.TransactionId,
+			LockID:        inParams.LockID,
+			LockedInputs:  endorsableStateIDs(lockedInputs),
+			LockedOutputs: endorsableStateIDs(lockedOutputs),
+			Outputs:       endorsableStateIDs(outputs),
+			Proof:         unlockSignature.Payload,
+			Data:          data,
+		}
+		paramsJSON, err = json.Marshal(params)
+	default:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
+		functionName = "unlock"
+		params := &NotoUnlock_V0_Params{
+			TxId:          req.Transaction.TransactionId,
+			LockedInputs:  endorsableStateIDs(lockedInputs),
+			LockedOutputs: endorsableStateIDs(lockedOutputs),
+			Outputs:       endorsableStateIDs(outputs),
+			Signature:     unlockSignature.Payload,
+			Data:          data,
+		}
+		paramsJSON, err = json.Marshal(params)
 	}
-	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()["transferLocked"],
+		functionABI: interfaceABI.Functions()[functionName],
 		paramsJSON:  paramsJSON,
 	}, nil
 }
