@@ -28,6 +28,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signpayloads"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 )
 
 type prepareUnlockHandler struct {
@@ -144,20 +145,40 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoSetLockOptionsParams{
-		TxId:         req.Transaction.TransactionId,
-		LockID:       inParams.LockID,
-		LockedInputs: endorsableStateIDs(lockedInputs),
-		Options:      lockOptionsEncoded,
-		Proof:        sender.Payload,
-		Data:         data,
+
+	var interfaceABI abi.ABI
+	var functionName string
+	var paramsJSON []byte
+
+	switch tx.DomainConfig.Variant {
+	case types.NotoVariantDefault:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
+		functionName = "setLockOptions"
+		params := &NotoSetLockOptionsParams{
+			TxId:         req.Transaction.TransactionId,
+			LockID:       inParams.LockID,
+			LockedInputs: endorsableStateIDs(lockedInputs),
+			Options:      lockOptionsEncoded,
+			Proof:        sender.Payload,
+			Data:         data,
+		}
+		paramsJSON, err = json.Marshal(params)
+	default:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
+		functionName = "prepareUnlock"
+		params := &NotoPrepareUnlock_V0_Params{
+			LockedInputs: endorsableStateIDs(lockedInputs),
+			UnlockHash:   unlockHash.String(),
+			Signature:    sender.Payload,
+			Data:         data,
+		}
+		paramsJSON, err = json.Marshal(params)
 	}
-	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()["setLockOptions"],
+		functionABI: interfaceABI.Functions()[functionName],
 		paramsJSON:  paramsJSON,
 	}, nil
 }

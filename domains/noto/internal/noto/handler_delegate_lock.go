@@ -30,6 +30,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signpayloads"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 )
 
 type delegateLockHandler struct {
@@ -176,19 +177,40 @@ func (h *delegateLockHandler) baseLedgerInvoke(ctx context.Context, tx *types.Pa
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoDelegateLockParams{
-		TxId:     req.Transaction.TransactionId,
-		LockID:   inParams.LockID,
-		Delegate: inParams.Delegate,
-		Proof:    sender.Payload,
-		Data:     data,
+
+	var interfaceABI abi.ABI
+	var functionName string
+	var paramsJSON []byte
+
+	switch tx.DomainConfig.Variant {
+	case types.NotoVariantDefault:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
+		functionName = "delegateLock"
+		params := &NotoDelegateLockParams{
+			TxId:     req.Transaction.TransactionId,
+			LockID:   inParams.LockID,
+			Delegate: inParams.Delegate,
+			Proof:    sender.Payload,
+			Data:     data,
+		}
+		paramsJSON, err = json.Marshal(params)
+	default:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
+		functionName = "delegateLock"
+		params := &NotoDelegateLock_V0_Params{
+			TxId:       req.Transaction.TransactionId,
+			UnlockHash: inParams.LockID.String(),
+			Delegate:   inParams.Delegate,
+			Signature:  sender.Payload,
+			Data:       data,
+		}
+		paramsJSON, err = json.Marshal(params)
 	}
-	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()["delegateLock"],
+		functionABI: interfaceABI.Functions()[functionName],
 		paramsJSON:  paramsJSON,
 	}, nil
 }
