@@ -6,10 +6,10 @@ import PaladinClient, {
 import * as fs from 'fs';
 import * as path from 'path';
 import helloWorldJson from "./abis/HelloWorld.json";
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
 
-const paladin = new PaladinClient({ url: "http://127.0.0.1:31548" });
 
 export interface ContractData {
   privacyGroupId: string;
@@ -54,6 +54,15 @@ function findLatestContractDataFile(dataDir: string): string | null {
 }
 
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 1) {
+    logger.error("The environment config must provide at least 1 node for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin client from the environment configuration...");
+  const paladin = new PaladinClient(nodeConnections[0].clientOptions);
+
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
   const dataDir = path.join(__dirname, '..', 'data');
@@ -77,7 +86,7 @@ async function main(): Promise<boolean> {
 
   // STEP 2: Get verifier and recreate privacy group connection
   logger.log("STEP 2: Recreating privacy group connection...");
-  const [verifierNode1] = paladin.getVerifiers("member@node1");
+  const [verifierNode1] = paladin.getVerifiers(`member@${nodeConnections[0].id}`);
 
   // Recreate privacy group connection
   const penteFactory = new PenteFactory(paladin, "pente");

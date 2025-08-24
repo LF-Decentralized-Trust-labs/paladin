@@ -10,13 +10,20 @@ import helloWorldJson from "./abis/HelloWorld.json";
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContractData } from "./verify-deployed";
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
 
-const paladin = new PaladinClient({ url: "http://127.0.0.1:31548" });
-
 async function main(): Promise<boolean> {
-  const [verifierNode1] = paladin.getVerifiers("member@node1");
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 1) {
+    logger.error("The environment config must provide at least 1 node for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin client from the environment configuration...");
+  const paladin = new PaladinClient(nodeConnections[0].clientOptions);
+  const [verifierNode1] = paladin.getVerifiers(`member@${nodeConnections[0].id}`);
 
   // Create a privacy group for Node1 alone
   logger.log("Creating a privacy group for Node1...");
@@ -214,7 +221,7 @@ async function main(): Promise<boolean> {
       name: name,
       receivedEventData: receivedEventData,
       receivedReceiptId: receivedReceiptId,
-      transactionId: txId
+      transactionId: txId,
     },
     listenerConfig: {
       type: TransactionType.PRIVATE,

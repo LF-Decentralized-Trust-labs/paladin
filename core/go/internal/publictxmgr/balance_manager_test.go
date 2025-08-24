@@ -33,14 +33,14 @@ func newTestBalanceManager(t *testing.T) (context.Context, *BalanceManagerWithIn
 	return ctx, balanceManager.(*BalanceManagerWithInMemoryTracking), ble, m, done
 }
 
-func TestNotifyAddressBalanceChanged(t *testing.T) {
+func TestNotifyRetrieveAddressBalance(t *testing.T) {
 	ctx, bm, _, _, done := newTestBalanceManager(t)
 	defer done()
 
 	exampleAddr := *pldtypes.RandAddress()
-	assert.Equal(t, false, bm.addressBalanceChangedMap[exampleAddr])
-	bm.NotifyAddressBalanceChanged(ctx, exampleAddr)
-	assert.Equal(t, true, bm.addressBalanceChangedMap[exampleAddr])
+	assert.Equal(t, false, bm.retrieveAddressBalanceMap[exampleAddr])
+	bm.NotifyRetrieveAddressBalance(ctx, exampleAddr)
+	assert.Equal(t, true, bm.retrieveAddressBalanceMap[exampleAddr])
 }
 
 func TestGetAddressBalance(t *testing.T) {
@@ -69,13 +69,13 @@ func TestGetAddressBalance(t *testing.T) {
 	assert.Equal(t, balanceOld, addressAccount.Balance.Uint64())
 
 	// next get should retrieve the balance again
-	bm.NotifyAddressBalanceChanged(ctx, exampleAddr)
+	bm.NotifyRetrieveAddressBalance(ctx, exampleAddr)
 	addressAccount, err = bm.GetAddressBalance(ctx, exampleAddr)
 	require.NoError(t, err)
 	assert.Equal(t, balanceNew, addressAccount.Balance.Uint64())
 
 	// test error
-	bm.NotifyAddressBalanceChanged(ctx, exampleAddr)
+	bm.NotifyRetrieveAddressBalance(ctx, exampleAddr)
 	_, err = bm.GetAddressBalance(ctx, exampleAddr)
 	assert.Error(t, err)
 }

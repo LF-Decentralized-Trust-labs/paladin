@@ -20,6 +20,7 @@ import (
 	"os"
 	"runtime/debug"
 	"testing"
+	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
@@ -337,7 +338,13 @@ func TestDomainRequestsOK(t *testing.T) {
 	})
 	defer done()
 
-	domainAPI := <-waitForAPI
+	var domainAPI components.DomainManagerToDomain
+	select {
+	case domainAPI = <-waitForAPI:
+		// Received domain API
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for domain API - expected registration was not received")
+	}
 
 	cdr, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{
 		ChainId: int64(12345),
@@ -471,7 +478,13 @@ func TestDomainRequestsOK(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, `{"wrapped":"params"}`, wpgtr.Transaction.ParamsJson)
 
-	callbacks := <-waitForCallbacks
+	// Add timeout for callbacks
+	var callbacks plugintk.DomainCallbacks
+	select {
+	case callbacks = <-waitForCallbacks:
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for callbacks - expected callbacks were not received")
+	}
 
 	fas, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
 		SchemaId: "schema1",
@@ -548,7 +561,13 @@ func TestDomainRegisterFail(t *testing.T) {
 	})
 	defer done()
 
-	<-waitForError
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case <-waitForError:
+		// Error received successfully
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for error - expected error was not received")
+	}
 }
 
 func TestFromDomainRequestBadReq(t *testing.T) {
@@ -589,6 +608,11 @@ func TestFromDomainRequestBadReq(t *testing.T) {
 	})
 	defer done()
 
-	<-waitForResponse
-
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case <-waitForResponse:
+		// Response received successfully
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for response - expected response was not received")
+	}
 }

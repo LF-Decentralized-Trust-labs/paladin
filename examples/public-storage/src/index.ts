@@ -4,17 +4,20 @@ import PaladinClient, {
 import storageJson from "./abis/Storage.json";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
 
-// Instantiate Paladin client
-const paladin = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-
 async function main(): Promise<boolean> {
-  // Get the owner account verifier
-  const [owner] = paladin.getVerifiers("owner@node1");
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 1) {
+    logger.error("The environment config must provide at least 1 node for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin client from the environment configuration...");
+  const paladin = new PaladinClient(nodeConnections[0].clientOptions);
+  const [owner] = paladin.getVerifiers(`owner@${nodeConnections[0].id}`);
 
   // Step 1: Deploy the Storage contract
   logger.log("Step 1: Deploying the Storage contract...");

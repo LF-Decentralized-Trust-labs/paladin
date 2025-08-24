@@ -104,7 +104,7 @@ const (
 
 type BalanceManager interface {
 	GetAddressBalance(ctx context.Context, address pldtypes.EthAddress) (*AddressAccount, error)
-	NotifyAddressBalanceChanged(ctx context.Context, address pldtypes.EthAddress)
+	NotifyRetrieveAddressBalance(ctx context.Context, address pldtypes.EthAddress)
 }
 
 // AddressAccount provides the following feature:

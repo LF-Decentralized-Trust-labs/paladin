@@ -405,7 +405,7 @@ func (it *inFlightTransactionStageController) processSubmittingStageOutput(ctx c
 	if stageOutput.PersistenceOutput != nil {
 		if rsc.StageOutput.SubmitOutput.Err != nil {
 			if rsc.StageOutput.SubmitOutput.ErrorReason == string(ethclient.ErrorReasonInsufficientFunds) {
-				it.balanceManager.NotifyAddressBalanceChanged(ctx, it.signingAddress)
+				it.balanceManager.NotifyRetrieveAddressBalance(ctx, it.signingAddress)
 			}
 			// wait for the stale transaction timeout to re-trigger the submission provided this is the current generation
 			rsc.StageErrored = true

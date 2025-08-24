@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
@@ -181,8 +182,13 @@ func TestPluginRequestsError(t *testing.T) {
 	})
 	defer done()
 
-	<-waitForResponse
-
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case <-waitForResponse:
+		// Response received successfully
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for response - expected response was not received")
+	}
 }
 
 func TestSenderErrorHandling(t *testing.T) {
@@ -207,26 +213,29 @@ func TestSenderErrorHandling(t *testing.T) {
 		testDomainManager: tdm,
 	})
 
-	domainAPI := <-waitForRegister
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case domainAPI := <-waitForRegister:
+		// Stop
+		done()
 
-	// Stop
-	done()
-
-	// Check send loop sending on closed stream
-	bridge := domainAPI.(*domainBridge)
-	handler := bridge.toPlugin.(*pluginHandler[prototk.DomainMessage])
-	handler.senderDone = make(chan struct{})
-	handler.sendChl = make(chan plugintk.PluginMessage[prototk.DomainMessage])
-	cancellable, cancel := context.WithCancel(context.Background())
-	handler.ctx = cancellable
-	go func() {
+		// Check send loop sending on closed stream
+		bridge := domainAPI.(*domainBridge)
+		handler := bridge.toPlugin.(*pluginHandler[prototk.DomainMessage])
+		handler.senderDone = make(chan struct{})
+		handler.sendChl = make(chan plugintk.PluginMessage[prototk.DomainMessage])
+		cancellable, cancel := context.WithCancel(context.Background())
+		handler.ctx = cancellable
+		go func() {
+			handler.send(handler.wrapper.Wrap(&prototk.DomainMessage{}))
+			cancel() // cancel after first message pushed to sender
+		}()
+		handler.sender()
+		// Check does not block after context is closed
 		handler.send(handler.wrapper.Wrap(&prototk.DomainMessage{}))
-		cancel() // cancel after first message pushed to sender
-	}()
-	handler.sender()
-	// Check does not block after context is closed
-	handler.send(handler.wrapper.Wrap(&prototk.DomainMessage{}))
-
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for domain API - expected registration was not received")
+	}
 }
 
 func TestDomainRequestsBadResponse(t *testing.T) {
@@ -268,11 +277,14 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 	})
 	defer done()
 
-	domainAPI := <-waitForRegister
-
-	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
-	assert.Regexp(t, "PD011205", err)
-
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case domainAPI := <-waitForRegister:
+		_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
+		assert.Regexp(t, "PD011205", err)
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for domain API - expected registration was not received")
+	}
 }
 
 func TestDomainRequestsErrorWithMessage(t *testing.T) {
@@ -310,11 +322,14 @@ func TestDomainRequestsErrorWithMessage(t *testing.T) {
 	})
 	defer done()
 
-	domainAPI := <-waitForRegister
-
-	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
-	assert.Regexp(t, "PD011206.*some error", err)
-
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case domainAPI := <-waitForRegister:
+		_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
+		assert.Regexp(t, "PD011206.*some error", err)
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for domain API - expected registration was not received")
+	}
 }
 
 func TestDomainRequestsErrorNoMessage(t *testing.T) {
@@ -351,11 +366,14 @@ func TestDomainRequestsErrorNoMessage(t *testing.T) {
 	})
 	defer done()
 
-	domainAPI := <-waitForRegister
-
-	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
-	assert.Regexp(t, "PD011206.*ERROR_RESPONSE", err)
-
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case domainAPI := <-waitForRegister:
+		_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
+		assert.Regexp(t, "PD011206.*ERROR_RESPONSE", err)
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for domain API - expected registration was not received")
+	}
 }
 
 func TestReceiveAfterTimeout(t *testing.T) {
@@ -388,19 +406,23 @@ func TestReceiveAfterTimeout(t *testing.T) {
 	})
 	defer done()
 
-	domainAPI := <-waitForRegister
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case domainAPI := <-waitForRegister:
+		go func() {
+			<-readyToGo
+			// Force a timeout by closing the inflight handler while the request is mid-flight
+			bridge := domainAPI.(*domainBridge)
+			handler := bridge.toPlugin.(*pluginHandler[prototk.DomainMessage])
+			handler.inflight.Close()
+			gone <- true
+		}()
 
-	go func() {
-		<-readyToGo
-		// Force a timeout by closing the inflight handler while the request is mid-flight
-		bridge := domainAPI.(*domainBridge)
-		handler := bridge.toPlugin.(*pluginHandler[prototk.DomainMessage])
-		handler.inflight.Close()
-		close(gone)
-	}()
-	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
-	assert.Regexp(t, "PD020100", err)
-
+		_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
+		assert.Regexp(t, "PD020100", err)
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for domain API - expected registration was not received")
+	}
 }
 
 func TestDomainSendBeforeRegister(t *testing.T) {
@@ -433,7 +455,13 @@ func TestDomainSendBeforeRegister(t *testing.T) {
 	})
 	defer done()
 
-	<-waitForRegister
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case <-waitForRegister:
+		// Registration received successfully
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for registration - expected registration was not received")
+	}
 }
 
 func TestDomainSendDoubleRegister(t *testing.T) {
@@ -468,8 +496,13 @@ func TestDomainSendDoubleRegister(t *testing.T) {
 	})
 	defer done()
 
-	<-waitForRegister
-
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case <-waitForRegister:
+		// Registration received successfully
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for registration - expected registration was not received")
+	}
 }
 
 func TestDomainRegisterWrongID(t *testing.T) {
@@ -506,7 +539,13 @@ func TestDomainRegisterWrongID(t *testing.T) {
 	})
 	defer done()
 
-	assert.Regexp(t, "UUID", <-waitForError)
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case err := <-waitForError:
+		assert.Regexp(t, "UUID", err.Error())
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for error - expected error was not received")
+	}
 }
 
 func TestDomainSendResponseWrongID(t *testing.T) {
@@ -576,12 +615,17 @@ func TestDomainSendResponseWrongID(t *testing.T) {
 	})
 	defer done()
 
-	domainAPI := <-waitForRegister
-	atr, err := domainAPI.AssembleTransaction(ctx, &prototk.AssembleTransactionRequest{
-		Transaction: &prototk.TransactionSpecification{
-			TransactionId: "tx2_prepare",
-		},
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, prototk.AssembleTransactionResponse_REVERT, atr.AssemblyResult)
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case domainAPI := <-waitForRegister:
+		atr, err := domainAPI.AssembleTransaction(ctx, &prototk.AssembleTransactionRequest{
+			Transaction: &prototk.TransactionSpecification{
+				TransactionId: "tx2_prepare",
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, prototk.AssembleTransactionResponse_REVERT, atr.AssemblyResult)
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for domain API - expected registration was not received")
+	}
 }

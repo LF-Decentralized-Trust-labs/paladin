@@ -13,56 +13,57 @@ import { newERC20Tracker } from "./helpers/erc20tracker";
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContractData } from "./verify-deployed";
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
 
-const paladin1 = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-const paladin2 = new PaladinClient({
-  url: "http://127.0.0.1:31648",
-});
-const paladin3 = new PaladinClient({
-  url: "http://127.0.0.1:31748",
-});
-
-// TODO: eliminate the need for this call
-async function encodeZetoTransfer(preparedCashTransfer: IPreparedTransaction) {
-  try {
-    const zetoTransferAbi = await paladin3.ptx.getStoredABI(
-      preparedCashTransfer.transaction.abiReference ?? ""
-    );
-    
-    if (!zetoTransferAbi) {
-      throw new Error("Failed to get stored ABI for prepared transaction");
-    }
-    
-    const encodedData = new ethers.Interface(zetoTransferAbi.abi).encodeFunctionData(
-      "transferLocked",
-      [
-        preparedCashTransfer.transaction.data.inputs,
-        preparedCashTransfer.transaction.data.outputs,
-        preparedCashTransfer.transaction.data.proof,
-        preparedCashTransfer.transaction.data.data,
-      ]
-    );
-    
-    logger.log("Successfully encoded Zeto transfer data");
-    return encodedData;
-  } catch (error) {
-    logger.error("Failed to encode Zeto transfer:");
-    logger.error(`Error: ${error}`);
-    throw error;
-  }
-}
-
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const [paladin1, paladin2, paladin3] = clients;
+
   const [cashIssuer, assetIssuer] = paladin1.getVerifiers(
-    "cashIssuer@node1",
-    "assetIssuer@node1"
+    `cashIssuer@${nodeConnections[0].id}`,
+    `assetIssuer@${nodeConnections[0].id}`
   );
-  const [investor1] = paladin2.getVerifiers("investor1@node2");
-  const [investor2] = paladin3.getVerifiers("investor2@node3");
+  const [investor1] = paladin2.getVerifiers(`investor1@${nodeConnections[1].id}`);
+  const [investor2] = paladin3.getVerifiers(`investor2@${nodeConnections[2].id}`);
+
+  // TODO: eliminate the need for this call
+  async function encodeZetoTransfer(preparedCashTransfer: IPreparedTransaction) {
+    try {
+      const zetoTransferAbi = await paladin3.ptx.getStoredABI(
+        preparedCashTransfer.transaction.abiReference ?? ""
+      );
+      
+      if (!zetoTransferAbi) {
+        throw new Error("Failed to get stored ABI for prepared transaction");
+      }
+      
+      const encodedData = new ethers.Interface(zetoTransferAbi.abi).encodeFunctionData(
+        "transferLocked",
+        [
+          preparedCashTransfer.transaction.data.inputs,
+          preparedCashTransfer.transaction.data.outputs,
+          preparedCashTransfer.transaction.data.proof,
+          preparedCashTransfer.transaction.data.data,
+        ]
+      );
+      
+      logger.log("Successfully encoded Zeto transfer data");
+      return encodedData;
+    } catch (error) {
+      logger.error("Failed to encode Zeto transfer:");
+      logger.error(`Error: ${error}`);
+      throw error;
+    }
+  }
 
   const issuedAssetAmount = 1000;
   const issuedCashAmount = 10000;

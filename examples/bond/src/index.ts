@@ -14,27 +14,28 @@ import { newBondTracker } from "./helpers/bondtracker";
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContractData } from "./verify-deployed";
+import { nodeConnections } from "../../common/src/config";
 
 const logger = console;
 
-const paladin1 = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-const paladin2 = new PaladinClient({
-  url: "http://127.0.0.1:31648",
-});
-const paladin3 = new PaladinClient({
-  url: "http://127.0.0.1:31748",
-});
-
 async function main(): Promise<boolean> {
-  const [cashIssuer, bondIssuer] = paladin1.getVerifiers(
-    "cashIssuer@node1",
-    "bondIssuer@node1"
-  );
-  const [bondCustodian] = paladin2.getVerifiers("bondCustodian@node2");
-  const [investor] = paladin3.getVerifiers("investor@node3");
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const [paladin1, paladin2, paladin3] = clients;
 
+  const [cashIssuer, bondIssuer] = paladin1.getVerifiers(
+    `cashIssuer@${nodeConnections[0].id}`,
+    `bondIssuer@${nodeConnections[0].id}`
+  );
+
+  const [bondCustodian] = paladin2.getVerifiers(`bondCustodian@${nodeConnections[1].id}`);
+  const [investor] = paladin3.getVerifiers(`investor@${nodeConnections[2].id}`);
   // Create a Noto token to represent cash
   logger.log("Deploying Noto cash token...");
   const notoFactory = new NotoFactory(paladin1, "noto");
