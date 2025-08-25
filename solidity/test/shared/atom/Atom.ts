@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import { ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 import { Atom, Noto } from "../../../typechain-types";
 import {
@@ -27,28 +28,40 @@ describe("Atom", function () {
     const erc20 = await ERC20Simple.connect(notary2).deploy("Token", "TOK");
 
     // Bring TXOs and tokens into being
+    const lockId = randomBytes32();
     const [f1txo1, f1txo2] = [fakeTXO(), fakeTXO()];
-    await noto
-      .connect(notary1)
-      .lock(randomBytes32(), [], [], [f1txo1, f1txo2], "0x", randomBytes32());
+    await noto.connect(notary1).lock(
+      randomBytes32(),
+      lockId,
+      {
+        inputs: [],
+        outputs: [],
+        lockedOutputs: [f1txo1, f1txo2],
+      },
+      ZeroAddress,
+      "0x",
+      "0x",
+      "0x"
+    );
     await erc20.mint(notary2, 1000);
 
     // Encode two function calls
     const [f1txo3, f1txo4] = [fakeTXO(), fakeTXO()];
     const f1TxData = randomBytes32();
-    const multiTXF1Part = await newUnlockHash(
+    const unlockHash = await newUnlockHash(
       noto,
       [f1txo1, f1txo2],
       [],
       [f1txo3, f1txo4],
       f1TxData
     );
-    const encoded1 = noto.interface.encodeFunctionData("unlock", [
+    const encoded1 = noto.interface.encodeFunctionData("transferLocked", [
       randomBytes32(),
+      lockId,
       [f1txo1, f1txo2],
       [],
       [f1txo3, f1txo4],
-      randomBytes32(),
+      "0x",
       f1TxData,
     ]);
     const encoded2 = erc20.interface.encodeFunctionData("transferFrom", [
@@ -59,7 +72,7 @@ describe("Atom", function () {
 
     // Deploy the delegation contract
     const atomFactory = await AtomFactory.connect(anybody1).deploy();
-    const mcFactoryInvoke = await atomFactory.connect(anybody1).create([
+    const atomFactoryInvoke = await atomFactory.connect(anybody1).create([
       {
         contractAddress: noto,
         callData: encoded1,
@@ -69,27 +82,25 @@ describe("Atom", function () {
         callData: encoded2,
       },
     ]);
-    const createMF = await mcFactoryInvoke.wait();
-    const createMFEvent = createMF?.logs
+    const createAtom = await atomFactoryInvoke.wait();
+    const createAtomEvent = createAtom?.logs
       .map((l) => AtomFactory.interface.parseLog(l))
       .find((l) => l?.name === "AtomDeployed");
-    const mcAddr = createMFEvent?.args.addr;
+    const atomAddr = createAtomEvent?.args.addr;
 
     // Do the delegation/approval transactions
+    const options = ethers.AbiCoder.defaultAbiCoder().encode(
+      ["tuple(bytes32)"],
+      [[unlockHash]]
+    );
     await noto
       .connect(notary1)
-      .prepareUnlock([f1txo1, f1txo2], multiTXF1Part, "0x", "0x");
-    await noto.connect(notary1).delegateLock(
-      randomBytes32(),
-      multiTXF1Part,
-      mcAddr,
-      "0x",
-      "0x"
-    );
-    await erc20.approve(mcAddr, 1000);
+      .setLockOptions(randomBytes32(), lockId, [f1txo1, f1txo2], options, "0x", "0x");
+    await noto.connect(notary1).delegateLock(randomBytes32(), lockId, atomAddr, "0x", "0x");
+    await erc20.approve(atomAddr, 1000);
 
     // Run the atomic op (anyone can initiate)
-    const atom = Atom.connect(anybody2).attach(mcAddr) as Atom;
+    const atom = Atom.connect(anybody2).attach(atomAddr) as Atom;
     await atom.execute();
 
     // Now we should find the final TXOs/tokens in both contracts in the right states
@@ -117,19 +128,14 @@ describe("Atom", function () {
     ) as Noto;
 
     // Fake up a delegation
+    const lockId = randomBytes32();
     const [f1txo1, f1txo2] = [fakeTXO(), fakeTXO()];
     const [f1txo3, f1txo4] = [fakeTXO(), fakeTXO()];
     const f1TxData = randomBytes32();
-    const multiTXF1Part = await newUnlockHash(
-      noto,
-      [f1txo1, f1txo2],
-      [],
-      [f1txo3, f1txo4],
-      f1TxData
-    );
 
-    const encoded1 = noto.interface.encodeFunctionData("unlock", [
+    const encoded1 = noto.interface.encodeFunctionData("transferLocked", [
       randomBytes32(),
+      lockId,
       [f1txo1, f1txo2],
       [],
       [f1txo3, f1txo4],
