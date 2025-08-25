@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#prerequisites" class="md-skip">
+        <a href="#tutorials" class="md-skip">
           Skip to content
         </a>
       
@@ -3340,6 +3340,8 @@
   
   
   
+    
+  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -3365,6 +3367,24 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#learning-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      Learning Path
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      Getting Help
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3383,47 +3403,47 @@
   
 
 
-  <h1>Introduction</h1>
-
+<h1 id="tutorials">Tutorials<a class="headerlink" href="#tutorials" title="Permanent link">&para;</a></h1>
+<p>Welcome to the Paladin tutorials! These tutorials provide a comprehensive introduction to running Paladin, starting with basic concepts and progressing to advanced privacy-preserving  applications.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Git</strong>  </li>
 <li><strong>Node.js 20.x or newer</strong><br />
   Follow the <a href="https://nodejs.org/en/download/package-manager">official Node.js documentation</a> for your platform to install the appropriate version.</li>
 </ul>
-<p>To access the tutorial code, clone the <strong>most recent release tag</strong> of the Paladin repository:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">REPO</span><span class="o">=</span>https://github.com/LF-Decentralized-Trust-labs/paladin.git<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>git<span class="w"> </span>clone<span class="w"> </span><span class="nv">$REPO</span><span class="w"> </span>--single-branch<span class="w"> </span>--branch<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">$(</span>git<span class="w"> </span>ls-remote<span class="w"> </span>--tags<span class="w"> </span><span class="nv">$REPO</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d/<span class="w"> </span>-f3<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-V<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-n1<span class="k">)</span>
+<p>⚠️ To ensure you are using a stable version, <strong>always clone the most recent release tag</strong>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">REPO</span><span class="o">=</span>https://github.com/LF-Decentralized-Trust-labs/paladin.git
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nv">TAG</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>ls-remote<span class="w"> </span>--tags<span class="w"> </span><span class="nv">$REPO</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d/<span class="w"> </span>-f3<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span><span class="s1">&#39;\-rc&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-V<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-n1<span class="k">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>git<span class="w"> </span>clone<span class="w"> </span><span class="nv">$REPO</span><span class="w"> </span>-b<span class="w"> </span><span class="nv">$TAG</span>
 </code></pre></div>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<p>The tutorials on this page provide an introduction to building on the Paladin platform. If you haven’t already, visit the <a href="../getting-started/installation/">Getting Started guide</a> to familiarize yourself with running Paladin before proceeding with any of the tutorials below.</p>
+<p>The tutorials on this page provide an introduction to building on the Paladin platform. If you haven't already, visit the <a href="../getting-started/installation/">Getting Started guide</a> to familiarize yourself with running Paladin before proceeding with any of the tutorials below.</p>
 <div class="grid cards">
 <ul>
 <li>
 <p><strong><a href="hello-world/">Hello World</a></strong>  </p>
 <hr />
-<p>Begin with a simple “Hello World” example to get familiar with some of the basics.</p>
+<p>Begin with a simple "Hello World" example to get familiar with deploying and interacting with smart contracts using the Paladin SDK.</p>
 </li>
 <li>
 <p><strong><a href="public-storage/">Public Smart Contract</a></strong>  </p>
 <hr />
-<p>Explore fundamental SDK functionality for deploying and interacting with a publicly visible contract.</p>
+<p>Explore fundamental SDK functionality for deploying and interacting with a publicly visible contract that stores and retrieves data.</p>
 </li>
 <li>
-<p><strong><a href="private-storage/">Private  Smart Contract</a></strong>  </p>
+<p><strong><a href="private-storage/">Private Smart Contract</a></strong>  </p>
 <hr />
-<p>Discover how to use <strong>Privacy Groups</strong> and keep contract data confidential among authorized members.</p>
+<p>Discover how to use <strong>Privacy Groups</strong> and keep contract data confidential among authorized members using Paladin's Pente domain.</p>
 </li>
 <li>
 <p><strong><a href="notarized-tokens/">Notarized Tokens</a></strong>  </p>
 <hr />
-<p>Learn how to issue, mint, and transfer tokens using Paladin’s <strong>Notarized Tokens</strong> domain.</p>
+<p>Learn how to issue, mint, and transfer tokens using Paladin's <strong>Notarized Tokens</strong> domain with notary-controlled oversight.</p>
 </li>
 <li>
 <p><strong><a href="zkp-cbdc/">Wholesale CBDC</a></strong>  </p>
 <hr />
-<p>Implement a wholesale CBDC with <strong>zero-knowledge proof</strong> features for enhanced privacy and regulatory compliance.</p>
+<p>Implement a wholesale CBDC with <strong>zero-knowledge proof</strong> features for enhanced privacy and regulatory compliance using the Zeto domain.</p>
 </li>
 <li>
 <p><strong><a href="private-stablecoin/">Private Stablecoin with KYC</a></strong>  </p>
@@ -3431,12 +3451,32 @@
 <p>Deploy a <strong>private stablecoin with KYC compliance</strong> combining <strong>deposit/withdraw functionality</strong> with zero-knowledge proof privacy and nullifier protection.</p>
 </li>
 <li>
+<p><strong><a href="atomic-swap/">Atomic Swap</a></strong>  </p>
+<hr />
+<p>Learn how to perform <strong>atomic swaps</strong> between different types of privacy-preserving tokens across multiple Paladin domains.</p>
+</li>
+<li>
 <p><strong><a href="bond-issuance/">Bond Issuance</a></strong>  </p>
 <hr />
-<p>Understand how <strong>Notarized Tokens</strong> and <strong>Privacy Groups</strong> work together to model and manage a bond issuance process.</p>
+<p>Understand how <strong>Notarized Tokens</strong> and <strong>Privacy Groups</strong> work together to model and manage a sophisticated bond issuance process.</p>
 </li>
 </ul>
 </div>
+<h2 id="learning-path">Learning Path<a class="headerlink" href="#learning-path" title="Permanent link">&para;</a></h2>
+<p>The tutorials are designed to be completed in sequence, with each building upon the concepts introduced in previous tutorials:</p>
+<ol>
+<li><strong>Foundation</strong> - Start with Hello World and Public Storage to understand basic Paladin operations</li>
+<li><strong>Privacy</strong> - Move to Private Storage to learn about privacy groups and confidential contracts</li>
+<li><strong>Tokens</strong> - Explore Notarized Tokens for controlled, auditable token operations</li>
+<li><strong>Advanced Privacy</strong> - Dive into ZKP-based privacy with the CBDC and Stablecoin tutorials</li>
+<li><strong>Integration</strong> - Learn atomic operations and complex workflows with Atomic Swap and Bond Issuance</li>
+</ol>
+<h2 id="getting-help">Getting Help<a class="headerlink" href="#getting-help" title="Permanent link">&para;</a></h2>
+<p>If you encounter issues while working through the tutorials:
+- Check the <a href="../../getting-started/troubleshooting.md">Troubleshooting guide</a>.
+- Review the <a href="../../architecture/">Architecture documentation</a>.
+- Explore the <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/examples">Examples repository</a>.
+- Join the <a href="https://discord.com/channels/905194001349627914/1303371167020879903">Paladin community on Discord</a> for support and updates.</p>
 
 
 

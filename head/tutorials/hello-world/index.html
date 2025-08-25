@@ -1412,23 +1412,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-the-example" class="md-nav__link">
     <span class="md-ellipsis">
       Running the Example
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Running the Example">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
+</li>
+      
+        <li class="md-nav__item">
   <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
       Overview
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Overview">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#key-artifacts" class="md-nav__link">
@@ -1438,6 +1447,21 @@
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-by-step-walkthrough" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step-by-Step Walkthrough
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step-by-Step Walkthrough">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#step-1-deploy-the-contract" class="md-nav__link">
@@ -1486,6 +1510,15 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-concepts-demonstrated" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Concepts Demonstrated
+    </span>
+  </a>
   
 </li>
       
@@ -3486,23 +3519,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-the-example" class="md-nav__link">
     <span class="md-ellipsis">
       Running the Example
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Running the Example">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
+</li>
+      
+        <li class="md-nav__item">
   <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
       Overview
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Overview">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#key-artifacts" class="md-nav__link">
@@ -3512,6 +3554,21 @@
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-by-step-walkthrough" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step-by-Step Walkthrough
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step-by-Step Walkthrough">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#step-1-deploy-the-contract" class="md-nav__link">
@@ -3564,6 +3621,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#key-concepts-demonstrated" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Concepts Demonstrated
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#conclusion" class="md-nav__link">
     <span class="md-ellipsis">
       Conclusion
@@ -3600,20 +3666,31 @@
 
 
 <h1 id="hello-world-with-paladin">Hello World with Paladin<a class="headerlink" href="#hello-world-with-paladin" title="Permanent link">&para;</a></h1>
-<p>This tutorial walks you through deploying and interacting with a simple <code>HelloWorld</code> smart contract using the Paladin SDK. The example demonstrates how to:</p>
+<p>This tutorial walks you through deploying and interacting with a simple <code>HelloWorld</code> smart contract using the Paladin SDK. The example demonstrates how to deploy a contract, interact with it by calling its <code>sayHello</code> function, and retrieve and verify the emitted event.</p>
+<p>The code for this tutorial can be found in <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/helloworld">examples/helloworld</a>.</p>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<p>Before starting, ensure you have:</p>
 <ol>
-<li>Deploy the contract,</li>
-<li>Interact with it by calling its <code>sayHello</code> function,</li>
-<li>Retrieve and verify the emitted event.</li>
+<li><strong>Git</strong> and <strong>Node.js 20.x or newer</strong> installed</li>
+<li>A <strong>running Paladin network</strong> to deploy and interact with smart contracts</li>
 </ol>
-<p>This tutorial demonstrates how traditional, non-private Ethereum smart contract interactions can be achieved via a Paladin node and its transaction manager. Later tutorials will demonstrate how to make use of more advanced features of the Paladin APIs.</p>
-<hr />
 <h2 id="running-the-example">Running the Example<a class="headerlink" href="#running-the-example" title="Permanent link">&para;</a></h2>
-<p>The example code can be found in the <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/helloworld">Paladin example repository</a>.</p>
-<p>The HelloWorld solidity contract can be found <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/tutorials/HelloWorld.sol">here</a>.</p>
-<p>Follow the <a href="../../getting-started/installation/">Getting Started</a> instructions to set up a Paladin environment. Then, follow the example <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/helloworld/README.md">README</a> to run the code.</p>
-<hr />
-<h3 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h3>
+<p>Follow the <a href="../../getting-started/installation/">Getting Started</a> instructions to set up a Paladin environment.</p>
+<blockquote>
+<p>⚠️ To ensure you are using a stable version, <strong>always clone the most recent release tag</strong> instead of <code>main</code>.</p>
+</blockquote>
+<p>Clone the repository at the latest release:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">REPO</span><span class="o">=</span>https://github.com/LF-Decentralized-Trust-labs/paladin.git
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nv">TAG</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>ls-remote<span class="w"> </span>--tags<span class="w"> </span><span class="nv">$REPO</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d/<span class="w"> </span>-f3<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span><span class="s1">&#39;\-rc&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-V<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-n1<span class="k">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>git<span class="w"> </span>clone<span class="w"> </span><span class="nv">$REPO</span><span class="w"> </span>-b<span class="w"> </span><span class="nv">$TAG</span>
+</code></pre></div>
+<p>Once cloned, navigate to the example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>paladin/examples/helloworld
+</code></pre></div>
+<p>The HelloWorld solidity contract is located at: <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/tutorials/HelloWorld.sol"><code>solidity/contracts/tutorials/HelloWorld.sol</code></a></p>
+<p>Follow the example <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/helloworld/README.md">README</a> to run the code.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>This tutorial demonstrates how traditional, non-private Ethereum smart contract interactions can be achieved via a Paladin node and its transaction manager. Later tutorials will demonstrate how to make use of more advanced features of the Paladin APIs.</p>
 <p>We have a <code>HelloWorld</code> smart contract, which:</p>
 <ul>
 <li>Emits a "welcome" message as an event when its <code>sayHello</code> function is called.</li>
@@ -3625,17 +3702,15 @@
 <li><strong>Bytecode</strong>: The compiled contract code.</li>
 </ol>
 <p>These are pre-compiled and provided in the <code>helloWorldJson</code> object.</p>
-<hr />
-<p>To address the PR comment and clarify the differences between <strong>contract deployment</strong> and <strong>function invocation</strong>, here’s a revised version of the tutorial with an explicit callout:</p>
-<hr />
+<h2 id="step-by-step-walkthrough">Step-by-Step Walkthrough<a class="headerlink" href="#step-by-step-walkthrough" title="Permanent link">&para;</a></h2>
 <h3 id="step-1-deploy-the-contract">Step 1: Deploy the Contract<a class="headerlink" href="#step-1-deploy-the-contract" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">deploymentTxID</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">ptx</span><span class="p">.</span><span class="nx">sendTransaction</span><span class="p">({</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="nx">TransactionType</span><span class="p">.</span><span class="nx">PUBLIC</span><span class="p">,</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nx">abi</span><span class="o">:</span><span class="w"> </span><span class="kt">helloWorldJson.abi</span><span class="p">,</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nx">bytecode</span><span class="o">:</span><span class="w"> </span><span class="kt">helloWorldJson.bytecode</span><span class="p">,</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">owner.lookup</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="p">{},</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">});</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">deploymentTxID</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">ptx</span><span class="p">.</span><span class="nx">sendTransaction</span><span class="p">({</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="nx">TransactionType</span><span class="p">.</span><span class="nx">PUBLIC</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nx">abi</span><span class="o">:</span><span class="w"> </span><span class="kt">helloWorldJson.abi</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nx">bytecode</span><span class="o">:</span><span class="w"> </span><span class="kt">helloWorldJson.bytecode</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">owner.lookup</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="p">{},</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">});</span>
 </code></pre></div>
 <h4 id="key-differences-vs-calling-a-contract-function">Key Differences (vs. calling a contract function)<a class="headerlink" href="#key-differences-vs-calling-a-contract-function" title="Permanent link">&para;</a></h4>
 <ul>
@@ -3648,90 +3723,93 @@
 <li>The <code>sendTransaction</code> method sends a deployment transaction to the blockchain via Paladin.</li>
 <li>The function returns a <code>deploymentTxID</code> that uniquely identifies the transaction.</li>
 </ul>
-<hr />
 <h3 id="step-2-confirm-the-deployment">Step 2: Confirm the Deployment<a class="headerlink" href="#step-2-confirm-the-deployment" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">deploymentReceipt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">pollForReceipt</span><span class="p">(</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nx">deploymentTxID</span><span class="p">,</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="mf">10000</span><span class="p">,</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="kc">true</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">);</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">deploymentReceipt</span><span class="o">?</span><span class="p">.</span><span class="nx">contractAddress</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s2">&quot;Deployment failed!&quot;</span><span class="p">);</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">}</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="s2">&quot;Contract deployed successfully at address:&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="nx">deploymentReceipt</span><span class="p">.</span><span class="nx">contractAddress</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="p">);</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">deploymentReceipt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">pollForReceipt</span><span class="p">(</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nx">deploymentTxID</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="mf">10000</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="kc">true</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">);</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">deploymentReceipt</span><span class="o">?</span><span class="p">.</span><span class="nx">contractAddress</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s2">&quot;Deployment failed!&quot;</span><span class="p">);</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">}</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="s2">&quot;Contract deployed successfully at address:&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="nx">deploymentReceipt</span><span class="p">.</span><span class="nx">contractAddress</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="p">);</span>
 </code></pre></div>
 <h4 id="what-happens_1">What happens:<a class="headerlink" href="#what-happens_1" title="Permanent link">&para;</a></h4>
 <ul>
 <li>We use <code>pollForReceipt</code> to wait for the deployment transaction to be confirmed.</li>
 <li>If successful, the receipt includes the new <code>contractAddress</code>, which we will use in the next step.</li>
 </ul>
-<hr />
-<h3 id="step-3-call-the-sayhello-function"><strong>Step 3: Call the <code>sayHello</code> Function</strong><a class="headerlink" href="#step-3-call-the-sayhello-function" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Paladin User&quot;</span><span class="p">;</span><span class="w"> </span><span class="c1">// Example name for the greeting</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">sayHelloTxID</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">ptx</span><span class="p">.</span><span class="nx">sendTransaction</span><span class="p">({</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="nx">TransactionType</span><span class="p">.</span><span class="nx">PUBLIC</span><span class="p">,</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nx">abi</span><span class="o">:</span><span class="w"> </span><span class="kt">helloWorldJson.abi</span><span class="p">,</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="kd">function</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;sayHello&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">owner.lookup</span><span class="p">,</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nx">to</span><span class="o">:</span><span class="w"> </span><span class="kt">deploymentReceipt.contractAddress</span><span class="p">,</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="kt">name</span><span class="w"> </span><span class="p">},</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">});</span>
+<h3 id="step-3-call-the-sayhello-function">Step 3: Call the <code>sayHello</code> Function<a class="headerlink" href="#step-3-call-the-sayhello-function" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Paladin User&quot;</span><span class="p">;</span><span class="w"> </span><span class="c1">// Example name for the greeting</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">sayHelloTxID</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">ptx</span><span class="p">.</span><span class="nx">sendTransaction</span><span class="p">({</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="nx">TransactionType</span><span class="p">.</span><span class="nx">PUBLIC</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nx">abi</span><span class="o">:</span><span class="w"> </span><span class="kt">helloWorldJson.abi</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="kd">function</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;sayHello&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">owner.lookup</span><span class="p">,</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nx">to</span><span class="o">:</span><span class="w"> </span><span class="kt">deploymentReceipt.contractAddress</span><span class="p">,</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="kt">name</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="p">});</span>
 </code></pre></div>
-<h4 id="key-differences-vs-contract-deployment"><strong>Key Differences (vs. contract deployment)</strong><a class="headerlink" href="#key-differences-vs-contract-deployment" title="Permanent link">&para;</a></h4>
+<h4 id="key-differences-vs-contract-deployment">Key Differences (vs. contract deployment)<a class="headerlink" href="#key-differences-vs-contract-deployment" title="Permanent link">&para;</a></h4>
 <ul>
 <li><strong>Function calls require a <code>to</code> address</strong>, since the contract already exists.</li>
 <li><strong>No <code>bytecode</code> is needed</strong>, as we are invoking an existing contract, not creating one.</li>
 <li><strong>A specific function (<code>sayHello</code>) is provided</strong>, along with its arguments in <code>data</code>.</li>
 </ul>
-<h4 id="what-happens_2"><strong>What happens:</strong><a class="headerlink" href="#what-happens_2" title="Permanent link">&para;</a></h4>
+<h4 id="what-happens_2">What happens:<a class="headerlink" href="#what-happens_2" title="Permanent link">&para;</a></h4>
 <ul>
 <li>The <code>sendTransaction</code> method sends a transaction to call the <code>sayHello</code> function of the deployed contract.</li>
 <li>The <code>data</code> object includes the function arguments—in this case, the <code>name</code> of the person being greeted.</li>
 </ul>
-<hr />
 <h3 id="step-4-confirm-the-function-call">Step 4: Confirm the Function Call<a class="headerlink" href="#step-4-confirm-the-function-call" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">functionReceipt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">pollForReceipt</span><span class="p">(</span><span class="nx">sayHelloTxID</span><span class="p">,</span><span class="w"> </span><span class="mf">10000</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">);</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">functionReceipt</span><span class="o">?</span><span class="p">.</span><span class="nx">transactionHash</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s2">&quot;Receipt retrieval failed!&quot;</span><span class="p">);</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">}</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;sayHello function executed successfully!&quot;</span><span class="p">);</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">functionReceipt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">pollForReceipt</span><span class="p">(</span><span class="nx">sayHelloTxID</span><span class="p">,</span><span class="w"> </span><span class="mf">10000</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">);</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">functionReceipt</span><span class="o">?</span><span class="p">.</span><span class="nx">transactionHash</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s2">&quot;Receipt retrieval failed!&quot;</span><span class="p">);</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">}</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;sayHello function executed successfully!&quot;</span><span class="p">);</span>
 </code></pre></div>
+<h4 id="what-happens_3">What happens:<a class="headerlink" href="#what-happens_3" title="Permanent link">&para;</a></h4>
 <ul>
-<li><strong>What happens</strong>:</li>
 <li>Similar to the deployment step, we wait for confirmation of the <code>sayHello</code> function call using <code>pollForReceipt</code>.</li>
 </ul>
-<hr />
 <h3 id="step-5-retrieve-the-emitted-event">Step 5: Retrieve the Emitted Event<a class="headerlink" href="#step-5-retrieve-the-emitted-event" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">bidx</span><span class="p">.</span><span class="nx">decodeTransactionEvents</span><span class="p">(</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nx">functionReceipt</span><span class="p">.</span><span class="nx">transactionHash</span><span class="p">,</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nx">helloWorldJson</span><span class="p">.</span><span class="nx">abi</span><span class="p">,</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="s2">&quot;pretty=true&quot;</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="p">);</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">events</span><span class="p">[</span><span class="mf">0</span><span class="p">].</span><span class="nx">data</span><span class="p">[</span><span class="s2">&quot;message&quot;</span><span class="p">]);</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">paladin</span><span class="p">.</span><span class="nx">bidx</span><span class="p">.</span><span class="nx">decodeTransactionEvents</span><span class="p">(</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nx">functionReceipt</span><span class="p">.</span><span class="nx">transactionHash</span><span class="p">,</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nx">helloWorldJson</span><span class="p">.</span><span class="nx">abi</span><span class="p">,</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="s2">&quot;pretty=true&quot;</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="p">);</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">events</span><span class="p">[</span><span class="mf">0</span><span class="p">].</span><span class="nx">data</span><span class="p">[</span><span class="s2">&quot;message&quot;</span><span class="p">]);</span>
 </code></pre></div>
+<h4 id="what-happens_4">What happens:<a class="headerlink" href="#what-happens_4" title="Permanent link">&para;</a></h4>
 <ul>
-<li><strong>What happens</strong>:</li>
 <li>We use <code>decodeTransactionEvents</code> to extract event data from the <code>sayHello</code> transaction.</li>
 </ul>
-<hr />
+<h2 id="key-concepts-demonstrated">Key Concepts Demonstrated<a class="headerlink" href="#key-concepts-demonstrated" title="Permanent link">&para;</a></h2>
+<p>This tutorial introduces fundamental Paladin concepts:</p>
+<ul>
+<li><strong>Contract Deployment</strong> - Creating new smart contracts on the Paladin network</li>
+<li><strong>Function Invocation</strong> - Calling existing contract functions</li>
+<li><strong>Transaction Management</strong> - Using Paladin's transaction APIs</li>
+<li><strong>Event Handling</strong> - Retrieving and processing contract events</li>
+<li><strong>Receipt Processing</strong> - Confirming transaction success and extracting results</li>
+</ul>
 <h2 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h2>
 <p>Congratulations! You've successfully:</p>
 <ol>
-<li>Deployed the <code>HelloWorld</code> contract,</li>
-<li>Called its <code>sayHello</code> function,</li>
-<li>Retrieved and validated the emitted event.</li>
+<li><strong>Deployed</strong> the <code>HelloWorld</code> contract</li>
+<li><strong>Called</strong> its <code>sayHello</code> function</li>
+<li><strong>Retrieved</strong> and validated the emitted event</li>
 </ol>
 <p>This simple example demonstrates how to interact with smart contracts using the Paladin SDK.</p>
-<hr />
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<p>Now that you’ve deployed and interacted with the <code>HelloWorld</code> contract, you’re ready to explore more complex interactions with smart contracts. In the next tutorial, we will introduce you to a <strong>Storage</strong> contract where you will write and read from from the blockchain!</p>
+<p>Now that you've deployed and interacted with the <code>HelloWorld</code> contract, you're ready to explore more complex interactions with smart contracts. In the next tutorial, we will introduce you to a <strong>Storage</strong> contract where you will write and read from the blockchain!</p>
 <p><a href="../public-storage/">Continue to the Storage Contract Tutorial →</a></p>
 
 
