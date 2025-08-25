@@ -14,6 +14,29 @@ entries:
     version: 0.0.0
   paladin-operator:
   - apiVersion: v2
+    appVersion: v0.10.0-rc.8
+    created: "2025-08-25T21:40:53.734089896Z"
+    dependencies:
+    - condition: installCRDs
+      name: paladin-operator-crd
+      repository: file://../paladin-operator-crd/
+      version: 0.10.0-rc.8
+    - condition: prometheus.enabled
+      name: prometheus-namespace
+      repository: file://../prometheus-namespace/
+      version: 0.0.0
+    - condition: prometheus.enabled
+      name: prometheus
+      repository: https://prometheus-community.github.io/helm-charts
+      version: 15.8.0
+    description: A Helm chart for Kubernetes
+    digest: 94ce0f3d403d86b664f30a6e047d5649af2c70d414b9275ce382853086b2ec30
+    name: paladin-operator
+    type: application
+    urls:
+    - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-0.10.0-rc.8/paladin-operator-0.10.0-rc.8.tgz
+    version: 0.10.0-rc.8
+  - apiVersion: v2
     appVersion: v0.10.0-rc.7
     created: "2025-08-20T13:55:29.800055947Z"
     dependencies:
@@ -621,6 +644,16 @@ entries:
     version: 0.0.0
   paladin-operator-crd:
   - apiVersion: v2
+    appVersion: v0.10.0-rc.8
+    created: "2025-08-25T21:40:53.946883789Z"
+    description: A Helm chart for Kubernetes
+    digest: fcfaa4956d8b3390ab7f2cf2ad1cfc2fad75b92a4fcd38f084eadc99b8c6bf9b
+    name: paladin-operator-crd
+    type: application
+    urls:
+    - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/paladin-operator-crd-0.10.0-rc.8/paladin-operator-crd-0.10.0-rc.8.tgz
+    version: 0.10.0-rc.8
+  - apiVersion: v2
     appVersion: v0.10.0-rc.7
     created: "2025-08-20T13:55:29.960692244Z"
     description: A Helm chart for Kubernetes
@@ -762,4 +795,4 @@ entries:
     urls:
     - https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/prometheus-namespace-0.0.0/prometheus-namespace-0.0.0.tgz
     version: 0.0.0
-generated: "2025-08-20T13:55:29.960986356Z"
+generated: "2025-08-25T21:40:53.947258138Z"
