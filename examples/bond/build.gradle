@@ -35,6 +35,10 @@ dependencies {
     buildCommon project(path: ':examples:common', configuration: 'buildCommon')
 }
 
+ext {
+    namespace = project.hasProperty('namespace') ? project.namespace : 'default' // Default namespace is 'default'
+}
+
 task install_sdk(type: Exec) {
     executable 'npm'
     args 'install' 
@@ -80,17 +84,25 @@ task build(type: Exec, dependsOn: [install, copyABI]) {
 
 task start(type: Exec, dependsOn: [build]) {
     dependsOn ':operator:e2e'
-
+    
     executable 'npm'
     args 'run'
     args 'start'
+
+    // Apply the log dumping configuration
+    rootProject.helpers.dumpChartInfo(it, "start")
 }
 
 task e2e(type: Exec, dependsOn: [start]) {
-
     executable 'npm'
     args 'run'
     args 'verify'
+
+    // Apply the log dumping configuration
+    rootProject.helpers.dumpChartInfo(it, "e2e")
+}
+
+task ci(dependsOn: [e2e]) {
 }
 
 task clean(type: Delete) {

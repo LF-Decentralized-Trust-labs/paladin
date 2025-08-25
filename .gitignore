@@ -62,3 +62,5 @@ bin/
 *.pb.go
 
 **.tar.gz
+
+dump-*/
