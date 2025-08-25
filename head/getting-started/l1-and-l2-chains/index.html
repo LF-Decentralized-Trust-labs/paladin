@@ -3598,10 +3598,12 @@ in order for them to be mined into blocks. Currently this must be configured on 
 public chains this will need increasing to a suitable value, based on the block period of the chain. The following is an example of a modification to a <code>waitForReceipt()</code> call:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>const cashToken = await notoFactory
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    .newNoto(verifierNode1, {
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>      notary: verifierNode1,
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>      notaryMode: &quot;basic&quot;,
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    })
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    .waitForDeploy(20000);  // Allow 20 seconds for the contract deploy to complete
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>      name: &quot;NOTO&quot;,
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>      symbol: &quot;NOTO&quot;,
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>      notary: verifierNode1,
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>      notaryMode: &quot;basic&quot;,
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    })
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    .waitForDeploy(20000);  // Allow 20 seconds for the contract deploy to complete
 </code></pre></div>
 <p>Note: the example code won't wait the full 20 seconds if the contract deploy completes early, so setting a large value won't increase the example run time unncessarily.</p>
 <h2 id="funding-signing-addresses-with-gas-tokens-eg-eth">Funding signing addresses with gas tokens e.g. ETH<a class="headerlink" href="#funding-signing-addresses-with-gas-tokens-eg-eth" title="Permanent link">&para;</a></h2>
