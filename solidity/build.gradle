@@ -46,6 +46,9 @@ task compile(type: Exec, dependsOn: install) {
         include "**/*.sol"
     })
     outputs.dirs(buildOutput, "cache", "typechain-types")
+    
+    // Enable parallel execution and caching
+    outputs.cacheIf { true }
 }
 
 task test(type: Exec, dependsOn: compile) {
