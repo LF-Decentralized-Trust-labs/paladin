@@ -12,7 +12,7 @@ appVersion: "0.0.0"
 
 dependencies:
   - name: paladin-operator-crd
-    version: 0.0.3
+    version: 0.0.0
     repository: "file://../paladin-operator-crd/"
     condition: installCRDs
 

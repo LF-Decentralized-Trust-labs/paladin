@@ -1,8 +1,18 @@
 name: Upload Solidity Artifacts
 on:
   workflow_call:
+    inputs:
+      tag:
+        description: 'The tag of the release'
+        required: true
+        type: string
        
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The tag of the release'
+        required: true
+        type: string
 
   pull_request:
     paths:
@@ -21,6 +31,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  
   upload:
     permissions:
       contents: read

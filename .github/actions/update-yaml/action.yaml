@@ -4,8 +4,8 @@ inputs:
   file:
     description: 'The path to the YAML file to update'
     required: true
-  updates:
-    description: 'YAML content with the updates to apply'
+  expressions:
+    description: 'A multi-line string of yq update expressions to apply.'
     required: true
 runs:
   using: 'composite'
@@ -13,21 +13,30 @@ runs:
     - name: Install yq
       shell: bash
       run: |
-        wget https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64 -O yq
-        chmod +x yq
-        sudo mv yq /usr/local/bin/
+        # This check prevents re-downloading yq on every call within the same job
+        if ! command -v yq &> /dev/null; then
+            echo "yq not found, installing..."
+            wget https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64 -O yq
+            chmod +x yq
+            sudo mv yq /usr/local/bin/
+        else
+            echo "yq is already installed."
+        fi
 
     - name: Update YAML file
       shell: bash
       run: |
         set -e
-        echo "Applying updates to ${{ inputs.file }}"
+        echo "Applying expressions to ${{ inputs.file }}"
+        
+        # Write the expressions to a temporary file, filtering out any empty lines
+        echo "${{ inputs.expressions }}" | grep -v '^$' > expressions.txt
+        
+        # Loop through the expressions file and execute each line as a separate command.
+        while IFS= read -r expression; do
+            echo "Applying: yq eval -i '${expression}' '${{ inputs.file }}'"
+            eval "yq eval -i '${expression}' '${{ inputs.file }}'"
+        done < expressions.txt
 
-        # Write the updates to a temporary YAML file
-        echo "${{ inputs.updates }}" > updates.yaml
-
-        # Merge the updates into the target YAML file
-        yq e -i '. * load("updates.yaml")' "${{ inputs.file }}"
-
-        echo "Updated ${{ inputs.file }}:"
+        echo "Updated content of ${{ inputs.file }}:"
         cat "${{ inputs.file }}"

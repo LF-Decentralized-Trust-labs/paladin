@@ -1,3 +1,17 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   INotoDomainReceipt,
   IPreparedTransaction,
@@ -12,8 +26,8 @@ import { newAtomFactory } from "./helpers/atom";
 import { newERC20Tracker } from "./helpers/erc20tracker";
 import * as fs from 'fs';
 import * as path from 'path';
-import { ContractData } from "./verify-deployed";
-import { nodeConnections } from "../../common/src/config";
+import { ContractData } from "./tests/data-persistence";
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
 
@@ -208,7 +222,7 @@ async function main(): Promise<boolean> {
   logger.log("Waiting for lock operation to settle...");
   let lockedStateId: string | undefined;
   const pollStartTime = Date.now();
-  const pollTimeout = 30000; // 30 seconds
+  const pollTimeout = 120000; // 2 minutes
   while (Date.now() - pollStartTime < pollTimeout) {
     const lockedStates = await paladin3.ptx.getStateReceipt(receipt.id);
     const confirmedLockedState = lockedStates?.confirmed?.find(
@@ -242,7 +256,7 @@ async function main(): Promise<boolean> {
   }).id;
   
   logger.log(`Prepared transaction ID: ${txID}`);
-  const preparedCashTransfer = await paladin3.pollForPreparedTransaction(txID, 50000);
+  const preparedCashTransfer = await paladin3.pollForPreparedTransaction(txID, pollTimeout); // 2 minutes
   if (!preparedCashTransfer) {
     logger.error(`Failed to get prepared transaction for ID: ${txID}`);
     return false;
@@ -282,7 +296,7 @@ async function main(): Promise<boolean> {
       delegate: atom.address,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(pollTimeout);
   if (!checkReceipt(receipt)) return false;
 
   // Approve cash transfer operation
@@ -388,7 +402,8 @@ async function main(): Promise<boolean> {
     timestamp: new Date().toISOString()
   };
 
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
