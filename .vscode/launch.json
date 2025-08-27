@@ -27,6 +27,17 @@
             "cwd": "${workspaceFolder}/examples/lock"
         },
         {
+            "name": "Solidity tests",
+            "request": "launch",
+            "runtimeArgs": [
+                "run",
+                "test"
+            ],
+            "runtimeExecutable": "npm",
+            "type": "node",
+            "cwd": "${workspaceFolder}/solidity"
+        },
+        {
             "name": "Run Controller",
             "type": "go",
             "preLaunchTask": "check-running-on-kind",
