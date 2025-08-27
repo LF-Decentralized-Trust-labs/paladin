@@ -48,7 +48,7 @@ type inMemoryTxState struct {
 }
 
 func gasPricingSet(gasPricing pldapi.PublicTxGasPricing) bool {
-	return gasPricing.GasPrice != nil || gasPricing.MaxFeePerGas != nil || gasPricing.MaxPriorityFeePerGas != nil
+	return gasPricing.MaxFeePerGas != nil && gasPricing.MaxPriorityFeePerGas != nil
 }
 
 func NewInMemoryTxStateManager(ctx context.Context, ptx *DBPublicTxn) InMemoryTxStateManager {

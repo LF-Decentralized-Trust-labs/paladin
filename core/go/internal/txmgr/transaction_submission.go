@@ -80,7 +80,7 @@ type persistedTransactionHistory struct {
 	Data                 pldtypes.RawJSON                      `gorm:"column:data"` // we always store in JSON object format
 	Gas                  *pldtypes.HexUint64                   `gorm:"column:gas"`
 	Value                *pldtypes.HexUint256                  `gorm:"column:value"`
-	GasPrice             *pldtypes.HexUint256                  `gorm:"column:gas_price"`
+	GasPrice             *pldtypes.HexUint256                  `gorm:"column:gas_price"` // deprecated- this has never worked with EIP-1559 TODO AM: golang migration to drop this field?
 	MaxFeePerGas         *pldtypes.HexUint256                  `gorm:"column:max_fee_per_gas"`
 	MaxPriorityFeePerGas *pldtypes.HexUint256                  `gorm:"column:max_priority_fee_per_gas"`
 }
@@ -740,7 +740,6 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX persistence.DB
 			Data:                 ptxs[i].Data,
 			Gas:                  tx.Gas,
 			Value:                tx.Value,
-			GasPrice:             tx.GasPrice,
 			MaxFeePerGas:         tx.MaxFeePerGas,
 			MaxPriorityFeePerGas: tx.MaxPriorityFeePerGas,
 		}
@@ -883,7 +882,6 @@ func (tm *txManager) processUpdatedTransaction(ctx context.Context, dbTX persist
 			Data:                 tx.Data,
 			Gas:                  tx.Gas,
 			Value:                tx.Value,
-			GasPrice:             tx.GasPrice,
 			MaxFeePerGas:         tx.MaxFeePerGas,
 			MaxPriorityFeePerGas: tx.MaxPriorityFeePerGas,
 		}

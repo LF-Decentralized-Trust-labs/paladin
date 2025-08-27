@@ -45,7 +45,8 @@ func TestProduceLatestInFlightStageContextSubmitPanic(t *testing.T) {
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: pldtypes.Uint64ToUint256(10),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 	})
 
@@ -86,7 +87,8 @@ func TestProduceLatestInFlightStageContextSubmitComplete(t *testing.T) {
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: pldtypes.Uint64ToUint256(10),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 	})
 
@@ -184,7 +186,8 @@ func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: pldtypes.Uint64ToUint256(10),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 		FirstSubmit: confutil.P(pldtypes.TimestampNow()),
 	})
@@ -269,7 +272,8 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: pldtypes.Uint64ToUint256(10),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 		FirstSubmit: confutil.P(pldtypes.TimestampNow()),
 	})
@@ -388,7 +392,8 @@ func TestProduceLatestInFlightStageContextSubmitRePrepare(t *testing.T) {
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: pldtypes.Uint64ToUint256(10),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 		TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
 	})
@@ -434,7 +439,8 @@ func TestProduceLatestInFlightStageContextResubmission(t *testing.T) {
 	// the transaction already has details of a last submission
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: pldtypes.Uint64ToUint256(10),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 		TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
 		LastSubmit:      confutil.P(pldtypes.TimestampNow()),
@@ -476,7 +482,8 @@ func TestTriggerSubmitTx(t *testing.T) {
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: pldtypes.Uint64ToUint256(10),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 		TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
 	})

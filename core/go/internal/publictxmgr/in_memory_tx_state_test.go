@@ -53,7 +53,8 @@ func NewTestInMemoryTxState(t *testing.T) InMemoryTxStateManager {
 	imtxs.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
 		NewSubmission: &DBPubTxnSubmission{TransactionHash: oldTxHash},
 		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: oldGasPrice,
+			MaxFeePerGas:         oldGasPrice,
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 		},
 		FirstSubmit:  &oldTime,
 		LastSubmit:   &oldTime,
@@ -87,7 +88,7 @@ func TestSettersAndGetters(t *testing.T) {
 
 	imts := NewInMemoryTxStateManager(context.Background(), testManagedTx)
 	imts.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
-		GasPricing:      &pldapi.PublicTxGasPricing{GasPrice: oldGasPrice},
+		GasPricing:      &pldapi.PublicTxGasPricing{MaxFeePerGas: oldGasPrice, MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1)},
 		TransactionHash: &oldTxHash,
 		FlushedSubmission: &DBPubTxnSubmission{
 			TransactionHash: oldTxHash,
@@ -106,7 +107,7 @@ func TestSettersAndGetters(t *testing.T) {
 	assert.Equal(t, oldNonce.Uint64(), imts.GetNonce())
 	assert.Equal(t, *oldFrom, imts.GetFrom())
 	assert.Equal(t, InFlightStatusPending, imts.GetInFlightStatus())
-	assert.Equal(t, oldGasPrice.Int(), imts.GetGasPriceObject().GasPrice.Int())
+	assert.Equal(t, oldGasPrice.Int(), imts.GetGasPriceObject().MaxFeePerGas.Int())
 	assert.Equal(t, oldTime, *imts.GetFirstSubmit())
 	assert.Equal(t, oldGasLimit.Uint64(), imts.GetGasLimit())
 	assert.False(t, imts.IsReadyToExit())
@@ -130,7 +131,7 @@ func TestSettersAndGetters(t *testing.T) {
 
 	imts.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
 		InFlightStatus:  &confirmReceived,
-		GasPricing:      &pldapi.PublicTxGasPricing{GasPrice: newGasPrice},
+		GasPricing:      &pldapi.PublicTxGasPricing{MaxFeePerGas: newGasPrice, MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(11)},
 		TransactionHash: &newTxHash,
 		NewSubmission: &DBPubTxnSubmission{
 			TransactionHash: newTxHash,
@@ -144,9 +145,8 @@ func TestSettersAndGetters(t *testing.T) {
 	assert.Equal(t, oldTime, *imts.GetCreatedTime())
 	assert.Equal(t, newTime, imts.GetLastSubmitTime())
 	assert.Equal(t, newTxHash, *imts.GetTransactionHash())
-	assert.Equal(t, newGasPrice.Int(), imts.GetGasPriceObject().GasPrice.Int())
-	assert.Nil(t, imts.GetGasPriceObject().MaxFeePerGas)
-	assert.Nil(t, imts.GetGasPriceObject().MaxPriorityFeePerGas)
+	assert.Equal(t, newGasPrice.Int(), imts.GetGasPriceObject().MaxFeePerGas.Int())
+	assert.Equal(t, pldtypes.Uint64ToUint256(11).Int(), imts.GetGasPriceObject().MaxPriorityFeePerGas.Int())
 	assert.Equal(t, newTime, imts.GetFirstSubmit())
 	assert.Equal(t, &DBPubTxnSubmission{
 		TransactionHash: newTxHash,
@@ -170,8 +170,6 @@ func TestSettersAndGetters(t *testing.T) {
 		},
 	})
 
-	assert.Nil(t, imts.GetGasPriceObject().GasPrice)
 	assert.Equal(t, maxFeePerGas.Int(), imts.GetGasPriceObject().MaxFeePerGas.Int())
 	assert.Equal(t, maxPriorityFeePerGas.Int(), imts.GetGasPriceObject().MaxPriorityFeePerGas.Int())
-
 }

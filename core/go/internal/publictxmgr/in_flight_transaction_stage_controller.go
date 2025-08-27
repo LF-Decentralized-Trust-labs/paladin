@@ -551,21 +551,7 @@ func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.C
 	// The change is not made here to InMemoryTx, but rather pushed to TxUpdates for persisting.
 	// So we need to make sure we don't edit the in-memory existing object by passing it to calculateNewGasPrice
 
-	if newGpo.GasPrice != nil && existingGpo.GasPrice != nil && existingGpo.GasPrice.Int().Cmp(newGpo.GasPrice.Int()) == 1 {
-		// existing gas price already above the new gas price, increase using percentage
-		newPercentage := big.NewInt(100)
-		newPercentage = newPercentage.Add(newPercentage, big.NewInt(int64(it.gasPriceIncreasePercent)))
-		newGasPrice := new(big.Int).Mul(existingGpo.GasPrice.Int(), newPercentage)
-		newGasPrice = newGasPrice.Div(newGasPrice, big.NewInt(100))
-		if it.gasPriceIncreaseMax != nil && newGasPrice.Cmp(it.gasPriceIncreaseMax) == 1 {
-			newGasPrice.Set(it.gasPriceIncreaseMax)
-		}
-		newGpo = &pldapi.PublicTxGasPricing{
-			GasPrice:             (*pldtypes.HexUint256)(newGasPrice),
-			MaxFeePerGas:         existingGpo.MaxFeePerGas,         // copy over unchanged (although expected to be unset)
-			MaxPriorityFeePerGas: existingGpo.MaxPriorityFeePerGas, //   "
-		}
-	} else if newGpo.MaxFeePerGas != nil && existingGpo.MaxFeePerGas != nil && existingGpo.MaxFeePerGas.Int().Cmp(newGpo.MaxFeePerGas.Int()) == 1 {
+	if newGpo.MaxFeePerGas != nil && existingGpo.MaxFeePerGas != nil && existingGpo.MaxFeePerGas.Int().Cmp(newGpo.MaxFeePerGas.Int()) == 1 {
 		// existing MaxFeePerGas already above the new MaxFeePerGas, increase using percentage
 		newPercentage := big.NewInt(100)
 
@@ -576,7 +562,6 @@ func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.C
 			newMaxFeePerGas.Set(it.gasPriceIncreaseMax)
 		}
 		newGpo = &pldapi.PublicTxGasPricing{
-			GasPrice:             existingGpo.GasPrice, // copy over unchanged (although expected to be unset)
 			MaxFeePerGas:         (*pldtypes.HexUint256)(newMaxFeePerGas),
 			MaxPriorityFeePerGas: existingGpo.MaxPriorityFeePerGas,
 		}
@@ -586,10 +571,7 @@ func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.C
 }
 
 func calculateGasRequiredForTransaction(ctx context.Context, gpo *pldapi.PublicTxGasPricing, gasLimit uint64) (gasRequired *big.Int, err error) {
-	if gpo.GasPrice != nil {
-		log.L(ctx).Debugf("gas calculation using GasPrice (%+v)", gpo.GasPrice)
-		gasRequired = new(big.Int).Mul(gpo.GasPrice.Int(), new(big.Int).SetUint64(gasLimit))
-	} else if gpo.MaxFeePerGas != nil && gpo.MaxPriorityFeePerGas != nil {
+	if gpo.MaxFeePerGas != nil && gpo.MaxPriorityFeePerGas != nil {
 		// max-fee and max-priority-fee have been provided. We can only use
 		// max-fee to calculate how much this TX could cost, but we ultimately
 		// require both to be set
@@ -598,7 +580,6 @@ func calculateGasRequiredForTransaction(ctx context.Context, gpo *pldapi.PublicT
 		gasRequired = maxFeePerGasCopy.Mul(maxFeePerGasCopy, new(big.Int).SetUint64(gasLimit))
 	}
 	return gasRequired, nil
-
 }
 
 func (it *inFlightTransactionStageController) NotifyStatusUpdate(ctx context.Context, status InFlightStatus) (updateRequired bool, err error) {

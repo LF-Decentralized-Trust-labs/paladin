@@ -194,7 +194,8 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 		for i := 0; i < expectedNumberOfGasPriceSuccessOutput; i++ {
 			go func() {
 				version.AddGasPriceOutput(ctx, &pldapi.PublicTxGasPricing{
-					GasPrice: pldtypes.Int64ToInt256(100),
+					MaxFeePerGas:         pldtypes.Int64ToInt256(100),
+					MaxPriorityFeePerGas: pldtypes.Int64ToInt256(10),
 				}, nil)
 				countChanel <- true
 			}()

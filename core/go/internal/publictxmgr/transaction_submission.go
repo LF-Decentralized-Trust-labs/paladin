@@ -91,13 +91,17 @@ func (it *inFlightTransactionStageController) submitTX(ctx context.Context, sign
 				// retry the request without using the oracle immediately as the oracle sometimes set the price too low for the node to accept
 				// this is because each node can set the gas price limit in the config which is independent from other nodes
 				// but a gas oracle typically come up the value based on the data collected from all nodes
-				it.gasPriceClient.DeleteCache(ctx)
-				log.L(ctx).Debug("Underpriced, removed gas price cache")
+				// TODO AM: Re-instate gas price cache clearing when dynamic gas pricing is re-implemented - but move to handling that resets the whole transaction back to gas price retrieval stage
+				// it.gasPriceClient.DeleteCache(ctx)
+				log.L(ctx).Debug("Underpriced, retrying without cache clearing (no cache during migration)")
 				submissionOutcome = SubmissionOutcomeFailedRequiresRetry
 			case ethclient.ErrorReasonTransactionReverted:
+				// TODO AM: surely this is genuinely failed? We don't go down this path for estimation so if the transaction is reverted on chain then
+				// we're going to confirm it as such from the block indexer
 				// transaction could be reverted due to gas estimate too low, clear the cache before try again
-				it.gasPriceClient.DeleteCache(ctx)
-				log.L(ctx).Debug("Transaction reverted, removed gas price cache")
+				// TODO AM: Re-instate gas price cache clearing when dynamic gas pricing is re-implemented - but move to handling that resets the whole transaction back to gas price retrieval stage
+				// it.gasPriceClient.DeleteCache(ctx)
+				log.L(ctx).Debug("Transaction reverted, retrying without cache clearing (no cache during migration)")
 				submissionOutcome = SubmissionOutcomeFailedRequiresRetry
 			case ethclient.ErrorKnownTransaction:
 				// check mined transaction also returns this error code

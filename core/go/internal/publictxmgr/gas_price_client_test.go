@@ -18,159 +18,610 @@ package publictxmgr
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"testing"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
-
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/ethclientmocks"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/cache"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func longLivedGasPriceTestCache() cache.Cache[string, pldtypes.RawJSON] {
-	return cache.NewCache[string, pldtypes.RawJSON](&pldconf.CacheConfig{}, &pldconf.PublicTxManagerDefaults.GasPrice.Cache)
-}
-
-func NewTestFixedPriceGasPriceClient(t *testing.T) GasPriceClient {
-	hgc := &HybridGasPriceClient{}
-	hgc.fixedGasPrice = pldtypes.RawJSON(`{"gasPrice": 10}`)
-	hgc.gasPriceCache = longLivedGasPriceTestCache()
-	return hgc
-}
-
-func NewTestZeroGasPriceChainClient(t *testing.T) GasPriceClient {
-	hgc := &HybridGasPriceClient{}
-	hgc.fixedGasPrice = pldtypes.RawJSON(`0`)
-	hgc.hasZeroGasPrice = true
-	hgc.gasPriceCache = longLivedGasPriceTestCache()
-	return hgc
-}
-
-func NewTestFixedPriceGasPriceClientEIP1559(t *testing.T) GasPriceClient {
-	hgc := &HybridGasPriceClient{}
-	hgc.fixedGasPrice = pldtypes.RawJSON(`{
-		"maxPriorityFeePerGas": 1,
-		"maxFeePerGas": 10
-	}`)
-	hgc.gasPriceCache = longLivedGasPriceTestCache()
-	return hgc
-}
-
-func NewTestNodeGasPriceClient(t *testing.T, connectorAPI ethclient.EthClient) GasPriceClient {
-	hgc := &HybridGasPriceClient{}
-	hgc.ethClient = connectorAPI
-	hgc.gasPriceCache = longLivedGasPriceTestCache()
-	return hgc
-}
-
-func TestSetFixedGasPriceIfConfigured(t *testing.T) {
+func NewTestGasPriceClient(t *testing.T, conf *pldconf.GasPriceConfig, zeroGasPrice bool) (context.Context, *HybridGasPriceClient, *ethclientmocks.EthClient) {
 	ctx := context.Background()
-	zeroHgc := NewTestZeroGasPriceChainClient(t)
-	testTx := &ethsigner.Transaction{}
-	zeroHgc.SetFixedGasPriceIfConfigured(ctx, testTx)
-	assert.Equal(t, big.NewInt(0), testTx.GasPrice.BigInt())
-	assert.Nil(t, testTx.MaxFeePerGas)
-	assert.Nil(t, testTx.MaxPriorityFeePerGas)
-	zeroGpo, err := zeroHgc.GetGasPriceObject(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, big.NewInt(0), zeroGpo.GasPrice.Int())
-	assert.Nil(t, zeroGpo.MaxFeePerGas)
-	assert.Nil(t, zeroGpo.MaxPriorityFeePerGas)
+	mockEthClient := ethclientmocks.NewEthClient(t)
 
-	testTx = &ethsigner.Transaction{}
-	tenHgc := NewTestFixedPriceGasPriceClient(t)
-	tenHgc.SetFixedGasPriceIfConfigured(ctx, testTx)
-	assert.Equal(t, big.NewInt(10), testTx.GasPrice.BigInt())
-	assert.Nil(t, testTx.MaxFeePerGas)
-	assert.Nil(t, testTx.MaxPriorityFeePerGas)
-	tenGpo, err := tenHgc.GetGasPriceObject(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, big.NewInt(10), tenGpo.GasPrice.Int())
-	assert.Nil(t, tenGpo.MaxFeePerGas)
-	assert.Nil(t, tenGpo.MaxPriorityFeePerGas)
+	hgc := &HybridGasPriceClient{
+		conf: conf,
+	}
+	hgc.Init(ctx)
 
-	testTx = &ethsigner.Transaction{}
-	eip1559Hgc := NewTestFixedPriceGasPriceClientEIP1559(t)
-	eip1559Hgc.SetFixedGasPriceIfConfigured(ctx, testTx)
-	assert.Equal(t, big.NewInt(10), testTx.MaxFeePerGas.BigInt())
-	assert.Equal(t, big.NewInt(1), testTx.MaxPriorityFeePerGas.BigInt())
-	assert.Nil(t, testTx.GasPrice)
-	gpo, err := eip1559Hgc.GetGasPriceObject(ctx)
-	assert.NoError(t, err)
-	assert.Nil(t, gpo.GasPrice)
-	assert.Equal(t, big.NewInt(10), gpo.MaxFeePerGas.Int())
-	assert.Equal(t, big.NewInt(1), gpo.MaxPriorityFeePerGas.Int())
+	if hgc.fixedGasPrice == nil {
+		// Add GasPrice mock since Start method calls it
+		gasPrice := pldtypes.Uint64ToUint256(20000000000)
+		if zeroGasPrice {
+			gasPrice = pldtypes.Uint64ToUint256(0)
+		}
+		mockEthClient.On("GasPrice", ctx).Return(gasPrice, nil).Once()
+	}
+
+	hgc.Start(ctx, mockEthClient)
+	return ctx, hgc, mockEthClient
 }
 
-func TestGasPriceClientInit(t *testing.T) {
-	ctx := context.Background()
-	hgc := &HybridGasPriceClient{}
-	hgc.fixedGasPrice = pldtypes.RawJSON(`invalid`)
-	hgc.gasPriceCache = longLivedGasPriceTestCache()
-	assert.False(t, hgc.hasZeroGasPrice)
-	hgc.Init(ctx, nil)
-	assert.False(t, hgc.hasZeroGasPrice)
-	hgc.fixedGasPrice = pldtypes.RawJSON(`0`)
-	hgc.Init(ctx, nil)
-	assert.True(t, hgc.hasZeroGasPrice)
-}
-
-func TestFixedGasPrice(t *testing.T) {
-	ctx := context.Background()
-
-	gasPriceClient := NewGasPriceClient(ctx, &pldconf.PublicTxManagerConfig{
-		GasPrice: pldconf.GasPriceConfig{
-			FixedGasPrice: "1020304050",
+func NewFixedPriceGasPriceClient(t *testing.T, maxFeePerGas, maxPriorityFeePerGas uint64) (context.Context, *HybridGasPriceClient, *ethclientmocks.EthClient) {
+	return NewTestGasPriceClient(t, &pldconf.GasPriceConfig{
+		FixedGasPrice: &pldconf.FixedGasPricing{
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(maxFeePerGas),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(maxPriorityFeePerGas),
 		},
-	})
-	hgc := gasPriceClient.(*HybridGasPriceClient)
+	}, false)
+}
 
+func TestNewGasPriceClientFixedPricing(t *testing.T) {
+	ctx, hgc, _ := NewFixedPriceGasPriceClient(t, 10, 1)
 	gpo, err := hgc.GetGasPriceObject(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, &pldapi.PublicTxGasPricing{
-		GasPrice: pldtypes.Int64ToInt256(1020304050),
-	}, gpo)
+	assert.NotNil(t, gpo)
+	assert.Equal(t, int64(10), gpo.MaxFeePerGas.Int().Int64())
+	assert.Equal(t, int64(1), gpo.MaxPriorityFeePerGas.Int().Int64())
 }
 
-func TestGasPriceClient(t *testing.T) {
-	ctx := context.Background()
-
-	gasPriceClient := NewGasPriceClient(ctx, &pldconf.PublicTxManagerConfig{})
-	hgc := gasPriceClient.(*HybridGasPriceClient)
-
-	mEC := ethclientmocks.NewEthClient(t)
-	hgc.Init(ctx, mEC)
-	// check functions
+func TestHasZeroGasPrice(t *testing.T) {
+	// Test with zero gas price retrieved from chain
+	ctx, hgc, _ := NewTestGasPriceClient(t, &pldconf.GasPriceConfig{}, true)
 	assert.True(t, hgc.HasZeroGasPrice(ctx))
 
-	testNodeGasPrice := `"0x03e8"`
-	// fall back to connector when get call failed
-	mEC.On("GasPrice", ctx, mock.Anything).Return(pldtypes.Uint64ToUint256(1000), nil).Once()
-	gasPriceJSON, err := hgc.getGasPriceJSON(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, testNodeGasPrice, gasPriceJSON.String())
+	// Test with zero gas price set in config
+	ctx, hgc, _ = NewFixedPriceGasPriceClient(t, 0, 0)
+	assert.True(t, hgc.HasZeroGasPrice(ctx))
 
-	// gasPrice should be cached
-	gasPriceJSON, err = hgc.getGasPriceJSON(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, testNodeGasPrice, gasPriceJSON.String())
-	fixedGpo, err := hgc.ParseGasPriceJSON(ctx, gasPriceJSON)
-	require.NoError(t, err)
-	assert.Equal(t, big.NewInt(1000), fixedGpo.GasPrice.Int())
-	assert.Nil(t, fixedGpo.MaxFeePerGas)
-	assert.Nil(t, fixedGpo.MaxPriorityFeePerGas)
+	// Test with non-zero gas price in config
+	ctx, hgc, _ = NewFixedPriceGasPriceClient(t, 10, 1)
+	assert.False(t, hgc.HasZeroGasPrice(ctx))
 
-	// return error when connector also errored
-	hgc.DeleteCache(ctx)
-	mEC.On("GasPrice", ctx, mock.Anything).Return(nil, fmt.Errorf("doesn't work")).Once()
+	// Test with non-zero gas price from chain
+	ctx, hgc, _ = NewTestGasPriceClient(t, &pldconf.GasPriceConfig{}, false)
+	assert.False(t, hgc.HasZeroGasPrice(ctx))
+}
+
+// Test helpers for dynamic gas pricing
+func createMockFeeHistoryResult(blockCount int, baseFeeWei uint64, tipWei uint64) *ethclient.FeeHistoryResult {
+	baseFees := make([]pldtypes.HexUint256, blockCount)
+	rewards := make([][]pldtypes.HexUint256, blockCount)
+
+	for i := 0; i < blockCount; i++ {
+		baseFees[i] = *pldtypes.Uint64ToUint256(baseFeeWei)
+		rewards[i] = []pldtypes.HexUint256{*pldtypes.Uint64ToUint256(tipWei)}
+	}
+
+	return &ethclient.FeeHistoryResult{
+		OldestBlock:   pldtypes.HexUint64(100),
+		BaseFeePerGas: baseFees,
+		GasUsedRatio:  make([]float64, blockCount),
+		Reward:        rewards,
+	}
+}
+
+func TestDynamicGasPricingBasic(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:          confutil.P(85),
+			HistoryBlockCount:   confutil.P(20),
+			BaseFeeBufferFactor: confutil.P(2),
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
+
+	// Mock fee history response
+	mockFeeHistoryResult := createMockFeeHistoryResult(20, 20000000000, 1500000000) // 20 Gwei base fee, 1.5 Gwei tip
+	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Once()
+
 	gpo, err := hgc.GetGasPriceObject(ctx)
-	assert.Regexp(t, "doesn't work", err)
+	require.NoError(t, err)
+	assert.NotNil(t, gpo)
+
+	// Verify the calculation: maxFeePerGas = (2 * baseFee) + maxPriorityFeePerGas
+	expectedMaxFeePerGas := int64(2*20000000000 + 1500000000) // (2 * 20 Gwei) + 1.5 Gwei
+	expectedMaxPriorityFeePerGas := int64(1500000000)         // 1.5 Gwei
+
+	assert.Equal(t, expectedMaxFeePerGas, gpo.MaxFeePerGas.Int().Int64())
+	assert.Equal(t, expectedMaxPriorityFeePerGas, gpo.MaxPriorityFeePerGas.Int().Int64())
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestDynamicGasPricingWithCustomConfig(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:          confutil.P(75), // Custom percentile
+			HistoryBlockCount:   confutil.P(10), // Custom block count
+			BaseFeeBufferFactor: confutil.P(3),  // Custom buffer factor
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
+
+	// Mock fee history response
+	mockFeeHistoryResult := createMockFeeHistoryResult(10, 30000000000, 2000000000) // 30 Gwei base fee, 2 Gwei tip
+	mockEthClient.On("FeeHistory", ctx, 10, "latest", []float64{75.0}).Return(mockFeeHistoryResult, nil).Once()
+
+	gpo, err := hgc.GetGasPriceObject(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, gpo)
+
+	// Verify the calculation: maxFeePerGas = (3 * baseFee) + maxPriorityFeePerGas
+	expectedMaxFeePerGas := int64(3*30000000000 + 2000000000) // (3 * 30 Gwei) + 2 Gwei
+	expectedMaxPriorityFeePerGas := int64(2000000000)         // 2 Gwei
+
+	assert.Equal(t, expectedMaxFeePerGas, gpo.MaxFeePerGas.Int().Int64())
+	assert.Equal(t, expectedMaxPriorityFeePerGas, gpo.MaxPriorityFeePerGas.Int().Int64())
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestDynamicGasPricingWithPriorityFeeCap(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(85),
+			HistoryBlockCount: confutil.P(20),
+			MaxPriorityFeeCap: pldtypes.Uint64ToUint256(1000000000), // 1 Gwei cap
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
+
+	// Mock fee history response with high tip that should be capped
+	mockFeeHistoryResult := createMockFeeHistoryResult(20, 20000000000, 3000000000) // 20 Gwei base fee, 3 Gwei tip (above 1 Gwei cap)
+	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Once()
+
+	gpo, err := hgc.GetGasPriceObject(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, gpo)
+
+	// Verify the tip is capped to 1 Gwei
+	expectedMaxFeePerGas := int64(1*20000000000 + 1000000000) // (1 * 20 Gwei) + 1 Gwei (capped)
+	expectedMaxPriorityFeePerGas := int64(1000000000)         // 1 Gwei (capped)
+
+	assert.Equal(t, expectedMaxFeePerGas, gpo.MaxFeePerGas.Int().Int64())
+	assert.Equal(t, expectedMaxPriorityFeePerGas, gpo.MaxPriorityFeePerGas.Int().Int64())
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestDynamicGasPricingFallbackTo1Gwei(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(85),
+			HistoryBlockCount: confutil.P(20),
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
+
+	// Mock fee history response with no valid tips (all zero)
+	mockFeeHistoryResult := &ethclient.FeeHistoryResult{
+		OldestBlock:   pldtypes.HexUint64(100),
+		BaseFeePerGas: []pldtypes.HexUint256{*pldtypes.Uint64ToUint256(20000000000)},
+		GasUsedRatio:  []float64{0.5},
+		Reward:        [][]pldtypes.HexUint256{{*pldtypes.Uint64ToUint256(0)}}, // Zero tip
+	}
+	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Once()
+
+	gpo, err := hgc.GetGasPriceObject(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, gpo)
+
+	// Verify fallback to 1 Gwei
+	expectedMaxFeePerGas := int64(1*20000000000 + 1000000000) // (1 * 20 Gwei) + 1 Gwei (fallback)
+	expectedMaxPriorityFeePerGas := int64(1000000000)         // 1 Gwei (fallback)
+
+	assert.Equal(t, expectedMaxFeePerGas, gpo.MaxFeePerGas.Int().Int64())
+	assert.Equal(t, expectedMaxPriorityFeePerGas, gpo.MaxPriorityFeePerGas.Int().Int64())
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestDynamicGasPricingFallbackWithCap(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(85),
+			HistoryBlockCount: confutil.P(20),
+			MaxPriorityFeeCap: pldtypes.Uint64ToUint256(500000000), // 0.5 Gwei cap
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
+
+	// Mock fee history response with no valid tips
+	mockFeeHistoryResult := &ethclient.FeeHistoryResult{
+		OldestBlock:   pldtypes.HexUint64(100),
+		BaseFeePerGas: []pldtypes.HexUint256{*pldtypes.Uint64ToUint256(20000000000)},
+		GasUsedRatio:  []float64{0.5},
+		Reward:        [][]pldtypes.HexUint256{{*pldtypes.Uint64ToUint256(0)}}, // Zero tip
+	}
+	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Once()
+
+	gpo, err := hgc.GetGasPriceObject(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, gpo)
+
+	// Verify fallback 1 Gwei is capped to 0.5 Gwei
+	expectedMaxFeePerGas := int64(1*20000000000 + 500000000) // (1 * 20 Gwei) + 0.5 Gwei (capped fallback)
+	expectedMaxPriorityFeePerGas := int64(500000000)         // 0.5 Gwei (capped fallback)
+
+	assert.Equal(t, expectedMaxFeePerGas, gpo.MaxFeePerGas.Int().Int64())
+	assert.Equal(t, expectedMaxPriorityFeePerGas, gpo.MaxPriorityFeePerGas.Int().Int64())
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestDynamicGasPricingCaching(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(85),
+			HistoryBlockCount: confutil.P(20),
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
+
+	// Mock fee history response
+	mockFeeHistoryResult := createMockFeeHistoryResult(20, 20000000000, 1500000000)
+	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Once()
+
+	// First call should hit the RPC
+	gpo1, err := hgc.GetGasPriceObject(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, gpo1)
+
+	// Second call should use cache (no additional RPC calls)
+	gpo2, err := hgc.GetGasPriceObject(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, gpo2)
+
+	// Results should be identical
+	assert.Equal(t, gpo1.MaxFeePerGas.Int().Int64(), gpo2.MaxFeePerGas.Int().Int64())
+	assert.Equal(t, gpo1.MaxPriorityFeePerGas.Int().Int64(), gpo2.MaxPriorityFeePerGas.Int().Int64())
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestDynamicGasPricingCacheDisabled(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(85),
+			HistoryBlockCount: confutil.P(20),
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(false),
+			},
+		},
+	}
+	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
+
+	// Mock fee history response - should be called twice since caching is disabled
+	mockFeeHistoryResult := createMockFeeHistoryResult(20, 20000000000, 1500000000)
+	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Twice()
+
+	// First call
+	gpo1, err := hgc.GetGasPriceObject(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, gpo1)
+
+	// Second call should hit RPC again
+	gpo2, err := hgc.GetGasPriceObject(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, gpo2)
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestDynamicGasPricingEmptyFeeHistory(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(85),
+			HistoryBlockCount: confutil.P(20),
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
+
+	// Mock empty fee history response
+	mockFeeHistoryResult := &ethclient.FeeHistoryResult{
+		OldestBlock:   pldtypes.HexUint64(100),
+		BaseFeePerGas: []pldtypes.HexUint256{}, // Empty
+		GasUsedRatio:  []float64{},
+		Reward:        [][]pldtypes.HexUint256{},
+	}
+	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Once()
+
+	gpo, err := hgc.GetGasPriceObject(ctx)
+	assert.Error(t, err)
 	assert.Nil(t, gpo)
+	assert.Contains(t, err.Error(), "fee history returned empty data")
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestDynamicGasPricingRPCError(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(85),
+			HistoryBlockCount: confutil.P(20),
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
+
+	// Mock RPC error
+	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(nil, fmt.Errorf("RPC error")).Once()
+
+	gpo, err := hgc.GetGasPriceObject(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, gpo)
+	assert.Contains(t, err.Error(), "RPC error")
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestDeleteCache(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(85),
+			HistoryBlockCount: confutil.P(20),
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
+
+	// Mock fee history response
+	mockFeeHistoryResult := createMockFeeHistoryResult(20, 20000000000, 1500000000)
+	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Twice()
+
+	// First call to populate cache
+	gpo1, err := hgc.GetGasPriceObject(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, gpo1)
+
+	// Delete cache
+	hgc.DeleteCache(ctx)
+
+	// Second call should hit RPC again since cache was cleared
+	gpo2, err := hgc.GetGasPriceObject(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, gpo2)
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestInitValidation(t *testing.T) {
+	ctx := context.Background()
+	// Test with invalid percentile (should log error but not panic)
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(150), // Invalid: > 100
+			HistoryBlockCount: confutil.P(20),
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+
+	gasPriceClient := NewGasPriceClient(ctx, conf)
+	err := gasPriceClient.Init(ctx)
+	assert.Error(t, err)
+
+	conf = &pldconf.GasPriceConfig{
+		FixedGasPrice: &pldconf.FixedGasPricing{
+			MaxFeePerGas: pldtypes.Uint64ToUint256(1000),
+			// Missing MaxPriorityFeePerGas
+		},
+	}
+
+	gasPriceClient = NewGasPriceClient(ctx, conf)
+	err = gasPriceClient.Init(ctx)
+	assert.Error(t, err)
+}
+
+func TestInitWithNilDynamicGasPricing(t *testing.T) {
+	ctx := context.Background()
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice:     nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{}, // All fields nil
+	}
+
+	gasPriceClient := NewGasPriceClient(ctx, conf)
+	err := gasPriceClient.Init(ctx)
+	require.NoError(t, err)
+
+	hgc := gasPriceClient.(*HybridGasPriceClient)
+	// Should use defaults when config fields are nil
+	assert.Equal(t, 85, hgc.percentile)
+	assert.Equal(t, 20, hgc.historyBlockCount)
+	assert.Equal(t, 1, hgc.baseFeeBufferFactor)
+	assert.True(t, hgc.cacheEnabled)
+}
+
+func TestInitWithPartialConfig(t *testing.T) {
+	ctx := context.Background()
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:          confutil.P(75), // Only percentile set
+			HistoryBlockCount:   nil,            // Missing
+			BaseFeeBufferFactor: nil,            // Missing
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: nil, // Missing
+			},
+		},
+	}
+
+	gasPriceClient := NewGasPriceClient(ctx, conf)
+	err := gasPriceClient.Init(ctx)
+	require.NoError(t, err)
+
+	hgc := gasPriceClient.(*HybridGasPriceClient)
+	// Should use defaults for missing fields
+	assert.Equal(t, 75, hgc.percentile)
+	assert.Equal(t, 20, hgc.historyBlockCount)
+	assert.Equal(t, 1, hgc.baseFeeBufferFactor)
+	assert.True(t, hgc.cacheEnabled)
+}
+
+// mapConfigToAPIGasPricing edge cases
+func TestMapConfigToAPIGasPricingIncompleteConfig(t *testing.T) {
+	ctx := context.Background()
+
+	// Test with only MaxFeePerGas set
+	conf := &pldconf.FixedGasPricing{
+		MaxFeePerGas:         pldtypes.Uint64ToUint256(1000),
+		MaxPriorityFeePerGas: nil,
+	}
+
+	result, err := mapConfigToAPIGasPricing(ctx, conf)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "maxPriorityFeePerGas is missing")
+
+	// Test with only MaxPriorityFeePerGas set
+	conf = &pldconf.FixedGasPricing{
+		MaxFeePerGas:         nil,
+		MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(100),
+	}
+
+	result, err = mapConfigToAPIGasPricing(ctx, conf)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "maxFeePerGas is missing")
+
+	// Test with both fields nil - this should return a valid object with nil fields
+	conf = &pldconf.FixedGasPricing{
+		MaxFeePerGas:         nil,
+		MaxPriorityFeePerGas: nil,
+	}
+
+	result, err = mapConfigToAPIGasPricing(ctx, conf)
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Nil(t, result.MaxFeePerGas)
+	assert.Nil(t, result.MaxPriorityFeePerGas)
+}
+
+func TestStartWithNilGasPriceResponse(t *testing.T) {
+	ctx := context.Background()
+	mockEthClient := ethclientmocks.NewEthClient(t)
+
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(85),
+			HistoryBlockCount: confutil.P(20),
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+
+	gasPriceClient := NewGasPriceClient(ctx, conf)
+	hgc := gasPriceClient.(*HybridGasPriceClient)
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Mock GasPrice returning nil
+	mockEthClient.On("GasPrice", ctx).Return(nil, nil).Once()
+
+	hgc.Start(ctx, mockEthClient)
+	assert.False(t, hgc.hasZeroGasPrice) // Should not be set when gasPrice is nil
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestStartWithGasPriceError(t *testing.T) {
+	ctx := context.Background()
+	mockEthClient := ethclientmocks.NewEthClient(t)
+
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(85),
+			HistoryBlockCount: confutil.P(20),
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+
+	gasPriceClient := NewGasPriceClient(ctx, conf)
+	hgc := gasPriceClient.(*HybridGasPriceClient)
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Mock GasPrice returning error
+	mockEthClient.On("GasPrice", ctx).Return(nil, fmt.Errorf("network error")).Once()
+
+	hgc.Start(ctx, mockEthClient)
+	assert.False(t, hgc.hasZeroGasPrice) // Should not be set when GasPrice fails
+
+	mockEthClient.AssertExpectations(t)
+}
+
+func TestStartSkipsGasPriceWhenFixedPriceSet(t *testing.T) {
+	ctx := context.Background()
+	mockEthClient := ethclientmocks.NewEthClient(t)
+
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: &pldconf.FixedGasPricing{
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(1000),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(100),
+		},
+		DynamicGasPricing: pldconf.DynamicGasPricingConfig{
+			Percentile:        confutil.P(85),
+			HistoryBlockCount: confutil.P(20),
+			Cache: pldconf.DynamicGasPricingCacheConfig{
+				Enabled: confutil.P(true),
+			},
+		},
+	}
+
+	gasPriceClient := NewGasPriceClient(ctx, conf)
+	hgc := gasPriceClient.(*HybridGasPriceClient)
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Should not call GasPrice since fixedGasPrice is set
+	hgc.Start(ctx, mockEthClient)
+
+	// No expectations to assert since GasPrice should not be called
 }

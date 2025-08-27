@@ -134,8 +134,11 @@ type txActivityRecords struct {
 func NewPublicTransactionManager(ctx context.Context, conf *pldconf.PublicTxManagerConfig) components.PublicTxManager {
 	log.L(ctx).Debugf("Creating new public transaction manager")
 
-	gasPriceClient := NewGasPriceClient(ctx, conf)
-	gasPriceIncreaseMax := confutil.BigIntOrNil(conf.GasPrice.IncreaseMax)
+	gasPriceClient := NewGasPriceClient(ctx, &conf.GasPrice)
+	var gasPriceIncreaseMax *big.Int
+	if conf.GasPrice.IncreaseMax != nil {
+		gasPriceIncreaseMax = conf.GasPrice.IncreaseMax.Int()
+	}
 	gasEstimateFactor := confutil.Float64Min(conf.GasLimit.GasEstimateFactor, 1.0, *pldconf.PublicTxManagerDefaults.GasLimit.GasEstimateFactor)
 
 	log.L(ctx).Debugf("Enterprise transaction handler created")
@@ -165,6 +168,10 @@ func NewPublicTransactionManager(ctx context.Context, conf *pldconf.PublicTxMana
 }
 
 func (ptm *pubTxManager) PreInit(pic components.PreInitComponents) (result *components.ManagerInitResult, err error) {
+	err = ptm.gasPriceClient.Init(ptm.ctx)
+	if err != nil {
+		return nil, err
+	}
 	ptm.thMetrics = metrics.InitMetrics(ptm.ctx, pic.MetricsManager().Registry())
 	return &components.ManagerInitResult{}, nil
 }
@@ -191,7 +198,7 @@ func (ptm *pubTxManager) Start() error {
 
 	// The client is assured to be started by this point and availaptm
 	ptm.ethClient = ptm.ethClientFactory.SharedWS()
-	ptm.gasPriceClient.Init(ctx, ptm.ethClient)
+	ptm.gasPriceClient.Start(ctx, ptm.ethClient)
 	if ptm.engineLoopDone == nil { // only start once
 		ptm.engineLoopDone = make(chan struct{})
 		log.L(ctx).Debugf("Kicking off  enterprise handler engine loop")
@@ -221,9 +228,9 @@ func buildEthTX(
 	options *pldapi.PublicTxOptions,
 ) *ethsigner.Transaction {
 	ethTx := &ethsigner.Transaction{
-		From:                 json.RawMessage(pldtypes.JSONString(from)),
-		To:                   to.Address0xHex(),
-		GasPrice:             (*ethtypes.HexInteger)(options.GasPrice),
+		From: json.RawMessage(pldtypes.JSONString(from)),
+		To:   to.Address0xHex(),
+
 		MaxPriorityFeePerGas: (*ethtypes.HexInteger)(options.MaxPriorityFeePerGas),
 		MaxFeePerGas:         (*ethtypes.HexInteger)(options.MaxFeePerGas),
 		Value:                (*ethtypes.HexInteger)(options.Value),
