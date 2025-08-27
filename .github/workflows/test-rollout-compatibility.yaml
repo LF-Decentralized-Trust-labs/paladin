@@ -35,7 +35,7 @@ jobs:
         run: |
           echo "Finding all tags before ${{ inputs.new_tag }}..."
           
-          # This test is only compatible with releases from v0.10.0 onwards.
+          # This test is only compatible with releases from v0.11.0 onwards.
           # The 'sed' command filters the sorted tag list to exclude everything up to and including v0.9.0.
           all_tags=$(git tag --sort=v:refname | sed '1,/^v0.9\.0$/d')
           new_tag="${{ inputs.new_tag }}"
@@ -55,15 +55,15 @@ jobs:
           
           echo "Found previous tags: $previous_tags"
           
-          # TODO: remove this once we have a v0.10.0 release
+          # TODO: remove this once we have a v0.11.0 release
           # Handle case where no previous tags are found
           if [[ -z "$previous_tags" ]]; then
             echo "No previous tags found, skipping backward compatibility tests"
             echo "tags=[]" >> $GITHUB_OUTPUT
           else
-            # The list of tags is converted to a JSON array. This is a robust way to pass
-            # multi-line or complex strings between steps and could be used in a matrix strategy in the future.
-            tags_json=$(echo "$previous_tags" | tr ' ' '\n' | grep -v '^$' | jq -R . | jq -s .)
+            # Convert space-separated tags to a proper JSON array
+            # First, trim whitespace and split into lines, then convert to JSON
+            tags_json=$(echo "$previous_tags" | xargs -n1 | jq -R . | jq -s .)
             echo "tags=$tags_json" >> $GITHUB_OUTPUT
           fi
 
@@ -112,7 +112,7 @@ jobs:
         id: cache_data
         shell: bash
         run: |
-          # TODO: remove this once we have a v0.10.0 release
+          # TODO: remove this once we have a v0.11.0 release
           # Check if we have any previous tags to process
           tags_array=$(echo '${{ steps.get_tags.outputs.tags }}' | jq -r '.[]')
           if [[ -z "$tags_array" ]]; then
@@ -161,7 +161,7 @@ jobs:
 
           echo "--- Verifying Backwards Compatibility ---"
           
-          # TODO: remove this once we have a v0.10.0 release
+          # TODO: remove this once we have a v0.11.0 release
           # Check if we have any previous tags to verify
           tags_array=$(echo '${{ steps.get_tags.outputs.tags }}' | jq -r '.[]')
           if [[ -z "$tags_array" ]]; then
