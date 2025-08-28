@@ -175,6 +175,11 @@ jobs:
         run: |
           ls -R
 
+      - name: override examples sdk version
+        uses: ./.github/actions/override-sdk-version/action.yaml
+        with:
+          sdk_version: ${{ needs.setup.outputs.tag }}
+          
       - name: Create release candidate with all artifacts
         uses: softprops/action-gh-release@v2
         with:
