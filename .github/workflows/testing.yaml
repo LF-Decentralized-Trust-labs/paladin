@@ -1,0 +1,54 @@
+on:
+  push:
+    branches:
+      - dw-ghw-testing
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        # Fetch all history and tags to build the full upgrade path.
+        fetch-depth: 0
+        ref: ${{ github.ref }}
+        fetch-tags: true
+
+    - name: Get all previous release tags
+      id: get_tags
+      shell: bash
+      run: |
+        echo "Finding all tags before v0.11.0..."
+        
+        # This test is only compatible with releases from v0.11.0 onwards.
+        # The 'sed' command filters the sorted tag list to exclude everything up to and including v0.9.0.
+        all_tags=$(git tag --sort=v:refname | sed '1,/^v0.9\.0$/d')
+        new_tag="v0.11.0"
+        previous_tags=""
+        
+        # This loop builds a space-separated list of final release tags (e.g., vX.Y.Z)
+        # that exist before the new RC tag being tested.
+        while read -r tag; do
+          if [[ "$tag" == "$new_tag" ]]; then
+            break
+          fi
+          
+          if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            previous_tags+="$tag "
+          fi
+        done <<< "$all_tags"
+        
+        echo "Found previous tags: $previous_tags"
+        
+        # TODO: remove this once we have a v0.11.0 release
+        # Handle case where no previous tags are found
+        if [[ -z "$previous_tags" ]]; then
+          echo "No previous tags found, skipping backward compatibility tests"
+          echo "tags=[]" >> $GITHUB_OUTPUT
+        else
+          # Convert space-separated tags to a proper JSON array
+          # First, trim whitespace and split into lines, then convert to JSON
+          tags_json=$(echo "$previous_tags" | xargs -n1 | jq -R . | jq -s .)
+          echo "tags=$tags_json" >> $GITHUB_OUTPUT
+        fi
