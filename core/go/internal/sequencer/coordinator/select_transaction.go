@@ -27,8 +27,14 @@ import (
 )
 
 func (c *coordinator) selectNextTransaction(ctx context.Context, event *TransactionStateTransitionEvent) error {
+	log.L(ctx).Infof("[Sequencer] selecting next transaction")
 	txn, err := c.transactionSelector.SelectNextTransaction(ctx, event)
-	if txn == nil || err != nil {
+	if txn == nil {
+		log.L(ctx).Info("[Sequencer] no transaction found")
+		return nil
+	}
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] error selecting transaction: %v", err)
 		return err
 	}
 
@@ -42,18 +48,21 @@ func (c *coordinator) selectNextTransaction(ctx context.Context, event *Transact
 /* Functions of the TransactionPool interface required by the transactionSelector */
 func (c *coordinator) GetPooledTransactionsBySenderNodeAndIdentity(ctx context.Context) map[string]map[string]*transaction.Transaction {
 	pooledTransactions := c.getTransactionsInStates(ctx, []transaction.State{transaction.State_Pooled})
+	log.L(ctx).Infof("[Sequencer] pooled transactions: %d", len(pooledTransactions))
 	transactionsBySenderNodeAndIdentity := make(map[string]map[string]*transaction.Transaction)
 	for _, txn := range pooledTransactions {
-
+		log.L(ctx).Infof("[Sequencer] found pooled transaction %s from %s", txn.ID.String(), txn.SenderNode())
 		if _, ok := transactionsBySenderNodeAndIdentity[txn.SenderNode()]; !ok {
 			transactionsBySenderNodeAndIdentity[txn.SenderNode()] = make(map[string]*transaction.Transaction)
 		}
+		log.L(ctx).Infof("[Sequencer] candidate txn from sender node '%s', sender ID '%s': TXID %s", txn.SenderNode(), txn.SenderIdentity(), txn.ID.String())
 		transactionsBySenderNodeAndIdentity[txn.SenderNode()][txn.SenderIdentity()] = txn
 	}
 	return transactionsBySenderNodeAndIdentity
 }
 
 func (c *coordinator) GetCommittee(ctx context.Context) map[string][]string {
+	log.L(ctx).Infof("[Sequencer] %d committee nodes for contract %s", len(c.committee), c.contractAddress.HexString())
 	return c.committee
 }
 
@@ -105,12 +114,16 @@ func NewTransactionSelector(ctx context.Context, transactionPool TransactionPool
 		selector.numSenders = selector.numSenders + len(committeeMap[node])
 	}
 
+	log.L(ctx).Infof("[Sequencer] committee size for transaction selector: %d", selector.numSenders)
+
 	selector.fastQueue = make(chan *senderLocator, selector.numSenders)
 	selector.slowQueue = make(chan *senderLocator, selector.numSenders)
 
 	for node := range committeeMap {
 		for _, sender := range committeeMap[node] {
+			// MRW TODO - is this to emulate 2x the fast queue senders?
 			selector.fastQueue <- &senderLocator{node: node, identity: sender}
+			selector.slowQueue <- &senderLocator{node: node, identity: sender}
 			selector.numSenders++
 		}
 	}
@@ -135,17 +148,19 @@ func (ts *transactionSelector) SelectNextTransaction(ctx context.Context, event 
 
 	//TODO experiment with refactoring this to be a mini state machine
 	if event != nil {
+		log.L(ctx).Infof("[Sequencer] event for transaction selection: %+v", event)
 		// validate the the event relates to a transaction for the current sender otherwise return an error
 		txnID := event.TransactionID
 
-		currentAssemblingTransaction := ts.transactionPool.GetTransactionByID(ctx, txnID)
-		if currentAssemblingTransaction == nil {
-			msg := fmt.Sprintf("Transaction %s not found in the transaction pool", txnID)
+		pooledTransaction := ts.transactionPool.GetTransactionByID(ctx, txnID)
+		log.L(ctx).Info("[Sequencer] locate TX in pool")
+		if pooledTransaction == nil {
+			msg := fmt.Sprintf("[Sequencer] transaction %s not found in the transaction pool", txnID)
 			log.L(ctx).Error(msg)
 			return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
-		if currentAssemblingTransaction.SenderNode() != ts.currentAssemblingSender.node || currentAssemblingTransaction.SenderIdentity() != ts.currentAssemblingSender.identity {
-			msg := fmt.Sprintf("Transaction %s is not being assembled by the current sender %s", txnID, ts.currentAssemblingSender)
+		if pooledTransaction.SenderNode() != ts.currentAssemblingSender.node || pooledTransaction.SenderIdentity() != ts.currentAssemblingSender.identity {
+			msg := fmt.Sprintf("[Sequencer] transaction %s is not being assembled by the current sender %s", txnID, ts.currentAssemblingSender)
 			log.L(ctx).Error(msg)
 			return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
@@ -165,7 +180,7 @@ func (ts *transactionSelector) SelectNextTransaction(ctx context.Context, event 
 				ts.slowQueue <- ts.currentAssemblingSender
 				ts.currentAssemblingSender = nil
 			default:
-				msg := fmt.Sprintf("Unexpected transition of transaction %s from assembling state to %s", txnID.String(), event.To.String())
+				msg := fmt.Sprintf("[Sequencer] unexpected transition of transaction %s from assembling state to %s", txnID.String(), event.To.String())
 				log.L(ctx).Error(msg)
 				return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 			}
@@ -177,17 +192,44 @@ func (ts *transactionSelector) SelectNextTransaction(ctx context.Context, event 
 		}
 
 	} else {
-		//there is a transaction currently being assembled and we have no event to tell us that situation has changed
+		// there is a transaction currently being assembled and we have no event to tell us that situation has changed
+		log.L(ctx).Infof("[Sequencer] no event to tell us that current assembling sender has changed, leaving current assembling sender unchanged")
 		if ts.currentAssemblingSender != nil {
-			return nil, nil
+			log.L(ctx).Infof("[Sequencer] already have a current assembling sender '%s' for transaction selection, putting them back to the front of the queue", ts.currentAssemblingSender.identity)
+			ts.fastQueue <- ts.currentAssemblingSender
+		} else {
+			log.L(ctx).Infof("[Sequencer] no current assembling sender, reset to the coordinator committee")
+			committeeMap := ts.transactionPool.GetCommittee(ctx)
+			if len(ts.fastQueue) == 0 && len(ts.slowQueue) == 0 {
+				for node := range committeeMap {
+					for _, sender := range committeeMap[node] {
+						if len(ts.fastQueue) < ts.numSenders {
+							log.L(ctx).Infof("[Sequencer] putting sender '%s' from committee '%s' back to the front of the fast queue", sender, node)
+							ts.fastQueue <- &senderLocator{node: node, identity: sender}
+						} else {
+							log.L(ctx).Infof("[Sequencer] not putting sender '%s' from committee '%s' back to the front of the slow queue", sender, node)
+						}
+						if len(ts.slowQueue) < ts.numSenders {
+							log.L(ctx).Infof("[Sequencer] putting sender '%s' from committee '%s' back to the front of the slow queue", sender, node)
+							ts.slowQueue <- &senderLocator{node: node, identity: sender}
+						} else {
+							log.L(ctx).Infof("[Sequencer] not putting sender '%s' from committee '%s' back to the front of the slow queue", sender, node)
+						}
+					}
+				}
+			} else {
+				log.L(ctx).Infof("[Sequencer] already have senders in at least one queue, leaving the queues unchanged")
+			}
 		}
 	}
 
 	selectableTransactionsMap := ts.transactionPool.GetPooledTransactionsBySenderNodeAndIdentity(ctx)
 
 	getFromFastQueue := func() *senderLocator {
+		log.L(ctx).Infof("[Sequencer] getting from fast queue")
 		select {
 		case sender := <-ts.fastQueue:
+			log.L(ctx).Infof("[Sequencer] got sender '%s' from fast queue", sender.identity)
 			return sender
 		default:
 			return nil
@@ -195,8 +237,10 @@ func (ts *transactionSelector) SelectNextTransaction(ctx context.Context, event 
 	}
 
 	getFromSlowQueue := func() *senderLocator {
+		log.L(ctx).Infof("[Sequencer] getting from slow queue")
 		select {
 		case sender := <-ts.slowQueue:
+			log.L(ctx).Infof("[Sequencer] got sender '%s' from slow queue", sender.identity)
 			return sender
 		default:
 			return nil
@@ -214,31 +258,47 @@ func (ts *transactionSelector) SelectNextTransaction(ctx context.Context, event 
 
 		if (ts.timesRoundQueue > 1 && len(ts.slowQueue) != 0) || len(ts.fastQueue) == 0 {
 			ts.timesRoundQueue = 0
-			return getFromSlowQueue()
-
+			log.L(ctx).Info("[Sequencer] timesRoundQueue > 1 and slow queue is not empty, returning slow queue")
+			if sender := getFromSlowQueue(); sender != nil {
+				return sender
+			}
+			return getFromFastQueue()
 		}
 		ts.unseenQueueEntries--
+		log.L(ctx).Infof("[Sequencer] timesRoundQueue %d, returning fast queue", ts.timesRoundQueue)
 		return getFromFastQueue()
-
 	}
 
+	log.L(ctx).Infof("[Sequencer] next sender selector, we have %d candidate senders", ts.numSenders)
 	for i := 0; i < ts.numSenders; i++ {
 		sender := nextSender()
 		if sender == nil {
 			//very strange situation where the fast queue and slow queue are both empty
-			log.L(ctx).Error("Both fast and slow queues are empty")
+			log.L(ctx).Error("[Sequencer] both fast and slow queues are empty")
 			return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Both fast and slow queues are empty")
 		}
+		log.L(ctx).Infof("[Sequencer] considering next sender identity '%s', node '%s'", sender.identity, sender.node)
+
+		// MRW TODO - tidy up here
+		log.L(ctx).Infof("[Sequencer] Selectable transaction identities by node: %d", len(selectableTransactionsMap[sender.node]))
 		txn, ok := selectableTransactionsMap[sender.node][sender.identity]
-		if ok {
-			ts.currentAssemblingSender = sender
-			return txn, nil
+		log.L(ctx).Infof("[Sequencer] Selectable transaction for that identity: %+v", txn)
+
+		if txn != nil {
+			log.L(ctx).Infof("[Sequencer] found transaction %s for sender identity '%s', node '%s'", txn.ID.String(), sender.identity, sender.node)
+			if ok {
+				ts.currentAssemblingSender = sender
+				return txn, nil
+			} else {
+				//requeue the sender to the fast queue
+				// even if it has came from the slow queue, it has served its time there
+				ts.fastQueue <- sender
+			}
 		} else {
-			//requeue the sender to the fast queue
-			// even if it has came from the slow queue, it has served its time there
-			ts.fastQueue <- sender
+			log.L(ctx).Infof("[Sequencer] no candidate transaction found for sender identity '%s', node '%s'", sender.identity, sender.node)
 		}
 	}
+	log.L(ctx).Error("[Sequencer] no TX found")
 	//gave all senders a chance to have their transaction selected but none had a transaction in the State_Pooled state
 	return nil, nil
 }

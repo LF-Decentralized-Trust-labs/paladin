@@ -19,7 +19,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
@@ -41,7 +40,6 @@ type BaseEvent struct {
 
 // Default implementation is a no-op
 func (e *BaseEvent) ApplyToTransaction(ctx context.Context, _ *Transaction) error {
-	log.L(ctx).Debugf("nothing to apply for event type %T", e)
 	return nil
 }
 

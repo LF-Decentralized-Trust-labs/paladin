@@ -307,7 +307,7 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 
 func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error {
 
-	log.L(ctx).Infof("Distributed sender transaction handling new event (TX ID %s, TX sender %s, TX address %+v)", t.ID.String(), t.sender, t.Address.HexString())
+	log.L(ctx).Infof("[Sequencer] transaction state machine handling new event (TX ID %s, TX sender %s, TX address %+v)", t.ID.String(), t.sender, t.Address.HexString())
 	//determine whether this event is valid for the current state
 	eventHandler, err := t.evaluateEvent(ctx, event)
 	if err != nil || eventHandler == nil {
@@ -346,19 +346,19 @@ func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*E
 			valid, err := eventHandler.Validator(ctx, t, event)
 			if err != nil {
 				//This is an unexpected error.  If the event is invalid, the validator should return false and not an error
-				log.L(ctx).Errorf("Error validating event %s: %v", event.TypeString(), err)
+				log.L(ctx).Errorf("[Sequencer] error validating event %s: %v", event.TypeString(), err)
 				return nil, err
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the transaction so we just ignore it and move on
-				log.L(ctx).Debugf("Coordinator transaction event %s is not valid for current state %s: %t", event.TypeString(), sm.currentState.String(), valid)
+				log.L(ctx).Debugf("[Sequencer] coordinator transaction event %s is not valid for current state %s: %t", event.TypeString(), sm.currentState.String(), valid)
 				return nil, nil
 			}
 		}
 		return &eventHandler, nil
 	} else {
 		// no event handler defined for this event while in this state
-		log.L(ctx).Debugf("No coordinator transactionevent handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
+		log.L(ctx).Debugf("[Sequencer] no coordinator transactionevent handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
 		return nil, nil
 	}
 
@@ -395,7 +395,7 @@ func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error 
 		t.heartbeatIntervalsSinceStateChange++
 	default:
 		//other events may trigger actions and/or state transitions but not require any internal state to be updated
-		log.L(ctx).Debugf("no internal state to apply for event type %T", event)
+		log.L(ctx).Debugf("[Sequencer] no internal state to apply for event type %T", event)
 	}
 	return err
 }
@@ -406,7 +406,7 @@ func (t *Transaction) performActions(ctx context.Context, eventHandler EventHand
 			err := rule.Action(ctx, t)
 			if err != nil {
 				//any recoverable errors should have been handled by the action function
-				log.L(ctx).Errorf("Error applying action: %v", err)
+				log.L(ctx).Errorf("[Sequencer] error applying action: %v", err)
 				return err
 			}
 		}
@@ -418,7 +418,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 	sm := t.stateMachine
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
-			log.L(ctx).Infof("Transaction %s transitioning from %s to %s triggered by event %T", t.ID.String(), sm.currentState.String(), rule.To.String(), event)
+			log.L(ctx).Infof("[Sequencer] transaction %s transitioning from %s to %s triggered by event %T", t.ID.String(), sm.currentState.String(), rule.To.String(), event)
 			previousState := sm.currentState
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
@@ -427,7 +427,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 				err := rule.On(ctx, t)
 				if err != nil {
 					//any recoverable errors should have been handled by the action function
-					log.L(ctx).Errorf("Error transitioning coordinator transaction to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("[Sequencer] error transitioning coordinator transaction to state %v: %v", sm.currentState, err)
 					return err
 				}
 			}
@@ -437,11 +437,11 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 				err := newStateDefinition.OnTransitionTo(ctx, t)
 				if err != nil {
 					// any recoverable errors should have been handled by the OnTransitionTo function
-					log.L(ctx).Errorf("Error transitioning coordinator transaction to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("[Sequencer] error transitioning coordinator transaction to state %v: %v", sm.currentState, err)
 					return err
 				}
 			} else {
-				log.L(ctx).Debugf("No OnTransitionTo function defined for state %v", sm.currentState)
+				log.L(ctx).Debugf("[Sequencer] no OnTransitionTo function defined for state %v", sm.currentState)
 			}
 
 			// if there is a state change notification function, run it

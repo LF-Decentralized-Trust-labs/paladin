@@ -214,9 +214,9 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 }
 
 func (c *coordinator) HandleEvent(ctx context.Context, event common.Event) error {
-	log.L(ctx).Infof("Distributed coordinator handling new event (contract address %s, active coordinator %s, committee %+v)", c.contractAddress, c.activeCoordinator, c.committee)
+	log.L(ctx).Infof("[Sequencer] coordinator handling new event (contract address %s, active coordinator %s, committee %+v)", c.contractAddress, c.activeCoordinator, c.committee)
 	for node, party := range c.committee {
-		log.L(ctx).Infof("Distributed coordinator handling new event: party %s = %s", node, party)
+		log.L(ctx).Infof("[Sequencer] coordinator handling new event: party %s = %s", node, party)
 	}
 
 	if transactionEvent, ok := event.(transaction.Event); ok {
@@ -261,19 +261,19 @@ func (c *coordinator) evaluateEvent(ctx context.Context, event common.Event) (*E
 			valid, err := eventHandler.Validator(ctx, c, event)
 			if err != nil {
 				//This is an unexpected error.  If the event is invalid, the validator should return false and not an error
-				log.L(ctx).Errorf("Error validating event %s: %v", event.TypeString(), err)
+				log.L(ctx).Errorf("[Sequencer] error validating event %s: %v", event.TypeString(), err)
 				return nil, err
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the coordinator so we just ignore it and move on
-				log.L(ctx).Debugf("Coordinator event %s is not valid for current state %s: %t", event.TypeString(), sm.currentState.String(), valid)
+				log.L(ctx).Debugf("[Sequencer] oordinator event %s is not valid for current state %s: %t", event.TypeString(), sm.currentState.String(), valid)
 				return nil, nil
 			}
 		}
 		return &eventHandler, nil
 	} else {
 		// no event handler defined for this event while in this state
-		log.L(ctx).Debugf("No coordinatorevent handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
+		log.L(ctx).Debugf("[Sequencer] no coordinatorevent handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
 		return nil, nil
 	}
 }
@@ -293,9 +293,9 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 		// we were loaded into memory
 		//TODO - we can't actually guarantee that we have all transactions we dispatched in memory.
 		//Even assuming that the public txmgr is in the same process (may not be true forever)  and assuming that we haven't been swapped out ( likely not to be true very soon) there is still a chance that the transaction was submitted to the base ledger, then the process restarted then we get the confirmation.				//When the process starts, we need to make sure that the coordinator is pre loaded with knowledge of all transactions that it has dispatched
-		isDispatchedTransaction, err := c.confirmDispatchedTransaction(ctx, event.From, event.Nonce, event.Hash, event.RevertReason)
+		isDispatchedTransaction, err := c.confirmDispatchedTransaction(ctx, event.TxID, event.From, event.Nonce, event.Hash, event.RevertReason)
 		if err != nil {
-			log.L(ctx).Errorf("Error confirming transaction From: %s , Nonce: %d, Hash: %v: %v", event.From, event.Nonce, event.Hash, err)
+			log.L(ctx).Errorf("[Sequencer] error confirming transaction From: %s , Nonce: %d, Hash: %v: %v", event.From, event.Nonce, event.Hash, err)
 			return err
 		}
 		if !isDispatchedTransaction {
@@ -321,7 +321,7 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 		err = c.propagateEventToAllTransactions(ctx, event)
 	}
 	if err != nil {
-		log.L(ctx).Errorf("Error applying event %v: %v", event.Type(), err)
+		log.L(ctx).Errorf("[Sequencer] error applying event %v: %v", event.Type(), err)
 	}
 	return err
 }
@@ -332,7 +332,7 @@ func (c *coordinator) performActions(ctx context.Context, eventHandler EventHand
 			err := rule.Action(ctx, c)
 			if err != nil {
 				//any recoverable errors should have been handled by the action function
-				log.L(ctx).Errorf("Error applying action: %v", err)
+				log.L(ctx).Errorf("[Sequencer] error applying action: %v", err)
 				return err
 			}
 		}
@@ -345,7 +345,7 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
-			log.L(ctx).Infof("Coordinator for address %s transitioning from %s to %s triggered by event %T", c.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
+			log.L(ctx).Infof("[Sequencer] coordinator for address %s transitioning from %s to %s triggered by event %T", c.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first
@@ -353,7 +353,7 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 				err := rule.On(ctx, c)
 				if err != nil {
 					//any recoverable errors should have been handled by the action function
-					log.L(ctx).Errorf("Error transitioning coordinator to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("[Sequencer] error transitioning coordinator to state %v: %v", sm.currentState, err)
 					return err
 				}
 			}
@@ -363,11 +363,11 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 				err := newStateDefinition.OnTransitionTo(ctx, c)
 				if err != nil {
 					// any recoverable errors should have been handled by the OnTransitionTo function
-					log.L(ctx).Errorf("Error transitioning coordinator to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("[Sequencer] error transitioning coordinator to state %v: %v", sm.currentState, err)
 					return err
 				}
 			} else {
-				log.L(ctx).Debugf("No OnTransitionTo function defined for state %v", sm.currentState)
+				log.L(ctx).Debugf("[Sequencer] no OnTransitionTo function defined for state %v", sm.currentState)
 			}
 
 			c.heartbeatIntervalsSinceStateChange = 0

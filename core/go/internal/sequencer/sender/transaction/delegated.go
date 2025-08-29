@@ -30,11 +30,11 @@ func action_SendDispatchConfirmationResponse(ctx context.Context, txn *Transacti
 func validator_AssembleRequestMatches(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
 	assembleRequestEvent, ok := event.(*AssembleRequestReceivedEvent)
 	if !ok {
-		log.L(ctx).Errorf("expected event type *AssembleRequestReceivedEvent, got %T", event)
+		log.L(ctx).Errorf("[Sequencer] expected event type *AssembleRequestReceivedEvent, got %T", event)
 		return false, nil
 	}
 
-	log.L(ctx).Debugf("sender transaction validating assemble request - event coordinator %s, TX current delegate = %s", assembleRequestEvent.Coordinator, txn.currentDelegate)
+	log.L(ctx).Debugf("[Sequencer] sender transaction validating assemble request - event coordinator %s, TX current delegate = %s", assembleRequestEvent.Coordinator, txn.currentDelegate)
 	return assembleRequestEvent.Coordinator == txn.currentDelegate, nil
 
 }
@@ -42,20 +42,20 @@ func validator_AssembleRequestMatches(ctx context.Context, txn *Transaction, eve
 func validator_DispatchConfirmationRequestMatchesAssembledDelegation(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
 	dispatchConfirmationRequestEvent, ok := event.(*DispatchConfirmationRequestReceivedEvent)
 	if !ok {
-		log.L(ctx).Errorf("expected event type *DispatchConfirmationRequestReceivedEvent, got %T", event)
+		log.L(ctx).Errorf("[Sequencer] expected event type *DispatchConfirmationRequestReceivedEvent, got %T", event)
 		return false, nil
 	}
 	txnHash, err := txn.Hash(ctx)
 	if err != nil {
-		log.L(ctx).Errorf("error hashing transaction: %s", err)
+		log.L(ctx).Errorf("[Sequencer] error hashing transaction: %s", err)
 		return false, err
 	}
 	if dispatchConfirmationRequestEvent.Coordinator != txn.currentDelegate {
-		log.L(ctx).Debugf("DispatchConfirmationRequest invalid for transaction %s.  Expected coordinator %s, got %s", txn.ID.String(), txn.currentDelegate, dispatchConfirmationRequestEvent.Coordinator)
+		log.L(ctx).Debugf("[Sequencer] DispatchConfirmationRequest invalid for transaction %s.  Expected coordinator %s, got %s", txn.ID.String(), txn.currentDelegate, dispatchConfirmationRequestEvent.Coordinator)
 		return false, nil
 	}
 	if !txnHash.Equals(dispatchConfirmationRequestEvent.PostAssemblyHash) {
-		log.L(ctx).Debugf("DispatchConfirmationRequest invalid for transaction %s.  Transaction hash does not match.", txn.ID.String())
+		log.L(ctx).Debugf("[Sequencer] DispatchConfirmationRequest invalid for transaction %s.  Transaction hash does not match.", txn.ID.String())
 		return false, nil
 	}
 	return true, nil

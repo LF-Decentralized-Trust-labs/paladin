@@ -70,14 +70,14 @@ func NewTransaction(
 
 func (t *Transaction) Hash(ctx context.Context) (*pldtypes.Bytes32, error) {
 	if t.PrivateTransaction == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without PrivateTransaction")
+		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "[Sequencer] cannot hash transaction without PrivateTransaction")
 	}
 	if t.PostAssembly == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without PostAssembly")
+		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "[Sequencer] cannot hash transaction without PostAssembly")
 	}
 
 	if len(t.PostAssembly.Signatures) == 0 {
-		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without at least one Signature")
+		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "[Sequencer] cannot hash transaction without at least one Signature")
 	}
 
 	hash := sha3.NewLegacyKeccak256()

@@ -50,13 +50,13 @@ func (s *sender) confirmTransaction(
 		// In the meantime, it would be safe albeit possibly inefficient to delegate all unconfirmed transactions
 		// to new coordinator on switchover.  Double intent protection in the base contract will ensure that we don't process the same transaction twice
 
-		log.L(ctx).Debugf("Transaction %s not found in submitted transactions", hash)
+		log.L(ctx).Debugf("[Sequencer] transaction %s not found in submitted transactions", hash)
 		return nil
 	}
 	if transactionID == nil {
 		//This should never happen and if it does, we can no longer trust any of the data structures we have in memory
 		// for this sequencer instance so return an error to trigger an abend of the sequencer instance
-		msg := fmt.Sprintf("Transaction %s found in submitted transactions but nil transaction ID", hash)
+		msg := fmt.Sprintf("[Sequencer] transaction %s found in submitted transactions but nil transaction ID", hash)
 		log.L(ctx).Error(msg)
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
@@ -64,7 +64,7 @@ func (s *sender) confirmTransaction(
 	if txn == nil || !ok {
 		//This should never happen and if it does, we can no longer trust any of the data structures we have in memory
 		// for this sequencer instance so return an error to trigger an abend of the sequencer instance
-		msg := fmt.Sprintf("Transaction %s found in submitted transactions but nil transaction", hash)
+		msg := fmt.Sprintf("[Sequencer] transaction %s found in submitted transactions but nil transaction", hash)
 		log.L(ctx).Error(msg)
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
@@ -75,7 +75,7 @@ func (s *sender) confirmTransaction(
 			},
 		})
 		if err != nil {
-			msg := fmt.Sprintf("Error handling confirmed success event for transaction %s: %v", txn.ID, err)
+			msg := fmt.Sprintf("[Sequencer] error handling confirmed success event for transaction %s: %v", txn.ID, err)
 			log.L(ctx).Errorf(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
@@ -87,7 +87,7 @@ func (s *sender) confirmTransaction(
 			RevertReason: revertReason,
 		})
 		if err != nil {
-			msg := fmt.Sprintf("Error handling confirmed revert event for transaction %s: %v", txn.ID, err)
+			msg := fmt.Sprintf("[Sequencer] error handling confirmed revert event for transaction %s: %v", txn.ID, err)
 			log.L(ctx).Errorf(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}

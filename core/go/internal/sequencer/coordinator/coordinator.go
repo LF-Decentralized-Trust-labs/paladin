@@ -108,13 +108,13 @@ func NewCoordinator(
 		memberLocator := pldtypes.PrivateIdentityLocator(member)
 		memberNode, err := memberLocator.Node(ctx, false)
 		if err != nil {
-			log.L(ctx).Errorf("Error resolving node for member %s: %v", member, err)
+			log.L(ctx).Errorf("[Sequencer] error resolving node for member %s: %v", member, err)
 			return nil, err
 		}
 
 		memberIdentity, err := memberLocator.Identity(ctx)
 		if err != nil {
-			log.L(ctx).Errorf("Error resolving identity for member %s: %v", member, err)
+			log.L(ctx).Errorf("[Sequencer] error resolving identity for member %s: %v", member, err)
 			return nil, err
 		}
 
@@ -166,7 +166,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			c.grapher,
 			func(ctx context.Context, t *transaction.Transaction, to, from transaction.State) {
 				//callback function to notify us when the transaction changes state
-				log.L(ctx).Debugf("Transaction %s moved from %s to %s", t.ID.String(), from.String(), to.String())
+				log.L(ctx).Debugf("[Sequencer] transaction %s moved from %s to %s", t.ID.String(), from.String(), to.String())
 				//TODO the following logic should be moved to the state machine so that all the rules are in one place
 				if c.stateMachine.currentState == State_Active {
 					if from == transaction.State_Assembling {
@@ -176,7 +176,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 							To:            to,
 						})
 						if err != nil {
-							log.L(ctx).Errorf("Error selecting next transaction after transaction %s moved from %s to %s: %v", t.ID.String(), from.String(), to.String(), err)
+							log.L(ctx).Errorf("[Sequencer] error selecting next transaction after transaction %s moved from %s to %s: %v", t.ID.String(), from.String(), to.String(), err)
 							//TODO figure out how to get this to the abend handler
 						}
 					}
@@ -187,14 +187,14 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 				delete(c.transactionsByID, txn.ID)
 				err := c.grapher.Forget(txn.ID)
 				if err != nil {
-					log.L(ctx).Errorf("Error forgetting transaction %s: %v", txn.ID.String(), err)
+					log.L(ctx).Errorf("[Sequencer] error forgetting transaction %s: %v", txn.ID.String(), err)
 				}
-				log.L(ctx).Debugf("Transaction %s cleaned up", txn.ID.String())
+				log.L(ctx).Debugf("[Sequencer] transaction %s cleaned up", txn.ID.String())
 			},
 			c.readyForDispatch,
 		)
 		if err != nil {
-			log.L(ctx).Errorf("Error creating transaction: %v", err)
+			log.L(ctx).Errorf("[Sequencer] error creating transaction: %v", err)
 			return err
 		}
 
@@ -209,7 +209,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 		receivedEvent.TransactionID = txn.ID
 		err = c.transactionsByID[txn.ID].HandleEvent(context.Background(), receivedEvent)
 		if err != nil {
-			log.L(ctx).Errorf("Error handling ReceivedEvent for transaction %s: %v", txn.ID.String(), err)
+			log.L(ctx).Errorf("[Sequencer] error handling ReceivedEvent for transaction %s: %v", txn.ID.String(), err)
 			return err
 		}
 	}
@@ -220,7 +220,7 @@ func (c *coordinator) propagateEventToTransaction(ctx context.Context, event tra
 	if txn := c.transactionsByID[event.GetTransactionID()]; txn != nil {
 		return txn.HandleEvent(ctx, event)
 	} else {
-		log.L(ctx).Debugf("Ignoring Event because transaction not known to this coordinator %s", event.GetTransactionID().String())
+		log.L(ctx).Debugf("[Sequencer] ignoring event because transaction not known to this coordinator %s", event.GetTransactionID().String())
 	}
 	return nil
 }
@@ -229,7 +229,7 @@ func (c *coordinator) propagateEventToAllTransactions(ctx context.Context, event
 	for _, txn := range c.transactionsByID {
 		err := txn.HandleEvent(ctx, event)
 		if err != nil {
-			log.L(ctx).Errorf("Error handling event %v for transaction %s: %v", event.Type(), txn.ID.String(), err)
+			log.L(ctx).Errorf("[Sequencer] error handling event %v for transaction %s: %v", event.Type(), txn.ID.String(), err)
 			return err
 		}
 	}
@@ -239,13 +239,17 @@ func (c *coordinator) propagateEventToAllTransactions(ctx context.Context, event
 func (c *coordinator) getTransactionsInStates(ctx context.Context, states []transaction.State) []*transaction.Transaction {
 	//TODO this could be made more efficient by maintaining a separate index of transactions for each state but that is error prone so
 	// deferring until we have a comprehensive test suite to catch errors
+	log.L(ctx).Infof("[Sequencer] getting transactions in states: %+v", states)
 	matchingStates := make(map[transaction.State]bool)
 	for _, state := range states {
 		matchingStates[state] = true
 	}
+
+	log.L(ctx).Infof("[Sequencer] found %d transactions in states: %+v", len(c.transactionsByID), states)
 	matchingTxns := make([]*transaction.Transaction, 0, len(c.transactionsByID))
 	for _, txn := range c.transactionsByID {
 		if matchingStates[txn.GetState()] {
+			log.L(ctx).Infof("[Sequencer] found transaction %s in state %s", txn.ID.String(), txn.GetState())
 			matchingTxns = append(matchingTxns, txn)
 		}
 	}
@@ -268,10 +272,17 @@ func (c *coordinator) getTransactionsNotInStates(ctx context.Context, states []t
 	return matchingTxns
 }
 
+// MRW TODO - is there a reason we need to find by nonce and not by TX ID?
 func (c *coordinator) findTransactionBySignerNonce(ctx context.Context, signer *pldtypes.EthAddress, nonce uint64) *transaction.Transaction {
 	//TODO this would be more efficient by maintaining a separate index but that is error prone so
 	// deferring until we have a comprehensive test suite to catch errors
 	for _, txn := range c.transactionsByID {
+		if txn != nil {
+			log.L(ctx).Infof("[Sequencer] Tracked TX ID %s", txn.ID.String())
+		}
+		if txn != nil && txn.GetSignerAddress() != nil {
+			log.L(ctx).Infof("[Sequencer] Tracked TX ID %s signer address '%s'", txn.ID.String(), txn.GetSignerAddress().String())
+		}
 		if txn.GetSignerAddress() != nil && *txn.GetSignerAddress() == *signer && txn.GetNonce() != nil && *(txn.GetNonce()) == nonce {
 			return txn
 		}
@@ -279,15 +290,15 @@ func (c *coordinator) findTransactionBySignerNonce(ctx context.Context, signer *
 	return nil
 }
 
-func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, from *pldtypes.EthAddress, nonce uint64, hash pldtypes.Bytes32, revertReason pldtypes.HexBytes) (bool, error) {
-	log.L(ctx).Infof("confirmDispatchedTransaction - we currently have %d transactions to handle", len(c.transactionsByID))
+func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uuid.UUID, from *pldtypes.EthAddress, nonce uint64, hash pldtypes.Bytes32, revertReason pldtypes.HexBytes) (bool, error) {
+	log.L(ctx).Infof("[Sequencer] confirmDispatchedTransaction - we currently have %d transactions to handle", len(c.transactionsByID))
 	// First check whether it is one that we have been coordinating
 	if dispatchedTransaction := c.findTransactionBySignerNonce(ctx, from, nonce); dispatchedTransaction != nil {
 		if dispatchedTransaction.GetLatestSubmissionHash() == nil || *(dispatchedTransaction.GetLatestSubmissionHash()) != hash {
 			// Is this not the transaction that we are looking for?
 			// We have missed a submission?  Or is it possible that an earlier submission has managed to get confirmed?
 			// It is interesting so we log it but either way,  this must be the transaction that we are looking for because we can't re-use a nonce
-			log.L(ctx).Debugf("Transaction %s confirmed with a different hash than expected", dispatchedTransaction.ID.String())
+			log.L(ctx).Debugf("[Sequencer] transaction %s confirmed with a different hash than expected", dispatchedTransaction.ID.String())
 		}
 		event := &transaction.ConfirmedEvent{
 			Hash:         hash,
@@ -296,12 +307,40 @@ func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, from *pl
 		event.TransactionID = dispatchedTransaction.ID
 		err := dispatchedTransaction.HandleEvent(ctx, event)
 		if err != nil {
-			log.L(ctx).Errorf("Error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
+			log.L(ctx).Errorf("[Sequencer] error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
 			return false, err
 		}
 		return true, nil
 	}
-	log.L(ctx).Infof("confirmDispatchedTransaction - failed to find a transaction submitted by signer %s", from.String())
+
+	// MRW TODO - fallback while deciding whether we can confirm transactions by ID rather than signer
+	for _, dispatchedTransaction := range c.transactionsByID {
+		if dispatchedTransaction.ID == txId {
+			if dispatchedTransaction.GetLatestSubmissionHash() == nil {
+				// Is this not the transaction that we are looking for?
+				// We have missed a submission?  Or is it possible that an earlier submission has managed to get confirmed?
+				// It is interesting so we log it but either way,  this must be the transaction that we are looking for because we can't re-use a nonce
+				log.L(ctx).Debugf("[Sequencer] transaction %s confirmed with a different hash than expected. Dispatch hash nil, confirmed hash %s", dispatchedTransaction.ID.String(), hash.String())
+			} else if *(dispatchedTransaction.GetLatestSubmissionHash()) != hash {
+				// Is this not the transaction that we are looking for?
+				// We have missed a submission?  Or is it possible that an earlier submission has managed to get confirmed?
+				// It is interesting so we log it but either way,  this must be the transaction that we are looking for because we can't re-use a nonce
+				log.L(ctx).Debugf("[Sequencer] transaction %s confirmed with a different hash than expected. Dispatch hash %s, confirmed hash %s", dispatchedTransaction.ID.String(), dispatchedTransaction.GetLatestSubmissionHash(), hash.String())
+			}
+			event := &transaction.ConfirmedEvent{
+				Hash:         hash,
+				RevertReason: revertReason,
+			}
+			event.TransactionID = txId
+			err := dispatchedTransaction.HandleEvent(ctx, event)
+			if err != nil {
+				log.L(ctx).Errorf("[Sequencer] error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
+				return false, err
+			}
+			return true, nil
+		}
+	}
+	log.L(ctx).Infof("[Sequencer] confirmDispatchedTransaction - failed to find a transaction submitted by signer %s", from.String())
 	return false, nil
 
 }
@@ -322,7 +361,7 @@ func ptrTo[T any](v T) *T {
 // have an active sequencer for the contract address since it may be the only sender that can honour dispatch
 // requests from another coordinator, but this node is no longer acting as the coordinator.
 func (c *coordinator) Stop() {
-	log.L(context.Background()).Infof("Stopping coordinator for contract %s", c.contractAddress.String())
+	log.L(context.Background()).Infof("[Sequencer] stopping coordinator for contract %s", c.contractAddress.String())
 
 	// Opt-out of being the coordinator
 	handoverRequestEvent := &HandoverRequestEvent{}

@@ -49,7 +49,8 @@ type ReceiptInput struct {
 
 type TxCompletion struct {
 	ReceiptInput
-	PSC DomainSmartContract
+	PSC  DomainSmartContract
+	From string
 }
 
 type ResolvedTransaction struct {

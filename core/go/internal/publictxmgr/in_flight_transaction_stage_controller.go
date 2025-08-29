@@ -664,6 +664,8 @@ func (it *inFlightTransactionStageController) TriggerSubmitTx(ctx context.Contex
 
 	it.executeAsync(func() {
 		txHash, submissionTime, errReason, submissionOutcome, err := it.submitTX(ctx, signedMessage, calculatedHash, signerNonce, lastSubmitTime, generation.IsCancelled)
+		// MRW TODO Create Submitted and/or nonce assigned event for the sequencer to handle
+
 		generation.AddSubmitOutput(ctx, txHash, submissionTime, submissionOutcome, errReason, err)
 	}, ctx, generation, false)
 	return nil

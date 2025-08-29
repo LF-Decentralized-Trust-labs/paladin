@@ -39,12 +39,12 @@ import (
 )
 
 func (d *distributedSequencer) senderEventHandler(event common.Event) {
-	log.L(d.ctx).Tracef("Handing off TX-emitted event to sequencer sender: %+v", event)
+	log.L(d.ctx).Tracef("[Sequencer] handing off TX-emitted event to sequencer sender: %+v", event)
 	d.sender.HandleEvent(d.ctx, event)
 }
 
 func (d *distributedSequencer) coordinatorEventHandler(event common.Event) {
-	log.L(d.ctx).Tracef("Handing off TX-emitted event to sequencer coordinator: %+v", event)
+	log.L(d.ctx).Tracef("[Sequencer] handing off TX-emitted event to sequencer coordinator: %+v", event)
 	d.coordinator.HandleEvent(d.ctx, event)
 }
 
@@ -75,7 +75,7 @@ func (d *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX pe
 	if domainAPI == nil {
 		domainAPI, err = d.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
 		if err != nil {
-			log.L(ctx).Errorf("Failed to get domain smart contract for contract address %s: %s", contractAddr, err)
+			log.L(ctx).Errorf("[Sequencer] failed to get domain smart contract for contract address %s: %s", contractAddr, err)
 			return nil, err
 		}
 	}
@@ -114,7 +114,7 @@ func (d *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX pe
 			committee, err := d.getTXCommittee(ctx, tx)
 
 			if err != nil {
-				log.L(ctx).Errorf("Failed to get transaction committee for contract %s: %s", contractAddr.String(), err)
+				log.L(ctx).Errorf("[Sequencer] failed to get transaction committee for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
 
@@ -129,12 +129,13 @@ func (d *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX pe
 			d.engineIntegration = common.NewEngineIntegration(d.ctx, d.components, domainAPI, dCtx, d, d)
 
 			sequencer := &distributedSequencer{
-				ctx: d.ctx,
+				ctx:             d.ctx,
+				contractAddress: contractAddr.String(),
 			}
 
 			sender, err := sender.NewSender(d.ctx, d.nodeName, transportWriter, committee, common.RealClock(), sequencer.senderEventHandler, d.engineIntegration, 10, &contractAddr, 15000, 10)
 			if err != nil {
-				log.L(ctx).Errorf("Failed to create distributed sequencer sender for contract %s: %s", contractAddr.String(), err)
+				log.L(ctx).Errorf("[Sequencer] failed to create distributed sequencer sender for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
 
@@ -330,7 +331,7 @@ func (d *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX pe
 				},
 			)
 			if err != nil {
-				log.L(ctx).Errorf("Failed to create distributed sequencer coordinator for contract %s: %s", contractAddr.String(), err)
+				log.L(ctx).Errorf("[Sequencer] failed to create distributed sequencer coordinator for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
 
@@ -353,7 +354,7 @@ func (d *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX pe
 
 // Must be called within the sequencer's write lock
 func (d *distributedSequencerManager) stopLowestPrioritySequencer(ctx context.Context) {
-	log.L(ctx).Debugf("Max concurrent sequencers reached, stopping lowest priority sequencer")
+	log.L(ctx).Debugf("[Sequencer] max concurrent sequencers reached, stopping lowest priority sequencer")
 
 	// If any sequencers are already closing we can wait for them to close instead of stopping a different one
 	for _, sequencer := range d.sequencers {
@@ -364,12 +365,12 @@ func (d *distributedSequencerManager) stopLowestPrioritySequencer(ctx context.Co
 			// we don't wait for the closing ones to complete. The aim is to allow the node to remain stable while
 			// still being responsive to new contract activity so a closing sequencer is allowed to page out in its
 			// own time.
-			log.L(ctx).Debugf("Coordinator %s is closing, waiting for it to close", sequencer.contractAddress)
+			log.L(ctx).Debugf("[Sequencer] coordinator %s is closing, waiting for it to close", sequencer.contractAddress)
 			return
 		} else if sequencer.coordinator.GetCurrentState() == common.CoordinatorState_Idle ||
 			sequencer.coordinator.GetCurrentState() == common.CoordinatorState_Observing {
 			// This sequencer is already idle or observing so we can page it out immediately
-			log.L(ctx).Debugf("Coordinator %s is idle or observing, stopping it", sequencer.contractAddress)
+			log.L(ctx).Debugf("[Sequencer] coordinator %s is idle or observing, stopping it", sequencer.contractAddress)
 			sequencer.sender.Stop()
 			delete(d.sequencers, sequencer.contractAddress)
 			return
@@ -393,18 +394,22 @@ func (d *distributedSequencerManager) stopLowestPrioritySequencer(ctx context.Co
 
 // Must be called within the sequencer's read lock
 func (d *distributedSequencerManager) checkExceededMaxActiveCoordinators(ctx context.Context) {
-	log.L(ctx).Debugf("Checking if the max concurrent coordinators limit has been reached")
+	log.L(ctx).Debugf("[Sequencer] checking if the max concurrent coordinators limit has been reached")
 
 	activeCoordinators := 0
 	// If any sequencers are already closing we can wait for them to close instead of stopping a different one
 	for _, sequencer := range d.sequencers {
+		log.L(ctx).Debugf("[Sequencer] coordinator %s state %s", sequencer.contractAddress, sequencer.coordinator.GetCurrentState())
 		if sequencer.coordinator.GetCurrentState() == common.CoordinatorState_Active {
+			log.L(ctx).Debugf("[Sequencer] coordinator %s is active", sequencer.contractAddress)
 			activeCoordinators++
 		}
 	}
 
+	log.L(ctx).Debugf("[Sequencer] %d coordinators currently active", activeCoordinators)
+
 	if activeCoordinators >= d.targetActiveCoordinatorsLimit {
-		log.L(ctx).Debugf("Max concurrent coordinators reached, asking the lowest priority coordinator to hand over to another node")
+		log.L(ctx).Debugf("[Sequencer] max concurrent coordinators reached, asking the lowest priority coordinator to hand over to another node")
 		// Order existing sequencers by LRU time
 		sequencers := make([]*distributedSequencer, 0)
 		for _, sequencer := range d.sequencers {

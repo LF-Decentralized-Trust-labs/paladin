@@ -88,13 +88,13 @@ func NewSender(
 		memberLocator := pldtypes.PrivateIdentityLocator(member)
 		memberNode, err := memberLocator.Node(ctx, false)
 		if err != nil {
-			log.L(ctx).Errorf("Error resolving node for member %s: %v", member, err)
+			log.L(ctx).Errorf("[Sequencer] error resolving node for member %s: %v", member, err)
 			return nil, err
 		}
 
 		memberIdentity, err := memberLocator.Identity(ctx)
 		if err != nil {
-			log.L(ctx).Errorf("Error resolving identity for member %s: %v", member, err)
+			log.L(ctx).Errorf("[Sequencer] error resolving identity for member %s: %v", member, err)
 			return nil, err
 		}
 
@@ -113,7 +113,7 @@ func (s *sender) propagateEventToTransaction(ctx context.Context, event transact
 	if txn := s.transactionsByID[event.GetTransactionID()]; txn != nil {
 		return txn.HandleEvent(ctx, event)
 	} else {
-		log.L(ctx).Debugf("Ignoring Event because transaction not known to this coordinator %s", event.GetTransactionID().String())
+		log.L(ctx).Debugf("[Sequencer] ignoring event because transaction not known to this coordinator %s", event.GetTransactionID().String())
 	}
 	return nil
 }
@@ -121,7 +121,7 @@ func (s *sender) propagateEventToTransaction(ctx context.Context, event transact
 func (s *sender) createTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
 	newTxn, err := transaction.NewTransaction(ctx, txn, s.messageSender, s.clock, s.emit, s.engineIntegration)
 	if err != nil {
-		log.L(ctx).Errorf("Error creating transaction: %v", err)
+		log.L(ctx).Errorf("[Sequencer] error creating transaction: %v", err)
 		return err
 	}
 	s.transactionsByID[txn.ID] = newTxn
@@ -130,7 +130,7 @@ func (s *sender) createTransaction(ctx context.Context, txn *components.PrivateT
 	createdEvent.TransactionID = txn.ID
 	err = newTxn.HandleEvent(context.Background(), createdEvent)
 	if err != nil {
-		log.L(ctx).Errorf("Error handling CreatedEvent for transaction %s: %v", txn.ID.String(), err)
+		log.L(ctx).Errorf("[Sequencer] error handling CreatedEvent for transaction %s: %v", txn.ID.String(), err)
 		return err
 	}
 	return nil

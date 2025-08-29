@@ -32,28 +32,37 @@ type endorsementRequirement struct {
 }
 
 func (t *Transaction) applyEndorsement(ctx context.Context, endorsement *prototk.AttestationResult, requestID uuid.UUID) error {
+	t.pendingEndorsementsMutex.Lock()
+	defer t.pendingEndorsementsMutex.Unlock()
+	log.L(ctx).Infof("[Sequencer] apply endorsement - pending endorsement requests: %+v", t.pendingEndorsementRequests)
+	log.L(ctx).Infof("[Sequencer] apply endorsement - received endorsement name '%s'", endorsement.Name)
 	pendingRequestsForAttRequest, ok := t.pendingEndorsementRequests[endorsement.Name]
 	if !ok {
-		log.L(ctx).Infof("Ignoring endorsement response for transaction %s from %s because no pending request found for attestation request name %s", t.ID, endorsement.Verifier.Lookup, endorsement.Name)
+		log.L(ctx).Infof("[Sequencer] ignoring endorsement response for transaction %s from %s because no pending request found for attestation request name %s", t.ID, endorsement.Verifier.Lookup, endorsement.Name)
 		return nil
 	}
 	if pendingRequest, ok := pendingRequestsForAttRequest[endorsement.Verifier.Lookup]; ok {
 		if pendingRequest.IdempotencyKey() == requestID {
-			log.L(ctx).Infof("Endorsement received for transaction %s from %s", t.ID, endorsement.Verifier.Lookup)
+			log.L(ctx).Infof("[Sequencer] endorsement '%s' received for transaction %s from %s", endorsement.Name, t.ID, endorsement.Verifier.Lookup)
 			delete(t.pendingEndorsementRequests[endorsement.Name], endorsement.Verifier.Lookup)
-			log.L(ctx).Infof("Applying endorsement. Appending %+v to list of endorsements received for transaction %s from %s", endorsement, t.ID, endorsement.Verifier.Lookup)
+			log.L(ctx).Infof("[Sequencer] applying endorsement. Appending %+v to list of endorsements received for transaction %s from %s", endorsement, t.ID, endorsement.Verifier.Lookup)
 			t.PostAssembly.Endorsements = append(t.PostAssembly.Endorsements, endorsement)
 
 			// MRW TODO - Hashing the TX for dispatch confirmation requires that there is > 0 signatures. Need to follow up where an endorsed TX populates the signatures. Temporarily put this workaround in.
 			// log.L(ctx).Infof("Applying endorsement. Appending %+v to list of endorsements received for transaction %s from %s", endorsement, t.ID, endorsement.Verifier.Lookup)
 			// t.PostAssembly.Signatures = append(t.PostAssembly.Signatures, endorsement)
 		} else {
-			log.L(ctx).Infof("Ignoring endorsement response for transaction %s from %s because idempotency key %s does not match expected %s ", t.ID, endorsement.Verifier.Lookup, requestID.String(), pendingRequest.IdempotencyKey().String())
+			log.L(ctx).Infof("[Sequencer] ignoring endorsement response for transaction %s from %s because idempotency key %s does not match expected %s ", t.ID, endorsement.Verifier.Lookup, requestID.String(), pendingRequest.IdempotencyKey().String())
 		}
 	} else {
-		log.L(ctx).Infof("Ignoring endorsement response for transaction %s from %s because no pending request found", t.ID, endorsement.Verifier.Lookup)
+		log.L(ctx).Infof("[Sequencer] ignoring endorsement response for transaction %s from %s because no pending request found", t.ID, endorsement.Verifier.Lookup)
 	}
 
+	// Log complete list of current endorsements
+	log.L(ctx).Infof("[Sequencer] current endorsements after applying latest: %+v", t.PostAssembly.Endorsements)
+	for _, endorsement := range t.PostAssembly.Endorsements {
+		log.L(ctx).Infof("[Sequencer] completed endorsement: %+v", endorsement)
+	}
 	return nil
 }
 
@@ -74,35 +83,42 @@ func (d *Transaction) hasUnfulfilledEndorsementRequirements(ctx context.Context)
 func (d *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []*endorsementRequirement {
 	unfulfilledEndorsementRequirements := make([]*endorsementRequirement, 0)
 	if d.PostAssembly == nil {
-		log.L(ctx).Debug("PostAssembly is nil so there are no outstanding endorsement requirements")
+		log.L(ctx).Debug("[Sequencer] PostAssembly is nil so there are no outstanding endorsement requirements")
 		return unfulfilledEndorsementRequirements
 	}
 	for _, attRequest := range d.PostAssembly.AttestationPlan {
-		log.L(ctx).Debugf("unfulfilled endorsement plan - payload length = %d", len(attRequest.Payload))
+		log.L(ctx).Debugf("[Sequencer] unfulfilled endorsement plan - payload length = %d", len(attRequest.Payload))
 		if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
 			for _, party := range attRequest.Parties {
+				// MRW TODO - tidy up these logs
+				log.L(ctx).Debugf("[Sequencer] party %s must endorse this request. Checking for endorsement", party)
 				found := false
 				for _, endorsement := range d.PostAssembly.Endorsements {
+					log.L(ctx).Debugf("[Sequencer] existing endorsement from party %s", endorsement.Verifier.Lookup)
 					found = endorsement.Name == attRequest.Name &&
 						party == endorsement.Verifier.Lookup &&
 						attRequest.VerifierType == endorsement.Verifier.VerifierType
 
-					log.L(ctx).Infof("endorsement matched=%t: request[name=%s,party=%s,verifierType=%s] endorsement[name=%s,party=%s,verifierType=%s] verifier=%s",
-						found,
-						attRequest.Name, party, attRequest.VerifierType,
-						endorsement.Name, endorsement.Verifier.Lookup, endorsement.Verifier.VerifierType,
-						endorsement.Verifier.Verifier,
-					)
 					if found {
+						log.L(ctx).Infof("[Sequencer] endorsement found: request[name=%s,party=%s,verifierType=%s] endorsement[name=%s,party=%s,verifierType=%s] verifier=%s",
+							attRequest.Name, party, attRequest.VerifierType,
+							endorsement.Name, endorsement.Verifier.Lookup, endorsement.Verifier.VerifierType,
+							endorsement.Verifier.Verifier,
+						)
 						break
 					}
 				}
 				if !found {
-					log.L(ctx).Debugf("endorsement requirement for %s unfulfilled for transaction %s", party, d.ID)
+					log.L(ctx).Debugf("[Sequencer] no endorsement exists from party %s for transaction %s", party, d.ID)
 					unfulfilledEndorsementRequirements = append(unfulfilledEndorsementRequirements, &endorsementRequirement{party: party, attRequest: attRequest})
 				}
 			}
 		}
+	}
+
+	// MRW TODO - the logging in this function is super-verbose and probably duplicated
+	for _, req := range unfulfilledEndorsementRequirements {
+		log.L(ctx).Debugf("[Sequencer] unfulfilled endorsement requirement: %+v", req)
 	}
 	return unfulfilledEndorsementRequirements
 }
@@ -141,7 +157,7 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 		}
 		err := pendingRequest.Nudge(ctx)
 		if err != nil {
-			log.L(ctx).Errorf("Failed to nudge endorsement request for party %s: %s", endorsementRequirement.party, err)
+			log.L(ctx).Errorf("[Sequencer] failed to nudge endorsement request for party %s: %s", endorsementRequirement.party, err)
 			t.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerEndorsementRequestError), endorsementRequirement.party, err.Error())
 		}
 
@@ -164,7 +180,7 @@ func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey uui
 		toEndorsableList(t.PostAssembly.InfoStates),
 	)
 	if err != nil {
-		log.L(ctx).Errorf("Failed to send endorsement request to party %s: %s", party, err)
+		log.L(ctx).Errorf("[Sequencer] failed to send endorsement request to party %s: %s", party, err)
 		t.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerEndorsementRequestError), party, err.Error())
 	}
 	return err
@@ -183,7 +199,7 @@ func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState
 }
 
 func action_SendEndorsementRequests(ctx context.Context, txn *Transaction) error {
-	log.L(ctx).Debugf("Sending endorsement requests for transaction %s. Post assembly info states: %+v", txn.ID, len(txn.PostAssembly.InfoStates))
+	log.L(ctx).Debugf("[Sequencer] sending endorsement requests for transaction %s. Post assembly info states: %+v", txn.ID, len(txn.PostAssembly.InfoStates))
 	return txn.sendEndorsementRequests(ctx)
 }
 
