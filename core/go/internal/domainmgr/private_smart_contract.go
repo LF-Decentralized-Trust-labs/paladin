@@ -509,7 +509,7 @@ func (dc *domainContract) EndorseTransaction(dCtx components.DomainContext, read
 	// waiting for the DB TX to commit.
 
 	// Run the endorsement
-	log.L(dCtx.Ctx()).Infof("Running endorsement transaction=%s domain=%s contract-address=%s",
+	log.L(dCtx.Ctx()).Infof("Running endorse transaction=%s domain=%s contract-address=%s",
 		req.TransactionSpecification.TransactionId, dc.d.name, req.TransactionSpecification.ContractInfo.ContractAddress)
 	res, err := dc.api.EndorseTransaction(dCtx.Ctx(), &prototk.EndorseTransactionRequest{
 		StateQueryContext:   c.id,

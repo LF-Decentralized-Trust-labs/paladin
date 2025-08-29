@@ -34,7 +34,7 @@ func (c *coordinator) GetTransactionsReadyToDispatch(ctx context.Context) ([]*co
 
 	sortedTransactions, err := transaction.SortTransactions(ctx, transactions)
 	if err != nil {
-		log.L(ctx).Errorf("Failed to sort transactions: %v", err)
+		log.L(ctx).Errorf("[Sequencer] failed to sort transactions: %v", err)
 		return nil, err
 	}
 

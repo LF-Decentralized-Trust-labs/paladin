@@ -59,12 +59,12 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 	t.pendingAssembleRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
 		stateLocks, err := t.engineIntegration.GetStateLocks(ctx)
 		if err != nil {
-			log.L(ctx).Errorf("sendAssembleRequest failed to get engine state locks: %s", err)
+			log.L(ctx).Errorf("[Sequencer] sendAssembleRequest failed to get engine state locks: %s", err)
 			return err
 		}
 		blockHeight, err := t.engineIntegration.GetBlockHeight(ctx)
 		if err != nil {
-			log.L(ctx).Errorf("sendAssembleRequest failed to get engine block height: %s", err)
+			log.L(ctx).Errorf("[Sequencer] sendAssembleRequest failed to get engine block height: %s", err)
 			return err
 		}
 
@@ -82,7 +82,7 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 
 func (t *Transaction) nudgeAssembleRequest(ctx context.Context) error {
 	if t.pendingAssembleRequest == nil {
-		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "nudgeAssembleRequest called with no pending request")
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "[Sequencer] nudgeAssembleRequest called with no pending request")
 	}
 	return t.pendingAssembleRequest.Nudge(ctx)
 }
@@ -92,7 +92,7 @@ func (t *Transaction) assembleTimeoutExceeded(ctx context.Context) bool {
 		//strange situation to be in if we get to the point of this being nil, should immediately leave the state where we ever ask this question
 		// however we go here, the answer to the question is "false" because there is no pending request to timeout but log this as it is a strange situation
 		// and might be an indicator of another issue
-		log.L(ctx).Infof("assembleTimeoutExceeded called on transaction %s with no pending assemble request", t.ID)
+		log.L(ctx).Infof("[Sequencer] assembleTimeoutExceeded called on transaction %s with no pending assemble request", t.ID)
 		return false
 	}
 	return t.clock.HasExpired(t.pendingAssembleRequest.FirstRequestTime(), t.assembleTimeout)
@@ -122,7 +122,7 @@ func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
 			DependencyID: t.ID,
 		})
 		if err != nil {
-			log.L(ctx).Errorf("Error notifying next transaction %s of assembly of transaction %s: %s", t.nextTransaction.ID, t.ID, err)
+			log.L(ctx).Errorf("[Sequencer] error notifying next transaction %s of assembly of transaction %s: %s", t.nextTransaction.ID, t.ID, err)
 			return err
 		}
 	}
@@ -130,7 +130,7 @@ func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
 	for _, dependentId := range t.dependencies.PrereqOf {
 		dependent := t.grapher.TransactionByID(ctx, dependentId)
 		if dependent == nil {
-			msg := fmt.Sprintf("notifyDependentsOfReadiness: Dependent transaction %s not found in memory", dependentId)
+			msg := fmt.Sprintf("[Sequencer] notifyDependentsOfReadiness: Dependent transaction %s not found in memory", dependentId)
 			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
@@ -141,7 +141,7 @@ func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
 			DependencyID: t.ID,
 		})
 		if err != nil {
-			log.L(ctx).Errorf("Error notifying dependent transaction %s of assembly of transaction %s: %s", dependent.ID, t.ID, err)
+			log.L(ctx).Errorf("[Sequencer] error notifying dependent transaction %s of assembly of transaction %s: %s", dependent.ID, t.ID, err)
 			return err
 		}
 	}
@@ -167,13 +167,13 @@ func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 				DependencyID: t.ID,
 			})
 			if err != nil {
-				log.L(ctx).Errorf("Error notifying dependent transaction %s of revert of transaction %s: %s", dependentID, t.ID, err)
+				log.L(ctx).Errorf("[Sequencer] error notifying dependent transaction %s of revert of transaction %s: %s", dependentID, t.ID, err)
 				return err
 			}
 		} else {
 			//TODO can we Assume that the dependent is no longer in memory and doesn't need to know about this event?  Point to (write) the architecture doc that explains why this is safe
 
-			msg := fmt.Sprintf("notifyDependentsOfRevert: Dependent transaction %s not found in memory", dependentID)
+			msg := fmt.Sprintf("[Sequencer] notifyDependentsOfRevert: Dependent transaction %s not found in memory", dependentID)
 			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
@@ -188,7 +188,7 @@ func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) err
 	// this function calculates the dependencies relating to states and sets up the reverse association
 	// it is assumed that the other dependencies have already been set up when the transaction was first received by the coordinator TODO correct this comment line with more accurate description of when we expect the static dependencies to have been calculated.  Or make it more vague.
 	if t.PostAssembly == nil {
-		msg := fmt.Sprintf("Cannot calculate dependencies for transaction %s without a PostAssembly", t.ID)
+		msg := fmt.Sprintf("[Sequencer] cannot calculate dependencies for transaction %s without a PostAssembly", t.ID)
 		log.L(ctx).Error(msg)
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
@@ -206,7 +206,7 @@ func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) err
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, errMsg)
 		}
 		if dependency == nil {
-			log.L(ctx).Infof("No minter found for state %s", state.ID)
+			log.L(ctx).Infof("[Sequencer] no minter found for state %s", state.ID)
 			//assume the state was produced by a confirmed transaction
 			//TODO should we validate this by checking the domain context? If not, explain why this is safe in the architecture doc
 			continue

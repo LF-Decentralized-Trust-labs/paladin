@@ -59,6 +59,7 @@ func (_ *CoordinatorFlushedEvent) TypeString() string {
 }
 
 type TransactionConfirmedEvent struct {
+	TxID         uuid.UUID
 	From         *pldtypes.EthAddress
 	Nonce        uint64
 	Hash         pldtypes.Bytes32

@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -221,6 +222,7 @@ func (br *domainBridge) InitTransaction(ctx context.Context, req *prototk.InitTr
 }
 
 func (br *domainBridge) AssembleTransaction(ctx context.Context, req *prototk.AssembleTransactionRequest) (res *prototk.AssembleTransactionResponse, err error) {
+	log.L(ctx).Infof("[Plugin] assembling transaction %s", req.Transaction.TransactionId)
 	err = br.toPlugin.RequestReply(ctx,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_AssembleTransaction{AssembleTransaction: req}
@@ -228,6 +230,9 @@ func (br *domainBridge) AssembleTransaction(ctx context.Context, req *prototk.As
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
 			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_AssembleTransactionRes); ok {
 				res = r.AssembleTransactionRes
+				for i, attRequest := range res.AttestationPlan {
+					log.L(ctx).Infof("[Plugin] assembled transaction %s, assemble response %d name '%s'", req.Transaction.TransactionId, i, attRequest.Name)
+				}
 			}
 			return res != nil
 		},

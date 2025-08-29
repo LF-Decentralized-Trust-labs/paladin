@@ -77,6 +77,7 @@ func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persisten
 					Address:         parsedEvent.Instance,
 					ConfigBytes:     parsedEvent.Config,
 				})
+
 				// We don't know if the private transaction will match, but we need to pass it over
 				// to the private TX manager within our DB transaction to allow it to check
 				txCompletions = append(txCompletions, &components.TxCompletion{
@@ -126,6 +127,8 @@ func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) 
 	for _, completion := range txCompletions {
 		// Private transaction manager needs to know about these to update its in-memory state
 		// MRW TODO - what's the interaction point between these and distributed sequencer manager?
+
+		// Get the from address of the tranasction submission
 		dm.sequencerManager.ProcessPrivateTransactionConfirmed(dm.bgCtx, completion)
 
 		// We also provide a direct waiter that's used by the testbed
@@ -135,7 +138,6 @@ func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) 
 			inflight.Complete(&completion.ReceiptInput)
 		}
 	}
-
 }
 
 func (d *domain) batchEventsByAddress(ctx context.Context, dbTX persistence.DBTX, batchID string, events []*pldapi.EventWithData) (map[pldtypes.EthAddress]*pscEventBatch, error) {
@@ -212,8 +214,18 @@ func (d *domain) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, ba
 				return err
 			}
 			log.L(ctx).Infof("Domain transaction completion: %s", txID)
+
+			log.L(ctx).Infof("Getting transaction by ID: %s", txID)
+			// MRW TODO - is this the most efficient way to retrieve the TX sender?
+			tx, err := d.dm.txManager.GetTransactionByID(ctx, *txID)
+			if err != nil {
+				return err
+			}
+			log.L(ctx).Infof("Retrieved transaction by ID to enrich TxCompletion: %s, sender: %s", txID, tx.From)
+
 			completion := &components.TxCompletion{
-				PSC: batch.psc,
+				PSC:  batch.psc,
+				From: tx.From,
 				ReceiptInput: components.ReceiptInput{
 					TransactionID: *txID,
 					Domain:        d.name,
