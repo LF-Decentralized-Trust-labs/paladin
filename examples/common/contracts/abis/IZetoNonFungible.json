@@ -1,0 +1,61 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IZetoNonFungible",
+  "sourceName": "contracts/domains/interfaces/IZetoNonFungible.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "to",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "uri",
+              "type": "string"
+            }
+          ],
+          "internalType": "struct IZetoNonFungible.MintParam[]",
+          "name": "mints",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "mint",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "to",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "tokenID",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IZetoNonFungible.TransferParam[]",
+          "name": "transfers",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "transfer",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

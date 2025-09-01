@@ -1,0 +1,6 @@
+node_modules/
+build/
+src/abis/*.json
+src/zeto-abis/*.json
+data/
+logs/
