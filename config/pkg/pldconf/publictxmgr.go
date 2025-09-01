@@ -71,14 +71,16 @@ var PublicTxManagerDefaults = &PublicTxManagerConfig{
 			MaxAttempts: confutil.P(3),
 		},
 	},
+	// Gas price defaults are optimised for getting transactions onto chain as easily as possible
+	// When spending real gas, a user might want to be more conservative with setting caps or not allowing the fixed price to be increased
 	GasPrice: GasPriceConfig{
-		IncreaseMax:        nil,
-		IncreasePercentage: confutil.P(0),
-		FixedGasPrice:      nil,
-		DynamicGasPricing: DynamicGasPricingConfig{
-			Percentile:          confutil.P(85), // Default to 85th percentile for good balance of cost vs speed
+		IncreasePercentage:      confutil.P(10), // default to 10% increase - this is what Besu and other blockchains define as the minimum increase for a replacement transaction
+		MaxPriorityFeePerGasCap: nil,            // No cap by default
+		MaxFeePerGasCap:         nil,            // No cap by default
+		FixedGasPrice:           nil,
+		EthFeeHistory: EthFeeHistoryConfig{
+			TipPercentile:       confutil.P(85), // Default to 85th percentile for good balance of cost vs speed
 			HistoryBlockCount:   confutil.P(20), // Default to 20 blocks for fee history
-			MaxPriorityFeeCap:   nil,            // No cap by default
 			BaseFeeBufferFactor: confutil.P(1),  // Default to 1x buffer for base fee
 			Cache: DynamicGasPricingCacheConfig{
 				Enabled: confutil.P(true), // Caching enabled by default
@@ -126,16 +128,13 @@ type FixedGasPricing struct {
 	MaxPriorityFeePerGas *pldtypes.HexUint256 `json:"maxPriorityFeePerGas"`
 }
 
-// DynamicGasPricingConfig represents configuration for dynamic EIP-1559 gas pricing using eth_feeHistory
-type DynamicGasPricingConfig struct {
-	// Percentile for priority fee calculation (0-100)
-	Percentile *int `json:"percentile"`
+// EthFeeHistoryConfig represents configuration for dynamic EIP-1559 gas pricing using eth_feeHistory
+type EthFeeHistoryConfig struct {
+	// TipPercentile for priority fee calculation (0-100)
+	TipPercentile *int `json:"tipPercentile"`
 
 	// Number of historical blocks to query for fee history
 	HistoryBlockCount *int `json:"historyBlockCount"`
-
-	// Optional cap for maxPriorityFeePerGas (in Wei)
-	MaxPriorityFeeCap *pldtypes.HexUint256 `json:"maxPriorityFeeCap"`
 
 	// Factor to multiply base fee by for buffering (default: 1)
 	BaseFeeBufferFactor *int `json:"baseFeeBufferFactor"`
@@ -151,11 +150,12 @@ type DynamicGasPricingCacheConfig struct {
 }
 
 type GasPriceConfig struct {
-	IncreaseMax        *pldtypes.HexUint256    `json:"increaseMax"`
-	IncreasePercentage *int                    `json:"increasePercentage"`
-	FixedGasPrice      *FixedGasPricing        `json:"fixedGasPrice"`     // EIP-1559 structured gas pricing
-	DynamicGasPricing  DynamicGasPricingConfig `json:"dynamicGasPricing"` // Dynamic EIP-1559 gas pricing
-	GasOracleAPI       GasOracleAPIConfig      `json:"gasOracleAPI"`
+	IncreasePercentage      *int                 `json:"increasePercentage"`
+	MaxPriorityFeePerGasCap *pldtypes.HexUint256 `json:"maxPriorityFeePerGasCap"`
+	MaxFeePerGasCap         *pldtypes.HexUint256 `json:"maxFeePerGasCap"`
+	FixedGasPrice           *FixedGasPricing     `json:"fixedGasPrice"`
+	EthFeeHistory           EthFeeHistoryConfig  `json:"ethFeeHistory"`
+	GasOracleAPI            GasOracleAPIConfig   `json:"gasOracleAPI"`
 }
 
 type GasLimitConfig struct {

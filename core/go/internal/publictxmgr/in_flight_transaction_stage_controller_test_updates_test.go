@@ -46,5 +46,5 @@ func TestTXStageControllerUpdate(t *testing.T) {
 
 	rsc := it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	require.NotNil(t, rsc)
-	assert.Equal(t, InFlightTxStageSigning, rsc.Stage)
+	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 }

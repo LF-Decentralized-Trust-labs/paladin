@@ -44,9 +44,11 @@ func TestProduceLatestInFlightStageContextSubmitPanic(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
 		},
 	})
 
@@ -86,9 +88,11 @@ func TestProduceLatestInFlightStageContextSubmitComplete(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
 		},
 	})
 
@@ -118,9 +122,9 @@ func TestProduceLatestInFlightStageContextSubmitComplete(t *testing.T) {
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, 1, len(rsc.StageOutputsToBePersisted.StatusUpdates))
 	_ = rsc.StageOutputsToBePersisted.StatusUpdates[0](mTS.statusUpdater)
-	assert.Equal(t, txHash, rsc.StageOutputsToBePersisted.TxUpdates.TransactionHash)
-	assert.Equal(t, submissionTime, rsc.StageOutputsToBePersisted.TxUpdates.FirstSubmit)
-	assert.Equal(t, submissionTime, rsc.StageOutputsToBePersisted.TxUpdates.LastSubmit)
+	assert.Equal(t, txHash, rsc.StageOutputsToBePersisted.TxUpdates.NewValues.TransactionHash)
+	assert.Equal(t, submissionTime, rsc.StageOutputsToBePersisted.TxUpdates.NewValues.FirstSubmit)
+	assert.Equal(t, submissionTime, rsc.StageOutputsToBePersisted.TxUpdates.NewValues.LastSubmit)
 
 	// submission attempt completed - nonce too low
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
@@ -136,8 +140,8 @@ func TestProduceLatestInFlightStageContextSubmitComplete(t *testing.T) {
 	assert.Equal(t, InFlightTxStageSubmitting, rsc.Stage)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	_ = rsc.StageOutputsToBePersisted.StatusUpdates[0](mTS.statusUpdater)
-	assert.Equal(t, submissionTime, rsc.StageOutputsToBePersisted.TxUpdates.LastSubmit)
-	assert.Equal(t, txHash, rsc.StageOutputsToBePersisted.TxUpdates.TransactionHash)
+	assert.Equal(t, submissionTime, rsc.StageOutputsToBePersisted.TxUpdates.NewValues.LastSubmit)
+	assert.Equal(t, txHash, rsc.StageOutputsToBePersisted.TxUpdates.NewValues.TransactionHash)
 }
 
 func TestProduceLatestInFlightStageContextCannotSubmit(t *testing.T) {
@@ -151,9 +155,11 @@ func TestProduceLatestInFlightStageContextCannotSubmit(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(32247127816),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(32146027800),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(32247127816),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(32146027800),
+			},
 		},
 	})
 
@@ -185,11 +191,13 @@ func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
+			FirstSubmit: confutil.P(pldtypes.TimestampNow()),
 		},
-		FirstSubmit: confutil.P(pldtypes.TimestampNow()),
 	})
 
 	// switch to submit
@@ -220,7 +228,7 @@ func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.
 	assert.Equal(t, InFlightTxStageSubmitting, rsc.Stage)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Empty(t, rsc.StageOutputsToBePersisted.StatusUpdates)
-	assert.Equal(t, txHash, rsc.StageOutputsToBePersisted.TxUpdates.TransactionHash)
+	assert.Equal(t, txHash, rsc.StageOutputsToBePersisted.TxUpdates.NewValues.TransactionHash)
 
 	// submission attempt completed - already known for the first time submission
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
@@ -238,14 +246,16 @@ func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.
 	assert.Equal(t, InFlightTxStageSubmitting, rsc.Stage)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Empty(t, rsc.StageOutputsToBePersisted.StatusUpdates)
-	assert.Equal(t, txHash, rsc.StageOutputsToBePersisted.TxUpdates.TransactionHash)
+	assert.Equal(t, txHash, rsc.StageOutputsToBePersisted.TxUpdates.NewValues.TransactionHash)
 
 	// submission attempt completed - already known for the an existing time submission
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
 	rsc.StageOutputsToBePersisted = nil
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		FirstSubmit:     confutil.P(pldtypes.TimestampNow()),
-		TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("already known"))),
+		NewValues: BaseTXUpdateNewValues{
+			FirstSubmit:     confutil.P(pldtypes.TimestampNow()),
+			TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("already known"))),
+		},
 	})
 	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	it.stateManager.GetCurrentGeneration(ctx).AddSubmitOutput(ctx, txHash, submissionTime, SubmissionOutcomeAlreadyKnown, ethclient.ErrorReason(""), nil)
@@ -271,11 +281,13 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
+			FirstSubmit: confutil.P(pldtypes.TimestampNow()),
 		},
-		FirstSubmit: confutil.P(pldtypes.TimestampNow()),
 	})
 
 	// switch to submit
@@ -309,9 +321,9 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, 1, len(rsc.StageOutputsToBePersisted.StatusUpdates))
 	_ = rsc.StageOutputsToBePersisted.StatusUpdates[0](mTS.statusUpdater)
-	assert.Equal(t, submissionErr.Error(), *rsc.StageOutputsToBePersisted.TxUpdates.ErrorMessage)
+	assert.Equal(t, submissionErr.Error(), *rsc.StageOutputsToBePersisted.TxUpdates.NewValues.ErrorMessage)
 	assert.Equal(t, InFlightTxStageSubmitting, rsc.Stage)
-	assert.Nil(t, rsc.StageOutputsToBePersisted.TxUpdates.NewSubmission)
+	assert.Nil(t, rsc.StageOutputsToBePersisted.TxUpdates.NewValues.NewSubmission)
 
 	// submission attempt errored - required re-preparation during resubmission
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
@@ -319,8 +331,10 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	newWarnTime := confutil.P(pldtypes.TimestampNow())
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		FirstSubmit:     confutil.P(pldtypes.TimestampNow()),
-		TransactionHash: txHash,
+		NewValues: BaseTXUpdateNewValues{
+			FirstSubmit:     confutil.P(pldtypes.TimestampNow()),
+			TransactionHash: txHash,
+		},
 	})
 	it.stateManager.GetCurrentGeneration(ctx).AddSubmitOutput(ctx, nil, newWarnTime, SubmissionOutcomeFailedRequiresRetry, ethclient.ErrorReasonTransactionReverted, submissionErr)
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
@@ -335,10 +349,10 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, 1, len(rsc.StageOutputsToBePersisted.StatusUpdates))
 	_ = rsc.StageOutputsToBePersisted.StatusUpdates[0](mTS.statusUpdater)
-	assert.Equal(t, submissionErr.Error(), *rsc.StageOutputsToBePersisted.TxUpdates.ErrorMessage)
+	assert.Equal(t, submissionErr.Error(), *rsc.StageOutputsToBePersisted.TxUpdates.NewValues.ErrorMessage)
 	assert.Equal(t, InFlightTxStageSubmitting, rsc.Stage)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted.TxUpdates)
-	assert.NotNil(t, rsc.StageOutputsToBePersisted.TxUpdates.LastSubmit)
+	assert.NotNil(t, rsc.StageOutputsToBePersisted.TxUpdates.NewValues.LastSubmit)
 
 	// persisting error waiting for persistence retry timeout
 	assert.False(t, rsc.StageErrored)
@@ -391,11 +405,13 @@ func TestProduceLatestInFlightStageContextSubmitRePrepare(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
+			TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
 		},
-		TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
 	})
 
 	// switch to submit
@@ -438,12 +454,14 @@ func TestProduceLatestInFlightStageContextResubmission(t *testing.T) {
 	}
 	// the transaction already has details of a last submission
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
+			TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
+			LastSubmit:      confutil.P(pldtypes.TimestampNow()),
 		},
-		TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
-		LastSubmit:      confutil.P(pldtypes.TimestampNow()),
 	})
 
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
@@ -464,7 +482,38 @@ func TestProduceLatestInFlightStageContextResubmission(t *testing.T) {
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
-	assert.Equal(t, newLastSubmit, *rsc.StageOutputsToBePersisted.TxUpdates.LastSubmit)
+	assert.Equal(t, newLastSubmit, *rsc.StageOutputsToBePersisted.TxUpdates.NewValues.LastSubmit)
+}
+
+func TestProduceLatestInFlightStageContextSubmitUnderpriced(t *testing.T) {
+	ctx, o, _, done := newTestOrchestrator(t)
+	defer done()
+	it, mTS := newInflightTransaction(o, 1)
+	it.testOnlyNoActionMode = true
+	mTS.statusUpdater = &mockStatusUpdater{
+		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err pldtypes.RawJSON, actionOccurred *pldtypes.Timestamp) error {
+			return nil
+		},
+	}
+
+	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
+	rsc := NewRunningStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived, currentGeneration.InMemoryTxStateManager)
+	currentGeneration.runningStageContext = rsc
+	currentGeneration.AddSubmitOutput(ctx, confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
+		confutil.P(pldtypes.TimestampNow()),
+		SubmissionOutcomeFailedRequiresRetry,
+		ethclient.ErrorReasonTransactionUnderpriced,
+		fmt.Errorf("transaction underpriced"))
+
+	it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
+		AvailableToSpend:         big.NewInt(1000000),
+		PreviousNonceCostUnknown: false,
+	})
+
+	txUpdates := currentGeneration.GetRunningStageContext(ctx).StageOutputsToBePersisted.TxUpdates
+
+	assert.True(t, *txUpdates.NewValues.Underpriced)
+	assert.True(t, txUpdates.ResetValues.GasPricing)
 }
 
 func TestTriggerSubmitTx(t *testing.T) {
@@ -481,11 +530,13 @@ func TestTriggerSubmitTx(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
+			TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
 		},
-		TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
 	})
 
 	// trigger signing

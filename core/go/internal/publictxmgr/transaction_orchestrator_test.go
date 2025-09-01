@@ -176,9 +176,11 @@ func TestOrchestratorWaitingForBalance(t *testing.T) {
 		tx.Gas = 100
 	})
 	txState.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Int64ToInt256(1000),
-			MaxPriorityFeePerGas: pldtypes.Int64ToInt256(100),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Int64ToInt256(1000),
+				MaxPriorityFeePerGas: pldtypes.Int64ToInt256(100),
+			},
 		},
 	})
 

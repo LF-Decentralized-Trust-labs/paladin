@@ -59,11 +59,6 @@ func TestStateVersionBasic(t *testing.T) {
 	assert.Nil(t, version.GetStageTriggerError(ctx))
 	assert.Empty(t, version.GetStage(ctx))
 	assert.NotNil(t, version.GetStageStartTime(ctx))
-	assert.False(t, version.ValidatedTransactionHashMatchState(ctx))
-	version.SetValidatedTransactionHashMatchState(ctx, true)
-	assert.True(t, version.ValidatedTransactionHashMatchState(ctx))
-	version.SetValidatedTransactionHashMatchState(ctx, false)
-	assert.False(t, version.ValidatedTransactionHashMatchState(ctx))
 }
 
 func TestStateVersionTransactionFromRetrieveGasPriceToTracking(t *testing.T) {
@@ -324,9 +319,11 @@ func TestStateManagerTxPersistenceManagementUpdateErrors(t *testing.T) {
 	assert.Nil(t, err)
 
 	rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{
-		NewSubmission: &DBPubTxnSubmission{
-			from:            "0x12345",
-			TransactionHash: pldtypes.RandBytes32(),
+		NewValues: BaseTXUpdateNewValues{
+			NewSubmission: &DBPubTxnSubmission{
+				from:            "0x12345",
+				TransactionHash: pldtypes.RandBytes32(),
+			},
 		},
 	}
 

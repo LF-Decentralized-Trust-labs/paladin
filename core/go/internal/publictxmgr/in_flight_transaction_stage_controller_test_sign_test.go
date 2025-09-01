@@ -43,9 +43,11 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	}
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
 		},
 	})
 
@@ -162,9 +164,11 @@ func TestProduceLatestInFlightStageContextSigningPanic(t *testing.T) {
 	}
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
 		},
 	})
 
@@ -208,9 +212,11 @@ func TestProduceLatestInFlightStageContextTriggerSign(t *testing.T) {
 	}
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
 		},
 	})
 	it.testOnlyNoActionMode = false

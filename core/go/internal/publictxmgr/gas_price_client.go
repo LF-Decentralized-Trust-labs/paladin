@@ -33,13 +33,16 @@ import (
 
 type GasPriceClient interface {
 	HasZeroGasPrice(ctx context.Context) bool
-	GetGasPriceObject(ctx context.Context) (gasPrice *pldapi.PublicTxGasPricing, err error)
+	GetGasPriceObject(ctx context.Context, txFixedGasPrice *pldapi.PublicTxGasPricing, previouslySubmittedGPO *pldapi.PublicTxGasPricing, underpriced bool) (gasPrice *pldapi.PublicTxGasPricing, err error)
 	DeleteCache(ctx context.Context)
 	Init(ctx context.Context) error
 	Start(ctx context.Context, ethClient ethclient.EthClient)
 }
 
 // The hybrid gas price client handles fixed gas pricing from configuration
+// An important implementation details for the functions on this struct is that if they are passed a
+// pointer to a gas pricing struct, they never change the original struct, but instead return a new one.
+// This means that is is safe to pass "fixed" prices to it.
 type HybridGasPriceClient struct {
 	hasZeroGasPrice bool
 	fixedGasPrice   *pldapi.PublicTxGasPricing
@@ -47,11 +50,13 @@ type HybridGasPriceClient struct {
 
 	conf *pldconf.GasPriceConfig
 	// Dynamic gas pricing configuration (always set with defaults)
-	percentile          int
-	historyBlockCount   int
-	maxPriorityFeeCap   *pldtypes.HexUint256
-	baseFeeBufferFactor int
-	cacheEnabled        bool
+	percentile              int
+	historyBlockCount       int
+	maxPriorityFeePerGasCap *pldtypes.HexUint256
+	maxFeePerGasCap         *pldtypes.HexUint256
+	baseFeeBufferFactor     int
+	gasPriceIncreasePercent int
+	cacheEnabled            bool
 
 	// Cache for dynamic gas pricing results
 	dynamicGasPriceCache cache.Cache[string, *pldapi.PublicTxGasPricing]
@@ -116,11 +121,11 @@ func (hGpc *HybridGasPriceClient) estimateEip1559Fees(ctx context.Context) (*pld
 	}
 
 	// Apply optional cap if configured (applies to both historical tips and fallback)
-	if hGpc.maxPriorityFeeCap != nil {
-		capInWei := hGpc.maxPriorityFeeCap.Int() // Already in Wei
-		if maxPriorityFeePerGas.Int().Cmp(capInWei) > 0 {
-			maxPriorityFeePerGas = (*pldtypes.HexUint256)(capInWei)
-			log.L(ctx).Debugf("Capped maxPriorityFeePerGas to %s", hGpc.maxPriorityFeeCap.HexString0xPrefix())
+	if hGpc.maxPriorityFeePerGasCap != nil {
+		cap := hGpc.maxPriorityFeePerGasCap.Int()
+		if maxPriorityFeePerGas.Int().Cmp(cap) > 0 {
+			maxPriorityFeePerGas = (*pldtypes.HexUint256)(cap)
+			log.L(ctx).Warnf("Capped maxPriorityFeePerGas to %s", hGpc.maxPriorityFeePerGasCap.HexString0xPrefix())
 		}
 	}
 
@@ -139,6 +144,14 @@ func (hGpc *HybridGasPriceClient) estimateEip1559Fees(ctx context.Context) (*pld
 	// maxFeePerGas = bufferedBaseFee + maxPriorityFeePerGas
 	maxFeePerGas := (*pldtypes.HexUint256)(new(big.Int).Add(bufferedBaseFee, maxPriorityFeePerGas.Int()))
 
+	if hGpc.maxFeePerGasCap != nil {
+		cap := hGpc.maxFeePerGasCap.Int()
+		if maxFeePerGas.Int().Cmp(cap) > 0 {
+			maxFeePerGas = (*pldtypes.HexUint256)(cap)
+			log.L(ctx).Warnf("Capped maxFeePerGas to %s", hGpc.maxPriorityFeePerGasCap.HexString0xPrefix())
+		}
+	}
+
 	result := &pldapi.PublicTxGasPricing{
 		MaxFeePerGas:         maxFeePerGas,
 		MaxPriorityFeePerGas: maxPriorityFeePerGas,
@@ -153,19 +166,161 @@ func (hGpc *HybridGasPriceClient) estimateEip1559Fees(ctx context.Context) (*pld
 	return result, nil
 }
 
-func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context) (gasPrice *pldapi.PublicTxGasPricing, err error) {
-	// if zero gas price chain, return zero gas price
+func (hGpc *HybridGasPriceClient) increaseGasPricingByPercentage(gasPricing *pldapi.PublicTxGasPricing, percentage int) *pldapi.PublicTxGasPricing {
+	// Calculate the multiplier (e.g., 1.10 for 10% increase)
+	// But if we simply express this multiplier as a float, we run into precision issues, so we need to take
+	// a different approach.
+	// Instead we're going to keep everything as integers, express the multiplier as 100 + percentage, then divide by 100.
+	// However, integer division will return the quotient, which could result in a lower increase than expected.
+	// To avoid this we will express our division as (x + y - 1) / y, instead of x / y, which results in the division rounding up.
+	// Concretely, this means that after the multiplication, we will add 99 to the result before diving by 100
+	multiplier := big.NewInt(int64(100 + percentage))
+	// returning a new struct so that we don't change the original
+	result := &pldapi.PublicTxGasPricing{}
+
+	// Increase MaxFeePerGas if present
+	if gasPricing.MaxFeePerGas != nil {
+		// new(big.Int) so that we don't change the original
+		increasedValue := new(big.Int).Mul(gasPricing.MaxFeePerGas.Int(), multiplier)
+		increasedValue.Add(increasedValue, big.NewInt(99))
+		increasedValue.Div(increasedValue, big.NewInt(100))
+		result.MaxFeePerGas = (*pldtypes.HexUint256)(increasedValue)
+	}
+
+	// Increase MaxPriorityFeePerGas if present
+	if gasPricing.MaxPriorityFeePerGas != nil {
+		// new(big.Int) so that we don't change the original
+		increasedValue := new(big.Int).Mul(gasPricing.MaxPriorityFeePerGas.Int(), multiplier)
+		increasedValue.Add(increasedValue, big.NewInt(99))
+		increasedValue.Div(increasedValue, big.NewInt(100))
+		result.MaxPriorityFeePerGas = (*pldtypes.HexUint256)(increasedValue)
+	}
+
+	return result
+}
+
+func (hGpc *HybridGasPriceClient) capGasPricing(ctx context.Context, gasPricing *pldapi.PublicTxGasPricing) *pldapi.PublicTxGasPricing {
+	result := &pldapi.PublicTxGasPricing{}
+
+	// Cap MaxFeePerGas if cap is provided and value exceeds it
+	if gasPricing.MaxFeePerGas != nil {
+		if hGpc.maxFeePerGasCap != nil && gasPricing.MaxFeePerGas.Int().Cmp(hGpc.maxFeePerGasCap.Int()) > 0 {
+			// Value exceeds cap, use cap value
+			log.L(ctx).Warnf("Capping MaxFeePerGas to %s", hGpc.maxFeePerGasCap.HexString0xPrefix())
+			result.MaxFeePerGas = hGpc.maxFeePerGasCap
+		} else {
+			// Value is within cap or no cap provided, use original value
+			result.MaxFeePerGas = gasPricing.MaxFeePerGas
+		}
+	}
+
+	// Cap MaxPriorityFeePerGas if cap is provided and value exceeds it
+	if gasPricing.MaxPriorityFeePerGas != nil {
+		if hGpc.maxPriorityFeePerGasCap != nil && gasPricing.MaxPriorityFeePerGas.Int().Cmp(hGpc.maxPriorityFeePerGasCap.Int()) > 0 {
+			// Value exceeds cap, use cap value
+			log.L(ctx).Warnf("Capping MaxPriorityFeePerGas to %s", hGpc.maxPriorityFeePerGasCap.HexString0xPrefix())
+			result.MaxPriorityFeePerGas = hGpc.maxPriorityFeePerGasCap
+		} else {
+			// Value is within cap or no cap provided, use original value
+			result.MaxPriorityFeePerGas = gasPricing.MaxPriorityFeePerGas
+		}
+	}
+
+	return result
+}
+
+func (hGpc *HybridGasPriceClient) calculateNewGasPrice(previouslySubmittedGPO *pldapi.PublicTxGasPricing, retrievedGPO *pldapi.PublicTxGasPricing, underpriced bool) *pldapi.PublicTxGasPricing {
+	// The general principle: if we have a previously submitted gas price is that we always use the higher of the retrieved and previously
+	// submitted gas prices.
+	// This is complicated by the fact that we are actually comparing two figures and need to ensure that if one has increased from
+	// the previous amount, then what we use on the next submission represents the minimum percentage on both values.
+
+	// if we've never submitted a gas price for this transaction then we can just return the retrieved gas price as is
+	if previouslySubmittedGPO == nil || previouslySubmittedGPO.MaxFeePerGas == nil || previouslySubmittedGPO.MaxPriorityFeePerGas == nil {
+		return retrievedGPO
+	}
+
+	// compare priority fee
+	priorityFeeCmp := retrievedGPO.MaxPriorityFeePerGas.Int().Cmp(previouslySubmittedGPO.MaxPriorityFeePerGas.Int())
+	// compare total fee
+	totalFeeCmp := retrievedGPO.MaxFeePerGas.Int().Cmp(previouslySubmittedGPO.MaxFeePerGas.Int())
+
+	// If either maxPriorityFeePerGas and maxFeePerGas have increased we use whichever is higher of the retrieved values, or
+	// the minimum percentage increase on the previous gas price.
+	// Otherwise we use the previous values, but increased by the configured percentage if we were previously underpriced
+	if priorityFeeCmp == 1 || totalFeeCmp == 1 {
+		gpo := &pldapi.PublicTxGasPricing{}
+		minNewGPO := hGpc.increaseGasPricingByPercentage(previouslySubmittedGPO, hGpc.gasPriceIncreasePercent)
+
+		if new(big.Int).Sub(retrievedGPO.MaxPriorityFeePerGas.Int(), minNewGPO.MaxPriorityFeePerGas.Int()).Sign() == -1 {
+			gpo.MaxPriorityFeePerGas = minNewGPO.MaxPriorityFeePerGas
+		} else {
+			gpo.MaxPriorityFeePerGas = retrievedGPO.MaxPriorityFeePerGas
+		}
+
+		if new(big.Int).Sub(retrievedGPO.MaxFeePerGas.Int(), minNewGPO.MaxFeePerGas.Int()).Sign() == -1 {
+			gpo.MaxFeePerGas = minNewGPO.MaxFeePerGas
+		} else {
+			gpo.MaxFeePerGas = retrievedGPO.MaxFeePerGas
+		}
+		return gpo
+	}
+
+	if underpriced {
+		return hGpc.increaseGasPricingByPercentage(previouslySubmittedGPO, hGpc.gasPriceIncreasePercent)
+	}
+
+	return previouslySubmittedGPO
+}
+
+func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixedGasPrice *pldapi.PublicTxGasPricing, previouslySubmittedGPO *pldapi.PublicTxGasPricing, underpriced bool) (gasPrice *pldapi.PublicTxGasPricing, err error) {
+	// priority order for retrieving a gas price object:
+	// 1. zero gas price chain
+	// 2. transaction fixed gas price
+	// 3. fixed gas price
+	// 4. estimate EIP-1559 fees
 	if hGpc.hasZeroGasPrice {
+		// if zero gas price chain, return zero gas price without any kind of retrieval/estimation
+		// there's no validation that we can do on a zero gas price chain so just return right away
 		return &pldapi.PublicTxGasPricing{
-			MaxFeePerGas:         (*pldtypes.HexUint256)(big.NewInt(0)),
-			MaxPriorityFeePerGas: (*pldtypes.HexUint256)(big.NewInt(0)),
+			MaxFeePerGas:         pldtypes.Uint64ToUint256(0),
+			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(0),
 		}, nil
 	}
-	// First, try fixed gas pricing if available
-	if hGpc.fixedGasPrice != nil {
-		return hGpc.fixedGasPrice, nil
+
+	if txFixedGasPrice != nil {
+		// A fixed gas price on the transaction cannot be incremented in the case of being underpriced-
+		// resolving this is the responsibility of the user submitting the transaction.
+		// The price cap does need to apply though.
+		return hGpc.capGasPricing(ctx, txFixedGasPrice), nil
 	}
-	return hGpc.estimateEip1559Fees(ctx)
+
+	var gpo *pldapi.PublicTxGasPricing
+
+	if hGpc.fixedGasPrice != nil {
+		gpo = hGpc.fixedGasPrice
+	} else {
+		if underpriced {
+			hGpc.DeleteCache(ctx)
+		}
+		var err error
+		gpo, err = hGpc.estimateEip1559Fees(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	gpo = hGpc.calculateNewGasPrice(previouslySubmittedGPO, gpo, underpriced)
+
+	// Finally cap the fees to the configured maximums if the new gas price exceeds them
+	// This could technically result in an increment that is less than the accepted replacement percentage on chain
+	// but at this point we're pretty limited on options- it's a question of which failure, rather than avoiding failure
+	//
+	// estimateEip1559Fees might already have applied the cap, because estimating maxFeePerGas off a value of
+	// maxPriorityFeePerGas that is over the cap could result in an excess estimation of how much gas will be required
+	// for the transaction. We still have to reapply it here because of the logic in calculateNewGasPrice that
+	// works out if a percentage increase is needed may have raised the prices above the cap again.
+	return hGpc.capGasPricing(ctx, gpo), nil
 }
 
 func (hGpc *HybridGasPriceClient) DeleteCache(ctx context.Context) {
@@ -175,18 +330,20 @@ func (hGpc *HybridGasPriceClient) DeleteCache(ctx context.Context) {
 }
 
 func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
-	if hGpc.conf.DynamicGasPricing.Percentile != nil &&
-		(*hGpc.conf.DynamicGasPricing.Percentile < 0 || *hGpc.conf.DynamicGasPricing.Percentile > 100) {
+	if hGpc.conf.EthFeeHistory.TipPercentile != nil &&
+		(*hGpc.conf.EthFeeHistory.TipPercentile < 0 || *hGpc.conf.EthFeeHistory.TipPercentile > 100) {
 		errMsg := fmt.Sprintf("Invalid dynamic gas pricing percentile: %d. Must be between 0 and 100", hGpc.percentile)
 		log.L(ctx).Error(errMsg)
 		return errors.New(errMsg)
 	}
 
-	hGpc.percentile = confutil.Int(hGpc.conf.DynamicGasPricing.Percentile, *pldconf.PublicTxManagerDefaults.GasPrice.DynamicGasPricing.Percentile)
-	hGpc.historyBlockCount = confutil.Int(hGpc.conf.DynamicGasPricing.HistoryBlockCount, *pldconf.PublicTxManagerDefaults.GasPrice.DynamicGasPricing.HistoryBlockCount)
-	hGpc.maxPriorityFeeCap = hGpc.conf.DynamicGasPricing.MaxPriorityFeeCap
-	hGpc.baseFeeBufferFactor = confutil.Int(hGpc.conf.DynamicGasPricing.BaseFeeBufferFactor, *pldconf.PublicTxManagerDefaults.GasPrice.DynamicGasPricing.BaseFeeBufferFactor)
-	hGpc.cacheEnabled = confutil.Bool(hGpc.conf.DynamicGasPricing.Cache.Enabled, *pldconf.PublicTxManagerDefaults.GasPrice.DynamicGasPricing.Cache.Enabled)
+	hGpc.percentile = confutil.Int(hGpc.conf.EthFeeHistory.TipPercentile, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.TipPercentile)
+	hGpc.historyBlockCount = confutil.Int(hGpc.conf.EthFeeHistory.HistoryBlockCount, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.HistoryBlockCount)
+	hGpc.maxPriorityFeePerGasCap = hGpc.conf.MaxPriorityFeePerGasCap
+	hGpc.maxFeePerGasCap = hGpc.conf.MaxFeePerGasCap
+	hGpc.baseFeeBufferFactor = confutil.Int(hGpc.conf.EthFeeHistory.BaseFeeBufferFactor, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.BaseFeeBufferFactor)
+	hGpc.gasPriceIncreasePercent = confutil.Int(hGpc.conf.IncreasePercentage, *pldconf.PublicTxManagerDefaults.GasPrice.IncreasePercentage)
+	hGpc.cacheEnabled = confutil.Bool(hGpc.conf.EthFeeHistory.Cache.Enabled, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.Cache.Enabled)
 
 	if hGpc.conf.FixedGasPrice != nil {
 		fixedGasPrice, err := mapConfigToAPIGasPricing(ctx, hGpc.conf.FixedGasPrice)

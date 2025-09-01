@@ -18,7 +18,6 @@ package publictxmgr
 import (
 	"context"
 	"encoding/json"
-	"math/big"
 	"sync"
 	"time"
 
@@ -114,10 +113,6 @@ type pubTxManager struct {
 	// balance manager
 	balanceManager BalanceManager
 
-	// orchestrator config
-	gasPriceIncreaseMax     *big.Int
-	gasPriceIncreasePercent int
-
 	// gas limit config
 	gasEstimateFactor float64
 
@@ -135,14 +130,6 @@ func NewPublicTransactionManager(ctx context.Context, conf *pldconf.PublicTxMana
 	log.L(ctx).Debugf("Creating new public transaction manager")
 
 	gasPriceClient := NewGasPriceClient(ctx, &conf.GasPrice)
-	var gasPriceIncreaseMax *big.Int
-	if conf.GasPrice.IncreaseMax != nil {
-		gasPriceIncreaseMax = conf.GasPrice.IncreaseMax.Int()
-	}
-	gasEstimateFactor := confutil.Float64Min(conf.GasLimit.GasEstimateFactor, 1.0, *pldconf.PublicTxManagerDefaults.GasLimit.GasEstimateFactor)
-
-	log.L(ctx).Debugf("Enterprise transaction handler created")
-
 	ptmCtx, ptmCtxCancel := context.WithCancel(log.WithLogField(ctx, "role", "public_tx_mgr"))
 
 	return &pubTxManager{
@@ -159,11 +146,9 @@ func NewPublicTransactionManager(ctx context.Context, conf *pldconf.PublicTxMana
 		enginePollingInterval:       confutil.DurationMin(conf.Manager.Interval, 50*time.Millisecond, *pldconf.PublicTxManagerDefaults.Manager.Interval),
 		nonceCacheTimeout:           confutil.DurationMin(conf.Manager.NonceCacheTimeout, 0, *pldconf.PublicTxManagerDefaults.Manager.NonceCacheTimeout),
 		retry:                       retry.NewRetryIndefinite(&conf.Manager.Retry),
-		gasPriceIncreaseMax:         gasPriceIncreaseMax,
-		gasPriceIncreasePercent:     confutil.Int(conf.GasPrice.IncreasePercentage, *pldconf.PublicTxManagerDefaults.GasPrice.IncreasePercentage),
 		activityRecordCache:         cache.NewCache[uint64, *txActivityRecords](&conf.Manager.ActivityRecords.CacheConfig, &pldconf.PublicTxManagerDefaults.Manager.ActivityRecords.CacheConfig),
 		maxActivityRecordsPerTx:     confutil.Int(conf.Manager.ActivityRecords.RecordsPerTransaction, *pldconf.PublicTxManagerDefaults.Manager.ActivityRecords.RecordsPerTransaction),
-		gasEstimateFactor:           gasEstimateFactor,
+		gasEstimateFactor:           confutil.Float64Min(conf.GasLimit.GasEstimateFactor, 1.0, *pldconf.PublicTxManagerDefaults.GasLimit.GasEstimateFactor),
 	}
 }
 
