@@ -62,7 +62,7 @@ publicTxManager:
 
 Configuration options:
 
-- **`tipPercentile`** (0-100): The percentile of historical priority fees to use. Higher values result in higher priority fees and faster transaction inclusion. Default: 85
+- **`priorityFeePercentile`** (0-100): The percentile of historical priority fees to use. Higher values result in higher priority fees and faster transaction inclusion. Default: 85
 - **`historyBlockCount`**: Number of historical blocks to analyze for fee calculation. More blocks provide better averages but may be less responsive to recent changes. Default: 20
 - **`baseFeeBufferFactor`**: Multiplier for the base fee to provide a buffer against base fee increases. Default: 1 (no buffer)
 - **`cache.enabled`**: Whether to cache fee history results to reduce RPC calls. Default: true

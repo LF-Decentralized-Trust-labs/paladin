@@ -59,7 +59,7 @@ type HybridGasPriceClient struct {
 	gasPriceIncreasePercent int
 
 	// Eth fee history gas pricing configuration (always set with defaults so this works as a fallback option)
-	percentile                int
+	priorityFeePercentile     int
 	historyBlockCount         int
 	baseFeeBufferFactor       int
 	ethFeeHistoryCacheEnabled bool
@@ -82,7 +82,7 @@ func (hGpc *HybridGasPriceClient) estimateEIP1559Fees(ctx context.Context) (*pld
 	}
 
 	// Prepare reward percentiles for the RPC call
-	rewardPercentiles := []float64{float64(hGpc.percentile)}
+	rewardPercentiles := []float64{float64(hGpc.priorityFeePercentile)}
 
 	// Fetch fee history
 	feeHistory, err := hGpc.ethClient.FeeHistory(ctx, hGpc.historyBlockCount, "latest", rewardPercentiles)
@@ -339,14 +339,14 @@ func (hGpc *HybridGasPriceClient) DeleteCache(ctx context.Context) {
 }
 
 func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
-	if hGpc.conf.EthFeeHistory.TipPercentile != nil &&
-		(*hGpc.conf.EthFeeHistory.TipPercentile < 0 || *hGpc.conf.EthFeeHistory.TipPercentile > 100) {
-		errMsg := fmt.Sprintf("Invalid dynamic gas pricing percentile: %d. Must be between 0 and 100", hGpc.percentile)
+	if hGpc.conf.EthFeeHistory.PriorityFeePercentile != nil &&
+		(*hGpc.conf.EthFeeHistory.PriorityFeePercentile < 0 || *hGpc.conf.EthFeeHistory.PriorityFeePercentile > 100) {
+		errMsg := fmt.Sprintf("Invalid priority fee percentile: %d. Must be between 0 and 100", hGpc.priorityFeePercentile)
 		log.L(ctx).Error(errMsg)
 		return errors.New(errMsg)
 	}
 
-	hGpc.percentile = confutil.Int(hGpc.conf.EthFeeHistory.TipPercentile, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.TipPercentile)
+	hGpc.priorityFeePercentile = confutil.Int(hGpc.conf.EthFeeHistory.PriorityFeePercentile, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.PriorityFeePercentile)
 	hGpc.historyBlockCount = confutil.Int(hGpc.conf.EthFeeHistory.HistoryBlockCount, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.HistoryBlockCount)
 	hGpc.maxPriorityFeePerGasCap = hGpc.conf.MaxPriorityFeePerGasCap
 	hGpc.maxFeePerGasCap = hGpc.conf.MaxFeePerGasCap

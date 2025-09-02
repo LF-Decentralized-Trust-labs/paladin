@@ -79,9 +79,9 @@ var PublicTxManagerDefaults = &PublicTxManagerConfig{
 		MaxFeePerGasCap:         nil,            // No cap by default
 		FixedGasPrice:           nil,
 		EthFeeHistory: EthFeeHistoryConfig{
-			TipPercentile:       confutil.P(85), // Default to 85th percentile for getting transactions onto chain as easily as possible
-			HistoryBlockCount:   confutil.P(20), // Default to 20 blocks for fee history
-			BaseFeeBufferFactor: confutil.P(1),  // Default to 1x buffer for base fee
+			PriorityFeePercentile: confutil.P(85), // Default to 85th percentile for getting transactions onto chain as easily as possible
+			HistoryBlockCount:     confutil.P(20), // Default to 20 blocks for fee history
+			BaseFeeBufferFactor:   confutil.P(1),  // Default to 1x buffer for base fee
 			Cache: EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true), // Caching enabled by default
 			},
@@ -130,8 +130,8 @@ type FixedGasPricing struct {
 
 // EthFeeHistoryConfig represents configuration for dynamic EIP-1559 gas pricing using eth_feeHistory
 type EthFeeHistoryConfig struct {
-	// TipPercentile for priority fee calculation (0-100)
-	TipPercentile *int `json:"tipPercentile"`
+	// PriorityFeePercentile for priority fee calculation (0-100)
+	PriorityFeePercentile *int `json:"tipPercentile"`
 
 	// Number of historical blocks to query for fee history
 	HistoryBlockCount *int `json:"historyBlockCount"`
