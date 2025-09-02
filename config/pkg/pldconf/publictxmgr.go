@@ -17,7 +17,6 @@ package pldconf
 
 import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
 
 type PublicTxManagerConfig struct {
@@ -124,14 +123,14 @@ type BalanceManagerConfig struct {
 
 // FixedGasPricing represents EIP-1559 gas pricing configuration
 type FixedGasPricing struct {
-	MaxFeePerGas         *pldtypes.HexUint256 `json:"maxFeePerGas"`
-	MaxPriorityFeePerGas *pldtypes.HexUint256 `json:"maxPriorityFeePerGas"`
+	MaxFeePerGas         *string `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *string `json:"maxPriorityFeePerGas"`
 }
 
 // EthFeeHistoryConfig represents configuration for dynamic EIP-1559 gas pricing using eth_feeHistory
 type EthFeeHistoryConfig struct {
 	// PriorityFeePercentile for priority fee calculation (0-100)
-	PriorityFeePercentile *int `json:"tipPercentile"`
+	PriorityFeePercentile *int `json:"priorityFeePercentile"`
 
 	// Number of historical blocks to query for fee history
 	HistoryBlockCount *int `json:"historyBlockCount"`
@@ -150,12 +149,12 @@ type EthFeeHistoryCacheConfig struct {
 }
 
 type GasPriceConfig struct {
-	IncreasePercentage      *int                 `json:"increasePercentage"`
-	MaxPriorityFeePerGasCap *pldtypes.HexUint256 `json:"maxPriorityFeePerGasCap"`
-	MaxFeePerGasCap         *pldtypes.HexUint256 `json:"maxFeePerGasCap"`
-	FixedGasPrice           *FixedGasPricing     `json:"fixedGasPrice"`
-	EthFeeHistory           EthFeeHistoryConfig  `json:"ethFeeHistory"`
-	GasOracleAPI            GasOracleAPIConfig   `json:"gasOracleAPI"`
+	IncreasePercentage      *int                `json:"increasePercentage"`
+	MaxPriorityFeePerGasCap *string             `json:"maxPriorityFeePerGasCap"`
+	MaxFeePerGasCap         *string             `json:"maxFeePerGasCap"`
+	FixedGasPrice           *FixedGasPricing    `json:"fixedGasPrice"`
+	EthFeeHistory           EthFeeHistoryConfig `json:"ethFeeHistory"`
+	GasOracleAPI            GasOracleAPIConfig  `json:"gasOracleAPI"`
 }
 
 type GasLimitConfig struct {

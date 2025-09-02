@@ -564,7 +564,6 @@ func (it *inFlightTransactionStageController) startNewStage(ctx context.Context,
 	}
 	// check and track the existing transaction hash- tracking is done in the block indexer so there is nothing to do here
 	log.L(ctx).Debugf("Transaction with ID %s entering tracking stage", it.stateManager.GetSignerNonce())
-	return
 }
 
 func calculateGasRequiredForTransaction(ctx context.Context, gpo *pldapi.PublicTxGasPricing, gasLimit uint64) (gasRequired *big.Int, err error) {

@@ -90,6 +90,8 @@ func baseMocks(t *testing.T) *mocksAndTestControl {
 func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig)) (context.Context, *pubTxManager, *mocksAndTestControl, func()) {
 	// log.SetLevel("debug")
 	ctx := context.Background()
+	maxFeePerGasStr := pldtypes.Uint64ToUint256(0).HexString0xPrefix()
+	maxPriorityFeePerGasStr := pldtypes.Uint64ToUint256(0).HexString0xPrefix()
 	conf := &pldconf.PublicTxManagerConfig{
 		Manager: pldconf.PublicTxManagerManagerConfig{
 			Interval:                 confutil.P("1h"),
@@ -107,8 +109,8 @@ func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...fu
 		},
 		GasPrice: pldconf.GasPriceConfig{
 			FixedGasPrice: &pldconf.FixedGasPricing{
-				MaxFeePerGas:         pldtypes.Uint64ToUint256(0),
-				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(0),
+				MaxFeePerGas:         &maxFeePerGasStr,
+				MaxPriorityFeePerGas: &maxPriorityFeePerGasStr,
 			},
 		},
 	}

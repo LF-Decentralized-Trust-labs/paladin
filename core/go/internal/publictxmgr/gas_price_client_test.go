@@ -53,10 +53,12 @@ func NewTestGasPriceClient(t *testing.T, conf *pldconf.GasPriceConfig, zeroGasPr
 }
 
 func NewTestFixedPriceGasPriceClient(t *testing.T, maxFeePerGas, maxPriorityFeePerGas uint64) (context.Context, *HybridGasPriceClient, *ethclientmocks.EthClient) {
+	maxFeePerGasStr := pldtypes.Uint64ToUint256(maxFeePerGas).HexString0xPrefix()
+	maxPriorityFeePerGasStr := pldtypes.Uint64ToUint256(maxPriorityFeePerGas).HexString0xPrefix()
 	return NewTestGasPriceClient(t, &pldconf.GasPriceConfig{
 		FixedGasPrice: &pldconf.FixedGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(maxFeePerGas),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(maxPriorityFeePerGas),
+			MaxFeePerGas:         &maxFeePerGasStr,
+			MaxPriorityFeePerGas: &maxPriorityFeePerGasStr,
 		},
 	}, false)
 }
@@ -171,10 +173,12 @@ func TestEthFeeHistoryGasPricingWithCustomConfig(t *testing.T) {
 }
 
 func TestEthFeeHistoryGasPricingWithPriorityFeeCap(t *testing.T) {
+	maxPriorityFeePerGasCapStr := pldtypes.Uint64ToUint256(1000000000).HexString0xPrefix()
+	maxFeePerGasCapStr := pldtypes.Uint64ToUint256(20000000000).HexString0xPrefix()
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice:           nil,
-		MaxPriorityFeePerGasCap: pldtypes.Uint64ToUint256(1000000000),  // 1 Gwei cap
-		MaxFeePerGasCap:         pldtypes.Uint64ToUint256(20000000000), // 1 Gwei cap
+		MaxPriorityFeePerGasCap: &maxPriorityFeePerGasCapStr,
+		MaxFeePerGasCap:         &maxFeePerGasCapStr,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
@@ -240,9 +244,10 @@ func TestEthFeeHistoryGasPricingFallbackTo1Gwei(t *testing.T) {
 }
 
 func TestEthFeeHistoryGasPricingFallbackWithCap(t *testing.T) {
+	maxPriorityFeePerGasCapStr := pldtypes.Uint64ToUint256(500000000).HexString0xPrefix()
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice:           nil,
-		MaxPriorityFeePerGasCap: pldtypes.Uint64ToUint256(500000000), // 0.5 Gwei cap
+		MaxPriorityFeePerGasCap: &maxPriorityFeePerGasCapStr,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
@@ -445,9 +450,10 @@ func TestInitValidation(t *testing.T) {
 	err := gasPriceClient.Init(ctx)
 	assert.Error(t, err)
 
+	maxFeePerGasStr := pldtypes.Uint64ToUint256(1000).HexString0xPrefix()
 	conf = &pldconf.GasPriceConfig{
 		FixedGasPrice: &pldconf.FixedGasPricing{
-			MaxFeePerGas: pldtypes.Uint64ToUint256(1000),
+			MaxFeePerGas: &maxFeePerGasStr,
 			// Missing MaxPriorityFeePerGas
 		},
 	}
@@ -477,10 +483,12 @@ func TestInitWithDefaults(t *testing.T) {
 // mapConfigToAPIGasPricing edge cases
 func TestMapConfigToAPIGasPricingIncompleteConfig(t *testing.T) {
 	ctx := context.Background()
+	maxFeePerGasStr := pldtypes.Uint64ToUint256(1000).HexString0xPrefix()
+	maxPriorityFeePerGasStr := pldtypes.Uint64ToUint256(100).HexString0xPrefix()
 
 	// Test with only MaxFeePerGas set
 	conf := &pldconf.FixedGasPricing{
-		MaxFeePerGas:         pldtypes.Uint64ToUint256(1000),
+		MaxFeePerGas:         &maxFeePerGasStr,
 		MaxPriorityFeePerGas: nil,
 	}
 
@@ -492,7 +500,7 @@ func TestMapConfigToAPIGasPricingIncompleteConfig(t *testing.T) {
 	// Test with only MaxPriorityFeePerGas set
 	conf = &pldconf.FixedGasPricing{
 		MaxFeePerGas:         nil,
-		MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(100),
+		MaxPriorityFeePerGas: &maxPriorityFeePerGasStr,
 	}
 
 	result, err = mapConfigToAPIGasPricing(ctx, conf)
@@ -508,9 +516,7 @@ func TestMapConfigToAPIGasPricingIncompleteConfig(t *testing.T) {
 
 	result, err = mapConfigToAPIGasPricing(ctx, conf)
 	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Nil(t, result.MaxFeePerGas)
-	assert.Nil(t, result.MaxPriorityFeePerGas)
+	assert.Nil(t, result)
 }
 
 func TestStartWithNilGasPriceResponse(t *testing.T) {
@@ -575,10 +581,13 @@ func TestStartSkipsGasPriceWhenFixedPriceSet(t *testing.T) {
 	ctx := context.Background()
 	mockEthClient := ethclientmocks.NewEthClient(t)
 
+	maxFeePerGasStr := pldtypes.Uint64ToUint256(1000).HexString0xPrefix()
+	maxPriorityFeePerGasStr := pldtypes.Uint64ToUint256(100).HexString0xPrefix()
+
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice: &pldconf.FixedGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(1000),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(100),
+			MaxFeePerGas:         &maxFeePerGasStr,
+			MaxPriorityFeePerGas: &maxPriorityFeePerGasStr,
 		},
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
@@ -680,10 +689,12 @@ func TestIncreaseGasPricingByPercentage(t *testing.T) {
 func TestCapGasPricing(t *testing.T) {
 	ctx := context.Background()
 	// Create a gas price client with configured caps
+	maxPriorityFeePerGasCapStr := pldtypes.Uint64ToUint256(2000000000).HexString0xPrefix()
+	maxFeePerGasCapStr := pldtypes.Uint64ToUint256(15000000000).HexString0xPrefix()
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice:           nil,
-		MaxPriorityFeePerGasCap: pldtypes.Uint64ToUint256(2000000000),  // 2 Gwei cap
-		MaxFeePerGasCap:         pldtypes.Uint64ToUint256(15000000000), // 15 Gwei cap
+		MaxPriorityFeePerGasCap: &maxPriorityFeePerGasCapStr,
+		MaxFeePerGasCap:         &maxFeePerGasCapStr,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
@@ -923,10 +934,12 @@ func TestGetGasPriceObjectWithTxFixedGasPrice(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a gas price client with caps configured
+	maxPriorityFeePerGasCapStr := pldtypes.Uint64ToUint256(2000000000).HexString0xPrefix()
+	maxFeePerGasCapStr := pldtypes.Uint64ToUint256(15000000000).HexString0xPrefix()
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice:           nil,
-		MaxPriorityFeePerGasCap: pldtypes.Uint64ToUint256(2000000000),  // 2 Gwei cap
-		MaxFeePerGasCap:         pldtypes.Uint64ToUint256(15000000000), // 15 Gwei cap
+		MaxPriorityFeePerGasCap: &maxPriorityFeePerGasCapStr,
+		MaxFeePerGasCap:         &maxFeePerGasCapStr,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
@@ -1022,10 +1035,12 @@ func TestGetGasPriceObjectWithZeroGasPriceChain(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a gas price client configured for zero gas price chain
+	maxFeePerGasStr := pldtypes.Uint64ToUint256(0).HexString0xPrefix()
+	maxPriorityFeePerGasStr := pldtypes.Uint64ToUint256(0).HexString0xPrefix()
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice: &pldconf.FixedGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(0),
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(0),
+			MaxFeePerGas:         &maxFeePerGasStr,
+			MaxPriorityFeePerGas: &maxPriorityFeePerGasStr,
 		},
 	}
 
@@ -1044,10 +1059,12 @@ func TestGetGasPriceObjectWithFixedGasPriceFromConfig(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a gas price client with fixed gas price from config
+	maxFeePerGasStr := pldtypes.Uint64ToUint256(10000000000).HexString0xPrefix()
+	maxPriorityFeePerGasStr := pldtypes.Uint64ToUint256(1000000000).HexString0xPrefix()
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice: &pldconf.FixedGasPricing{
-			MaxFeePerGas:         pldtypes.Uint64ToUint256(10000000000), // 10 Gwei
-			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1000000000),  // 1 Gwei
+			MaxFeePerGas:         &maxFeePerGasStr,
+			MaxPriorityFeePerGas: &maxPriorityFeePerGasStr,
 		},
 		IncreasePercentage: confutil.P(10),
 	}

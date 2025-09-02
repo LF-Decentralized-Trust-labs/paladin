@@ -346,10 +346,24 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 		return errors.New(errMsg)
 	}
 
+	if hGpc.conf.MaxPriorityFeePerGasCap != nil {
+		maxPriorityFeePerGasCap, err := pldtypes.ParseHexUint256(ctx, *hGpc.conf.MaxPriorityFeePerGasCap)
+		if err != nil {
+			return err
+		}
+		hGpc.maxPriorityFeePerGasCap = maxPriorityFeePerGasCap
+	}
+
+	if hGpc.conf.MaxFeePerGasCap != nil {
+		maxFeePerGasCap, err := pldtypes.ParseHexUint256(ctx, *hGpc.conf.MaxFeePerGasCap)
+		if err != nil {
+			return err
+		}
+		hGpc.maxFeePerGasCap = maxFeePerGasCap
+	}
+
 	hGpc.priorityFeePercentile = confutil.Int(hGpc.conf.EthFeeHistory.PriorityFeePercentile, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.PriorityFeePercentile)
 	hGpc.historyBlockCount = confutil.Int(hGpc.conf.EthFeeHistory.HistoryBlockCount, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.HistoryBlockCount)
-	hGpc.maxPriorityFeePerGasCap = hGpc.conf.MaxPriorityFeePerGasCap
-	hGpc.maxFeePerGasCap = hGpc.conf.MaxFeePerGasCap
 	hGpc.baseFeeBufferFactor = confutil.Int(hGpc.conf.EthFeeHistory.BaseFeeBufferFactor, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.BaseFeeBufferFactor)
 	hGpc.gasPriceIncreasePercent = confutil.Int(hGpc.conf.IncreasePercentage, *pldconf.PublicTxManagerDefaults.GasPrice.IncreasePercentage)
 	hGpc.ethFeeHistoryCacheEnabled = confutil.Bool(hGpc.conf.EthFeeHistory.Cache.Enabled, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.Cache.Enabled)
@@ -360,8 +374,8 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 			return err
 		}
 		hGpc.fixedGasPrice = fixedGasPrice
-		if (hGpc.fixedGasPrice.MaxFeePerGas != nil && hGpc.fixedGasPrice.MaxFeePerGas.Int().Sign() == 0) &&
-			(hGpc.fixedGasPrice.MaxPriorityFeePerGas != nil && hGpc.fixedGasPrice.MaxPriorityFeePerGas.Int().Sign() == 0) {
+		if (hGpc.fixedGasPrice != nil && hGpc.fixedGasPrice.MaxFeePerGas != nil && hGpc.fixedGasPrice.MaxFeePerGas.Int().Sign() == 0) &&
+			(hGpc.fixedGasPrice != nil && hGpc.fixedGasPrice.MaxPriorityFeePerGas != nil && hGpc.fixedGasPrice.MaxPriorityFeePerGas.Int().Sign() == 0) {
 			hGpc.hasZeroGasPrice = true
 		}
 	}
@@ -412,11 +426,21 @@ func mapConfigToAPIGasPricing(ctx context.Context, config *pldconf.FixedGasPrici
 			log.L(ctx).Error(errMsg)
 			return nil, errors.New(errMsg)
 		}
+		return nil, nil
+	}
+
+	maxFeePerGas, err := pldtypes.ParseHexUint256(ctx, *config.MaxFeePerGas)
+	if err != nil {
+		return nil, err
+	}
+	maxPriorityFeePerGas, err := pldtypes.ParseHexUint256(ctx, *config.MaxPriorityFeePerGas)
+	if err != nil {
+		return nil, err
 	}
 
 	// Both fields are set, create valid API gas pricing object
 	return &pldapi.PublicTxGasPricing{
-		MaxFeePerGas:         config.MaxFeePerGas,
-		MaxPriorityFeePerGas: config.MaxPriorityFeePerGas,
+		MaxFeePerGas:         maxFeePerGas,
+		MaxPriorityFeePerGas: maxPriorityFeePerGas,
 	}, nil
 }
