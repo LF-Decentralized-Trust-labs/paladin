@@ -39,38 +39,44 @@ type GasPriceClient interface {
 	Start(ctx context.Context, ethClient ethclient.EthClient)
 }
 
-// The hybrid gas price client handles fixed gas pricing from configuration
+// The hybrid gas price client handles fixed gas pricing from configuration or on a transaction
+// as well as dynamic gas pricing using eth_feeHistory.
+
 // An important implementation details for the functions on this struct is that if they are passed a
 // pointer to a gas pricing struct, they never change the original struct, but instead return a new one.
-// This means that is is safe to pass "fixed" prices to it.
+// This means that is is safe to pass "fixed" prices to it without them being unintentionally changed
+// for future transactions.
 type HybridGasPriceClient struct {
 	hasZeroGasPrice bool
 	fixedGasPrice   *pldapi.PublicTxGasPricing
 	ethClient       ethclient.EthClient
 
 	conf *pldconf.GasPriceConfig
-	// Dynamic gas pricing configuration (always set with defaults)
-	percentile              int
-	historyBlockCount       int
+
 	maxPriorityFeePerGasCap *pldtypes.HexUint256
 	maxFeePerGasCap         *pldtypes.HexUint256
-	baseFeeBufferFactor     int
-	gasPriceIncreasePercent int
-	cacheEnabled            bool
 
-	// Cache for dynamic gas pricing results
-	dynamicGasPriceCache cache.Cache[string, *pldapi.PublicTxGasPricing]
+	gasPriceIncreasePercent int
+
+	// Eth fee history gas pricing configuration (always set with defaults so this works as a fallback option)
+	percentile                int
+	historyBlockCount         int
+	baseFeeBufferFactor       int
+	ethFeeHistoryCacheEnabled bool
+
+	// Cache for eth fee history gas pricing results
+	ethFeeHistoryGasPriceCache cache.Cache[string, *pldapi.PublicTxGasPricing]
 }
 
 func (hGpc *HybridGasPriceClient) HasZeroGasPrice(ctx context.Context) bool {
 	return hGpc.hasZeroGasPrice
 }
 
-// estimateEip1559Fees calculates optimal maxFeePerGas and maxPriorityFeePerGas using eth_feeHistory
-func (hGpc *HybridGasPriceClient) estimateEip1559Fees(ctx context.Context) (*pldapi.PublicTxGasPricing, error) {
+// estimateEIP1559Fees calculates optimal maxFeePerGas and maxPriorityFeePerGas using eth_feeHistory
+func (hGpc *HybridGasPriceClient) estimateEIP1559Fees(ctx context.Context) (*pldapi.PublicTxGasPricing, error) {
 	// Check if we have valid cached results
-	if hGpc.dynamicGasPriceCache != nil {
-		if cached, found := hGpc.dynamicGasPriceCache.Get("dynamic_gas_pricing"); found {
+	if hGpc.ethFeeHistoryGasPriceCache != nil {
+		if cached, found := hGpc.ethFeeHistoryGasPriceCache.Get("eth_feeHistory_gas_pricing"); found {
 			return cached, nil
 		}
 	}
@@ -135,7 +141,7 @@ func (hGpc *HybridGasPriceClient) estimateEip1559Fees(ctx context.Context) (*pld
 	// When the cache is enabled, this base fee will be used for all subsequent transactions until DeleteCache is called.
 	// This is fine for chains where the base fee stays relatively stable since the baseFeeBufferFactor gives room for
 	// potential increases, but for chains where the base fee is volatile it would be better to disable the cache.
-	// Ideally we would have a cache with a configurable TTL.
+	// Ideally we would have a cache with a configurable TTL or which self refreshed after every N blocks
 	nextBlockBaseFee := feeHistory.BaseFeePerGas[len(feeHistory.BaseFeePerGas)-1].Int()
 
 	// Create a buffer by multiplying the base fee by the configured factor to handle potential increases
@@ -158,9 +164,9 @@ func (hGpc *HybridGasPriceClient) estimateEip1559Fees(ctx context.Context) (*pld
 	}
 
 	// Cache the results if caching is enabled
-	if hGpc.cacheEnabled {
+	if hGpc.ethFeeHistoryCacheEnabled {
 		// Store in cache
-		hGpc.dynamicGasPriceCache.Set("dynamic_gas_pricing", result)
+		hGpc.ethFeeHistoryGasPriceCache.Set("eth_feeHistory_gas_pricing", result)
 	}
 
 	return result, nil
@@ -229,12 +235,15 @@ func (hGpc *HybridGasPriceClient) capGasPricing(ctx context.Context, gasPricing 
 	return result
 }
 
+// calculateNewGasPrice ensures that if the gas price is always
+// * at least the previous gas price
+// * if it has been increased that it has increased by at least the configured percentage
+// * if the transaction was previously underpriced, that it has increased by at least the configured percentage
+//
+// The comparisons to do this are complicated by the fact that we are actually comparing two figures and need to ensure that
+// if one has increased from the previous amount, then what we use on the next submission represents the minimum percentage
+// increase on both values.
 func (hGpc *HybridGasPriceClient) calculateNewGasPrice(previouslySubmittedGPO *pldapi.PublicTxGasPricing, retrievedGPO *pldapi.PublicTxGasPricing, underpriced bool) *pldapi.PublicTxGasPricing {
-	// The general principle: if we have a previously submitted gas price is that we always use the higher of the retrieved and previously
-	// submitted gas prices.
-	// This is complicated by the fact that we are actually comparing two figures and need to ensure that if one has increased from
-	// the previous amount, then what we use on the next submission represents the minimum percentage on both values.
-
 	// if we've never submitted a gas price for this transaction then we can just return the retrieved gas price as is
 	if previouslySubmittedGPO == nil || previouslySubmittedGPO.MaxFeePerGas == nil || previouslySubmittedGPO.MaxPriorityFeePerGas == nil {
 		return retrievedGPO
@@ -304,7 +313,7 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 			hGpc.DeleteCache(ctx)
 		}
 		var err error
-		gpo, err = hGpc.estimateEip1559Fees(ctx)
+		gpo, err = hGpc.estimateEIP1559Fees(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -324,8 +333,8 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 }
 
 func (hGpc *HybridGasPriceClient) DeleteCache(ctx context.Context) {
-	if hGpc.dynamicGasPriceCache != nil {
-		hGpc.dynamicGasPriceCache.Delete("dynamic_gas_pricing")
+	if hGpc.ethFeeHistoryGasPriceCache != nil {
+		hGpc.ethFeeHistoryGasPriceCache.Delete("eth_feeHistory_gas_pricing")
 	}
 }
 
@@ -343,7 +352,7 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 	hGpc.maxFeePerGasCap = hGpc.conf.MaxFeePerGasCap
 	hGpc.baseFeeBufferFactor = confutil.Int(hGpc.conf.EthFeeHistory.BaseFeeBufferFactor, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.BaseFeeBufferFactor)
 	hGpc.gasPriceIncreasePercent = confutil.Int(hGpc.conf.IncreasePercentage, *pldconf.PublicTxManagerDefaults.GasPrice.IncreasePercentage)
-	hGpc.cacheEnabled = confutil.Bool(hGpc.conf.EthFeeHistory.Cache.Enabled, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.Cache.Enabled)
+	hGpc.ethFeeHistoryCacheEnabled = confutil.Bool(hGpc.conf.EthFeeHistory.Cache.Enabled, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.Cache.Enabled)
 
 	if hGpc.conf.FixedGasPrice != nil {
 		fixedGasPrice, err := mapConfigToAPIGasPricing(ctx, hGpc.conf.FixedGasPrice)
@@ -357,9 +366,9 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 		}
 	}
 
-	if hGpc.cacheEnabled {
+	if hGpc.ethFeeHistoryCacheEnabled {
 		hardcodedCacheConfig := &pldconf.CacheConfig{Capacity: confutil.P(1)} // we only cache one result so hardcode the capacity
-		hGpc.dynamicGasPriceCache = cache.NewCache[string, *pldapi.PublicTxGasPricing](hardcodedCacheConfig, hardcodedCacheConfig)
+		hGpc.ethFeeHistoryGasPriceCache = cache.NewCache[string, *pldapi.PublicTxGasPricing](hardcodedCacheConfig, hardcodedCacheConfig)
 	}
 	return nil
 }

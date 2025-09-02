@@ -88,7 +88,7 @@ func TestHasZeroGasPrice(t *testing.T) {
 	assert.False(t, hgc.HasZeroGasPrice(ctx))
 }
 
-// Test helpers for dynamic gas pricing
+// Test helpers for eth_feeHistory gas pricing
 func createMockFeeHistoryResult(blockCount int, baseFeeWei uint64, tipWei uint64) *ethclient.FeeHistoryResult {
 	baseFees := make([]pldtypes.HexUint256, blockCount)
 	rewards := make([][]pldtypes.HexUint256, blockCount)
@@ -106,14 +106,14 @@ func createMockFeeHistoryResult(blockCount int, baseFeeWei uint64, tipWei uint64
 	}
 }
 
-func TestDynamicGasPricingBasic(t *testing.T) {
+func TestEthFeeHistoryGasPricingBasic(t *testing.T) {
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice: nil,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:       confutil.P(85),
 			HistoryBlockCount:   confutil.P(20),
 			BaseFeeBufferFactor: confutil.P(2),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -138,14 +138,14 @@ func TestDynamicGasPricingBasic(t *testing.T) {
 	mockEthClient.AssertExpectations(t)
 }
 
-func TestDynamicGasPricingWithCustomConfig(t *testing.T) {
+func TestEthFeeHistoryGasPricingWithCustomConfig(t *testing.T) {
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice: nil,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:       confutil.P(75), // Custom percentile
 			HistoryBlockCount:   confutil.P(10), // Custom block count
 			BaseFeeBufferFactor: confutil.P(3),  // Custom buffer factor
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -170,7 +170,7 @@ func TestDynamicGasPricingWithCustomConfig(t *testing.T) {
 	mockEthClient.AssertExpectations(t)
 }
 
-func TestDynamicGasPricingWithPriorityFeeCap(t *testing.T) {
+func TestEthFeeHistoryGasPricingWithPriorityFeeCap(t *testing.T) {
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice:           nil,
 		MaxPriorityFeePerGasCap: pldtypes.Uint64ToUint256(1000000000),  // 1 Gwei cap
@@ -178,7 +178,7 @@ func TestDynamicGasPricingWithPriorityFeeCap(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -203,13 +203,13 @@ func TestDynamicGasPricingWithPriorityFeeCap(t *testing.T) {
 	mockEthClient.AssertExpectations(t)
 }
 
-func TestDynamicGasPricingFallbackTo1Gwei(t *testing.T) {
+func TestEthFeeHistoryGasPricingFallbackTo1Gwei(t *testing.T) {
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice: nil,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -239,14 +239,14 @@ func TestDynamicGasPricingFallbackTo1Gwei(t *testing.T) {
 	mockEthClient.AssertExpectations(t)
 }
 
-func TestDynamicGasPricingFallbackWithCap(t *testing.T) {
+func TestEthFeeHistoryGasPricingFallbackWithCap(t *testing.T) {
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice:           nil,
 		MaxPriorityFeePerGasCap: pldtypes.Uint64ToUint256(500000000), // 0.5 Gwei cap
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -276,13 +276,13 @@ func TestDynamicGasPricingFallbackWithCap(t *testing.T) {
 	mockEthClient.AssertExpectations(t)
 }
 
-func TestDynamicGasPricingCaching(t *testing.T) {
+func TestEthFeeHistoryGasPricingCaching(t *testing.T) {
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice: nil,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -310,13 +310,13 @@ func TestDynamicGasPricingCaching(t *testing.T) {
 	mockEthClient.AssertExpectations(t)
 }
 
-func TestDynamicGasPricingCacheDisabled(t *testing.T) {
+func TestEthFeeHistoryGasPricingCacheDisabled(t *testing.T) {
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice: nil,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(false),
 			},
 		},
@@ -340,13 +340,13 @@ func TestDynamicGasPricingCacheDisabled(t *testing.T) {
 	mockEthClient.AssertExpectations(t)
 }
 
-func TestDynamicGasPricingEmptyFeeHistory(t *testing.T) {
+func TestEthFeeHistoryGasPricingEmptyFeeHistory(t *testing.T) {
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice: nil,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -370,13 +370,13 @@ func TestDynamicGasPricingEmptyFeeHistory(t *testing.T) {
 	mockEthClient.AssertExpectations(t)
 }
 
-func TestDynamicGasPricingRPCError(t *testing.T) {
+func TestEthFeeHistoryGasPricingRPCError(t *testing.T) {
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice: nil,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -400,7 +400,7 @@ func TestDeleteCache(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -435,7 +435,7 @@ func TestInitValidation(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(150), // Invalid: > 100
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -471,7 +471,7 @@ func TestInitWithDefaults(t *testing.T) {
 	assert.Equal(t, 20, hgc.historyBlockCount)
 	assert.Equal(t, 1, hgc.baseFeeBufferFactor)
 	assert.Equal(t, 10, hgc.gasPriceIncreasePercent)
-	assert.True(t, hgc.cacheEnabled)
+	assert.True(t, hgc.ethFeeHistoryCacheEnabled)
 }
 
 // mapConfigToAPIGasPricing edge cases
@@ -522,7 +522,7 @@ func TestStartWithNilGasPriceResponse(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -551,7 +551,7 @@ func TestStartWithGasPriceError(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -583,7 +583,7 @@ func TestStartSkipsGasPriceWhenFixedPriceSet(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -687,7 +687,7 @@ func TestCapGasPricing(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -786,7 +786,7 @@ func TestCapGasPricing(t *testing.T) {
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
 			// No caps configured
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -815,7 +815,7 @@ func TestCalculateNewGasPrice(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -930,7 +930,7 @@ func TestGetGasPriceObjectWithTxFixedGasPrice(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -975,7 +975,7 @@ func TestGetGasPriceObjectWithPreviouslySubmittedGPO(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			TipPercentile:     confutil.P(85),
 			HistoryBlockCount: confutil.P(20),
-			Cache: pldconf.DynamicGasPricingCacheConfig{
+			Cache: pldconf.EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -983,7 +983,7 @@ func TestGetGasPriceObjectWithPreviouslySubmittedGPO(t *testing.T) {
 
 	_, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
 
-	// Mock fee history response for dynamic pricing
+	// Mock fee history response for eth_feeHistory pricing
 	mockFeeHistoryResult := createMockFeeHistoryResult(20, 20000000000, 1500000000) // 20 Gwei base fee, 1.5 Gwei tip
 	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil)
 
@@ -991,7 +991,7 @@ func TestGetGasPriceObjectWithPreviouslySubmittedGPO(t *testing.T) {
 	result, err := hgc.GetGasPriceObject(ctx, nil, nil, false)
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	// Should return dynamic gas pricing result
+	// Should return eth_feeHistory gas pricing result
 	expectedMaxFee := int64(1*20000000000 + 1500000000) // (1 * 20 Gwei) + 1.5 Gwei
 	expectedMaxPriorityFee := int64(1500000000)         // 1.5 Gwei
 	assert.Equal(t, expectedMaxFee, result.MaxFeePerGas.Int().Int64())
@@ -1009,7 +1009,7 @@ func TestGetGasPriceObjectWithPreviouslySubmittedGPO(t *testing.T) {
 	result, err = hgc.GetGasPriceObject(ctx, nil, previouslySubmittedGPO, true)
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	// Should return increased dynamic gas pricing result
+	// Should return increased eth_feeHistory gas pricing result
 	// Since retrieved values are higher than previous with percentage increase applied, should use retrieved values
 	assert.Equal(t, expectedMaxFee, result.MaxFeePerGas.Int().Int64())
 	assert.Equal(t, expectedMaxPriorityFee, result.MaxPriorityFeePerGas.Int().Int64())

@@ -346,7 +346,7 @@ func (it *inFlightTransactionStageController) processSigningStageOutput(ctx cont
 	// first check whether we've already completed the action and just waiting for required persistence to go to the next stage
 	if rsIn.PersistenceOutput != nil {
 		if rsc.StageOutput.SignOutput.Err != nil {
-			// wait for the stale transaction timeout to re-trigger the signing
+			// wait for the stage retry timeout to re-trigger the signing
 			rsc.StageErrored = true
 		}
 		if rsIn.PersistenceOutput.PersistenceError == nil && !rsc.StageErrored {
@@ -417,7 +417,7 @@ func (it *inFlightTransactionStageController) processSubmittingStageOutput(ctx c
 			if rsc.StageOutput.SubmitOutput.ErrorReason == string(ethclient.ErrorReasonInsufficientFunds) {
 				it.balanceManager.NotifyRetrieveAddressBalance(ctx, it.signingAddress)
 			}
-			// wait for the stale transaction timeout to trigger a new stage run
+			// wait for the stage retry timeout to trigger a new stage run
 			rsc.StageErrored = true
 		} else if stageOutput.PersistenceOutput.PersistenceError == nil {
 			// we've submitted and persisted successfully, it's safe to move to the next stage
@@ -511,55 +511,60 @@ func (it *inFlightTransactionStageController) processStatusUpdateStageOutput(ctx
 }
 
 func (it *inFlightTransactionStageController) startNewStage(ctx context.Context, cost *big.Int) {
-	// first check whether the current transaction is before the confirmed nonce
 	if it.newStatus != nil && !it.stateManager.IsReadyToExit() && *it.newStatus != it.stateManager.GetInFlightStatus() { // first apply any status update that's required
 		log.L(ctx).Debugf("Transaction with ID %s entering status update, current status: %s, target status: %s", it.stateManager.GetSignerNonce(), it.stateManager.GetInFlightStatus(), *it.newStatus)
 		it.TriggerNewStageRun(ctx, InFlightTxStageStatusUpdate, BaseTxSubStatusReceived)
-	} else if it.stateManager.IsReadyToExit() {
-		// then calculate the latest stage based on the managed transaction to kick off the next stage
-		// if there isn't any running context and the transaction status is no longer in pending
-		// we can wait for the transaction orchestrator to remove it from the in-flight transaction queue. It's either paused or completed
+		return
+	}
+
+	if it.stateManager.IsReadyToExit() {
 		log.L(ctx).Debugf("Transaction with ID %s is waiting for removal in status: %s.", it.stateManager.GetSignerNonce(), it.stateManager.GetInFlightStatus())
-	} else if it.stateManager.GetGasPriceObject() == nil {
-		// no gas price fetched, go and fetch gas price
+		return
+	}
+
+	if it.stateManager.GetGasPriceObject() == nil {
 		log.L(ctx).Debugf("Transaction with ID %s entering retrieve gas price as no gas price available.", it.stateManager.GetSignerNonce())
 		it.TriggerNewStageRun(ctx, InFlightTxStageRetrieveGasPrice, BaseTxSubStatusReceived)
-	} else if it.stateManager.GetTransactionHash() == nil {
-		// Ff we do not have a transaction hash recorded, it means that the latest state of this transaction has not yet been successfully
+		return
+	}
+
+	if it.stateManager.GetTransactionHash() == nil {
+		// If we do not have a transaction hash recorded, it means that the latest state of this transaction has not yet been successfully
 		// submitted to the chain- we need to sign and submit the transaction. The submission stage is never initiated in this function because
 		// it required the transient signature which we do not persist to be passed directly between the signing and submission stages
 		if it.stateManager.CanSubmit(ctx, cost, it.stateManager.GetSignerNonce()) {
-			// no transaction hash, do signing and submission
 			log.L(ctx).Debugf("Transaction with ID %s entering signing stage as no transaction hash recorded.", it.stateManager.GetSignerNonce())
 			it.TriggerNewStageRun(ctx, InFlightTxStageSigning, BaseTxSubStatusReceived)
-		} else {
-			log.L(ctx).Debugf("Transaction with ID %s not progressing to signing stage- not currently able to submit.", it.stateManager.GetSignerNonce())
+			return
 		}
-	} else {
-		// We have a transaction hash recorded from our latest successful submission- this means we are now waiting for the transaction
-		// to be confirmed.
-		// The resubmit interval might be have been exceeded for a number of reasons. Not all of these necessitate a resubmission,
-		// but since we can't detect what the reason is, we will always return to the retrieve gas price stage and ensure we are
-		// resubmitting with the most up-to-date gas price.
-		// a) a transaction from the same signing address is unable to be mined so is blocking all subsequent transactions
-		// b) the transaction is has been mined but the block indexer is not yet aware of it - this is a common catch up problem
-		//    resubmitting is harmless but will result in a nonce too low error
-		// c) the transaction doesn't have a sufficiently high tip to be attractive to miners. Going through gas price retrieval
-		//    again when we're using dynamic gas pricing will tell us whether for our chosen tip percentile, we need to increase it
-		//    based on current conditions
-		// d) the resubmit interval is lower than the block period on the chain
-		// e) the transaction has been submitted to a node which has since "lost" the transaction- this isn't correct behaviour
-		//    from the node but it is flaky behaviour that we have observed and should guard against
-		lastSubmitTime := it.stateManager.GetLastSubmitTime()
-		if lastSubmitTime != nil && time.Since(lastSubmitTime.Time()) > it.resubmitInterval {
-			log.L(ctx).Debugf("Transaction with ID %s entering retrieve gas price as exceeded resubmit interval of %s.", it.stateManager.GetSignerNonce(), it.resubmitInterval.String())
-			it.TriggerNewStageRun(ctx, InFlightTxStageRetrieveGasPrice, BaseTxSubStatusStale)
-		} else {
-			// check and track the existing transaction hash- tracking is done in the block indexer so there is nothing to do here
-			log.L(ctx).Debugf("Transaction with ID %s entering tracking stage", it.stateManager.GetSignerNonce())
-		}
-
+		log.L(ctx).Warnf("Transaction with ID %s not progressing to signing stage- not currently able to submit.", it.stateManager.GetSignerNonce())
+		return
 	}
+
+	// If we reach this point then we have a transaction hash recorded from our latest successful submission- this means we
+	// are now waiting for the transaction to be confirmed.
+	//
+	// The resubmit interval might be have been exceeded for a number of reasons. Not all of these necessitate a resubmission,
+	// but since we can't detect what the reason is, we will always return to the retrieve gas price stage and ensure we are
+	// resubmitting with the most up-to-date gas price.
+	// a) a transaction from the same signing address is unable to be mined so is blocking all subsequent transactions
+	// b) the transaction is has been mined but the block indexer is not yet aware of it - this is a common catch up problem
+	//    resubmitting is harmless but will result in a nonce too low error
+	// c) the transaction doesn't have a sufficiently high tip to be attractive to miners. Going through gas price retrieval
+	//    again when we're using dynamic gas pricing will tell us whether for our chosen tip percentile, we need to increase it
+	//    based on current conditions
+	// d) the resubmit interval is lower than the block period on the chain
+	// e) the transaction has been submitted to a node which has since "lost" the transaction- this isn't correct behaviour
+	//    from the node but it is flaky behaviour that we have observed and should guard against
+	lastSubmitTime := it.stateManager.GetLastSubmitTime()
+	if lastSubmitTime != nil && time.Since(lastSubmitTime.Time()) > it.resubmitInterval {
+		log.L(ctx).Debugf("Transaction with ID %s entering retrieve gas price as exceeded resubmit interval of %s.", it.stateManager.GetSignerNonce(), it.resubmitInterval.String())
+		it.TriggerNewStageRun(ctx, InFlightTxStageRetrieveGasPrice, BaseTxSubStatusStale)
+		return
+	}
+	// check and track the existing transaction hash- tracking is done in the block indexer so there is nothing to do here
+	log.L(ctx).Debugf("Transaction with ID %s entering tracking stage", it.stateManager.GetSignerNonce())
+	return
 }
 
 func calculateGasRequiredForTransaction(ctx context.Context, gpo *pldapi.PublicTxGasPricing, gasLimit uint64) (gasRequired *big.Int, err error) {

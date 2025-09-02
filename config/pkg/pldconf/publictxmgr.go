@@ -82,7 +82,7 @@ var PublicTxManagerDefaults = &PublicTxManagerConfig{
 			TipPercentile:       confutil.P(85), // Default to 85th percentile for getting transactions onto chain as easily as possible
 			HistoryBlockCount:   confutil.P(20), // Default to 20 blocks for fee history
 			BaseFeeBufferFactor: confutil.P(1),  // Default to 1x buffer for base fee
-			Cache: DynamicGasPricingCacheConfig{
+			Cache: EthFeeHistoryCacheConfig{
 				Enabled: confutil.P(true), // Caching enabled by default
 			},
 		},
@@ -140,11 +140,11 @@ type EthFeeHistoryConfig struct {
 	BaseFeeBufferFactor *int `json:"baseFeeBufferFactor"`
 
 	// Cache configuration for fee history results
-	Cache DynamicGasPricingCacheConfig `json:"cache"`
+	Cache EthFeeHistoryCacheConfig `json:"cache"`
 }
 
-// DynamicGasPricingCacheConfig represents cache configuration for dynamic gas pricing
-type DynamicGasPricingCacheConfig struct {
+// EthFeeHistoryCacheConfig represents cache configuration for dynamic gas pricing
+type EthFeeHistoryCacheConfig struct {
 	// Whether caching is enabled
 	Enabled *bool `json:"enabled"`
 }
