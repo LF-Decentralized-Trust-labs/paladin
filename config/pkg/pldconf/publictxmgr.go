@@ -79,7 +79,7 @@ var PublicTxManagerDefaults = &PublicTxManagerConfig{
 		MaxFeePerGasCap:         nil,            // No cap by default
 		FixedGasPrice:           nil,
 		EthFeeHistory: EthFeeHistoryConfig{
-			TipPercentile:       confutil.P(85), // Default to 85th percentile for good balance of cost vs speed
+			TipPercentile:       confutil.P(85), // Default to 85th percentile for getting transactions onto chain as easily as possible
 			HistoryBlockCount:   confutil.P(20), // Default to 20 blocks for fee history
 			BaseFeeBufferFactor: confutil.P(1),  // Default to 1x buffer for base fee
 			Cache: DynamicGasPricingCacheConfig{

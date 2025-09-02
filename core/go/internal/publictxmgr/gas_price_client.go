@@ -394,12 +394,12 @@ func mapConfigToAPIGasPricing(ctx context.Context, config *pldconf.FixedGasPrici
 	// Both fields must be set for valid fixed gas pricing
 	if config.MaxFeePerGas == nil || config.MaxPriorityFeePerGas == nil {
 		if config.MaxFeePerGas != nil {
-			errMsg := "Fixed gas pricing configuration incomplete: maxFeePerGas is set but maxPriorityFeePerGas is missing. Ignoring maxFeePerGas."
+			errMsg := "fixed gas pricing configuration incomplete: maxFeePerGas is set but maxPriorityFeePerGas is missing- ignoring maxFeePerGas"
 			log.L(ctx).Error(errMsg)
 			return nil, errors.New(errMsg)
 		}
 		if config.MaxPriorityFeePerGas != nil {
-			errMsg := "Fixed gas pricing configuration incomplete: maxPriorityFeePerGas is set but maxFeePerGas is missing. Ignoring maxPriorityFeePerGas."
+			errMsg := "fixed gas pricing configuration incomplete: maxPriorityFeePerGas is set but maxFeePerGas is missing- ignoring maxPriorityFeePerGas"
 			log.L(ctx).Error(errMsg)
 			return nil, errors.New(errMsg)
 		}
