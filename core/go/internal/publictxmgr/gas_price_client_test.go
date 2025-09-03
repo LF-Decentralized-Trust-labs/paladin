@@ -115,7 +115,7 @@ func TestEthFeeHistoryGasPricingBasic(t *testing.T) {
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
 			BaseFeeBufferFactor:   confutil.P(2),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -147,7 +147,7 @@ func TestEthFeeHistoryGasPricingWithCustomConfig(t *testing.T) {
 			PriorityFeePercentile: confutil.P(75), // Custom percentile
 			HistoryBlockCount:     confutil.P(10), // Custom block count
 			BaseFeeBufferFactor:   confutil.P(3),  // Custom buffer factor
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -182,7 +182,7 @@ func TestEthFeeHistoryGasPricingWithPriorityFeeCap(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -213,7 +213,7 @@ func TestEthFeeHistoryGasPricingFallbackTo1Gwei(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -251,7 +251,7 @@ func TestEthFeeHistoryGasPricingFallbackWithCap(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -287,7 +287,7 @@ func TestEthFeeHistoryGasPricingCaching(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -321,7 +321,7 @@ func TestEthFeeHistoryGasPricingCacheDisabled(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(false),
 			},
 		},
@@ -351,7 +351,7 @@ func TestEthFeeHistoryGasPricingEmptyFeeHistory(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -381,7 +381,7 @@ func TestEthFeeHistoryGasPricingRPCError(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -405,7 +405,7 @@ func TestDeleteCache(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -440,7 +440,7 @@ func TestInitValidation(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(150), // Invalid: > 100
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -477,7 +477,8 @@ func TestInitWithDefaults(t *testing.T) {
 	assert.Equal(t, 20, hgc.historyBlockCount)
 	assert.Equal(t, 1, hgc.baseFeeBufferFactor)
 	assert.Equal(t, 10, hgc.gasPriceIncreasePercent)
-	assert.True(t, hgc.ethFeeHistoryCacheEnabled)
+	// Cache should be enabled for eth_feeHistory method (default)
+	assert.NotNil(t, hgc.gasPriceCache)
 }
 
 // mapConfigToAPIGasPricing edge cases
@@ -528,7 +529,7 @@ func TestStartWithNilGasPriceResponse(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -557,7 +558,7 @@ func TestStartWithGasPriceError(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -592,7 +593,7 @@ func TestStartSkipsGasPriceWhenFixedPriceSet(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -698,7 +699,7 @@ func TestCapGasPricing(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -797,7 +798,7 @@ func TestCapGasPricing(t *testing.T) {
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
 			// No caps configured
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -826,7 +827,7 @@ func TestCalculateNewGasPrice(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -943,7 +944,7 @@ func TestGetGasPriceObjectWithTxFixedGasPrice(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},
@@ -988,7 +989,7 @@ func TestGetGasPriceObjectWithPreviouslySubmittedGPO(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
+			Cache: pldconf.GasPriceCacheConfig{
 				Enabled: confutil.P(true),
 			},
 		},

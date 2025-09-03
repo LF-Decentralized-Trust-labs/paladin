@@ -16,19 +16,24 @@
 package publictxmgr
 
 import (
+	"bytes"
 	"context"
-	"errors"
-	"fmt"
+	"encoding/json"
 	"math/big"
+	"text/template"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/cache"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldresty"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/go-resty/resty/v2"
 )
 
 type GasPriceClient interface {
@@ -58,14 +63,18 @@ type HybridGasPriceClient struct {
 
 	gasPriceIncreasePercent int
 
-	// Eth fee history gas pricing configuration (always set with defaults so this works as a fallback option)
-	priorityFeePercentile     int
-	historyBlockCount         int
-	baseFeeBufferFactor       int
-	ethFeeHistoryCacheEnabled bool
+	// Gas oracle HTTP client for external gas price retrieval
+	gasOracleHTTPClient *resty.Client
+	gasOracleMethod     string
+	gasOracleTemplate   *template.Template
 
-	// Cache for eth fee history gas pricing results
-	ethFeeHistoryGasPriceCache cache.Cache[string, *pldapi.PublicTxGasPricing]
+	// Eth fee history gas pricing configuration (always set with defaults so this works as a fallback option)
+	priorityFeePercentile int
+	historyBlockCount     int
+	baseFeeBufferFactor   int
+
+	// Cache for dynamic gas pricing results
+	gasPriceCache cache.Cache[string, *pldapi.PublicTxGasPricing]
 }
 
 func (hGpc *HybridGasPriceClient) HasZeroGasPrice(ctx context.Context) bool {
@@ -75,8 +84,8 @@ func (hGpc *HybridGasPriceClient) HasZeroGasPrice(ctx context.Context) bool {
 // estimateEIP1559Fees calculates optimal maxFeePerGas and maxPriorityFeePerGas using eth_feeHistory
 func (hGpc *HybridGasPriceClient) estimateEIP1559Fees(ctx context.Context) (*pldapi.PublicTxGasPricing, error) {
 	// Check if we have valid cached results
-	if hGpc.ethFeeHistoryGasPriceCache != nil {
-		if cached, found := hGpc.ethFeeHistoryGasPriceCache.Get("eth_feeHistory_gas_pricing"); found {
+	if hGpc.gasPriceCache != nil {
+		if cached, found := hGpc.gasPriceCache.Get("dynamic_gas_pricing"); found {
 			return cached, nil
 		}
 	}
@@ -88,14 +97,13 @@ func (hGpc *HybridGasPriceClient) estimateEIP1559Fees(ctx context.Context) (*pld
 	feeHistory, err := hGpc.ethClient.FeeHistory(ctx, hGpc.historyBlockCount, "latest", rewardPercentiles)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to fetch fee history: %+v", err)
-		return nil, err
+		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrFeeHistoryCallFailed, err)
 	}
 
 	if len(feeHistory.BaseFeePerGas) == 0 || len(feeHistory.Reward) == 0 {
-		errMsg := fmt.Sprintf("fee history returned empty data: BaseFeePerGas=%d, Reward=%d",
+		log.L(ctx).Errorf("Fee history returned empty data: len(baseFeePerGas)=%d, len(reward)=%d",
 			len(feeHistory.BaseFeePerGas), len(feeHistory.Reward))
-		log.L(ctx).Error(errMsg)
-		return nil, errors.New(errMsg)
+		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrFeeHistoryEmpty, len(feeHistory.BaseFeePerGas), len(feeHistory.Reward))
 	}
 
 	// Calculate maxPriorityFeePerGas (the tip)
@@ -164,12 +172,74 @@ func (hGpc *HybridGasPriceClient) estimateEIP1559Fees(ctx context.Context) (*pld
 	}
 
 	// Cache the results if caching is enabled
-	if hGpc.ethFeeHistoryCacheEnabled {
+	if hGpc.gasPriceCache != nil {
 		// Store in cache
-		hGpc.ethFeeHistoryGasPriceCache.Set("eth_feeHistory_gas_pricing", result)
+		hGpc.gasPriceCache.Set("dynamic_gas_pricing", result)
 	}
 
 	return result, nil
+}
+
+func (hGpc *HybridGasPriceClient) getGasPriceFromGasOracle(ctx context.Context) (*pldapi.PublicTxGasPricing, error) {
+	// Check if we have valid cached results
+	if hGpc.gasPriceCache != nil {
+		if cached, found := hGpc.gasPriceCache.Get("dynamic_gas_pricing"); found {
+			return cached, nil
+		}
+	}
+
+	// Make HTTP request to the gas oracle API
+	resp, err := hGpc.gasOracleHTTPClient.R().
+		SetContext(ctx).
+		Execute(hGpc.gasOracleMethod, "")
+	if err != nil {
+		log.L(ctx).Errorf("Failed to call gas oracle API: %+v", err)
+		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleAPICallFailed, err)
+	}
+
+	if !resp.IsSuccess() {
+		log.L(ctx).Errorf("Gas oracle API returned error status: %d %s", resp.StatusCode(), resp.String())
+		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleAPIErrorStatus, resp.StatusCode(), resp.String())
+	}
+
+	// Parse the response as JSON
+	// TODO AM: is this actually necessary or can the byte array be used directly? or as a string?
+	var responseData map[string]interface{}
+	if err := json.Unmarshal(resp.Body(), &responseData); err != nil {
+		log.L(ctx).Errorf("Failed to parse gas oracle API response as JSON: %+v", err)
+		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleResponseParseFailed, err)
+	}
+
+	// Apply the template to extract gas price data
+	var templateResult bytes.Buffer
+	if templateErr := hGpc.gasOracleTemplate.Execute(&templateResult, responseData); templateErr != nil {
+		log.L(ctx).Errorf("Failed to execute gas oracle template: %+v", templateErr)
+		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleTemplateExecuteFailed, templateErr)
+	}
+
+	// Parse the template result directly into PublicTxGasPricing
+	var gasPriceData pldapi.PublicTxGasPricing
+	if templateErr := json.Unmarshal(templateResult.Bytes(), &gasPriceData); templateErr != nil {
+		log.L(ctx).Errorf("Failed to parse template result as PublicTxGasPricing JSON: %+v", templateErr)
+		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleTemplateResultParseFailed, templateErr)
+	}
+
+	// Validate that we have the required fields
+	if gasPriceData.MaxFeePerGas == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleMaxFeePerGasMissing)
+	}
+
+	if gasPriceData.MaxPriorityFeePerGas == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleMaxPriorityFeePerGasMissing)
+	}
+
+	// Cache the results if caching is enabled
+	if hGpc.gasPriceCache != nil {
+		// Store in cache
+		hGpc.gasPriceCache.Set("dynamic_gas_pricing", &gasPriceData)
+	}
+
+	return &gasPriceData, nil
 }
 
 func (hGpc *HybridGasPriceClient) increaseGasPricingByPercentage(gasPricing *pldapi.PublicTxGasPricing, percentage int) *pldapi.PublicTxGasPricing {
@@ -287,7 +357,8 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 	// 1. zero gas price chain
 	// 2. transaction fixed gas price
 	// 3. fixed gas price
-	// 4. estimate EIP-1559 fees
+	// 4. gas oracle api
+	// 5. estimate EIP-1559 fees
 	if hGpc.hasZeroGasPrice {
 		// if zero gas price chain, return zero gas price without any kind of retrieval/estimation
 		// there's no validation that we can do on a zero gas price chain so just return right away
@@ -312,8 +383,13 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 		if underpriced {
 			hGpc.DeleteCache(ctx)
 		}
+
 		var err error
-		gpo, err = hGpc.estimateEIP1559Fees(ctx)
+		if hGpc.gasOracleHTTPClient != nil {
+			gpo, err = hGpc.getGasPriceFromGasOracle(ctx)
+		} else {
+			gpo, err = hGpc.estimateEIP1559Fees(ctx)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -333,19 +409,14 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 }
 
 func (hGpc *HybridGasPriceClient) DeleteCache(ctx context.Context) {
-	if hGpc.ethFeeHistoryGasPriceCache != nil {
-		hGpc.ethFeeHistoryGasPriceCache.Delete("eth_feeHistory_gas_pricing")
+	if hGpc.gasPriceCache != nil {
+		hGpc.gasPriceCache.Delete("dynamic_gas_pricing")
 	}
 }
 
 func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
-	if hGpc.conf.EthFeeHistory.PriorityFeePercentile != nil &&
-		(*hGpc.conf.EthFeeHistory.PriorityFeePercentile < 0 || *hGpc.conf.EthFeeHistory.PriorityFeePercentile > 100) {
-		errMsg := fmt.Sprintf("Invalid priority fee percentile: %d. Must be between 0 and 100", hGpc.priorityFeePercentile)
-		log.L(ctx).Error(errMsg)
-		return errors.New(errMsg)
-	}
-
+	// TODO AM: move the errors returned from this function to proper PD errors in the catalog
+	// config that is relevant to all gas price retrieval methods
 	if hGpc.conf.MaxPriorityFeePerGasCap != nil {
 		maxPriorityFeePerGasCap, err := pldtypes.ParseHexUint256(ctx, *hGpc.conf.MaxPriorityFeePerGasCap)
 		if err != nil {
@@ -362,28 +433,73 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 		hGpc.maxFeePerGasCap = maxFeePerGasCap
 	}
 
-	hGpc.priorityFeePercentile = confutil.Int(hGpc.conf.EthFeeHistory.PriorityFeePercentile, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.PriorityFeePercentile)
-	hGpc.historyBlockCount = confutil.Int(hGpc.conf.EthFeeHistory.HistoryBlockCount, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.HistoryBlockCount)
-	hGpc.baseFeeBufferFactor = confutil.Int(hGpc.conf.EthFeeHistory.BaseFeeBufferFactor, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.BaseFeeBufferFactor)
 	hGpc.gasPriceIncreasePercent = confutil.Int(hGpc.conf.IncreasePercentage, *pldconf.PublicTxManagerDefaults.GasPrice.IncreasePercentage)
-	hGpc.ethFeeHistoryCacheEnabled = confutil.Bool(hGpc.conf.EthFeeHistory.Cache.Enabled, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.Cache.Enabled)
 
+	// config that is specific to each gas price retrieval method
+
+	// fixed gas price config takes precendence
 	if hGpc.conf.FixedGasPrice != nil {
 		fixedGasPrice, err := mapConfigToAPIGasPricing(ctx, hGpc.conf.FixedGasPrice)
 		if err != nil {
 			return err
 		}
-		hGpc.fixedGasPrice = fixedGasPrice
-		if (hGpc.fixedGasPrice != nil && hGpc.fixedGasPrice.MaxFeePerGas != nil && hGpc.fixedGasPrice.MaxFeePerGas.Int().Sign() == 0) &&
-			(hGpc.fixedGasPrice != nil && hGpc.fixedGasPrice.MaxPriorityFeePerGas != nil && hGpc.fixedGasPrice.MaxPriorityFeePerGas.Int().Sign() == 0) {
-			hGpc.hasZeroGasPrice = true
+		// it will be nil if fixed gas price was set to an empty object in config- we consider this to be the same as not set
+		if fixedGasPrice != nil {
+			hGpc.fixedGasPrice = fixedGasPrice
+			if (hGpc.fixedGasPrice.MaxFeePerGas != nil && hGpc.fixedGasPrice.MaxFeePerGas.Int().Sign() == 0) &&
+				(hGpc.fixedGasPrice.MaxPriorityFeePerGas != nil && hGpc.fixedGasPrice.MaxPriorityFeePerGas.Int().Sign() == 0) {
+				hGpc.hasZeroGasPrice = true
+			}
+			return nil
 		}
 	}
 
-	if hGpc.ethFeeHistoryCacheEnabled {
-		hardcodedCacheConfig := &pldconf.CacheConfig{Capacity: confutil.P(1)} // we only cache one result so hardcode the capacity
-		hGpc.ethFeeHistoryGasPriceCache = cache.NewCache[string, *pldapi.PublicTxGasPricing](hardcodedCacheConfig, hardcodedCacheConfig)
+	var enableCache bool
+
+	// Gas oracle API config comes next in precedence
+	if hGpc.conf.GasOracleAPI != nil {
+		gasOracleClient, err := pldresty.New(ctx, &hGpc.conf.GasOracleAPI.HTTPClientConfig)
+		if err != nil {
+			log.L(ctx).Errorf("Failed to initialize gas oracle HTTP client: %+v", err)
+			return err
+		}
+		hGpc.gasOracleHTTPClient = gasOracleClient
+		hGpc.gasOracleMethod = confutil.StringNotEmpty(hGpc.conf.GasOracleAPI.Method, *pldconf.PublicTxManagerDefaults.GasPrice.GasOracleAPI.Method)
+
+		// Parse the template and return error if parsing fails
+		templateStr := hGpc.conf.GasOracleAPI.Template
+		if templateStr == "" {
+			log.L(ctx).Error("Gas oracle template is empty")
+			return i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleTemplateEmpty)
+		}
+		hGpc.gasOracleTemplate, err = template.New("gasOracle").Parse(templateStr)
+		if err != nil {
+			log.L(ctx).Errorf("Failed to parse gas oracle template: %+v", err)
+			return i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleTemplateParseFailed, err)
+		}
+
+		log.L(ctx).Infof("Initialized gas oracle HTTP client for URL: %s with method: %s", hGpc.conf.GasOracleAPI.URL, hGpc.gasOracleMethod)
+		enableCache = confutil.Bool(hGpc.conf.GasOracleAPI.Cache.Enabled, *pldconf.PublicTxManagerDefaults.GasPrice.GasOracleAPI.Cache.Enabled)
+	} else {
+		// finally eth_feeHistory estimation is used if no other method is configured
+		if hGpc.conf.EthFeeHistory.PriorityFeePercentile != nil &&
+			(*hGpc.conf.EthFeeHistory.PriorityFeePercentile < 0 || *hGpc.conf.EthFeeHistory.PriorityFeePercentile > 100) {
+			log.L(ctx).Errorf("Invalid priority fee percentile: %d. Must be between 0 and 100", *hGpc.conf.EthFeeHistory.PriorityFeePercentile)
+			return i18n.NewError(ctx, msgs.MsgPublicTxMgrInvalidPriorityFeePercentile, *hGpc.conf.EthFeeHistory.PriorityFeePercentile)
+		}
+
+		hGpc.priorityFeePercentile = confutil.Int(hGpc.conf.EthFeeHistory.PriorityFeePercentile, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.PriorityFeePercentile)
+		hGpc.historyBlockCount = confutil.Int(hGpc.conf.EthFeeHistory.HistoryBlockCount, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.HistoryBlockCount)
+		hGpc.baseFeeBufferFactor = confutil.Int(hGpc.conf.EthFeeHistory.BaseFeeBufferFactor, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.BaseFeeBufferFactor)
+		enableCache = confutil.Bool(hGpc.conf.EthFeeHistory.Cache.Enabled, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.Cache.Enabled)
 	}
+
+	// the same cache can be used for both eth_feeHistory and gas oracle because only one is enabled at a time
+	if enableCache {
+		hardcodedCacheConfig := &pldconf.CacheConfig{Capacity: confutil.P(1)} // we only cache one result so hardcode the capacity
+		hGpc.gasPriceCache = cache.NewCache[string, *pldapi.PublicTxGasPricing](hardcodedCacheConfig, hardcodedCacheConfig)
+	}
+
 	return nil
 }
 
@@ -417,14 +533,12 @@ func mapConfigToAPIGasPricing(ctx context.Context, config *pldconf.FixedGasPrici
 	// Both fields must be set for valid fixed gas pricing
 	if config.MaxFeePerGas == nil || config.MaxPriorityFeePerGas == nil {
 		if config.MaxFeePerGas != nil {
-			errMsg := "fixed gas pricing configuration incomplete: maxFeePerGas is set but maxPriorityFeePerGas is missing- ignoring maxFeePerGas"
-			log.L(ctx).Error(errMsg)
-			return nil, errors.New(errMsg)
+			log.L(ctx).Error("Incomplete fixed gas pricing configuration: maxFeePerGas is set but maxPriorityFeePerGas is missing")
+			return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrFixedGasPriceIncomplete, "maxPriorityFeePerGas")
 		}
 		if config.MaxPriorityFeePerGas != nil {
-			errMsg := "fixed gas pricing configuration incomplete: maxPriorityFeePerGas is set but maxFeePerGas is missing- ignoring maxPriorityFeePerGas"
-			log.L(ctx).Error(errMsg)
-			return nil, errors.New(errMsg)
+			log.L(ctx).Error("Incomplete fixed gas pricing configuration: maxPriorityFeePerGas is set but maxFeePerGas is missing")
+			return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrFixedGasPriceIncomplete, "maxFeePerGas")
 		}
 		return nil, nil
 	}

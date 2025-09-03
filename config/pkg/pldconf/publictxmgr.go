@@ -81,7 +81,13 @@ var PublicTxManagerDefaults = &PublicTxManagerConfig{
 			PriorityFeePercentile: confutil.P(85), // Default to 85th percentile for getting transactions onto chain as easily as possible
 			HistoryBlockCount:     confutil.P(20), // Default to 20 blocks for fee history
 			BaseFeeBufferFactor:   confutil.P(1),  // Default to 1x buffer for base fee
-			Cache: EthFeeHistoryCacheConfig{
+			Cache: GasPriceCacheConfig{
+				Enabled: confutil.P(true), // Caching enabled by default
+			},
+		},
+		GasOracleAPI: &GasOracleAPIConfig{
+			Method: confutil.P("GET"),
+			Cache: GasPriceCacheConfig{
 				Enabled: confutil.P(true), // Caching enabled by default
 			},
 		},
@@ -139,12 +145,10 @@ type EthFeeHistoryConfig struct {
 	BaseFeeBufferFactor *int `json:"baseFeeBufferFactor"`
 
 	// Cache configuration for fee history results
-	Cache EthFeeHistoryCacheConfig `json:"cache"`
+	Cache GasPriceCacheConfig `json:"cache"`
 }
 
-// EthFeeHistoryCacheConfig represents cache configuration for dynamic gas pricing
-type EthFeeHistoryCacheConfig struct {
-	// Whether caching is enabled
+type GasPriceCacheConfig struct {
 	Enabled *bool `json:"enabled"`
 }
 
@@ -154,7 +158,7 @@ type GasPriceConfig struct {
 	MaxFeePerGasCap         *string             `json:"maxFeePerGasCap"`
 	FixedGasPrice           *FixedGasPricing    `json:"fixedGasPrice"`
 	EthFeeHistory           EthFeeHistoryConfig `json:"ethFeeHistory"`
-	GasOracleAPI            GasOracleAPIConfig  `json:"gasOracleAPI"`
+	GasOracleAPI            *GasOracleAPIConfig `json:"gasOracleAPI"`
 }
 
 type GasLimitConfig struct {
@@ -162,8 +166,10 @@ type GasLimitConfig struct {
 }
 
 type GasOracleAPIConfig struct {
-	URL      string `json:"url"`
-	Template string `json:"template"`
+	HTTPClientConfig `json:",inline"`
+	Method           *string             `json:"method"`
+	Template         string              `json:"template"`
+	Cache            GasPriceCacheConfig `json:"cache"`
 }
 
 type PublicTxManagerOrchestratorConfig struct {
