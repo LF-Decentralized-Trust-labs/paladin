@@ -149,8 +149,8 @@ besu:
 # Domains can be configured with a default signing identity
 domains:
   noto:
-    defaultSigningIdentity: ""
+    fixedSigningIdentity: ""
   pente:
-    defaultSigningIdentity: ""
+    fixedSigningIdentity: ""
   zeto:
-    defaultSigningIdentity: ""
+    fixedSigningIdentity: ""

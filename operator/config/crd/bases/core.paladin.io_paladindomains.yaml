@@ -63,9 +63,9 @@ spec:
               configJSON:
                 description: JSON configuration specific to the individual domain
                 type: string
-              defaultSigningIdentity:
-                description: The default signing identity to use for the domain -
-                  will resolve to a different signing key on each node
+              fixedSigningIdentity:
+                description: The fixed signing identity to use for the domain - will
+                  resolve to a different signing key on each node
                 type: string
               plugin:
                 description: Details of the plugin to load for the domain

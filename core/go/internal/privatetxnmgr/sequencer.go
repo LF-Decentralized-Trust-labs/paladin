@@ -180,7 +180,7 @@ func NewSequencer(
 
 	log.L(ctx).Debugf("NewSequencer for contract address %s created: %+v", newSequencer.contractAddress, newSequencer)
 
-	defaultSigner := domainAPI.Domain().DefaultSigningIdentity()
+	defaultSigner := domainAPI.Domain().FixedSigningIdentity()
 	if defaultSigner == "" {
 		// Randomly allocate a signer.
 		// TODO: rotation
