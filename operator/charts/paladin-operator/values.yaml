@@ -145,3 +145,12 @@ besu:
   labels:
     app: besu
   baseNodePort: 31545
+
+# Domains can be configured with a default signing identity
+domains:
+  noto:
+    defaultSigningIdentity: ""
+  pente:
+    defaultSigningIdentity: ""
+  zeto:
+    defaultSigningIdentity: ""

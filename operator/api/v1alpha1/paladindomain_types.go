@@ -32,6 +32,8 @@ type PaladinDomainSpec struct {
 	// Required when Zero Knowledge Proof (ZKP) generation is being co-located with the Paladin core process
 	// for domains like Zeto.
 	AllowSigning bool `json:"allowSigning,omitempty"`
+	// The default signing identity to use for the domain - will resolve to a different signing key on each node
+	DefaultSigningIdentity string `json:"defaultSigningIdentity,omitempty"`
 	// JSON configuration specific to the individual domain
 	ConfigJSON string `json:"configJSON"`
 }
