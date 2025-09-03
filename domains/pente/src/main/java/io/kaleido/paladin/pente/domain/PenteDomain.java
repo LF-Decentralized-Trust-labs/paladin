@@ -156,7 +156,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
                      resolvedVerifiers,
                      params.externalCallsEnabled()
              ).getBytes());
-             var signingIdentity = config.getDefaultSigningIdentity();
+             var signingIdentity = config.getFixedSigningIdentity();
              if (signingIdentity == "") {
                  signingIdentity = "%s.deploy.%s".formatted(config.getDomainName(), UUID.randomUUID().toString());
              }

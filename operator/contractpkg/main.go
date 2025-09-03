@@ -262,7 +262,7 @@ func template() error {
 			domain.Spec.RegistryAddress = fmt.Sprintf("{{ %s.address }}", n)
 			domain.Spec.SmartContractDeployment = fmt.Sprintf("{{ %s.deployment }}", n)
 
-			domain.Spec.DefaultSigningIdentity = fmt.Sprintf("{{ .Values.domains.%s.defaultSigningIdentity }}", domain.Name)
+			domain.Spec.FixedSigningIdentity = fmt.Sprintf("{{ .Values.domains.%s.fixedSigningIdentity }}", domain.Name)
 			if content, err = yaml.Marshal(domain); err != nil {
 				return fmt.Errorf("error marshalling content: %v", err)
 			}

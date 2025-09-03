@@ -84,7 +84,7 @@ func newSequencerForTesting(t *testing.T, ctx context.Context, domainAddress *pl
 	mocks.allComponents.On("TxManager").Return(mocks.txManager).Maybe()
 	mocks.allComponents.On("PublicTxManager").Return(mocks.pubTxManager).Maybe()
 	mocks.domainMgr.On("GetSmartContractByAddress", mock.Anything, mock.Anything, *domainAddress).Maybe().Return(mocks.domainSmartContract, nil)
-	mocks.domain.On("DefaultSigningIdentity").Return("").Maybe()
+	mocks.domain.On("FixedSigningIdentity").Return("").Maybe()
 	p, persistenceDone, err := persistence.NewUnitTestPersistence(ctx, "privatetxmgr")
 	require.NoError(t, err)
 	mocks.allComponents.On("Persistence").Return(p).Maybe()
