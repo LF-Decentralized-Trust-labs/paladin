@@ -52,12 +52,13 @@ type domain struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 
-	conf            *pldconf.DomainConfig
-	defaultGasLimit pldtypes.HexUint64
-	dm              *domainManager
-	name            string
-	api             components.DomainManagerToDomain
-	registryAddress *pldtypes.EthAddress
+	conf                   *pldconf.DomainConfig
+	defaultGasLimit        pldtypes.HexUint64
+	dm                     *domainManager
+	name                   string
+	api                    components.DomainManagerToDomain
+	registryAddress        *pldtypes.EthAddress
+	defaultSigningIdentity string
 
 	stateLock          sync.Mutex
 	initialized        atomic.Bool
@@ -86,14 +87,15 @@ var DefaultDefaultGasLimit pldtypes.HexUint64 = 4000000 // high gas limit by def
 
 func (dm *domainManager) newDomain(name string, conf *pldconf.DomainConfig, toDomain components.DomainManagerToDomain) *domain {
 	d := &domain{
-		dm:              dm,
-		conf:            conf,
-		defaultGasLimit: DefaultDefaultGasLimit,                     // can be set by config below
-		initRetry:       retry.NewRetryIndefinite(&conf.Init.Retry), // indefinite retry
-		name:            name,
-		api:             toDomain,
-		initDone:        make(chan struct{}),
-		registryAddress: pldtypes.MustEthAddress(conf.RegistryAddress), // check earlier in startup
+		dm:                     dm,
+		conf:                   conf,
+		defaultGasLimit:        DefaultDefaultGasLimit,                     // can be set by config below
+		initRetry:              retry.NewRetryIndefinite(&conf.Init.Retry), // indefinite retry
+		name:                   name,
+		api:                    toDomain,
+		initDone:               make(chan struct{}),
+		registryAddress:        pldtypes.MustEthAddress(conf.RegistryAddress), // check earlier in startup
+		defaultSigningIdentity: conf.DefaultSigningIdentity,
 
 		schemasByID:        make(map[string]components.Schema),
 		schemasBySignature: make(map[string]components.Schema),
@@ -199,6 +201,7 @@ func (d *domain) init() {
 			RegistryContractAddress: d.RegistryAddress().String(),
 			ChainId:                 d.dm.ethClientFactory.ChainID(),
 			ConfigJson:              pldtypes.JSONString(d.conf.Config).String(),
+			DefaultSigningIdentity:  d.defaultSigningIdentity,
 		})
 		if err != nil {
 			return true, err
@@ -288,6 +291,10 @@ func (d *domain) RegistryAddress() *pldtypes.EthAddress {
 
 func (d *domain) Configuration() *prototk.DomainConfig {
 	return d.config
+}
+
+func (d *domain) DefaultSigningIdentity() string {
+	return d.defaultSigningIdentity
 }
 
 func toProtoStates(states []*pldapi.State) []*prototk.StoredState {

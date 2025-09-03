@@ -65,6 +65,7 @@
  
      private String domainName;
      private long chainId;
+     private String defaultSigningIdentity;
  
      private String schemaId_AccountState_v24_10_0;
  
@@ -312,10 +313,15 @@
      synchronized String getDomainName() {
          return domainName;
      }
+
+     synchronized String getDefaultSigningIdentity() {
+         return defaultSigningIdentity;
+     }
  
      synchronized void initFromConfig(ConfigureDomainRequest configReq) {
          this.domainName = configReq.getName();
          this.chainId = configReq.getChainId();
+         this.defaultSigningIdentity = configReq.getDefaultSigningIdentity();
      }
  
      List<String> allPenteSchemas() {

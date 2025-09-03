@@ -100,13 +100,14 @@ var schemasJSON = mustParseSchemas(allSchemas)
 type Noto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	name             string
-	config           types.DomainConfig
-	chainID          int64
-	coinSchema       *prototk.StateSchema
-	lockedCoinSchema *prototk.StateSchema
-	dataSchema       *prototk.StateSchema
-	lockInfoSchema   *prototk.StateSchema
+	name                   string
+	config                 types.DomainConfig
+	chainID                int64
+	defaultSigningIdentity string
+	coinSchema             *prototk.StateSchema
+	lockedCoinSchema       *prototk.StateSchema
+	dataSchema             *prototk.StateSchema
+	lockInfoSchema         *prototk.StateSchema
 }
 
 type NotoDeployParams struct {
@@ -298,6 +299,7 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomain
 	n.name = req.Name
 	n.config = config
 	n.chainID = req.ChainId
+	n.defaultSigningIdentity = req.DefaultSigningIdentity
 
 	return &prototk.ConfigureDomainResponse{
 		DomainConfig: &prototk.DomainConfig{
@@ -408,9 +410,11 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 	var paramsJSON []byte
 	var deployDataJSON []byte
 
-	// Use a random key to deploy
-	// TODO: shouldn't it be possible to omit this and let Paladin choose?
-	signer := fmt.Sprintf("%s.deploy.%s", n.name, uuid.New())
+	signer := n.defaultSigningIdentity
+	if signer == "" {
+		// Use a random key to deploy if no default signing identity is set
+		signer = fmt.Sprintf("%s.deploy.%s", n.name, uuid.New())
+	}
 
 	// Default to the V0 NotoFactory ABI if no version is specified
 	abi := factoryV0Build.ABI
