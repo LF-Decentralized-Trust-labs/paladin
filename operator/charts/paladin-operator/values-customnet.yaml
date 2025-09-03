@@ -127,3 +127,12 @@ paladinNodes:
       registryAdminNode: bank  # The admin node that manages the registry
       registryAdminKey: registry.operator
       registry: evm-registry
+
+# Domains can be configured with a default signing identity
+domains:
+  noto:
+    defaultSigningIdentity: ""
+  pente:
+    defaultSigningIdentity: ""
+  zeto:
+    defaultSigningIdentity: ""
