@@ -82,6 +82,9 @@ var PublicTxManagerDefaults = &PublicTxManagerConfig{
 			HistoryBlockCount:     confutil.P(20), // Default to 20 blocks for fee history
 			BaseFeeBufferFactor:   confutil.P(1),  // Default to 1x buffer for base fee
 		},
+		GasOracleAPI: &GasOracleAPIConfig{
+			Method: confutil.P("GET"),
+		},
 	},
 	BalanceManager: BalanceManagerConfig{
 		Cache: CacheConfig{
@@ -142,7 +145,7 @@ type GasPriceConfig struct {
 	MaxFeePerGasCap         *string             `json:"maxFeePerGasCap"`
 	FixedGasPrice           *FixedGasPricing    `json:"fixedGasPrice"`
 	EthFeeHistory           EthFeeHistoryConfig `json:"ethFeeHistory"`
-	GasOracleAPI            GasOracleAPIConfig  `json:"gasOracleAPI"`
+	GasOracleAPI            *GasOracleAPIConfig `json:"gasOracleAPI"`
 }
 
 type GasLimitConfig struct {
@@ -150,8 +153,9 @@ type GasLimitConfig struct {
 }
 
 type GasOracleAPIConfig struct {
-	URL      string `json:"url"`
-	Template string `json:"template"`
+	HTTPClientConfig `json:",inline"`
+	Method           *string `json:"method"`
+	Template         string  `json:"template"`
 }
 
 type PublicTxManagerOrchestratorConfig struct {
