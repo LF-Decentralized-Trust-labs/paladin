@@ -2674,6 +2674,7 @@ func (m *dependencyMocks) mockDomain(domainAddress *pldtypes.EthAddress) {
 	m.stateStore.On("NewDomainContext", mock.Anything, m.domain, *domainAddress, mock.Anything).Return(m.domainContext).Maybe()
 	m.domainMgr.On("GetSmartContractByAddress", mock.Anything, mock.Anything, *domainAddress).Maybe().Return(m.domainSmartContract, nil)
 	m.domain.On("Configuration").Return(&prototk.DomainConfig{}).Maybe()
+	m.domain.On("DefaultSigningIdentity").Return("").Maybe()
 }
 
 // Some of the tests were getting quite verbose and was difficult to see the wood for the trees so moved a lot of the boilerplate into these utility functions
