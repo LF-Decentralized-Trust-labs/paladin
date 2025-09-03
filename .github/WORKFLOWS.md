@@ -108,6 +108,109 @@ Once the RC has been tested and validated, the final release can be created:
 - **Testing:** Always test RCs thoroughly before promoting to final release
 - **Version Consistency:** The RC version must match the final version (e.g., `v1.0.0-rc.1` → `v1.0.0`)
 
+## Manual Docker Image Release
+
+> ⚠️ **Note:** This is **not the standard release process**.
+> Use this workflow only as a **workaround** when you need to release Docker images for testing, hotfixes, or other exceptional cases.
+> Official releases should always go through the [Release Candidate](#stage-1-release-candidate-rc-) and [Final Release](#stage-2-final-release-) workflows.
+
+Paladin includes a manual workflow for pushing Docker images to both DockerHub and GHCR.
+
+### How to Run
+
+1. Navigate to **Actions → [Image Release](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/release-images.yaml)**.
+
+2. Click **"Run workflow"**.
+
+3. Fill in the required fields:
+
+   * **Tag:**
+
+     * Required.
+     * The version to tag the images with (e.g., `v0.1.0-hotfix.0`).
+   * **Whether to also tag the images with "latest":**
+
+     * Optional.
+     * Set to `true` only if you want this build to overwrite the `latest` tag.
+
+4. Click **Run workflow**.
+
+### What Happens
+
+* Builds cross-platform Docker images (`linux/amd64`, `linux/arm64`).
+* Pushes them to both:
+
+  * **DockerHub:** `docker.io/lfdecentralizedtrust/...`
+  * **GHCR:** `ghcr.io/lf-decentralized-trust-labs/...`
+* Tags include the version you specified, and optionally `latest`.
+
+### Example
+
+If you run with:
+
+* **Tag:** `v0.1.0-hotfix.0`
+* **Latest:** `false`
+
+Images will be published as:
+
+* `docker.io/lfdecentralizedtrust/paladin:v0.1.0-hotfix.0`
+* `ghcr.io/lf-decentralized-trust-labs/paladin:v0.1.0-hotfix.0`
+
+If you set **Latest = true**, the same images will also be tagged as `latest`.
+
+
+## Manual Helm Chart Release
+
+> ⚠️ **Note:** This is **not part of the standard release process**.
+> Use this workflow only as a **workaround** when you need to release a Helm chart for testing, debugging, or other exceptional cases.
+> Official releases should always go through the [Release Candidate](#stage-1-release-candidate-rc-) and [Final Release](#stage-2-final-release-) workflows.
+
+Paladin includes a manual workflow for publishing Helm charts outside of the normal release cycle.
+
+### How to Run
+
+1. Navigate to **Actions → [Release Helm Chart](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/release-charts.yaml)**.
+
+2. Click **"Run workflow"**.
+
+3. Fill in the required fields:
+
+   * **Branch:** Choose the branch to release from (e.g., `main` or a feature branch).
+   * **Whether to mark the release as latest:** Optional.
+
+     * Leave unchecked for testing or patch releases.
+     * Check only if you explicitly want this to be marked as `latest`.
+   * **The docker registry to use for the images:**
+
+     * Options: `docker.io` or `ghcr.io` (default).
+   * **The images tags to patch the chart with:**
+
+     * Example: `main`, `test-branch`, or `v0.1.0-hotfix.0`.
+     * Must match an existing built/published image tag.
+   * **The helm chart tag to release the chart:**
+
+     * Example: `v0.1.0-hotfix.0`.
+     * Becomes the chart’s version in the repository.
+
+4. Click **Run workflow**.
+
+### What Happens
+
+* The workflow rebuilds the CRDs and Operator charts.
+* Patches image references and Helm dependencies with the provided tags.
+* Runs **Helm template validation** and **E2E tests**.
+* Publishes the chart to the [GitHub Pages chart repository](https://lf-decentralized-trust-labs.github.io/paladin).
+* Uploads deployment artifacts (`basenet.yaml`, `devnet.yaml`, `customnet.yaml`, etc.) for download.
+
+### Example
+
+If you run with:
+
+* **Images tag:** `test-branch`
+* **Helm chart tag:** `v0.1.0-hotfix.0`
+
+You will publish a Helm chart version `0.11.0-fix.0` that points to images built with the tag `test-branch`.
+
 
 ## Manual Actions 🛠️
 Workflows can also be triggered manually when needed. Available options include:
