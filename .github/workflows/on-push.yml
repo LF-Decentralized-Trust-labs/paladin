@@ -28,7 +28,7 @@ jobs:
     with:
       registry: ghcr.io
       repository: ${{ github.repository_owner }}
-      image_tags: ${{ github.ref_name }}
+      image_tags: ${{ github.ref_name }},${{ github.sha }}
     secrets:
       username: ${{ github.actor }}
       password: ${{ secrets.GITHUB_TOKEN }}

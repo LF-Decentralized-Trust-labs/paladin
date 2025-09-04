@@ -184,4 +184,26 @@ jobs:
               ${{ github.workspace }}/artifacts/customnet.yaml
               ${{ github.workspace }}/artifacts/attach.yaml
               ${{ github.workspace }}/artifacts/artifacts.tar.gz
- 
+
+      - name: Display update info
+        run: |
+          cat <<EOF >> $GITHUB_STEP_SUMMARY
+          ### Paladin Operator Update Instructions
+      
+          Follow these steps to update to version \`v${{ steps.clean-tag.outputs.PROCESSED_TAG }}\`.
+      
+          **1. Update Helm Repositories**
+          \`\`\`sh
+          helm repo update
+          \`\`\`
+      
+          **2. Upgrade the CRD Chart**
+          \`\`\`sh
+          helm upgrade --install paladin-crds paladin/paladin-operator-crd --version ${{ steps.clean-tag.outputs.PROCESSED_TAG }}
+          \`\`\`
+      
+          **3. Upgrade the Operator Chart**
+          \`\`\`sh
+          helm upgrade --install paladin paladin/paladin-operator -n paladin --create-namespace --version ${{ steps.clean-tag.outputs.PROCESSED_TAG }}
+          \`\`\`
+          EOF

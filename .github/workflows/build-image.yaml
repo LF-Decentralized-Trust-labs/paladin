@@ -132,4 +132,4 @@ jobs:
         with:
           name: ${{ inputs.image }}-${{ github.sha }}
           path: /tmp/${{ steps.image-name-sanitizer.outputs.IMAGE_NAME_SANITIZED }}-${{ github.sha }}.tar
-          retention-days: 1
+          retention-days: 7
