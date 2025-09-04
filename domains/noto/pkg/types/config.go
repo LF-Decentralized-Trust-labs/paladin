@@ -120,4 +120,13 @@ const (
 	NotaryModeIntHooks pldtypes.HexUint64 = 0x0001
 )
 
-var NotoVariantDefault pldtypes.HexUint64 = 0x0000
+var NotoVariantLegacy pldtypes.HexUint64 = 0x0000
+var NotoVariantDefault pldtypes.HexUint64 = 0x0001
+
+type NotoLockOptions struct {
+	UnlockHash pldtypes.Bytes32 `json:"unlockHash"`
+}
+
+var NotoLockOptionsABI = &abi.ParameterArray{
+	{Name: "unlockHash", Type: "bytes32"},
+}
