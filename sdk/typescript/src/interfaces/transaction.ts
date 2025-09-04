@@ -18,7 +18,6 @@ export interface PublicTxOptions {
   value?: BigNumberish;
   maxPriorityFeePerGas?: BigNumberish;
   maxFeePerGas?: BigNumberish;
-  gasPrice?: BigNumberish;
 }
 
 export interface ITransactionBase {

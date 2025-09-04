@@ -347,7 +347,8 @@ var (
 	MsgInvalidGasPriceIncreaseMax      = pde("PD011909", "Invalid max gas price increase price string %s")
 	MsgMissingTransactionID            = pde("PD011910", "Transaction ID must be provided")
 	MsgPublicTransactionNotFound       = pde("PD011911", "Public transaction not found with id %s")
-	MsgGasPriceError                   = pde("PD011917", `The gasPrice '%s' could not be parsed. Must be a numeric string, or an object with 'gasPrice' field, or 'maxFeePerGas'/'maxPriorityFeePerGas' fields (EIP-1559), error: %s`)
+	// Removed in PR 819 which removed non EIP-1559 gas pricing and therefore could introduce a well defined configuration struct for gas pricing
+	// MsgGasPriceError                   = pde("PD011917", `The gasPrice '%s' could not be parsed. Must be a numeric string, or an object with 'gasPrice' field, or 'maxFeePerGas'/'maxPriorityFeePerGas' fields (EIP-1559), error: %s`)
 	MsgPersistError                    = pde("PD011918", "Unexpected internal error, cannot persist stage.")
 	MsgInvalidStageOutput              = pde("PD011919", "Stage output object is missing %s: %+v")
 	MsgInvalidGasLimit                 = pde("PD011920", "Invalid gas limit, must be a positive number")

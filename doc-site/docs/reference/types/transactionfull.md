@@ -31,7 +31,6 @@ title: TransactionFull
 | `value` | The value transferred in the transaction (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 | `maxPriorityFeePerGas` | The maximum priority fee per gas (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 | `maxFeePerGas` | The maximum fee per gas (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
-| `gasPrice` | The gas price (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 | `dependsOn` | Transactions registered as dependencies when the transaction was created | [`UUID[]`](simpletypes.md#uuid) |
 | `receipt` | Transaction receipt data - available if the transaction has reached a final state | [`TransactionReceiptData`](#transactionreceiptdata) |
 | `public` | List of public transactions associated with this transaction | [`PublicTx[]`](publictx.md#publictx) |

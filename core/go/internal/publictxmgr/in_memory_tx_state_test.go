@@ -17,6 +17,7 @@ package publictxmgr
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -49,15 +50,18 @@ func NewTestInMemoryTxState(t *testing.T) InMemoryTxStateManager {
 		Data:    oldTransactionData,
 	}
 
-	imtxs := NewInMemoryTxStateManager(context.Background(), testManagedTx)
+	imtxs := NewInMemoryTxStateManager(context.Background(), testManagedTx, nil)
 	imtxs.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
-		NewSubmission: &DBPubTxnSubmission{TransactionHash: oldTxHash},
-		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: oldGasPrice,
+		NewValues: BaseTXUpdateNewValues{
+			NewSubmission: &DBPubTxnSubmission{TransactionHash: oldTxHash},
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         oldGasPrice,
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
+			FirstSubmit:  &oldTime,
+			LastSubmit:   &oldTime,
+			ErrorMessage: &oldErrorMessage,
 		},
-		FirstSubmit:  &oldTime,
-		LastSubmit:   &oldTime,
-		ErrorMessage: &oldErrorMessage,
 	})
 	return imtxs
 
@@ -85,16 +89,15 @@ func TestSettersAndGetters(t *testing.T) {
 		Data:    pldtypes.HexBytes(oldTransactionData),
 	}
 
-	imts := NewInMemoryTxStateManager(context.Background(), testManagedTx)
+	imts := NewInMemoryTxStateManager(context.Background(), testManagedTx, nil)
 	imts.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
-		GasPricing:      &pldapi.PublicTxGasPricing{GasPrice: oldGasPrice},
-		TransactionHash: &oldTxHash,
-		FlushedSubmission: &DBPubTxnSubmission{
-			TransactionHash: oldTxHash,
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing:      &pldapi.PublicTxGasPricing{MaxFeePerGas: oldGasPrice, MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1)},
+			TransactionHash: &oldTxHash,
+			FirstSubmit:     &oldTime,
+			LastSubmit:      &oldTime,
+			ErrorMessage:    &oldErrorMessage,
 		},
-		FirstSubmit:  &oldTime,
-		LastSubmit:   &oldTime,
-		ErrorMessage: &oldErrorMessage,
 	})
 
 	inMemoryTx := imts.(*inMemoryTxState)
@@ -106,51 +109,47 @@ func TestSettersAndGetters(t *testing.T) {
 	assert.Equal(t, oldNonce.Uint64(), imts.GetNonce())
 	assert.Equal(t, *oldFrom, imts.GetFrom())
 	assert.Equal(t, InFlightStatusPending, imts.GetInFlightStatus())
-	assert.Equal(t, oldGasPrice.Int(), imts.GetGasPriceObject().GasPrice.Int())
+	assert.Equal(t, oldGasPrice.Int(), imts.GetGasPriceObject().MaxFeePerGas.Int())
 	assert.Equal(t, oldTime, *imts.GetFirstSubmit())
 	assert.Equal(t, oldGasLimit.Uint64(), imts.GetGasLimit())
 	assert.False(t, imts.IsReadyToExit())
-
-	// dup flush
-	imts.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
-		FlushedSubmission: &DBPubTxnSubmission{
-			TransactionHash: oldTxHash,
-		},
-	})
-	assert.Equal(t, []*DBPubTxnSubmission{
-		{TransactionHash: oldTxHash},
-	}, inMemoryTx.mtx.ptx.Submissions)
 
 	// mark the transaction complete
 	confirmReceived := InFlightStatusConfirmReceived
 	newTime := confutil.P(pldtypes.TimestampNow())
 	newTxHash := pldtypes.Bytes32Keccak([]byte("0x000031"))
-	newGasPrice := pldtypes.Uint64ToUint256(111)
 	newErrorMessage := "new message"
+	newGasPricing := &pldapi.PublicTxGasPricing{
+		MaxFeePerGas:         pldtypes.Uint64ToUint256(123),
+		MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(2),
+	}
+	newGasPricingJSON, _ := json.Marshal(newGasPricing)
 
 	imts.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
-		InFlightStatus:  &confirmReceived,
-		GasPricing:      &pldapi.PublicTxGasPricing{GasPrice: newGasPrice},
-		TransactionHash: &newTxHash,
-		NewSubmission: &DBPubTxnSubmission{
-			TransactionHash: newTxHash,
+		NewValues: BaseTXUpdateNewValues{
+			InFlightStatus:  &confirmReceived,
+			GasPricing:      newGasPricing,
+			TransactionHash: &newTxHash,
+			NewSubmission: &DBPubTxnSubmission{
+				GasPricing: newGasPricingJSON,
+			},
+			FirstSubmit:  newTime,
+			LastSubmit:   newTime,
+			ErrorMessage: &newErrorMessage,
+			Underpriced:  confutil.P(true),
 		},
-		FirstSubmit:  newTime,
-		LastSubmit:   newTime,
-		ErrorMessage: &newErrorMessage,
 	})
 
 	assert.Equal(t, InFlightStatusConfirmReceived, imts.GetInFlightStatus())
 	assert.Equal(t, oldTime, *imts.GetCreatedTime())
 	assert.Equal(t, newTime, imts.GetLastSubmitTime())
 	assert.Equal(t, newTxHash, *imts.GetTransactionHash())
-	assert.Equal(t, newGasPrice.Int(), imts.GetGasPriceObject().GasPrice.Int())
-	assert.Nil(t, imts.GetGasPriceObject().MaxFeePerGas)
-	assert.Nil(t, imts.GetGasPriceObject().MaxPriorityFeePerGas)
+	assert.Equal(t, newGasPricing.MaxFeePerGas.Int(), imts.GetGasPriceObject().MaxFeePerGas.Int())
+	assert.Equal(t, newGasPricing.MaxPriorityFeePerGas.Int(), imts.GetGasPriceObject().MaxPriorityFeePerGas.Int())
+	assert.Equal(t, newGasPricing.MaxFeePerGas.Int(), imts.GetLastSubmittedGasPrice().MaxFeePerGas.Int())
+	assert.Equal(t, newGasPricing.MaxPriorityFeePerGas.Int(), imts.GetLastSubmittedGasPrice().MaxPriorityFeePerGas.Int())
 	assert.Equal(t, newTime, imts.GetFirstSubmit())
-	assert.Equal(t, &DBPubTxnSubmission{
-		TransactionHash: newTxHash,
-	}, imts.GetUnflushedSubmission())
+	assert.True(t, imts.GetUnderpriced())
 	assert.True(t, imts.IsReadyToExit())
 
 	// check immutable fields
@@ -159,19 +158,15 @@ func TestSettersAndGetters(t *testing.T) {
 	assert.Equal(t, oldValue, inMemoryTx.mtx.ptx.Value)
 	assert.Equal(t, oldTransactionData, inMemoryTx.mtx.ptx.Data)
 
-	maxPriorityFeePerGas := pldtypes.Uint64ToUint256(2)
-	maxFeePerGas := pldtypes.Uint64ToUint256(123)
-
-	// test switch gas price format
+	//check reset values
 	imts.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			MaxPriorityFeePerGas: maxPriorityFeePerGas,
-			MaxFeePerGas:         maxFeePerGas,
+		ResetValues: BaseTXUpdateResetValues{
+			GasPricing:      true,
+			TransactionHash: true,
+			Underpriced:     true,
 		},
 	})
-
-	assert.Nil(t, imts.GetGasPriceObject().GasPrice)
-	assert.Equal(t, maxFeePerGas.Int(), imts.GetGasPriceObject().MaxFeePerGas.Int())
-	assert.Equal(t, maxPriorityFeePerGas.Int(), imts.GetGasPriceObject().MaxPriorityFeePerGas.Int())
-
+	assert.Nil(t, imts.GetGasPriceObject())
+	assert.Nil(t, imts.GetTransactionHash())
+	assert.False(t, imts.GetUnderpriced())
 }

@@ -91,7 +91,9 @@ func TestProduceLatestInFlightStageContextStatusChange(t *testing.T) {
 
 	// persisted stage success and move on
 	ifts.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		InFlightStatus: &suspended,
+		NewValues: BaseTXUpdateNewValues{
+			InFlightStatus: &suspended,
+		},
 	})
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
 	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageStatusUpdate, time.Now(), nil)

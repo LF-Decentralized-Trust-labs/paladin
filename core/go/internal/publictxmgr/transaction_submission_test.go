@@ -49,7 +49,9 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 	defer done()
 	it, ifts := newInflightTransaction(o, 1)
 	ifts.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		TransactionHash: &textTxHashByte32,
+		NewValues: BaseTXUpdateNewValues{
+			TransactionHash: &textTxHashByte32,
+		},
 	})
 
 	// successful send with tx hash returned
@@ -205,7 +207,9 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 	defer done()
 	it, ifts := newInflightTransaction(o, 1)
 	ifts.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		TransactionHash: &textTxHashByte32,
+		NewValues: BaseTXUpdateNewValues{
+			TransactionHash: &textTxHashByte32,
+		},
 	})
 
 	// successful send with tx hash returned
