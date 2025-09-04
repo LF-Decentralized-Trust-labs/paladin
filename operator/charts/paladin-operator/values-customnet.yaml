@@ -53,7 +53,7 @@ paladinNodes:
     # ======== Registries ========
     # Registry names this node interacts with. Must match labels on registry CRs.
     registries:
-      - evm-reg
+      - evm-registry
 
     # ======== Transports ========
     transports:
