@@ -449,9 +449,13 @@ func (it *inFlightTransactionStageController) processSubmittingStageOutput(ctx c
 		rsc.StageOutputsToBePersisted.TxUpdates.NewValues.LastSubmit = confutil.P(pldtypes.TimestampNow())
 
 		if stageOutput.SubmitOutput.ErrorReason == string(ethclient.ErrorReasonTransactionUnderpriced) {
-			log.L(ctx).Warnf("Transaction %s underpriced: resetting gas price", it.stateManager.GetSignerNonce())
-			rsc.StageOutputsToBePersisted.TxUpdates.NewValues.Underpriced = confutil.P(true)
-			rsc.StageOutputsToBePersisted.TxUpdates.ResetValues.GasPricing = true
+			if it.stateManager.GetTransactionFixedGasPrice() != nil {
+				log.L(ctx).Warnf("Fixed gas price transaction %s underpriced", it.stateManager.GetSignerNonce())
+			} else {
+				log.L(ctx).Warnf("Transaction %s underpriced: resetting calculated gas price and transaction will reenter gas price retrieval stage", it.stateManager.GetSignerNonce())
+				rsc.StageOutputsToBePersisted.TxUpdates.NewValues.Underpriced = confutil.P(true)
+				rsc.StageOutputsToBePersisted.TxUpdates.ResetValues.GasPricing = true
+			}
 		}
 
 		info := pldtypes.RawJSON(`{"reason":"` + string(stageOutput.SubmitOutput.ErrorReason) + `"}`)

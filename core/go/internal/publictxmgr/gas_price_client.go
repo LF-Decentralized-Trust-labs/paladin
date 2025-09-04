@@ -23,7 +23,6 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/cache"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
@@ -34,7 +33,6 @@ import (
 type GasPriceClient interface {
 	HasZeroGasPrice(ctx context.Context) bool
 	GetGasPriceObject(ctx context.Context, txFixedGasPrice *pldapi.PublicTxGasPricing, previouslySubmittedGPO *pldapi.PublicTxGasPricing, underpriced bool) (gasPrice *pldapi.PublicTxGasPricing, err error)
-	DeleteCache(ctx context.Context)
 	Init(ctx context.Context) error
 	Start(ctx context.Context, ethClient ethclient.EthClient)
 }
@@ -59,13 +57,9 @@ type HybridGasPriceClient struct {
 	gasPriceIncreasePercent int
 
 	// Eth fee history gas pricing configuration (always set with defaults so this works as a fallback option)
-	priorityFeePercentile     int
-	historyBlockCount         int
-	baseFeeBufferFactor       int
-	ethFeeHistoryCacheEnabled bool
-
-	// Cache for eth fee history gas pricing results
-	ethFeeHistoryGasPriceCache cache.Cache[string, *pldapi.PublicTxGasPricing]
+	priorityFeePercentile int
+	historyBlockCount     int
+	baseFeeBufferFactor   int
 }
 
 func (hGpc *HybridGasPriceClient) HasZeroGasPrice(ctx context.Context) bool {
@@ -74,13 +68,6 @@ func (hGpc *HybridGasPriceClient) HasZeroGasPrice(ctx context.Context) bool {
 
 // estimateEIP1559Fees calculates optimal maxFeePerGas and maxPriorityFeePerGas using eth_feeHistory
 func (hGpc *HybridGasPriceClient) estimateEIP1559Fees(ctx context.Context) (*pldapi.PublicTxGasPricing, error) {
-	// Check if we have valid cached results
-	if hGpc.ethFeeHistoryGasPriceCache != nil {
-		if cached, found := hGpc.ethFeeHistoryGasPriceCache.Get("eth_feeHistory_gas_pricing"); found {
-			return cached, nil
-		}
-	}
-
 	// Prepare reward percentiles for the RPC call
 	rewardPercentiles := []float64{float64(hGpc.priorityFeePercentile)}
 
@@ -105,17 +92,17 @@ func (hGpc *HybridGasPriceClient) estimateEIP1559Fees(ctx context.Context) (*pld
 	tips := make([]*big.Int, 0, len(feeHistory.Reward))
 	for _, blockRewards := range feeHistory.Reward {
 		if len(blockRewards) > 0 {
-			tip := blockRewards[0].Int() // We only requested one percentile
-			if tip.Sign() > 0 {          // Filter out zero tips
-				tips = append(tips, tip)
-			}
+			tips = append(tips, blockRewards[0].Int())
 		}
 	}
 
 	if len(tips) == 0 {
-		// Fallback to 1 Gwei if no valid tips found
-		maxPriorityFeePerGas = (*pldtypes.HexUint256)(big.NewInt(1000000000)) // 1 Gwei in Wei
-		log.L(ctx).Warnf("No valid tips found in fee history, using fallback: 1 Gwei")
+		// This is a failure in the eth_feeHistory RPC response if the tip details we've requested
+		// are not included in the response. There's not much we can do about it, so we'll return an error
+		// which will cause this stage to be retried until it does succeed.
+		errMsg := "No valid tips found in fee history"
+		log.L(ctx).Error(errMsg)
+		return nil, errors.New(errMsg)
 	} else {
 		// Find the highest tip for robustness
 		maxPriorityFeePerGas = (*pldtypes.HexUint256)(tips[0])
@@ -126,49 +113,17 @@ func (hGpc *HybridGasPriceClient) estimateEIP1559Fees(ctx context.Context) (*pld
 		}
 	}
 
-	// Apply optional cap if configured (applies to both historical tips and fallback)
-	if hGpc.maxPriorityFeePerGasCap != nil {
-		cap := hGpc.maxPriorityFeePerGasCap.Int()
-		if maxPriorityFeePerGas.Int().Cmp(cap) > 0 {
-			maxPriorityFeePerGas = (*pldtypes.HexUint256)(cap)
-			log.L(ctx).Warnf("Capped maxPriorityFeePerGas to %s", hGpc.maxPriorityFeePerGasCap.HexString0xPrefix())
-		}
-	}
-
 	// Calculate maxFeePerGas (the total bid)
-
-	// Get the next block's base fee (last element in the array)
-	// When the cache is enabled, this base fee will be used for all subsequent transactions until DeleteCache is called.
-	// This is fine for chains where the base fee stays relatively stable since the baseFeeBufferFactor gives room for
-	// potential increases, but for chains where the base fee is volatile it would be better to disable the cache.
-	// Ideally we would have a cache with a configurable TTL or which self refreshed after every N blocks
+	// Get the next block's base fee (last element in the array) then create a buffer by multiplying the base fee by
+	// the configured factor to handle potential increases.
 	nextBlockBaseFee := feeHistory.BaseFeePerGas[len(feeHistory.BaseFeePerGas)-1].Int()
-
-	// Create a buffer by multiplying the base fee by the configured factor to handle potential increases
 	bufferedBaseFee := new(big.Int).Mul(nextBlockBaseFee, big.NewInt(int64(hGpc.baseFeeBufferFactor)))
-
-	// maxFeePerGas = bufferedBaseFee + maxPriorityFeePerGas
 	maxFeePerGas := (*pldtypes.HexUint256)(new(big.Int).Add(bufferedBaseFee, maxPriorityFeePerGas.Int()))
-
-	if hGpc.maxFeePerGasCap != nil {
-		cap := hGpc.maxFeePerGasCap.Int()
-		if maxFeePerGas.Int().Cmp(cap) > 0 {
-			maxFeePerGas = (*pldtypes.HexUint256)(cap)
-			log.L(ctx).Warnf("Capped maxFeePerGas to %s", hGpc.maxPriorityFeePerGasCap.HexString0xPrefix())
-		}
-	}
 
 	result := &pldapi.PublicTxGasPricing{
 		MaxFeePerGas:         maxFeePerGas,
 		MaxPriorityFeePerGas: maxPriorityFeePerGas,
 	}
-
-	// Cache the results if caching is enabled
-	if hGpc.ethFeeHistoryCacheEnabled {
-		// Store in cache
-		hGpc.ethFeeHistoryGasPriceCache.Set("eth_feeHistory_gas_pricing", result)
-	}
-
 	return result, nil
 }
 
@@ -309,9 +264,6 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 	if hGpc.fixedGasPrice != nil {
 		gpo = hGpc.fixedGasPrice
 	} else {
-		if underpriced {
-			hGpc.DeleteCache(ctx)
-		}
 		var err error
 		gpo, err = hGpc.estimateEIP1559Fees(ctx)
 		if err != nil {
@@ -330,12 +282,6 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 	// for the transaction. We still have to reapply it here because of the logic in calculateNewGasPrice that
 	// works out if a percentage increase is needed may have raised the prices above the cap again.
 	return hGpc.capGasPricing(ctx, gpo), nil
-}
-
-func (hGpc *HybridGasPriceClient) DeleteCache(ctx context.Context) {
-	if hGpc.ethFeeHistoryGasPriceCache != nil {
-		hGpc.ethFeeHistoryGasPriceCache.Delete("eth_feeHistory_gas_pricing")
-	}
 }
 
 func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
@@ -366,7 +312,6 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 	hGpc.historyBlockCount = confutil.Int(hGpc.conf.EthFeeHistory.HistoryBlockCount, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.HistoryBlockCount)
 	hGpc.baseFeeBufferFactor = confutil.Int(hGpc.conf.EthFeeHistory.BaseFeeBufferFactor, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.BaseFeeBufferFactor)
 	hGpc.gasPriceIncreasePercent = confutil.Int(hGpc.conf.IncreasePercentage, *pldconf.PublicTxManagerDefaults.GasPrice.IncreasePercentage)
-	hGpc.ethFeeHistoryCacheEnabled = confutil.Bool(hGpc.conf.EthFeeHistory.Cache.Enabled, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.Cache.Enabled)
 
 	if hGpc.conf.FixedGasPrice != nil {
 		fixedGasPrice, err := mapConfigToAPIGasPricing(ctx, hGpc.conf.FixedGasPrice)
@@ -378,11 +323,6 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 			(hGpc.fixedGasPrice != nil && hGpc.fixedGasPrice.MaxPriorityFeePerGas != nil && hGpc.fixedGasPrice.MaxPriorityFeePerGas.Int().Sign() == 0) {
 			hGpc.hasZeroGasPrice = true
 		}
-	}
-
-	if hGpc.ethFeeHistoryCacheEnabled {
-		hardcodedCacheConfig := &pldconf.CacheConfig{Capacity: confutil.P(1)} // we only cache one result so hardcode the capacity
-		hGpc.ethFeeHistoryGasPriceCache = cache.NewCache[string, *pldapi.PublicTxGasPricing](hardcodedCacheConfig, hardcodedCacheConfig)
 	}
 	return nil
 }

@@ -115,9 +115,6 @@ func TestEthFeeHistoryGasPricingBasic(t *testing.T) {
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
 			BaseFeeBufferFactor:   confutil.P(2),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
@@ -147,9 +144,6 @@ func TestEthFeeHistoryGasPricingWithCustomConfig(t *testing.T) {
 			PriorityFeePercentile: confutil.P(75), // Custom percentile
 			HistoryBlockCount:     confutil.P(10), // Custom block count
 			BaseFeeBufferFactor:   confutil.P(3),  // Custom buffer factor
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
@@ -174,7 +168,7 @@ func TestEthFeeHistoryGasPricingWithCustomConfig(t *testing.T) {
 
 func TestEthFeeHistoryGasPricingWithPriorityFeeCap(t *testing.T) {
 	maxPriorityFeePerGasCapStr := pldtypes.Uint64ToUint256(1000000000).HexString0xPrefix()
-	maxFeePerGasCapStr := pldtypes.Uint64ToUint256(20000000000).HexString0xPrefix()
+	maxFeePerGasCapStr := pldtypes.Uint64ToUint256(50000000000).HexString0xPrefix() // 50 Gwei cap
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice:           nil,
 		MaxPriorityFeePerGasCap: &maxPriorityFeePerGasCapStr,
@@ -182,9 +176,6 @@ func TestEthFeeHistoryGasPricingWithPriorityFeeCap(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
@@ -197,9 +188,10 @@ func TestEthFeeHistoryGasPricingWithPriorityFeeCap(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, gpo)
 
-	// Verify the tip is capped to 1 Gwei
-	expectedMaxFeePerGas := int64(20000000000)        // capped at 20 Gwei  - would have been 21 Gwei without cap(1 * 20 Gwei) + 1 Gwei
-	expectedMaxPriorityFeePerGas := int64(1000000000) // 1 Gwei (capped)
+	// Verify the tip is capped to 1 Gwei (caps are applied in GetGasPriceObject, not in estimateEIP1559Fees)
+	// MaxFeePerGas is not recalculated when priority fee is capped - it keeps the original value
+	expectedMaxFeePerGas := int64(1*20000000000 + 3000000000) // (1 * 20 Gwei) + 3 Gwei (original tip) - default buffer factor is 1
+	expectedMaxPriorityFeePerGas := int64(1000000000)         // 1 Gwei (capped)
 
 	assert.Equal(t, expectedMaxFeePerGas, gpo.MaxFeePerGas.Int().Int64())
 	assert.Equal(t, expectedMaxPriorityFeePerGas, gpo.MaxPriorityFeePerGas.Int().Int64())
@@ -207,20 +199,17 @@ func TestEthFeeHistoryGasPricingWithPriorityFeeCap(t *testing.T) {
 	mockEthClient.AssertExpectations(t)
 }
 
-func TestEthFeeHistoryGasPricingFallbackTo1Gwei(t *testing.T) {
+func TestEthFeeHistoryGasPricingWithZeroTips(t *testing.T) {
 	conf := &pldconf.GasPriceConfig{
 		FixedGasPrice: nil,
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
 
-	// Mock fee history response with no valid tips (all zero)
+	// Mock fee history response with zero tips
 	mockFeeHistoryResult := &ethclient.FeeHistoryResult{
 		OldestBlock:   pldtypes.HexUint64(100),
 		BaseFeePerGas: []pldtypes.HexUint256{*pldtypes.Uint64ToUint256(20000000000)},
@@ -233,114 +222,12 @@ func TestEthFeeHistoryGasPricingFallbackTo1Gwei(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, gpo)
 
-	// Verify fallback to 1 Gwei
-	expectedMaxFeePerGas := int64(1*20000000000 + 1000000000) // (1 * 20 Gwei) + 1 Gwei (fallback)
-	expectedMaxPriorityFeePerGas := int64(1000000000)         // 1 Gwei (fallback)
+	// Verify zero tip is used
+	expectedMaxFeePerGas := int64(1*20000000000 + 0) // (1 * 20 Gwei) + 0 Gwei (zero tip) - default buffer factor is 1
+	expectedMaxPriorityFeePerGas := int64(0)         // 0 Gwei (zero tip)
 
 	assert.Equal(t, expectedMaxFeePerGas, gpo.MaxFeePerGas.Int().Int64())
 	assert.Equal(t, expectedMaxPriorityFeePerGas, gpo.MaxPriorityFeePerGas.Int().Int64())
-
-	mockEthClient.AssertExpectations(t)
-}
-
-func TestEthFeeHistoryGasPricingFallbackWithCap(t *testing.T) {
-	maxPriorityFeePerGasCapStr := pldtypes.Uint64ToUint256(500000000).HexString0xPrefix()
-	conf := &pldconf.GasPriceConfig{
-		FixedGasPrice:           nil,
-		MaxPriorityFeePerGasCap: &maxPriorityFeePerGasCapStr,
-		EthFeeHistory: pldconf.EthFeeHistoryConfig{
-			PriorityFeePercentile: confutil.P(85),
-			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
-		},
-	}
-	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
-
-	// Mock fee history response with no valid tips
-	mockFeeHistoryResult := &ethclient.FeeHistoryResult{
-		OldestBlock:   pldtypes.HexUint64(100),
-		BaseFeePerGas: []pldtypes.HexUint256{*pldtypes.Uint64ToUint256(20000000000)},
-		GasUsedRatio:  []float64{0.5},
-		Reward:        [][]pldtypes.HexUint256{{*pldtypes.Uint64ToUint256(0)}}, // Zero tip
-	}
-	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Once()
-
-	gpo, err := hgc.GetGasPriceObject(ctx, nil, nil, false)
-	require.NoError(t, err)
-	assert.NotNil(t, gpo)
-
-	// Verify fallback 1 Gwei is capped to 0.5 Gwei
-	expectedMaxFeePerGas := int64(1*20000000000 + 500000000) // (1 * 20 Gwei) + 0.5 Gwei (capped fallback)
-	expectedMaxPriorityFeePerGas := int64(500000000)         // 0.5 Gwei (capped fallback)
-
-	assert.Equal(t, expectedMaxFeePerGas, gpo.MaxFeePerGas.Int().Int64())
-	assert.Equal(t, expectedMaxPriorityFeePerGas, gpo.MaxPriorityFeePerGas.Int().Int64())
-
-	mockEthClient.AssertExpectations(t)
-}
-
-func TestEthFeeHistoryGasPricingCaching(t *testing.T) {
-	conf := &pldconf.GasPriceConfig{
-		FixedGasPrice: nil,
-		EthFeeHistory: pldconf.EthFeeHistoryConfig{
-			PriorityFeePercentile: confutil.P(85),
-			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
-		},
-	}
-	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
-
-	// Mock fee history response
-	mockFeeHistoryResult := createMockFeeHistoryResult(20, 20000000000, 1500000000)
-	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Once()
-
-	// First call should hit the RPC
-	gpo1, err := hgc.GetGasPriceObject(ctx, nil, nil, false)
-	require.NoError(t, err)
-	assert.NotNil(t, gpo1)
-
-	// Second call should use cache (no additional RPC calls)
-	gpo2, err := hgc.GetGasPriceObject(ctx, nil, nil, false)
-	require.NoError(t, err)
-	assert.NotNil(t, gpo2)
-
-	// Results should be identical
-	assert.Equal(t, gpo1.MaxFeePerGas.Int().Int64(), gpo2.MaxFeePerGas.Int().Int64())
-	assert.Equal(t, gpo1.MaxPriorityFeePerGas.Int().Int64(), gpo2.MaxPriorityFeePerGas.Int().Int64())
-
-	mockEthClient.AssertExpectations(t)
-}
-
-func TestEthFeeHistoryGasPricingCacheDisabled(t *testing.T) {
-	conf := &pldconf.GasPriceConfig{
-		FixedGasPrice: nil,
-		EthFeeHistory: pldconf.EthFeeHistoryConfig{
-			PriorityFeePercentile: confutil.P(85),
-			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(false),
-			},
-		},
-	}
-	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
-
-	// Mock fee history response - should be called twice since caching is disabled
-	mockFeeHistoryResult := createMockFeeHistoryResult(20, 20000000000, 1500000000)
-	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Twice()
-
-	// First call
-	gpo1, err := hgc.GetGasPriceObject(ctx, nil, nil, false)
-	require.NoError(t, err)
-	assert.NotNil(t, gpo1)
-
-	// Second call should hit RPC again
-	gpo2, err := hgc.GetGasPriceObject(ctx, nil, nil, false)
-	require.NoError(t, err)
-	assert.NotNil(t, gpo2)
 
 	mockEthClient.AssertExpectations(t)
 }
@@ -351,9 +238,6 @@ func TestEthFeeHistoryGasPricingEmptyFeeHistory(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
@@ -381,9 +265,6 @@ func TestEthFeeHistoryGasPricingRPCError(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
@@ -399,39 +280,6 @@ func TestEthFeeHistoryGasPricingRPCError(t *testing.T) {
 	mockEthClient.AssertExpectations(t)
 }
 
-func TestDeleteCache(t *testing.T) {
-	conf := &pldconf.GasPriceConfig{
-		FixedGasPrice: nil,
-		EthFeeHistory: pldconf.EthFeeHistoryConfig{
-			PriorityFeePercentile: confutil.P(85),
-			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
-		},
-	}
-	ctx, hgc, mockEthClient := NewTestGasPriceClient(t, conf, false)
-
-	// Mock fee history response
-	mockFeeHistoryResult := createMockFeeHistoryResult(20, 20000000000, 1500000000)
-	mockEthClient.On("FeeHistory", ctx, 20, "latest", []float64{85.0}).Return(mockFeeHistoryResult, nil).Twice()
-
-	// First call to populate cache
-	gpo1, err := hgc.GetGasPriceObject(ctx, nil, nil, false)
-	require.NoError(t, err)
-	assert.NotNil(t, gpo1)
-
-	// Delete cache
-	hgc.DeleteCache(ctx)
-
-	// Second call should hit RPC again since cache was cleared
-	gpo2, err := hgc.GetGasPriceObject(ctx, nil, nil, false)
-	require.NoError(t, err)
-	assert.NotNil(t, gpo2)
-
-	mockEthClient.AssertExpectations(t)
-}
-
 func TestInitValidation(t *testing.T) {
 	ctx := context.Background()
 	// Test with invalid percentile (should log error but not panic)
@@ -440,9 +288,6 @@ func TestInitValidation(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(150), // Invalid: > 100
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 
@@ -477,7 +322,6 @@ func TestInitWithDefaults(t *testing.T) {
 	assert.Equal(t, 20, hgc.historyBlockCount)
 	assert.Equal(t, 1, hgc.baseFeeBufferFactor)
 	assert.Equal(t, 10, hgc.gasPriceIncreasePercent)
-	assert.True(t, hgc.ethFeeHistoryCacheEnabled)
 }
 
 // mapConfigToAPIGasPricing edge cases
@@ -528,9 +372,6 @@ func TestStartWithNilGasPriceResponse(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 
@@ -557,9 +398,6 @@ func TestStartWithGasPriceError(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 
@@ -592,9 +430,6 @@ func TestStartSkipsGasPriceWhenFixedPriceSet(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 
@@ -698,9 +533,6 @@ func TestCapGasPricing(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 
@@ -797,9 +629,6 @@ func TestCapGasPricing(t *testing.T) {
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
 			// No caps configured
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 
@@ -826,9 +655,6 @@ func TestCalculateNewGasPrice(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 
@@ -943,9 +769,6 @@ func TestGetGasPriceObjectWithTxFixedGasPrice(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 
@@ -988,9 +811,6 @@ func TestGetGasPriceObjectWithPreviouslySubmittedGPO(t *testing.T) {
 		EthFeeHistory: pldconf.EthFeeHistoryConfig{
 			PriorityFeePercentile: confutil.P(85),
 			HistoryBlockCount:     confutil.P(20),
-			Cache: pldconf.EthFeeHistoryCacheConfig{
-				Enabled: confutil.P(true),
-			},
 		},
 	}
 
@@ -1015,9 +835,6 @@ func TestGetGasPriceObjectWithPreviouslySubmittedGPO(t *testing.T) {
 		MaxFeePerGas:         pldtypes.Uint64ToUint256(10000000000), // 10 Gwei
 		MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1000000000),  // 1 Gwei
 	}
-
-	// Clear cache to force a new fee history call
-	hgc.DeleteCache(ctx)
 
 	result, err = hgc.GetGasPriceObject(ctx, nil, previouslySubmittedGPO, true)
 	require.NoError(t, err)
