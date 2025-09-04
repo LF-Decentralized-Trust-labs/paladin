@@ -100,7 +100,7 @@ func (hGpc *HybridGasPriceClient) estimateEIP1559Fees(ctx context.Context) (*pld
 		// This is a failure in the eth_feeHistory RPC response if the tip details we've requested
 		// are not included in the response. There's not much we can do about it, so we'll return an error
 		// which will cause this stage to be retried until it does succeed.
-		errMsg := "No valid tips found in fee history"
+		errMsg := "no valid tips found in fee history"
 		log.L(ctx).Error(errMsg)
 		return nil, errors.New(errMsg)
 	} else {
