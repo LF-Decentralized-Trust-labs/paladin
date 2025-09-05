@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -144,7 +145,7 @@ func (v *inFlightTransactionStateGeneration) GetStageTriggerError(ctx context.Co
 	return v.stageTriggerError
 }
 
-func (v *inFlightTransactionStateGeneration) StartNewStageContext(ctx context.Context, stage InFlightTxStage, substatus BaseTxSubStatus) {
+func (v *inFlightTransactionStateGeneration) StartNewStageContext(ctx context.Context, stage InFlightTxStage, substatus BaseTxSubStatus, txIdUUID uuid.UUID) {
 	nowTime := time.Now() // pin the now time
 	rsc := NewRunningStageContext(ctx, stage, substatus, v.InMemoryTxStateManager)
 	if rsc.Stage != v.stage {
@@ -176,7 +177,12 @@ func (v *inFlightTransactionStateGeneration) StartNewStageContext(ctx context.Co
 			signedMessage = v.TransientPreviousStageOutputs.SignedMessage
 			calculatedTxHash = v.TransientPreviousStageOutputs.TransactionHash
 		}
-		v.stageTriggerError = v.TriggerSubmitTx(ctx, signedMessage, calculatedTxHash)
+
+		toAddress := ""
+		if rsc.InMemoryTx.GetTo() != nil {
+			toAddress = rsc.InMemoryTx.GetTo().String()
+		}
+		v.stageTriggerError = v.TriggerSubmitTx(ctx, signedMessage, calculatedTxHash, toAddress, txIdUUID)
 	case InFlightTxStageStatusUpdate:
 		log.L(ctx).Tracef("Transaction with ID %s, triggering status update", rsc.InMemoryTx.GetSignerNonce())
 		v.stageTriggerError = v.TriggerStatusUpdate(ctx)

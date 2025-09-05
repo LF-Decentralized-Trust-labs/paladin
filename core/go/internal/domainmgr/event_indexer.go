@@ -126,10 +126,23 @@ func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persisten
 func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) {
 	for _, completion := range txCompletions {
 		// Private transaction manager needs to know about these to update its in-memory state
-		// MRW TODO - what's the interaction point between these and distributed sequencer manager?
 
-		// Get the from address of the tranasction submission
-		dm.sequencerManager.ProcessPrivateTransactionConfirmed(dm.bgCtx, completion)
+		fullTx, err := dm.txManager.GetTransactionByIDFull(dm.bgCtx, completion.TransactionID)
+		if err != nil {
+			log.L(dm.bgCtx).Errorf("Error getting transaction by ID: %s", err)
+		}
+
+		// MRW TODO - there may be multiple public transactions associated with a private transaction
+		for _, publicTx := range fullTx.Public {
+			log.L(dm.bgCtx).Debugf("Checking public transactions for TX ID %s to find a match for the receipt we are processing %s", completion.TransactionID, publicTx.TransactionHash)
+			if publicTx.TransactionHash.Equals(&completion.ReceiptInput.OnChain.TransactionHash) {
+				log.L(dm.bgCtx).Debugf("Found a match for the receipt we are processing %s", publicTx.TransactionHash)
+				err = dm.sequencerManager.HandleTransactionConfirmed(dm.bgCtx, completion.From, completion, publicTx.Nonce.Uint64())
+				if err != nil {
+					log.L(dm.bgCtx).Errorf("Error handling transaction confirmed event: %s", err)
+				}
+			}
+		}
 
 		// We also provide a direct waiter that's used by the testbed
 		inflight := dm.privateTxWaiter.GetInflight(completion.TransactionID)

@@ -35,7 +35,24 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func NewTransportWriter(domainName string, contractAddress *pldtypes.EthAddress, nodeID string, transportManager components.TransportManager, loopbackHandler func(ctx context.Context, message *components.ReceivedMessage)) *transportWriter {
+type TransportWriter interface {
+	SendDelegationRequest(ctx context.Context, coordinatorLocator string, transactions []*components.PrivateTransaction, blockHeight uint64)
+	SendDelegationRequestAcknowledgment(ctx context.Context, delegatingNodeName string, delegationId string, delegateNodeName string, transactionID string) error
+	SendEndorsementRequest(ctx context.Context, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error
+	SendAssembleRequest(ctx context.Context, assemblingNode string, txID uuid.UUID, idempotencyId uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error
+	SendAssembleResponse(ctx context.Context, txID uuid.UUID, assembleRequestId uuid.UUID, postAssembly *components.TransactionPostAssembly, recipient string)
+	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress)
+	SendNonceAssigned(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64)
+	SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32)
+	SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes)
+	SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot)
+	SendDispatchConfirmationRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error
+	SendDispatched(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
+	SendDispatchConfirmationResponse(ctx context.Context)
+	Send(ctx context.Context, payload *components.FireAndForgetMessageSend) error
+}
+
+func NewTransportWriter(domainName string, contractAddress *pldtypes.EthAddress, nodeID string, transportManager components.TransportManager, loopbackHandler func(ctx context.Context, message *components.ReceivedMessage)) TransportWriter {
 	loopbackTransport := NewLoopbackTransportWriter(loopbackHandler)
 	return &transportWriter{
 		nodeID:            nodeID,
@@ -339,6 +356,106 @@ func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordi
 	}
 }
 
+func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64) {
+	if contractAddress == nil {
+		err := fmt.Errorf("Attempt to send nonce assigned event request without specifying contract address")
+		log.L(ctx).Error(err.Error())
+	}
+	nonceAssigned := &engineProto.NonceAssigned{
+		Id:              uuid.New().String(),
+		TransactionId:   txID.String(),
+		ContractAddress: contractAddress.HexString(),
+		Nonce:           int64(nonce),
+	}
+	nonceAssignedBytes, err := proto.Marshal(nonceAssigned)
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] error marshalling nonce assigned event: %s", err)
+	}
+
+	// Split transactionSender into node and domain
+	parts := strings.Split(transactionSender, "@")
+	node := parts[0]
+	if len(parts) > 1 {
+		node = parts[1]
+	}
+
+	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+		MessageType: MessageType_NonceAssigned,
+		Payload:     nonceAssignedBytes,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
+		Node:        node,
+	}); err != nil {
+		log.L(ctx).Errorf("[Sequencer] error sending nonce assigned event: %s", err)
+	}
+}
+
+func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) {
+	if contractAddress == nil {
+		err := fmt.Errorf("Attempt to send TX submitted event without specifying contract address")
+		log.L(ctx).Error(err.Error())
+	}
+	txSubmitted := &engineProto.TransactionSubmitted{
+		Id:              uuid.New().String(),
+		TransactionId:   txID.String(),
+		ContractAddress: contractAddress.HexString(),
+		Hash:            txHash.Bytes(),
+	}
+	txSubmittedBytes, err := proto.Marshal(txSubmitted)
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] error marshalling TX submitted event: %s", err)
+	}
+
+	// Split transactionSender into node and domain
+	parts := strings.Split(transactionSender, "@")
+	node := parts[0]
+	if len(parts) > 1 {
+		node = parts[1]
+	}
+
+	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+		MessageType: MessageType_TransactionSubmitted,
+		Payload:     txSubmittedBytes,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
+		Node:        node,
+	}); err != nil {
+		log.L(ctx).Errorf("[Sequencer] error sending transaction submitted event: %s", err)
+	}
+}
+
+func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) {
+	if contractAddress == nil {
+		err := fmt.Errorf("Attempt to send TX submitted event without specifying contract address")
+		log.L(ctx).Error(err.Error())
+	}
+	txConfirmed := &engineProto.TransactionConfirmed{
+		Id:              uuid.New().String(),
+		TransactionId:   txID.String(),
+		ContractAddress: contractAddress.HexString(),
+		Nonce:           int64(nonce),
+		RevertReason:    revertReason,
+	}
+	txConfirmedBytes, err := proto.Marshal(txConfirmed)
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] error marshalling TX confirmed event: %s", err)
+	}
+
+	// Split transactionSender into node and domain
+	parts := strings.Split(transactionSender, "@")
+	node := parts[0]
+	if len(parts) > 1 {
+		node = parts[1]
+	}
+
+	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+		MessageType: MessageType_TransactionConfirmed,
+		Payload:     txConfirmedBytes,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
+		Node:        node,
+	}); err != nil {
+		log.L(ctx).Errorf("[Sequencer] error sending transaction confirmed event: %s", err)
+	}
+}
+
 func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot) {
 
 	coordinatorSnapshotBytes, err := json.Marshal(coordinatorSnapshot)
@@ -373,9 +490,10 @@ func (tw *transportWriter) SendDispatchConfirmationRequest(ctx context.Context, 
 
 	// MRW TODO - should dispatch confirmations also take the hash?
 	dispatchConfirmationRequest := &engineProto.TransactionDispatched{
-		Id:              idempotencyKey.String(),
-		TransactionId:   transactionSpecification.TransactionId,
-		ContractAddress: tw.contractAddress.HexString(),
+		Id:               idempotencyKey.String(),
+		TransactionId:    transactionSpecification.TransactionId,
+		ContractAddress:  tw.contractAddress.HexString(),
+		PostAssembleHash: hash.Bytes(),
 	}
 
 	dispatchConfirmationRequestBytes, err := proto.Marshal(dispatchConfirmationRequest)
@@ -397,6 +515,39 @@ func (tw *transportWriter) SendDispatchConfirmationRequest(ctx context.Context, 
 		Node:        node,
 	}); err != nil {
 		log.L(ctx).Errorf("[Sequencer] error sending dispatch confirmation request  message: %s", err)
+	}
+	return err
+}
+
+func (tw *transportWriter) SendDispatched(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+	log.L(ctx).Infof("SendDispatched")
+
+	dispatchedEvent := &engineProto.TransactionDispatched{
+		Id:              idempotencyKey.String(),
+		TransactionId:   transactionSpecification.TransactionId,
+		ContractAddress: tw.contractAddress.HexString(),
+		Signer:          transactionSender,
+	}
+
+	dispatchedEventBytes, err := proto.Marshal(dispatchedEvent)
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] error marshalling dispatch confirmation request  message: %s", err)
+	}
+
+	// Split transactionSender into node and domain
+	parts := strings.Split(transactionSender, "@")
+	node := parts[0]
+	if len(parts) > 1 {
+		node = parts[1]
+	}
+
+	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+		MessageType: MessageType_Dispatched,
+		Payload:     dispatchedEventBytes,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
+		Node:        node,
+	}); err != nil {
+		log.L(ctx).Errorf("[Sequencer] error sending dispatched event: %s", err)
 	}
 	return err
 }

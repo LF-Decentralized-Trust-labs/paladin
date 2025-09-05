@@ -70,15 +70,6 @@ func (t *Transaction) notifyDependentsOfReadinessAndQueueForDispatch(ctx context
 	// Ask the distributed sequencer manager to add this TX to the queue for collection
 	t.onReadyForDispatch(ctx, t)
 
-	log.L(ctx).Infof("[Sequencer] Transaction %s collected: Signer address %s", t.ID.String(), t.signerAddress.String())
-	collectedEvent := &CollectedEvent{
-		BaseEvent: BaseEvent{
-			TransactionID: t.ID,
-		},
-		SignerAddress: *t.signerAddress,
-	}
-	t.HandleEvent(ctx, collectedEvent)
-
 	//this function is called when the transaction enters the ready for dispatch state
 	// and we have a duty to inform all the transactions that are dependent on us that we are ready in case they are otherwise ready and are blocked waiting for us
 	for _, dependentId := range t.dependencies.PrereqOf {

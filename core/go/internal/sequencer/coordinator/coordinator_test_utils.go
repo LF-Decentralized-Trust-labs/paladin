@@ -180,6 +180,7 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		"node1",
 		func(context.Context, *transaction.Transaction) {}, // onReadyForDispatch function, not used in tests
 		func(contractAddress *pldtypes.EthAddress) {},      // coordinatorStarted function, not used in tests
+		func(contractAddress *pldtypes.EthAddress) {},      // coordinatorIdle function, not used in tests
 	)
 	if err != nil {
 		panic(err)

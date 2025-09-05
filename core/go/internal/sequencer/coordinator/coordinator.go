@@ -63,6 +63,9 @@ type coordinator struct {
 	emit               common.EmitEvent
 	readyForDispatch   func(context.Context, *transaction.Transaction)
 	coordinatorStarted func(contractAddress *pldtypes.EthAddress)
+	coordinatorIdle    func(contractAddress *pldtypes.EthAddress)
+	heartbeatCtx       context.Context
+	heartbeatCancel    context.CancelFunc
 
 	/*Algorithms*/
 	transactionSelector TransactionSelector
@@ -84,7 +87,7 @@ func NewCoordinator(
 	nodeName string,
 	readyForDispatch func(context.Context, *transaction.Transaction),
 	coordinatorStarted func(contractAddress *pldtypes.EthAddress),
-
+	coordinatorIdle func(contractAddress *pldtypes.EthAddress),
 ) (*coordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
@@ -102,6 +105,7 @@ func NewCoordinator(
 		emit:                               emit,
 		readyForDispatch:                   readyForDispatch,
 		coordinatorStarted:                 coordinatorStarted,
+		coordinatorIdle:                    coordinatorIdle,
 	}
 	c.committee = make(map[string][]string)
 	for _, member := range committeeMembers {

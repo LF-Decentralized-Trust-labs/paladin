@@ -62,6 +62,7 @@ const (
 	Event_Confirmed                                                                          // confirmation received from the blockchain of either a successful or reverted transaction
 	Event_RequestTimeoutInterval                                                             // event emitted by the state machine on a regular period while we have pending requests
 	Event_StateTransition                                                                    // event emitted by the state machine when a state transition occurs.  TODO should this be a separate enum?
+	Event_HeartbeatInterval                                                                  // event emitted by the state machine on a regular period while we have pending requests
 	Event_AssembleTimeout                                                                    // the assemble timeout period has passed since we sent the first assemble request
 )
 
@@ -273,7 +274,7 @@ func init() {
 		State_Reverted: {
 			OnTransitionTo: action_NotifyDependentsOfRevert,
 			Events: map[EventType]EventHandler{
-				common.Event_HeartbeatInterval: {
+				Event_HeartbeatInterval: {
 					Transitions: []Transition{
 						{
 							If: guard_HasGracePeriodPassedSinceStateChange,
@@ -284,7 +285,7 @@ func init() {
 		},
 		State_Confirmed: {
 			Events: map[EventType]EventHandler{
-				common.Event_HeartbeatInterval: {
+				Event_HeartbeatInterval: {
 					Transitions: []Transition{
 						{
 							If: guard_HasGracePeriodPassedSinceStateChange,
@@ -388,10 +389,12 @@ func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error 
 	case *NonceAllocatedEvent:
 		t.nonce = &event.Nonce
 	case *SubmittedEvent:
+		log.L(ctx).Infof("[Sequencer] coordinator transaction applying SubmittedEvent for transaction %s submitted with hash %s", t.ID.String(), event.SubmissionHash.HexString())
 		t.latestSubmissionHash = &event.SubmissionHash
 	case *ConfirmedEvent:
 		t.revertReason = event.RevertReason
-	case *common.HeartbeatIntervalEvent:
+	case *HeartbeatIntervalEvent:
+		log.L(ctx).Infof("[Sequencer] coordinator transaction increasing heartbeatIntervalsSinceStateChange")
 		t.heartbeatIntervalsSinceStateChange++
 	default:
 		//other events may trigger actions and/or state transitions but not require any internal state to be updated
@@ -418,7 +421,8 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 	sm := t.stateMachine
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
-			log.L(ctx).Infof("[Sequencer] transaction %s transitioning from %s to %s triggered by event %T", t.ID.String(), sm.currentState.String(), rule.To.String(), event)
+			// (Odd spacing is intentional to align logs more clearly)
+			log.L(ctx).Infof("[SeqState] | coord | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			previousState := sm.currentState
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]

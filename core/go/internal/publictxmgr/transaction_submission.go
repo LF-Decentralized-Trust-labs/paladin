@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
@@ -39,7 +40,7 @@ func calculateTransactionHash(rawTxnData []byte) *pldtypes.Bytes32 {
 	return &hashBytes
 }
 
-func (it *inFlightTransactionStageController) submitTX(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32, signerNonce string, lastSubmitTime *pldtypes.Timestamp, cancelled func(context.Context) bool) (*pldtypes.Bytes32, *pldtypes.Timestamp, ethclient.ErrorReason, SubmissionOutcome, error) {
+func (it *inFlightTransactionStageController) submitTX(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32, signerNonce string, contractAddress string, lastSubmitTime *pldtypes.Timestamp, cancelled func(context.Context) bool, txnID uuid.UUID) (*pldtypes.Bytes32, *pldtypes.Timestamp, ethclient.ErrorReason, SubmissionOutcome, error) {
 	var txHash *pldtypes.Bytes32
 	sendStart := time.Now()
 	if calculatedTxHash == nil {
@@ -57,6 +58,17 @@ func (it *inFlightTransactionStageController) submitTX(ctx context.Context, sign
 			return false, nil
 		}
 		txHash, submissionError = it.ethClient.SendRawTransaction(ctx, pldtypes.HexBytes(signedMessage))
+		if contractAddress != "" {
+			log.L(ctx).Infof("Geting transaction by ID to obtain the full private transaction %s", txnID)
+			privTX, err := it.rootTxMgr.GetTransactionByID(ctx, txnID)
+			if err != nil {
+				log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving transaction by ID for %s: %s", txnID, err)
+			}
+			err = it.sequencerManager.HandlePublicTXSubmission(ctx, privTX.From, txHash, contractAddress, txnID)
+			if err != nil {
+				log.L(ctx).Errorf("HandlePublicTXSubmission failed: %s", err)
+			}
+		}
 		if submissionError == nil {
 			submissionOutcome = SubmissionOutcomeFailedRequiresRetry
 			it.thMetrics.RecordOperationMetrics(ctx, string(InFlightTxOperationTransactionSend), string(GenericStatusSuccess), time.Since(sendStart).Seconds())

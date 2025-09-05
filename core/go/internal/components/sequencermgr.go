@@ -18,6 +18,7 @@ package components
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
@@ -70,14 +71,16 @@ type SequencerManager interface {
 	//Synchronous functions to submit a new private transaction
 	HandleNewTx(ctx context.Context, dbTX persistence.DBTX, tx *ValidatedTransaction) error
 	HandleNewEvent(ctx context.Context, event string) error
+	HandleTransactionCollected(ctx context.Context, signerAddress string, contractAddress string, txID uuid.UUID) error
+	HandleNonceAssigned(ctx context.Context, from string, nonce uint64, contractAddress string, txID uuid.UUID) error
+	HandlePublicTXSubmission(ctx context.Context, signerAddress string, txHash *pldtypes.Bytes32, contractAddress string, txnID uuid.UUID) error
+	HandleTransactionConfirmed(ctx context.Context, transactionSender string, receipt *TxCompletion, nonce uint64) error
 	// GetTxStatus(ctx context.Context, domainAddress string, txID uuid.UUID) (status PrivateTxStatus, err error)
 
 	// Synchronous function to call an existing deployed smart contract
 	CallPrivateSmartContract(ctx context.Context, call *ResolvedTransaction) (*abi.ComponentValue, error)
 
 	// NotifyFailedPublicTx(ctx context.Context, dbTX persistence.DBTX, confirms []*PublicTxMatch) error
-
-	ProcessPrivateTransactionConfirmed(ctx context.Context, receipt *TxCompletion)
 
 	// BuildStateDistributions(ctx context.Context, tx *PrivateTransaction) (*StateDistributionSet, error)
 	BuildNullifier(ctx context.Context, kr KeyResolver, s *StateDistributionWithData) (*NullifierUpsert, error)
