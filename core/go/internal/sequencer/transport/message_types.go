@@ -32,12 +32,16 @@ const (
 	MessageType_CoordinatorHeartbeatNotification = "CoordinatorHeartbeatNotification"
 	MessageType_DelegationRequest                = "DelegationRequest"
 	MessageType_DelegationRequestAcknowledgment  = "DelegationRequestAcknowledgment"
+	MessageType_Dispatched                       = "Dispatched"
 	MessageType_DispatchConfirmationRequest      = "DispatchConfirmationRequest"
 	MessageType_DispatchConfirmationResponse     = "DispatchConfirmationResponse"
 	MessageType_EndorsementRequest               = "EndorsementRequest"
 	MessageType_EndorsementResponse              = "EndorsementResponse"
 	MessageType_HandoverRequest                  = "HandoverRequest"
+	MessageType_NonceAssigned                    = "NonceAssigned"
 	MessageType_TransactionRequest               = "TransactionRequest"
+	MessageType_TransactionSubmitted             = "TransactionSubmitted"
+	MessageType_TransactionConfirmed             = "TransactionConfirmed"
 )
 
 type CoordinatorHeartbeatNotification struct {

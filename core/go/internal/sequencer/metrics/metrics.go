@@ -22,28 +22,46 @@ import (
 )
 
 type DistributedSequencerMetrics interface {
+	IncAcceptedTransactions()
 	IncAssembledTransactions()
 	IncDispatchedTransactions()
+	IncConfirmedTransactions()
+	SetActiveCoordinators(numberOfActiveCoordinators int)
 }
 
 var METRICS_SUBSYSTEM = "distributed_sequencer"
 
 type distributedSequencerMetrics struct {
+	acceptedTransactions   prometheus.Counter
 	assembledTransactions  prometheus.Counter
 	dispatchedTransactions prometheus.Counter
+	confirmedTransactions  prometheus.Counter
+	activeCoordinators     prometheus.Gauge
 }
 
 func InitMetrics(ctx context.Context, registry *prometheus.Registry) *distributedSequencerMetrics {
 	metrics := &distributedSequencerMetrics{}
 
+	metrics.acceptedTransactions = prometheus.NewCounter(prometheus.CounterOpts{Name: "accepted_txns_total",
+		Help: "Distributed sequencer accepted transactions", Subsystem: METRICS_SUBSYSTEM})
 	metrics.assembledTransactions = prometheus.NewCounter(prometheus.CounterOpts{Name: "assembled_txns_total",
 		Help: "Distributed sequencer assembled transactions", Subsystem: METRICS_SUBSYSTEM})
 	metrics.dispatchedTransactions = prometheus.NewCounter(prometheus.CounterOpts{Name: "dispatched_txns_total",
 		Help: "Distributed sequencer dispatched transactions", Subsystem: METRICS_SUBSYSTEM})
-
+	metrics.confirmedTransactions = prometheus.NewCounter(prometheus.CounterOpts{Name: "confirmed_txns_total",
+		Help: "Distributed sequencer confirmed transactions", Subsystem: METRICS_SUBSYSTEM})
+	metrics.activeCoordinators = prometheus.NewGauge(prometheus.GaugeOpts{Name: "active_coordinators",
+		Help: "Distributed sequencer active coordinators", Subsystem: METRICS_SUBSYSTEM})
+	registry.MustRegister(metrics.acceptedTransactions)
 	registry.MustRegister(metrics.assembledTransactions)
 	registry.MustRegister(metrics.dispatchedTransactions)
+	registry.MustRegister(metrics.confirmedTransactions)
+	registry.MustRegister(metrics.activeCoordinators)
 	return metrics
+}
+
+func (dtm *distributedSequencerMetrics) IncAcceptedTransactions() {
+	dtm.acceptedTransactions.Inc()
 }
 
 func (dtm *distributedSequencerMetrics) IncAssembledTransactions() {
@@ -52,4 +70,12 @@ func (dtm *distributedSequencerMetrics) IncAssembledTransactions() {
 
 func (dtm *distributedSequencerMetrics) IncDispatchedTransactions() {
 	dtm.dispatchedTransactions.Inc()
+}
+
+func (dtm *distributedSequencerMetrics) IncConfirmedTransactions() {
+	dtm.confirmedTransactions.Inc()
+}
+
+func (dtm *distributedSequencerMetrics) SetActiveCoordinators(numberOfActiveCoordinators int) {
+	dtm.activeCoordinators.Set(float64(numberOfActiveCoordinators))
 }

@@ -17,6 +17,7 @@ package coordinator
 
 import (
 	"context"
+	"time"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
@@ -87,6 +88,7 @@ func init() {
 	// Initialize state definitions in init function to avoid circular dependencies
 	stateDefinitionsMap = map[State]StateDefinition{
 		State_Idle: {
+			OnTransitionTo: action_Idle,
 			Events: map[EventType]EventHandler{
 
 				Event_TransactionsDelegated: {
@@ -102,6 +104,7 @@ func init() {
 			},
 		},
 		State_Observing: {
+			OnTransitionTo: action_StopHeartbeating,
 			Events: map[EventType]EventHandler{
 				common.Event_HeartbeatInterval: {},
 				Event_TransactionsDelegated: {
@@ -183,6 +186,7 @@ func init() {
 		},
 		State_Flush: {
 			//TODO should we move to active if we get delegated transactions while in flush?
+			OnTransitionTo: action_StopHeartbeating,
 			Events: map[EventType]EventHandler{
 				common.Event_HeartbeatInterval: {},
 				Event_TransactionConfirmed: {
@@ -195,6 +199,7 @@ func init() {
 		},
 		State_Closing: {
 			//TODO should we move to active if we get delegated transactions while in closing?
+			OnTransitionTo: action_StopHeartbeating,
 			Events: map[EventType]EventHandler{
 				common.Event_HeartbeatInterval: {
 					Transitions: []Transition{{
@@ -220,6 +225,7 @@ func (c *coordinator) HandleEvent(ctx context.Context, event common.Event) error
 	}
 
 	if transactionEvent, ok := event.(transaction.Event); ok {
+		log.L(ctx).Infof("[Sequencer] coordinator propogating event to transactions: %s", transactionEvent.TypeString())
 		return c.propagateEventToTransaction(ctx, transactionEvent)
 	}
 
@@ -318,6 +324,7 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 	case *common.HeartbeatIntervalEvent:
 		c.heartbeatIntervalsSinceStateChange++
 		//TODO is this the right place to do this vs more generically in the handleEvent function?
+		// MRW TODO - propogating a coordinator heartbeat doesn't have an effect on transactions. Not sure we will ever go through this code
 		err = c.propagateEventToAllTransactions(ctx, event)
 	}
 	if err != nil {
@@ -345,7 +352,7 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
-			log.L(ctx).Infof("[Sequencer] coordinator for address %s transitioning from %s to %s triggered by event %T", c.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
+			log.L(ctx).Infof("[SeqState] | coord | addr | %s | %T | %s -> %s", c.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first
@@ -383,12 +390,47 @@ func action_SendHandoverRequest(ctx context.Context, c *coordinator) error {
 	return nil
 }
 
+func action_StopHeartbeating(ctx context.Context, c *coordinator) error {
+	c.heartbeatCancel()
+	return nil
+}
+
 func action_SelectTransaction(ctx context.Context, c *coordinator) error {
 	// Take the opportunity to inform the sequencer lifecycle manager that we have become active so it can decide if that has
 	// casued us to reach the node's limit on active coordinators.
 	c.coordinatorStarted(c.contractAddress)
 
+	// Start heartbeating
+	go c.heartbeatLoop(ctx)
+
+	// Seleect our next transaction
 	return c.selectNextTransaction(ctx, nil)
+}
+
+func action_Idle(ctx context.Context, c *coordinator) error {
+	c.coordinatorIdle(c.contractAddress)
+	return nil
+}
+
+func (c *coordinator) heartbeatLoop(ctx context.Context) error {
+	if c.heartbeatCtx == nil {
+		c.heartbeatCtx, c.heartbeatCancel = context.WithCancel(ctx)
+
+		log.L(ctx).Infof("[SeqState] Starting heartbeat loop for %s", c.contractAddress.String())
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				c.sendHeartbeat(ctx, c.contractAddress)
+			case <-c.heartbeatCtx.Done():
+				log.L(ctx).Infof("[SeqState] Ending heartbeat loop for %s", c.contractAddress.String())
+				c.heartbeatCtx = nil
+				c.heartbeatCancel = nil
+			}
+		}
+	}
+	return nil
 }
 
 func (s State) String() string {

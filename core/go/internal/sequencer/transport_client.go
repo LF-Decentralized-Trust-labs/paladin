@@ -28,6 +28,7 @@ import (
 	coordTransaction "github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
+	senderTransaction "github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
 	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
@@ -55,12 +56,20 @@ func (d *distributedSequencerManager) HandlePaladinMsg(ctx context.Context, mess
 		go d.handleDelegationRequest(d.ctx, message)
 	case transport.MessageType_DelegationRequestAcknowledgment:
 		go d.handleDelegationRequestAcknowledgment(d.ctx, message)
+	case transport.MessageType_Dispatched:
+		go d.handleDispatchedEvent(d.ctx, message)
 	case transport.MessageType_DispatchConfirmationRequest:
 		go d.handleDispatchConfirmationRequest(d.ctx, message)
 	case transport.MessageType_EndorsementRequest:
 		go d.handleEndorsementRequest(d.ctx, message)
 	case transport.MessageType_EndorsementResponse:
 		go d.handleEndorsementResponse(d.ctx, message)
+	case transport.MessageType_NonceAssigned:
+		go d.handleNonceAssigned(d.ctx, message)
+	case transport.MessageType_TransactionSubmitted:
+		go d.handleTransactionSubmitted(d.ctx, message)
+	case transport.MessageType_TransactionConfirmed:
+		go d.handleTransactionConfirmed(d.ctx, message)
 	default:
 		log.L(ctx).Errorf("Unknown message type: %s", message.MessageType)
 	}
@@ -116,6 +125,10 @@ func (d *distributedSequencerManager) handleAssembleRequest(ctx context.Context,
 		log.L(ctx).Errorf("[Sequencer] failed to obtain sequencer to pass assemble request event to %v:", err)
 		return
 	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		return
+	}
 
 	assembleRequestEvent := &transaction.AssembleRequestReceivedEvent{}
 	assembleRequestEvent.TransactionID = uuid.MustParse(assembleRequest.TransactionId)
@@ -151,6 +164,10 @@ func (d *distributedSequencerManager) handleAssembleResponse(ctx context.Context
 	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
 		log.L(ctx).Errorf("[Sequencer] failed to obtain sequencer to pass assemble response event %v:", err)
+		return
+	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -201,6 +218,10 @@ func (d *distributedSequencerManager) handleAssembleError(ctx context.Context, m
 		log.L(ctx).Errorf("[Sequencer] failed to obtain sequencer to pass assemble error event %v:", err)
 		return
 	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		return
+	}
 	seq.GetCoordinator().HandleEvent(ctx, assembleErrorEvent)
 }
 
@@ -240,6 +261,17 @@ func (d *distributedSequencerManager) handleCoordinatorHeartbeatNotification(ctx
 		log.L(ctx).Errorf("[Sequencer] failed to obtain sequencer to pass heartbeat event to %v:", err)
 		return
 	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		return
+	}
+
+	for _, transaction := range coordinatorSnapshot.ConfirmedTransactions {
+		log.L(ctx).Infof("[Sequencer] received a heartbeat containing a confirmed transaction: %s", transaction.ID.String())
+		heartbeatIntervalEvent := &coordTransaction.HeartbeatIntervalEvent{}
+		heartbeatIntervalEvent.TransactionID = transaction.ID
+		seq.GetCoordinator().HandleEvent(ctx, heartbeatIntervalEvent)
+	}
 
 	seq.GetCoordinator().HandleEvent(ctx, heartbeatEvent)
 }
@@ -263,12 +295,52 @@ func (d *distributedSequencerManager) handleDispatchConfirmationRequest(ctx cont
 		log.L(ctx).Errorf("[Sequencer] failed to obtain sequencer to pass dispatch confirmation event to %v:", err)
 		return
 	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		return
+	}
 
-	dispatchConfirmedEvent := &coordTransaction.DispatchConfirmedEvent{}
-	dispatchConfirmedEvent.TransactionID = uuid.MustParse(dispatchConfirmationRequest.TransactionId[2:34])
-	dispatchConfirmedEvent.RequestID = uuid.MustParse(dispatchConfirmationRequest.Id)
+	postAssemblyHash := pldtypes.NewBytes32FromSlice(dispatchConfirmationRequest.PostAssembleHash)
 
-	seq.GetCoordinator().HandleEvent(ctx, dispatchConfirmedEvent)
+	seq.GetSender().HandleEvent(ctx, &transaction.DispatchConfirmationRequestReceivedEvent{
+		BaseEvent: transaction.BaseEvent{
+			TransactionID: uuid.MustParse(dispatchConfirmationRequest.TransactionId[2:34]),
+		},
+		RequestID:        uuid.MustParse(dispatchConfirmationRequest.Id),
+		Coordinator:      message.FromNode,
+		PostAssemblyHash: &postAssemblyHash,
+	})
+}
+
+func (d *distributedSequencerManager) handleDispatchedEvent(ctx context.Context, message *components.ReceivedMessage) {
+	dispatchedEvent := &engineProto.TransactionDispatched{}
+
+	err := proto.Unmarshal(message.Payload, dispatchedEvent)
+	if err != nil {
+		d.logPaladinMessageUnmarshalError(ctx, message, err)
+		return
+	}
+
+	contractAddress := d.parseContractAddressString(ctx, dispatchedEvent.ContractAddress, message)
+	if contractAddress == nil {
+		return
+	}
+
+	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] failed to obtain sequencer to pass dispatch confirmation event to %v:", err)
+		return
+	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		return
+	}
+
+	dispatchConfirmedEvent := &senderTransaction.DispatchedEvent{}
+	dispatchConfirmedEvent.TransactionID = uuid.MustParse(dispatchedEvent.TransactionId[2:34])
+	// MRW TODO Dispatched events include a signer, but it's not clear why we're interested in that here
+
+	seq.GetSender().HandleEvent(ctx, dispatchConfirmedEvent)
 }
 
 func (d *distributedSequencerManager) handleDelegationRequest(ctx context.Context, message *components.ReceivedMessage) {
@@ -301,6 +373,10 @@ func (d *distributedSequencerManager) handleDelegationRequest(ctx context.Contex
 	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
 		log.L(ctx).Errorf("[Sequencer] handleDelegationRequest failed to obtain sequencer to pass endorsement event %v:", err)
+		return
+	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -474,6 +550,10 @@ func (d *distributedSequencerManager) handleEndorsementRequest(ctx context.Conte
 		log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to obtain sequencer to pass endorsement event %v:", err)
 		return
 	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		return
+	}
 
 	result := &prototk.AttestationResult{
 		Name:            transactionEndorsement.Name,
@@ -579,7 +659,105 @@ func (d *distributedSequencerManager) handleEndorsementResponse(ctx context.Cont
 		log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to obtain sequencer to pass endorsement event %v:", err)
 		return
 	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		return
+	}
 
 	seq.GetCoordinator().HandleEvent(ctx, endorsementResponseEvent)
+}
 
+func (d *distributedSequencerManager) handleNonceAssigned(ctx context.Context, message *components.ReceivedMessage) {
+	nonceAssigned := &engineProto.NonceAssigned{}
+	err := proto.Unmarshal(message.Payload, nonceAssigned)
+	if err != nil {
+		d.logPaladinMessageUnmarshalError(ctx, message, err)
+		return
+	}
+
+	contractAddress := d.parseContractAddressString(ctx, nonceAssigned.ContractAddress, message)
+	if contractAddress == nil {
+		return
+	}
+
+	nonceAssignedEvent := &senderTransaction.NonceAssignedEvent{}
+	nonceAssignedEvent.TransactionID = uuid.MustParse(nonceAssigned.TransactionId)
+	nonceAssignedEvent.Nonce = uint64(nonceAssigned.Nonce)
+
+	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] handleNonceAssignedEvent failed to obtain sequencer to pass nonce assigned event %v:", err)
+		return
+	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		return
+	}
+
+	seq.GetSender().HandleEvent(ctx, nonceAssignedEvent)
+}
+
+func (d *distributedSequencerManager) handleTransactionSubmitted(ctx context.Context, message *components.ReceivedMessage) {
+	transactionSubmitted := &engineProto.TransactionSubmitted{}
+	err := proto.Unmarshal(message.Payload, transactionSubmitted)
+	if err != nil {
+		d.logPaladinMessageUnmarshalError(ctx, message, err)
+		return
+	}
+
+	contractAddress := d.parseContractAddressString(ctx, transactionSubmitted.ContractAddress, message)
+	if contractAddress == nil {
+		return
+	}
+
+	transactionSubmittedEvent := &senderTransaction.SubmittedEvent{}
+	transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionSubmitted.TransactionId)
+	transactionSubmittedEvent.LatestSubmissionHash = pldtypes.Bytes32(transactionSubmitted.Hash)
+
+	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] handleTransactionSubmitted failed to obtain sequencer to pass transaction submitted event %v:", err)
+		return
+	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		return
+	}
+
+	seq.GetSender().HandleEvent(ctx, transactionSubmittedEvent)
+}
+
+func (d *distributedSequencerManager) handleTransactionConfirmed(ctx context.Context, message *components.ReceivedMessage) {
+	transactionConfirmed := &engineProto.TransactionConfirmed{}
+	err := proto.Unmarshal(message.Payload, transactionConfirmed)
+	if err != nil {
+		d.logPaladinMessageUnmarshalError(ctx, message, err)
+		return
+	}
+
+	contractAddress := d.parseContractAddressString(ctx, transactionConfirmed.ContractAddress, message)
+	if contractAddress == nil {
+		return
+	}
+
+	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] handleTransactionSubmitted failed to obtain sequencer to pass transaction submitted event %v:", err)
+		return
+	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		return
+	}
+
+	if transactionConfirmed.RevertReason != nil {
+		transactionSubmittedEvent := &senderTransaction.ConfirmedRevertedEvent{}
+		transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionConfirmed.TransactionId)
+		transactionSubmittedEvent.RevertReason = transactionConfirmed.RevertReason
+		seq.GetSender().HandleEvent(ctx, transactionSubmittedEvent)
+	} else {
+		transactionSubmittedEvent := &senderTransaction.ConfirmedSuccessEvent{}
+		transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionConfirmed.TransactionId)
+		seq.GetSender().HandleEvent(ctx, transactionSubmittedEvent)
+	}
 }

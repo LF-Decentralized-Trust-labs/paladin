@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
@@ -76,9 +77,13 @@ func (t *Transaction) Hash(ctx context.Context) (*pldtypes.Bytes32, error) {
 		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "[Sequencer] cannot hash transaction without PostAssembly")
 	}
 
-	if len(t.PostAssembly.Signatures) == 0 {
-		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "[Sequencer] cannot hash transaction without at least one Signature")
-	}
+	log.L(ctx).Debugf("[Sequencer] hashing transaction %s with %d signatures and %d endorsements", t.ID.String(), len(t.PostAssembly.Signatures), len(t.PostAssembly.Endorsements))
+
+	// MRW TODO MUST DO - it's not clear is a sender transaction hash if valid without any signatures or endorsements.
+	// After assemble a Pente TX can have just the assembler's endorsement (not everyone else's), so comparing hashes with > 1 endorsements will fail
+	// if len(t.PostAssembly.Signatures) == 0 {
+	// 	return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "[Sequencer] cannot hash transaction without at least one Signature")
+	// }
 
 	hash := sha3.NewLegacyKeccak256()
 	for _, signature := range t.PostAssembly.Signatures {

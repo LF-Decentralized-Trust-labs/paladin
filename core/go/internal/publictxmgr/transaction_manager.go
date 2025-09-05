@@ -82,6 +82,7 @@ type pubTxManager struct {
 	thMetrics        metrics.PublicTransactionManagerMetrics
 	p                persistence.Persistence
 	bIndexer         blockindexer.BlockIndexer
+	sequencerManager components.SequencerManager
 	ethClient        ethclient.EthClient
 	keymgr           components.KeyManager
 	rootTxMgr        components.TXManager
@@ -183,6 +184,7 @@ func (ptm *pubTxManager) PostInit(pic components.AllComponents) error {
 	ptm.rootTxMgr = pic.TxManager()
 	ptm.submissionWriter = newSubmissionWriter(ptm.ctx, ptm.p, ptm.conf, ptm.thMetrics)
 	ptm.balanceManager = NewBalanceManagerWithInMemoryTracking(ctx, ptm.conf, ptm)
+	ptm.sequencerManager = pic.SequencerManager()
 
 	log.L(ctx).Debugf("Initialized public transaction manager")
 	return nil
@@ -436,6 +438,10 @@ func (ptm *pubTxManager) QueryPublicTxForTransactions(ctx context.Context, dbTX 
 }
 
 func (ptm *pubTxManager) queryPublicTxWithBinding(ctx context.Context, dbTX persistence.DBTX, scopeToTxns []uuid.UUID, jq *query.QueryJSON) ([]*pldapi.PublicTxWithBinding, error) {
+	log.L(ctx).Infof("queryPublicTxWithBinding: %d transactions", len(scopeToTxns))
+	for _, tx := range scopeToTxns {
+		log.L(ctx).Infof("queryPublicTxWithBinding: %s", tx)
+	}
 	q := dbTX.DB().Table("public_txns").
 		WithContext(ctx).
 		Joins("Completed")
@@ -446,6 +452,7 @@ func (ptm *pubTxManager) queryPublicTxWithBinding(ctx context.Context, dbTX pers
 	if err != nil {
 		return nil, err
 	}
+	log.L(ctx).Infof("queryPublicTxWithBinding: %d public transactions", len(ptxs))
 	results := make([]*pldapi.PublicTxWithBinding, len(ptxs))
 	for iTx, ptx := range ptxs {
 		tx := mapPersistedTransaction(ptx)

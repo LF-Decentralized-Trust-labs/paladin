@@ -31,18 +31,21 @@ func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uui
 
 func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error {
 
-	log.L(ctx).Debugf("Sending dispatch confirmation request for transaction %s", t.ID)
+	log.L(ctx).Debugf("[Sequencer] Sending dispatch confirmation request for transaction %s", t.ID)
+	log.L(ctx).Debugf("[Sequencer] Do we have endorsements or signatures?")
+	log.L(ctx).Debugf("[Sequencer] %d endorsements", len(t.PostAssembly.Endorsements))
+	log.L(ctx).Debugf("[Sequencer] %d signatures", len(t.PostAssembly.Signatures))
 
 	if t.pendingDispatchConfirmationRequest == nil {
 		hash, err := t.Hash(ctx)
 		if err != nil {
-			log.L(ctx).Debugf("Error hashing transaction for dispatch confirmation request: %s", err)
+			log.L(ctx).Debugf("[Sequencer] Error hashing transaction for dispatch confirmation request: %s", err)
 			return err
 		}
-		log.L(ctx).Debug("Creating idempotent request for dispatch confirmation request")
+		log.L(ctx).Debugf("[Sequencer] Creating idempotent request for dispatch confirmation request")
 		t.pendingDispatchConfirmationRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
 
-			log.L(ctx).Debug("Calling SendDispatchConfirmationRequest")
+			log.L(ctx).Debugf("[Sequencer] Calling SendDispatchConfirmationRequest")
 			return t.messageSender.SendDispatchConfirmationRequest(
 				ctx,
 				t.sender,
@@ -60,7 +63,17 @@ func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error
 		})
 	}
 
-	return t.pendingDispatchConfirmationRequest.Nudge(ctx)
+	sendErr := t.pendingDispatchConfirmationRequest.Nudge(ctx)
+
+	// MRW TODO - we are the ones doing the dispatching, so after we've informed the sender we can just update our own state?
+	t.HandleEvent(ctx, &DispatchConfirmedEvent{
+		BaseEvent: BaseEvent{
+			TransactionID: t.ID,
+		},
+		RequestID: t.pendingDispatchConfirmationRequest.IdempotencyKey(),
+	})
+
+	return sendErr
 
 }
 func (t *Transaction) nudgeDispatchConfirmationRequest(ctx context.Context) error {

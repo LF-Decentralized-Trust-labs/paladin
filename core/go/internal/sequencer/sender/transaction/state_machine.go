@@ -488,7 +488,8 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 	sm := t.stateMachine
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
-			log.L(ctx).Infof("[Sequencer] transaction %s transitioning from %s to %s triggered by event %T", t.ID.String(), sm.currentState.String(), rule.To.String(), event)
+			// (Odd spacing is intentional to align logs more clearly)
+			log.L(ctx).Infof("[SeqState]| sdr   | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first

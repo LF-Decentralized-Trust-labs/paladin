@@ -290,3 +290,16 @@ func (_ *StateTransitionEvent) Type() EventType {
 func (_ *StateTransitionEvent) TypeString() string {
 	return "Event_StateTransition"
 }
+
+// events emitted by the transaction state machine whenever a state transition occurs
+type HeartbeatIntervalEvent struct {
+	BaseEvent
+}
+
+func (_ *HeartbeatIntervalEvent) Type() EventType {
+	return Event_HeartbeatInterval
+}
+
+func (_ *HeartbeatIntervalEvent) TypeString() string {
+	return "Event_HeartbeatInterval"
+}

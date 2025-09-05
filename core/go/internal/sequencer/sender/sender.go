@@ -113,7 +113,7 @@ func (s *sender) propagateEventToTransaction(ctx context.Context, event transact
 	if txn := s.transactionsByID[event.GetTransactionID()]; txn != nil {
 		return txn.HandleEvent(ctx, event)
 	} else {
-		log.L(ctx).Debugf("[Sequencer] ignoring event because transaction not known to this coordinator %s", event.GetTransactionID().String())
+		log.L(ctx).Debugf("[Sequencer] ignoring event because transaction not known to this sender %s", event.GetTransactionID().String())
 	}
 	return nil
 }

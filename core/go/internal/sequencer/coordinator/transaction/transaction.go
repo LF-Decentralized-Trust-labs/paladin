@@ -45,9 +45,9 @@ const (
 // Transaction represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
 type Transaction struct {
 	*components.PrivateTransaction
-	sender               string // The member ID e.g. "member1"
+	sender               string // The fully qualified identity of the sender e.g. "member1@node1"
 	senderNode           string // The node the sender is running on e.g. "node1"
-	senderIdentity       string // The fully qualified identity of the sender e.g. "member1@node1"
+	senderIdentity       string // The member ID e.g. "member1"
 	signerAddress        *pldtypes.EthAddress
 	latestSubmissionHash *pldtypes.Bytes32
 	nonce                *uint64
@@ -167,21 +167,16 @@ func (t *Transaction) Hash(ctx context.Context) (*pldtypes.Bytes32, error) {
 		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without PostAssembly")
 	}
 
-	// MRW TODO - this was relying on only signatures being present, but Pente contracts reject transactions that have both signatures and endorsements.
-	if len(t.PostAssembly.Signatures) == 0 && len(t.PostAssembly.Endorsements) == 0 {
-		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without at least one Signature or Endorsement")
-	}
+	// MRW TODO - MUST DO - this was relying on only signatures being present, but Pente contracts reject transactions that have both signatures and endorsements.
+	// if len(t.PostAssembly.Signatures) == 0 {
+	// 	return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot hash transaction without at least one Signature")
+	// }
 
 	hash := sha3.NewLegacyKeccak256()
 
 	if len(t.PostAssembly.Signatures) != 0 {
 		for _, signature := range t.PostAssembly.Signatures {
 			hash.Write(signature.Payload)
-		}
-	}
-	if len(t.PostAssembly.Endorsements) != 0 {
-		for _, endorsement := range t.PostAssembly.Endorsements {
-			hash.Write(endorsement.Payload)
 		}
 	}
 

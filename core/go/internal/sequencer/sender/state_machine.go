@@ -156,10 +156,12 @@ func (s *sender) HandleEvent(ctx context.Context, event common.Event) error {
 	}
 
 	if transactionEvent, ok := event.(transaction.Event); ok {
+		log.L(ctx).Infof("Propagating transaction event to transaction: %s", transactionEvent.TypeString())
 		return s.propagateEventToTransaction(ctx, transactionEvent)
 	}
 
 	//determine whether this event is valid for the current state
+	log.L(ctx).Infof("Evaluating event: %s", event.TypeString())
 	eventHandler, err := s.evaluateEvent(ctx, event)
 	if err != nil || eventHandler == nil {
 		return err
@@ -168,6 +170,7 @@ func (s *sender) HandleEvent(ctx context.Context, event common.Event) error {
 	//If we get here, the state machine has defined a rule for handling this event
 	//Apply the event to the coordinator to update the internal state
 	// so that the guards and actions defined in the state machine can reference the new internal state of the coordinator
+	log.L(ctx).Infof("Applying event: %s", event.TypeString())
 	err = s.applyEvent(ctx, event)
 	if err != nil {
 		return err
@@ -268,8 +271,8 @@ func (s *sender) evaluateTransitions(ctx context.Context, event common.Event, ev
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, s) { //if there is no guard defined, or the guard returns true
-			log.L(ctx).Infof("[Sequencer] sender for address %s transitioning from %s to %s triggered by event %T", s.contractAddress.String(), sm.currentState.String(), rule.To.String(), event)
-			log.L(ctx).Infof("[Sequencer] sender state: active coordinator %s", s.activeCoordinator)
+			log.L(ctx).Infof("[SeqState] | sdr   | addr | %s | %T | %s -> %s", s.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
+
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first
