@@ -558,6 +558,8 @@ func (tw *transportWriter) SendDispatchConfirmationResponse(ctx context.Context)
 }
 
 func (tw *transportWriter) Send(ctx context.Context, payload *components.FireAndForgetMessageSend) error {
+
+	common.Log(ctx, common.LOGTYPE_MSGTX, "%+v ", payload.MessageType)
 	if payload.Node == "" || payload.Node == tw.transportManager.LocalNodeName() {
 		// "Localhost" loopback
 		log.L(ctx).Debugf("[Sequencer] sending %s to loopback interface", payload.MessageType)

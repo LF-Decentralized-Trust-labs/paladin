@@ -307,12 +307,13 @@ func (dSmgr *distributedSequencerManager) HandleNewTx(ctx context.Context, dbTX 
 	if txi.Function == nil || txi.Function.Definition == nil {
 		return i18n.NewError(ctx, msgs.MsgPrivateTxMgrFunctionNotProvided)
 	}
-	log.L(dSmgr.ctx).Info("[Sequencer] handling non-deploy transaction")
+	log.L(dSmgr.ctx).Infof("[Sequencer] handling non-deploy transaction, signer %s", tx.From)
 	return dSmgr.handleNewTx(ctx, dbTX, &components.PrivateTransaction{
 		ID:      *tx.ID,
 		Domain:  tx.Domain,
 		Address: *tx.To,
 		Intent:  intent,
+		Signer:  tx.From,
 	}, &txi.ResolvedTransaction)
 }
 

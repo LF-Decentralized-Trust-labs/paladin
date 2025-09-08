@@ -271,7 +271,7 @@ func (s *sender) evaluateTransitions(ctx context.Context, event common.Event, ev
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, s) { //if there is no guard defined, or the guard returns true
-			log.L(ctx).Infof("[SeqState] | sdr   | addr | %s | %T | %s -> %s", s.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			common.Log(ctx, common.LOGTYPE_STATE, " | sdr   | addr | %s | %T | %s -> %s", s.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
 
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]

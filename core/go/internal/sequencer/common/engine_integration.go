@@ -61,13 +61,14 @@ type EngineIntegration interface {
 	AssembleAndSign(ctx context.Context, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) (*components.TransactionPostAssembly, error)
 }
 
-func NewEngineIntegration(ctx context.Context, allComponents components.AllComponents, domainSmartContract components.DomainSmartContract, domainContext components.DomainContext, stateDistributer StateDistributer, hooks Hooks) EngineIntegration {
+func NewEngineIntegration(ctx context.Context, allComponents components.AllComponents, nodeName string, domainSmartContract components.DomainSmartContract, domainContext components.DomainContext, stateDistributer StateDistributer, hooks Hooks) EngineIntegration {
 	return &engineIntegration{
 		environment:         hooks,
 		stateDistributer:    stateDistributer,
 		components:          allComponents,
 		domainSmartContract: domainSmartContract,
 		domainContext:       domainContext,
+		nodeName:            nodeName,
 	}
 
 }
@@ -103,12 +104,12 @@ type engineIntegration struct {
 	environment         Hooks
 }
 
-func (s *engineIntegration) WriteLockAndDistributeStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
+func (e *engineIntegration) WriteLockAndDistributeStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
 
 	//Write output states
 	if txn.PostAssembly.OutputStatesPotential != nil && txn.PostAssembly.OutputStates == nil {
-		readTX := s.components.Persistence().NOTX() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
-		err := s.domainSmartContract.WritePotentialStates(s.domainContext, readTX, txn)
+		readTX := e.components.Persistence().NOTX() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
+		err := e.domainSmartContract.WritePotentialStates(e.domainContext, readTX, txn)
 		if err != nil {
 			//Any error from WritePotentialStates is likely to be caused by an invalid init or assemble of the transaction
 			// which is most likely a programming error in the domain or the domain manager or the sequencer
@@ -116,65 +117,65 @@ func (s *engineIntegration) WriteLockAndDistributeStatesForTransaction(ctx conte
 			log.L(ctx).Error(errorMessage)
 			return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, errorMessage)
 		} else {
-			log.L(ctx).Debugf("Potential states written %s", s.domainContext.Info().ID)
+			log.L(ctx).Debugf("Potential states written %s", e.domainContext.Info().ID)
 		}
 	}
 
 	//Lock input states
 	if len(txn.PostAssembly.InputStates) > 0 {
-		readTX := s.components.Persistence().NOTX() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
-		err := s.domainSmartContract.LockStates(s.domainContext, readTX, txn)
+		readTX := e.components.Persistence().NOTX() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
+		err := e.domainSmartContract.LockStates(e.domainContext, readTX, txn)
 		if err != nil {
 			errorMessage := fmt.Sprintf("Failed to lock states: %s", err)
 			log.L(ctx).Error(errorMessage)
 			return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, errorMessage)
 
 		} else {
-			log.L(ctx).Debugf("Input states locked %s: %s", s.domainContext.Info().ID, txn.PostAssembly.InputStates[0].ID)
+			log.L(ctx).Tracef("[Sequencer]Input states locked %s: %s", e.domainContext.Info().ID, txn.PostAssembly.InputStates[0].ID)
 		}
 	}
 
 	// Log info states before distribution
 	for _, state := range txn.PostAssembly.InfoStates {
-		log.L(ctx).Debugf("Info states before distribution: %+v", state)
+		log.L(ctx).Tracef("Info states before distribution: %+v", state)
 	}
 
 	//Distribute states
 
-	stateDistributionBuilder := NewStateDistributionBuilder(s.components, txn)
+	stateDistributionBuilder := NewStateDistributionBuilder(e.components, txn)
 	sds, err := stateDistributionBuilder.Build(ctx, txn)
 	if err != nil {
 		log.L(ctx).Errorf("Error getting state distributions: %s", err)
 	}
 
 	//distribute state data to remote nodes because they will need that data to a) endorse this, and future transactions and b) to assemble future transactions
-	s.stateDistributer.DistributeStates(ctx, sds.Remote)
+	e.stateDistributer.DistributeStates(ctx, sds.Remote)
 
 	return nil
 
 }
 
-func (s *engineIntegration) GetStateLocks(ctx context.Context) ([]byte, error) {
-	return s.domainContext.ExportSnapshot()
+func (e *engineIntegration) GetStateLocks(ctx context.Context) ([]byte, error) {
+	return e.domainContext.ExportSnapshot()
 }
 
-func (s *engineIntegration) GetBlockHeight(ctx context.Context) (int64, error) {
-	return s.environment.GetBlockHeight(), nil
+func (e *engineIntegration) GetBlockHeight(ctx context.Context) (int64, error) {
+	return e.environment.GetBlockHeight(), nil
 }
 
 // assemble a transaction that we are not coordinating, using the provided state locks
 // all errors are assumed to be transient and the request should be retried
 // if the domain as deemed the request as invalid then it will communicate the `revert` directive via the AssembleTransactionResponse_REVERT result without any error
-func (s *engineIntegration) AssembleAndSign(ctx context.Context, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) (*components.TransactionPostAssembly, error) {
+func (e *engineIntegration) AssembleAndSign(ctx context.Context, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) (*components.TransactionPostAssembly, error) {
 
 	log.L(ctx).Debugf("assembleForRemoteCoordinator: Assembling transaction %s ", transactionID)
 
-	log.L(ctx).Debugf("assembleForRemoteCoordinator: resetting domain context with state locks from the coordinator which assumes a block height of %d compared with local blockHeight of %d", blockHeight, s.environment.GetBlockHeight())
+	log.L(ctx).Debugf("assembleForRemoteCoordinator: resetting domain context with state locks from the coordinator which assumes a block height of %d compared with local blockHeight of %d", blockHeight, e.environment.GetBlockHeight())
 	//If our block height is behind the coordinator, there are some states that would otherwise be available to us but we wont see
 	// if our block height is ahead of the coordinator, there is a small chance that we we assemble a transaction that the coordinator will not be able to
 	// endorse yet but it is better to wait around on the endorsement flow than to wait around on the assemble flow which is single threaded per domain
 
-	err := s.domainContext.ImportSnapshot(stateLocksJSON)
+	err := e.domainContext.ImportSnapshot(stateLocksJSON)
 	if err != nil {
 		log.L(ctx).Errorf("assembleForRemoteCoordinator: Error importing state locks: %s", err)
 		return nil, err
@@ -182,7 +183,7 @@ func (s *engineIntegration) AssembleAndSign(ctx context.Context, transactionID u
 
 	for _, v := range preAssembly.RequiredVerifiers {
 		log.L(ctx).Debugf("assembleForRemoteCoordinator: resolving required verifier %s", v.Lookup)
-		verifier, err := s.components.IdentityResolver().ResolveVerifier(
+		verifier, err := e.components.IdentityResolver().ResolveVerifier(
 			ctx,
 			v.Lookup,
 			v.Algorithm,
@@ -200,7 +201,7 @@ func (s *engineIntegration) AssembleAndSign(ctx context.Context, transactionID u
 		})
 	}
 
-	postAssembly, err := s.assembleAndSign(ctx, transactionID, preAssembly, s.domainContext)
+	postAssembly, err := e.assembleAndSign(ctx, transactionID, preAssembly, e.domainContext)
 
 	if err != nil {
 		log.L(ctx).Errorf("assembleForRemoteCoordinator: Error assembling and signing transaction: %s", err)
@@ -210,15 +211,15 @@ func (s *engineIntegration) AssembleAndSign(ctx context.Context, transactionID u
 	return postAssembly, nil
 }
 
-func (s *engineIntegration) resolveLocalTransaction(ctx context.Context, transactionID uuid.UUID) (*components.ResolvedTransaction, error) {
-	locallyResolvedTx, err := s.components.TxManager().GetResolvedTransactionByID(ctx, transactionID)
+func (e *engineIntegration) resolveLocalTransaction(ctx context.Context, transactionID uuid.UUID) (*components.ResolvedTransaction, error) {
+	locallyResolvedTx, err := e.components.TxManager().GetResolvedTransactionByID(ctx, transactionID)
 	if err == nil && locallyResolvedTx == nil {
 		err = i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrAssembleTxnNotFound, transactionID)
 	}
 	return locallyResolvedTx, err
 }
 
-func (s *engineIntegration) assembleAndSign(ctx context.Context, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly, domainContext components.DomainContext) (*components.TransactionPostAssembly, error) {
+func (e *engineIntegration) assembleAndSign(ctx context.Context, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly, domainContext components.DomainContext) (*components.TransactionPostAssembly, error) {
 	//Assembles the transaction and synchronously fulfills any local signature attestation requests
 	// Given that the coordinator is single threading calls to assemble, there may be benefits to performance if we were to fulfill the signature request async
 	// but that would introduce levels of complexity that may not be justified so this is open as a potential for future optimization where we would need to think about
@@ -232,11 +233,11 @@ func (s *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 	// TODO is this still necessary? We are not receiving the PreAssembly from the coordinator. We only get it from the sender's state machine which was initialized from reading the DB
 	// there may be some weird cases where we get a assemble request and we have somehow swapped out the memory record of the preassembly since delegating but that is an edge case and not what we should optimize for
 
-	localTx, err := s.resolveLocalTransaction(ctx, transactionID)
-	if err != nil || localTx.Transaction.Domain != s.domainSmartContract.Domain().Name() || localTx.Transaction.To == nil || *localTx.Transaction.To != s.domainSmartContract.Address() {
+	localTx, err := e.resolveLocalTransaction(ctx, transactionID)
+	if err != nil || localTx.Transaction.Domain != e.domainSmartContract.Domain().Name() || localTx.Transaction.To == nil || *localTx.Transaction.To != e.domainSmartContract.Address() {
 		if err == nil {
 			log.L(ctx).Errorf("assembleAndSign: transaction %s for invalid domain/address domain=%s (expected=%s) to=%s (expected=%s)",
-				transactionID, localTx.Transaction.Domain, s.domainSmartContract.Domain().Name(), localTx.Transaction.To, s.domainSmartContract.Address())
+				transactionID, localTx.Transaction.Domain, e.domainSmartContract.Domain().Name(), localTx.Transaction.To, e.domainSmartContract.Address())
 		}
 		err := i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrAssembleRequestInvalid, transactionID)
 		return nil, err
@@ -251,8 +252,8 @@ func (s *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 	/*
 	 * Assemble
 	 */
-	readTX := s.components.Persistence().NOTX()
-	err = s.domainSmartContract.AssembleTransaction(domainContext, readTX, transaction, localTx)
+	readTX := e.components.Persistence().NOTX()
+	err = e.domainSmartContract.AssembleTransaction(domainContext, readTX, transaction, localTx)
 	if err != nil {
 		log.L(ctx).Errorf("assembleAndSign: Error assembling transaction: %s", err)
 		return nil, err
@@ -287,17 +288,22 @@ func (s *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 	 */
 	for _, attRequest := range transaction.PostAssembly.AttestationPlan {
 		if attRequest.AttestationType == prototk.AttestationType_SIGN {
-			log.L(ctx).Debugf("Attestation type is SIGN")
+			log.L(ctx).Debugf("Attestation type is SIGNN")
 			for _, partyName := range attRequest.Parties {
-				unqualifiedLookup, signerNode, err := pldtypes.PrivateIdentityLocator(partyName).Validate(ctx, s.nodeName, true)
+				log.L(ctx).Debugf("[Sequencer] validating identity locator for signing party %s", partyName)
+				unqualifiedLookup, signerNode, err := pldtypes.PrivateIdentityLocator(partyName).Validate(ctx, e.nodeName, true)
 				if err != nil {
 					log.L(ctx).Errorf("Failed to validate identity locator for signing party %s: %s", partyName, err)
 					return nil, err
 				}
-				if signerNode == s.nodeName {
+				log.L(ctx).Debugf("[Sequencer] signer node logged?")
+				log.L(ctx).Debugf("[Sequencer] validating that our node is the signer node %s", partyName)
+				log.L(ctx).Debugf("signerNode %s", signerNode)
+				log.L(ctx).Debugf("e.nodeName %s", e.nodeName)
+				if signerNode == e.nodeName {
 					log.L(ctx).Debugf("We're in the signing parties list - signing")
 
-					keyMgr := s.components.KeyManager()
+					keyMgr := e.components.KeyManager()
 					resolvedKey, err := keyMgr.ResolveKeyNewDatabaseTX(ctx, unqualifiedLookup, attRequest.Algorithm, attRequest.VerifierType)
 					if err != nil {
 						log.L(ctx).Errorf("Failed to resolve local signer for %s (algorithm=%s): %s", unqualifiedLookup, attRequest.Algorithm, err)
@@ -324,12 +330,11 @@ func (s *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 						PayloadType: &attRequest.PayloadType,
 					})
 				} else {
-					log.L(ctx).Warnf("assembleAndSign: ignoring signature request of transaction %s for remote party %s ", transactionID, partyName)
-
+					log.L(ctx).Warnf("[Sequencer]ignoring sign request of transaction %s for remote party %s ", transactionID, partyName)
 				}
 			}
 		} else {
-			log.L(ctx).Debugf("assembleAndSign: ignoring attestationType %s for fulfillment later", attRequest.AttestationType)
+			log.L(ctx).Debugf("[Sequencer] ignoring attestationType %s for fulfillment later", attRequest.AttestationType)
 		}
 	}
 
@@ -338,7 +343,7 @@ func (s *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 		for _, state := range transaction.PostAssembly.OutputStates {
 			stateIDs += "," + state.ID.String()
 		}
-		log.L(ctx).Debugf("assembleAndSign: Assembled transaction %s : %s", transactionID, stateIDs)
+		log.L(ctx).Debugf("[Sequencer] Assembled transaction %s, state IDs: %s", transactionID, stateIDs)
 	}
 	return transaction.PostAssembly, nil
 }

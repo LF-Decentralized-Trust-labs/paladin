@@ -76,7 +76,8 @@ func (d *distributedSequencerManager) HandlePaladinMsg(ctx context.Context, mess
 }
 
 func (d *distributedSequencerManager) logPaladinMessage(ctx context.Context, message *components.ReceivedMessage) {
-	log.L(ctx).Debugf("[Sequencer] << proto message %s received from %s", message.MessageType, message.FromNode)
+	//log.L(ctx).Debugf("[Sequencer] << proto message %s received from %s", message.MessageType, message.FromNode)
+	common.Log(ctx, common.LOGTYPE_MSGRX, "%+v from %s", message.MessageType, message.FromNode)
 }
 
 func (d *distributedSequencerManager) logPaladinMessageUnmarshalError(ctx context.Context, message *components.ReceivedMessage, err error) {

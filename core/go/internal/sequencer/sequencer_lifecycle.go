@@ -137,7 +137,7 @@ func (dMgr *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX
 			dCtx := dMgr.components.StateManager().NewDomainContext(dMgr.ctx, domainAPI.Domain(), contractAddr)
 
 			transportWriter := transport.NewTransportWriter(domainAPI.Domain().Name(), &contractAddr, dMgr.nodeName, dMgr.components.TransportManager(), dMgr.HandlePaladinMsg)
-			dMgr.engineIntegration = common.NewEngineIntegration(dMgr.ctx, dMgr.components, domainAPI, dCtx, dMgr, dMgr)
+			dMgr.engineIntegration = common.NewEngineIntegration(dMgr.ctx, dMgr.components, dMgr.nodeName, domainAPI, dCtx, dMgr, dMgr)
 
 			sequencer := &distributedSequencer{
 				ctx:             dMgr.ctx,
@@ -357,7 +357,8 @@ func (dMgr *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX
 				return nil, err
 			}
 
-			log.L(ctx).Infof("[SeqLifecycle] | created | %s", contractAddr.String())
+			common.Log(ctx, common.LOGTYPE_LIFECYCLE, " | created | %s", contractAddr.String())
+			//log.L(ctx).Infof("[SeqLifecycle] | created | %s", contractAddr.String())
 			sequencer.sender = sender
 			sequencer.coordinator = coordinator
 			dMgr.sequencers[contractAddr.String()] = sequencer
