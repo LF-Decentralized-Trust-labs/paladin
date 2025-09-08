@@ -1,13 +1,13 @@
-module github.com/kaleido-io/paladin/perf
+module github.com/LF-Decentralized-Trust-labs/paladin/perf
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.10
+toolchain go1.24.3
 
 require (
 	github.com/go-resty/resty/v2 v2.14.0
-	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/client_model v0.6.1
@@ -21,7 +21,7 @@ require (
 require (
 	github.com/hyperledger/firefly-common v1.5.4 // indirect
 	github.com/hyperledger/firefly-signer v1.1.21 // indirect
-	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000 // indirect
+	github.com/LF-Decentralized-Trust-labs/paladin/common/go v0.0.0-00010101000000-000000000000 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 )
 
@@ -67,8 +67,8 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )
 
-replace github.com/kaleido-io/paladin/common/go => ../common/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/common/go => ../common/go
 
-replace github.com/kaleido-io/paladin/sdk/go => ../sdk/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/sdk/go => ../sdk/go
 
-replace github.com/kaleido-io/paladin/config => ../config
+replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../config

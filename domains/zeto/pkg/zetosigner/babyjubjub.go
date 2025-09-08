@@ -16,8 +16,8 @@
 package zetosigner
 
 import (
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/signer/common"
 	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/signer/common"
 )
 
 func EncodeBabyJubJubPublicKey(pubKey *babyjub.PublicKey) string {

@@ -27,7 +27,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/kaleido-io/paladin/testinfra/pkg/besugenesis"
+	"github.com/LF-Decentralized-Trust-labs/paladin/testinfra/pkg/besugenesis"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -37,7 +37,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
+	corev1alpha1 "github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

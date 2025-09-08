@@ -18,11 +18,11 @@ package publictxmgr
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/flushwriter"
-	"github.com/kaleido-io/paladin/core/internal/publictxmgr/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/flushwriter"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr/metrics"
 
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 
 	"gorm.io/gorm/clause"
 )

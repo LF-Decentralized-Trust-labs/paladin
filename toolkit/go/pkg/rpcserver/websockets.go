@@ -25,9 +25,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
 )
 
 func (s *rpcServer) newWSConnection(conn *websocket.Conn) {
@@ -135,7 +135,7 @@ func (c *webSocketConnection) close() {
 	c.closeMux.Lock()
 	if !c.closed {
 		c.closed = true
-		c.conn.Close()
+		_ = c.conn.Close()
 		close(c.closing)
 		c.cancelCtx()
 	}

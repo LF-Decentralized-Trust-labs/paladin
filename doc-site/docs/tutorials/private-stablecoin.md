@@ -1,13 +1,13 @@
 # Private Stablecoin with KYC and Deposit/Withdraw
 
-The code for this tutorial can be found in [example/private-stablecoin](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/private-stablecoin).
+The code for this tutorial can be found in [examples/private-stablecoin](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/private-stablecoin).
 
 This example demonstrates a **private stablecoin with KYC compliance** that exists as both a **public ERC20 token** and a **private Zeto token**, showcasing **deposit/withdraw functionality** using Paladin's [Zeto domain](../../architecture/zeto/). It illustrates how financial institutions can manage regulatory compliance while enabling users to seamlessly move between public and private representations of the same asset for enhanced privacy preservation.
 
 ## Running the example
 
 Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paladin environment, and
-then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/private-stablecoin/README.md)
+then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/private-stablecoin/README.md)
 to run the code.
 
 ## Key Features
@@ -38,17 +38,21 @@ The example begins by deploying both the public ERC20 and private Zeto contracts
 ```typescript
 // Deploy private stablecoin using Zeto_AnonNullifierKyc
 const zetoFactory = new ZetoFactory(paladin1, "zeto");
-const privateStablecoin = await zetoFactory.newZeto(financialInstitution, {
-  tokenName: "Zeto_AnonNullifierKyc",
-});
+const privateStablecoin = await zetoFactory
+  .newZeto(financialInstitution, {
+    tokenName: "Zeto_AnonNullifierKyc",
+  })
+  .waitForDeploy();
 
 // Deploy public ERC20 stablecoin
 const publicStablecoinAddress = await deployERC20(paladin1, financialInstitution);
 
 // Connect the ERC20 to the Zeto contract for deposit/withdraw
-await privateStablecoin.setERC20(financialInstitution, {
-  erc20: publicStablecoinAddress,
-});
+await privateStablecoin
+  .setERC20(financialInstitution, {
+    erc20: publicStablecoinAddress,
+  })
+  .waitForReceipt();
 ```
 
 The `Zeto_AnonNullifierKyc` contract provides:
@@ -65,7 +69,7 @@ Before any stablecoin operations, the financial institution registers all partic
 ```typescript
 // Financial institution registers itself
 const bankPublicKey = await getBabyjubPublicKey(financialInstitution);
-let kycTxId = await paladin1.sendTransaction({
+let kycTxId = await paladin1.ptx.sendTransaction({
   type: TransactionType.PUBLIC,
   from: financialInstitution.lookup,
   to: privateStablecoin.address,
@@ -121,9 +125,12 @@ await approveERC20(
 );
 
 // Client A deposits ERC20 tokens to get private Zeto tokens
-const depositReceipt = await privateStablecoin.using(paladin2).deposit(clientA, {
-  amount: 75000,
-});
+const depositReceipt = await privateStablecoin
+  .using(paladin2)
+  .deposit(clientA, {
+    amount: 75000,
+  })
+  .waitForReceipt();
 ```
 
 **Privacy Benefits:**
@@ -148,7 +155,8 @@ const transferReceipt = await privateStablecoin
         data: "0x",
       },
     ],
-  });
+  })
+  .waitForReceipt();
 ```
 
 **KYC-Verified Privacy Features:**
@@ -167,7 +175,8 @@ const withdrawReceipt = await privateStablecoin
   .using(paladin3)
   .withdraw(clientB, {
     amount: 15000, // Withdraw 15,000 tokens
-  });
+  })
+  .waitForReceipt();
 ```
 
 **Withdrawal Benefits:**
@@ -211,6 +220,6 @@ This showcases Paladin's unique capability to balance **privacy preservation** w
 
 ## Next Steps
 
-Explore how **Notarized Tokens** and **Privacy Groups** work together to create comprehensive financial solutions with controlled oversight and selective disclosure.
+Explore how **Notarized Tokens** and **ZKP Tokens** can be used together in an atomic swap scenario.
 
-[Continue to the Bond Issuance Tutorial →](./bond-issuance.md) 
+[Continue to the Atomic Swap Tutorial →](./atomic-swap.md)

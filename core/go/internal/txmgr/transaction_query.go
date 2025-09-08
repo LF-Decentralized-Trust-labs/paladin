@@ -18,16 +18,15 @@ package txmgr
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/filters"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"gorm.io/gorm"
 )
 
@@ -74,7 +73,6 @@ func (tm *txManager) mapPersistedTXFull(pt *persistedTransaction) *pldapi.Transa
 	for _, dep := range pt.TransactionDeps {
 		res.DependsOn = append(res.DependsOn, dep.DependsOn)
 	}
-
 	return res
 }
 
@@ -163,7 +161,6 @@ func (tm *txManager) QueryTransactionsResolved(ctx context.Context, jq *query.Qu
 	if err != nil {
 		return nil, err
 	}
-	log.L(ctx).Infof("QueryTransactionsResolved: %d transactions", len(ptxs))
 	return tm.resolveABIReferencesAndCache(ctx, dbTX, ptxs)
 }
 
@@ -254,7 +251,6 @@ func (tm *txManager) resolveABIReferencesAndCache(ctx context.Context, dbTX pers
 			if a, err = tm.getABIByHash(ctx, dbTX, *tx.Transaction.ABIReference); a == nil || err != nil {
 				return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrABIReferenceLookupFailed, tx.Transaction.ABIReference)
 			}
-			log.L(ctx).Infof("resolveABIReferencesAndCache: ABIReference: %+v", a)
 		}
 		resolvedFunction, err := tm.pickFunction(ctx, a, tx.Transaction.Function, tx.Transaction.To)
 		if err != nil {

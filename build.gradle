@@ -19,6 +19,10 @@ def transports = [
     'transports/grpc/build/libs',
 ]
 
+def signingmodules = [
+    'signingmodules/example/build/libs',
+]
+
 def uiClient = [
     'ui/client/dist',
 ]
@@ -32,6 +36,7 @@ def assembleSubprojects = [
     ':domains:zeto',
     ':registries:static',
     ':registries:evm',
+    ':signingmodules:example',
     ':transports:grpc',
     ':ui:client',
 ]
@@ -78,8 +83,8 @@ task installProtocGenGoRPC(type: GoInstall) {
 }
 
 task installGolangCILint(type: GoInstall) {
-    tool = "github.com/golangci/golangci-lint/cmd/golangci-lint"
-    toolVersion = "v1.61.0"
+    tool = "github.com/golangci/golangci-lint/v2/cmd/golangci-lint"
+    toolVersion = "v2.3.1"
 }
 
 task installMockery(type: GoInstall) {
@@ -142,6 +147,25 @@ task copyRegistries(type: Copy) {
 
     doLast {
         println "Copied registries to ${registriesDir}"
+    }
+}
+
+task copySigningModules(type: Copy) {
+    def signingModulesDir = file("${buildDir}/signingmodules")
+
+    doFirst {
+        signingModulesDir.mkdirs()
+    }
+
+    signingmodules.each { dir ->
+        from dir
+    }
+    into signingModulesDir
+
+    outputs.upToDateWhen { false }
+
+    doLast {
+        println "Copied signing modules to ${signingModulesDir}"
     }
 }
 
@@ -257,7 +281,7 @@ task assemble {
     }
 }
 
-assemble.finalizedBy(copyLibraries, copyDomains, copyRegistries, copyTransports, copyUIFiles, copyZetoZKPFiles)
+assemble.finalizedBy(copyLibraries, copyDomains, copyRegistries, copySigningModules, copyTransports, copyUIFiles, copyZetoZKPFiles)
 
 defaultTasks 'build'
 

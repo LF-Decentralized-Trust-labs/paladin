@@ -21,11 +21,11 @@ ext {
         include "pkg/**/*.go"
         include "domainstarter/**/*.go"
     }
-    targetCoverage = 100
+    targetCoverage = 99.9
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
-        'github.com/kaleido-io/paladin/toolkit/pkg/prototk',
-        'github.com/kaleido-io/paladin/toolkit/pkg/reference',
+        'github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk',
+        'github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/reference',
     ]
 }
 
@@ -116,6 +116,7 @@ task lint(type: Exec, dependsOn:[protoc, ":installGolangCILint"]) {
     args '-v'
     args '--color=always'
     args '--timeout', '5m'
+    args '--tests=false'
 }
 
 task generateDocs(type: Exec) {

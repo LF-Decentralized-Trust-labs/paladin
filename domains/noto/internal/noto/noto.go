@@ -21,25 +21,36 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"reflect"
+
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/solutils"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
-	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
+
+// ParamValidator defines the interface for validating transaction parameters
+type ParamValidator interface {
+	ValidateParams(ctx context.Context, domainConfig *types.NotoParsedConfig, paramsJson string) (any, error)
+}
 
 //go:embed abis/NotoFactory.json
 var notoFactoryJSON []byte
+
+//go:embed abis/NotoFactory_V0.json
+var notoFactoryV0JSON []byte
 
 //go:embed abis/INoto.json
 var notoInterfaceJSON []byte
@@ -52,6 +63,7 @@ var notoHooksJSON []byte
 
 var (
 	factoryBuild   = solutils.MustLoadBuild(notoFactoryJSON)
+	factoryV0Build = solutils.MustLoadBuild(notoFactoryV0JSON)
 	interfaceBuild = solutils.MustLoadBuild(notoInterfaceJSON)
 	errorsBuild    = solutils.MustLoadBuild(notoErrorsJSON)
 	hooksBuild     = solutils.MustLoadBuild(notoHooksJSON)
@@ -59,7 +71,6 @@ var (
 
 var (
 	NotoTransfer       = "NotoTransfer"
-	NotoApproved       = "NotoApproved"
 	NotoLock           = "NotoLock"
 	NotoUnlock         = "NotoUnlock"
 	NotoUnlockPrepared = "NotoUnlockPrepared"
@@ -68,7 +79,6 @@ var (
 
 var allEvents = []string{
 	NotoTransfer,
-	NotoApproved,
 	NotoLock,
 	NotoUnlock,
 	NotoUnlockPrepared,
@@ -90,29 +100,33 @@ var schemasJSON = mustParseSchemas(allSchemas)
 type Noto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	name             string
-	config           types.DomainConfig
-	chainID          int64
-	coinSchema       *prototk.StateSchema
-	lockedCoinSchema *prototk.StateSchema
-	dataSchema       *prototk.StateSchema
-	lockInfoSchema   *prototk.StateSchema
+	name                 string
+	config               types.DomainConfig
+	chainID              int64
+	fixedSigningIdentity string
+	coinSchema           *prototk.StateSchema
+	lockedCoinSchema     *prototk.StateSchema
+	dataSchema           *prototk.StateSchema
+	lockInfoSchema       *prototk.StateSchema
 }
 
 type NotoDeployParams struct {
-	Name          string              `json:"name,omitempty"`
 	TransactionID string              `json:"transactionId"`
-	NotaryAddress pldtypes.EthAddress `json:"notaryAddress"`
+	Name          string              `json:"name"`
+	Symbol        string              `json:"symbol"`
+	Notary        pldtypes.EthAddress `json:"notary"`
 	Data          pldtypes.HexBytes   `json:"data"`
 }
 
 type NotoMintParams struct {
+	TxId      string            `json:"txId"`
 	Outputs   []string          `json:"outputs"`
 	Signature pldtypes.HexBytes `json:"signature"`
 	Data      pldtypes.HexBytes `json:"data"`
 }
 
 type NotoTransferParams struct {
+	TxId      string            `json:"txId"`
 	Inputs    []string          `json:"inputs"`
 	Outputs   []string          `json:"outputs"`
 	Signature pldtypes.HexBytes `json:"signature"`
@@ -120,6 +134,7 @@ type NotoTransferParams struct {
 }
 
 type NotoBurnParams struct {
+	TxId      string            `json:"txId"`
 	Inputs    []string          `json:"inputs"`
 	Outputs   []string          `json:"outputs"`
 	Signature pldtypes.HexBytes `json:"signature"`
@@ -127,6 +142,7 @@ type NotoBurnParams struct {
 }
 
 type NotoApproveTransferParams struct {
+	TxId      string               `json:"txId"`
 	Delegate  *pldtypes.EthAddress `json:"delegate"`
 	TXHash    pldtypes.Bytes32     `json:"txhash"`
 	Signature pldtypes.HexBytes    `json:"signature"`
@@ -134,6 +150,7 @@ type NotoApproveTransferParams struct {
 }
 
 type NotoLockParams struct {
+	TxId          string            `json:"txId"`
 	Inputs        []string          `json:"inputs"`
 	Outputs       []string          `json:"outputs"`
 	LockedOutputs []string          `json:"lockedOutputs"`
@@ -149,6 +166,7 @@ type NotoPrepareUnlockParams struct {
 }
 
 type NotoDelegateLockParams struct {
+	TxId       string               `json:"txId"`
 	UnlockHash pldtypes.Bytes32     `json:"unlockHash"`
 	Delegate   *pldtypes.EthAddress `json:"delegate"`
 	Signature  pldtypes.HexBytes    `json:"signature"`
@@ -272,13 +290,16 @@ func (n *Noto) DataSchemaID() string {
 }
 
 func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
-	err := json.Unmarshal([]byte(req.ConfigJson), &n.config)
+	var config types.DomainConfig
+	err := json.Unmarshal([]byte(req.ConfigJson), &config)
 	if err != nil {
 		return nil, err
 	}
 
 	n.name = req.Name
+	n.config = config
 	n.chainID = req.ChainId
+	n.fixedSigningIdentity = req.FixedSigningIdentity
 
 	return &prototk.ConfigureDomainResponse{
 		DomainConfig: &prototk.DomainConfig{
@@ -389,26 +410,46 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 	var paramsJSON []byte
 	var deployDataJSON []byte
 
-	// Use a random key to deploy
-	// TODO: shouldn't it be possible to omit this and let Paladin choose?
-	signer := fmt.Sprintf("%s.deploy.%s", n.name, uuid.New())
+	signer := n.fixedSigningIdentity
+	if signer == "" {
+		// Use a random key to deploy if no default signing identity is set
+		signer = fmt.Sprintf("%s.deploy.%s", n.name, uuid.New())
+	}
+
+	// Default to the V0 NotoFactory ABI if no version is specified
+	abi := factoryV0Build.ABI
+	if n.config.FactoryVersion == 1 {
+		abi = factoryBuild.ABI
+	}
 
 	functionName := "deploy"
 	if params.Implementation != "" {
 		functionName = "deployImplementation"
 	}
-	functionJSON, err = json.Marshal(factoryBuild.ABI.Functions()[functionName])
+	functionJSON, err = json.Marshal(abi.Functions()[functionName])
 	if err == nil {
 		deployDataJSON, err = json.Marshal(deployData)
 	}
 	if err == nil {
-		paramsJSON, err = json.Marshal(&NotoDeployParams{
-			Name:          params.Implementation,
-			TransactionID: req.Transaction.TransactionId,
-			NotaryAddress: *notaryAddress,
-			Data:          deployDataJSON,
-		})
+		// For V0 factories, we need to omit name and symbol parameters
+		if n.config.FactoryVersion == 0 {
+			paramsJSON, err = json.Marshal(&NotoDeployParams{
+				TransactionID: req.Transaction.TransactionId,
+				Notary:        *notaryAddress,
+				Data:          deployDataJSON,
+			})
+		} else {
+			// For V1 factories, include name and symbol
+			paramsJSON, err = json.Marshal(&NotoDeployParams{
+				TransactionID: req.Transaction.TransactionId,
+				Name:          params.Name,
+				Symbol:        params.Symbol,
+				Notary:        *notaryAddress,
+				Data:          deployDataJSON,
+			})
+		}
 	}
+
 	return &prototk.PrepareDeployResponse{
 		Transaction: &prototk.PreparedTransaction{
 			FunctionAbiJson: string(functionJSON),
@@ -424,6 +465,7 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 	domainConfig, decodedData, err := n.decodeConfig(ctx, req.ContractConfig)
 	if err != nil {
 		// This on-chain contract has invalid configuration - not an error in our process
+		log.L(ctx).Errorf("Error decoding config: %s", err)
 		return &prototk.InitContractResponse{Valid: false}, nil
 	}
 
@@ -434,6 +476,9 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 	}
 
 	parsedConfig := &types.NotoParsedConfig{
+		Name:         domainConfig.Name,
+		Symbol:       domainConfig.Symbol,
+		Decimals:     domainConfig.Decimals,
 		NotaryMode:   types.NotaryModeBasic.Enum(),
 		Variant:      domainConfig.Variant,
 		NotaryLookup: decodedData.NotaryLookup,
@@ -499,19 +544,30 @@ func (n *Noto) PrepareTransaction(ctx context.Context, req *prototk.PrepareTrans
 	return handler.Prepare(ctx, tx, req)
 }
 
-func (n *Noto) decodeConfig(ctx context.Context, domainConfig []byte) (*types.NotoConfig_V0, *types.NotoConfigData_V0, error) {
+func (n *Noto) decodeConfig(ctx context.Context, domainConfig []byte) (*types.NotoConfig_V1, *types.NotoConfigData_V0, error) {
 	var configSelector ethtypes.HexBytes0xPrefix
 	if len(domainConfig) >= 4 {
 		configSelector = ethtypes.HexBytes0xPrefix(domainConfig[0:4])
 	}
-	if configSelector.String() != types.NotoConfigID_V0.String() {
+
+	var err error
+	var configValues *abi.ComponentValue
+	switch configSelector.String() {
+	case types.NotoConfigID_V0.String():
+		configValues, err = types.NotoConfigABI_V0.DecodeABIDataCtx(ctx, domainConfig[4:], 0)
+		if err != nil {
+			return nil, nil, err
+		}
+	case types.NotoConfigID_V1.String():
+		configValues, err = types.NotoConfigABI_V1.DecodeABIDataCtx(ctx, domainConfig[4:], 0)
+		if err != nil {
+			return nil, nil, err
+		}
+	default:
 		return nil, nil, i18n.NewError(ctx, msgs.MsgUnexpectedConfigType, configSelector)
 	}
-	configValues, err := types.NotoConfigABI_V0.DecodeABIDataCtx(ctx, domainConfig[4:], 0)
-	if err != nil {
-		return nil, nil, err
-	}
-	var config types.NotoConfig_V0
+
+	var config types.NotoConfig_V1
 	var decodedData types.NotoConfigData_V0
 	configJSON, err := pldtypes.StandardABISerializer().SerializeJSON(configValues)
 	if err == nil {
@@ -532,33 +588,44 @@ func (n *Noto) validateDeploy(tx *prototk.DeployTransactionSpecification) (*type
 	return &params, err
 }
 
-func (n *Noto) validateTransaction(ctx context.Context, tx *prototk.TransactionSpecification) (*types.ParsedTransaction, types.DomainHandler, error) {
+func validateTransactionCommon[T any](
+	ctx context.Context,
+	tx *prototk.TransactionSpecification,
+	getHandler func(method string) T,
+) (*types.ParsedTransaction, T, error) {
 	var functionABI abi.Entry
 	err := json.Unmarshal([]byte(tx.FunctionAbiJson), &functionABI)
 	if err != nil {
-		return nil, nil, err
+		var zero T
+		return nil, zero, err
 	}
 
 	var domainConfig types.NotoParsedConfig
 	err = json.Unmarshal([]byte(tx.ContractInfo.ContractConfigJson), &domainConfig)
 	if err != nil {
-		return nil, nil, err
+		var zero T
+		return nil, zero, err
 	}
 
 	abi := types.NotoABI.Functions()[functionABI.Name]
-	handler := n.GetHandler(functionABI.Name)
-	if abi == nil || handler == nil {
-		return nil, nil, i18n.NewError(ctx, msgs.MsgUnknownFunction, functionABI.Name)
+	handler := getHandler(functionABI.Name)
+	handlerValue := reflect.ValueOf(handler)
+	if abi == nil || handlerValue.IsNil() {
+		var zero T
+		return nil, zero, i18n.NewError(ctx, msgs.MsgUnknownFunction, functionABI.Name)
 	}
 
-	contractAddress, err := ethtypes.NewAddress(tx.ContractInfo.ContractAddress)
-	if err != nil {
-		return nil, nil, err
+	// check if the handler implements the ValidateParams method cause generic T
+	validator, ok := any(handler).(ParamValidator)
+	if !ok {
+		var zero T
+		return nil, zero, i18n.NewError(ctx, msgs.MsgErrorHandlerImplementationNotFound)
 	}
 
-	params, err := handler.ValidateParams(ctx, &domainConfig, tx.FunctionParamsJson)
+	params, err := validator.ValidateParams(ctx, &domainConfig, tx.FunctionParamsJson)
 	if err != nil {
-		return nil, nil, err
+		var zero T
+		return nil, zero, err
 	}
 
 	signature, err := abi.SolidityStringCtx(ctx)
@@ -566,7 +633,14 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *prototk.TransactionS
 		err = i18n.NewError(ctx, msgs.MsgUnexpectedFunctionSignature, functionABI.Name, signature, tx.FunctionSignature)
 	}
 	if err != nil {
-		return nil, nil, err
+		var zero T
+		return nil, zero, err
+	}
+
+	contractAddress, err := ethtypes.NewAddress(tx.ContractInfo.ContractAddress)
+	if err != nil {
+		var zero T
+		return nil, zero, err
 	}
 
 	return &types.ParsedTransaction{
@@ -576,6 +650,22 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *prototk.TransactionS
 		DomainConfig:    &domainConfig,
 		Params:          params,
 	}, handler, nil
+}
+
+func (n *Noto) validateTransaction(ctx context.Context, tx *prototk.TransactionSpecification) (*types.ParsedTransaction, types.DomainHandler, error) {
+	return validateTransactionCommon(
+		ctx,
+		tx,
+		n.GetHandler,
+	)
+}
+
+func (n *Noto) validateCall(ctx context.Context, call *prototk.TransactionSpecification) (*types.ParsedTransaction, types.DomainCallHandler, error) {
+	return validateTransactionCommon(
+		ctx,
+		call,
+		n.GetCallHandler,
+	)
 }
 
 func (n *Noto) ethAddressVerifiers(lookups ...string) []*prototk.ResolveVerifierRequest {
@@ -630,7 +720,6 @@ func (n *Noto) parseCoinList(ctx context.Context, label string, states []*protot
 				SchemaId: state.SchemaId,
 				Id:       state.Id,
 			})
-			break
 
 		case n.lockedCoinSchema.Id:
 			coin, err := n.unmarshalLockedCoin(state.StateDataJson)
@@ -643,7 +732,6 @@ func (n *Noto) parseCoinList(ctx context.Context, label string, states []*protot
 				SchemaId: state.SchemaId,
 				Id:       state.Id,
 			})
-			break
 
 		default:
 			return nil, i18n.NewError(ctx, msgs.MsgUnexpectedSchema, state.SchemaId)
@@ -753,11 +841,19 @@ func (n *Noto) ValidateStateHashes(ctx context.Context, req *prototk.ValidateSta
 }
 
 func (n *Noto) InitCall(ctx context.Context, req *prototk.InitCallRequest) (*prototk.InitCallResponse, error) {
-	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+	ptx, handler, err := n.validateCall(ctx, req.Transaction)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorValidateInitCallTxSpec, err)
+	}
+	return handler.InitCall(ctx, ptx, req)
 }
 
 func (n *Noto) ExecCall(ctx context.Context, req *prototk.ExecCallRequest) (*prototk.ExecCallResponse, error) {
-	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
+	ptx, handler, err := n.validateCall(ctx, req.Transaction)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorValidateExecCallTxSpec, err)
+	}
+	return handler.ExecCall(ctx, ptx, req)
 }
 
 func (n *Noto) ConfigurePrivacyGroup(ctx context.Context, req *prototk.ConfigurePrivacyGroupRequest) (*prototk.ConfigurePrivacyGroupResponse, error) {

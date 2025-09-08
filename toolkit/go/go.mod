@@ -1,8 +1,8 @@
-module github.com/kaleido-io/paladin/toolkit
+module github.com/LF-Decentralized-Trust-labs/paladin/toolkit
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.10
+toolchain go1.24.3
 
 require (
 	github.com/Code-Hex/go-generics-cache v1.5.1
@@ -13,9 +13,9 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/hyperledger/firefly-signer v1.1.21
-	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/common/go v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/prometheus/client_golang v1.22.0
 	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.10.0
@@ -60,8 +60,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/kaleido-io/paladin/common/go => ../../common/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/common/go => ../../common/go
 
-replace github.com/kaleido-io/paladin/config => ../../config
+replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../../config
 
-replace github.com/kaleido-io/paladin/sdk/go => ../../sdk/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/sdk/go => ../../sdk/go

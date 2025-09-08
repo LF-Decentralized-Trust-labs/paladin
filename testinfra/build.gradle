@@ -14,16 +14,30 @@
  */
 
 task besuBootstrapTool(type: Exec) {
+    // Only build if the image doesn't exist
+    onlyIf {
+        def result = exec {
+            executable "docker"
+            args "image", "inspect", "paladin/besu_bootstrap"
+            ignoreExitValue true
+            standardOutput OutputStream.nullOutputStream()
+            errorOutput OutputStream.nullOutputStream()
+        }
+        
+        if (result.exitValue != 0) {
+            println "Docker image paladin/besu_bootstrap not found, building..."
+            return true
+        } else {
+            println "Docker image paladin/besu_bootstrap exists, skipping build"
+            return false
+        }
+    }
+    
     executable "docker"
     args "build"
     args "-t", "paladin/besu_bootstrap"
     args "-f", "besu_bootstrap/Dockerfile"
     args "."
-
-    inputs.dir "besu_bootstrap"
-    outputs.upToDateWhen {
-        ["docker", "images", "-q", "paladin/besu_bootstrap"].execute().text != ""
-    }
 }
 
 task startTestInfra(type: DockerCompose, dependsOn: tasks.besuBootstrapTool) {

@@ -1,0 +1,7 @@
+paladin:
+  nodeNamePrefix: worker
+besu:
+  nodeNamePrefix: evm
+
+nodeCount: 2
+besuNodeCount: 1

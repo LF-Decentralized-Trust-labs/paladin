@@ -20,8 +20,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/kaleido-io/paladin/core/internal/publictxmgr/metrics"
-	"github.com/kaleido-io/paladin/core/mocks/publictxmgrmocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/publictxmgrmocks"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

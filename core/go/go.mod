@@ -1,8 +1,8 @@
-module github.com/kaleido-io/paladin/core
+module github.com/LF-Decentralized-Trust-labs/paladin/core
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.10
+toolchain go1.24.3
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
@@ -10,12 +10,12 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/google/uuid v1.6.0
 	github.com/hyperledger/firefly-signer v1.1.21
-	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/registries/static v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/transports/grpc v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/common/go v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/registries/static v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/sdk/go v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/toolkit v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/transports/grpc v0.0.0-00010101000000-000000000000
 	github.com/prometheus/client_golang v1.22.0
 	github.com/serialx/hashring v0.0.0-20200727003509-22c0c7ab6b1b
 	github.com/sirupsen/logrus v1.9.3
@@ -85,14 +85,14 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )
 
-replace github.com/kaleido-io/paladin/common/go => ../../common/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/common/go => ../../common/go
 
-replace github.com/kaleido-io/paladin/sdk/go => ../../sdk/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/sdk/go => ../../sdk/go
 
-replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/toolkit => ../../toolkit/go
 
-replace github.com/kaleido-io/paladin/config => ../../config
+replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../../config
 
-replace github.com/kaleido-io/paladin/registries/static => ../../registries/static
+replace github.com/LF-Decentralized-Trust-labs/paladin/registries/static => ../../registries/static
 
-replace github.com/kaleido-io/paladin/transports/grpc => ../../transports/grpc
+replace github.com/LF-Decentralized-Trust-labs/paladin/transports/grpc => ../../transports/grpc

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -22,13 +22,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/pldmsgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/tyler-smith/go-bip39"
 )
 
@@ -41,18 +41,18 @@ type hdWalletPathEntry struct {
 	Index uint64
 }
 
-func configToKeyResolutionRequest(k *pldconf.StaticKeyReference) (string, *signerapi.ResolveKeyRequest) {
+func configToKeyResolutionRequest(k *pldconf.StaticKeyReference) (string, *prototk.ResolveKeyRequest) {
 	if k.KeyHandle != "" {
 		return k.KeyHandle, nil
 	}
-	keyReq := &signerapi.ResolveKeyRequest{
+	keyReq := &prototk.ResolveKeyRequest{
 		Name:       k.Name,
 		Index:      k.Index,
 		Attributes: k.Attributes,
-		Path:       []*signerapi.ResolveKeyPathSegment{},
+		Path:       []*prototk.ResolveKeyPathSegment{},
 	}
 	for _, p := range k.Path {
-		keyReq.Path = append(keyReq.Path, &signerapi.ResolveKeyPathSegment{
+		keyReq.Path = append(keyReq.Path, &prototk.ResolveKeyPathSegment{
 			Name:  p.Name,
 			Index: p.Index,
 		})
@@ -104,7 +104,7 @@ func (sm *signingModule[C]) new32ByteRandomSeed() ([]byte, error) {
 	return buff, err
 }
 
-func (hd *hdDerivation[C]) flatPathList(req *signerapi.ResolveKeyRequest) []hdWalletPathEntry {
+func (hd *hdDerivation[C]) flatPathList(req *prototk.ResolveKeyRequest) []hdWalletPathEntry {
 	ret := make([]hdWalletPathEntry, len(req.Path)+1)
 	for i, p := range req.Path {
 		ret[i] = hdWalletPathEntry{Name: p.Name, Index: p.Index}
@@ -116,7 +116,7 @@ func (hd *hdDerivation[C]) flatPathList(req *signerapi.ResolveKeyRequest) []hdWa
 	return ret
 }
 
-func (hd *hdDerivation[C]) resolveHDWalletKey(ctx context.Context, req *signerapi.ResolveKeyRequest) (res *signerapi.ResolveKeyResponse, err error) {
+func (hd *hdDerivation[C]) resolveHDWalletKey(ctx context.Context, req *prototk.ResolveKeyRequest) (res *prototk.ResolveKeyResponse, err error) {
 	keyHandle := hd.bip44Prefix
 	for i, s := range hd.flatPathList(req) {
 		var derivation uint64
@@ -181,6 +181,9 @@ func (hd *hdDerivation[C]) loadHDWalletPrivateKey(ctx context.Context, keyHandle
 				derivation += 0x80000000
 			}
 			pos, err = pos.Derive(uint32(derivation))
+			if err != nil {
+				return nil, i18n.WrapError(ctx, err, pldmsgs.MsgSignerBIP44DerivationInvalid, s)
+			}
 		}
 		if err != nil {
 			return nil, i18n.WrapError(ctx, err, pldmsgs.MsgSignerBIP44DerivationInvalid, s)
@@ -194,7 +197,7 @@ func (hd *hdDerivation[C]) loadHDWalletPrivateKey(ctx context.Context, keyHandle
 	return privateKey, err
 }
 
-func (hd *hdDerivation[C]) signHDWalletKey(ctx context.Context, req *signerapi.SignRequest) (res *signerapi.SignResponse, err error) {
+func (hd *hdDerivation[C]) signHDWalletKey(ctx context.Context, req *prototk.SignWithKeyRequest) (res *prototk.SignWithKeyResponse, err error) {
 	privateKey, err := hd.loadHDWalletPrivateKey(ctx, req.KeyHandle)
 	if err != nil {
 		return nil, err

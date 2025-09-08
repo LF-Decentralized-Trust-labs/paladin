@@ -20,11 +20,11 @@ import (
 	_ "embed"
 	"testing"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/solutils"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -85,6 +85,30 @@ func (n *NotoHelper) Transfer(ctx context.Context, to string, amount int64) *Dom
 	}))
 }
 
+func (n *NotoHelper) TransferFrom(ctx context.Context, from, to string, amount int64) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["transferFrom"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.TransferFromParams{
+		From:   from,
+		To:     to,
+		Amount: pldtypes.Int64ToInt256(amount),
+	}))
+}
+
+func (n *NotoHelper) Burn(ctx context.Context, amount int64) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["burn"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.BurnParams{
+		Amount: pldtypes.Int64ToInt256(amount),
+	}))
+}
+
+func (n *NotoHelper) BurnFrom(ctx context.Context, from string, amount int64) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["burnFrom"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.BurnFromParams{
+		From:   from,
+		Amount: pldtypes.Int64ToInt256(amount),
+	}))
+}
+
 func (n *NotoHelper) ApproveTransfer(ctx context.Context, params *types.ApproveParams) *DomainTransactionHelper {
 	fn := types.NotoABI.Functions()["approveTransfer"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
@@ -107,5 +131,10 @@ func (n *NotoHelper) PrepareUnlock(ctx context.Context, params *types.UnlockPara
 
 func (n *NotoHelper) DelegateLock(ctx context.Context, params *types.DelegateLockParams) *DomainTransactionHelper {
 	fn := types.NotoABI.Functions()["delegateLock"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
+}
+
+func (n *NotoHelper) BalanceOf(ctx context.Context, params *types.BalanceOfParam) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["balanceOf"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
 }

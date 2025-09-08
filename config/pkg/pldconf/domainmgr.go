@@ -16,7 +16,7 @@
 package pldconf
 
 import (
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 )
 
 // Intended to be embedded at root level of paladin config
@@ -30,12 +30,13 @@ type DomainManagerManagerConfig struct {
 }
 
 type DomainConfig struct {
-	Init            DomainInitConfig `json:"init"`
-	Plugin          PluginConfig     `json:"plugin"`
-	Config          map[string]any   `json:"config"`
-	RegistryAddress string           `json:"registryAddress"`
-	AllowSigning    bool             `json:"allowSigning"`
-	DefaultGasLimit *uint64          `json:"defaultGasLimit"`
+	Init                 DomainInitConfig `json:"init"`
+	Plugin               PluginConfig     `json:"plugin"`
+	Config               map[string]any   `json:"config"`
+	RegistryAddress      string           `json:"registryAddress"`
+	AllowSigning         bool             `json:"allowSigning"`
+	DefaultGasLimit      *uint64          `json:"defaultGasLimit"`
+	FixedSigningIdentity string           `json:"fixedSigningIdentity"`
 }
 
 var ContractCacheDefaults = &CacheConfig{

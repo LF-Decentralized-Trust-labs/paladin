@@ -40,7 +40,7 @@ Paladin’s API design follows **Ethereum JSON-RPC patterns**, making it familia
 
 ## Where to Find the Code?
 
-🔹 Example implementation: [Paladin example repository](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/public-storage)  
+🔹 Example implementation: [Paladin example repository](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/public-storage)  
 🔹 Solidity contract: [Storage.sol](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/tutorials/Storage.sol)  
 
 ---
@@ -50,7 +50,7 @@ Paladin’s API design follows **Ethereum JSON-RPC patterns**, making it familia
 The first step is to deploy the `Storage` contract to the blockchain
 
 ```typescript
-const deploymentTxID = await paladin.sendTransaction({
+const deploymentTxID = await paladin.ptx.sendTransaction({
   type: TransactionType.PUBLIC,
   abi: storageJson.abi,
   bytecode: storageJson.bytecode,
@@ -82,7 +82,7 @@ Now that the contract is deployed, you can **store a value** in it using the `st
 const valueToStore = 125; // Example value to store
 logger.log(`Step 2: Storing value "${valueToStore}" in the contract...`);
 
-const storeTxID = await paladin.sendTransaction({
+const storeTxID = await paladin.ptx.sendTransaction({
   type: TransactionType.PUBLIC,
   abi: storageJson.abi,
   function: "store",
@@ -113,7 +113,7 @@ Now, retrieve the stored value using the `retrieve` function
 ```typescript
 logger.log("Step 3: Retrieving the stored value...");
 
-const retrieveResult = await paladin.call({
+const retrieveResult = await paladin.ptx.call({
   type: TransactionType.PUBLIC,
   abi: storageJson.abi,
   function: "retrieve",

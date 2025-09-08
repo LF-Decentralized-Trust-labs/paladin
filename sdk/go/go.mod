@@ -1,8 +1,8 @@
-module github.com/kaleido-io/paladin/sdk/go
+module github.com/LF-Decentralized-Trust-labs/paladin/sdk/go
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.10
+toolchain go1.24.3
 
 require (
 	github.com/aidarkhanov/nanoid v1.0.8
@@ -11,8 +11,8 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hyperledger/firefly-signer v1.1.21
 	github.com/jarcoal/httpmock v1.2.0
-	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/common/go v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/crypto v0.36.0
@@ -49,6 +49,6 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 )
 
-replace github.com/kaleido-io/paladin/common/go => ../../common/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/common/go => ../../common/go
 
-replace github.com/kaleido-io/paladin/config => ../../config
+replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../../config

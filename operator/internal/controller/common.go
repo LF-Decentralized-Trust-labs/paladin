@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"sort"
 
-	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
+	corev1alpha1 "github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

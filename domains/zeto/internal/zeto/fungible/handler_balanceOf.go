@@ -18,16 +18,16 @@ package fungible
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
-	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/domain"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 )
 
 var _ types.DomainCallHandler = &balanceOfHandler{}
@@ -92,9 +92,9 @@ func (h *balanceOfHandler) ExecCall(ctx context.Context, tx *types.ParsedTransac
 	}
 	// Format balance as JSON string
 	balanceResult := types.BalanceOfResult{
-		TotalBalance: fmt.Sprint(totalBalance),
-		TotalStates:  fmt.Sprint(totalStates),
-		Overflow:     fmt.Sprint(overflow),
+		TotalBalance: (*pldtypes.HexUint256)(totalBalance),
+		TotalStates:  pldtypes.Uint64ToUint256(uint64(totalStates)),
+		Overflow:     overflow,
 	}
 	balanceJson, err := json.Marshal(balanceResult)
 	if err != nil {

@@ -61,7 +61,7 @@ func (ffe *pdError) StackTrace() string {
 	if st, ok := interface{}(ffe.error).(stackTracer); ok {
 		buff := new(strings.Builder)
 		for _, frame := range st.StackTrace() {
-			buff.WriteString(fmt.Sprintf("%+v\n", frame))
+			fmt.Fprintf(buff, "%+v\n", frame)
 		}
 		return buff.String()
 	}

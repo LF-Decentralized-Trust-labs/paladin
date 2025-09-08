@@ -16,7 +16,7 @@
 
 package pldapi
 
-import "github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+import "github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 
 // An entity within a registry with its current properties
 type RegistryEntry struct {

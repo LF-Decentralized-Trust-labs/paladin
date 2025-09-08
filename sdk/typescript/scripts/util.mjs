@@ -25,11 +25,16 @@ export async function downloadFile(url, filename) {
   }
 }
 
-export async function extractFile(filePath) {
+export async function extractFile(filePath, destinationDir) {
   try {
-    const tmpDir = path.dirname(filePath);
-    await tar.x({ file: filePath, C: tmpDir });
-    console.log(`File extracted successfully to: ${tmpDir}`);
+    let tmpDir = path.dirname(filePath); 
+    let fullPath = tmpDir;
+    if (destinationDir) {
+      fullPath = path.join(tmpDir, destinationDir);
+      fs.mkdirSync(fullPath, { recursive: true });
+    }
+    await tar.x({ file: filePath, C: fullPath });
+    console.log(`File extracted successfully to: ${fullPath}`);
     return tmpDir;
   } catch (error) {
     console.error('Error extracting file:', error);

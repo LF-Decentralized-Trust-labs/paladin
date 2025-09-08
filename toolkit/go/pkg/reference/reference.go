@@ -25,14 +25,14 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/pldmsgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
 	"k8s.io/utils/ptr"
 )
 
@@ -355,7 +355,7 @@ func (d *docGenerator) generateMethodTypesMarkdown(ctx context.Context, apiGroup
 			}
 		}
 		if method == nil {
-			return nil, fmt.Errorf("Implementation method '%s' for RPC method '%s' does not exist on interface %T", requiredFnName, methodName, apiGroup)
+			return nil, fmt.Errorf("implementation method '%s' for RPC method '%s' does not exist on interface %T", requiredFnName, methodName, apiGroup)
 		}
 		reflectMethods[methodName] = *method
 	}
@@ -367,7 +367,7 @@ func (d *docGenerator) generateMethodTypesMarkdown(ctx context.Context, apiGroup
 
 	b := bytes.NewBuffer([]byte{})
 	for _, method := range methods {
-		b.WriteString(fmt.Sprintf("## `%s`\n\n", method.name))
+		fmt.Fprintf(b, "## `%s`\n\n", method.name)
 		markdown, _ := d.generateMethodReferenceMarkdown(ctx, method, outputPath)
 		b.Write(markdown)
 	}
@@ -397,7 +397,7 @@ func (d *docGenerator) generateMethodReferenceMarkdown(ctx context.Context, meth
 	if len(method.inputs) > 0 {
 		buff.WriteString("### Parameters\n\n")
 		for i, param := range method.inputs {
-			buff.WriteString(fmt.Sprintf("%d. %s\n", i, d.getParamField(param)))
+			fmt.Fprintf(buff, "%d. %s\n", i, d.getParamField(param))
 		}
 		buff.WriteString("\n")
 	}
@@ -406,7 +406,7 @@ func (d *docGenerator) generateMethodReferenceMarkdown(ctx context.Context, meth
 	if len(method.outputs) > 0 {
 		buff.WriteString("### Returns\n\n")
 		for i, param := range method.outputs {
-			buff.WriteString(fmt.Sprintf("%d. %s\n", i, d.getParamField(param)))
+			fmt.Fprintf(buff, "%d. %s\n", i, d.getParamField(param))
 		}
 		buff.WriteString("\n")
 	}
@@ -544,7 +544,7 @@ func (d *docGenerator) generateSimpleTypesMarkdown(ctx context.Context, simpleTy
 	pageHeader := generatePageHeader("Simple Types")
 	b := bytes.NewBuffer([]byte(pageHeader))
 	for _, simpleType := range simpleTypes {
-		b.WriteString(fmt.Sprintf("## %s\n\n", reflect.TypeOf(simpleType).Name()))
+		fmt.Fprintf(b, "## %s\n\n", reflect.TypeOf(simpleType).Name())
 		d.addPageToMap(reflect.TypeOf(simpleType), pageName)
 		markdown, _ := d.generateObjectReferenceMarkdown(ctx, true, nil, reflect.TypeOf(simpleType), pageName, outputPath)
 		b.Write(markdown)
@@ -732,14 +732,14 @@ func (d *docGenerator) writeStructFields(ctx context.Context, t reflect.Type, pa
 			if isStruct && !typeAlreadyGenerated && !page {
 				d.addPageToMap(fieldType, pageName)
 
-				subFieldBuff.WriteString(fmt.Sprintf("## %s\n\n", fieldType.Name()))
+				fmt.Fprintf(subFieldBuff, "## %s\n\n", fieldType.Name())
 				subFieldMarkdown, _ := d.generateObjectReferenceMarkdown(ctx, false, nil, fieldType, pageName, outputPath)
 				subFieldBuff.Write(subFieldMarkdown)
 				subFieldBuff.WriteString("\n")
 			}
 		}
 
-		tableBuff.WriteString(fmt.Sprintf("| `%s` | %s | %s |\n", jsonFieldName, description, pldType))
+		fmt.Fprintf(tableBuff, "| `%s` | %s | %s |\n", jsonFieldName, description, pldType)
 		tableRowCount++
 	}
 	return tableRowCount, nil

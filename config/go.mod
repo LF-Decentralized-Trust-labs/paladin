@@ -1,6 +1,6 @@
-module github.com/kaleido-io/paladin/config
+module github.com/LF-Decentralized-Trust-labs/paladin/config
 
-go 1.22.5
+go 1.24.0
 
 require (
 	github.com/docker/go-units v0.5.0

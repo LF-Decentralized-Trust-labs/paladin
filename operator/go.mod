@@ -1,26 +1,26 @@
-module github.com/kaleido-io/paladin/operator
+module github.com/LF-Decentralized-Trust-labs/paladin/operator
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.10
+toolchain go1.24.3
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/google/uuid v1.6.0
 	github.com/hyperledger/firefly-signer v1.1.21
-	github.com/kaleido-io/paladin/common/go v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/config v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/domains/noto v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/domains/zeto v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/sdk/go v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/testinfra v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/common/go v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/domains/noto v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/sdk/go v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/testinfra v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/onsi/ginkgo/v2 v2.17.2
 	github.com/onsi/gomega v1.33.1
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/tyler-smith/go-bip39 v1.1.0
 	k8s.io/api v0.29.2
 	k8s.io/apimachinery v0.29.2
@@ -60,7 +60,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20240424215950-a892ee059fd6 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
@@ -90,9 +90,9 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.19.1 // indirect
+	github.com/prometheus/client_golang v1.22.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.55.0 // indirect
+	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
@@ -109,7 +109,7 @@ require (
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/oauth2 v0.22.0 // indirect
+	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
@@ -118,7 +118,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241007155032-5fefd90f89a9 // indirect
 	google.golang.org/grpc v1.67.1 // indirect
-	google.golang.org/protobuf v1.35.1 // indirect
+	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
@@ -133,16 +133,16 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-replace github.com/kaleido-io/paladin/common/go => ../common/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/common/go => ../common/go
 
-replace github.com/kaleido-io/paladin/config => ../config
+replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../config
 
-replace github.com/kaleido-io/paladin/domains/noto => ../domains/noto
+replace github.com/LF-Decentralized-Trust-labs/paladin/domains/noto => ../domains/noto
 
-replace github.com/kaleido-io/paladin/domains/zeto => ../domains/zeto
+replace github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto => ../domains/zeto
 
-replace github.com/kaleido-io/paladin/testinfra => ../testinfra
+replace github.com/LF-Decentralized-Trust-labs/paladin/testinfra => ../testinfra
 
-replace github.com/kaleido-io/paladin/sdk/go => ../sdk/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/sdk/go => ../sdk/go
 
-replace github.com/kaleido-io/paladin/toolkit => ../toolkit/go
+replace github.com/LF-Decentralized-Trust-labs/paladin/toolkit => ../toolkit/go

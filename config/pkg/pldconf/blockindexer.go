@@ -19,7 +19,7 @@ package pldconf
 import (
 	"encoding/json"
 
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 )
 
 type BlockIndexerConfig struct {
@@ -31,7 +31,7 @@ type BlockIndexerConfig struct {
 	BlockPollingInterval    *string            `json:"blockPollingInterval"`
 	EventStreams            EventStreamsConfig `json:"eventStreams"`
 	Retry                   RetryConfig        `json:"retry"`
-	IgnoredTransactionTypes *[]int             `json:"ignoredTransactionTypes"`
+	IgnoredTransactionTypes []int64            `json:"ignoredTransactionTypes"`
 }
 
 type EventStreamsConfig struct {
@@ -51,5 +51,5 @@ var BlockIndexerDefaults = &BlockIndexerConfig{
 	RequiredConfirmations:   confutil.P(0),
 	ChainHeadCacheLen:       confutil.P(50),
 	BlockPollingInterval:    confutil.P("10s"),
-	IgnoredTransactionTypes: confutil.P([]int{0x7e}),
+	IgnoredTransactionTypes: []int64{0x7e},
 }

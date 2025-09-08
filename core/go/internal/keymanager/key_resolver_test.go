@@ -22,11 +22,11 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,7 +54,7 @@ func TestGetOrCreateIdentifierPathEmptySegment(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
-	})
+	}, nil)
 	defer done()
 
 	mc.db.ExpectBegin()
@@ -73,7 +73,7 @@ func TestResolvePathNoCreate(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
-	})
+	}, nil)
 	defer done()
 
 	mc.db.ExpectBegin()
@@ -92,7 +92,7 @@ func TestResolvePathInLockLookupFail(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
-	})
+	}, nil)
 	defer done()
 
 	mc.db.ExpectBegin()
@@ -112,7 +112,7 @@ func TestResolvePathCreateFail(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
-	})
+	}, nil)
 	defer done()
 
 	mc.db.ExpectBegin()
@@ -133,7 +133,7 @@ func TestResolveKeyIdentifierLookupFail(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
-	})
+	}, nil)
 	defer done()
 
 	mockNewFirstLevelEntryExistingRoot(mc)
@@ -152,7 +152,7 @@ func TestGetStoredVerifierFail(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
-	})
+	}, nil)
 	defer done()
 
 	mc.db.ExpectBegin()
@@ -171,7 +171,7 @@ func TestGetStoredVerifierNotFound(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
-	})
+	}, nil)
 	defer done()
 
 	mc.db.ExpectBegin()
@@ -192,7 +192,7 @@ func TestResolveKeyNotFound(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
-	})
+	}, nil)
 	defer done()
 
 	mc.db.ExpectBegin()
@@ -218,7 +218,7 @@ func TestResolveNewMappingNoSuitableWalletError(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "not_this_one")},
-	})
+	}, nil)
 	defer done()
 
 	mc.db.ExpectBegin()
@@ -243,7 +243,7 @@ func TestResolveExistingMappingNoWallet(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
-	})
+	}, nil)
 	defer done()
 
 	mc.db.ExpectBegin()
@@ -268,7 +268,7 @@ func TestResolveExistingGetStoredVerifierFail(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
-	})
+	}, nil)
 	defer done()
 
 	mc.db.ExpectBegin()
@@ -294,7 +294,7 @@ func TestResolveNewMappingWhenRequiredExisting(t *testing.T) {
 
 	ctx, km, mc, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
-	})
+	}, nil)
 	defer done()
 
 	mc.db.ExpectBegin()

@@ -20,17 +20,18 @@ import (
 	"os"
 	"runtime/debug"
 	"testing"
+	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/mocks/componentsmocks"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -337,7 +338,13 @@ func TestDomainRequestsOK(t *testing.T) {
 	})
 	defer done()
 
-	domainAPI := <-waitForAPI
+	var domainAPI components.DomainManagerToDomain
+	select {
+	case domainAPI = <-waitForAPI:
+		// Received domain API
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for domain API - expected registration was not received")
+	}
 
 	cdr, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{
 		ChainId: int64(12345),
@@ -351,7 +358,7 @@ func TestDomainRequestsOK(t *testing.T) {
 	// This is the point the domain manager would call us to say the domain is initialized
 	// (once it's happy it's updated its internal state)
 	domainAPI.Initialized()
-	require.NoError(t, pc.WaitForInit(ctx))
+	require.NoError(t, pc.WaitForInit(ctx, prototk.PluginInfo_DOMAIN))
 
 	idr, err := domainAPI.InitDeploy(ctx, &prototk.InitDeployRequest{
 		Transaction: &prototk.DeployTransactionSpecification{
@@ -471,7 +478,13 @@ func TestDomainRequestsOK(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, `{"wrapped":"params"}`, wpgtr.Transaction.ParamsJson)
 
-	callbacks := <-waitForCallbacks
+	// Add timeout for callbacks
+	var callbacks plugintk.DomainCallbacks
+	select {
+	case callbacks = <-waitForCallbacks:
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for callbacks - expected callbacks were not received")
+	}
 
 	fas, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
 		SchemaId: "schema1",
@@ -523,10 +536,9 @@ func TestDomainRegisterFail(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
-				t:                   t,
-				allowRegisterErrors: true,
-				connectFactory:      domainConnectFactory,
-				headerAccessor:      domainHeaderAccessor,
+				t:              t,
+				connectFactory: domainConnectFactory,
+				headerAccessor: domainHeaderAccessor,
 				preRegister: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
 						Header: &prototk.Header{
@@ -549,7 +561,13 @@ func TestDomainRegisterFail(t *testing.T) {
 	})
 	defer done()
 
-	<-waitForError
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case <-waitForError:
+		// Error received successfully
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for error - expected error was not received")
+	}
 }
 
 func TestFromDomainRequestBadReq(t *testing.T) {
@@ -590,6 +608,11 @@ func TestFromDomainRequestBadReq(t *testing.T) {
 	})
 	defer done()
 
-	<-waitForResponse
-
+	// Add timeout to prevent test from hanging indefinitely
+	select {
+	case <-waitForResponse:
+		// Response received successfully
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test timed out waiting for response - expected response was not received")
+	}
 }

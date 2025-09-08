@@ -18,7 +18,7 @@ spec:
     endpoint:
       jsonrpc: {{ .baseLedgerEndpoint.endpoint.jsonrpc }}
       ws: {{ .baseLedgerEndpoint.endpoint.ws }}
-      {{- if .baseLedgerEndpoint.endpoint.auth.enabled }}
+      {{- if and .baseLedgerEndpoint.endpoint.auth .baseLedgerEndpoint.endpoint.auth.enabled }}
       auth:
         type: secret
         secret:
@@ -57,9 +57,11 @@ spec:
         - name: transport-grpc
           port: {{ .ports.transportGrpc.port }}
           targetPort: {{ .ports.transportGrpc.targetPort }}
+      {{- if .tls }}
       tls:
         secretName: {{ .tls.secretName }}
         certName: {{ .tls.certName }}
+      {{- end }}
   {{- end }}
 
   service:
@@ -67,10 +69,14 @@ spec:
     ports:
       - name: rpc-http
         port: {{ .service.ports.rpcHttp.port }}
+        {{- if and (eq .service.type "NodePort") .service.ports.rpcHttp.nodePort }}
         nodePort: {{ .service.ports.rpcHttp.nodePort }}
+        {{- end }}
       - name: rpc-ws
         port: {{ .service.ports.rpcWs.port }}
+        {{- if and (eq .service.type "NodePort") .service.ports.rpcWs.nodePort }}
         nodePort: {{ .service.ports.rpcWs.nodePort }}
+        {{- end }}
 
   database:
     mode: {{ .database.mode }}

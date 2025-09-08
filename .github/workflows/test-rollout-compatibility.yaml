@@ -1,0 +1,207 @@
+name: 'Test Rollout Compatibility'
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_tag:
+        description: 'The new RC tag to test for compatibility (e.g., v1.2.3-rc.1)'
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      new_tag:
+        description: 'The new RC tag to test for compatibility (e.g., v1.2.3-rc.1)'
+        required: true
+        type: string
+
+jobs:
+  test-rollout-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # Fetch all history and tags to build the full upgrade path.
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+          fetch-tags: true
+
+      - name: Get all previous release tags
+        id: get_tags
+        shell: bash
+        run: |
+          echo "Finding all tags before ${{ inputs.new_tag }}..."
+          
+          # This test is only compatible with releases from v0.10.0 onwards.
+          # The 'sed' command filters the sorted tag list to exclude everything up to and including v0.9.0.
+          all_tags=$(git tag --sort=v:refname | sed '1,/^v0.9\.0$/d')
+          new_tag="${{ inputs.new_tag }}"
+          previous_tags=""
+          
+          # This loop builds a space-separated list of final release tags (e.g., vX.Y.Z)
+          # that exist before the new RC tag being tested.
+          while read -r tag; do
+            if [[ "$tag" == "$new_tag" ]]; then
+              break
+            fi
+            
+            if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              previous_tags+="$tag "
+            fi
+          done <<< "$all_tags"
+          
+          echo "Found previous tags: $previous_tags"
+          
+          # TODO: remove this once we have a v0.10.0 release
+          # Handle case where no previous tags are found
+          if [[ -z "$previous_tags" ]]; then
+            echo "No previous tags found, skipping backward compatibility tests"
+            echo "tags=[]" >> $GITHUB_OUTPUT
+          else
+            # The list of tags is converted to a JSON array. This is a robust way to pass
+            # multi-line or complex strings between steps and could be used in a matrix strategy in the future.
+            tags_json=$(echo "$previous_tags" | tr ' ' '\n' | grep -v '^$' | jq -R . | jq -s .)
+            echo "tags=$tags_json" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install Dependencies
+        uses: ./.github/actions/setup
+
+      - name: Install Kind and Helm
+        uses: helm/kind-action@v1.10.0
+        with:
+          install_only: true
+          ignore_failed_clean: true
+
+      - name: Create Kind Cluster
+        run: |
+          curl -sL https://raw.githubusercontent.com/LF-Decentralized-Trust-labs/paladin/main/operator/paladin-kind.yaml -o paladin-kind.yaml
+          kind create cluster --name paladin --config paladin-kind.yaml
+          kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+      - name: Cache Helm repositories
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/helm
+            ~/.config/helm
+          key: ${{ runner.os }}-helm-repos-${{ hashFiles('**/helm-repos.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-helm-repos-
+
+      - name: Add Helm Repositories
+        run: |
+          helm repo add paladin https://LF-Decentralized-Trust-labs.github.io/paladin --force-update
+          helm repo add jetstack https://charts.jetstack.io --force-update
+          helm repo update
+          
+          helm upgrade --install cert-manager --namespace cert-manager --version v1.16.1 jetstack/cert-manager --create-namespace --set crds.enabled=true --wait
+
+      - name: Setup Cache Directory
+        id: setup_cache_directory
+        run: |
+          CACHE_BASE_DIR="/tmp/paladin-cache"
+          mkdir -p "$CACHE_BASE_DIR"
+          echo "Cache base directory created: $CACHE_BASE_DIR"
+          echo "CACHE_BASE_DIR=$CACHE_BASE_DIR" >> $GITHUB_OUTPUT
+
+      - name: Phase 1 - Sequentially Install and Cache Data
+        id: cache_data
+        shell: bash
+        run: |
+          # TODO: remove this once we have a v0.10.0 release
+          # Check if we have any previous tags to process
+          tags_array=$(echo '${{ steps.get_tags.outputs.tags }}' | jq -r '.[]')
+          if [[ -z "$tags_array" ]]; then
+            echo "No previous tags found, skipping Phase 1"
+            exit 0
+          fi
+          
+          # This loop simulates a real-world cluster being upgraded over time.
+          # For each historical version, we install it, check out its corresponding source code,
+          # and run the examples to generate and cache state data.
+          for tag in $tags_array; do
+            echo "--- Processing version $tag ---"
+
+            echo "Checking out git ref $tag..."
+            git checkout "$tag"
+
+            echo "Upgrading crd chart to $tag..."
+            helm upgrade --install paladin-crds paladin/paladin-operator-crd --version "$tag"
+
+            echo "Upgrading Helm chart to $tag..."
+            helm upgrade --install paladin paladin/paladin-operator -n paladin --create-namespace --version "$tag" --wait
+            
+            IMAGE_TAG="$tag" ./scripts/default-installation-validation.sh paladin
+            
+            echo "Running examples to cache data for $tag..."
+            RUN_COMMANDS=start PALADIN_ABI_VERSION="$tag" ./scripts/run-examples.sh "${{ steps.setup_cache_directory.outputs.CACHE_BASE_DIR }}" "$tag"
+            
+            echo "Cache contents for $tag:"
+            ls -la "${{ steps.setup_cache_directory.outputs.CACHE_BASE_DIR }}"/"$tag" || echo "No cache directory found for $tag"
+          done
+
+      - name: Phase 2 - Sequentially Verify Compatibility
+        id: verify_compatibility
+        shell: bash
+        run: |
+          NEW_TAG="${{ inputs.new_tag }}"
+
+          echo "--- Upgrading to Release Candidate $NEW_TAG ---"
+          helm upgrade --install paladin-crds paladin/paladin-operator-crd --version "$NEW_TAG"
+          helm upgrade --install paladin paladin/paladin-operator -n paladin --create-namespace --version "$NEW_TAG" --wait
+          
+          # We check out the new tag here primarily to validate the new chart installation
+          # with the corresponding version of the validation script.
+          git checkout main
+          IMAGE_TAG="$NEW_TAG" ./scripts/default-installation-validation.sh paladin
+
+          echo "--- Verifying Backwards Compatibility ---"
+          
+          # TODO: remove this once we have a v0.10.0 release
+          # Check if we have any previous tags to verify
+          tags_array=$(echo '${{ steps.get_tags.outputs.tags }}' | jq -r '.[]')
+          if [[ -z "$tags_array" ]]; then
+            echo "No previous tags found, skipping Phase 2"
+            exit 0
+          fi
+          
+          # This loop tests two critical user scenarios after an upgrade.
+          # For each historical version, we check out its code to get the original examples and dependencies.
+          for tag in $tags_array; do
+            echo "--- Verifying data from $tag ---"
+            
+            echo "Checking out git ref $tag..."
+            git checkout "$tag"
+            
+            # Scenario 1: A user has upgraded their server (the chart) but NOT their client code.
+            # We test if the old SDK can still interact with the new server to verify old data.
+            echo "Verifying $tag data with OLD ($tag) SDK..."
+            RUN_COMMANDS=verify PALADIN_SDK_VERSION="$tag" ./scripts/run-examples.sh "${{ steps.setup_cache_directory.outputs.CACHE_BASE_DIR }}" "$tag"
+            
+            # Scenario 2: A user has upgraded both their server and their client code.
+            # We test if the new SDK can correctly read and verify data created by an old version.
+            echo "Verifying $tag data with NEW ($NEW_TAG) SDK..."
+            RUN_COMMANDS=verify PALADIN_SDK_VERSION="$NEW_TAG" ./scripts/run-examples.sh "${{ steps.setup_cache_directory.outputs.CACHE_BASE_DIR }}" "$tag"
+          done
+
+      # This phase is separate because it tests the RC's code directly.
+      # Since the RC is not yet published to NPM, we must build the SDK and ABI locally from source.
+      - name: Phase 3 - Verify Compatibility with New SDK and ABI
+        id: test_rc
+        shell: bash
+        run: |
+          NEW_TAG="${{ inputs.new_tag }}"
+          echo "--- Testing Release Candidate $NEW_TAG ---"
+          git checkout ${{ github.ref }}
+          
+          RUN_COMMANDS=start,verify BUILD_PALADIN_SDK=true BUILD_PALADIN_ABI=true ./scripts/run-examples.sh
+          
+          echo "Completed testing for RC $NEW_TAG"
+
+      - name: Cleanup cluster
+        if: always()
+        run: kind delete cluster --name paladin

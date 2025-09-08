@@ -21,7 +21,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"golang.org/x/text/language"
 )
 

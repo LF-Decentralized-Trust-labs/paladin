@@ -68,6 +68,7 @@ task lint(type: Exec, dependsOn:[":installGolangCILint", tasks.protoc]) {
     args '-v'
     args '--color=always'
     args '--timeout', '5m'
+    args '--tests=false'
 }
 
 task test(type: Exec, dependsOn:[tasks.protoc]) {

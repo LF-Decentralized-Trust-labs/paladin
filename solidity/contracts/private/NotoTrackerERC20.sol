@@ -128,19 +128,6 @@ contract NotoTrackerERC20 is INotoHooks, ERC20 {
         _onTransfer(sender, from, to, amount, data, prepared);
     }
 
-    uint256 approvals;
-
-    function onApproveTransfer(
-        address sender,
-        address from,
-        address delegate,
-        bytes calldata data,
-        PreparedTransaction calldata prepared
-    ) external virtual override {
-        approvals++; // must store something on each call (see https://github.com/kaleido-io/paladin/issues/252)
-        emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
-    }
-
     function onBurn(
         address sender,
         address from,

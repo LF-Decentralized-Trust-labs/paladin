@@ -25,8 +25,8 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/pldmsgs"
 )
 
 const MAX_SAFE_INT64 = 0x7fffffffffffffff

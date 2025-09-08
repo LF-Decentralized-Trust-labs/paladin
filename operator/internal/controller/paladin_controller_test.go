@@ -1,5 +1,5 @@
 /*
-Copyright 2024.
+Copyright 2025.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,11 +38,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
-	"github.com/kaleido-io/paladin/operator/pkg/config"
+	corev1alpha1 "github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1"
+	"github.com/LF-Decentralized-Trust-labs/paladin/operator/pkg/config"
 )
 
 var _ = Describe("Paladin Controller", func() {
@@ -120,6 +120,16 @@ var _ = Describe("Paladin Controller", func() {
 										},
 									},
 								},
+							},
+						},
+						SigningModules: []corev1alpha1.SigningModuleConfig{
+							{
+								Name: "sm",
+								Plugin: corev1alpha1.PluginConfig{
+									Type:    "c-shared",
+									Library: "/app/signingmodules/libsm.so",
+								},
+								ConfigJSON: `{"url": "http://smendpoint"}`,
 							},
 						},
 					},

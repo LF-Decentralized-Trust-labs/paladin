@@ -21,14 +21,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -238,6 +238,7 @@ func TestTransfer(t *testing.T) {
 		"inputs": ["%s"],
 		"outputs": ["0x0000000000000000000000000000000000000000000000000000000000000001","0x0000000000000000000000000000000000000000000000000000000000000002"],
 		"signature": "%s",
+		"txId": "0x015e1881f2ba769c22d05c841f06949ec6e1bd573f5e1e0328885494212f077d",
 		"data": "0x00010000015e1881f2ba769c22d05c841f06949ec6e1bd573f5e1e0328885494212f077d000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003"
 	}`, inputCoin.ID, signatureBytes), prepareRes.Transaction.ParamsJson)
 
@@ -300,7 +301,9 @@ func TestTransferAssembleMissingFrom(t *testing.T) {
 		coinSchema: &prototk.StateSchema{Id: "coin"},
 		dataSchema: &prototk.StateSchema{Id: "data"},
 	}
-	h := transferHandler{noto: n}
+	handler := &transferHandler{
+		transferCommon: transferCommon{noto: n},
+	}
 	ctx := context.Background()
 
 	fn := types.NotoABI.Functions()["transfer"]
@@ -322,7 +325,7 @@ func TestTransferAssembleMissingFrom(t *testing.T) {
 		ResolvedVerifiers: []*prototk.ResolvedVerifier{},
 	}
 
-	_, err := h.Assemble(ctx, parsedTx, req)
+	_, err := handler.Assemble(ctx, parsedTx, req)
 	assert.Regexp(t, "PD200011.*'from'", err)
 }
 
@@ -332,7 +335,9 @@ func TestTransferAssembleMissingTo(t *testing.T) {
 		coinSchema: &prototk.StateSchema{Id: "coin"},
 		dataSchema: &prototk.StateSchema{Id: "data"},
 	}
-	h := transferHandler{noto: n}
+	handler := &transferHandler{
+		transferCommon: transferCommon{noto: n},
+	}
 	ctx := context.Background()
 
 	fn := types.NotoABI.Functions()["transfer"]
@@ -361,6 +366,6 @@ func TestTransferAssembleMissingTo(t *testing.T) {
 		},
 	}
 
-	_, err := h.Assemble(ctx, parsedTx, req)
+	_, err := handler.Assemble(ctx, parsedTx, req)
 	assert.Regexp(t, "PD200011.*'to'", err)
 }

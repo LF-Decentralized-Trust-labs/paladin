@@ -28,11 +28,15 @@ spec:
         {{- with .Values.operator.annotations }}
         checksum/operator-config: {{ $checksums.operatorConfig }} # Add a checksum annotation to trigger a rolling update when the config changes
         {{ toYaml . | nindent 8 }}
+        {{- else }}
+        checksum/operator-config: {{ $checksums.operatorConfig }} # Add a checksum annotation to trigger a rolling update when the config changes
         {{- end }}
     spec:
       serviceAccountName: {{ .Values.operator.name }}
+      {{- with .Values.operator.podSecurityContext }}
       securityContext:
-        runAsNonRoot: true
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Values.operator.name }}
         image: "{{ .Values.operator.image.repository }}:{{ .Values.operator.image.tag }}"
@@ -58,10 +62,10 @@ spec:
           {{- toYaml .Values.operator.readinessProbe | nindent 10 }}
         resources:
           {{- toYaml .Values.operator.resources | nindent 10 }}
+        {{- with .Values.operator.securityContext }}
         securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         volumeMounts:
           {{- toYaml .Values.operator.volumeMounts | nindent 12 }}
       volumes:

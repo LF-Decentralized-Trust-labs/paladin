@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -23,9 +23,10 @@ import (
 	"path"
 	"testing"
 
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -223,9 +224,9 @@ func TestStaticStoreResolveOK(t *testing.T) {
 		},
 	})
 
-	keyData, keyHandle, err := store.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{
+	keyData, keyHandle, err := store.FindOrCreateLoadableKey(ctx, &prototk.ResolveKeyRequest{
 		Name: "key ten",
-		Path: []*signerapi.ResolveKeyPathSegment{
+		Path: []*prototk.ResolveKeyPathSegment{
 			{Name: "my"},
 			{Name: "shiny"},
 		},
@@ -245,12 +246,12 @@ func TestStaticStoreResolveBadPath(t *testing.T) {
 		},
 	})
 
-	_, _, err := store.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{}, nil)
+	_, _, err := store.FindOrCreateLoadableKey(ctx, &prototk.ResolveKeyRequest{}, nil)
 	assert.Regexp(t, "PD020803", err)
 
-	_, _, err = store.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{
+	_, _, err = store.FindOrCreateLoadableKey(ctx, &prototk.ResolveKeyRequest{
 		Name: "something",
-		Path: []*signerapi.ResolveKeyPathSegment{
+		Path: []*prototk.ResolveKeyPathSegment{
 			{Name: ""},
 		},
 	}, nil)
@@ -267,9 +268,9 @@ func TestStaticStoreResolveNotFound(t *testing.T) {
 		},
 	})
 
-	_, _, err := store.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{
+	_, _, err := store.FindOrCreateLoadableKey(ctx, &prototk.ResolveKeyRequest{
 		Name: "key eleven",
-		Path: []*signerapi.ResolveKeyPathSegment{
+		Path: []*prototk.ResolveKeyPathSegment{
 			{Name: "my"},
 			{Name: "shiny"},
 		},
@@ -299,7 +300,7 @@ key1:
 	})
 	require.NoError(t, err)
 
-	key, _, err := store.FindOrCreateLoadableKey(context.Background(), &signerapi.ResolveKeyRequest{
+	key, _, err := store.FindOrCreateLoadableKey(context.Background(), &prototk.ResolveKeyRequest{
 		Name: "key1",
 	}, nil)
 	require.NoError(t, err)

@@ -44,6 +44,7 @@ CREATE TABLE public_txn_bindings (
   "signer_nonce"              VARCHAR         NOT NULL,
   "transaction"               UUID            NOT NULL,
   "tx_type"                   VARCHAR         NOT NULL,
+  -- sender added in migration 22
   PRIMARY KEY ("signer_nonce"), -- a binding is not mandatory for a public TXN, but it is singular (see #210)
   FOREIGN KEY ("signer_nonce") REFERENCES public_txns ("signer_nonce") ON DELETE CASCADE
 );

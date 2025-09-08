@@ -20,13 +20,13 @@ import (
 	"encoding/hex"
 	"strings"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/pldmsgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signpayloads"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 type ecdsaSigner struct{}
@@ -67,7 +67,10 @@ func (s *ecdsaSigner) Sign_secp256k1(ctx context.Context, algorithm, payloadType
 		if err != nil {
 			return nil, err
 		}
-		return sig.CompactRSV(), nil
+		signature := sig.CompactRSV()
+		// firefly-signer has V with legacy 27/28 values but Paladin expects the latest EIP-1559 values 0/1
+		signature[len(signature)-1] -= 27
+		return signature, nil
 	default:
 		return nil, i18n.NewError(ctx, pldmsgs.MsgSigningUnsupportedPayloadCombination, payloadType, algorithm)
 	}
