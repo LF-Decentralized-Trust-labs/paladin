@@ -1321,9 +1321,54 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#automatic-gas-price-retrieval" class="md-nav__link">
+  <a href="#fixed-gas-pricing-node-level" class="md-nav__link">
     <span class="md-ellipsis">
-      Automatic gas price retrieval
+      Fixed gas pricing (node-level)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-gas-pricing-using-eth_feehistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dynamic gas pricing using eth_feeHistory
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed-gas-pricing-transaction-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fixed gas pricing (transaction-level)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gas-price-increase-mechanism" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas price increase mechanism
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gas-price-caps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas price caps
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gas-pricing-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas pricing priority
     </span>
   </a>
   
@@ -3495,9 +3540,54 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#automatic-gas-price-retrieval" class="md-nav__link">
+  <a href="#fixed-gas-pricing-node-level" class="md-nav__link">
     <span class="md-ellipsis">
-      Automatic gas price retrieval
+      Fixed gas pricing (node-level)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-gas-pricing-using-eth_feehistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dynamic gas pricing using eth_feeHistory
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed-gas-pricing-transaction-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fixed gas pricing (transaction-level)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gas-price-increase-mechanism" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas price increase mechanism
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gas-price-caps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas price caps
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gas-pricing-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas pricing priority
     </span>
   </a>
   
@@ -3572,8 +3662,10 @@ option under the <code>blockIndexer</code> configuration section. For example:</
 </code></pre></div>
 <p>Set the <code>fromBlock</code> to a recent block near the head of the base ledger chain you are using. Indexing should complete within a few minutes and Paladin can then confirm any new Paladin transactions that are mined into blocks.</p>
 <h2 id="gas-price">Gas price<a class="headerlink" href="#gas-price" title="Permanent link">&para;</a></h2>
-<p>Most public chains, whether they are an L1 or an L2, will use paid gas for all transactions. Paladin uses EIP1559 transactions and must set a suitable <code>maxBaseFeePerGas</code> and <code>maxPriorityFeePerGas</code> value in those transactions
-in order for them to be mined into blocks. Currently this must be configured on the Paladin node, for example:</p>
+<p>Most public chains, whether they are an L1 or an L2, will use paid gas for all transactions. Paladin uses EIP1559 transactions and must set a suitable <code>maxFeePerGas</code> and <code>maxPriorityFeePerGas</code> value in those transactions
+in order for them to be mined into blocks. Paladin provides several options for configuring gas pricing, from fixed values to dynamic retrieval based on network conditions.</p>
+<h3 id="fixed-gas-pricing-node-level">Fixed gas pricing (node-level)<a class="headerlink" href="#fixed-gas-pricing-node-level" title="Permanent link">&para;</a></h3>
+<p>You can configure fixed gas prices at the node level that will be used for all transactions unless overridden at the transaction level:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>publicTxManager:
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  gasPrice:
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    fixedGasPrice:
@@ -3591,19 +3683,85 @@ in order for them to be mined into blocks. Currently this must be configured on 
 <li><code>maxFeePerGas</code> &gt;= the minimum transaction pool gas fee for the chain</li>
 </ul>
 <p>Note: setting the fixed gas price values too high could result in paying more gas tokens (e.g. ETH) than necessary for transactions.</p>
-<h3 id="automatic-gas-price-retrieval">Automatic gas price retrieval<a class="headerlink" href="#automatic-gas-price-retrieval" title="Permanent link">&para;</a></h3>
-<p>TBC</p>
+<h3 id="dynamic-gas-pricing-using-eth_feehistory">Dynamic gas pricing using eth_feeHistory<a class="headerlink" href="#dynamic-gas-pricing-using-eth_feehistory" title="Permanent link">&para;</a></h3>
+<p>Paladin can automatically retrieve optimal gas prices using the <code>eth_feeHistory</code> RPC method, which provides historical fee data from the network. This approach adapts to network conditions and can be more cost-effective than fixed pricing.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>publicTxManager:
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  gasPrice:
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    ethFeeHistory:
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>      tipPercentile: 85
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>      historyBlockCount: 20
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>      baseFeeBufferFactor: 1
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>      cache:
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        enabled: true
+</code></pre></div>
+<p>Configuration options:</p>
+<ul>
+<li><strong><code>priorityFeePercentile</code></strong> (0-100): The percentile of historical priority fees to use. Higher values result in higher priority fees and faster transaction inclusion. Default: 85</li>
+<li><strong><code>historyBlockCount</code></strong>: Number of historical blocks to analyze for fee calculation. More blocks provide better averages but may be less responsive to recent changes. Default: 20</li>
+<li><strong><code>baseFeeBufferFactor</code></strong>: Multiplier for the base fee to provide a buffer against base fee increases. Default: 1 (no buffer)</li>
+<li><strong><code>cache.enabled</code></strong>: Whether to cache fee history results to reduce RPC calls. Default: true</li>
+</ul>
+<h3 id="fixed-gas-pricing-transaction-level">Fixed gas pricing (transaction-level)<a class="headerlink" href="#fixed-gas-pricing-transaction-level" title="Permanent link">&para;</a></h3>
+<p>You can override gas pricing for individual transactions by setting gas prices directly on the transaction. This disables the gas pricing engine for that specific transaction:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// Go SDK example</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nx">txBuilder</span><span class="p">.</span><span class="nx">PublicTxOptions</span><span class="p">(</span><span class="nx">pldapi</span><span class="p">.</span><span class="nx">PublicTxOptions</span><span class="p">{</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nx">MaxFeePerGas</span><span class="p">:</span><span class="w">         </span><span class="nx">pldtypes</span><span class="p">.</span><span class="nx">Uint64ToUint256</span><span class="p">(</span><span class="mi">20000000000</span><span class="p">),</span><span class="w"> </span><span class="c1">// 20 Gwei</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nx">MaxPriorityFeePerGas</span><span class="p">:</span><span class="w"> </span><span class="nx">pldtypes</span><span class="p">.</span><span class="nx">Uint64ToUint256</span><span class="p">(</span><span class="mi">2000000000</span><span class="p">),</span><span class="w">  </span><span class="c1">// 2 Gwei</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">})</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// TypeScript SDK example</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">sendTransaction</span><span class="p">({</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="c1">// ... transaction details</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nx">maxFeePerGas</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;0x4a817c800&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// 20 Gwei</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nx">maxPriorityFeePerGas</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;0x77359400&quot;</span><span class="w"> </span><span class="c1">// 2 Gwei</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">});</span>
+</code></pre></div>
+<p>Transaction-level fixed gas pricing bypasses all automatic gas pricing logic and uses the exact values you specify.</p>
+<h3 id="gas-price-increase-mechanism">Gas price increase mechanism<a class="headerlink" href="#gas-price-increase-mechanism" title="Permanent link">&para;</a></h3>
+<p>When a transaction is rejected for being underpriced, Paladin can automatically increase the gas price by a configurable percentage and resubmit the transaction. This mechanism applies to both node-level fixed pricing and dynamic pricing, but not to transaction-level fixed pricing.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>publicTxManager:
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  gasPrice:
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    increasePercentage: 10
+</code></pre></div>
+<ul>
+<li><strong><code>increasePercentage</code></strong>: Percentage increase to apply when a transaction is underpriced. Default: 10%</li>
+<li>This increase is applied to the previously submitted gas price, not the current network price</li>
+<li>The mechanism helps ensure transactions are eventually included even during periods of rapidly increasing gas prices</li>
+</ul>
+<h3 id="gas-price-caps">Gas price caps<a class="headerlink" href="#gas-price-caps" title="Permanent link">&para;</a></h3>
+<p>To protect against excessive gas spending, you can configure maximum caps for both <code>maxFeePerGas</code> and <code>maxPriorityFeePerGas</code>. These caps apply universally to all gas pricing methods:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>publicTxManager:
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  gasPrice:
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    maxFeePerGasCap: 0x5d21dba00  # 25 Gwei cap
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    maxPriorityFeePerGasCap: 0x77359400  # 2 Gwei cap
+</code></pre></div>
+<ul>
+<li><strong><code>maxFeePerGasCap</code></strong>: Maximum allowed <code>maxFeePerGas</code> value</li>
+<li><strong><code>maxPriorityFeePerGasCap</code></strong>: Maximum allowed <code>maxPriorityFeePerGas</code> value</li>
+<li>Caps are applied after all other gas pricing calculations, including increases for underpriced transactions</li>
+<li>If a calculated gas price exceeds the cap, it will be reduced to the cap value</li>
+<li>Setting caps too low may result in transactions being rejected by the network</li>
+</ul>
+<h3 id="gas-pricing-priority">Gas pricing priority<a class="headerlink" href="#gas-pricing-priority" title="Permanent link">&para;</a></h3>
+<p>Paladin uses the following priority order when determining gas prices for a transaction:</p>
+<ol>
+<li><strong>Zero gas price chain</strong>: If the chain is detected as having zero gas prices, return zero values</li>
+<li><strong>Transaction-level fixed pricing</strong>: If gas prices are set on the individual transaction</li>
+<li><strong>Node-level fixed pricing</strong>: If fixed gas prices are configured at the node level</li>
+<li><strong>Dynamic pricing</strong>: Use <code>eth_feeHistory</code> to calculate optimal gas prices</li>
+</ol>
+<p>This priority system ensures that transaction-level overrides take precedence while providing fallback mechanisms for automatic gas pricing.</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>The examples deploy contracts and invoke transactions before waiting for receipts to confirm they have succeesfully been mined. The default wait time in the Paladin Node SDK is 5 seconds. For many
 public chains this will need increasing to a suitable value, based on the block period of the chain. The following is an example of a modification to a <code>waitForReceipt()</code> call:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>const cashToken = await notoFactory
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    .newNoto(verifierNode1, {
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>      name: &quot;NOTO&quot;,
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>      symbol: &quot;NOTO&quot;,
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>      notary: verifierNode1,
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>      notaryMode: &quot;basic&quot;,
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    })
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    .waitForDeploy(20000);  // Allow 20 seconds for the contract deploy to complete
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>const cashToken = await notoFactory
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    .newNoto(verifierNode1, {
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>      name: &quot;NOTO&quot;,
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>      symbol: &quot;NOTO&quot;,
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>      notary: verifierNode1,
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>      notaryMode: &quot;basic&quot;,
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    })
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    .waitForDeploy(20000);  // Allow 20 seconds for the contract deploy to complete
 </code></pre></div>
 <p>Note: the example code won't wait the full 20 seconds if the contract deploy completes early, so setting a large value won't increase the example run time unncessarily.</p>
 <h2 id="funding-signing-addresses-with-gas-tokens-eg-eth">Funding signing addresses with gas tokens e.g. ETH<a class="headerlink" href="#funding-signing-addresses-with-gas-tokens-eg-eth" title="Permanent link">&para;</a></h2>
