@@ -64,7 +64,6 @@ type HybridGasPriceClient struct {
 
 	// Gas oracle HTTP client for external gas price retrieval
 	gasOracleHTTPClient *resty.Client
-	gasOracleMethod     string
 	gasOracleTemplate   *template.Template
 
 	// Eth fee history gas pricing configuration (always set with defaults so this works as a fallback option)
@@ -141,7 +140,7 @@ func (hGpc *HybridGasPriceClient) getGasPriceFromGasOracle(ctx context.Context) 
 	// Make HTTP request to the gas oracle API
 	resp, err := hGpc.gasOracleHTTPClient.R().
 		SetContext(ctx).
-		Execute(hGpc.gasOracleMethod, "")
+		Get("")
 	if err != nil {
 		log.L(ctx).Errorf("Failed to call gas oracle API: %+v", err)
 		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleAPICallFailed, err)
@@ -153,7 +152,6 @@ func (hGpc *HybridGasPriceClient) getGasPriceFromGasOracle(ctx context.Context) 
 	}
 
 	// Parse the response as JSON
-	// TODO AM: is this actually necessary or can the byte array be used directly? or as a string?
 	var responseData map[string]interface{}
 	if err := json.Unmarshal(resp.Body(), &responseData); err != nil {
 		log.L(ctx).Errorf("Failed to parse gas oracle API response as JSON: %+v", err)
@@ -349,7 +347,6 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 }
 
 func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
-	// TODO AM: move the errors returned from this function to proper PD errors in the catalog
 	// config that is relevant to all gas price retrieval methods
 	if hGpc.conf.MaxPriorityFeePerGasCap != nil {
 		maxPriorityFeePerGasCap, err := pldtypes.ParseHexUint256(ctx, *hGpc.conf.MaxPriorityFeePerGasCap)
@@ -396,7 +393,6 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 			return err
 		}
 		hGpc.gasOracleHTTPClient = gasOracleClient
-		hGpc.gasOracleMethod = confutil.StringNotEmpty(hGpc.conf.GasOracleAPI.Method, *pldconf.PublicTxManagerDefaults.GasPrice.GasOracleAPI.Method)
 
 		// Parse the template and return error if parsing fails
 		templateStr := hGpc.conf.GasOracleAPI.Template
@@ -410,7 +406,7 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 			return i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleTemplateParseFailed, err)
 		}
 
-		log.L(ctx).Infof("Initialized gas oracle HTTP client for URL: %s with method: %s", hGpc.conf.GasOracleAPI.URL, hGpc.gasOracleMethod)
+		log.L(ctx).Infof("Initialized gas oracle HTTP client for URL: %s", hGpc.conf.GasOracleAPI.URL)
 		return nil
 	}
 

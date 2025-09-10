@@ -67,6 +67,62 @@ Configuration options:
 - **`baseFeeBufferFactor`**: Multiplier for the base fee to provide a buffer against base fee increases. Default: 1 (no buffer)
 - **`cache.enabled`**: Whether to cache fee history results to reduce RPC calls. Default: true
 
+### Gas oracle API pricing
+
+Paladin can retrieve gas prices from external gas oracle APIs, which can provide more accurate or specialized gas price data than the standard `eth_feeHistory` method. This is particularly useful for chains with limited RPC capabilities or when using specialized gas price services.
+
+```
+publicTxManager:
+  gasPrice:
+    gasOracleAPI:
+      url: "https://api.example.com/gas"
+      auth:
+        username: "your-username"
+        password: "your-password"
+      httpHeaders:
+        X-API-Key: "your-api-key-here"
+      template: |
+        {
+          "maxFeePerGas": "{{.maxFeePerGas}}",
+          "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
+        }
+```
+
+Configuration options:
+
+- **`url`**: The HTTP endpoint URL for the gas oracle API
+- **`template`**: A Go template string that extracts gas price data from the API response. The template receives the JSON response as data and should output a JSON object with `maxFeePerGas` and `maxPriorityFeePerGas` fields
+- **Authentication**: HTTP client authentication options are supported:
+  - **`auth.username`** and **`auth.password`**: Basic authentication
+  - **`httpHeaders`**: Custom HTTP headers (useful for API keys, bearer tokens, etc.)
+
+The gas oracle API must:
+- Return a JSON response containing gas price information
+- Be accessible via HTTP GET requests
+- Return gas prices in either hexadecimal format (e.g., `"0x2FAF080"`) or decimal format (e.g., `"50000000"`)
+
+Example API responses that work with the template above:
+
+**Hexadecimal format:**
+```json
+{
+  "data": {
+    "maxFeePerGas": "0x2FAF080",
+    "maxPriorityFeePerGas": "0x3B9ACA0"
+  }
+}
+```
+
+**Decimal format:**
+```json
+{
+  "data": {
+    "maxFeePerGas": "50000000",
+    "maxPriorityFeePerGas": "62500000"
+  }
+}
+```
+
 ### Fixed gas pricing (transaction-level)
 
 You can override gas pricing for individual transactions by setting gas prices directly on the transaction. This disables the gas pricing engine for that specific transaction:
@@ -92,7 +148,7 @@ Transaction-level fixed gas pricing bypasses all automatic gas pricing logic and
 
 ### Gas price increase mechanism
 
-When a transaction is rejected for being underpriced, Paladin can automatically increase the gas price by a configurable percentage and resubmit the transaction. This mechanism applies to both node-level fixed pricing and dynamic pricing, but not to transaction-level fixed pricing.
+When a transaction is rejected for being underpriced, Paladin can automatically increase the gas price by a configurable percentage and resubmit the transaction. This mechanism applies to node-level fixed pricing, gas oracle API pricing, and dynamic pricing, but not to transaction-level fixed pricing.
 
 ```
 publicTxManager:
@@ -128,9 +184,10 @@ Paladin uses the following priority order when determining gas prices for a tran
 1. **Zero gas price chain**: If the chain is detected as having zero gas prices, return zero values
 2. **Transaction-level fixed pricing**: If gas prices are set on the individual transaction
 3. **Node-level fixed pricing**: If fixed gas prices are configured at the node level
-4. **Dynamic pricing**: Use `eth_feeHistory` to calculate optimal gas prices
+4. **Gas oracle API**: If a gas oracle API is configured, retrieve gas prices from the external service
+5. **Dynamic pricing**: Use `eth_feeHistory` to calculate optimal gas prices
 
-This priority system ensures that transaction-level overrides take precedence while providing fallback mechanisms for automatic gas pricing.
+This priority system ensures that transaction-level overrides take precedence while providing multiple fallback mechanisms for automatic gas pricing.
 
 ## Examples
 

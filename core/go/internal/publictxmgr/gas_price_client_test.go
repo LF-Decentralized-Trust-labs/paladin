@@ -26,6 +26,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -294,7 +295,7 @@ func TestEthFeeHistoryGasPricingEmptyFeeHistory(t *testing.T) {
 	gpo, err := hgc.GetGasPriceObject(ctx, nil, nil, false)
 	assert.Error(t, err)
 	assert.Nil(t, gpo)
-	assert.Contains(t, err.Error(), "fee history returned empty data")
+	assert.Contains(t, err.Error(), "Fee history returned empty data")
 
 	mockEthClient.AssertExpectations(t)
 }
@@ -438,7 +439,7 @@ func TestMapConfigToAPIGasPricingIncompleteConfig(t *testing.T) {
 	result, err := mapConfigToAPIGasPricing(ctx, conf)
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "maxPriorityFeePerGas is missing")
+	assert.Contains(t, err.Error(), "missing field maxPriorityFeePerGas")
 
 	// Test with only MaxPriorityFeePerGas set
 	conf = &pldconf.FixedGasPricing{
@@ -449,7 +450,7 @@ func TestMapConfigToAPIGasPricingIncompleteConfig(t *testing.T) {
 	result, err = mapConfigToAPIGasPricing(ctx, conf)
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "maxFeePerGas is missing")
+	assert.Contains(t, err.Error(), "missing field maxFeePerGas")
 
 	// Test with both fields nil - this should return a valid object with nil fields
 	conf = &pldconf.FixedGasPricing{
@@ -1147,6 +1148,336 @@ func TestGetGasPriceObjectWithFixedGasPriceFromConfig(t *testing.T) {
 	// Should return increased previously submitted GPO (10% increase)
 	expectedMaxFee := int64(13200000000)        // 12 Gwei + 10% = 13.2 Gwei
 	expectedMaxPriorityFee := int64(1320000000) // 1.2 Gwei + 10% = 1.32 Gwei
+	assert.Equal(t, expectedMaxFee, result.MaxFeePerGas.Int().Int64())
+	assert.Equal(t, expectedMaxPriorityFee, result.MaxPriorityFeePerGas.Int().Int64())
+}
+
+// TestGetGasPriceFromGasOracleSuccess tests successful gas oracle response
+func TestGetGasPriceFromGasOracleSuccess(t *testing.T) {
+	// Create gas price client with gas oracle config first
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		GasOracleAPI: &pldconf.GasOracleAPIConfig{
+			HTTPClientConfig: pldconf.HTTPClientConfig{
+				URL: "https://api.example.com/gas",
+			},
+			Template: `{
+				"maxFeePerGas": "{{.maxFeePerGas}}",
+				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
+			}`,
+		},
+	}
+
+	ctx, hgc, _ := NewTestGasPriceClient(t, conf, false)
+
+	// Initialize the client to set up gas oracle
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Setup httpmock for the specific client after it's created
+	httpmock.ActivateNonDefault(hgc.gasOracleHTTPClient.GetClient())
+	defer httpmock.DeactivateAndReset()
+	httpmock.Reset()
+
+	// Mock successful HTTP response
+	mockResponse := `{
+		"maxFeePerGas": "0x2FAF080",
+		"maxPriorityFeePerGas": "0x3B9ACA0"
+	}`
+	httpmock.RegisterResponder("GET", "https://api.example.com/gas",
+		httpmock.NewStringResponder(200, mockResponse))
+
+	// Call getGasPriceFromGasOracle
+	result, err := hgc.getGasPriceFromGasOracle(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Verify the result
+	expectedMaxFee := int64(50000000)         // 0x2FAF080 = 50,000,000 Wei = 0.05 Gwei
+	expectedMaxPriorityFee := int64(62500000) // 0x3B9ACA0 = 62,500,000 Wei = 0.0625 Gwei
+	assert.Equal(t, expectedMaxFee, result.MaxFeePerGas.Int().Int64())
+	assert.Equal(t, expectedMaxPriorityFee, result.MaxPriorityFeePerGas.Int().Int64())
+
+	// Verify HTTP call was made
+	assert.Equal(t, 1, httpmock.GetTotalCallCount())
+}
+
+// TestGetGasPriceFromGasOracleHTTPError tests HTTP error response
+func TestGetGasPriceFromGasOracleHTTPError(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		GasOracleAPI: &pldconf.GasOracleAPIConfig{
+			HTTPClientConfig: pldconf.HTTPClientConfig{
+				URL: "https://api.example.com/gas",
+			},
+			Template: `{
+				"maxFeePerGas": "{{.maxFeePerGas}}",
+				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
+			}`,
+		},
+	}
+
+	ctx, hgc, _ := NewTestGasPriceClient(t, conf, false)
+
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Setup httpmock for the specific client after it's created
+	httpmock.ActivateNonDefault(hgc.gasOracleHTTPClient.GetClient())
+	defer httpmock.DeactivateAndReset()
+	httpmock.Reset()
+
+	// Mock HTTP error response
+	httpmock.RegisterResponder("GET", "https://api.example.com/gas",
+		httpmock.NewStringResponder(500, "Internal Server Error"))
+
+	result, err := hgc.getGasPriceFromGasOracle(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "status 500")
+}
+
+// TestGetGasPriceFromGasOracleInvalidJSON tests invalid JSON response
+func TestGetGasPriceFromGasOracleInvalidJSON(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		GasOracleAPI: &pldconf.GasOracleAPIConfig{
+			HTTPClientConfig: pldconf.HTTPClientConfig{
+				URL: "https://api.example.com/gas",
+			},
+			Template: `{
+				"maxFeePerGas": "{{.maxFeePerGas}}",
+				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
+			}`,
+		},
+	}
+
+	ctx, hgc, _ := NewTestGasPriceClient(t, conf, false)
+
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Setup httpmock for the specific client after it's created
+	httpmock.ActivateNonDefault(hgc.gasOracleHTTPClient.GetClient())
+	defer httpmock.DeactivateAndReset()
+	httpmock.Reset()
+
+	// Mock invalid JSON response
+	httpmock.RegisterResponder("GET", "https://api.example.com/gas",
+		httpmock.NewStringResponder(200, "invalid json"))
+
+	result, err := hgc.getGasPriceFromGasOracle(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "Failed to parse gas oracle API response as JSON")
+}
+
+// TestGetGasPriceFromGasOracleTemplateExecutionFailure tests template execution failure
+func TestGetGasPriceFromGasOracleTemplateExecutionFailure(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		GasOracleAPI: &pldconf.GasOracleAPIConfig{
+			HTTPClientConfig: pldconf.HTTPClientConfig{
+				URL: "https://api.example.com/gas",
+			},
+			Template: `{
+				"maxFeePerGas": "{{.data.maxFeePerGas}}",
+				"maxPriorityFeePerGas": "{{.data.maxPriorityFeePerGas}}"
+			}`,
+		},
+	}
+
+	ctx, hgc, _ := NewTestGasPriceClient(t, conf, false)
+
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Setup httpmock for the specific client after it's created
+	httpmock.ActivateNonDefault(hgc.gasOracleHTTPClient.GetClient())
+	defer httpmock.DeactivateAndReset()
+	httpmock.Reset()
+
+	// Mock response that will cause template execution to fail
+	mockResponse := `{
+		"maxFeePerGas": "0x2FAF080",
+		"maxPriorityFeePerGas": "0x3B9ACA0"
+	}`
+	httpmock.RegisterResponder("GET", "https://api.example.com/gas",
+		httpmock.NewStringResponder(200, mockResponse))
+
+	result, err := hgc.getGasPriceFromGasOracle(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "Failed to parse template result as PublicTxGasPricing JSON")
+}
+
+// TestGetGasPriceFromGasOracleMissingMaxFeePerGas tests missing maxFeePerGas in template result
+func TestGetGasPriceFromGasOracleMissingMaxFeePerGas(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		GasOracleAPI: &pldconf.GasOracleAPIConfig{
+			HTTPClientConfig: pldconf.HTTPClientConfig{
+				URL: "https://api.example.com/gas",
+			},
+			Template: `{
+				"maxFeePerGas": "{{.maxFeePerGas}}",
+				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
+			}`,
+		},
+	}
+
+	ctx, hgc, _ := NewTestGasPriceClient(t, conf, false)
+
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Setup httpmock for the specific client after it's created
+	httpmock.ActivateNonDefault(hgc.gasOracleHTTPClient.GetClient())
+	defer httpmock.DeactivateAndReset()
+	httpmock.Reset()
+
+	// Mock response missing maxFeePerGas
+	mockResponse := `{
+		"maxPriorityFeePerGas": "0x3B9ACA0"
+	}`
+	httpmock.RegisterResponder("GET", "https://api.example.com/gas",
+		httpmock.NewStringResponder(200, mockResponse))
+
+	result, err := hgc.getGasPriceFromGasOracle(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "Failed to parse template result as PublicTxGasPricing JSON")
+}
+
+// TestGetGasPriceFromGasOracleMissingMaxPriorityFeePerGas tests missing maxPriorityFeePerGas in template result
+func TestGetGasPriceFromGasOracleMissingMaxPriorityFeePerGas(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		GasOracleAPI: &pldconf.GasOracleAPIConfig{
+			HTTPClientConfig: pldconf.HTTPClientConfig{
+				URL: "https://api.example.com/gas",
+			},
+			Template: `{
+				"maxFeePerGas": "{{.maxFeePerGas}}",
+				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
+			}`,
+		},
+	}
+
+	ctx, hgc, _ := NewTestGasPriceClient(t, conf, false)
+
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Setup httpmock for the specific client after it's created
+	httpmock.ActivateNonDefault(hgc.gasOracleHTTPClient.GetClient())
+	defer httpmock.DeactivateAndReset()
+	httpmock.Reset()
+
+	// Mock response missing maxPriorityFeePerGas
+	mockResponse := `{
+		"maxFeePerGas": "0x2FAF080"
+	}`
+	httpmock.RegisterResponder("GET", "https://api.example.com/gas",
+		httpmock.NewStringResponder(200, mockResponse))
+
+	result, err := hgc.getGasPriceFromGasOracle(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "Failed to parse template result as PublicTxGasPricing JSON")
+}
+
+// TestGetGasPriceFromGasOracleDifferentURL tests different URL endpoint
+func TestGetGasPriceFromGasOracleDifferentURL(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		GasOracleAPI: &pldconf.GasOracleAPIConfig{
+			HTTPClientConfig: pldconf.HTTPClientConfig{
+				URL: "https://api.different-provider.com/eth/gas",
+			},
+			Template: `{
+				"maxFeePerGas": "{{.maxFeePerGas}}",
+				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
+			}`,
+		},
+	}
+
+	ctx, hgc, _ := NewTestGasPriceClient(t, conf, false)
+
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Setup httpmock for the specific client after it's created
+	httpmock.ActivateNonDefault(hgc.gasOracleHTTPClient.GetClient())
+	defer httpmock.DeactivateAndReset()
+	httpmock.Reset()
+
+	// Mock successful response from different provider
+	mockResponse := `{
+		"maxFeePerGas": "0x2FAF080",
+		"maxPriorityFeePerGas": "0x3B9ACA0"
+	}`
+	httpmock.RegisterResponder("GET", "https://api.different-provider.com/eth/gas",
+		httpmock.NewStringResponder(200, mockResponse))
+
+	result, err := hgc.getGasPriceFromGasOracle(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Verify the result
+	expectedMaxFee := int64(50000000)
+	expectedMaxPriorityFee := int64(62500000)
+	assert.Equal(t, expectedMaxFee, result.MaxFeePerGas.Int().Int64())
+	assert.Equal(t, expectedMaxPriorityFee, result.MaxPriorityFeePerGas.Int().Int64())
+
+	// Verify GET call was made
+	assert.Equal(t, 1, httpmock.GetTotalCallCount())
+}
+
+// TestGetGasPriceFromGasOracleComplexTemplate tests complex template with nested data
+func TestGetGasPriceFromGasOracleComplexTemplate(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		GasOracleAPI: &pldconf.GasOracleAPIConfig{
+			HTTPClientConfig: pldconf.HTTPClientConfig{
+				URL: "https://api.example.com/gas",
+			},
+			Template: `{
+				"maxFeePerGas": "{{.result.gasPrice.maxFeePerGas}}",
+				"maxPriorityFeePerGas": "{{.result.gasPrice.maxPriorityFeePerGas}}"
+			}`,
+		},
+	}
+
+	ctx, hgc, _ := NewTestGasPriceClient(t, conf, false)
+
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Setup httpmock for the specific client after it's created
+	httpmock.ActivateNonDefault(hgc.gasOracleHTTPClient.GetClient())
+	defer httpmock.DeactivateAndReset()
+	httpmock.Reset()
+
+	// Mock complex JSON response
+	mockResponse := `{
+		"result": {
+			"gasPrice": {
+				"maxFeePerGas": "0x2FAF080",
+				"maxPriorityFeePerGas": "0x3B9ACA0"
+			}
+		}
+	}`
+	httpmock.RegisterResponder("GET", "https://api.example.com/gas",
+		httpmock.NewStringResponder(200, mockResponse))
+
+	result, err := hgc.getGasPriceFromGasOracle(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Verify the result
+	expectedMaxFee := int64(50000000)
+	expectedMaxPriorityFee := int64(62500000)
 	assert.Equal(t, expectedMaxFee, result.MaxFeePerGas.Int().Int64())
 	assert.Equal(t, expectedMaxPriorityFee, result.MaxPriorityFeePerGas.Int().Int64())
 }
