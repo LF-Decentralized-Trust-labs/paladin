@@ -320,8 +320,8 @@ describe('Rootless Identity Registry', () => {
     await identityRegistry.waitForDeployment();
   });
 
-  it('Root Identity', async () => {
-    // Root identity is established as part of the smart contract deployment, name 'root' owned by root_account
+  it('Rootless Identity', async () => {
+  // Rootless identity is established as part of the smart contract deployment when rootless is set to true, name 'root' owned by no one
     const rootIdentity = await identityRegistry.getRootIdentity();
     expect(rootIdentity.parent).to.equal(hre.ethers.ZeroHash);
     expect(rootIdentity.children.length).to.equal(0);
@@ -330,7 +330,7 @@ describe('Rootless Identity Registry', () => {
   });
 
   it('Self-register identities', async () => {
-    // Owner of root identity registers child identity "identity-a" and sets the ownership to account_a
+    // account_a is allowed to register child identity "identity-a" and sets the ownership to account_a, assuming no one else has registered it
     const transaction1 = await identityRegistry.connect(account_a).registerIdentity(hre.ethers.ZeroHash, 'identity-a', account_a);
     const event1 = await getEvent(transaction1);
     expect(event1?.fragment.name).to.equal('IdentityRegistered');
@@ -339,7 +339,7 @@ describe('Rootless Identity Registry', () => {
     expect(event1?.args[3]).to.equal(account_a);
     identity_a_hash = event1?.args[1];
 
-    // Owner of root identity registers child identity "identity-b" and sets the ownership to account_b
+    // account_b is allowed to register child identity "identity-b" and sets the ownership to account_b, assuming no one else has registered it
     const transaction2 = await identityRegistry.connect(account_b).registerIdentity(hre.ethers.ZeroHash, 'identity-b', account_b);
     const event2 = await getEvent(transaction2);
     expect(event2?.fragment.name).to.equal('IdentityRegistered');
@@ -356,11 +356,11 @@ describe('Rootless Identity Registry', () => {
     const identity_b = await identityRegistry.getIdentity(identity_b_hash);
     expect(identity_b.owner).to.equal(account_b);
 
-    // Confirm identity-a cannot registry identity-b now that it is taken
+    // Confirm identity-b cannot be registered again at the root now that it is taken
     await expect(identityRegistry.connect(account_a).registerIdentity(hre.ethers.ZeroHash, 'identity-b', account_b))
       .to.be.revertedWith('Name already taken');
 
-    // Confirm identity-b cannot registry identity-a now that it is taken
+    // Confirm identity-a cannot be registered again at the root now that it is taken
     await expect(identityRegistry.connect(account_b).registerIdentity(hre.ethers.ZeroHash, 'identity-a', account_a))
       .to.be.revertedWith('Name already taken');
   });
