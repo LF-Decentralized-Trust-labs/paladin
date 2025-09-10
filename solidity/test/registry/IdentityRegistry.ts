@@ -312,9 +312,6 @@ describe('Rootless Identity Registry', () => {
 
   let identity_a_hash: string;
   let identity_b_hash: string;
-  let identity_a_a_hash: string;
-  let identity_a_b_hash: string;
-
 
   before(async () => {
     [deployer_account, account_a, account_b, account_a_a, account_a_b, other_account] = await hre.ethers.getSigners();
