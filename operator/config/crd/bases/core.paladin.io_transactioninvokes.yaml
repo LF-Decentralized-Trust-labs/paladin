@@ -121,6 +121,9 @@ spec:
           status:
             description: TransactionInvokeStatus defines the observed state of TransactionInvoke
             properties:
+              blockNumber:
+                format: int64
+                type: integer
               contractDepsSummary:
                 type: string
               failureMessage:

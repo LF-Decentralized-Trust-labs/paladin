@@ -85,6 +85,9 @@ spec:
               publishTxs:
                 additionalProperties:
                   properties:
+                    blockNumber:
+                      format: int64
+                      type: integer
                     failureMessage:
                       type: string
                     idempotencyKey:
@@ -99,6 +102,9 @@ spec:
                 type: object
               registrationTx:
                 properties:
+                  blockNumber:
+                    format: int64
+                    type: integer
                   failureMessage:
                     type: string
                   idempotencyKey:

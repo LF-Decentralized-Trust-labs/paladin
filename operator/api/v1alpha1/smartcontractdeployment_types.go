@@ -73,6 +73,7 @@ type TransactionSubmission struct {
 	TransactionID     string            `json:"transactionID,omitempty"`
 	FailureMessage    string            `json:"failureMessage,omitempty"`
 	TransactionHash   string            `json:"transactionHash,omitempty"`
+	BlockNumber       int64             `json:"blockNumber,omitempty"`
 }
 
 type ContactDependenciesStatus struct {

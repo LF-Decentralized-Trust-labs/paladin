@@ -130,13 +130,11 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now(), nil)
 	rsc.StageOutput.GasPriceOutput.Err = nil
 	rsc.StageErrored = false
-	// it.stateManager.GetCurrentGeneration(ctx).SetValidatedTransactionHashMatchState(ctx, true) // TODO AM???
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
-	// assert.False(t, it.stateManager.GetCurrentGeneration(ctx).ValidatedTransactionHashMatchState(ctx))
 	// switched running stage context
 	assert.NotEqual(t, rsc, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 }
