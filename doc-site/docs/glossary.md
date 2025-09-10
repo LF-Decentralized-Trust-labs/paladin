@@ -8,7 +8,7 @@ This guarantees the entire workflow is treated as one "atomic" unit: either all 
 
 ### Besu
 
-**Hyperledger Besu** is an open-source **[Ethereum client](#evm-ethereum-virtual-machine)** developed under the Linux Foundation's Hyperledger project and written in Java. An Ethereum client is the software that implements the Ethereum protocol, allowing a computer to act as a node on the network. Besu is notable for its versatility, as it's designed to run on both the public Ethereum Mainnet and private, permissioned enterprise networks, making it a popular choice for projects that require customized privacy and permissioning features.
+**LFDT Besu** is an open-source **[Ethereum client](#evm-ethereum-virtual-machine)** developed under the Linux Foundation's Decentralized Trust and written in Java. An Ethereum client is the software that implements the Ethereum protocol, allowing a computer to act as a node on the network. Besu is notable for its versatility, as it's designed to run on both the public Ethereum Mainnet and private, permissioned enterprise networks, making it a popular choice for projects that require customized privacy and permissioning features.
 
 ***
 
@@ -72,7 +72,7 @@ Paladin's architecture uses a layered approach to separate private computation f
 
 ### noto
 
-The **noto** domain is a specialized environment within Paladin for managing **confidential [UTXO](#utxo-unspent-transaction-output) tokens under the control of a [Notary](#notary)**. It enables the creation and transfer of tokens where ownership and value are kept private from the public, while a trusted notary service enforces the rules of the token. For a developer, `noto` provides a straightforward way to implement asset privacy where governance by a designated arbiter is acceptable or desired.
+The **noto** domain is a reference domain provided with Paladin for managing **confidential [UTXO](#utxo-unspent-transaction-output) tokens under the control of a [Notary](#notary)**. It enables the creation and transfer of tokens where ownership and value are kept private from the public, while a trusted notary service enforces the rules of the token. For a developer, `noto` provides a straightforward way to implement asset privacy where governance by a designated arbiter is acceptable or desired.
 
 ***
 
@@ -90,7 +90,7 @@ A decentralized trust platform designed for building and deploying secure, inter
 
 ### pente
 
-The **pente** domain provides a powerful environment for executing **private [EVM-compatible](#evm-ethereum-virtual-machine) [smart contracts](#smart-contract)**. It creates what is effectively a "mini-blockchain within a single smart contract" on the base ledger.
+The **pente** domain is a reference domain that provides a powerful environment for executing **private [EVM-compatible](#evm-ethereum-virtual-machine) [smart contracts](#smart-contract)**. It creates what is effectively a "mini-blockchain within a single smart contract" on the base ledger.
 
 When a transaction is sent to a `pente` domain, it loads an ephemeral instance of an [EVM](#evm-ethereum-virtual-machine) (specifically, the **[Besu](#besu)** EVM) to run the smart contract logic privately. This allows for confidential execution, custom gas economics, and controlled access, separate from the public base ledger. For a developer, `pente` is the key to building complex, privacy-preserving applications (e.g., **[Delivery versus Payment (DvP)](#delivery-versus-payment-dvp)**) using familiar Ethereum tools while ensuring sensitive business logic remains confidential.
 
@@ -134,7 +134,7 @@ The **UTXO** model is a method for tracking cryptocurrency ownership. Instead of
 
 ### zeto
 
-The **zeto** domain is a **[UTXO](#utxo-unspent-transaction-output)**-based privacy-preserving token toolkit for **[EVM](#evm-ethereum-virtual-machine)**. Unlike [noto](#noto), which relies on a trusted [Notary](#notary) for privacy, `zeto` uses advanced cryptography. It leverages **[Zero-Knowledge Proofs (ZKPs)](#zkp-zero-knowledge-proof)** to allow users to prove ownership and transact tokens without revealing any underlying confidential information. The technical implementation of these proofs is handled using **[Circom](#circom)**, a specialized language for creating ZKP circuits. For a developer, this makes `zeto` the tool of choice for applications that require the strongest level of cryptographically-guaranteed privacy for assets.
+The **zeto** domain is a reference domain that uses **[UTXO](#utxo-unspent-transaction-output)**-based privacy-preserving token toolkit for **[EVM](#evm-ethereum-virtual-machine)**. Unlike [noto](#noto), which relies on a trusted [Notary](#notary) for privacy, `zeto` uses advanced cryptography. It leverages **[Zero-Knowledge Proofs (ZKPs)](#zkp-zero-knowledge-proof)** to allow users to prove ownership and transact tokens without revealing any underlying confidential information. The technical implementation of these proofs is handled using **[Circom](#circom)**, a specialized language for creating ZKP circuits. For a developer, this makes `zeto` the tool of choice for applications that require the strongest level of cryptographically-guaranteed privacy for assets.
 
 ***
 

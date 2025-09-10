@@ -12,16 +12,13 @@
 * Unlike previous private EVM implementations, Paladin runs on top of **un-modified** EVM chains and offers a more scalable and robust model for private transactions.
 * Instead of being a single solution, Paladin is designed to host many different privacy technologies (`noto`, `zeto`, etc.) in a single runtime, with the goal of creating common standards for private assets, similar to what ERC-20 did for public tokens.
 
-### What is the difference between Paladin and a Layer 2 (L2)?
+### What is the relationship between Paladin, permissioned chains, L1s and L2s?
 
-**Paladin is a client for enabling programmable privacy, whereas L2s are primarily designed to provide scalability.**
+Paladin is a client for enabling programmable privacy using any EVM compatible chain as the base ledger. The base ledger could be a permissioned chain, a public L1 or a public L2 chain. Paladin manages what state needs submitting to the base ledger and handles gas calculations where the base ledger requires gas tokens to fund transactions.
 
-* **Layer 2s** exist to "roll up" multiple transactions to solve for network congestion and high fees. They are not inherently privacy technologies.
-* **Paladin** is focused on confidentiality. Every private transaction it facilitates is backed 1-to-1 by a transaction on the underlying base ledger.
 
-### Paladin is additive to L2s; it can run on top of an L2 network just as easily as it can on a Layer 1.
 
-Why does Paladin use a base public ledger instead of being its own standalone blockchain?
+Why does Paladin use a base ledger instead of being its own standalone blockchain?
 
 **Paladin uses a base ledger to leverage its security and enable interoperability, rather than creating another isolated ecosystem.** This additive approach provides three key advantages:
 
@@ -37,7 +34,7 @@ Why does Paladin use a base public ledger instead of being its own standalone bl
 
 **A Domain is an isolated, pluggable execution engine that implements a specific set of privacy-preserving features.** Like a secured workspace within a larger office, a Domain provides a specialized environment tailored for a specific task. This model allows developers to choose the right privacy tool for the job—whether it's for tokens or general smart contracts—without being locked into a single technology.
 
-### What is the difference between the `noto`, `pente`, and `zeto` domains?
+### What is the difference between the `noto`, `pente`, and `zeto` reference domains?
 
 **These domains provide different tools and trust models for different privacy use cases.**
 
@@ -45,6 +42,7 @@ Why does Paladin use a base public ledger instead of being its own standalone bl
 * **`pente`**: Provides **Private EVM Execution** for running complex, confidential business logic and workflows, such as a Delivery versus Payment (DvP) agreement.
 * **`zeto`**: Leverages **Zero-Knowledge Proofs** for maximum asset privacy, enabling transactions where no underlying data is revealed to any party.
 
+These domains are _reference_ domains and have been implemented using Paladin's pluggable architecture. Other domains can be implemented to the same plugin interface, for example a zero-knowledge token that uses a different ZK standard to the one used by **zeto**.
 ### How does Paladin handle interoperability between different privacy domains?
 
 **Paladin achieves interoperability through atomic settlement on the shared base ledger.** This allows a single, seamless transaction to involve multiple steps across different domains. For example, you can atomically swap a `noto` token for an asset managed by a `pente` smart contract. Because all domains ultimately commit a proof to the same underlying EVM ledger, the entire multi-step workflow can be guaranteed to succeed or fail as a single unit, a concept known as **Atomic Programmability**.
@@ -77,7 +75,7 @@ You can find the complete, step-by-step instructions in the **[Installation Guid
 
 **The best place to connect with the Paladin community and development team is on the Hyperledger Discord server.** This is the primary forum for real-time discussions, questions, and sharing ideas.
 
-* Join the conversation here: **[Hyperledger Discord](https://discord.gg/hyperledger)** (look for the Paladin channel).
+* Join the conversation here: **[Hyperledger Discord](https://discord.com/channels/905194001349627914/1303371167020879903)**.
 
 ### How should I report a bug?
 
