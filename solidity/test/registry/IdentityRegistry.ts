@@ -13,11 +13,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import hre from 'hardhat';
-import { IdentityRegistry } from '../../typechain-types/contracts/registry';
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers';
 import { expect } from 'chai';
 import { ContractTransactionResponse, EventLog } from 'ethers';
+import hre from 'hardhat';
+import { IdentityRegistry } from '../../typechain-types/contracts/registry';
 
 /**
  * Test design
@@ -59,7 +59,7 @@ describe('Identity Registry', () => {
   before(async () => {
     [root_account, account_a, account_b, account_a_a, account_a_b, other_account] = await hre.ethers.getSigners();
     const IdentityRegistry = await hre.ethers.getContractFactory('IdentityRegistry');
-    identityRegistry = await IdentityRegistry.connect(root_account).deploy();
+    identityRegistry = await IdentityRegistry.connect(root_account).deploy(false);
     await identityRegistry.waitForDeployment();
   });
 
@@ -297,6 +297,76 @@ describe('Identity Registry', () => {
       .to.be.revertedWith('Property not found');
   });
 
+});
+
+describe('Rootless Identity Registry', () => {
+  let identityRegistry: IdentityRegistry;
+
+  let deployer_account: SignerWithAddress;
+
+  let account_a: SignerWithAddress;
+  let account_b: SignerWithAddress;
+  let account_a_a: SignerWithAddress;
+  let account_a_b: SignerWithAddress;
+  let other_account: SignerWithAddress;
+
+  let identity_a_hash: string;
+  let identity_b_hash: string;
+  let identity_a_a_hash: string;
+  let identity_a_b_hash: string;
+
+
+  before(async () => {
+    [deployer_account, account_a, account_b, account_a_a, account_a_b, other_account] = await hre.ethers.getSigners();
+    const IdentityRegistry = await hre.ethers.getContractFactory('IdentityRegistry');
+    identityRegistry = await IdentityRegistry.connect(deployer_account).deploy(true);
+    await identityRegistry.waitForDeployment();
+  });
+
+  it('Root Identity', async () => {
+    // Root identity is established as part of the smart contract deployment, name 'root' owned by root_account
+    const rootIdentity = await identityRegistry.getRootIdentity();
+    expect(rootIdentity.parent).to.equal(hre.ethers.ZeroHash);
+    expect(rootIdentity.children.length).to.equal(0);
+    expect(rootIdentity.name).to.equal('root');
+    expect(rootIdentity.owner).to.equal(hre.ethers.ZeroAddress);
+  });
+
+  it('Self-register identities', async () => {
+    // Owner of root identity registers child identity "identity-a" and sets the ownership to account_a
+    const transaction1 = await identityRegistry.connect(account_a).registerIdentity(hre.ethers.ZeroHash, 'identity-a', account_a);
+    const event1 = await getEvent(transaction1);
+    expect(event1?.fragment.name).to.equal('IdentityRegistered');
+    expect(event1?.args[0]).to.equal(hre.ethers.ZeroHash);
+    expect(event1?.args[2]).to.equal('identity-a');
+    expect(event1?.args[3]).to.equal(account_a);
+    identity_a_hash = event1?.args[1];
+
+    // Owner of root identity registers child identity "identity-b" and sets the ownership to account_b
+    const transaction2 = await identityRegistry.connect(account_b).registerIdentity(hre.ethers.ZeroHash, 'identity-b', account_b);
+    const event2 = await getEvent(transaction2);
+    expect(event2?.fragment.name).to.equal('IdentityRegistered');
+    expect(event2?.args[0]).to.equal(hre.ethers.ZeroHash);
+    expect(event2?.args[2]).to.equal('identity-b');
+    expect(event2?.args[3]).to.equal(account_b);
+    identity_b_hash = event2?.args[1];
+
+    // Confirm account_a is the owner of identity-a
+    const identity_a = await identityRegistry.getIdentity(identity_a_hash);
+    expect(identity_a.owner).to.equal(account_a);
+
+    // Confirm account_b is the owner of identity-b
+    const identity_b = await identityRegistry.getIdentity(identity_b_hash);
+    expect(identity_b.owner).to.equal(account_b);
+
+    // Confirm identity-a cannot registry identity-b now that it is taken
+    await expect(identityRegistry.connect(account_a).registerIdentity(hre.ethers.ZeroHash, 'identity-b', account_b))
+      .to.be.revertedWith('Name already taken');
+
+    // Confirm identity-b cannot registry identity-a now that it is taken
+    await expect(identityRegistry.connect(account_b).registerIdentity(hre.ethers.ZeroHash, 'identity-a', account_a))
+      .to.be.revertedWith('Name already taken');
+  });
 });
 
 const getEvents = async (response: ContractTransactionResponse) => {
