@@ -196,6 +196,7 @@ func (r *transactionReconcile) trackTransactionAndRequeue(ctx context.Context, p
 	if r.receipt.Success {
 		r.pStatus.TransactionStatus = corev1alpha1.TransactionStatusSuccess
 		r.succeeded = true
+		r.pStatus.BlockNumber = r.receipt.BlockNumber
 	} else {
 		r.pStatus.TransactionStatus = corev1alpha1.TransactionStatusFailed
 		r.pStatus.FailureMessage = r.receipt.FailureMessage
