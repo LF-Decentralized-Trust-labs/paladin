@@ -1,6 +1,16 @@
 ---
 title: keymgr_*
 ---
+## `keymgr_queryKeys`
+
+### Parameters
+
+0. `query`: [`QueryJSON`](../types/queryjson.md#queryjson)
+
+### Returns
+
+0. `keys`: [`KeyQueryEntry[]`](../types/keyqueryentry.md#keyqueryentry)
+
 ## `keymgr_resolveEthAddress`
 
 ### Parameters
