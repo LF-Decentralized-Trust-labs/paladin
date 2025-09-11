@@ -1,6 +1,9 @@
 {
     "registry": {
-        "filename": "test/e2e/abis/IdentityRegistry.json"
+        "filename": "test/e2e/abis/IdentityRegistry.json",
+        "params": {
+            "rootless": false
+        }
     },
     "noto_factory": {
         "filename": "test/e2e/abis/NotoFactory.json"
