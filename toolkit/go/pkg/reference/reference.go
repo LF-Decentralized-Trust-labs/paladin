@@ -118,6 +118,7 @@ var allTypes = []interface{}{
 	pldapi.ABIDecodedData{},
 	pldapi.PeerInfo{},
 	pldapi.KeyMappingAndVerifier{},
+	pldapi.KeyQueryEntry{},
 	pldapi.ReliableMessageAck{},
 	pldapi.ReliableMessage{},
 	pldapi.PrivacyGroup{},
