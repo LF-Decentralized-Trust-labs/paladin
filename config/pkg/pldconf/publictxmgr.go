@@ -142,7 +142,7 @@ type GasPriceConfig struct {
 	MaxFeePerGasCap         *string             `json:"maxFeePerGasCap"`
 	FixedGasPrice           *FixedGasPricing    `json:"fixedGasPrice"`
 	EthFeeHistory           EthFeeHistoryConfig `json:"ethFeeHistory"`
-	GasOracleAPI            GasOracleAPIConfig  `json:"gasOracleAPI"`
+	GasOracleAPI            *GasOracleAPIConfig `json:"gasOracleAPI"`
 }
 
 type GasLimitConfig struct {
@@ -150,8 +150,8 @@ type GasLimitConfig struct {
 }
 
 type GasOracleAPIConfig struct {
-	URL      string `json:"url"`
-	Template string `json:"template"`
+	HTTPClientConfig `json:",inline"`
+	Template         string `json:"template"`
 }
 
 type PublicTxManagerOrchestratorConfig struct {
