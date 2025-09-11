@@ -166,7 +166,7 @@ task makeMocks(type: Exec, dependsOn: [":installMockery", protoc, goGet]) {
    executable "mockery"
 }
 
-task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
+task clean(type: Delete, dependsOn: [':testinfra:stopTestInfra', ':testinfra:stopTestInfraWithGas']) {
     delete "${buildDir}"
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
@@ -296,6 +296,28 @@ abstract class ComponentTest extends Exec {
     }
 }
 
+abstract class GasComponentTest extends Exec {
+    GasComponentTest() {
+        inputs.files(project.goFiles)
+        outputs.dir('coverage')
+
+        workingDir '.'
+        executable 'go'
+        args 'test'
+        args './componenttest'
+        args '-cover'
+        args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..." // toolkit handled seperately
+        args '-covermode=atomic'
+        args '-timeout=120s'
+        if (project.findProperty('verboseTests') == 'true') {
+            args '-v'
+        }
+        args "-test.gocoverdir=${project.projectDir}/coverage"
+
+        project.helpers.dumpLogsOnFailure(this, ':testinfra:startTestInfraWithGas')
+    }
+}
+
 task setupCoverage(dependsOn: [protoc, copyContracts, makeMocks]) {
     inputs.files(goFiles)
     outputs.dir('coverage')
@@ -326,7 +348,7 @@ task unitTestPostgres(type: UnitTests, dependsOn: [
     mustRunAfter 'unitTestSQLite' // these tests cannot run concurrently
 }
 
-task componentTestSQLite(type: ComponentTest, dependsOn: [
+task componentTestPostgres(type: ComponentTest, dependsOn: [
         makeMocks,
         ':testinfra:startTestInfra',
         setupCoverage,
@@ -336,12 +358,22 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [
     mustRunAfter 'unitTestPostgres' // these tests cannot run concurrently
 }
 
+task componentTestWithGasPostgres(type: GasComponentTest, dependsOn: [
+        makeMocks,
+        ':testinfra:startTestInfraWithGas',
+        setupCoverage,
+        goGet,
+        copyContracts, // Ensure this task depends on copying the test contracts
+    ]) {
+    mustRunAfter 'componentTestPostgres' // these tests cannot run concurrently
+}
+
 task buildCoverageTxt(type: Exec, dependsOn: [
         protoc,
         unitTestSQLite,
         unitTestPostgres,
-        componentTestSQLite,
-        // componentTestPostgres
+        componentTestPostgres,
+        componentTestWithGasPostgres
     ]) {
     inputs.files(fileTree(project.mkdir('coverage')) {
         include "covcounters.*"
