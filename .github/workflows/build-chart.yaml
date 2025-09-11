@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CLUSTER_NAME: paladin
-      NAMESPACE: paladin
+      NAMESPACE: ci-devnet
 
     steps:
       - uses: actions/checkout@v4
