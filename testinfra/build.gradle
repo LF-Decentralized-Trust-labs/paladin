@@ -40,17 +40,28 @@ task besuBootstrapTool(type: Exec) {
     args "."
 }
 
-task startTestInfra(type: DockerCompose, dependsOn: tasks.besuBootstrapTool) {
+task stopTestInfra(type: DockerCompose) {
+    composeFile 'docker-compose-test.yml'
+    projectName 'paladin-testinfra'
+    args 'down', '-v'
+}
+
+task stopTestInfraWithGas(type: DockerCompose) {
+    composeFile 'docker-compose-test-with-gas.yml'
+    projectName 'paladin-testinfra-gas'
+    args 'down', '-v'
+}
+
+task startTestInfra(type: DockerCompose, dependsOn: [tasks.besuBootstrapTool, tasks.stopTestInfraWithGas]) {
     composeFile 'docker-compose-test.yml'
     projectName 'paladin-testinfra'
     args 'up', '-d', '--wait', '--wait-timeout', 60
 }
 
-
-task stopTestInfra(type: DockerCompose) {
-    composeFile 'docker-compose-test.yml'
-    projectName 'paladin-testinfra'
-    args 'down', '-v'
+task startTestInfraWithGas(type: DockerCompose, dependsOn: [tasks.besuBootstrapTool, tasks.stopTestInfra]) {
+    composeFile 'docker-compose-test-with-gas.yml'
+    projectName 'paladin-testinfra-gas'
+    args 'up', '-d', '--wait', '--wait-timeout', 60
 }
 
 task removeBesuBootstrapTool(type: Exec, dependsOn: stopTestInfra) {
@@ -60,5 +71,5 @@ task removeBesuBootstrapTool(type: Exec, dependsOn: stopTestInfra) {
     ignoreExitValue true
 }
 
-task clean(type: Delete, dependsOn: [tasks.removeBesuBootstrapTool, tasks.stopTestInfra]) {
+task clean(type: Delete, dependsOn: [tasks.removeBesuBootstrapTool, tasks.stopTestInfra, tasks.stopTestInfraWithGas]) {
 }

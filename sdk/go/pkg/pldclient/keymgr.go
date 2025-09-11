@@ -20,6 +20,7 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
 )
 
 type KeyManager interface {
@@ -29,6 +30,7 @@ type KeyManager interface {
 	ResolveKey(ctx context.Context, keyIdentifier, algorithm, verifierType string) (mapping *pldapi.KeyMappingAndVerifier, err error)
 	ResolveEthAddress(ctx context.Context, keyIdentifier string) (ethAddress *pldtypes.EthAddress, err error)
 	ReverseKeyLookup(ctx context.Context, algorithm, verifierType, verifier string) (mapping *pldapi.KeyMappingAndVerifier, err error)
+	QueryKeys(ctx context.Context, jq *query.QueryJSON) (receipts []*pldapi.KeyQueryEntry, err error)
 }
 
 // This is necessary because there's no way to introspect function parameter names via reflection
@@ -50,6 +52,10 @@ var keymgrInfo = &rpcModuleInfo{
 		"keymgr_reverseKeyLookup": {
 			Inputs: []string{"algorithm", "verifierType", "verifier"},
 			Output: "mapping",
+		},
+		"keymgr_queryKeys": {
+			Inputs: []string{"query"},
+			Output: "keys",
 		},
 	},
 }
@@ -80,5 +86,10 @@ func (k *keymgr) ResolveEthAddress(ctx context.Context, keyIdentifier string) (e
 
 func (k *keymgr) ReverseKeyLookup(ctx context.Context, algorithm, verifierType, verifier string) (mapping *pldapi.KeyMappingAndVerifier, err error) {
 	err = k.c.CallRPC(ctx, &mapping, "keymgr_reverseKeyLookup", algorithm, verifierType, verifier)
+	return
+}
+
+func (k *keymgr) QueryKeys(ctx context.Context, jq *query.QueryJSON) (keys []*pldapi.KeyQueryEntry, err error) {
+	err = k.c.CallRPC(ctx, &keys, "keymgr_queryKeys", jq)
 	return
 }
