@@ -326,7 +326,7 @@ describe('Rootless Identity Registry', () => {
     expect(rootIdentity.parent).to.equal(hre.ethers.ZeroHash);
     expect(rootIdentity.children.length).to.equal(0);
     expect(rootIdentity.name).to.equal('root');
-    expect(rootIdentity.owner).to.equal(hre.ethers.ZeroAddress);
+    expect(rootIdentity.owner).to.equal('0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF');
   });
 
   it('Self-register identities', async () => {

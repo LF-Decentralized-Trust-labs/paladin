@@ -43,7 +43,8 @@ contract IdentityRegistry {
     mapping(bytes32 => mapping(bytes32 => Property)) private properties;
 
     constructor(bool rootless) {
-        address owner = rootless ? address(0) : msg.sender;
+        // if rootless, owner is set to the max address (0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF)
+        address owner = rootless ? address(type(uint160).max) : msg.sender;
         // Root identity is created
         Identity memory rootIdentity = Identity(
             0,
@@ -68,7 +69,7 @@ contract IdentityRegistry {
         require(bytes(name).length != 0, "Name cannot be empty");
 
         // Ensure sender owns parent identity
-        require(identities[parentIdentityHash].owner == msg.sender || identities[parentIdentityHash].owner == address(0), "Forbidden");
+        require(identities[parentIdentityHash].owner == msg.sender || identities[parentIdentityHash].owner == address(type(uint160).max), "Forbidden");
 
         // Calculate identity hash based on its name and the hash of the parent identity
         bytes32 hash = sha256(abi.encodePacked(parentIdentityHash, name));
