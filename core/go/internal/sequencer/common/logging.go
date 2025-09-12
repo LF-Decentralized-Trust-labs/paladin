@@ -16,22 +16,16 @@
 package common
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 )
-
-type SeqLogType string
 
 const (
-	LOGTYPE_STATE     SeqLogType = "State"
-	LOGTYPE_LIFECYCLE SeqLogType = "Lifecyle"
-	LOGTYPE_MSGTX     SeqLogType = "MsgTx"
-	LOGTYPE_MSGRX     SeqLogType = "MsgRx"
+	SUBCOMP_STATE     log.Component = "State"
+	SUBCOMP_LIFECYCLE log.Component = "Life "
+	SUBCOMP_MSGTX     log.Component = "MsgTx"
+	SUBCOMP_MSGRX     log.Component = "MsgRx"
+	SUBCOMP_COORD     log.Component = "Coord"
+	SUBCOMP_MISC      log.Component = "Misc"
 )
 
-func Log(ctx context.Context, SeqLogType SeqLogType, message string, args ...interface{}) {
-	msg := fmt.Sprintf(message, args...)
-	log.L(ctx).Infof("[Seq%s] %s", SeqLogType, msg)
-}
+const COMPONENT_SEQUENCER = "Sequencer"

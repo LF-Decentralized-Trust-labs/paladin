@@ -22,6 +22,7 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/google/uuid"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
@@ -64,8 +65,10 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	require.NoError(t, err)
 	assert.Empty(t, errReason)
 	assert.Equal(t, SubmissionOutcomeSubmittedNew, outCome)
@@ -82,8 +85,10 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	require.NoError(t, err)
 	assert.Empty(t, errReason)
 	assert.Equal(t, SubmissionOutcomeSubmittedNew, outCome)
@@ -100,8 +105,10 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	assert.Regexp(t, "PD011905", err)
 	assert.Empty(t, errReason)
 	assert.Equal(t, SubmissionOutcomeFailedRequiresRetry, outCome)
@@ -118,8 +125,10 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	assert.Regexp(t, "transaction underpriced", err)
 	assert.Equal(t, ethclient.ErrorReasonTransactionUnderpriced, errReason)
 	assert.Equal(t, SubmissionOutcomeFailedRequiresRetry, outCome)
@@ -135,8 +144,10 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	assert.Regexp(t, "execution reverted", err)
 	assert.Equal(t, ethclient.ErrorReasonTransactionReverted, errReason)
 	assert.Equal(t, SubmissionOutcomeFailedRequiresRetry, outCome)
@@ -152,8 +163,10 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	require.NoError(t, err)
 	assert.Empty(t, errReason)
 	assert.Equal(t, SubmissionOutcomeAlreadyKnown, outCome)
@@ -169,8 +182,10 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	require.NoError(t, err)
 	assert.Empty(t, errReason)
 	assert.Equal(t, SubmissionOutcomeNonceTooLow, outCome)
@@ -187,8 +202,10 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	assert.Regexp(t, "error submitting", err)
 	assert.Equal(t, ethclient.ErrorReason(""), errReason)
 	assert.Equal(t, SubmissionOutcomeFailedRequiresRetry, outCome)
@@ -215,8 +232,10 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	require.NoError(t, err)
 	assert.Empty(t, errReason)
 	assert.Equal(t, SubmissionOutcomeSubmittedNew, outCome)
@@ -232,8 +251,10 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	require.NoError(t, err)
 	assert.Empty(t, errReason)
 	assert.Equal(t, SubmissionOutcomeSubmittedNew, outCome)
@@ -248,8 +269,10 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	require.NoError(t, err)
 	assert.Empty(t, errReason)
 	assert.Equal(t, SubmissionOutcomeSubmittedNew, outCome)
@@ -263,8 +286,10 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	assert.Regexp(t, "transaction underpriced", err)
 	assert.Equal(t, ethclient.ErrorReasonTransactionUnderpriced, errReason)
 	assert.Equal(t, SubmissionOutcomeFailedRequiresRetry, outCome)
@@ -276,8 +301,10 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	assert.Regexp(t, "execution reverted", err)
 	assert.Equal(t, ethclient.ErrorReasonTransactionReverted, errReason)
 	assert.Equal(t, SubmissionOutcomeFailedRequiresRetry, outCome)
@@ -289,8 +316,10 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	require.NoError(t, err)
 	assert.Empty(t, errReason)
 	assert.Equal(t, SubmissionOutcomeAlreadyKnown, outCome)
@@ -302,8 +331,10 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	require.NoError(t, err)
 	assert.Empty(t, errReason)
 	assert.Equal(t, SubmissionOutcomeNonceTooLow, outCome)
@@ -320,8 +351,10 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	require.NoError(t, err)
 	assert.Empty(t, errReason)
 	assert.Equal(t, SubmissionOutcomeSubmittedNew, outCome)
@@ -335,8 +368,10 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testHashedSignedMessage),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
-		testCancel)
+		testCancel,
+		uuid.New())
 	assert.Regexp(t, "PD020000", err)
 	assert.Equal(t, SubmissionOutcomeFailedRequiresRetry, outCome)
 	assert.Nil(t, txHash)

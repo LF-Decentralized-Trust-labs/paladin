@@ -59,12 +59,7 @@ func (it *inFlightTransactionStageController) submitTX(ctx context.Context, sign
 		}
 		txHash, submissionError = it.ethClient.SendRawTransaction(ctx, pldtypes.HexBytes(signedMessage))
 		if contractAddress != "" {
-			log.L(ctx).Infof("Geting transaction by ID to obtain the full private transaction %s", txnID)
-			privTX, err := it.rootTxMgr.GetTransactionByID(ctx, txnID)
-			if err != nil {
-				log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving transaction by ID for %s: %s", txnID, err)
-			}
-			err = it.sequencerManager.HandlePublicTXSubmission(ctx, privTX.From, txHash, contractAddress, txnID)
+			err := it.sequencerManager.HandlePublicTXSubmission(ctx, txHash, contractAddress, txnID)
 			if err != nil {
 				log.L(ctx).Errorf("HandlePublicTXSubmission failed: %s", err)
 			}

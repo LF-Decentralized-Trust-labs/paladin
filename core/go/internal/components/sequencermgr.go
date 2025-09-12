@@ -72,9 +72,9 @@ type SequencerManager interface {
 	HandleNewTx(ctx context.Context, dbTX persistence.DBTX, tx *ValidatedTransaction) error
 	HandleNewEvent(ctx context.Context, event string) error
 	HandleTransactionCollected(ctx context.Context, signerAddress string, contractAddress string, txID uuid.UUID) error
-	HandleNonceAssigned(ctx context.Context, from string, nonce uint64, contractAddress string, txID uuid.UUID) error
-	HandlePublicTXSubmission(ctx context.Context, signerAddress string, txHash *pldtypes.Bytes32, contractAddress string, txnID uuid.UUID) error
-	HandleTransactionConfirmed(ctx context.Context, transactionSender string, receipt *TxCompletion, nonce uint64) error
+	HandleNonceAssigned(ctx context.Context, nonce uint64, contractAddress string, txID uuid.UUID) error
+	HandlePublicTXSubmission(ctx context.Context, txHash *pldtypes.Bytes32, contractAddress string, txnID uuid.UUID) error
+	HandleTransactionConfirmed(ctx context.Context, receipt *TxCompletion, from *pldtypes.EthAddress, nonce uint64) error
 	// GetTxStatus(ctx context.Context, domainAddress string, txID uuid.UUID) (status PrivateTxStatus, err error)
 
 	// Synchronous function to call an existing deployed smart contract

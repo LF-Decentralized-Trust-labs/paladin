@@ -19,20 +19,20 @@ import (
 	"context"
 	"testing"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/testutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/testutil"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func NewSenderForUnitTest(t *testing.T, ctx context.Context, committeeMembers []string) (*sender, *senderDependencyMocks) {
+func NewSenderForUnitTest(t *testing.T, ctx context.Context, senderIdentityPool []string) (*sender, *senderDependencyMocks) {
 
-	if committeeMembers == nil {
-		committeeMembers = []string{"member1@node1"}
+	if senderIdentityPool == nil {
+		senderIdentityPool = []string{"member1@node1"}
 	}
 	mocks := &senderDependencyMocks{
 		messageSender:     NewMockMessageSender(t),
@@ -45,7 +45,6 @@ func NewSenderForUnitTest(t *testing.T, ctx context.Context, committeeMembers []
 		ctx,
 		"member1@node1",
 		mocks.messageSender,
-		committeeMembers,
 		mocks.clock,
 		mocks.emit,
 		mocks.engineIntegration,

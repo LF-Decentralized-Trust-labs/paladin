@@ -127,19 +127,20 @@ func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) 
 	for _, completion := range txCompletions {
 		// Private transaction manager needs to know about these to update its in-memory state
 
-		fullTx, err := dm.txManager.GetTransactionByIDFull(dm.bgCtx, completion.TransactionID)
+		pubBindingTx, err := dm.publicTxManager.QueryPublicTxForTransactions(dm.bgCtx, dm.persistence.NOTX(), []uuid.UUID{completion.TransactionID}, nil)
 		if err != nil {
-			log.L(dm.bgCtx).Errorf("Error getting transaction by ID: %s", err)
+			log.L(dm.bgCtx).Errorf("Error getting public transaction by ID: %s", err)
 		}
-
 		// MRW TODO - there may be multiple public transactions associated with a private transaction
-		for _, publicTx := range fullTx.Public {
-			log.L(dm.bgCtx).Debugf("Checking public transactions for TX ID %s to find a match for the receipt we are processing %s", completion.TransactionID, publicTx.TransactionHash)
-			if publicTx.TransactionHash.Equals(&completion.ReceiptInput.OnChain.TransactionHash) {
-				log.L(dm.bgCtx).Debugf("Found a match for the receipt we are processing %s", publicTx.TransactionHash)
-				err = dm.sequencerManager.HandleTransactionConfirmed(dm.bgCtx, completion.From, completion, publicTx.Nonce.Uint64())
-				if err != nil {
-					log.L(dm.bgCtx).Errorf("Error handling transaction confirmed event: %s", err)
+		for _, pubTx := range pubBindingTx {
+			for _, publicTx := range pubTx {
+				log.L(dm.bgCtx).Debugf("Checking public transactions for TX ID %s to find a match for the receipt we are processing %s", completion.TransactionID, publicTx.TransactionHash)
+				if publicTx.TransactionHash.Equals(&completion.ReceiptInput.OnChain.TransactionHash) {
+					log.L(dm.bgCtx).Debugf("Found a match for the receipt we are processing %s", publicTx.TransactionHash)
+					err = dm.sequencerManager.HandleTransactionConfirmed(dm.bgCtx, completion, &publicTx.From, publicTx.Nonce.Uint64())
+					if err != nil {
+						log.L(dm.bgCtx).Errorf("Error handling transaction confirmed event: %s", err)
+					}
 				}
 			}
 		}
@@ -228,17 +229,8 @@ func (d *domain) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, ba
 			}
 			log.L(ctx).Infof("Domain transaction completion: %s", txID)
 
-			log.L(ctx).Infof("Getting transaction by ID: %s", txID)
-			// MRW TODO - is this the most efficient way to retrieve the TX sender?
-			tx, err := d.dm.txManager.GetTransactionByID(ctx, *txID)
-			if err != nil {
-				return err
-			}
-			log.L(ctx).Infof("Retrieved transaction by ID to enrich TxCompletion: %s, sender: %s", txID, tx.From)
-
 			completion := &components.TxCompletion{
-				PSC:  batch.psc,
-				From: tx.From,
+				PSC: batch.psc,
 				ReceiptInput: components.ReceiptInput{
 					TransactionID: *txID,
 					Domain:        d.name,

@@ -18,10 +18,10 @@ package transaction
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type MessageSender interface {
@@ -38,6 +38,7 @@ type MessageSender interface {
 	//SendEndorsementRequest to either a local or remote endorser
 	SendEndorsementRequest(
 		ctx context.Context,
+		transactionId uuid.UUID,
 		idempotencyKey uuid.UUID,
 		party string,
 		attRequest *prototk.AttestationRequest,

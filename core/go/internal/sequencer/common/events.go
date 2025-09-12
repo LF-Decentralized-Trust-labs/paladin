@@ -15,6 +15,8 @@
 
 package common
 
+import "time"
+
 type EventType int
 
 // function that can be used to emit events from the internals of the sequencer to feed back into the state machine
@@ -24,12 +26,22 @@ const (
 	Event_HeartbeatInterval EventType = iota // emitted on a regular basis, interval defined by the sequencer config a
 )
 
+type BaseEvent struct {
+	EventTime time.Time
+}
+
+func (e *BaseEvent) GetEventTime() time.Time {
+	return e.EventTime
+}
+
 type Event interface {
 	Type() EventType
 	TypeString() string
+	GetEventTime() time.Time
 }
 
 type HeartbeatIntervalEvent struct {
+	BaseEvent
 }
 
 func (_ *HeartbeatIntervalEvent) Type() EventType {

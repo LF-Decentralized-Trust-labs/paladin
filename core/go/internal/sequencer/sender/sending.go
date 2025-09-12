@@ -19,11 +19,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 )
 
 func action_SendDelegationRequest(ctx context.Context, s *sender) error {
@@ -43,13 +43,13 @@ func action_SendDelegationRequest(ctx context.Context, s *sender) error {
 		}
 	}
 
-	s.messageSender.SendDelegationRequest(ctx, s.activeCoordinator, privateTransactions, s.currentBlockHeight)
+	s.messageSender.SendDelegationRequest(ctx, s.activeCoordinatorNode, privateTransactions, s.currentBlockHeight)
 	for _, txn := range transactions {
 		err := txn.HandleEvent(ctx, &transaction.DelegatedEvent{
 			BaseEvent: transaction.BaseEvent{
 				TransactionID: txn.ID,
 			},
-			Coordinator: s.activeCoordinator,
+			Coordinator: s.activeCoordinatorNode,
 		})
 		if err != nil {
 			msg := fmt.Sprintf("[Sequencer] error handling delegated event for transaction %s: %v", txn.ID, err)

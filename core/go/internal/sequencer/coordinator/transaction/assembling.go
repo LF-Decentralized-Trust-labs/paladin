@@ -18,13 +18,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 )
 
 func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *components.TransactionPostAssembly) error {
@@ -72,7 +72,7 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 	})
 	t.cancelAssembleTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
 		t.emit(&RequestTimeoutIntervalEvent{
-			BaseEvent: BaseEvent{
+			BaseCoordinatorEvent: BaseCoordinatorEvent{
 				TransactionID: t.ID,
 			},
 		})
@@ -116,7 +116,7 @@ func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
 	// and we have a duty to inform all the transactions that are ordered behind us
 	if t.nextTransaction != nil {
 		err := t.nextTransaction.HandleEvent(ctx, &DependencyAssembledEvent{
-			BaseEvent: BaseEvent{
+			BaseCoordinatorEvent: BaseCoordinatorEvent{
 				TransactionID: t.nextTransaction.ID,
 			},
 			DependencyID: t.ID,
@@ -135,7 +135,7 @@ func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
 		err := dependent.HandleEvent(ctx, &DependencyAssembledEvent{
-			BaseEvent: BaseEvent{
+			BaseCoordinatorEvent: BaseCoordinatorEvent{
 				TransactionID: t.nextTransaction.ID,
 			},
 			DependencyID: t.ID,
@@ -161,7 +161,7 @@ func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 		dependentTxn := t.grapher.TransactionByID(ctx, dependentID)
 		if dependentTxn != nil {
 			err := dependentTxn.HandleEvent(ctx, &DependencyRevertedEvent{
-				BaseEvent: BaseEvent{
+				BaseCoordinatorEvent: BaseCoordinatorEvent{
 					TransactionID: dependentID,
 				},
 				DependencyID: t.ID,

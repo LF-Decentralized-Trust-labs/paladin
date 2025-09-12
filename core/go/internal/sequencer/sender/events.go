@@ -16,10 +16,10 @@
 package sender
 
 import (
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
 
 type Event interface {
@@ -38,6 +38,7 @@ func (_ *HeartbeatIntervalEvent) TypeString() string {
 }
 
 type HeartbeatReceivedEvent struct {
+	common.BaseEvent
 	transport.CoordinatorHeartbeatNotification
 }
 
@@ -50,6 +51,7 @@ func (_ *HeartbeatReceivedEvent) TypeString() string {
 }
 
 type TransactionCreatedEvent struct {
+	common.BaseEvent
 	Transaction *components.PrivateTransaction
 }
 
@@ -62,6 +64,7 @@ func (_ *TransactionCreatedEvent) TypeString() string {
 }
 
 type TransactionConfirmedEvent struct {
+	common.BaseEvent
 	From         *pldtypes.EthAddress
 	Nonce        uint64
 	Hash         pldtypes.Bytes32

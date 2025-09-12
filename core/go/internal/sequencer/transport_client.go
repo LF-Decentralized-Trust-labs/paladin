@@ -19,20 +19,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator"
+	coordTransaction "github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	senderTransaction "github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
+	engineProto "github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto/engine"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator"
-	coordTransaction "github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/sender"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
-	senderTransaction "github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
-	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -77,7 +78,7 @@ func (d *distributedSequencerManager) HandlePaladinMsg(ctx context.Context, mess
 
 func (d *distributedSequencerManager) logPaladinMessage(ctx context.Context, message *components.ReceivedMessage) {
 	//log.L(ctx).Debugf("[Sequencer] << proto message %s received from %s", message.MessageType, message.FromNode)
-	common.Log(ctx, common.LOGTYPE_MSGRX, "%+v from %s", message.MessageType, message.FromNode)
+	log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_MSGRX)).Debugf("%+v received from %s", message.MessageType, message.FromNode)
 }
 
 func (d *distributedSequencerManager) logPaladinMessageUnmarshalError(ctx context.Context, message *components.ReceivedMessage, err error) {
@@ -115,6 +116,13 @@ func (d *distributedSequencerManager) handleAssembleRequest(ctx context.Context,
 		d.logPaladinMessageJsonUnmarshalError(ctx, "TransactionPreAssembly", message, err)
 		return
 	}
+	log.L(ctx).Infof("[Sequencer] We've been asked to handle an assemble request. How many required verifiers are there? %d How many actual verifiers are there? %d", len(preAssembly.RequiredVerifiers), len(preAssembly.Verifiers))
+	for _, verifier := range preAssembly.RequiredVerifiers {
+		log.L(ctx).Infof("[Sequencer] Required verifier: %+v", verifier)
+	}
+	for _, verifier := range preAssembly.Verifiers {
+		log.L(ctx).Infof("[Sequencer] Actual verifier: %+v", verifier)
+	}
 
 	contractAddress := d.parseContractAddressString(ctx, assembleRequest.ContractAddress, message)
 	if contractAddress == nil {
@@ -137,6 +145,8 @@ func (d *distributedSequencerManager) handleAssembleRequest(ctx context.Context,
 	assembleRequestEvent.Coordinator = seq.GetCoordinator().GetActiveCoordinatorNode(ctx)
 	assembleRequestEvent.CoordinatorsBlockHeight = assembleRequest.BlockHeight
 	assembleRequestEvent.StateLocksJSON = assembleRequest.StateLocks
+	assembleRequestEvent.PreAssembly = assembleRequest.PreAssembly
+	assembleRequestEvent.EventTime = time.Now()
 
 	seq.GetSender().HandleEvent(ctx, assembleRequestEvent)
 }
@@ -162,6 +172,28 @@ func (d *distributedSequencerManager) handleAssembleResponse(ctx context.Context
 		return
 	}
 
+	err = json.Unmarshal(assembleResponse.PostAssembly, postAssembly)
+	if err != nil {
+		d.logPaladinMessageJsonUnmarshalError(ctx, "TransactionPostAssembly", message, err)
+		return
+	}
+
+	preAssembly := &components.TransactionPreAssembly{}
+	err = json.Unmarshal(assembleResponse.PreAssembly, preAssembly)
+	if err != nil {
+		d.logPaladinMessageJsonUnmarshalError(ctx, "TransactionPreAssembly", message, err)
+		return
+	}
+
+	err = json.Unmarshal(assembleResponse.PreAssembly, preAssembly)
+	if err != nil {
+		d.logPaladinMessageJsonUnmarshalError(ctx, "TransactionPreAssembly", message, err)
+		return
+	}
+
+	log.L(ctx).Infof("[Sequencer] preAssembly required verifiers: %+v", preAssembly.RequiredVerifiers)
+	log.L(ctx).Infof("[Sequencer] preAssembly verifiers: %+v", preAssembly.Verifiers)
+
 	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
 		log.L(ctx).Errorf("[Sequencer] failed to obtain sequencer to pass assemble response event %v:", err)
@@ -179,6 +211,8 @@ func (d *distributedSequencerManager) handleAssembleResponse(ctx context.Context
 		assembleResponseEvent.TransactionID = uuid.MustParse(assembleResponse.TransactionId)
 		assembleResponseEvent.RequestID = uuid.MustParse(assembleResponse.AssembleRequestId)
 		assembleResponseEvent.PostAssembly = postAssembly
+		assembleResponseEvent.PreAssembly = preAssembly
+		assembleResponseEvent.EventTime = time.Now()
 		seq.GetCoordinator().HandleEvent(ctx, assembleResponseEvent)
 	case prototk.AssembleTransactionResponse_PARK:
 		log.L(ctx).Errorf("[Sequencer] coordinator state machine cannot move from Assembling to Parked")
@@ -188,6 +222,7 @@ func (d *distributedSequencerManager) handleAssembleResponse(ctx context.Context
 		assembleResponseEvent.TransactionID = uuid.MustParse(assembleResponse.TransactionId)
 		assembleResponseEvent.RequestID = uuid.MustParse(assembleResponse.AssembleRequestId)
 		assembleResponseEvent.PostAssembly = postAssembly
+		assembleResponseEvent.EventTime = time.Now()
 		seq.GetCoordinator().HandleEvent(ctx, assembleResponseEvent)
 	default:
 		log.L(ctx).Errorf("[Sequencer] received unexpected assemble response type %s", postAssembly.AssemblyResult)
@@ -210,6 +245,7 @@ func (d *distributedSequencerManager) handleAssembleError(ctx context.Context, m
 
 	assembleErrorEvent := &transaction.AssembleErrorEvent{}
 	assembleErrorEvent.TransactionID = uuid.MustParse(assembleError.TransactionId)
+	assembleErrorEvent.EventTime = time.Now()
 
 	errorString := assembleError.ErrorMessage
 	log.L(ctx).Infof("[Sequencer] assemble error for TX %s: %s", assembleError.TransactionId, errorString)
@@ -256,6 +292,7 @@ func (d *distributedSequencerManager) handleCoordinatorHeartbeatNotification(ctx
 	heartbeatEvent.From = from
 	heartbeatEvent.ContractAddress = contractAddress
 	heartbeatEvent.CoordinatorSnapshot = *coordinatorSnapshot
+	heartbeatEvent.EventTime = time.Now()
 
 	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
@@ -271,6 +308,7 @@ func (d *distributedSequencerManager) handleCoordinatorHeartbeatNotification(ctx
 		log.L(ctx).Infof("[Sequencer] received a heartbeat containing a confirmed transaction: %s", transaction.ID.String())
 		heartbeatIntervalEvent := &coordTransaction.HeartbeatIntervalEvent{}
 		heartbeatIntervalEvent.TransactionID = transaction.ID
+		heartbeatIntervalEvent.EventTime = time.Now()
 		seq.GetCoordinator().HandleEvent(ctx, heartbeatIntervalEvent)
 	}
 
@@ -303,14 +341,14 @@ func (d *distributedSequencerManager) handleDispatchConfirmationRequest(ctx cont
 
 	postAssemblyHash := pldtypes.NewBytes32FromSlice(dispatchConfirmationRequest.PostAssembleHash)
 
-	seq.GetSender().HandleEvent(ctx, &transaction.DispatchConfirmationRequestReceivedEvent{
-		BaseEvent: transaction.BaseEvent{
-			TransactionID: uuid.MustParse(dispatchConfirmationRequest.TransactionId[2:34]),
-		},
+	dispatchConfirmationRequestReceivedEvent := &transaction.DispatchConfirmationRequestReceivedEvent{
 		RequestID:        uuid.MustParse(dispatchConfirmationRequest.Id),
 		Coordinator:      message.FromNode,
 		PostAssemblyHash: &postAssemblyHash,
-	})
+	}
+	dispatchConfirmationRequestReceivedEvent.TransactionID = uuid.MustParse(dispatchConfirmationRequest.TransactionId[2:34])
+	dispatchConfirmationRequestReceivedEvent.EventTime = time.Now()
+	seq.GetSender().HandleEvent(ctx, dispatchConfirmationRequestReceivedEvent)
 }
 
 func (d *distributedSequencerManager) handleDispatchedEvent(ctx context.Context, message *components.ReceivedMessage) {
@@ -339,7 +377,7 @@ func (d *distributedSequencerManager) handleDispatchedEvent(ctx context.Context,
 
 	dispatchConfirmedEvent := &senderTransaction.DispatchedEvent{}
 	dispatchConfirmedEvent.TransactionID = uuid.MustParse(dispatchedEvent.TransactionId[2:34])
-	// MRW TODO Dispatched events include a signer, but it's not clear why we're interested in that here
+	dispatchConfirmedEvent.EventTime = time.Now()
 
 	seq.GetSender().HandleEvent(ctx, dispatchConfirmedEvent)
 }
@@ -364,12 +402,7 @@ func (d *distributedSequencerManager) handleDelegationRequest(ctx context.Contex
 		return
 	}
 
-	transactionDelegatedEvent := &coordinator.TransactionsDelegatedEvent{}
-	log.L(d.ctx).Debugf("[Sequencer] handleDelegationRequest transaction specific from: %s", privateTransaction.PreAssembly.TransactionSpecification.From)
-	transactionDelegatedEvent.Sender = privateTransaction.PreAssembly.TransactionSpecification.From
-
-	transactionDelegatedEvent.Transactions = append(transactionDelegatedEvent.Transactions, privateTransaction)
-	transactionDelegatedEvent.SendersBlockHeight = uint64(d.blockHeight) // MRW TODO - which is the senders block height here?
+	// MRW TODO - do we need to check if this coordinator has successfully confirmed this transaction on chain already?
 
 	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
@@ -380,6 +413,15 @@ func (d *distributedSequencerManager) handleDelegationRequest(ctx context.Contex
 		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
 		return
 	}
+
+	transactionDelegatedEvent := &coordinator.TransactionsDelegatedEvent{}
+	transactionDelegatedEvent.Sender = privateTransaction.PreAssembly.TransactionSpecification.From
+	transactionDelegatedEvent.Transactions = append(transactionDelegatedEvent.Transactions, privateTransaction)
+	transactionDelegatedEvent.SendersBlockHeight = uint64(d.blockHeight) // MRW TODO - which is the senders block height here?
+	transactionDelegatedEvent.EventTime = time.Now()
+
+	// Anyone who delegates a transaction to us is a candidate sender and should be sent heartbeats for TX confirmation processing
+	seq.GetCoordinator().UpdateSenderNodePool(ctx, message.FromNode)
 
 	seq.GetCoordinator().HandleEvent(ctx, transactionDelegatedEvent)
 }
@@ -539,12 +581,51 @@ func (d *distributedSequencerManager) handleEndorsementRequest(ctx context.Conte
 	// Create a throwaway domain context for this call
 	dCtx := d.components.StateManager().NewDomainContext(ctx, psc.Domain(), psc.Address())
 	defer dCtx.Close()
-	endorseRes, err := psc.EndorseTransaction(dCtx, d.components.Persistence().NOTX(), privateEndorsementRequest)
+	endorsementResult, err := psc.EndorseTransaction(dCtx, d.components.Persistence().NOTX(), privateEndorsementRequest)
 	if err != nil {
 		log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to endorse transaction: %s", err)
 		return
 	}
-	transactionEndorsement.Payload = endorseRes.Payload
+	transactionEndorsement.Payload = endorsementResult.Payload
+
+	attResult := &prototk.AttestationResult{
+		Name:            transactionEndorsement.Name,
+		AttestationType: transactionEndorsement.AttestationType,
+		Verifier:        endorsementResult.Endorser,
+	}
+
+	switch endorsementResult.Result {
+	case prototk.EndorseTransactionResponse_SIGN:
+		//log.L(ctx).Infof("[Sequencer] endorsement response resulted in signing request for transaction %s", endorsementRequest.TransactionId)
+
+		//log.L(ctx).Infof("[Sequencer] endorsement response, checking if the endorser of this endorsement request '%s'is us so we can sign and submit TX %s", endorseRes.Endorser.Lookup, endorsementRequest.TransactionId)
+		unqualifiedLookup, signerNode, err := pldtypes.PrivateIdentityLocator(endorsementResult.Endorser.Lookup).Validate(ctx, d.nodeName, true)
+		if err != nil {
+			log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to validate endorser: %s", err)
+			return
+		}
+		if signerNode == d.nodeName {
+
+			log.L(ctx).Info("[Sequencer] endorsement response signing request includes us - signing it now")
+			keyMgr := d.components.KeyManager()
+			resolvedKey, err := keyMgr.ResolveKeyNewDatabaseTX(ctx, unqualifiedLookup, transactionEndorsement.Algorithm, transactionEndorsement.VerifierType)
+			if err != nil {
+				log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to resolve key for endorser: %s", err)
+				return
+			}
+
+			signaturePayload, err := keyMgr.Sign(ctx, resolvedKey, transactionEndorsement.PayloadType, transactionEndorsement.Payload)
+			if err != nil {
+				log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to sign endorsement request: %s", err)
+				return
+			}
+			attResult.Payload = signaturePayload
+			//log.L(ctx).Debugf("[Sequencer] handleEndorsementRequest payload %x signed %x by %s (%s)", transactionEndorsement.Payload, signaturePayload, unqualifiedLookup, resolvedKey.Verifier.Verifier)
+			attResult.Constraints = append(attResult.Constraints, prototk.AttestationResult_ENDORSER_MUST_SUBMIT)
+			// MRW TODO - is this manual extrapolation of TX ID from 32 char hex string required?
+
+		}
+	}
 
 	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
@@ -556,78 +637,8 @@ func (d *distributedSequencerManager) handleEndorsementRequest(ctx context.Conte
 		return
 	}
 
-	result := &prototk.AttestationResult{
-		Name:            transactionEndorsement.Name,
-		AttestationType: transactionEndorsement.AttestationType,
-		Verifier:        endorseRes.Endorser,
-	}
-	switch endorseRes.Result {
-	case prototk.EndorseTransactionResponse_REVERT:
-		revertReason := "(no revert reason)"
-		if endorseRes.RevertReason != nil {
-			revertReason = *endorseRes.RevertReason
-		}
-		log.L(ctx).Infof("[Sequencer] endorsement response for transaction %s - %s rejected: %s", endorsementRequest.TransactionId, endorsementRequest.Party, revertReason)
-		endorseRejectedEvent := &coordTransaction.EndorsedRejectedEvent{}
-		endorseRejectedEvent.RevertReason = revertReason
-		endorseRejectedEvent.Party = endorsementRequest.Party
-		endorseRejectedEvent.AttestationRequestName = transactionEndorsement.Name
-		endorseRejectedEvent.RequestID = uuid.MustParse(endorsementRequest.IdempotencyKey)
-		seq.GetCoordinator().HandleEvent(ctx, endorseRejectedEvent)
-	case prototk.EndorseTransactionResponse_SIGN:
-		log.L(ctx).Infof("[Sequencer] endorsement response resulted in signing request for transaction %s", endorsementRequest.TransactionId)
-
-		log.L(ctx).Infof("[Sequencer] endorsement response, checking if the endorser of this endorsement request '%s'is us so we can sign and submit TX %s", endorseRes.Endorser.Lookup, endorsementRequest.TransactionId)
-		unqualifiedLookup, signerNode, err := pldtypes.PrivateIdentityLocator(endorseRes.Endorser.Lookup).Validate(ctx, d.nodeName, true)
-		if err != nil {
-			log.L(ctx).Errorf("handleEndorsementRequest failed to validate identity locator for signing party %s: %s", endorseRes.Endorser.Lookup, err)
-			return
-		}
-		if signerNode == d.nodeName {
-
-			log.L(ctx).Info("[Sequencer] endorsement response signing request includes us - signing it now")
-			keyMgr := d.components.KeyManager()
-			resolvedKey, err := keyMgr.ResolveKeyNewDatabaseTX(ctx, unqualifiedLookup, transactionEndorsement.Algorithm, transactionEndorsement.VerifierType)
-			if err != nil {
-				log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to resolve local signer for %s (algorithm=%s): %s", unqualifiedLookup, transactionEndorsement.Algorithm, err)
-				return
-			}
-
-			signaturePayload, err := keyMgr.Sign(ctx, resolvedKey, transactionEndorsement.PayloadType, transactionEndorsement.Payload)
-			if err != nil {
-				log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to sign for party %s (verifier=%s,algorithm=%s): %s", unqualifiedLookup, resolvedKey.Verifier.Verifier, transactionEndorsement.Algorithm, err)
-				return
-			}
-			result.Payload = signaturePayload
-			log.L(ctx).Debugf("[Sequencer] handleEndorsementRequest payload %x signed %x by %s (%s)", transactionEndorsement.Payload, signaturePayload, unqualifiedLookup, resolvedKey.Verifier.Verifier)
-
-			result.Constraints = append(result.Constraints, prototk.AttestationResult_ENDORSER_MUST_SUBMIT)
-			endorsedEvent := &coordTransaction.EndorsedEvent{}
-
-			// MRW TODO - is this manual extrapolation of TX ID from 32 char hex string required?
-			endorsedEvent.TransactionID = uuid.MustParse(endorsementRequest.TransactionId[2:34])
-			endorsedEvent.RequestID = uuid.MustParse(endorsementRequest.IdempotencyKey)
-			endorsedEvent.Endorsement = result
-			seq.GetCoordinator().HandleEvent(ctx, endorsedEvent)
-		} else {
-			log.L(ctx).Warnf("[Sequencer] handleEndorsementRequest ignoring endorsement for TX %s from remote verifier %s ", endorsementRequest.TransactionId, endorseRes.Endorser.Lookup)
-		}
-	case prototk.EndorseTransactionResponse_ENDORSER_SUBMIT:
-		log.L(ctx).Infof("[Sequencer] endorsement response - submit it")
-		result.Constraints = append(result.Constraints, prototk.AttestationResult_ENDORSER_MUST_SUBMIT)
-		endorsedEvent := &coordTransaction.EndorsedEvent{}
-		endorsedEvent.TransactionID = uuid.MustParse(endorsementRequest.TransactionId[2:34])
-		endorsedEvent.RequestID = uuid.MustParse(endorsementRequest.IdempotencyKey)
-		endorsedEvent.Endorsement = result
-		seq.GetCoordinator().HandleEvent(ctx, endorsedEvent)
-	default:
-		log.L(ctx).Infof("[Sequencer] endorsement response - default result, raising endorses event")
-		endorsedEvent := &coordTransaction.EndorsedEvent{}
-		endorsedEvent.TransactionID = uuid.MustParse(endorsementRequest.TransactionId[2:34])
-		endorsedEvent.RequestID = uuid.MustParse(endorsementRequest.IdempotencyKey)
-		endorsedEvent.Endorsement = result
-		seq.GetCoordinator().HandleEvent(ctx, endorsedEvent)
-	}
+	d.metrics.IncEndorsedTransactions()
+	seq.GetTransportWriter().SendEndorsementResponse(ctx, endorsementRequest.TransactionId, endorsementRequest.IdempotencyKey, contractAddress.String(), attResult, endorsementResult, transactionEndorsement.Name, endorsementRequest.Party, message.FromNode)
 }
 
 func (d *distributedSequencerManager) handleEndorsementResponse(ctx context.Context, message *components.ReceivedMessage) {
@@ -650,11 +661,6 @@ func (d *distributedSequencerManager) handleEndorsementResponse(ctx context.Cont
 		return
 	}
 
-	endorsementResponseEvent := &coordTransaction.EndorsedEvent{}
-	endorsementResponseEvent.TransactionID = uuid.MustParse(endorsementResponse.TransactionId)
-	endorsementResponseEvent.RequestID = uuid.MustParse(endorsementResponse.IdempotencyKey)
-	endorsementResponseEvent.Endorsement = endorsement
-
 	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
 		log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to obtain sequencer to pass endorsement event %v:", err)
@@ -664,6 +670,12 @@ func (d *distributedSequencerManager) handleEndorsementResponse(ctx context.Cont
 		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
 		return
 	}
+
+	endorsementResponseEvent := &coordTransaction.EndorsedEvent{}
+	endorsementResponseEvent.TransactionID = uuid.MustParse(endorsementResponse.TransactionId)
+	endorsementResponseEvent.RequestID = uuid.MustParse(endorsementResponse.IdempotencyKey)
+	endorsementResponseEvent.Endorsement = endorsement
+	endorsementResponseEvent.EventTime = time.Now()
 
 	seq.GetCoordinator().HandleEvent(ctx, endorsementResponseEvent)
 }
@@ -681,10 +693,6 @@ func (d *distributedSequencerManager) handleNonceAssigned(ctx context.Context, m
 		return
 	}
 
-	nonceAssignedEvent := &senderTransaction.NonceAssignedEvent{}
-	nonceAssignedEvent.TransactionID = uuid.MustParse(nonceAssigned.TransactionId)
-	nonceAssignedEvent.Nonce = uint64(nonceAssigned.Nonce)
-
 	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
 		log.L(ctx).Errorf("[Sequencer] handleNonceAssignedEvent failed to obtain sequencer to pass nonce assigned event %v:", err)
@@ -694,6 +702,11 @@ func (d *distributedSequencerManager) handleNonceAssigned(ctx context.Context, m
 		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
 		return
 	}
+
+	nonceAssignedEvent := &senderTransaction.NonceAssignedEvent{}
+	nonceAssignedEvent.TransactionID = uuid.MustParse(nonceAssigned.TransactionId)
+	nonceAssignedEvent.Nonce = uint64(nonceAssigned.Nonce)
+	nonceAssignedEvent.EventTime = time.Now()
 
 	seq.GetSender().HandleEvent(ctx, nonceAssignedEvent)
 }
@@ -711,10 +724,6 @@ func (d *distributedSequencerManager) handleTransactionSubmitted(ctx context.Con
 		return
 	}
 
-	transactionSubmittedEvent := &senderTransaction.SubmittedEvent{}
-	transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionSubmitted.TransactionId)
-	transactionSubmittedEvent.LatestSubmissionHash = pldtypes.Bytes32(transactionSubmitted.Hash)
-
 	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
 		log.L(ctx).Errorf("[Sequencer] handleTransactionSubmitted failed to obtain sequencer to pass transaction submitted event %v:", err)
@@ -724,6 +733,11 @@ func (d *distributedSequencerManager) handleTransactionSubmitted(ctx context.Con
 		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
 		return
 	}
+
+	transactionSubmittedEvent := &senderTransaction.SubmittedEvent{}
+	transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionSubmitted.TransactionId)
+	transactionSubmittedEvent.LatestSubmissionHash = pldtypes.Bytes32(transactionSubmitted.Hash)
+	transactionSubmittedEvent.EventTime = time.Now()
 
 	seq.GetSender().HandleEvent(ctx, transactionSubmittedEvent)
 }
@@ -755,10 +769,12 @@ func (d *distributedSequencerManager) handleTransactionConfirmed(ctx context.Con
 		transactionSubmittedEvent := &senderTransaction.ConfirmedRevertedEvent{}
 		transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionConfirmed.TransactionId)
 		transactionSubmittedEvent.RevertReason = transactionConfirmed.RevertReason
+		transactionSubmittedEvent.EventTime = time.Now()
 		seq.GetSender().HandleEvent(ctx, transactionSubmittedEvent)
 	} else {
 		transactionSubmittedEvent := &senderTransaction.ConfirmedSuccessEvent{}
 		transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionConfirmed.TransactionId)
+		transactionSubmittedEvent.EventTime = time.Now()
 		seq.GetSender().HandleEvent(ctx, transactionSubmittedEvent)
 	}
 }

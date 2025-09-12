@@ -19,10 +19,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,7 +31,7 @@ func TestCoordinatorTransaction_Initial_ToPooled_OnReceived_IfNoInflightDependen
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Pooled).Build()
 
 	err := txn.HandleEvent(ctx, &transaction.ReceivedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -60,7 +60,7 @@ func TestCoordinatorTransaction_Initial_ToPreAssemblyBlocked_OnReceived_IfDepend
 	txn2 := builder2.Build()
 
 	err := txn2.HandleEvent(ctx, &transaction.ReceivedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn2.ID,
 		},
 	})
@@ -77,7 +77,7 @@ func TestCoordinatorTransaction_Initial_ToPreAssemblyBlocked_OnReceived_IfDepend
 	txn := builder.Build()
 
 	err := txn.HandleEvent(ctx, &transaction.ReceivedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -93,7 +93,7 @@ func TestCoordinatorTransaction_Pooled_ToAssembling_OnSelected(t *testing.T) {
 	txn, mocks := transaction.NewTransactionBuilderForTesting(t, transaction.State_Pooled).BuildWithMocks()
 
 	err := txn.HandleEvent(ctx, &transaction.SelectedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -109,7 +109,7 @@ func TestCoordinatorTransaction_Assembling_ToEndorsing_OnAssembleResponse(t *tes
 	txn, mocks := txnBuilder.BuildWithMocks()
 
 	err := txn.HandleEvent(ctx, &transaction.AssembleSuccessEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		PostAssembly: txnBuilder.BuildPostAssembly(),
@@ -128,7 +128,7 @@ func TestCoordinatorTransaction_Assembling_NoTransition_OnAssembleResponse_IfRes
 	txn := txnBuilder.Build()
 
 	err := txn.HandleEvent(ctx, &transaction.AssembleSuccessEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		PostAssembly: txnBuilder.BuildPostAssembly(),
@@ -147,7 +147,7 @@ func TestCoordinatorTransaction_Assembling_NoTransition_OnRequestTimeout_IfNotAs
 
 	assert.Equal(t, 1, mocks.SentMessageRecorder.NumberOfSentAssembleRequests())
 	err := txn.HandleEvent(ctx, &transaction.RequestTimeoutIntervalEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -165,7 +165,7 @@ func TestCoordinatorTransaction_Assembling_ToPooled_OnRequestTimeout_IfAssembleT
 	mocks.Clock.Advance(txnBuilder.GetAssembleTimeout() + 1)
 
 	err := txn.HandleEvent(ctx, &transaction.RequestTimeoutIntervalEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -183,7 +183,7 @@ func TestCoordinatorTransaction_Assembling_ToReverted_OnAssembleRevertResponse(t
 	txn, mocks := txnBuilder.BuildWithMocks()
 
 	err := txn.HandleEvent(ctx, &transaction.AssembleRevertResponseEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		PostAssembly: txnBuilder.BuildPostAssembly(),
@@ -202,7 +202,7 @@ func TestCoordinatorTransaction_Assembling_NoTransition_OnAssembleRevertResponse
 	txn := txnBuilder.Build()
 
 	err := txn.HandleEvent(ctx, &transaction.AssembleRevertResponseEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		PostAssembly: txnBuilder.BuildPostAssembly(),
@@ -232,7 +232,7 @@ func TestCoordinatorTransaction_Pooled_ToPreAssemblyBlocked_OnDependencyReverted
 	txn2 := builder2.Build()
 
 	err := txn1.HandleEvent(ctx, &transaction.AssembleRevertResponseEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn1.ID,
 		},
 		PostAssembly: builder1.BuildPostAssembly(),
@@ -255,7 +255,7 @@ func TestCoordinatorTransaction_EndorsementGathering_NudgeRequests_OnRequestTime
 	mocks.Clock.Advance(builder.GetRequestTimeout() + 1)
 
 	err := txn.HandleEvent(ctx, &transaction.RequestTimeoutIntervalEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -285,7 +285,7 @@ func TestCoordinatorTransaction_EndorsementGathering_NudgeRequests_OnRequestTime
 	mocks.Clock.Advance(builder.GetRequestTimeout() + 1)
 
 	err = txn.HandleEvent(ctx, &transaction.RequestTimeoutIntervalEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -381,7 +381,7 @@ func TestCoordinatorTransaction_ConfirmingDispatch_NudgeRequest_OnRequestTimeout
 	mocks.Clock.Advance(builder.GetRequestTimeout() + 1)
 
 	err := txn.HandleEvent(ctx, &transaction.RequestTimeoutIntervalEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -396,7 +396,7 @@ func TestCoordinatorTransaction_ConfirmingDispatch_ToReadyForDispatch_OnDispatch
 	txn, mocks := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatch).BuildWithMocks()
 
 	err := txn.HandleEvent(ctx, &transaction.DispatchConfirmedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID: mocks.SentMessageRecorder.SentDispatchConfirmationRequestIdempotencyKey(),
@@ -411,7 +411,7 @@ func TestCoordinatorTransaction_ConfirmingDispatch_NoTransition_OnDispatchConfir
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatch).Build()
 
 	err := txn.HandleEvent(ctx, &transaction.DispatchConfirmedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID: uuid.New(),
@@ -451,7 +451,7 @@ func TestCoordinatorTransaction_Blocked_ToConfirmingDispatch_OnDependencyReady_I
 	// decided on (a) as it is slightly less white box and less brittle to future refactoring of the implementation
 
 	err := txnC.HandleEvent(ctx, &transaction.DispatchConfirmedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txnC.ID,
 		},
 		RequestID: mocksC.SentMessageRecorder.SentDispatchConfirmationRequestIdempotencyKey(),
@@ -491,7 +491,7 @@ func TestCoordinatorTransaction_BlockedNoTransition_OnDependencyReady_IfHasDepen
 	// decided on (a) as it is slightly less white box and less brittle to future refactoring of the implementation
 
 	err := txnB.HandleEvent(ctx, &transaction.DispatchConfirmedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txnB.ID,
 		},
 		RequestID: mocksB.SentMessageRecorder.SentDispatchConfirmationRequestIdempotencyKey(),
@@ -507,7 +507,7 @@ func TestCoordinatorTransaction_ReadyForDispatch_ToDispatched_OnCollected(t *tes
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Ready_For_Dispatch).Build()
 
 	err := txn.HandleEvent(ctx, &transaction.CollectedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -522,7 +522,7 @@ func TestCoordinatorTransaction_Dispatched_ToSubmitted_OnSubmitted(t *testing.T)
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Dispatched).Build()
 
 	err := txn.HandleEvent(ctx, &transaction.SubmittedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 	})
@@ -536,7 +536,7 @@ func TestCoordinatorTransaction_Submitted_ToPooled_OnConfirmed_IfRevert(t *testi
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
 	err := txn.HandleEvent(ctx, &transaction.ConfirmedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		RevertReason: pldtypes.HexBytes("0x01020304"),
@@ -551,7 +551,7 @@ func TestCoordinatorTransaction_Submitted_ToConfirmed_IfNoRevert(t *testing.T) {
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
 	err := txn.HandleEvent(ctx, &transaction.ConfirmedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 	})

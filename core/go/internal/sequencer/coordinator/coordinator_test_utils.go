@@ -19,11 +19,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 func privateTransactionMatcher(txID ...uuid.UUID) func(*components.PrivateTransaction) bool {
@@ -73,7 +73,7 @@ func (r *SentMessageRecorder) HasSentHeartbeat() bool {
 
 type CoordinatorBuilderForTesting struct {
 	state                                    State
-	committeeMembers                         []string
+	senderIdentityPool                       []string
 	contractAddress                          *pldtypes.EthAddress
 	currentBlockHeight                       *uint64
 	activeCoordinatorBlockHeight             *uint64
@@ -100,8 +100,8 @@ func NewCoordinatorBuilderForTesting(state State) *CoordinatorBuilderForTesting 
 	}
 }
 
-func (b *CoordinatorBuilderForTesting) CommitteeMembers(committeeMembers ...string) *CoordinatorBuilderForTesting {
-	b.committeeMembers = committeeMembers
+func (b *CoordinatorBuilderForTesting) SenderIdentityPool(senderIdentityPool ...string) *CoordinatorBuilderForTesting {
+	b.senderIdentityPool = senderIdentityPool
 	return b
 }
 
@@ -148,8 +148,8 @@ func (b *CoordinatorBuilderForTesting) GetFlushPointHash() pldtypes.Bytes32 {
 
 func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator, *CoordinatorDependencyMocks) {
 
-	if b.committeeMembers == nil {
-		b.committeeMembers = []string{"member1@node1"}
+	if b.senderIdentityPool == nil {
+		b.senderIdentityPool = []string{"member1@node1"}
 	}
 	if b.contractAddress == nil {
 		b.contractAddress = pldtypes.RandAddress()
@@ -166,8 +166,9 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 
 	coordinator, err := NewCoordinator(
 		ctx,
+		nil,
 		mocks.SentMessageRecorder,
-		b.committeeMembers,
+		b.senderIdentityPool,
 		mocks.Clock,
 		b.emitFunction,
 		mocks.EngineIntegration,
@@ -178,9 +179,9 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		5,                          // Block height tolerance
 		5,                          // Closing grace period (measured in number of heartbeat intervals)
 		"node1",
-		func(context.Context, *transaction.Transaction) {}, // onReadyForDispatch function, not used in tests
-		func(contractAddress *pldtypes.EthAddress) {},      // coordinatorStarted function, not used in tests
-		func(contractAddress *pldtypes.EthAddress) {},      // coordinatorIdle function, not used in tests
+		func(context.Context, *transaction.Transaction) {},                    // onReadyForDispatch function, not used in tests
+		func(contractAddress *pldtypes.EthAddress, coordinatorNode string) {}, // coordinatorStarted function, not used in tests
+		func(contractAddress *pldtypes.EthAddress) {},                         // coordinatorIdle function, not used in tests
 	)
 	if err != nil {
 		panic(err)
@@ -210,7 +211,7 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 
 		coordinator.currentBlockHeight = *b.currentBlockHeight
 		coordinator.activeCoordinatorBlockHeight = *b.activeCoordinatorBlockHeight
-		coordinator.activeCoordinator = *b.activeCoordinator
+		coordinator.activeCoordinatorNode = *b.activeCoordinator
 	case State_Prepared:
 		if b.flushPointTransactionID == nil {
 			b.flushPointTransactionID = ptrTo(uuid.New())

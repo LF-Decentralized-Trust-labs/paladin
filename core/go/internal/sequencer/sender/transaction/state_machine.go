@@ -18,8 +18,8 @@ package transaction
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 )
 
 type State int
@@ -489,7 +489,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
 			// (Odd spacing is intentional to align logs more clearly)
-			common.Log(ctx, common.LOGTYPE_STATE, " | sdr   | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_STATE)).Debugf("sdr      | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first

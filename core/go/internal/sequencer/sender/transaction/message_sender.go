@@ -18,11 +18,11 @@ package transaction
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
 )
 
 type MessageSender interface {
 	SendDispatchConfirmationResponse(ctx context.Context)
-	SendAssembleResponse(ctx context.Context, txID uuid.UUID, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, recipient string)
+	SendAssembleResponse(ctx context.Context, txID uuid.UUID, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string)
 }

@@ -18,20 +18,26 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
+	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
 
 type SeqCoordinator interface {
 	GetTransactionsReadyToDispatch(ctx context.Context) ([]*components.PrivateTransaction, error)
+	GetTransactionByID(ctx context.Context, txID uuid.UUID) *transaction.Transaction
 	GetActiveCoordinatorNode(ctx context.Context) string
 	HandleEvent(ctx context.Context, event common.Event) error
+	UpdateSenderNodePool(ctx context.Context, senderNode string)
 	GetCurrentState() common.CoordinatorState
 	Stop()
 }
@@ -39,7 +45,7 @@ type SeqCoordinator interface {
 type coordinator struct {
 	/* State */
 	stateMachine                               *StateMachine
-	activeCoordinator                          string
+	activeCoordinatorNode                      string
 	activeCoordinatorBlockHeight               uint64
 	heartbeatIntervalsSinceStateChange         int
 	transactionsByID                           map[uuid.UUID]*transaction.Transaction
@@ -54,15 +60,17 @@ type coordinator struct {
 	closingGracePeriod   int // expressed as a multiple of heartbeat intervals
 	requestTimeout       common.Duration
 	assembleTimeout      common.Duration
-	committee            map[string][]string
+	senderNodePool       []string // The (possibly changing) list of sender nodes
+	nodeName             string
 
 	/* Dependencies */
+	domainAPI          components.DomainSmartContract
 	messageSender      MessageSender
 	clock              common.Clock
 	engineIntegration  common.EngineIntegration
 	emit               common.EmitEvent
 	readyForDispatch   func(context.Context, *transaction.Transaction)
-	coordinatorStarted func(contractAddress *pldtypes.EthAddress)
+	coordinatorStarted func(contractAddress *pldtypes.EthAddress, coordinatorNode string)
 	coordinatorIdle    func(contractAddress *pldtypes.EthAddress)
 	heartbeatCtx       context.Context
 	heartbeatCancel    context.CancelFunc
@@ -73,8 +81,9 @@ type coordinator struct {
 
 func NewCoordinator(
 	ctx context.Context,
+	domainAPI components.DomainSmartContract,
 	messageSender MessageSender,
-	committeeMembers []string,
+	senderNodePool []string,
 	clock common.Clock,
 	emit common.EmitEvent,
 	engineIntegration common.EngineIntegration,
@@ -86,12 +95,13 @@ func NewCoordinator(
 	closingGracePeriod int,
 	nodeName string,
 	readyForDispatch func(context.Context, *transaction.Transaction),
-	coordinatorStarted func(contractAddress *pldtypes.EthAddress),
+	coordinatorStarted func(contractAddress *pldtypes.EthAddress, coordinatorNode string),
 	coordinatorIdle func(contractAddress *pldtypes.EthAddress),
 ) (*coordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
 		transactionsByID:                   make(map[uuid.UUID]*transaction.Transaction),
+		domainAPI:                          domainAPI,
 		messageSender:                      messageSender,
 		blockRangeSize:                     blockRangeSize,
 		contractAddress:                    contractAddress,
@@ -106,44 +116,93 @@ func NewCoordinator(
 		readyForDispatch:                   readyForDispatch,
 		coordinatorStarted:                 coordinatorStarted,
 		coordinatorIdle:                    coordinatorIdle,
+		nodeName:                           nodeName,
 	}
-	c.committee = make(map[string][]string)
-	for _, member := range committeeMembers {
-		memberLocator := pldtypes.PrivateIdentityLocator(member)
-		memberNode, err := memberLocator.Node(ctx, false)
-		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error resolving node for member %s: %v", member, err)
-			return nil, err
-		}
+	c.senderNodePool = make([]string, 0)
+	// for _, member := range senderNodePool {
+	// 	memberLocator := pldtypes.PrivateIdentityLocator(member)
+	// 	memberNode, err := memberLocator.Node(ctx, false)
+	// 	if err != nil {
+	// 		log.L(ctx).Errorf("[Sequencer] error resolving node for member %s: %v", member, err)
+	// 		return nil, err
+	// 	}
 
-		memberIdentity, err := memberLocator.Identity(ctx)
-		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error resolving identity for member %s: %v", member, err)
-			return nil, err
-		}
+	// 	memberIdentity, err := memberLocator.Identity(ctx)
+	// 	if err != nil {
+	// 		log.L(ctx).Errorf("[Sequencer] error resolving identity for member %s: %v", member, err)
+	// 		return nil, err
+	// 	}
 
-		if _, ok := c.committee[memberNode]; !ok {
-			c.committee[memberNode] = make([]string, 0)
-		}
+	// 	if _, ok := c.senderNodePool[memberNode]; !ok {
+	// 		c.senderNodePool[memberNode] = make([]string, 0)
+	// 	}
 
-		c.committee[memberNode] = append(c.committee[memberNode], memberIdentity)
+	// 	c.senderNodePool[memberNode] = append(c.senderNodePool[memberNode], memberIdentity)
 
-	}
+	// }
 	c.InitializeStateMachine(State_Idle)
 	c.transactionSelector = NewTransactionSelector(ctx, c)
 
-	// MRW TODO - what is the correct initial active coordinator?
-	c.activeCoordinator = nodeName
+	activeCoordinator, err := c.SelectNextActiveCoordinator(ctx)
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] error selecting next active coordinator: %v", err)
+		return nil, err
+	}
+	c.activeCoordinatorNode = activeCoordinator
 	return c, nil
 
 }
 
 func (c *coordinator) sendHandoverRequest(ctx context.Context) {
-	c.messageSender.SendHandoverRequest(ctx, c.activeCoordinator, c.contractAddress)
+	c.messageSender.SendHandoverRequest(ctx, c.activeCoordinatorNode, c.contractAddress)
 }
 
 func (c *coordinator) GetActiveCoordinatorNode(ctx context.Context) string {
-	return c.activeCoordinator
+	return c.activeCoordinatorNode
+}
+
+func (c *coordinator) SelectNextActiveCoordinator(ctx context.Context) (string, error) {
+	coordinator := ""
+	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_STATIC {
+		// E.g. Noto
+		log.L(ctx).Infof("[Sequencer] selecting next active coordinator in static coordinator mode")
+		if c.domainAPI.ContractConfig().GetStaticCoordinator() == "" {
+			return "", fmt.Errorf("Static coordinator mode is configured but static coordinator node is not set")
+		}
+		log.L(ctx).Infof("[Sequencer] selected next active coordinator in static coordinator mode: %s", c.domainAPI.ContractConfig().GetStaticCoordinator())
+		coordinator = c.domainAPI.ContractConfig().GetStaticCoordinator()
+	}
+	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_ENDORSER {
+		// E.g. Pente
+		// Make a fair choice about the next coordinator, but for now just choose the node this request arrived at
+		log.L(ctx).Infof("[Sequencer] selecting next active coordinator in endorser coordinator mode")
+		log.L(ctx).Infof("[Sequencer] selected next active coordinator in endorser coordinator mode: %s", c.nodeName)
+		coordinator = c.nodeName
+	}
+	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_SENDER {
+		// E.g. Zeto
+		log.L(ctx).Infof("[Sequencer] selecting next active coordinator in sender coordinator mode")
+		log.L(ctx).Infof("[Sequencer] selected next active coordinator in sender coordinator mode: %s", c.nodeName)
+		coordinator = c.nodeName
+	}
+	// Strip everything after the @ to get the node node
+	coordinatorNode := strings.Split(coordinator, "@")
+	if len(coordinatorNode) > 1 {
+		return coordinatorNode[1], nil
+	}
+
+	if coordinatorNode[0] == "" {
+		return "", fmt.Errorf("coordinator node not found")
+	}
+	return coordinatorNode[0], nil
+}
+
+func (c *coordinator) UpdateSenderNodePool(ctx context.Context, senderNode string) {
+	log.L(ctx).Infof("[Sequencer] updating sender node pool with %s", senderNode)
+	if !slices.Contains(c.senderNodePool, senderNode) {
+		c.senderNodePool = append(c.senderNodePool, senderNode)
+	}
+	//c.senderNodePool[senderNode] = append(c.senderNodePool[senderNode], senderNode)
 }
 
 // TODO consider renaming to setDelegatedTransactionsForSender to make it clear that we expect senders to include all inflight transactions in every delegation request and therefore this is
@@ -309,6 +368,7 @@ func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uui
 			RevertReason: revertReason,
 		}
 		event.TransactionID = dispatchedTransaction.ID
+		event.EventTime = time.Now()
 		err := dispatchedTransaction.HandleEvent(ctx, event)
 		if err != nil {
 			log.L(ctx).Errorf("[Sequencer] error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
@@ -369,7 +429,8 @@ func (c *coordinator) Stop() {
 
 	// Opt-out of being the coordinator
 	handoverRequestEvent := &HandoverRequestEvent{}
-	handoverRequestEvent.Requester = c.activeCoordinator
+	handoverRequestEvent.EventTime = time.Now()
+	handoverRequestEvent.Requester = c.activeCoordinatorNode
 	c.HandleEvent(context.Background(), handoverRequestEvent)
 }
 

@@ -25,6 +25,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/google/uuid"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
@@ -487,12 +488,12 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 
 		// MRW TODO - emit nonce allocated events here?
 		for _, tx := range additional {
-			log.L(ctx).Infof("Handling nonce assignment for public TX ID %s", tx.PublicTxnID)
+			log.L(ctx).Infof("Handling nonce assignment for public TX ID %d", tx.PublicTxnID)
 			log.L(ctx).Infof("Handling nonce assignment for signing address %s", oc.signingAddress.String())
 			log.L(ctx).Infof("Handling nonce assignment for to address %s", tx.To)
 			log.L(ctx).Infof("Handling nonce assignment for binding %v", tx.Binding)
 
-			log.L(ctx).Infof("Retrieving binding for public TX ID %s", tx.PublicTxnID)
+			log.L(ctx).Infof("Retrieving binding for public TX ID %d", tx.PublicTxnID)
 			if tx.Binding != nil {
 				log.L(ctx).Infof("Binding for public TX ID isn't null, it's %s, we can skip the extra DB lookup here FYI", tx.Binding.Transaction.String())
 			}
@@ -505,37 +506,28 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 				Find(&txId).
 				Error
 			if err != nil {
-				log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %s: %s", tx.PublicTxnID, err)
+				log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %d: %s", tx.PublicTxnID, err)
 				return
 			}
-			log.L(ctx).Infof("Retrieved binding for public TX ID %s: %s", tx.PublicTxnID, txId)
+			log.L(ctx).Infof("Retrieved binding for public TX ID %d: %s", tx.PublicTxnID, txId)
 
 			if txId != "" {
 				// Convert txId to UUID
 				txIdUUID, err := uuid.Parse(txId)
 				if err != nil {
-					log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %s: %s", tx.PublicTxnID, err)
+					log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %d: %s", tx.PublicTxnID, err)
 					return
 				}
 
-				log.L(ctx).Infof("Geting transaction by ID to obtain the full private transaction %s", tx.PublicTxnID)
-				privTX, err := oc.rootTxMgr.GetTransactionByID(ctx, txIdUUID)
-				if err != nil {
-					log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving transaction by ID for %s: %s", tx.PublicTxnID, err)
-				}
 				if oc.sequencerManager == nil {
-					log.L(ctx).Warnf("Orchestrator poll and process: sequencer manager is nil for %s", tx.PublicTxnID)
+					log.L(ctx).Warnf("Orchestrator poll and process: sequencer manager is nil for %d", tx.PublicTxnID)
 				} else {
-					if privTX == nil {
-						log.L(ctx).Warnf("Orchestrator poll and process: transaction is nil for %s", tx.PublicTxnID)
+					if tx.To == nil {
+						log.L(ctx).Warnf("Orchestrator poll and process: to address is nil for %d", tx.PublicTxnID)
 					} else {
-						if tx.To == nil {
-							log.L(ctx).Warnf("Orchestrator poll and process: to address is nil for %s", tx.PublicTxnID)
-						} else {
-							err = oc.sequencerManager.HandleNonceAssigned(ctx, privTX.From, *tx.Nonce, tx.To.String(), txIdUUID)
-							if err != nil {
-								log.L(ctx).Warnf("Orchestrator poll and process: error while handing nonce assignment to sequencer for %s: %s", tx.PublicTxnID, err)
-							}
+						err = oc.sequencerManager.HandleNonceAssigned(ctx, *tx.Nonce, tx.To.String(), txIdUUID)
+						if err != nil {
+							log.L(ctx).Warnf("Orchestrator poll and process: error while handing nonce assignment to sequencer for %d: %s", tx.PublicTxnID, err)
 						}
 					}
 				}

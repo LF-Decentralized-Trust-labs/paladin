@@ -18,11 +18,11 @@ package sender
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 )
 
 type State int
@@ -150,10 +150,7 @@ func (s *sender) InitializeStateMachine(initialState State) {
 
 func (s *sender) HandleEvent(ctx context.Context, event common.Event) error {
 
-	log.L(ctx).Infof("Distributed sender handling new event (contract address %s, node name %s, committee %+v)", s.contractAddress, s.nodeName, s.committee)
-	for node, party := range s.committee {
-		log.L(ctx).Infof("Distributed sender handling new event: party %s @ %s", party[0], node)
-	}
+	log.L(ctx).Infof("Distributed sender handling new event (contract address %s, node name %s)", s.contractAddress, s.nodeName)
 
 	if transactionEvent, ok := event.(transaction.Event); ok {
 		log.L(ctx).Infof("Propagating transaction event to transaction: %s", transactionEvent.TypeString())
@@ -191,11 +188,11 @@ func (s *sender) SetActiveCoordinator(ctx context.Context, coordinator string) e
 	if coordinator == "" {
 		return i18n.NewError(ctx, msgs.MsgDistSeqInternalError, "Cannot set active coordinator to an empty string")
 	}
-	if s.activeCoordinator != "" {
+	if s.activeCoordinatorNode != "" {
 		return i18n.NewError(ctx, msgs.MsgDistSeqInternalError, "SetActiveCoordinator should only be used when an active coordinator has not yet been set")
 	}
-	s.activeCoordinator = coordinator
-	log.L(ctx).Infof("[Sequencer] initial active coordinator set to %s", s.activeCoordinator)
+	s.activeCoordinatorNode = coordinator
+	log.L(ctx).Infof("[Sequencer] initial active coordinator set to %s", s.activeCoordinatorNode)
 	return nil
 }
 
@@ -271,7 +268,7 @@ func (s *sender) evaluateTransitions(ctx context.Context, event common.Event, ev
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, s) { //if there is no guard defined, or the guard returns true
-			common.Log(ctx, common.LOGTYPE_STATE, " | sdr   | addr | %s | %T | %s -> %s", s.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_STATE)).Debugf("sdr      | addr | %s | %T | %s -> %s", s.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
 
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]

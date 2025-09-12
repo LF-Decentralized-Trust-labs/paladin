@@ -160,6 +160,7 @@ message AssembleResponse {
     string assemble_request_id = 2;
     string contract_address = 3;
     bytes post_assembly = 4;
+    bytes pre_assembly = 5;
 }
 
 message AssembleError {

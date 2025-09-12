@@ -18,9 +18,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 )
 
 func (t *Transaction) isNotReady() bool {
@@ -80,7 +80,7 @@ func (t *Transaction) notifyDependentsOfReadinessAndQueueForDispatch(ctx context
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
 		err := dependent.HandleEvent(ctx, &DependencyReadyEvent{
-			BaseEvent: BaseEvent{
+			BaseCoordinatorEvent: BaseCoordinatorEvent{
 				TransactionID: dependent.ID,
 			},
 			DependencyID: t.ID,

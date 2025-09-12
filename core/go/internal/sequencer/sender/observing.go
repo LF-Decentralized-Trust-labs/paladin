@@ -19,15 +19,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 )
 
 func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatReceivedEvent) error {
 	s.timeOfMostRecentHeartbeat = s.clock.Now()
-	s.activeCoordinator = event.From
+	s.activeCoordinatorNode = event.From
 	s.latestCoordinatorSnapshot = &event.CoordinatorSnapshot
 	for _, dispatchedTransaction := range event.DispatchedTransactions {
 		//if any of the dispatched transactions were sent by this sender, ensure that we have an up to date view of its state
@@ -35,7 +35,7 @@ func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatRec
 			txn := s.transactionsByID[dispatchedTransaction.ID]
 			if txn == nil {
 				//unexpected situation to be in.  We trust our memory of transactions over the coordinator's, so we ignore this transaction
-				log.L(ctx).Warnf("[Sequencer] received heartbeat from %s with dispatched transaction %s but no transaction found in memory", s.activeCoordinator, dispatchedTransaction.ID)
+				log.L(ctx).Warnf("[Sequencer] received heartbeat from %s with dispatched transaction %s but no transaction found in memory", s.activeCoordinatorNode, dispatchedTransaction.ID)
 				continue
 			}
 			if dispatchedTransaction.LatestSubmissionHash != nil {

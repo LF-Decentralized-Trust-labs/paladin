@@ -18,11 +18,11 @@ package sender
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	uuid "github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 const (
@@ -144,7 +144,6 @@ func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDe
 		ctx,
 		*b.nodeName,
 		mocks.SentMessageRecorder,
-		b.committeeMembers,
 		mocks.Clock,
 		b.emitFunction,
 		mocks.EngineIntegration,

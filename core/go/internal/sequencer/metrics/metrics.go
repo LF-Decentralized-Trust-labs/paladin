@@ -17,6 +17,7 @@ package metrics
 
 import (
 	"context"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -24,9 +25,12 @@ import (
 type DistributedSequencerMetrics interface {
 	IncAcceptedTransactions()
 	IncAssembledTransactions()
+	IncEndorsedTransactions()
 	IncDispatchedTransactions()
 	IncConfirmedTransactions()
+	ObserveSequencerStateChange(stage string, duration time.Duration)
 	SetActiveCoordinators(numberOfActiveCoordinators int)
+	SetActiveSequencers(numberOfActiveSequencers int)
 }
 
 var METRICS_SUBSYSTEM = "distributed_sequencer"
@@ -34,9 +38,12 @@ var METRICS_SUBSYSTEM = "distributed_sequencer"
 type distributedSequencerMetrics struct {
 	acceptedTransactions   prometheus.Counter
 	assembledTransactions  prometheus.Counter
+	endorsedTransactions   prometheus.Counter
 	dispatchedTransactions prometheus.Counter
 	confirmedTransactions  prometheus.Counter
+	sequencerStage         *prometheus.HistogramVec
 	activeCoordinators     prometheus.Gauge
+	activeSequencers       prometheus.Gauge
 }
 
 func InitMetrics(ctx context.Context, registry *prometheus.Registry) *distributedSequencerMetrics {
@@ -46,17 +53,26 @@ func InitMetrics(ctx context.Context, registry *prometheus.Registry) *distribute
 		Help: "Distributed sequencer accepted transactions", Subsystem: METRICS_SUBSYSTEM})
 	metrics.assembledTransactions = prometheus.NewCounter(prometheus.CounterOpts{Name: "assembled_txns_total",
 		Help: "Distributed sequencer assembled transactions", Subsystem: METRICS_SUBSYSTEM})
+	metrics.endorsedTransactions = prometheus.NewCounter(prometheus.CounterOpts{Name: "endorsed_txns_total",
+		Help: "Distributed sequencer endorsed transactions", Subsystem: METRICS_SUBSYSTEM})
 	metrics.dispatchedTransactions = prometheus.NewCounter(prometheus.CounterOpts{Name: "dispatched_txns_total",
 		Help: "Distributed sequencer dispatched transactions", Subsystem: METRICS_SUBSYSTEM})
 	metrics.confirmedTransactions = prometheus.NewCounter(prometheus.CounterOpts{Name: "confirmed_txns_total",
 		Help: "Distributed sequencer confirmed transactions", Subsystem: METRICS_SUBSYSTEM})
+	metrics.sequencerStage = prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "sequencer_stage",
+		Help: "Distributed sequencer stage", Subsystem: METRICS_SUBSYSTEM}, []string{"stage"})
 	metrics.activeCoordinators = prometheus.NewGauge(prometheus.GaugeOpts{Name: "active_coordinators",
 		Help: "Distributed sequencer active coordinators", Subsystem: METRICS_SUBSYSTEM})
+	metrics.activeSequencers = prometheus.NewGauge(prometheus.GaugeOpts{Name: "active_sequencers",
+		Help: "Distributed sequencer active sequencers", Subsystem: METRICS_SUBSYSTEM})
 	registry.MustRegister(metrics.acceptedTransactions)
 	registry.MustRegister(metrics.assembledTransactions)
+	registry.MustRegister(metrics.endorsedTransactions)
 	registry.MustRegister(metrics.dispatchedTransactions)
 	registry.MustRegister(metrics.confirmedTransactions)
+	registry.MustRegister(metrics.sequencerStage)
 	registry.MustRegister(metrics.activeCoordinators)
+	registry.MustRegister(metrics.activeSequencers)
 	return metrics
 }
 
@@ -68,6 +84,10 @@ func (dtm *distributedSequencerMetrics) IncAssembledTransactions() {
 	dtm.assembledTransactions.Inc()
 }
 
+func (dtm *distributedSequencerMetrics) IncEndorsedTransactions() {
+	dtm.endorsedTransactions.Inc()
+}
+
 func (dtm *distributedSequencerMetrics) IncDispatchedTransactions() {
 	dtm.dispatchedTransactions.Inc()
 }
@@ -76,6 +96,14 @@ func (dtm *distributedSequencerMetrics) IncConfirmedTransactions() {
 	dtm.confirmedTransactions.Inc()
 }
 
+func (dtm *distributedSequencerMetrics) ObserveSequencerStateChange(stage string, duration time.Duration) {
+	dtm.sequencerStage.WithLabelValues(stage).Observe(duration.Seconds())
+}
+
 func (dtm *distributedSequencerMetrics) SetActiveCoordinators(numberOfActiveCoordinators int) {
 	dtm.activeCoordinators.Set(float64(numberOfActiveCoordinators))
+}
+
+func (dtm *distributedSequencerMetrics) SetActiveSequencers(numberOfActiveSequencers int) {
+	dtm.activeSequencers.Set(float64(numberOfActiveSequencers))
 }

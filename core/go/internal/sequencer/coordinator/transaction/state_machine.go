@@ -19,8 +19,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 )
 
 type State int
@@ -376,6 +376,8 @@ func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error 
 		if err == nil {
 			err = t.writeLockAndDistributeStates(ctx)
 		}
+		// Assembling resolves the required verifiers which will need passing on for the endorse step
+		t.PreAssembly.Verifiers = event.PreAssembly.Verifiers
 	case *AssembleRevertResponseEvent:
 		err = t.applyPostAssembly(ctx, event.PostAssembly)
 	case *EndorsedEvent:
@@ -422,7 +424,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
 			// (Odd spacing is intentional to align logs more clearly)
-			common.Log(ctx, common.LOGTYPE_STATE, " | coord | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_STATE)).Debugf("coord    | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			previousState := sm.currentState
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
