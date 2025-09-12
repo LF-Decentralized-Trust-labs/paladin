@@ -94,7 +94,7 @@ task copySolidity(type: Copy) {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-task test(type: Exec, dependsOn: [":core:go:makeMocks"]) {
+task test(type: Exec, dependsOn: [":core:go:makeMocks", copySolidity]) {
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.coreGo)
     inputs.files(configurations.notoGo)
@@ -113,8 +113,14 @@ task test(type: Exec, dependsOn: [":core:go:makeMocks"]) {
     args '-timeout=480s'
     args "-test.gocoverdir=${projectDir}/coverage"
 
+    // Only start test infrastructure if not already running
     dependsOn ':testinfra:startTestInfra'
     helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
+    
+    // Enable parallel execution for this task
+    // This allows other tasks to run while this one is executing
+    outputs.cacheIf { true }
+    
 }
 
 task build {

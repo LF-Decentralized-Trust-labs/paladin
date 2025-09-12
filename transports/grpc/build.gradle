@@ -58,10 +58,10 @@ task protoc(type: ProtoCompile, dependsOn: [":installProtocGenGo", ":installProt
 task lint(type: Exec, dependsOn:[":installGolangCILint", tasks.protoc]) {
     workingDir '.'
 
-    helpers.lockResource(it, "lint.lock")
     inputs.files(configurations.toolkitGo)
     inputs.files(goFiles);
     environment 'GOGC', '20'
+    environment 'GOLANGCI_LINT_CACHE', "${project.buildDir}/golangci-lint-cache"
 
     executable "golangci-lint"
     args 'run'
