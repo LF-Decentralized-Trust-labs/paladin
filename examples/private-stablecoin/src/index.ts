@@ -1,3 +1,17 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   PaladinVerifier,
   TransactionType,
@@ -11,19 +25,11 @@ import kycAbi from "./zeto-abis/IZetoKyc.json";
 import { buildBabyjub } from "circomlibjs";
 import * as fs from 'fs';
 import * as path from 'path';
-import { ContractData } from "./verify-deployed";
+import { ContractData } from "./tests/data-persistence";
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
-
-const paladin1 = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-const paladin2 = new PaladinClient({
-  url: "http://127.0.0.1:31648",
-});
-const paladin3 = new PaladinClient({
-  url: "http://127.0.0.1:31748",
-});
+ 
 
 async function getBabyjubPublicKey(
   verifier: PaladinVerifier
@@ -149,14 +155,24 @@ async function getERC20Balance(
 }
 
 async function main(): Promise<boolean> {
-  // Generate unique identity names for this run to avoid Merkle tree conflicts
-  const runId = Math.random().toString(36).substring(2, 8);
-  logger.log(`Using run ID: ${runId} for unique identities`);
+    // --- Initialization from Imported Config ---
+    if (nodeConnections.length < 3) {
+      logger.error("The environment config must provide at least 3 nodes for this scenario.");
+      return false;
+    }
+    
+    logger.log("Initializing Paladin clients from the environment configuration...");
+    const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+    const [paladin1, paladin2, paladin3] = clients;
 
-  // Get verifiers for the financial institution and clients with unique names
-  const [financialInstitution] = paladin1.getVerifiers(`bank-${runId}@node1`);
-  const [clientA] = paladin2.getVerifiers(`client-a-${runId}@node2`);
-  const [clientB] = paladin3.getVerifiers(`client-b-${runId}@node3`);
+    // Generate unique identity names for this run to avoid Merkle tree conflicts
+    const runId = Math.random().toString(36).substring(2, 8);
+    logger.log(`Using run ID: ${runId} for unique identities`);
+
+    // Get verifiers for the financial institution and clients with unique names
+    const [financialInstitution] = paladin1.getVerifiers(`bank-${runId}@${nodeConnections[0].id}`);
+    const [clientA] = paladin2.getVerifiers(`client-a-${runId}@${nodeConnections[1].id}`);
+    const [clientB] = paladin3.getVerifiers(`client-b-${runId}@${nodeConnections[2].id}`);
 
   logger.log("=== Private Stablecoin with KYC and Deposit/Withdraw ===");
   logger.log(
@@ -521,7 +537,8 @@ async function main(): Promise<boolean> {
     timestamp: new Date().toISOString()
   };
 
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }

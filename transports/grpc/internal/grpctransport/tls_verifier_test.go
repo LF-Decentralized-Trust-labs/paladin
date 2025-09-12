@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -673,4 +674,161 @@ func TestGRPCTransport_ServerRejectNoCerts(t *testing.T) {
 func TestTLSVerifierRejectsOverrideServerName(t *testing.T) {
 	err := (&tlsVerifier{}).OverrideServerName("whatever")
 	assert.Error(t, err)
+}
+
+func TestGRPCTransport_GetLocalDetails_IncludesCAAndNodeCertificates(t *testing.T) {
+	// This test verifies that GetLocalDetails now includes both CA and node certificates
+	ctx := context.Background()
+
+	// Create a CA certificate
+	caCert, caKeyPEM := buildTestCertificate(t, pkix.Name{CommonName: "test-ca"}, nil, nil)
+	caCerts, err := getCertListFromPEM(ctx, []byte(caCert))
+	require.NoError(t, err)
+	caKey := getRSAKeyFromPEM(t, caKeyPEM)
+
+	// Create a node certificate signed by the CA
+	nodeCert, nodeKeyPEM := buildTestCertificate(t, pkix.Name{CommonName: "test-node"}, caCerts[0], caKey)
+
+	// Create a temporary CA file
+	caFile, err := os.CreateTemp("", "test-ca-*.crt")
+	require.NoError(t, err)
+	defer os.Remove(caFile.Name())
+	_, err = caFile.WriteString(caCert)
+	require.NoError(t, err)
+	caFile.Close()
+
+	// Create a temporary node certificate file
+	certFile, err := os.CreateTemp("", "test-node-*.crt")
+	require.NoError(t, err)
+	defer os.Remove(certFile.Name())
+	_, err = certFile.WriteString(nodeCert)
+	require.NoError(t, err)
+	certFile.Close()
+
+	// Create a temporary node key file
+	keyFile, err := os.CreateTemp("", "test-node-*.key")
+	require.NoError(t, err)
+	defer os.Remove(keyFile.Name())
+	_, err = keyFile.WriteString(nodeKeyPEM)
+	require.NoError(t, err)
+	keyFile.Close()
+
+	// Create gRPC transport with CA file and node certificate files
+	plugin, _, _, done := newTestGRPCTransport(t, nodeCert, nodeKeyPEM, &Config{
+		TLS: pldconf.TLSConfig{
+			CAFile:   caFile.Name(),
+			CertFile: certFile.Name(),
+			KeyFile:  keyFile.Name(),
+		},
+		DirectCertVerification: confutil.P(true),
+	})
+	defer done()
+
+	// Call GetLocalDetails
+	resp, err := plugin.GetLocalDetails(ctx, &prototk.GetLocalDetailsRequest{})
+	require.NoError(t, err)
+
+	// Parse the response
+	var transportDetails PublishedTransportDetails
+	err = json.Unmarshal([]byte(resp.TransportDetails), &transportDetails)
+	require.NoError(t, err)
+
+	// Verify that the Issuers field contains both CA and node certificates
+	issuerCerts, err := getCertListFromPEM(ctx, []byte(transportDetails.Issuers))
+	require.NoError(t, err)
+
+	// Should have at least 2 certificates: CA + node certificate
+	require.GreaterOrEqual(t, len(issuerCerts), 2, "Should contain both CA and node certificates")
+
+	// The first certificate should be the CA
+	require.Equal(t, "CN=test-ca", issuerCerts[0].Subject.String(), "First certificate should be the CA")
+
+	// The last certificate should be the node certificate
+	lastCert := issuerCerts[len(issuerCerts)-1]
+	require.Equal(t, "CN=test-node", lastCert.Subject.String(), "Last certificate should be the node certificate")
+}
+
+func TestGRPCTransport_GetLocalDetails_WorksWithCAConfig(t *testing.T) {
+	// This test verifies that GetLocalDetails works when CA is provided via config (not file)
+	ctx := context.Background()
+
+	// Create a CA certificate
+	caCert, caKeyPEM := buildTestCertificate(t, pkix.Name{CommonName: "test-ca-config"}, nil, nil)
+	caCerts, err := getCertListFromPEM(ctx, []byte(caCert))
+	require.NoError(t, err)
+	caKey := getRSAKeyFromPEM(t, caKeyPEM)
+
+	// Create a node certificate signed by the CA
+	nodeCert, nodeKeyPEM := buildTestCertificate(t, pkix.Name{CommonName: "test-node-config"}, caCerts[0], caKey)
+
+	// Create gRPC transport with CA config and node certificate config
+	plugin, _, _, done := newTestGRPCTransport(t, nodeCert, nodeKeyPEM, &Config{
+		TLS: pldconf.TLSConfig{
+			CA:   caCert,
+			Cert: nodeCert,
+			Key:  nodeKeyPEM,
+		},
+		DirectCertVerification: confutil.P(true),
+	})
+	defer done()
+
+	// Call GetLocalDetails
+	resp, err := plugin.GetLocalDetails(ctx, &prototk.GetLocalDetailsRequest{})
+	require.NoError(t, err)
+
+	// Parse the response
+	var transportDetails PublishedTransportDetails
+	err = json.Unmarshal([]byte(resp.TransportDetails), &transportDetails)
+	require.NoError(t, err)
+
+	// Verify that the Issuers field contains both CA and node certificates
+	issuerCerts, err := getCertListFromPEM(ctx, []byte(transportDetails.Issuers))
+	require.NoError(t, err)
+
+	// Should have at least 2 certificates: CA + node certificate
+	require.GreaterOrEqual(t, len(issuerCerts), 2, "Should contain both CA and node certificates")
+
+	// The first certificate should be the CA
+	require.Equal(t, "CN=test-ca-config", issuerCerts[0].Subject.String(), "First certificate should be the CA")
+
+	// The last certificate should be the node certificate
+	lastCert := issuerCerts[len(issuerCerts)-1]
+	require.Equal(t, "CN=test-node-config", lastCert.Subject.String(), "Last certificate should be the node certificate")
+}
+
+func TestGRPCTransport_GetLocalDetails_WorksWithoutCA(t *testing.T) {
+	// This test verifies that GetLocalDetails still works when no CA is provided (backward compatibility)
+	ctx := context.Background()
+
+	// Create a self-signed node certificate (no CA)
+	nodeCert, nodeKeyPEM := buildTestCertificate(t, pkix.Name{CommonName: "test-node-self-signed"}, nil, nil)
+
+	// Create gRPC transport without CA
+	plugin, _, _, done := newTestGRPCTransport(t, nodeCert, nodeKeyPEM, &Config{
+		TLS: pldconf.TLSConfig{
+			Cert: nodeCert,
+			Key:  nodeKeyPEM,
+		},
+		DirectCertVerification: confutil.P(true),
+	})
+	defer done()
+
+	// Call GetLocalDetails
+	resp, err := plugin.GetLocalDetails(ctx, &prototk.GetLocalDetailsRequest{})
+	require.NoError(t, err)
+
+	// Parse the response
+	var transportDetails PublishedTransportDetails
+	err = json.Unmarshal([]byte(resp.TransportDetails), &transportDetails)
+	require.NoError(t, err)
+
+	// Verify that the Issuers field contains at least the node certificate
+	issuerCerts, err := getCertListFromPEM(ctx, []byte(transportDetails.Issuers))
+	require.NoError(t, err)
+
+	// Should have at least 1 certificate: the node certificate
+	require.GreaterOrEqual(t, len(issuerCerts), 1, "Should contain at least the node certificate")
+
+	// The certificate should be the node certificate
+	require.Equal(t, "CN=test-node-self-signed", issuerCerts[0].Subject.String(), "Should contain the node certificate")
 }

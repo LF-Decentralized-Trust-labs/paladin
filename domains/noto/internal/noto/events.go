@@ -47,19 +47,6 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				log.L(ctx).Warnf("Ignoring malformed NotoTransfer event in batch %s: %s", req.BatchId, err)
 			}
 
-		case eventSignatures[NotoApproved]:
-			log.L(ctx).Infof("Processing '%s' event in batch %s", ev.SoliditySignature, req.BatchId)
-			var approved NotoApproved_Event
-			if err := json.Unmarshal([]byte(ev.DataJson), &approved); err == nil {
-				txData, err := n.decodeTransactionData(ctx, approved.Data)
-				if err != nil {
-					return nil, err
-				}
-				n.recordTransactionInfo(ev, txData, &res)
-			} else {
-				log.L(ctx).Warnf("Ignoring malformed NotoApproved event in batch %s: %s", req.BatchId, err)
-			}
-
 		case eventSignatures[NotoLock]:
 			log.L(ctx).Infof("Processing '%s' event in batch %s", ev.SoliditySignature, req.BatchId)
 			var lock NotoLock_Event

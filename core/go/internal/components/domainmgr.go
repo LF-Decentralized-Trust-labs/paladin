@@ -54,6 +54,7 @@ type Domain interface {
 	RegistryAddress() *pldtypes.EthAddress
 	Configuration() *prototk.DomainConfig
 	CustomHashFunction() bool
+	FixedSigningIdentity() string
 
 	// Specific to domains that support privacy groups (domain should return error if it does not).
 	// Validates the input properties, and turns it into the full genesis configuration for a group

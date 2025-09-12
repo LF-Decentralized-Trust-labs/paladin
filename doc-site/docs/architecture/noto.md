@@ -123,35 +123,6 @@ Inputs:
 * **amount** - amount of value to transfer
 * **data** - user/application data to include with the transaction (will be accessible from an "info" state in the state receipt)
 
-### approveTransfer
-
-Approve a transfer to be executed by another party.
-
-When calling `ptx_prepareTransaction()` to prepare a private `transfer`, the `metadata` of the prepared transaction
-will include information on how to build a proper `approveTransfer` call. This allows preparing a transfer and then
-delegating it to another party for execution.
-
-```json
-{
-    "name": "approveTransfer",
-    "type": "function",
-    "inputs": [
-        {"name": "inputs", "type": "tuple[]", "components": [
-            {"name": "id", "type": "bytes"},
-            {"name": "schema", "type": "bytes32"},
-            {"name": "data", "type": "bytes"}
-        ]},
-        {"name": "outputs", "type": "tuple[]", "components": [
-            {"name": "id", "type": "bytes"},
-            {"name": "schema", "type": "bytes32"},
-            {"name": "data", "type": "bytes"}
-        ]},
-        {"name": "data", "type": "bytes"},
-        {"name": "delegate", "type": "address"}
-    ]
-}
-```
-
 ### burn
 
 Burn value from the sender. Available UTXO states will be selected for burning, and new UTXO
@@ -353,63 +324,6 @@ May only be invoked by the notary address.
         {"name": "signature", "type": "bytes"},
         {"name": "data", "type": "bytes"}
     ]
-}
-```
-
-Inputs:
-
-* **inputs** - input states that will be spent
-* **outputs** - output states that will be created
-* **signature** - sender's signature (not verified on-chain, but can be verified by anyone with the private state data)
-* **data** - encoded Paladin and/or user data
-
-### approveTransfer
-
-Approve a specific `transfer` transaction to be executed by a specific `delegate` address.
-Generally should not be called directly.
-
-The `txhash` should be computed as the EIP-712 hash of the intended transfer, using type:
-`Transfer(bytes32[] inputs,bytes32[] outputs,bytes data)`.
-
-May only be invoked by the notary address.
-
-```json
-{
-    "name": "approveTransfer",
-    "type": "function",
-    "inputs": [
-        {"name": "delegate", "type": "address"},
-        {"name": "txhash", "type": "bytes32"},
-        {"name": "signature", "type": "bytes"},
-        {"name": "data", "type": "bytes"}
-      ]
-}
-```
-
-Inputs:
-
-* **delegate** - address of the delegate party that will be able to execute this transaction once approved
-* **txhash** - EIP-712 hash of the intended transfer, using type `Transfer(bytes32[] inputs,bytes32[] outputs,bytes data)`
-* **signature** - sender's signature (not verified on-chain, but can be verified by anyone with the private state data)
-* **data** - encoded Paladin and/or user data
-
-### transferWithApproval
-
-Execute a transfer that was previously approved.
-
-The values of `inputs`, `outputs`, and `data` will be used to (re-)compute a `txhash`, which must exactly
-match a `txhash` that was previously delegated to the sender via `approveTransfer`.
-
-```json
-{
-    "name": "transferWithApproval",
-    "type": "function",
-    "inputs": [
-        {"name": "inputs", "type": "bytes32[]"},
-        {"name": "outputs", "type": "bytes32[]"},
-        {"name": "signature", "type": "bytes"},
-        {"name": "data", "type": "bytes"}
-      ]
 }
 ```
 

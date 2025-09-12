@@ -1,3 +1,17 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   INotoDomainReceipt,
   IPreparedTransaction,
@@ -12,57 +26,58 @@ import { newAtomFactory } from "./helpers/atom";
 import { newERC20Tracker } from "./helpers/erc20tracker";
 import * as fs from 'fs';
 import * as path from 'path';
-import { ContractData } from "./verify-deployed";
+import { ContractData } from "./tests/data-persistence";
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
 
-const paladin1 = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-const paladin2 = new PaladinClient({
-  url: "http://127.0.0.1:31648",
-});
-const paladin3 = new PaladinClient({
-  url: "http://127.0.0.1:31748",
-});
-
-// TODO: eliminate the need for this call
-async function encodeZetoTransfer(preparedCashTransfer: IPreparedTransaction) {
-  try {
-    const zetoTransferAbi = await paladin3.ptx.getStoredABI(
-      preparedCashTransfer.transaction.abiReference ?? ""
-    );
-    
-    if (!zetoTransferAbi) {
-      throw new Error("Failed to get stored ABI for prepared transaction");
-    }
-    
-    const encodedData = new ethers.Interface(zetoTransferAbi.abi).encodeFunctionData(
-      "transferLocked",
-      [
-        preparedCashTransfer.transaction.data.inputs,
-        preparedCashTransfer.transaction.data.outputs,
-        preparedCashTransfer.transaction.data.proof,
-        preparedCashTransfer.transaction.data.data,
-      ]
-    );
-    
-    logger.log("Successfully encoded Zeto transfer data");
-    return encodedData;
-  } catch (error) {
-    logger.error("Failed to encode Zeto transfer:");
-    logger.error(`Error: ${error}`);
-    throw error;
-  }
-}
-
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const [paladin1, paladin2, paladin3] = clients;
+
   const [cashIssuer, assetIssuer] = paladin1.getVerifiers(
-    "cashIssuer@node1",
-    "assetIssuer@node1"
+    `cashIssuer@${nodeConnections[0].id}`,
+    `assetIssuer@${nodeConnections[0].id}`
   );
-  const [investor1] = paladin2.getVerifiers("investor1@node2");
-  const [investor2] = paladin3.getVerifiers("investor2@node3");
+  const [investor1] = paladin2.getVerifiers(`investor1@${nodeConnections[1].id}`);
+  const [investor2] = paladin3.getVerifiers(`investor2@${nodeConnections[2].id}`);
+
+  // TODO: eliminate the need for this call
+  async function encodeZetoTransfer(preparedCashTransfer: IPreparedTransaction) {
+    try {
+      const zetoTransferAbi = await paladin3.ptx.getStoredABI(
+        preparedCashTransfer.transaction.abiReference ?? ""
+      );
+      
+      if (!zetoTransferAbi) {
+        throw new Error("Failed to get stored ABI for prepared transaction");
+      }
+      
+      const encodedData = new ethers.Interface(zetoTransferAbi.abi).encodeFunctionData(
+        "transferLocked",
+        [
+          preparedCashTransfer.transaction.data.inputs,
+          preparedCashTransfer.transaction.data.outputs,
+          preparedCashTransfer.transaction.data.proof,
+          preparedCashTransfer.transaction.data.data,
+        ]
+      );
+      
+      logger.log("Successfully encoded Zeto transfer data");
+      return encodedData;
+    } catch (error) {
+      logger.error("Failed to encode Zeto transfer:");
+      logger.error(`Error: ${error}`);
+      throw error;
+    }
+  }
 
   const issuedAssetAmount = 1000;
   const issuedCashAmount = 10000;
@@ -109,6 +124,8 @@ async function main(): Promise<boolean> {
   const notoFactory = new NotoFactory(paladin1, "noto");
   const notoAsset = await notoFactory
     .newNoto(assetIssuer, {
+      name: "NOTO",
+      symbol: "NOTO",
       notary: assetIssuer,
       notaryMode: "hooks",
       options: {
@@ -205,7 +222,7 @@ async function main(): Promise<boolean> {
   logger.log("Waiting for lock operation to settle...");
   let lockedStateId: string | undefined;
   const pollStartTime = Date.now();
-  const pollTimeout = 30000; // 30 seconds
+  const pollTimeout = 120000; // 2 minutes
   while (Date.now() - pollStartTime < pollTimeout) {
     const lockedStates = await paladin3.ptx.getStateReceipt(receipt.id);
     const confirmedLockedState = lockedStates?.confirmed?.find(
@@ -239,7 +256,7 @@ async function main(): Promise<boolean> {
   }).id;
   
   logger.log(`Prepared transaction ID: ${txID}`);
-  const preparedCashTransfer = await paladin3.pollForPreparedTransaction(txID, 50000);
+  const preparedCashTransfer = await paladin3.pollForPreparedTransaction(txID, pollTimeout); // 2 minutes
   if (!preparedCashTransfer) {
     logger.error(`Failed to get prepared transaction for ID: ${txID}`);
     return false;
@@ -279,7 +296,7 @@ async function main(): Promise<boolean> {
       delegate: atom.address,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(pollTimeout);
   if (!checkReceipt(receipt)) return false;
 
   // Approve cash transfer operation
@@ -385,7 +402,8 @@ async function main(): Promise<boolean> {
     timestamp: new Date().toISOString()
   };
 
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }

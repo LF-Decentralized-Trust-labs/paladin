@@ -4,8 +4,7 @@ description: 'Install pre-requisites for building paladin'
 runs:
   using: 'composite'
   steps:
- 
-  - name: Install protoc if not cached
+  - name: Install protoc
     shell: bash
     run: |
       curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v25.1/protoc-25.1-linux-x86_64.zip

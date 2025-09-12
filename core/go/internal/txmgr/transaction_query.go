@@ -92,7 +92,6 @@ func (tm *txManager) mapPersistedTXHistory(pth *persistedTransactionHistory) *pl
 				Value: pth.Value,
 				Gas:   pth.Gas,
 				PublicTxGasPricing: pldapi.PublicTxGasPricing{
-					GasPrice:             pth.GasPrice,
 					MaxFeePerGas:         pth.MaxFeePerGas,
 					MaxPriorityFeePerGas: pth.MaxPriorityFeePerGas,
 				},

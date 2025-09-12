@@ -18,6 +18,7 @@ package grpctransport
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -50,13 +51,14 @@ type grpcTransport struct {
 	bgCtx     context.Context
 	callbacks plugintk.TransportCallbacks
 
-	name             string
-	listener         net.Listener
-	grpcServer       *grpc.Server
-	serverDone       chan struct{}
-	peerVerifier     *tlsVerifier
-	externalHostname string
-	localCertificate *tls.Certificate
+	name               string
+	listener           net.Listener
+	grpcServer         *grpc.Server
+	serverDone         chan struct{}
+	peerVerifier       *tlsVerifier
+	externalHostname   string
+	localCertificate   *tls.Certificate
+	localCACertificate *x509.Certificate
 
 	conf                Config
 	connLock            sync.RWMutex
@@ -112,12 +114,14 @@ func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.Con
 	}
 	baseTLSConfig := tlsDetail.TLSConfig
 	t.localCertificate = tlsDetail.Certificate
+	t.localCACertificate = tlsDetail.CACertificate
 
 	directCertVerification := confutil.Bool(t.conf.DirectCertVerification, *ConfigDefaults.DirectCertVerification)
 	baseTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
 	if directCertVerification {
 		// Check the tls default settings haven't been set with conflicting config
-		if t.conf.TLS.CAFile != "" || t.conf.TLS.CA != "" || t.conf.TLS.InsecureSkipHostVerify || len(t.conf.TLS.RequiredDNAttributes) > 0 {
+		// Note: We allow CAFile and CA to be set for publishing purposes, but they won't be used for verification
+		if t.conf.TLS.InsecureSkipHostVerify || len(t.conf.TLS.RequiredDNAttributes) > 0 {
 			return nil, i18n.NewError(ctx, msgs.MsgConfIncompatibleWithDirectCertVerify)
 		}
 		// Set InsecureSkipVerify and RequireAnyClientCert to skip the default
@@ -292,8 +296,18 @@ func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessag
 
 func (t *grpcTransport) GetLocalDetails(ctx context.Context, req *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error) {
 
-	certList := t.localCertificate.Certificate
 	issuersText := new(strings.Builder)
+
+	// First, add the CA certificate if available
+	if t.localCACertificate != nil {
+		_ = pem.Encode(issuersText, &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: t.localCACertificate.Raw,
+		})
+	}
+
+	// Then, add the node's certificate chain
+	certList := t.localCertificate.Certificate
 	for _, cert := range certList {
 		_ = pem.Encode(issuersText, &pem.Block{
 			Type:  "CERTIFICATE",

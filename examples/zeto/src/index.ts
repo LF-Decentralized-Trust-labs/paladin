@@ -1,3 +1,17 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   PaladinVerifier,
   TransactionType,
@@ -7,24 +21,25 @@ import { checkDeploy, checkReceipt } from "paladin-example-common";
 import erc20Abi from "./zeto-abis/SampleERC20.json";
 import * as fs from 'fs';
 import * as path from 'path';
-import { ContractData } from "./verify-deployed";
+import { ContractData } from "./tests/data-persistence";
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
 
-const paladin1 = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-const paladin2 = new PaladinClient({
-  url: "http://127.0.0.1:31648",
-});
-const paladin3 = new PaladinClient({
-  url: "http://127.0.0.1:31748",
-});
-
 async function main(): Promise<boolean> {
-  const [cbdcIssuer] = paladin1.getVerifiers("centralbank@node3");
-  const [bank1] = paladin2.getVerifiers("bank1@node1");
-  const [bank2] = paladin3.getVerifiers("bank2@node2");
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const [paladin1, paladin2, paladin3] = clients;
+
+  const [cbdcIssuer] = paladin1.getVerifiers(`centralbank@${nodeConnections[2].id}`);
+  const [bank1] = paladin2.getVerifiers(`bank1@${nodeConnections[0].id}`);
+  const [bank2] = paladin3.getVerifiers(`bank2@${nodeConnections[1].id}`);
 
   const mintAmounts = [100000, 100000];
   const transferAmount = 1000;
@@ -263,7 +278,8 @@ async function main(): Promise<boolean> {
     timestamp: new Date().toISOString()
   };
 
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
@@ -280,7 +296,7 @@ async function deployERC20(
   paladin: PaladinClient,
   cbdcIssuer: PaladinVerifier
 ): Promise<string | undefined> {
-  const txId1 = await paladin3.ptx.sendTransaction({
+  const txId1 = await paladin.ptx.sendTransaction({
     type: TransactionType.PUBLIC,
     from: cbdcIssuer.lookup,
     data: {
@@ -290,7 +306,7 @@ async function deployERC20(
     abi: erc20Abi.abi,
     bytecode: erc20Abi.bytecode,
   });
-  const result1 = await paladin.pollForReceipt(txId1, 10000);
+  const result1 = await paladin.pollForReceipt(txId1, 120000); // 2 minutes
   if (!checkReceipt(result1)) {
     throw new Error("Failed to deploy ERC20 token");
   }
@@ -316,7 +332,7 @@ async function mintERC20(
     function: "mint",
     abi: erc20Abi.abi,
   });
-  const result3 = await paladin.pollForReceipt(txId2, 10000);
+  const result3 = await paladin.pollForReceipt(txId2, 120000);
   if (!checkReceipt(result3)) {
     throw new Error("Failed to mint ERC20 tokens to bank1");
   }
@@ -338,7 +354,7 @@ async function approveERC20(
     from: from.lookup,
     data: { value: amount, spender },
   });
-  const result1 = await paladin.pollForReceipt(txID1, 10000);
+  const result1 = await paladin.pollForReceipt(txID1, 120000);
   if (!checkReceipt(result1)) {
     throw new Error("Failed to approve transfer");
   }

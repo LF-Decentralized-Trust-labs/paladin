@@ -53,7 +53,7 @@ paladinNodes:
     # ======== Registries ========
     # Registry names this node interacts with. Must match labels on registry CRs.
     registries:
-      - evm-reg
+      - evm-registry
 
     # ======== Transports ========
     transports:
@@ -64,14 +64,14 @@ paladinNodes:
         config:
           port: 9000
           address: 0.0.0.0
-          externalHostname: ""  # External hostname if accessible outside cluster; leave empty if not required
+          # externalHostname: "bank.paladin"  # External hostname if accessible outside cluster; leave unset if not required
         ports:
           transportGrpc:
             port: 9000
             targetPort: 9000
         tls:
-          secretName: paladin-mtls  # Kubernetes Secret for TLS
-          certName: paladin-mtls    # Certificate name within the Secret
+          secretName: paladin-bank-mtls  # Kubernetes Secret for TLS - needs to be unique for each node
+          certName: paladin-bank-mtls    # Certificate name within the Secret - needs to be unique for each node
 
     # ======== Service ========
     service:
@@ -127,3 +127,12 @@ paladinNodes:
       registryAdminNode: bank  # The admin node that manages the registry
       registryAdminKey: registry.operator
       registry: evm-registry
+
+# Domains can be configured with a default signing identity
+domains:
+  noto:
+    fixedSigningIdentity: ""
+  pente:
+    fixedSigningIdentity: ""
+  zeto:
+    fixedSigningIdentity: ""

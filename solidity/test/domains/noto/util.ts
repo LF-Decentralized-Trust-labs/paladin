@@ -4,29 +4,6 @@ import { Signer, TypedDataEncoder } from "ethers";
 import hre from "hardhat";
 import { Noto, NotoFactory } from "../../../typechain-types";
 
-export async function newTransferHash(
-  noto: Noto,
-  inputs: string[],
-  outputs: string[],
-  data: string
-) {
-  const domain = {
-    name: "noto",
-    version: "0.0.1",
-    chainId: hre.network.config.chainId,
-    verifyingContract: await noto.getAddress(),
-  };
-  const types = {
-    Transfer: [
-      { name: "inputs", type: "bytes32[]" },
-      { name: "outputs", type: "bytes32[]" },
-      { name: "data", type: "bytes" },
-    ],
-  };
-  const value = { inputs, outputs, data };
-  return TypedDataEncoder.hash(domain, types, value);
-}
-
 export async function newUnlockHash(
   noto: Noto,
   lockedInputs: string[],
@@ -64,7 +41,7 @@ export async function deployNotoInstance(
   notoFactory: NotoFactory,
   notary: string
 ) {
-  const deployTx = await notoFactory.deploy(randomBytes32(), notary, "0x");
+  const deployTx = await notoFactory.deploy(randomBytes32(), "NOTO", "NOTO", notary, "0x");
   const deployReceipt = await deployTx.wait();
   const deployEvent = deployReceipt?.logs.find(
     (l) =>

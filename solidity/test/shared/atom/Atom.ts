@@ -1,11 +1,10 @@
 import { expect } from "chai";
-import { ContractTransactionReceipt, ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 import { Atom, Noto } from "../../../typechain-types";
 import {
   deployNotoInstance,
   fakeTXO,
-  newTransferHash,
+  newUnlockHash,
   randomBytes32,
 } from "../../domains/noto/util";
 
@@ -31,22 +30,23 @@ describe("Atom", function () {
     const [f1txo1, f1txo2] = [fakeTXO(), fakeTXO()];
     await noto
       .connect(notary1)
-      .transfer(randomBytes32(), [], [f1txo1, f1txo2], "0x", randomBytes32());
-
+      .lock(randomBytes32(), [], [], [f1txo1, f1txo2], "0x", randomBytes32());
     await erc20.mint(notary2, 1000);
 
     // Encode two function calls
     const [f1txo3, f1txo4] = [fakeTXO(), fakeTXO()];
     const f1TxData = randomBytes32();
-    const multiTXF1Part = await newTransferHash(
+    const multiTXF1Part = await newUnlockHash(
       noto,
       [f1txo1, f1txo2],
+      [],
       [f1txo3, f1txo4],
       f1TxData
     );
-    const encoded1 = noto.interface.encodeFunctionData("transferWithApproval", [
+    const encoded1 = noto.interface.encodeFunctionData("unlock", [
       randomBytes32(),
       [f1txo1, f1txo2],
+      [],
       [f1txo3, f1txo4],
       randomBytes32(),
       f1TxData,
@@ -76,16 +76,16 @@ describe("Atom", function () {
     const mcAddr = createMFEvent?.args.addr;
 
     // Do the delegation/approval transactions
-    const f1tx = await noto
+    await noto
       .connect(notary1)
-      .approveTransfer(randomBytes32(), mcAddr, multiTXF1Part, "0x", "0x");
-    const delegateResult1: ContractTransactionReceipt | null =
-      await f1tx.wait();
-    const delegateEvent1 = noto.interface.parseLog(
-      delegateResult1?.logs[0] as any
-    )!.args;
-    expect(delegateEvent1.delegate).to.equal(mcAddr);
-    expect(delegateEvent1.txhash).to.equal(multiTXF1Part);
+      .prepareUnlock([f1txo1, f1txo2], multiTXF1Part, "0x", "0x");
+    await noto.connect(notary1).delegateLock(
+      randomBytes32(),
+      multiTXF1Part,
+      mcAddr,
+      "0x",
+      "0x"
+    );
     await erc20.approve(mcAddr, 1000);
 
     // Run the atomic op (anyone can initiate)
@@ -120,16 +120,18 @@ describe("Atom", function () {
     const [f1txo1, f1txo2] = [fakeTXO(), fakeTXO()];
     const [f1txo3, f1txo4] = [fakeTXO(), fakeTXO()];
     const f1TxData = randomBytes32();
-    const multiTXF1Part = await newTransferHash(
+    const multiTXF1Part = await newUnlockHash(
       noto,
       [f1txo1, f1txo2],
+      [],
       [f1txo3, f1txo4],
       f1TxData
     );
 
-    const encoded1 = noto.interface.encodeFunctionData("transferWithApproval", [
+    const encoded1 = noto.interface.encodeFunctionData("unlock", [
       randomBytes32(),
       [f1txo1, f1txo2],
+      [],
       [f1txo3, f1txo4],
       randomBytes32(),
       f1TxData,
@@ -152,7 +154,7 @@ describe("Atom", function () {
     // Run the atomic op (will revert because delegation was never actually created)
     const atom = Atom.connect(anybody2).attach(mcAddr) as Atom;
     await expect(atom.execute())
-      .to.be.revertedWithCustomError(Noto, "NotoInvalidDelegate")
-      .withArgs(multiTXF1Part, ZeroAddress, mcAddr);
+      .to.be.revertedWithCustomError(Noto, "NotoNotNotary")
+      .withArgs(mcAddr);
   });
 });

@@ -4,10 +4,7 @@ description: A Helm chart for Kubernetes
 
 type: application
 
-# The chart is a dependency of the paladin-operator chart,
-# please make sure to update the paladin-operator chart dependencies if you update this chart version.
-# 
-# This chart version is NOT overwritten at the release, if you want to release a new CRD chart you must bump the version in this file and run the release pipeline
-version: 0.0.3
+# The chart version is overwritten at the release 
+version: 0.0.0
 
-appVersion: "0.0.3"
+appVersion: "0.0.0"

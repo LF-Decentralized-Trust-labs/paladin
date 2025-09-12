@@ -1,20 +1,37 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   TransactionType,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import storageJson from "./abis/Storage.json";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
 
-// Instantiate Paladin client
-const paladin = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-
 async function main(): Promise<boolean> {
-  // Get the owner account verifier
-  const [owner] = paladin.getVerifiers("owner@node1");
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 1) {
+    logger.error("The environment config must provide at least 1 node for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin client from the environment configuration...");
+  const paladin = new PaladinClient(nodeConnections[0].clientOptions);
+  const [owner] = paladin.getVerifiers(`owner@${nodeConnections[0].id}`);
 
   // Step 1: Deploy the Storage contract
   logger.log("Step 1: Deploying the Storage contract...");
@@ -32,6 +49,13 @@ async function main(): Promise<boolean> {
     logger.error("Deployment failed!");
     return false;
   }
+  
+  // Validate deployment was successful
+  if (!deploymentReceipt.success) {
+    logger.error("Deployment transaction failed!");
+    return false;
+  }
+  
   logger.log("Step 1: Storage contract deployed successfully!");
 
   // Step 2: Store a value in the contract
@@ -52,6 +76,13 @@ async function main(): Promise<boolean> {
     logger.error("Failed to store value in the contract!");
     return false;
   }
+  
+  // Validate store transaction was successful
+  if (!storeReceipt.success) {
+    logger.error("Store transaction failed!");
+    return false;
+  }
+  
   logger.log("Step 2: Value stored successfully!" );
 
   // Step 3: Retrieve the stored value from the contract
@@ -83,7 +114,8 @@ async function main(): Promise<boolean> {
     timestamp: new Date().toISOString()
   };
 
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }

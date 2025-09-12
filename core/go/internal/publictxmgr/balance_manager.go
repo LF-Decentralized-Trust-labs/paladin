@@ -39,24 +39,24 @@ type BalanceManagerWithInMemoryTracking struct {
 
 	// a map of signing addresses and a boolean to indicate whether balance manager should fetch
 	// the balance of the signing address from the chain
-	addressBalanceChangedMap    map[pldtypes.EthAddress]bool
-	addressBalanceChangedMapMux sync.Mutex
+	retrieveAddressBalanceMap    map[pldtypes.EthAddress]bool
+	retrieveAddressBalanceMapMux sync.Mutex
 }
 
-func (af *BalanceManagerWithInMemoryTracking) NotifyAddressBalanceChanged(ctx context.Context, address pldtypes.EthAddress) {
-	af.addressBalanceChangedMapMux.Lock()
-	defer af.addressBalanceChangedMapMux.Unlock()
-	af.addressBalanceChangedMap[address] = true
+func (af *BalanceManagerWithInMemoryTracking) NotifyRetrieveAddressBalance(ctx context.Context, address pldtypes.EthAddress) {
+	af.retrieveAddressBalanceMapMux.Lock()
+	defer af.retrieveAddressBalanceMapMux.Unlock()
+	af.retrieveAddressBalanceMap[address] = true
 }
 
 func (af *BalanceManagerWithInMemoryTracking) GetAddressBalance(ctx context.Context, address pldtypes.EthAddress) (*AddressAccount, error) {
-	af.addressBalanceChangedMapMux.Lock()
-	defer af.addressBalanceChangedMapMux.Unlock()
+	af.retrieveAddressBalanceMapMux.Lock()
+	defer af.retrieveAddressBalanceMapMux.Unlock()
 	log.L(ctx).Debugf("Retrieving balance for address %s ", address)
 
 	cachedAddressBalance, _ := af.balanceCache.Get(address)
 	var addressBalance big.Int
-	balanceChangedOnChain := af.addressBalanceChangedMap[address]
+	balanceChangedOnChain := af.retrieveAddressBalanceMap[address]
 	if balanceChangedOnChain || cachedAddressBalance == nil {
 		log.L(ctx).Debugf("Retrieving balance for address %s from connector", address)
 		// fetch the latest balance from the chain
@@ -69,7 +69,7 @@ func (af *BalanceManagerWithInMemoryTracking) GetAddressBalance(ctx context.Cont
 		af.balanceCache.Set(address, addressBalancePtr.Int())
 		// set the flag to false so that the following requests of this address
 		// uses cache if there is no new balance change
-		af.addressBalanceChangedMap[address] = false
+		af.retrieveAddressBalanceMap[address] = false
 	} else {
 		addressBalance = *cachedAddressBalance
 		log.L(ctx).Tracef("Retrieved balance for address %s from cache: %s", address, addressBalance.String())
@@ -87,8 +87,8 @@ func (af *BalanceManagerWithInMemoryTracking) GetAddressBalance(ctx context.Cont
 
 func NewBalanceManagerWithInMemoryTracking(ctx context.Context, conf *pldconf.PublicTxManagerConfig, publicTxMgr *pubTxManager) BalanceManager {
 	return &BalanceManagerWithInMemoryTracking{
-		pubTxMgr:                 publicTxMgr,
-		balanceCache:             cache.NewCache[pldtypes.EthAddress, *big.Int](&conf.BalanceManager.Cache, &pldconf.PublicTxManagerDefaults.BalanceManager.Cache),
-		addressBalanceChangedMap: make(map[pldtypes.EthAddress]bool),
+		pubTxMgr:                  publicTxMgr,
+		balanceCache:              cache.NewCache[pldtypes.EthAddress, *big.Int](&conf.BalanceManager.Cache, &pldconf.PublicTxManagerDefaults.BalanceManager.Cache),
+		retrieveAddressBalanceMap: make(map[pldtypes.EthAddress]bool),
 	}
 }

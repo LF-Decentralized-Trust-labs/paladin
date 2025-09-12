@@ -252,7 +252,7 @@ func (h *burnCommon) prepareBurn(ctx context.Context, tx *types.ParsedTransactio
 		if err != nil {
 			return nil, err
 		}
-		return hookTransaction.prepare(nil)
+		return hookTransaction.prepare()
 	}
-	return baseTransaction.prepare(nil)
+	return baseTransaction.prepare()
 }

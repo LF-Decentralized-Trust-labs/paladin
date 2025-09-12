@@ -24,6 +24,8 @@ Below is a walkthrough of each step in the example, with an explanation of what 
 const notoFactory = new NotoFactory(paladin1, "noto");
 const notoCash = await notoFactory
   .newNoto(cashIssuer, {
+    name: "CASH",
+    symbol: "CASH",
     notary: cashIssuer,
     notaryMode: "basic",
   })
@@ -129,6 +131,8 @@ visible to the bond issuer and custodian, but will be atomically linked to the N
 ```typescript
 const notoBond = await notoFactory
   .newNoto(bondIssuer, {
+    name: "BOND",
+    symbol: "BOND",
     notary: bondCustodian,
     notaryMode: "hooks",
     options: {

@@ -1,4 +1,14 @@
+# This workflow manages the first phase of the two-phase release process:
+#   1. Create a release candidate (RC) tag and publish all artifacts (images, charts, SDK, etc.) for testing.
+#   2. After successful testing of the RC artifacts, proceed to create the final release with the "latest" tag.
+# The goal is to ensure all released artifacts are validated before making the final release public. 
+# The final release (phase 2) is created by the `release` workflow.
 name: Release Candidate
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
 
 on:
   push:
@@ -12,7 +22,8 @@ on:
         description: 'Release candidate tag (e.g., v0.1.0-rc.1)'
 
 jobs:
-  set-variables:
+  # ================================ SETUP ================================
+  setup:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.set-vars.outputs.tag }}
@@ -70,43 +81,82 @@ jobs:
             exit 1
           fi
           echo "Valid RC tag: $REF_TAG_VERSION"
+
+  # ================================ BUILD ARTIFACTS ================================
+  # Build and prepare all release artifacts (images, charts, contracts, SDK)
+
+  # Build and publish RC images
   release-images:
-    needs: set-variables
+    needs: setup
     uses: ./.github/workflows/release-images.yaml
     with:
-      tag: ${{ needs.set-variables.outputs.tag }}
+      tag: ${{ needs.setup.outputs.tag }}
       latest: false
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
+  # Test and release RC Helm charts
   release-charts:
-    needs: [set-variables, release-images]
+    needs: [setup, release-images]
     uses: ./.github/workflows/release-charts.yaml
     with:
-      chart_tag: ${{ needs.set-variables.outputs.tag }}
-      images_tag: ${{ needs.set-variables.outputs.tag }}
+      chart_tag: ${{ needs.setup.outputs.tag }}
+      images_tag: ${{ needs.setup.outputs.tag }}
       registry: docker.io
     secrets:
       CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  release-solidity-contracts:
-    needs: [set-variables]
-    uses: ./.github/workflows/release-solidity-contracts.yaml
   
+  test-examples:
+    needs: [setup, release-charts]
+    uses: ./.github/workflows/test-examples.yaml
+    with:
+      build_local_abi: true
+      build_local_sdk: true
+      chart_tag: ${{ needs.setup.outputs.tag }}
+
+  # Upload Solidity contracts
+  release-solidity-contracts:
+    needs: [setup, test-examples]
+    uses: ./.github/workflows/release-solidity-contracts.yaml
+    with:
+      tag: ${{ needs.setup.outputs.tag }}
+
+  # Release TypeScript SDK
   release-typescript-sdk:
-    needs: [set-variables]
+    needs: [setup, test-examples]
     uses: ./.github/workflows/release-typescript-sdk.yaml
     with:
-      sdk_version: ${{ needs.set-variables.outputs.tag }}
+      sdk_version: ${{ needs.setup.outputs.tag }}
       # Construct the semicolon-separated string.
-      # For a tag like 'v0.1.0-rc.1', this will become "rc;rc.1;1"
-      sdk_tag: "rc;${{ needs.set-variables.outputs.npm_prerelease_tag }};${{ needs.set-variables.outputs.npm_rc_number }}"
+      # For a tag like 'v0.1.0-rc.1', this will become "rc;rc.1"
+      # We can't use the rc_number (e.g. 1)because it's not a valid npm tag
+      sdk_tag: "rc;${{ needs.setup.outputs.npm_prerelease_tag }}"
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-  
-  release:
-    needs: [set-variables, release-charts, release-solidity-contracts, release-typescript-sdk]
+
+  # ================================ PRE-RELEASE TESTING ================================
+  # Test that the built artifacts are compatible and functional before creating the RC release
+    
+  test-rollout-compatibility:
+    needs: [setup, release-solidity-contracts, release-typescript-sdk]
+    uses: ./.github/workflows/test-rollout-compatibility.yaml
+    with:
+      new_tag: ${{ needs.setup.outputs.tag }}
+
+  # Testing the rollout compatibility between v0.9.0 and v0.10.0-RC.*
+  # This is a temporary step that should be removed after the v0.10.0 release
+  test-v9-to-v10:
+    needs: [setup, release-solidity-contracts, release-typescript-sdk]
+    uses: ./.github/workflows/test-v9-to-v10.yaml
+    with:
+      new_tag: ${{ needs.setup.outputs.tag }}
+
+  # ================================ CREATE RC RELEASE ================================
+  # Only create the RC release after all tests have passed
+  # This step bundles all built artifacts and creates the GitHub release
+  create-rc-release:
+    needs: [setup, test-rollout-compatibility, test-v9-to-v10]
     runs-on: ubuntu-latest
     steps:
       - name: Download Helm artifacts
@@ -128,8 +178,8 @@ jobs:
       - name: Create release candidate with all artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.set-variables.outputs.tag }}
-          body: "Release Candidate ${{ needs.set-variables.outputs.tag }}"
+          tag_name: ${{ needs.setup.outputs.tag }}
+          body: "Release Candidate ${{ needs.setup.outputs.tag }}"
           generate_release_notes: true
           make_latest: "false" # RC releases are never marked as latest
           prerelease: true

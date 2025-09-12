@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "ts-node ./src/index.ts",
     "start:prod": "node ./build/index.js",
-    "verify": "ts-node ./src/verify-deployed.ts",
+    "verify": "ts-node ./src/tests/data-persistence.ts",
     "abi": "node scripts/abi.mjs",
     "copy-abi": "node scripts/contracts.mjs"
   },
@@ -20,6 +20,7 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@lfdecentralizedtrust-labs/paladin-sdk": "^0.9.0"
+    "@lfdecentralizedtrust-labs/paladin-sdk": "^0.9.0",
+    "paladin-example-common": "file:../common"
   }
 }

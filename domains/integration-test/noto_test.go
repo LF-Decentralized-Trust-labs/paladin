@@ -79,9 +79,7 @@ func (s *notoTestSuite) TestNoto() {
 	t := s.T()
 	log.L(ctx).Infof("TestNoto")
 
-	waitForNoto, notoTestbed := newNotoDomain(t, &types.DomainConfig{
-		FactoryAddress: s.factoryAddress,
-	})
+	waitForNoto, notoTestbed := newNotoDomain(t, pldtypes.MustEthAddress(s.factoryAddress))
 	done, _, tb, rpc := newTestbed(t, s.hdWalletSeed, map[string]*testbed.TestbedDomain{
 		s.domainName: notoTestbed,
 	})
@@ -250,102 +248,12 @@ func (s *notoTestSuite) TestNoto() {
 	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[1].Data.Owner.String())
 }
 
-func (s *notoTestSuite) TestNotoApprove() {
-	ctx := context.Background()
-	t := s.T()
-	log.L(ctx).Infof("TestNotoApprove")
-
-	_, notoTestbed := newNotoDomain(t, &types.DomainConfig{
-		FactoryAddress: s.factoryAddress,
-	})
-	done, _, tb, rpc := newTestbed(t, s.hdWalletSeed, map[string]*testbed.TestbedDomain{
-		s.domainName: notoTestbed,
-	})
-	defer done()
-
-	recipient1Key, err := tb.ResolveKey(ctx, recipient1Name, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
-	require.NoError(t, err)
-
-	log.L(ctx).Infof("Deploying an instance of Noto")
-	noto := helpers.DeployNoto(ctx, t, rpc, s.domainName, notary, nil)
-	log.L(ctx).Infof("Noto deployed to %s", noto.Address)
-
-	log.L(ctx).Infof("Mint 100 from notary to notary")
-	var invokeResult testbed.TransactionResult
-	rpcerr := rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
-		TransactionBase: pldapi.TransactionBase{
-			From:     notaryName,
-			To:       noto.Address,
-			Function: "mint",
-			Data: toJSON(t, &types.MintParams{
-				To:     notaryName,
-				Amount: pldtypes.Int64ToInt256(100),
-			}),
-		},
-		ABI: types.NotoABI,
-	}, true)
-	require.NoError(t, rpcerr)
-
-	log.L(ctx).Infof("Approve recipient1 to claim 50")
-	var prepared testbed.TransactionResult
-	rpcerr = rpc.CallRPC(ctx, &prepared, "testbed_prepare", &pldapi.TransactionInput{
-		TransactionBase: pldapi.TransactionBase{
-			From:     notaryName,
-			To:       noto.Address,
-			Function: "transfer",
-			Data: toJSON(t, &types.TransferParams{
-				To:     recipient1Name,
-				Amount: pldtypes.Int64ToInt256(50),
-			}),
-		},
-		ABI: types.NotoABI,
-	})
-	require.NoError(t, rpcerr)
-
-	var transferParams map[string]any
-	err = json.Unmarshal(prepared.PreparedTransaction.Data, &transferParams)
-	require.NoError(t, err)
-
-	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
-		TransactionBase: pldapi.TransactionBase{
-			From:     notaryName,
-			To:       noto.Address,
-			Function: "approveTransfer",
-			Data: toJSON(t, &types.ApproveParams{
-				Inputs:   prepared.InputStates,
-				Outputs:  prepared.OutputStates,
-				Data:     pldtypes.MustParseHexBytes(transferParams["data"].(string)),
-				Delegate: pldtypes.MustEthAddress(recipient1Key.Verifier.Verifier),
-			}),
-		},
-		ABI: types.NotoABI,
-	}, true)
-	require.NoError(t, rpcerr)
-
-	log.L(ctx).Infof("Claim 50 using approval")
-	notoBuild := solutils.MustLoadBuild(helpers.NotoInterfaceJSON)
-	receipt, err := tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{
-		TransactionBase: pldapi.TransactionBase{
-			Type:     pldapi.TransactionTypePublic.Enum(),
-			Function: "transferWithApproval",
-			From:     recipient1Name,
-			To:       noto.Address,
-			Data:     pldtypes.JSONString(transferParams),
-		},
-		ABI: notoBuild.ABI,
-	})
-	assert.NoError(t, err)
-	log.L(ctx).Infof("Claimed with transaction: %s", receipt.TransactionHash)
-}
-
 func (s *notoTestSuite) TestNotoLock() {
 	ctx := context.Background()
 	t := s.T()
 	log.L(ctx).Infof("TestNotoLock")
 
-	waitForNoto, notoTestbed := newNotoDomain(t, &types.DomainConfig{
-		FactoryAddress: s.factoryAddress,
-	})
+	waitForNoto, notoTestbed := newNotoDomain(t, pldtypes.MustEthAddress(s.factoryAddress))
 	done, _, tb, rpc := newTestbed(t, s.hdWalletSeed, map[string]*testbed.TestbedDomain{
 		s.domainName: notoTestbed,
 	})

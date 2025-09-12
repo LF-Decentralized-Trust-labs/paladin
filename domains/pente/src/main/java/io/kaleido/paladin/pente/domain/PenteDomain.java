@@ -156,8 +156,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
                      resolvedVerifiers,
                      params.externalCallsEnabled()
              ).getBytes());
+             var signingIdentity = config.getFixedSigningIdentity();
+             if (signingIdentity == "") {
+                 signingIdentity = "%s.deploy.%s".formatted(config.getDomainName(), UUID.randomUUID().toString());
+             }
              var response = PrepareDeployResponse.newBuilder().
-                     setSigner("%s.deploy.%s".formatted(config.getDomainName(), UUID.randomUUID().toString()));
+                     setSigner(signingIdentity);
              var newPrivacyGroupABIJson = config.getFactoryContractABI().getABIEntry("function", "newPrivacyGroup").toJSON(false);
              response.getTransactionBuilder().
                      setFunctionAbiJson(newPrivacyGroupABIJson).

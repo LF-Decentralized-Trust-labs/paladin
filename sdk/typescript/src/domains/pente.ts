@@ -36,6 +36,7 @@ export interface PenteDeploy {
 }
 
 export interface PentePrivacyGroupParams {
+  name?: string;
   members: (string | PaladinVerifier)[];
   salt?: string;
   evmVersion?: string;
@@ -93,8 +94,9 @@ export class PenteFactory {
   newPrivacyGroup(input: PentePrivacyGroupParams) {
     return new PentePrivacyGroupFuture(
       this.paladin,
-      this.paladin.createPrivacyGroup({
+      this.paladin.pgroup.createGroup({
         domain: this.domain,
+        name: input.name,
         members: input.members.map((m) => m.toString()),
         configuration: {
           evmVersion: input.evmVersion,

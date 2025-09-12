@@ -1018,10 +1018,11 @@ func (r *PaladinReconciler) generatePaladinDomains(ctx context.Context, node *co
 		// or wholely defined by reference to the CR attached.
 		// We do not attempt to merge
 		pldConf.Domains[domain.Name] = &pldconf.DomainConfig{
-			Plugin:          r.mapPluginConfig(domain.Spec.Plugin),
-			Config:          domainConf,
-			RegistryAddress: domain.Status.RegistryAddress,
-			AllowSigning:    domain.Spec.AllowSigning,
+			Plugin:               r.mapPluginConfig(domain.Spec.Plugin),
+			Config:               domainConf,
+			RegistryAddress:      domain.Status.RegistryAddress,
+			AllowSigning:         domain.Spec.AllowSigning,
+			FixedSigningIdentity: domain.Spec.FixedSigningIdentity,
 		}
 	}
 

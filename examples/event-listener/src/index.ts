@@ -1,3 +1,17 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   ITransactionReceipt,
   PaladinWebSocketClient,
@@ -9,14 +23,21 @@ import { checkDeploy } from "paladin-example-common";
 import helloWorldJson from "./abis/HelloWorld.json";
 import * as fs from 'fs';
 import * as path from 'path';
-import { ContractData } from "./verify-deployed";
+import { ContractData } from "./tests/data-persistence";
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
 
-const paladin = new PaladinClient({ url: "http://127.0.0.1:31548" });
-
 async function main(): Promise<boolean> {
-  const [verifierNode1] = paladin.getVerifiers("member@node1");
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 1) {
+    logger.error("The environment config must provide at least 1 node for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin client from the environment configuration...");
+  const paladin = new PaladinClient(nodeConnections[0].clientOptions);
+  const [verifierNode1] = paladin.getVerifiers(`member@${nodeConnections[0].id}`);
 
   // Create a privacy group for Node1 alone
   logger.log("Creating a privacy group for Node1...");
@@ -214,7 +235,7 @@ async function main(): Promise<boolean> {
       name: name,
       receivedEventData: receivedEventData,
       receivedReceiptId: receivedReceiptId,
-      transactionId: txId
+      transactionId: txId,
     },
     listenerConfig: {
       type: TransactionType.PRIVATE,
@@ -233,7 +254,8 @@ async function main(): Promise<boolean> {
     timestamp: new Date().toISOString()
   };
 
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }

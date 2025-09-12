@@ -88,42 +88,49 @@ jobs:
           registry: ${{ inputs.registry }}
       
       - name: Finalize image names
+        id: finalize-image-names          
         shell: bash
         run: |
-          echo "IMG_PALADIN=${{ inputs.registry }}/${{ steps.docker_repo.outputs.repository }}/paladin" >> $GITHUB_ENV
-          echo "IMG_OPERATOR=${{ inputs.registry }}/${{ steps.docker_repo.outputs.repository }}/paladin-operator" >> $GITHUB_ENV
+          echo "IMG_PALADIN=${{ inputs.registry }}/${{ steps.docker_repo.outputs.repository }}/paladin" >> $GITHUB_OUTPUT
+          echo "IMG_OPERATOR=${{ inputs.registry }}/${{ steps.docker_repo.outputs.repository }}/paladin-operator" >> $GITHUB_OUTPUT
       
       - name: Override image tags
         uses: ./.github/actions/update-yaml
         with:
           file: 'operator/charts/paladin-operator/values.yaml'
-          updates: |
-            operator:
-              image:
-                repository: ${{ env.IMG_OPERATOR }}
-                tag: ${{ inputs.images_tag }}
-            paladin:
-              image:
-                repository: ${{ env.IMG_PALADIN }}
-                tag: ${{ inputs.images_tag }}
+          expressions: |
+            .operator.image.repository=\"${{ steps.finalize-image-names.outputs.IMG_OPERATOR }}\"
+            .operator.image.tag=\"${{ inputs.images_tag }}\"
+            .paladin.image.repository=\"${{ steps.finalize-image-names.outputs.IMG_PALADIN }}\"
+            .paladin.image.tag=\"${{ inputs.images_tag }}\"
       
       # Remove 'v' prefix from the tag
       - name: Process Tag
+        id: clean-tag
         shell: bash
         run: |
           TAG="${{ inputs.chart_tag }}"
           PROCESSED_TAG="${TAG#v}"
-          echo "PROCESSED_TAG=${PROCESSED_TAG}" >> $GITHUB_ENV
+          echo "PROCESSED_TAG=${PROCESSED_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Override paladin-operator-crd chart version
+        uses: ./.github/actions/update-yaml
+        with:
+          file: 'operator/charts/paladin-operator-crd/Chart.yaml'
+          expressions: |
+            .version=\"${{ steps.clean-tag.outputs.PROCESSED_TAG }}\"
+            .appVersion=\"${{ inputs.chart_tag }}\"
 
       # Override the chart version in the Chart.yaml file
       - name: Override chart version
         uses: ./.github/actions/update-yaml
         with:
           file: 'operator/charts/paladin-operator/Chart.yaml'
-          updates: |
-            version: ${{ env.PROCESSED_TAG }}
-            appVersion: ${{ inputs.chart_tag }}
-
+          expressions: |
+            .version=\"${{ steps.clean-tag.outputs.PROCESSED_TAG }}\"
+            .appVersion=\"${{ inputs.chart_tag }}\"
+            (.dependencies[] | select(.name == \"paladin-operator-crd\")).version=\"${{ steps.clean-tag.outputs.PROCESSED_TAG }}\"
+      
       - name: Confirm Helm templates
         working-directory: operator/charts/paladin-operator
         run: |
@@ -131,7 +138,7 @@ jobs:
           helm template .
           rm -rf charts
           rm Chart.lock
-
+          
       # e2e tests 
       - name: E2E Test
         run: |
@@ -139,9 +146,9 @@ jobs:
             -PloadImages=false \
             -PbuildOperator=false \
             -PbuildPaladin=false \
-            -PoperatorImageName=${{ env.IMG_OPERATOR }} \
+            -PoperatorImageName=${{ steps.finalize-image-names.outputs.IMG_OPERATOR }} \
             -PoperatorImageTag=${{ inputs.images_tag }} \
-            -PpaladinImageName=${{ env.IMG_PALADIN }} \
+            -PpaladinImageName=${{ steps.finalize-image-names.outputs.IMG_PALADIN }} \
             -PpaladinImageTag=${{ inputs.images_tag }} \
             -PdeleteCluster=false
 
@@ -154,8 +161,7 @@ jobs:
           else
             echo "CR_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
           fi
-
-      - name: Run chart-releaser
+      - name: Release crd chart
         uses: helm/chart-releaser-action@v1.6.0
         with:
           mark_as_latest: false # the release job is marked as latest
@@ -164,6 +170,7 @@ jobs:
         env: 
           CR_TOKEN: "${{ env.CR_TOKEN }}"
 
+      
       - name: Prepare CRs artifacts
         run: ./gradlew prepareArtifacts -PartifactDir=${{ github.workspace }}/artifacts
       

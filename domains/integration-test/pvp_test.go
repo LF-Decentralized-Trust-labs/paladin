@@ -120,9 +120,7 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	log.L(ctx).Infof("TestNotoForNoto (withHooks=%t)", withHooks)
 
 	log.L(ctx).Infof("Initializing testbed")
-	_, notoTestbed := newNotoDomain(t, &nototypes.DomainConfig{
-		FactoryAddress: s.notoFactoryAddress,
-	})
+	_, notoTestbed := newNotoDomain(t, pldtypes.MustEthAddress(s.notoFactoryAddress))
 	done, _, tb, rpc := newTestbed(t, s.hdWalletSeed, map[string]*testbed.TestbedDomain{
 		s.notoDomainName: notoTestbed,
 	})
@@ -292,9 +290,7 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 	log.L(ctx).Infof("TestNotoForZeto")
 
 	log.L(ctx).Infof("Initializing testbed")
-	waitForNoto, notoTestbed := newNotoDomain(t, &nototypes.DomainConfig{
-		FactoryAddress: s.notoFactoryAddress,
-	})
+	waitForNoto, notoTestbed := newNotoDomain(t, pldtypes.MustEthAddress(s.notoFactoryAddress))
 	waitForZeto, zetoTestbed := newZetoDomain(t, s.zetoConfig, s.zetoContracts.FactoryAddress)
 	done, _, tb, rpc := newTestbed(t, s.hdWalletSeed, map[string]*testbed.TestbedDomain{
 		s.notoDomainName: notoTestbed,

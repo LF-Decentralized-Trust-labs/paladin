@@ -44,8 +44,6 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 		return &burnHandler{burnCommon: burnCommon{noto: n}}
 	case "burnFrom":
 		return &burnFromHandler{burnCommon: burnCommon{noto: n}}
-	case "approveTransfer":
-		return &approveHandler{noto: n}
 	case "lock":
 		return &lockHandler{noto: n}
 	case "unlock":
@@ -61,6 +59,12 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 
 func (n *Noto) GetCallHandler(method string) types.DomainCallHandler {
 	switch method {
+	case "name":
+		return &nameHandler{noto: n}
+	case "symbol":
+		return &symbolHandler{noto: n}
+	case "decimals":
+		return &decimalsHandler{noto: n}
 	case "balanceOf":
 		return &balanceOfHandler{noto: n}
 	default:
@@ -187,7 +191,7 @@ type TransactionWrapper struct {
 	contractAddress *pldtypes.EthAddress
 }
 
-func (tw *TransactionWrapper) prepare(metadata []byte) (*prototk.PrepareTransactionResponse, error) {
+func (tw *TransactionWrapper) prepare() (*prototk.PrepareTransactionResponse, error) {
 	functionJSON, err := json.Marshal(tw.functionABI)
 	if err != nil {
 		return nil, err
@@ -204,10 +208,6 @@ func (tw *TransactionWrapper) prepare(metadata []byte) (*prototk.PrepareTransact
 			ParamsJson:      string(tw.paramsJSON),
 			ContractAddress: contractAddress,
 		},
-	}
-	if metadata != nil {
-		metadataString := string(metadata)
-		res.Metadata = &metadataString
 	}
 	return res, nil
 }

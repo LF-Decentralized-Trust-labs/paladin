@@ -257,76 +257,24 @@ func (h *transferCommon) hookInvokeTransfer(ctx context.Context, tx *types.Parse
 	}, nil
 }
 
-func (h *transferCommon) makeDomainData(ctx context.Context, withApprovalTX *TransactionWrapper, req *prototk.PrepareTransactionRequest) ([]byte, error) {
-	data, err := h.noto.encodeTransactionData(ctx, req.Transaction, req.InfoStates)
-	if err != nil {
-		return nil, err
-	}
-	encodedCall, err := withApprovalTX.functionABI.EncodeCallDataJSONCtx(ctx, withApprovalTX.paramsJSON)
-	if err != nil {
-		return nil, err
-	}
-	domainData := &types.NotoTransferMetadata{
-		ApprovalParams: types.ApproveExtraParams{
-			Data: data,
-		},
-		TransferWithApproval: types.NotoPublicTransaction{
-			FunctionABI: withApprovalTX.functionABI,
-			ParamsJSON:  withApprovalTX.paramsJSON,
-			EncodedCall: encodedCall,
-		},
-	}
-	return json.Marshal(domainData)
-}
-
 func (h *transferCommon) prepareTransfer(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, from, to string, amount *pldtypes.HexUint256, data pldtypes.HexBytes) (*prototk.PrepareTransactionResponse, error) {
 	endorsement := domain.FindAttestation("notary", req.AttestationResult)
 	if endorsement == nil || endorsement.Verifier.Lookup != tx.DomainConfig.NotaryLookup {
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "notary")
 	}
 
-	var withApprovalTransaction *TransactionWrapper
-	var hookTransaction *TransactionWrapper
-	var withApprovalHookTransaction *TransactionWrapper
-	var metadata []byte
-
-	// If preparing a transaction for later use, return metadata allowing it to be delegated to an approved party
-	prepareApprovals := req.Transaction.Intent == prototk.TransactionSpecification_PREPARE_TRANSACTION
-
 	baseTransaction, err := h.baseLedgerInvokeTransfer(ctx, req, false)
 	if err != nil {
 		return nil, err
 	}
-	if prepareApprovals {
-		withApprovalTransaction, err = h.baseLedgerInvokeTransfer(ctx, req, true)
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	if tx.DomainConfig.NotaryMode == types.NotaryModeHooks.Enum() {
-		hookTransaction, err = h.hookInvokeTransfer(ctx, tx, req, baseTransaction, from, to, amount, data)
+		hookTransaction, err := h.hookInvokeTransfer(ctx, tx, req, baseTransaction, from, to, amount, data)
 		if err != nil {
 			return nil, err
 		}
-		if prepareApprovals {
-			withApprovalHookTransaction, err = h.hookInvokeTransfer(ctx, tx, req, withApprovalTransaction, from, to, amount, data)
-			if err != nil {
-				return nil, err
-			}
-			metadata, err = h.makeDomainData(ctx, withApprovalHookTransaction, req)
-			if err != nil {
-				return nil, err
-			}
-		}
-		return hookTransaction.prepare(metadata)
+		return hookTransaction.prepare()
 	}
 
-	if prepareApprovals {
-		metadata, err = h.makeDomainData(ctx, withApprovalTransaction, req)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return baseTransaction.prepare(metadata)
+	return baseTransaction.prepare()
 }

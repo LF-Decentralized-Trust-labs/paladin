@@ -1,21 +1,26 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   PaladinVerifier,
   ZetoFactory,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
-
-const paladin1 = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-const paladin2 = new PaladinClient({
-  url: "http://127.0.0.1:31648",
-});
-const paladin3 = new PaladinClient({
-  url: "http://127.0.0.1:31748",
-});
 
 export interface ContractData {
   zetoCBDC1Address: string;
@@ -70,16 +75,33 @@ function findLatestContractDataFile(dataDir: string): string | null {
 
   const files = fs.readdirSync(dataDir)
     .filter(file => file.startsWith('contract-data-') && file.endsWith('.json'))
-    .sort()
-    .reverse(); // Most recent first
+    .sort((a, b) => {
+      const timestampA = a.replace('contract-data-', '').replace('.json', '');
+      const timestampB = b.replace('contract-data-', '').replace('.json', '');
+      return new Date(timestampB).getTime() - new Date(timestampA).getTime(); // Descending order (newest first)
+    })
+    .reverse();
 
   return files.length > 0 ? path.join(dataDir, files[0]) : null;
 }
 
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const [paladin1, paladin2, paladin3] = clients;
+  const [bank1] = paladin2.getVerifiers(`bank1@${nodeConnections[0].id}`);
+  const [bank2] = paladin3.getVerifiers(`bank2@${nodeConnections[1].id}`);
+
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', '..', 'data');
   const dataFile = findLatestContractDataFile(dataDir);
   
   if (!dataFile) {
@@ -90,16 +112,26 @@ async function main(): Promise<boolean> {
 
   const contractData: ContractData = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
   logger.log(`STEP 1: Loaded contract data from ${dataFile}`);
+
+  // Print cached data summary
+  logger.log("\n=== CACHED DATA SUMMARY ===");
+  logger.log(`Data File: ${dataFile}`);
+  logger.log(`Timestamp: ${contractData.timestamp}`);
   logger.log(`Zeto CBDC1 Address: ${contractData.zetoCBDC1Address}`);
   logger.log(`Zeto CBDC2 Address: ${contractData.zetoCBDC2Address}`);
   logger.log(`ERC20 Address: ${contractData.erc20Address}`);
   logger.log(`Token Name: ${contractData.tokenName}`);
+  logger.log(`CBDC Issuer: ${contractData.cbdcIssuer}`);
+  logger.log(`Bank1: ${contractData.bank1}`);
+  logger.log(`Bank2: ${contractData.bank2}`);
+  logger.log(`Use Case 1 - Transfer Amount: ${contractData.useCase1.transferAmount}`);
+  logger.log(`Use Case 2 - Deposit Amount: ${contractData.useCase2.depositAmount}`);
+  logger.log(`Use Case 2 - Transfer Amount: ${contractData.useCase2.transferAmount}`);
+  logger.log(`Use Case 2 - Withdraw Amount: ${contractData.useCase2.withdrawAmount}`);
+  logger.log("=============================\n");
 
   // STEP 2: Get verifiers and recreate token connections
   logger.log("STEP 2: Recreating token connections...");
-  const [cbdcIssuer] = paladin1.getVerifiers("centralbank@node3");
-  const [bank1] = paladin2.getVerifiers("bank1@node1");
-  const [bank2] = paladin3.getVerifiers("bank2@node2");
 
   const zetoFactory = new ZetoFactory(paladin3, "zeto");
   
@@ -280,6 +312,24 @@ async function main(): Promise<boolean> {
 
     logger.log("STEP 6: State accessibility verification successful!");
 
+    // save the new balance in a new file
+    const newContractData: ContractData = {
+      ...contractData,
+      useCase1: {
+        ...contractData.useCase1,
+        finalBalances: {
+          ...contractData.useCase1.finalBalances,
+          bank1: { ...contractData.useCase1.finalBalances.bank1, totalBalance: currentBank1Balance.totalBalance.toString() },
+          bank2: { ...contractData.useCase1.finalBalances.bank2, totalBalance: currentBank2Balance.totalBalance.toString() },
+        },
+      },
+    };
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const newDataFile = path.join(dataDir, `contract-data-${timestamp}.json`);
+    fs.writeFileSync(newDataFile, JSON.stringify(newContractData, null, 2));
+    logger.log(`New contract data saved to ${newDataFile}`);
+
   } catch (error) {
     logger.error("STEP 6: State accessibility verification failed!");
     logger.error(`Error: ${error}`);
@@ -301,4 +351,4 @@ if (require.main === module) {
       console.error(err);
       process.exit(1);
     });
-} 
+}

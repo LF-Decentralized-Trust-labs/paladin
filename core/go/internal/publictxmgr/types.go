@@ -41,16 +41,27 @@ import (
 // There are separate setter functions for fields that depending on the persistence
 // mechanism might be in separate tables - including History, Receipt, and Confirmations
 type BaseTXUpdates struct {
+	NewValues   BaseTXUpdateNewValues
+	ResetValues BaseTXUpdateResetValues
+}
+
+type BaseTXUpdateNewValues struct {
 	InFlightStatus *InFlightStatus
 	SubStatus      *BaseTxSubStatus
 	GasPricing     *pldapi.PublicTxGasPricing
+	Underpriced    *bool
 	// GasLimit          *pldtypes.HexUint64 // note this is required for some methods (eth_estimateGas)
-	TransactionHash   *pldtypes.Bytes32
-	FirstSubmit       *pldtypes.Timestamp
-	LastSubmit        *pldtypes.Timestamp
-	ErrorMessage      *string
-	NewSubmission     *DBPubTxnSubmission
-	FlushedSubmission *DBPubTxnSubmission
+	TransactionHash *pldtypes.Bytes32
+	FirstSubmit     *pldtypes.Timestamp
+	LastSubmit      *pldtypes.Timestamp
+	ErrorMessage    *string
+	NewSubmission   *DBPubTxnSubmission
+}
+
+type BaseTXUpdateResetValues struct {
+	GasPricing      bool
+	TransactionHash bool
+	Underpriced     bool
 }
 
 // PublicTransactionEventType is a enum type that contains all types of transaction process events
@@ -87,9 +98,6 @@ type BaseTxAction string
 const (
 	// BaseTxActionSign indicates the operation has been signed
 	BaseTxActionSign BaseTxAction = "Sign"
-)
-
-const (
 	// BaseTxActionStateTransition is a special value used for state transition entries, which are created using SetSubStatus
 	BaseTxActionStateTransition BaseTxAction = "StateTransition"
 	// BaseTxActionAssignNonce indicates that a nonce has been assigned to the transaction
@@ -104,7 +112,7 @@ const (
 
 type BalanceManager interface {
 	GetAddressBalance(ctx context.Context, address pldtypes.EthAddress) (*AddressAccount, error)
-	NotifyAddressBalanceChanged(ctx context.Context, address pldtypes.EthAddress)
+	NotifyRetrieveAddressBalance(ctx context.Context, address pldtypes.EthAddress)
 }
 
 // AddressAccount provides the following feature:
@@ -232,9 +240,11 @@ type InMemoryTxStateReadOnly interface {
 	GetValue() *pldtypes.HexUint256
 	BuildEthTX() *ethsigner.Transaction
 	GetGasPriceObject() *pldapi.PublicTxGasPricing
+	GetTransactionFixedGasPrice() *pldapi.PublicTxGasPricing
+	GetLastSubmittedGasPrice() *pldapi.PublicTxGasPricing
+	GetUnderpriced() bool
 	GetFirstSubmit() *pldtypes.Timestamp
 	GetLastSubmitTime() *pldtypes.Timestamp
-	GetUnflushedSubmission() *DBPubTxnSubmission
 	GetInFlightStatus() InFlightStatus
 	GetSignerNonce() string
 	GetGasLimit() uint64
@@ -248,8 +258,7 @@ type InMemoryTxStateManager interface {
 
 type InMemoryTxStateSetters interface {
 	ApplyInMemoryUpdates(ctx context.Context, txUpdates *BaseTXUpdates)
-	UpdateTransaction(newPtx *DBPublicTxn)
-	ResetTransactionHash()
+	UpdateTransaction(ctx context.Context, newPtx *DBPublicTxn)
 }
 
 type StageOutput struct {
@@ -369,7 +378,7 @@ type InFlightTransactionStateManager interface {
 	// tx state management
 	InMemoryTxStateReadOnly
 	InMemoryTxStateSetters
-	CanSubmit(ctx context.Context, cost *big.Int) bool
+	CanSubmit(ctx context.Context, cost *big.Int, signerNonce string) bool
 	CanBeRemoved(ctx context.Context) bool
 	GetInFlightStatus() InFlightStatus
 	SetOrchestratorContext(ctx context.Context, tec *OrchestratorContext)
@@ -397,8 +406,6 @@ type InFlightTransactionStateGeneration interface {
 	GetStageTriggerError(ctx context.Context) error
 	ClearRunningStageContext(ctx context.Context)
 	GetStageStartTime(ctx context.Context) time.Time
-	SetValidatedTransactionHashMatchState(ctx context.Context, validatedTransactionHashMatchState bool)
-	ValidatedTransactionHashMatchState(ctx context.Context) bool
 
 	// stage outputs management
 	AddStageOutputs(ctx context.Context, stageOutput *StageOutput)

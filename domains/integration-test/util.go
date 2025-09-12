@@ -131,16 +131,18 @@ func deployContracts(ctx context.Context, t *testing.T, hdWalletSeed *testbed.UT
 	return deployed
 }
 
-func newNotoDomain(t *testing.T, config *nototypes.DomainConfig) (chan noto.Noto, *testbed.TestbedDomain) {
+func newNotoDomain(t *testing.T, registryAddress *pldtypes.EthAddress) (chan noto.Noto, *testbed.TestbedDomain) {
 	waitForDomain := make(chan noto.Noto, 1)
 	tbd := &testbed.TestbedDomain{
-		Config: mapConfig(t, config),
+		Config: mapConfig(t, nototypes.DomainConfig{
+			FactoryVersion: 1,
+		}),
 		Plugin: plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
 			domain := noto.New(callbacks)
 			waitForDomain <- domain
 			return domain
 		}),
-		RegistryAddress: pldtypes.MustEthAddress(config.FactoryAddress),
+		RegistryAddress: registryAddress,
 	}
 	return waitForDomain, tbd
 }

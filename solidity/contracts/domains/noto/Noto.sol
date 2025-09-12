@@ -25,35 +25,37 @@ import {INotoErrors} from "../interfaces/INotoErrors.sol";
  *         be using any model programmable via EVM (not just C-UTXO)
  */
 contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
-    address _notary;
-    mapping(bytes32 => bool) private _unspent;
-    mapping(bytes32 => address) private _approvals;
-
-    mapping(bytes32 => bool) private _locked;
-    mapping(bytes32 => bytes32) private _unlockHashes; // state ID => unlock hash
-    mapping(bytes32 => address) private _unlockDelegates; // unlock hash => delegate
-    mapping(bytes32 => bool) private _txids;
-
-    // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
-    bytes4 public constant NotoConfigID_V0 = 0x00010000;
-
-    struct NotoConfig_V0 {
-        address notaryAddress;
+    struct NotoConfig_V1 {
+        string name;
+        string symbol;
+        uint8 decimals;
+        address notary;
         uint64 variant;
         bytes data;
     }
 
+    // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
+    bytes4 public constant NotoConfigID_V1 = 0x00020000;
+
     uint64 public constant NotoVariantDefault = 0x0000;
 
-    bytes32 private constant TRANSFER_TYPEHASH =
-        keccak256("Transfer(bytes32[] inputs,bytes32[] outputs,bytes data)");
     bytes32 private constant UNLOCK_TYPEHASH =
         keccak256(
             "Unlock(bytes32[] lockedInputs,bytes32[] lockedOutputs,bytes32[] outputs,bytes data)"
         );
 
+    string private _name;
+    string private _symbol;
+    address public notary;
+    mapping(bytes32 => bool) private _unspent;
+    mapping(bytes32 => bool) private _txids;
+
+    mapping(bytes32 => bool) private _locked;
+    mapping(bytes32 => bytes32) private _unlockHashes; // state ID => unlock hash
+    mapping(bytes32 => address) private _unlockDelegates; // unlock hash => delegate
+
     function requireNotary(address addr) internal view {
-        if (addr != _notary) {
+        if (addr != notary) {
             revert NotoNotNotary(addr);
         }
     }
@@ -89,9 +91,15 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         _disableInitializers();
     }
 
-    function initialize(address notaryAddress) public virtual initializer {
+    function initialize(
+        string memory name_,
+        string memory symbol_,
+        address notary_
+    ) public virtual initializer {
         __EIP712_init("noto", "0.0.1");
-        _notary = notaryAddress;
+        _name = name_;
+        _symbol = symbol_;
+        notary = notary_;
     }
 
     function buildConfig(
@@ -99,8 +107,11 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
     ) external view returns (bytes memory) {
         return
             _encodeConfig(
-                NotoConfig_V0({
-                    notaryAddress: _notary,
+                NotoConfig_V1({
+                    name: _name,
+                    symbol: _symbol,
+                    decimals: decimals(),
+                    notary: notary,
                     variant: NotoVariantDefault,
                     data: data
                 })
@@ -108,17 +119,41 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
     }
 
     function _encodeConfig(
-        NotoConfig_V0 memory config
+        NotoConfig_V1 memory config
     ) internal pure returns (bytes memory) {
         bytes memory configOut = abi.encode(
-            config.notaryAddress,
+            config.name,
+            config.symbol,
+            config.decimals,
+            config.notary,
             config.variant,
             config.data
         );
-        return bytes.concat(NotoConfigID_V0, configOut);
+        return bytes.concat(NotoConfigID_V1, configOut);
     }
 
     function _authorizeUpgrade(address) internal override onlyNotary {}
+
+    /**
+     * @dev Returns the name of the token.
+     */
+    function name() external view returns (string memory) {
+        return _name;
+    }
+
+    /**
+     * @dev Returns the symbol of the token.
+     */
+    function symbol() external view returns (string memory) {
+        return _symbol;
+    }
+
+    /**
+     * @dev Returns the decimals places of the token.
+     */
+    function decimals() public pure returns (uint8) {
+        return 4;
+    }
 
     /**
      * @dev query whether a TXO is currently in the unspent list
@@ -136,17 +171,6 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
      */
     function isLocked(bytes32 id) public view returns (bool locked) {
         return _locked[id];
-    }
-
-    /**
-     * @dev query whether an approval exists for the given transaction
-     * @param txhash the transaction hash
-     * @return delegate the non-zero owner address, or zero if the TXO ID is not in the approval map
-     */
-    function getTransferApproval(
-        bytes32 txhash
-    ) public view returns (address delegate) {
-        return _approvals[txhash];
     }
 
     /**
@@ -222,79 +246,6 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
             }
             _unspent[outputs[i]] = true;
         }
-    }
-
-    /**
-     * @dev Authorize a transfer to be performed by another address in a future transaction
-     *      (for example, a smart contract coordinating a DVP).
-     *
-     *      Note the txhash will only be spendable if it is exactly correct for
-     *      the inputs/outputs/data that are later supplied in useDelegation.
-     *      This approach is gas-efficient as it means:
-     *      - The inputs/outputs/data are not stored on-chain at any point
-     *      - The EIP-712 hash is only calculated on-chain once, in transferWithApproval()
-     *
-     * @param txId a unique identifier for this transaction which must not have been used before
-     * @param delegate the address that is authorized to submit the transaction
-     * @param txhash the pre-calculated hash of the transaction that is delegated
-     * @param signature a signature over the original request to the notary (opaque to the blockchain)
-     * @param data any additional transaction data (opaque to the blockchain)
-     *
-     * Emits a {NotoApproved} event.
-     */
-    function approveTransfer(
-        bytes32 txId,
-        address delegate,
-        bytes32 txhash,
-        bytes calldata signature,
-        bytes calldata data
-    ) external virtual onlyNotary txIdNotUsed(txId) {
-        _approvals[txhash] = delegate;
-        emit NotoApproved(txId, delegate, txhash, signature, data);
-    }
-
-    /**
-     * @dev Transfer via delegation - must be the approved delegate.
-     *
-     * @param txId a unique identifier for this transaction which must not have been used before
-     * @param inputs as per transfer()
-     * @param outputs as per transfer()
-     * @param signature as per transfer()
-     * @param data as per transfer()
-     *
-     * Emits a {NotoTransfer} event.
-     */
-    function transferWithApproval(
-        bytes32 txId,
-        bytes32[] calldata inputs,
-        bytes32[] calldata outputs,
-        bytes calldata signature,
-        bytes calldata data
-    ) public {
-        bytes32 txhash = _buildTransferHash(inputs, outputs, data);
-        if (_approvals[txhash] != msg.sender) {
-            revert NotoInvalidDelegate(txhash, _approvals[txhash], msg.sender);
-        }
-
-        _transfer(txId, inputs, outputs, signature, data);
-
-        delete _approvals[txhash];
-    }
-
-    function _buildTransferHash(
-        bytes32[] calldata inputs,
-        bytes32[] calldata outputs,
-        bytes calldata data
-    ) internal view returns (bytes32) {
-        bytes32 structHash = keccak256(
-            abi.encode(
-                TRANSFER_TYPEHASH,
-                keccak256(abi.encodePacked(inputs)),
-                keccak256(abi.encodePacked(outputs)),
-                keccak256(data)
-            )
-        );
-        return _hashTypedDataV4(structHash);
     }
 
     function _buildUnlockHash(

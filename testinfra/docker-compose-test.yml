@@ -47,6 +47,7 @@ services:
       - --host-allowlist=localhost,besu,127.0.0.1
       - --rpc-http-host=0.0.0.0
       - --rpc-ws-host=0.0.0.0
+      - --min-gas-price=0
 volumes:
   besu_data:
     driver: local

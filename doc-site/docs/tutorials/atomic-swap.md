@@ -94,6 +94,8 @@ The **private asset tracker** is an ERC-20 contract deployed within the privacy 
 const notoFactory = new NotoFactory(paladin1, "noto");
 const notoAsset = await notoFactory
   .newNoto(assetIssuer, {
+    name: "NOTO",
+    symbol: "NOTO",
     notary: assetIssuer,
     notaryMode: "hooks",
     options: {

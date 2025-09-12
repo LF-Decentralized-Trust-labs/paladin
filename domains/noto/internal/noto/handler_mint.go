@@ -246,7 +246,7 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 		if err != nil {
 			return nil, err
 		}
-		return hookTransaction.prepare(nil)
+		return hookTransaction.prepare()
 	}
-	return baseTransaction.prepare(nil)
+	return baseTransaction.prepare()
 }

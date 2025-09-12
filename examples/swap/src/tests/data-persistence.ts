@@ -1,3 +1,17 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   PaladinVerifier,
   NotoFactory,
@@ -6,18 +20,9 @@ import PaladinClient, {
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
-
-const paladin1 = new PaladinClient({
-  url: "http://127.0.0.1:31548",
-});
-const paladin2 = new PaladinClient({
-  url: "http://127.0.0.1:31648",
-});
-const paladin3 = new PaladinClient({
-  url: "http://127.0.0.1:31748",
-});
 
 export interface ContractData {
   atomFactoryAddress: string;
@@ -77,16 +82,31 @@ function findLatestContractDataFile(dataDir: string): string | null {
 
   const files = fs.readdirSync(dataDir)
     .filter(file => file.startsWith('contract-data-') && file.endsWith('.json'))
-    .sort()
-    .reverse(); // Most recent first
+    .sort((a, b) => {
+      const timestampA = a.replace('contract-data-', '').replace('.json', '');
+      const timestampB = b.replace('contract-data-', '').replace('.json', '');
+      return new Date(timestampB).getTime() - new Date(timestampA).getTime(); // Descending order (newest first)
+    })
+    .reverse();
 
   return files.length > 0 ? path.join(dataDir, files[0]) : null;
 }
 
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const [paladin1, paladin2, paladin3] = clients;
+
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', '..', 'data');
   const dataFile = findLatestContractDataFile(dataDir);
   
   if (!dataFile) {
@@ -97,6 +117,11 @@ async function main(): Promise<boolean> {
 
   const contractData: ContractData = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
   logger.log(`STEP 1: Loaded contract data from ${dataFile}`);
+
+  // Print cached data summary
+  logger.log("\n=== CACHED DATA SUMMARY ===");
+  logger.log(`Data File: ${dataFile}`);
+  logger.log(`Timestamp: ${contractData.timestamp}`);
   logger.log(`Atom Factory Address: ${contractData.atomFactoryAddress}`);
   logger.log(`Zeto Cash Address: ${contractData.zetoCashAddress}`);
   logger.log(`Noto Asset Address: ${contractData.notoAssetAddress}`);
@@ -104,6 +129,9 @@ async function main(): Promise<boolean> {
   logger.log(`Issuer Group Address: ${contractData.issuerGroupAddress}`);
   logger.log(`Tracker Address: ${contractData.trackerAddress}`);
   logger.log(`Atom Address: ${contractData.atomAddress}`);
+  logger.log(`Asset Amount: ${contractData.swapDetails.assetAmount}`);
+  logger.log(`Cash Amount: ${contractData.swapDetails.cashAmount}`);
+  logger.log("=============================\n");
 
   // STEP 2: Get verifiers and recreate contract connections
   logger.log("STEP 2: Recreating contract connections...");

@@ -38,7 +38,7 @@ var encodedConfig = func(data *types.NotoConfigData_V0) []byte {
 		panic(err)
 	}
 	encoded, err := types.NotoConfigABI_V0.EncodeABIDataJSON([]byte(fmt.Sprintf(`{
-		"notaryAddress": "0x138baffcdcc3543aad1afd81c71d2182cdf9c8cd",
+		"notary": "0x138baffcdcc3543aad1afd81c71d2182cdf9c8cd",
 		"variant": "0x0000000000000000000000000000000000000000000000000000000000000000",
 		"data": "%s"
 	}`, pldtypes.HexBytes(dataJSON).String())))
@@ -133,7 +133,7 @@ func TestNotoDomainDeployDefaults(t *testing.T) {
 	err = json.Unmarshal([]byte(prepareDeployRes.Transaction.ParamsJson), &deployParams)
 	require.NoError(t, err)
 	assert.Equal(t, "tx1", deployParams["transactionId"])
-	assert.Equal(t, "0x6e2430d15301a7ee28ceaaee0dff9781f8f82f71", deployParams["notaryAddress"])
+	assert.Equal(t, "0x6e2430d15301a7ee28ceaaee0dff9781f8f82f71", deployParams["notary"])
 	deployData := pldtypes.MustParseHexBytes(deployParams["data"].(string))
 	assert.JSONEq(t, `{
 		"notaryLookup": "notary@node1",
@@ -196,7 +196,7 @@ func TestNotoDomainDeployBasicConfig(t *testing.T) {
 	err = json.Unmarshal([]byte(prepareDeployRes.Transaction.ParamsJson), &deployParams)
 	require.NoError(t, err)
 	assert.Equal(t, "tx1", deployParams["transactionId"])
-	assert.Equal(t, "0x6e2430d15301a7ee28ceaaee0dff9781f8f82f71", deployParams["notaryAddress"])
+	assert.Equal(t, "0x6e2430d15301a7ee28ceaaee0dff9781f8f82f71", deployParams["notary"])
 	deployData := pldtypes.MustParseHexBytes(deployParams["data"].(string))
 	assert.JSONEq(t, `{
 		"notaryLookup": "notary@node1",
@@ -263,7 +263,7 @@ func TestNotoDomainDeployHooksConfig(t *testing.T) {
 	err = json.Unmarshal([]byte(prepareDeployRes.Transaction.ParamsJson), &deployParams)
 	require.NoError(t, err)
 	assert.Equal(t, "tx1", deployParams["transactionId"])
-	assert.Equal(t, "0x0a8cb8c4cf5aea4ea2ed3b3777ccddd3e0eb9bc5", deployParams["notaryAddress"])
+	assert.Equal(t, "0x0a8cb8c4cf5aea4ea2ed3b3777ccddd3e0eb9bc5", deployParams["notary"])
 	deployData := pldtypes.MustParseHexBytes(deployParams["data"].(string))
 	assert.JSONEq(t, fmt.Sprintf(`{
 		"notaryLookup": "notary@node1",
@@ -447,7 +447,7 @@ func TestPrepareDeployUnqualifiedNotary(t *testing.T) {
 	var deployParams map[string]any
 	err = json.Unmarshal([]byte(res.Transaction.ParamsJson), &deployParams)
 	require.NoError(t, err)
-	assert.Equal(t, "0x6e2430d15301a7ee28ceaaee0dff9781f8f82f71", deployParams["notaryAddress"])
+	assert.Equal(t, "0x6e2430d15301a7ee28ceaaee0dff9781f8f82f71", deployParams["notary"])
 	var deployData map[string]any
 	err = json.Unmarshal(pldtypes.MustParseHexBytes(deployParams["data"].(string)), &deployData)
 	require.NoError(t, err)

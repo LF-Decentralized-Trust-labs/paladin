@@ -1,18 +1,28 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   PenteFactory,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import { checkDeploy } from "paladin-example-common";
-import storageJson from "./abis/Storage.json";
-import { PrivateStorage } from "./helpers/storage";
+import storageJson from "../abis/Storage.json";
+import { PrivateStorage } from "../helpers/storage";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
-
-// Initialize Paladin clients for three nodes
-const paladinNode1 = new PaladinClient({ url: "http://127.0.0.1:31548" });
-const paladinNode2 = new PaladinClient({ url: "http://127.0.0.1:31648" });
-const paladinNode3 = new PaladinClient({ url: "http://127.0.0.1:31748" });
 
 interface ContractData {
   privacyGroupId: string;
@@ -34,16 +44,34 @@ function findLatestContractDataFile(dataDir: string): string | null {
 
   const files = fs.readdirSync(dataDir)
     .filter(file => file.startsWith('contract-data-') && file.endsWith('.json'))
-    .sort()
-    .reverse(); // Most recent first
+    .sort((a, b) => {
+      const timestampA = a.replace('contract-data-', '').replace('.json', '');
+      const timestampB = b.replace('contract-data-', '').replace('.json', '');
+      return new Date(timestampB).getTime() - new Date(timestampA).getTime(); // Descending order (newest first)
+    })
+    .reverse();
 
   return files.length > 0 ? path.join(dataDir, files[0]) : null;
 }
 
 async function main(): Promise<boolean> {
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const [paladinNode1, paladinNode2, paladinNode3] = clients;
+  const [verifierNode1] = paladinNode1.getVerifiers(`member@${nodeConnections[0].id}`);
+  const [verifierNode2] = paladinNode2.getVerifiers(`member@${nodeConnections[1].id}`);
+  const [verifierNode3] = paladinNode3.getVerifiers(`outsider@${nodeConnections[2].id}`);
+
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', '..', 'data');
   const dataFile = findLatestContractDataFile(dataDir);
   
   if (!dataFile) {
@@ -54,18 +82,21 @@ async function main(): Promise<boolean> {
 
   const contractData: ContractData = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
   logger.log(`STEP 1: Loaded contract data from ${dataFile}`);
+
+  // Print cached data summary
+  logger.log("\n=== CACHED DATA SUMMARY ===");
+  logger.log(`Data File: ${dataFile}`);
+  logger.log(`Timestamp: ${contractData.timestamp}`);
   logger.log(`Privacy Group ID: ${contractData.privacyGroupId}`);
   logger.log(`Contract Address: ${contractData.contractAddress}`);
   logger.log(`Stored Value: ${contractData.storedValue}`);
   logger.log(`Node1 Retrieved Value: ${contractData.retrievedValueNode1}`);
   logger.log(`Node2 Retrieved Value: ${contractData.retrievedValueNode2}`);
-  logger.log(`Store Transaction Hash: ${contractData.storeTransactionHash}`);
+  logger.log(`Store TX Hash: ${contractData.storeTransactionHash}`);
+  logger.log("=============================\n");
 
   // STEP 2: Get verifiers and recreate privacy group connection
   logger.log("STEP 2: Recreating privacy group connection...");
-  const [verifierNode1] = paladinNode1.getVerifiers("member@node1");
-  const [verifierNode2] = paladinNode2.getVerifiers("member@node2");
-  const [verifierNode3] = paladinNode3.getVerifiers("outsider@node3");
 
   const penteFactory = new PenteFactory(paladinNode1, "pente");
   const memberPrivacyGroup = await penteFactory.resumePrivacyGroup({

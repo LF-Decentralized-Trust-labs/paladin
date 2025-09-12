@@ -1,3 +1,17 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   PenteFactory,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
@@ -6,19 +20,24 @@ import storageJson from "./abis/Storage.json";
 import { PrivateStorage } from "./helpers/storage";
 import * as fs from 'fs';
 import * as path from 'path';
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
 
-// Initialize Paladin clients for three nodes
-const paladinNode1 = new PaladinClient({ url: "http://127.0.0.1:31548" });
-const paladinNode2 = new PaladinClient({ url: "http://127.0.0.1:31648" });
-const paladinNode3 = new PaladinClient({ url: "http://127.0.0.1:31748" });
-
 async function main(): Promise<boolean> {
-  // Get verifiers for each node
-  const [verifierNode1] = paladinNode1.getVerifiers("member@node1");
-  const [verifierNode2] = paladinNode2.getVerifiers("member@node2");
-  const [verifierNode3] = paladinNode3.getVerifiers("outsider@node3");
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    return false;
+  }
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+  const [paladinNode1, paladinNode2, paladinNode3] = clients;
+
+  const [verifierNode1] = paladinNode1.getVerifiers(`member@${nodeConnections[0].id}`);
+  const [verifierNode2] = paladinNode2.getVerifiers(`member@${nodeConnections[1].id}`);
+  const [verifierNode3] = paladinNode3.getVerifiers(`outsider@${nodeConnections[2].id}`);
 
   // Step 1: Create a privacy group for members
   logger.log("Creating a privacy group for Node1 and Node2...");
@@ -60,6 +79,13 @@ async function main(): Promise<boolean> {
     function: "store",
     data: { num: valueToStore },
   }).waitForReceipt(10000);
+  
+  // Validate store transaction was successful
+  if (!storeReceipt?.success) {
+    logger.error("Store transaction failed!");
+    return false;
+  }
+  
   logger.log(
     "Value stored successfully! Transaction hash:",
     storeReceipt?.transactionHash
@@ -71,6 +97,13 @@ async function main(): Promise<boolean> {
     from: verifierNode1.lookup,
     function: "retrieve",
   });
+  
+  // Validate the retrieved value
+  if (retrievedValueNode1["value"] !== valueToStore.toString()) {
+    logger.error(`Value retrieval validation failed for Node1! Expected: "${valueToStore}", Retrieved: "${retrievedValueNode1["value"]}"`);
+    return false;
+  }
+  
   logger.log(
     "Node1 retrieved the value successfully:",
     retrievedValueNode1["value"]
@@ -84,6 +117,13 @@ async function main(): Promise<boolean> {
       from: verifierNode2.lookup,
       function: "retrieve",
     });
+    
+  // Validate the retrieved value
+  if (retrievedValueNode2["value"] !== valueToStore.toString()) {
+    logger.error(`Value retrieval validation failed for Node2! Expected: "${valueToStore}", Retrieved: "${retrievedValueNode2["value"]}"`);
+    return false;
+  }
+  
   logger.log(
     "Node2 retrieved the value successfully:",
     retrievedValueNode2["value"]
@@ -101,8 +141,8 @@ async function main(): Promise<boolean> {
     );
     return false;
   } catch (error) {
-    logger.info(
-      "Expected behavior - Node3 (outsider) cannot retrieve the data from the privacy group. Access denied."
+    logger.log(
+      "Node3 (outsider) correctly denied access to the privacy group!"
     );
   }
 
@@ -120,7 +160,8 @@ async function main(): Promise<boolean> {
     timestamp: new Date().toISOString()
   };
 
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }

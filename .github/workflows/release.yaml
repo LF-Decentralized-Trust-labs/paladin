@@ -1,3 +1,8 @@
+# This workflow manages the second phase of the two-phase release process:
+#   1. Create a release candidate (RC) tag and publish all artifacts (images, charts, SDK, etc.) for testing.
+#   2. After successful testing of the RC artifacts, proceed to create the final release with the "latest" tag.
+# The goal is to ensure all released artifacts are validated before making the final release public. 
+# This workflow (phase 2) creates the final release after RC testing has been completed.
 name: Release
 
 on:
@@ -17,7 +22,9 @@ on:
         description: 'Release tag (chart and images)'
 
 jobs:
-  set-variables:
+  # ================================ SETUP ================================
+  # Validate the release tag and ensure it's a final release (not an RC)
+  setup:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.set-vars.outputs.tag }}
@@ -64,7 +71,7 @@ jobs:
         uses: matt-usurp/validate-semver@v2
         with:
           version: ${{ steps.set-vars.outputs.tag }}
-      
+          
       - id: ref-tag
         name: Validate ref tag follows semver versioning
         uses: matt-usurp/validate-semver@v2
@@ -116,32 +123,64 @@ jobs:
           fi
 
           echo "Valid tag: $NEW_TAG_VERSION"
+
+
+  # ================================ BUILD ARTIFACTS ================================
+  # Build and prepare all final release artifacts (images, charts, contracts, SDK)
+  # These are the same artifacts that were tested in the RC phase
+
+  # Build and publish final release images
   release-images:
-    needs: set-variables
+    needs: setup
     uses: ./.github/workflows/release-images.yaml
     with:
-      tag: ${{ needs.set-variables.outputs.tag }}
-      latest: '${{ fromJSON(needs.set-variables.outputs.latest) }}'
+      tag: ${{ needs.setup.outputs.tag }}
+      latest: '${{ fromJSON(needs.setup.outputs.latest) }}'
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
+  # Test and release final Helm charts
   release-charts:
-    needs: [set-variables, release-images]
+    needs: [setup, release-images]
     uses: ./.github/workflows/release-charts.yaml
     with:
-      chart_tag: ${{ needs.set-variables.outputs.tag }}
-      images_tag: ${{ needs.set-variables.outputs.tag }}
+      chart_tag: ${{ needs.setup.outputs.tag }}
+      images_tag: ${{ needs.setup.outputs.tag }}
       registry: docker.io
     secrets:
       CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  release-solidity-contracts:
-    needs: [set-variables]
-    uses: ./.github/workflows/release-solidity-contracts.yaml
+  test-examples:
+    needs: [setup, release-charts]
+    uses: ./.github/workflows/test-examples.yaml
+    with:
+      build_local_abi: true
+      build_local_sdk: true
+      chart_tag: ${{ needs.setup.outputs.tag }}
 
-  release:
-    needs: [set-variables, release-charts, release-solidity-contracts]
+  # Upload final Solidity contracts
+  release-solidity-contracts:
+    needs: [setup, test-examples]
+    uses: ./.github/workflows/release-solidity-contracts.yaml
+    with:
+      tag: ${{ needs.setup.outputs.tag }}
+
+  # Release final TypeScript SDK
+  release-typescript-sdk:
+    needs: [setup, test-examples]
+    uses: ./.github/workflows/release-typescript-sdk.yaml
+    with:
+      sdk_version: ${{ needs.setup.outputs.tag }}
+      sdk_tag: ${{ needs.setup.outputs.sdk_tag }}
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }} 
+
+  # ================================ CREATE FINAL RELEASE ================================
+  # Bundle all built artifacts and create the final GitHub release
+  # This step only runs after all artifacts have been successfully built and published
+  create-final-release:
+    needs: [setup, release-solidity-contracts, release-typescript-sdk]
     runs-on: ubuntu-latest
     steps:
       - name: Download Helm artifacts
@@ -160,13 +199,13 @@ jobs:
         run: |
           ls -R
 
-      - name: Create release with all artifacts
+      - name: Create final release with all artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.set-variables.outputs.tag }}
-          body: "Release ${{ needs.set-variables.outputs.tag }}"
+          tag_name: ${{ needs.setup.outputs.tag }}
+          body: "Release ${{ needs.setup.outputs.tag }}"
           generate_release_notes: true
-          make_latest: '${{ fromJSON(needs.set-variables.outputs.latest) }}'
+          make_latest: '${{ fromJSON(needs.setup.outputs.latest) }}'
           files: |
             helm-artifacts/basenet.yaml
             helm-artifacts/devnet.yaml
@@ -178,11 +217,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  release-typescript-sdk:
-    needs: [set-variables, release]
-    uses: ./.github/workflows/release-typescript-sdk.yaml
-    with:
-      sdk_version: ${{ needs.set-variables.outputs.tag }}
-      sdk_tag: ${{ needs.set-variables.outputs.sdk_tag }}
-    secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }} 
