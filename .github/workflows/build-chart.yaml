@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CLUSTER_NAME: paladin
-      NAMESPACE: ci-devnet
+      NAMESPACE: paladin
 
     steps:
       - uses: actions/checkout@v4
@@ -100,7 +100,7 @@ jobs:
         if: failure()
         run: |
           for i in 1 2 3; do
-            POD_NAME="paladin-worker$i-0"
+            POD_NAME="paladin-node$i-0"
             echo "Port-forwarding $POD_NAME on port $((6060 + i))"
             kubectl port-forward pod/$POD_NAME $((6060 + i)):6060 -n ${{ env.NAMESPACE }} &
           done
@@ -108,7 +108,7 @@ jobs:
           sleep 10
 
           for i in 1 2 3; do
-            POD_NAME="paladin-worker$i-0"
+            POD_NAME="paladin-node$i-0"
             curl "http://localhost:$((6060 + i))/debug/pprof/goroutine?debug=2" > goroutine_dump_node$i.txt
             curl "http://localhost:$((6060 + i))/debug/javadump"
           done
@@ -117,18 +117,18 @@ jobs:
         if: failure()
         run: |
           kubectl logs deployment/paladin-operator -n ${{ env.NAMESPACE }} > operator.log
-          kubectl logs statefulset/paladin-worker1 -n ${{ env.NAMESPACE }} > sfs-paladin-1.log
-          kubectl logs statefulset/paladin-worker2 -n ${{ env.NAMESPACE }} > sfs-paladin-2.log
-          kubectl logs statefulset/paladin-worker3 -n ${{ env.NAMESPACE }} > sfs-paladin-3.log
-          kubectl logs statefulset/besu-evm1 -n ${{ env.NAMESPACE }} > sfs-besu-1.log
-          kubectl logs statefulset/besu-evm2 -n ${{ env.NAMESPACE }} > sfs-besu-2.log
-          kubectl logs statefulset/besu-evm3 -n ${{ env.NAMESPACE }} > sfs-besu-3.log
-          kubectl get paladin worker1 -n ${{ env.NAMESPACE }} -o json > crd-paladin-1.json
-          kubectl get paladin worker2 -n ${{ env.NAMESPACE }} -o json > crd-paladin-2.json
-          kubectl get paladin worker3 -n ${{ env.NAMESPACE }} -o json > crd-paladin-3.json
-          kubectl get cm paladin-worker1 -n ${{ env.NAMESPACE }} -o json > cm-1.json
-          kubectl get cm paladin-worker2 -n ${{ env.NAMESPACE }} -o json > cm-2.json
-          kubectl get cm paladin-worker3 -n ${{ env.NAMESPACE }} -o json > cm-3.json
+          kubectl logs statefulset/paladin-node1 -n ${{ env.NAMESPACE }} > sfs-paladin-1.log
+          kubectl logs statefulset/paladin-node2 -n ${{ env.NAMESPACE }} > sfs-paladin-2.log
+          kubectl logs statefulset/paladin-node3 -n ${{ env.NAMESPACE }} > sfs-paladin-3.log
+          kubectl logs statefulset/besu-node1 -n ${{ env.NAMESPACE }} > sfs-besu-1.log
+          kubectl logs statefulset/besu-node2 -n ${{ env.NAMESPACE }} > sfs-besu-2.log
+          kubectl logs statefulset/besu-node3 -n ${{ env.NAMESPACE }} > sfs-besu-3.log
+          kubectl get paladin node1 -n ${{ env.NAMESPACE }} -o json > crd-paladin-1.json
+          kubectl get paladin node2 -n ${{ env.NAMESPACE }} -o json > crd-paladin-2.json
+          kubectl get paladin node3 -n ${{ env.NAMESPACE }} -o json > crd-paladin-3.json
+          kubectl get cm paladin-node1 -n ${{ env.NAMESPACE }} -o json > cm-1.json
+          kubectl get cm paladin-node2 -n ${{ env.NAMESPACE }} -o json > cm-2.json
+          kubectl get cm paladin-node3 -n ${{ env.NAMESPACE }} -o json > cm-3.json
 
  
       - name: Upload logs
