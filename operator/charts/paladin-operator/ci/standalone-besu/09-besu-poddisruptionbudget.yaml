@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: besu-standalone-besu-node
+  labels:
+    app.kubernetes.io/name: standalone-besu
+    app.kubernetes.io/component: disruption-budget
+spec:
+  unhealthyPodEvictionPolicy: AlwaysAllow
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: standalone-besu
+      app.kubernetes.io/component: node
