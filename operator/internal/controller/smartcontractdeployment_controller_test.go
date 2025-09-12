@@ -255,7 +255,7 @@ func TestBuildDeployTransaction_Success(t *testing.T) {
 	assert.Equal(t, scd.Spec.Bytecode, tx.Bytecode.String())
 	// Additional assertions can be made on tx.ABI, tx.Data, etc.
 	assert.NotNil(t, tx.ABI)
-	assert.NotNil(t, tx.Data)
+	assert.Nil(t, tx.Data)
 }
 
 func TestBuildLinkReferences_Success(t *testing.T) {

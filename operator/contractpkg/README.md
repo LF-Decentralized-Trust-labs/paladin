@@ -29,6 +29,11 @@ go run ./contractpkg/main.go artifacts [srcDir] [outDir]
     "filename": "path/to/contract.sol.json",
     "linkedContracts": {"LibName": "linked_contract"},
     "params": {"param1": "value1"}
+  },
+  "contract_name2": {
+    "filename": "path/to/contract2.sol.json",
+    "linkedContracts": {"LibName": "linked_contract"},
+    "params": ["value2"]
   }
 }
 ```
