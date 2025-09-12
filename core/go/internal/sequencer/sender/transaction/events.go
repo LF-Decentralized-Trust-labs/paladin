@@ -18,10 +18,10 @@ package transaction
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type Event interface {
@@ -35,6 +35,7 @@ type Event interface {
 }
 
 type BaseEvent struct {
+	common.BaseEvent
 	TransactionID uuid.UUID
 }
 
@@ -108,6 +109,7 @@ type AssembleRequestReceivedEvent struct {
 	Coordinator             string
 	CoordinatorsBlockHeight int64
 	StateLocksJSON          []byte
+	PreAssembly             []byte
 }
 
 func (_ *AssembleRequestReceivedEvent) Type() EventType {
@@ -124,6 +126,7 @@ func (event *AssembleRequestReceivedEvent) ApplyToTransaction(_ context.Context,
 		coordinatorsBlockHeight: event.CoordinatorsBlockHeight,
 		stateLocksJSON:          event.StateLocksJSON,
 		requestID:               event.RequestID,
+		preAssembly:             event.PreAssembly,
 	}
 
 	return nil

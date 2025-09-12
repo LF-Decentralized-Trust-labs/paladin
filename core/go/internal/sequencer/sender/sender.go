@@ -18,13 +18,13 @@ package sender
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/sender/transaction"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
 
 type SeqSender interface {
@@ -36,7 +36,7 @@ type SeqSender interface {
 type sender struct {
 	/* State */
 	stateMachine                *StateMachine
-	activeCoordinator           string
+	activeCoordinatorNode       string
 	timeOfMostRecentHeartbeat   common.Time
 	transactionsByID            map[uuid.UUID]*transaction.Transaction
 	submittedTransactionsByHash map[pldtypes.Bytes32]*uuid.UUID
@@ -48,7 +48,6 @@ type sender struct {
 	nodeName             string
 	blockRangeSize       uint64
 	contractAddress      *pldtypes.EthAddress
-	committee            map[string][]string
 	heartbeatThresholdMs common.Duration
 
 	/* Dependencies */
@@ -62,7 +61,6 @@ func NewSender(
 	ctx context.Context,
 	nodeName string,
 	messageSender MessageSender,
-	committeeMembers []string,
 	clock common.Clock,
 	emit common.EmitEvent,
 	engineIntegration common.EngineIntegration,
@@ -82,28 +80,6 @@ func NewSender(
 		engineIntegration:           engineIntegration,
 		emit:                        emit,
 		heartbeatThresholdMs:        clock.Duration(heartbeatPeriodMs * heartbeatThresholdIntervals),
-	}
-	s.committee = make(map[string][]string)
-	for _, member := range committeeMembers {
-		memberLocator := pldtypes.PrivateIdentityLocator(member)
-		memberNode, err := memberLocator.Node(ctx, false)
-		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error resolving node for member %s: %v", member, err)
-			return nil, err
-		}
-
-		memberIdentity, err := memberLocator.Identity(ctx)
-		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error resolving identity for member %s: %v", member, err)
-			return nil, err
-		}
-
-		if _, ok := s.committee[memberNode]; !ok {
-			s.committee[memberNode] = make([]string, 0)
-		}
-
-		s.committee[memberNode] = append(s.committee[memberNode], memberIdentity)
-
 	}
 	s.InitializeStateMachine(State_Idle)
 	return s, nil

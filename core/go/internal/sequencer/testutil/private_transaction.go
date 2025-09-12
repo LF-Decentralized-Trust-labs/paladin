@@ -21,14 +21,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signpayloads"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"golang.org/x/crypto/sha3"
 )
 

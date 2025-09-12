@@ -16,12 +16,12 @@
 package coordinator
 
 import (
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/transport"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 type Event interface {
@@ -35,6 +35,7 @@ func (_ *CoordinatorStateEventActivated) Type() EventType {
 }
 
 type TransactionsDelegatedEvent struct {
+	common.BaseEvent
 	Sender             string // Fully qualified identity locator for the sender
 	Transactions       []*components.PrivateTransaction
 	SendersBlockHeight uint64
@@ -59,6 +60,7 @@ func (_ *CoordinatorFlushedEvent) TypeString() string {
 }
 
 type TransactionConfirmedEvent struct {
+	common.BaseEvent
 	TxID         uuid.UUID
 	From         *pldtypes.EthAddress
 	Nonce        uint64
@@ -75,6 +77,7 @@ func (_ *TransactionConfirmedEvent) TypeString() string {
 }
 
 type TransactionDispatchConfirmedEvent struct {
+	common.BaseEvent
 	TransactionID uuid.UUID
 }
 
@@ -90,6 +93,7 @@ func (t *TransactionDispatchConfirmedEvent) GetTransactionID() uuid.UUID {
 }
 
 type HeartbeatReceivedEvent struct {
+	common.BaseEvent
 	transport.CoordinatorHeartbeatNotification
 }
 
@@ -102,6 +106,7 @@ func (_ *HeartbeatReceivedEvent) TypeString() string {
 }
 
 type HandoverRequestEvent struct {
+	common.BaseEvent
 	Requester string
 }
 
@@ -114,6 +119,7 @@ func (_ *HandoverRequestEvent) TypeString() string {
 }
 
 type NewBlockEvent struct {
+	common.BaseEvent
 	BlockHeight uint64
 }
 

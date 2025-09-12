@@ -19,9 +19,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 )
 
 type State int
@@ -219,8 +219,8 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 }
 
 func (c *coordinator) HandleEvent(ctx context.Context, event common.Event) error {
-	log.L(ctx).Infof("[Sequencer] coordinator handling new event (contract address %s, active coordinator %s, committee %+v)", c.contractAddress, c.activeCoordinator, c.committee)
-	for node, party := range c.committee {
+	log.L(ctx).Infof("[Sequencer] coordinator handling new event (contract address %s, active coordinator %s, committee %+v)", c.contractAddress, c.activeCoordinatorNode, c.senderNodePool)
+	for node, party := range c.senderNodePool {
 		log.L(ctx).Infof("[Sequencer] coordinator handling new event: party %s = %s", node, party)
 	}
 
@@ -298,7 +298,9 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 		//if the latter, then we may or may not know about it depending on whether we have seen a heartbeat from that coordinator since last time
 		// we were loaded into memory
 		//TODO - we can't actually guarantee that we have all transactions we dispatched in memory.
-		//Even assuming that the public txmgr is in the same process (may not be true forever)  and assuming that we haven't been swapped out ( likely not to be true very soon) there is still a chance that the transaction was submitted to the base ledger, then the process restarted then we get the confirmation.				//When the process starts, we need to make sure that the coordinator is pre loaded with knowledge of all transactions that it has dispatched
+		//Even assuming that the public txmgr is in the same process (may not be true forever)  and assuming that we haven't been swapped out ( likely not to be true very soon) there is still a chance that the transaction was submitted to the base ledger, then the process restarted then we get the confirmation.
+		// //When the process starts, we need to make sure that the coordinator is pre loaded with knowledge of all transactions that it has dispatched
+		// MRW TODO ^^
 		isDispatchedTransaction, err := c.confirmDispatchedTransaction(ctx, event.TxID, event.From, event.Nonce, event.Hash, event.RevertReason)
 		if err != nil {
 			log.L(ctx).Errorf("[Sequencer] error confirming transaction From: %s , Nonce: %d, Hash: %v: %v", event.From, event.Nonce, event.Hash, err)
@@ -316,8 +318,9 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 	case *NewBlockEvent:
 		c.currentBlockHeight = event.BlockHeight
 	case *HeartbeatReceivedEvent:
-		c.activeCoordinator = event.From
+		c.activeCoordinatorNode = event.From
 		c.activeCoordinatorBlockHeight = event.BlockHeight
+		c.coordinatorStarted(c.contractAddress, event.From)
 		for _, flushPoint := range event.FlushPoints {
 			c.activeCoordinatorsFlushPointsBySignerNonce[flushPoint.GetSignerNonce()] = flushPoint
 		}
@@ -352,7 +355,7 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
-			common.Log(ctx, common.LOGTYPE_STATE, " | coord | addr | %s | %T | %s -> %s", c.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_STATE)).Debugf("coord    | addr | %s | %T | %s -> %s", c.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first
@@ -398,7 +401,7 @@ func action_StopHeartbeating(ctx context.Context, c *coordinator) error {
 func action_SelectTransaction(ctx context.Context, c *coordinator) error {
 	// Take the opportunity to inform the sequencer lifecycle manager that we have become active so it can decide if that has
 	// casued us to reach the node's limit on active coordinators.
-	c.coordinatorStarted(c.contractAddress)
+	c.coordinatorStarted(c.contractAddress, c.nodeName)
 
 	// Start heartbeating
 	go c.heartbeatLoop(ctx)
@@ -416,7 +419,7 @@ func (c *coordinator) heartbeatLoop(ctx context.Context) error {
 	if c.heartbeatCtx == nil {
 		c.heartbeatCtx, c.heartbeatCancel = context.WithCancel(ctx)
 
-		common.Log(ctx, common.LOGTYPE_STATE, " Starting heartbeat loop for %s", c.contractAddress.String())
+		log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_STATE)).Debugf("Starting heartbeat loop for %s", c.contractAddress.String())
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 		for {

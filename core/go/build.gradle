@@ -34,7 +34,6 @@ ext {
     targetCoverage = 83
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
-        'github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr/ptmgrtypes/mock_transaction_flow.go',
         'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto',
         'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto/transaction',
         'github.com/LF-Decentralized-Trust-labs/paladin/toolkit/prototk',

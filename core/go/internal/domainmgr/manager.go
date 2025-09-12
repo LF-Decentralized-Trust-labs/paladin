@@ -92,6 +92,7 @@ type domainManager struct {
 	ethClientFactory ethclient.EthClientFactory
 	domainSigner     *domainSigner
 	rpcModule        *rpcserver.RPCModule
+	publicTxManager  components.PublicTxManager
 
 	domainsByName    map[string]*domain
 	domainsByAddress map[pldtypes.EthAddress]*domain
@@ -123,6 +124,7 @@ func (dm *domainManager) PostInit(c components.AllComponents) error {
 	dm.blockIndexer = c.BlockIndexer()
 	dm.keyManager = c.KeyManager()
 	dm.transportMgr = c.TransportManager()
+	dm.publicTxManager = c.PublicTxManager()
 
 	for name, d := range dm.conf.Domains {
 		if _, err := pldtypes.ParseEthAddress(d.RegistryAddress); err != nil {

@@ -21,12 +21,12 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/testutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/testutil"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type identityForTesting struct {
@@ -113,6 +113,7 @@ func (r *SentMessageRecorder) SendAssembleRequest(
 
 func (r *SentMessageRecorder) SendEndorsementRequest(
 	ctx context.Context,
+	txID uuid.UUID,
 	idempotencyKey uuid.UUID,
 	party string,
 	attRequest *prototk.AttestationRequest,
@@ -373,7 +374,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 func (b *TransactionBuilderForTesting) BuildEndorsedEvent(endorserIndex int) *EndorsedEvent {
 
 	return &EndorsedEvent{
-		BaseEvent: BaseEvent{
+		BaseCoordinatorEvent: BaseCoordinatorEvent{
 			TransactionID: b.txn.ID,
 		},
 		RequestID:   b.txn.pendingEndorsementRequests[b.privateTransactionBuilder.GetEndorsementName(endorserIndex)][b.privateTransactionBuilder.GetEndorserIdentityLocator(endorserIndex)].IdempotencyKey(),
@@ -386,7 +387,7 @@ func (b *TransactionBuilderForTesting) BuildEndorseRejectedEvent(endorserIndex i
 
 	attReqName := fmt.Sprintf("endorse-%d", endorserIndex)
 	return &EndorsedRejectedEvent{
-		BaseEvent: BaseEvent{
+		BaseCoordinatorEvent: BaseCoordinatorEvent{
 			TransactionID: b.txn.ID,
 		},
 		RevertReason:           "some reason for rejection",

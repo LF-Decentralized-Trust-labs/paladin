@@ -18,7 +18,7 @@ package transport
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 )
 
 type LoopbackTransportManager interface {

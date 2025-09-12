@@ -18,7 +18,7 @@ package coordinator
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 )
 
 type Guard func(ctx context.Context, c *coordinator) bool

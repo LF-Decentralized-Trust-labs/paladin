@@ -17,7 +17,7 @@ package transaction
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 )
 
 func guard_HasGracePeriodPassedSinceStateChange(ctx context.Context, txn *Transaction) bool {

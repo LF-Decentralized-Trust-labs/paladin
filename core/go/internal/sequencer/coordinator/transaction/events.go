@@ -16,11 +16,11 @@
 package transaction
 
 import (
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type Event interface {
@@ -28,11 +28,12 @@ type Event interface {
 	GetTransactionID() uuid.UUID
 }
 
-type BaseEvent struct {
+type BaseCoordinatorEvent struct {
+	common.BaseEvent
 	TransactionID uuid.UUID
 }
 
-func (e *BaseEvent) GetTransactionID() uuid.UUID {
+func (e *BaseCoordinatorEvent) GetTransactionID() uuid.UUID {
 	return e.TransactionID
 }
 
@@ -40,7 +41,7 @@ func (e *BaseEvent) GetTransactionID() uuid.UUID {
 // Feels slightly artificial to model this as an event because it happens every time we create a transaction object
 // but rather than bury the logic in NewTransaction func, modeling this event allows us to define the initial state transition rules in the same declarative stateDefinitions structure as all other state transitions
 type ReceivedEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 }
 
 func (_ *ReceivedEvent) Type() EventType {
@@ -53,7 +54,7 @@ func (_ *ReceivedEvent) TypeString() string {
 
 // TransactionSelectedEvent
 type SelectedEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 }
 
 func (_ *SelectedEvent) Type() EventType {
@@ -66,7 +67,7 @@ func (_ *SelectedEvent) TypeString() string {
 
 // AssembleRequestSentEvent
 type AssembleRequestSentEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 }
 
 func (_ *AssembleRequestSentEvent) Type() EventType {
@@ -79,8 +80,9 @@ func (_ *AssembleRequestSentEvent) TypeString() string {
 
 // AssembleSuccessEvent
 type AssembleSuccessEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	PostAssembly *components.TransactionPostAssembly
+	PreAssembly  *components.TransactionPreAssembly
 	RequestID    uuid.UUID
 }
 
@@ -94,7 +96,7 @@ func (_ *AssembleSuccessEvent) TypeString() string {
 
 // AssembleRevertResponseEvent
 type AssembleRevertResponseEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	PostAssembly *components.TransactionPostAssembly
 	RequestID    uuid.UUID
 }
@@ -109,7 +111,7 @@ func (_ *AssembleRevertResponseEvent) TypeString() string {
 
 // EndorsedEvent
 type EndorsedEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	Endorsement *prototk.AttestationResult
 	RequestID   uuid.UUID
 }
@@ -124,7 +126,7 @@ func (_ *EndorsedEvent) TypeString() string {
 
 // EndorsedRejectedEvent
 type EndorsedRejectedEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	RevertReason           string
 	Party                  string
 	AttestationRequestName string
@@ -141,7 +143,7 @@ func (_ *EndorsedRejectedEvent) TypeString() string {
 
 // DispatchConfirmedEvent
 type DispatchConfirmedEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	RequestID uuid.UUID
 }
 
@@ -155,7 +157,7 @@ func (_ *DispatchConfirmedEvent) TypeString() string {
 
 // DispatchConfirmationRejectedEvent
 type DispatchConfirmationRejectedEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 }
 
 func (_ *DispatchConfirmationRejectedEvent) Type() EventType {
@@ -169,7 +171,7 @@ func (_ *DispatchConfirmationRejectedEvent) TypeString() string {
 // CollectedEvent
 // Collected by the dispatcher thread and dispatched to a public transaction manager for a given signer address
 type CollectedEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	SignerAddress pldtypes.EthAddress
 }
 
@@ -183,7 +185,7 @@ func (_ *CollectedEvent) TypeString() string {
 
 // NonceAllocatedEvent
 type NonceAllocatedEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	Nonce uint64
 }
 
@@ -197,7 +199,7 @@ func (_ *NonceAllocatedEvent) TypeString() string {
 
 // SubmittedEvent
 type SubmittedEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	SubmissionHash pldtypes.Bytes32
 }
 
@@ -211,7 +213,7 @@ func (_ *SubmittedEvent) TypeString() string {
 
 // ConfirmedEvent
 type ConfirmedEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	Nonce        uint64
 	Hash         pldtypes.Bytes32
 	RevertReason pldtypes.HexBytes
@@ -226,7 +228,7 @@ func (_ *ConfirmedEvent) TypeString() string {
 }
 
 type DependencyAssembledEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	DependencyID uuid.UUID
 }
 
@@ -239,7 +241,7 @@ func (_ *DependencyAssembledEvent) TypeString() string {
 }
 
 type DependencyRevertedEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	DependencyID uuid.UUID
 }
 
@@ -252,7 +254,7 @@ func (_ *DependencyRevertedEvent) TypeString() string {
 }
 
 type DependencyReadyEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	DependencyID uuid.UUID
 }
 
@@ -265,7 +267,7 @@ func (_ *DependencyReadyEvent) TypeString() string {
 }
 
 type RequestTimeoutIntervalEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 }
 
 func (_ *RequestTimeoutIntervalEvent) Type() EventType {
@@ -278,7 +280,7 @@ func (_ *RequestTimeoutIntervalEvent) TypeString() string {
 
 // events emitted by the transaction state machine whenever a state transition occurs
 type StateTransitionEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 	FromState State
 	ToState   State
 }
@@ -293,7 +295,7 @@ func (_ *StateTransitionEvent) TypeString() string {
 
 // events emitted by the transaction state machine whenever a state transition occurs
 type HeartbeatIntervalEvent struct {
-	BaseEvent
+	BaseCoordinatorEvent
 }
 
 func (_ *HeartbeatIntervalEvent) Type() EventType {

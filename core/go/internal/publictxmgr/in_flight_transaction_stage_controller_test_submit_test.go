@@ -24,6 +24,7 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/google/uuid"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
@@ -490,7 +491,7 @@ func TestTriggerSubmitTx(t *testing.T) {
 		sendRawTransactionMock.Return(nil, fmt.Errorf("pop"))
 		close(called)
 	}).Once()
-	err := it.TriggerSubmitTx(ctx, nil, confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))))
+	err := it.TriggerSubmitTx(ctx, nil, confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))), it.stateManager.GetTo().String(), uuid.New())
 	require.NoError(t, err)
 	<-called
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)

@@ -338,10 +338,11 @@ func (tb *testbed) execPrivateTransaction(ctx context.Context, tx *testbedTransa
 		return err
 	}
 
+	// MRW TODO - reinstate with the new sequencer
 	// Build any nullifiers
-	if err := tb.writeNullifiersToContext(dCtx, tx.ptx); err != nil {
-		return err
-	}
+	// if err := tb.writeNullifiersToContext(dCtx, tx.ptx); err != nil {
+	// 	return err
+	// }
 
 	// Flush the context
 	err := tb.Components().Persistence().Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {

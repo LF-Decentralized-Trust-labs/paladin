@@ -17,11 +17,11 @@ package transaction
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
 )
 
 func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uuid.UUID) error {
@@ -56,7 +56,7 @@ func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error
 		})
 		t.cancelDispatchConfirmationRequestTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
 			t.emit(&RequestTimeoutIntervalEvent{
-				BaseEvent: BaseEvent{
+				BaseCoordinatorEvent: BaseCoordinatorEvent{
 					TransactionID: t.ID,
 				},
 			})
@@ -67,7 +67,7 @@ func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error
 
 	// MRW TODO - we are the ones doing the dispatching, so after we've informed the sender we can just update our own state?
 	t.HandleEvent(ctx, &DispatchConfirmedEvent{
-		BaseEvent: BaseEvent{
+		BaseCoordinatorEvent: BaseCoordinatorEvent{
 			TransactionID: t.ID,
 		},
 		RequestID: t.pendingDispatchConfirmationRequest.IdempotencyKey(),

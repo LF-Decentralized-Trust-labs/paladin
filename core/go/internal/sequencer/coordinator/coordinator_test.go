@@ -19,11 +19,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/testutil"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/testutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,10 +32,10 @@ func TestTransactionStateTransition(t *testing.T) {
 
 }
 
-func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, committeeMembers []string) (*coordinator, *coordinatorDependencyMocks) {
+func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentityPool []string) (*coordinator, *coordinatorDependencyMocks) {
 
-	if committeeMembers == nil {
-		committeeMembers = []string{"member1@node1"}
+	if senderIdentityPool == nil {
+		senderIdentityPool = []string{"member1@node1"}
 	}
 	mocks := &coordinatorDependencyMocks{
 		messageSender:     NewMockMessageSender(t),
@@ -44,7 +44,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, committeeMembe
 		emit:              func(event common.Event) {},
 	}
 
-	coordinator, err := NewCoordinator(ctx, mocks.messageSender, committeeMembers, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1", nil)
+	coordinator, err := NewCoordinator(ctx, nil, mocks.messageSender, senderIdentityPool, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1", nil, nil, nil)
 	require.NoError(t, err)
 
 	return coordinator, mocks
@@ -65,7 +65,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 
 	ctx := context.Background()
 	sender := "sender@senderNode"
-	builder := NewCoordinatorBuilderForTesting(State_Idle).CommitteeMembers(sender)
+	builder := NewCoordinatorBuilderForTesting(State_Idle).SenderIdentityPool(sender)
 	c, mocks := builder.Build(ctx)
 
 	// Start by simulating the sender and delegate a transaction to the coordinator
@@ -86,7 +86,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	// Assert that a request has been sent to the sender and respond with an assembled transaction
 	require.True(t, mocks.SentMessageRecorder.HasSentAssembleRequest())
 	err = c.HandleEvent(ctx, &transaction.AssembleSuccessEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID:    mocks.SentMessageRecorder.SentAssembleRequestIdempotencyKey(),
@@ -103,7 +103,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	// Assert that the coordinator has sent an endorsement request to the endorser and respond with an endorsement
 	require.Equal(t, 1, mocks.SentMessageRecorder.NumberOfSentEndorsementRequests())
 	err = c.HandleEvent(ctx, &transaction.EndorsedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID:   mocks.SentMessageRecorder.SentEndorsementRequestsForPartyIdempotencyKey(transactionBuilder.GetEndorserIdentityLocator(0)),
@@ -120,7 +120,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	// Assert that the coordinator has sent a dispatch confirmation request to the transaction sender and respond with a dispatch confirmation
 	require.True(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationRequest())
 	err = c.HandleEvent(ctx, &transaction.DispatchConfirmedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		RequestID: mocks.SentMessageRecorder.SentDispatchConfirmationRequestIdempotencyKey(),
@@ -145,7 +145,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	// Simulate the dispatcher thread collecting the transaction and dispatching it to a public transaction manager with a signing address
 	signerAddress := pldtypes.RandAddress()
 	err = c.HandleEvent(ctx, &transaction.CollectedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		SignerAddress: *signerAddress,
@@ -162,7 +162,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 
 	// Simulate the dispatcher thread allocating a nonce for the transaction
 	err = c.HandleEvent(ctx, &transaction.NonceAllocatedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		Nonce: 42,
@@ -182,7 +182,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	// Simulate the public transaction manager submitting the transaction
 	submissionHash := pldtypes.Bytes32(pldtypes.RandBytes(32))
 	err = c.HandleEvent(ctx, &transaction.SubmittedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		SubmissionHash: submissionHash,
@@ -202,7 +202,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 
 	// Simulate the block indexer confirming the transaction
 	err = c.HandleEvent(ctx, &transaction.ConfirmedEvent{
-		BaseEvent: transaction.BaseEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
 		Nonce: 42,

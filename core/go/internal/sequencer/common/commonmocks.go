@@ -7,8 +7,8 @@ package common
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/internal/components"
 	mock "github.com/stretchr/testify/mock"
 )
 

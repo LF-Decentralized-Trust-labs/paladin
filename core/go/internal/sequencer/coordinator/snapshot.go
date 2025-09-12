@@ -18,10 +18,10 @@ package coordinator
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
 
 func action_SendHeartbeat(ctx context.Context, c *coordinator) error {
@@ -31,7 +31,7 @@ func action_SendHeartbeat(ctx context.Context, c *coordinator) error {
 func (c *coordinator) sendHeartbeat(ctx context.Context, contractAddress *pldtypes.EthAddress) error {
 	snapshot := c.getSnapshot(ctx)
 	log.L(ctx).Infof("[Sequencer] sending heartbeat for sequencer %s", contractAddress.String())
-	for node, _ := range c.committee {
+	for _, node := range c.senderNodePool {
 		// MRW TODO - still don't know where we're sending this
 		log.L(ctx).Infof("[Sequencer] sending heartbeat to %s", node)
 		c.messageSender.SendHeartbeat(ctx, node, contractAddress, snapshot)

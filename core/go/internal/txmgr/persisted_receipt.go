@@ -177,38 +177,39 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 		}
 	}
 
-	if len(possibleChainingRecordIDs) > 0 {
-		var chainingRecords []*persistedChainedPrivateTxn
-		err := dbTX.DB().
-			Where(`"chained_transaction" IN ?`, possibleChainingRecordIDs).
-			Find(&chainingRecords).
-			Error
-		// Recurse into PrivateTXManager, who will call us back, or send via the transport mgr
-		if err == nil {
-			receiptsToWrite := make([]*components.ReceiptInputWithOriginator, 0, len(chainingRecords))
-			for _, cr := range chainingRecords {
-				for _, receipt := range info {
-					if receipt.TransactionID == cr.ChainedTransaction {
-						log.L(ctx).Infof("Propagating chained transaction receipt from %s to %s", receipt.TransactionID, cr.Transaction)
-						upstreamReceipt := &components.ReceiptInputWithOriginator{
-							Originator:            cr.Sender,
-							DomainContractAddress: cr.ContractAddress,
-							ReceiptInput:          *receipt, // note copy by value
-						}
-						upstreamReceipt.TransactionID = cr.Transaction
-						upstreamReceipt.Domain = cr.Domain
-						receiptsToWrite = append(receiptsToWrite, upstreamReceipt)
-					}
-				}
-			}
-			if len(receiptsToWrite) > 0 {
-				err = tm.privateTxMgr.WriteOrDistributeReceiptsPostSubmit(ctx, dbTX, receiptsToWrite)
-			}
-		}
-		if err != nil {
-			return err
-		}
-	}
+	// MRW TODO - reinstate integrated with the new sequencer
+	// if len(possibleChainingRecordIDs) > 0 {
+	// 	var chainingRecords []*persistedChainedPrivateTxn
+	// 	err := dbTX.DB().
+	// 		Where(`"chained_transaction" IN ?`, possibleChainingRecordIDs).
+	// 		Find(&chainingRecords).
+	// 		Error
+	// 	// Recurse into PrivateTXManager, who will call us back, or send via the transport mgr
+	// 	if err == nil {
+	// 		receiptsToWrite := make([]*components.ReceiptInputWithOriginator, 0, len(chainingRecords))
+	// 		for _, cr := range chainingRecords {
+	// 			for _, receipt := range info {
+	// 				if receipt.TransactionID == cr.ChainedTransaction {
+	// 					log.L(ctx).Infof("Propagating chained transaction receipt from %s to %s", receipt.TransactionID, cr.Transaction)
+	// 					upstreamReceipt := &components.ReceiptInputWithOriginator{
+	// 						Originator:            cr.Sender,
+	// 						DomainContractAddress: cr.ContractAddress,
+	// 						ReceiptInput:          *receipt, // note copy by value
+	// 					}
+	// 					upstreamReceipt.TransactionID = cr.Transaction
+	// 					upstreamReceipt.Domain = cr.Domain
+	// 					receiptsToWrite = append(receiptsToWrite, upstreamReceipt)
+	// 				}
+	// 			}
+	// 		}
+	// 		if len(receiptsToWrite) > 0 {
+	// 			err = tm.privateTxMgr.WriteOrDistributeReceiptsPostSubmit(ctx, dbTX, receiptsToWrite)
+	// 		}
+	// 	}
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	dbTX.AddPostCommit(func(ctx context.Context) {
 		if len(receiptsToInsert) > 0 {

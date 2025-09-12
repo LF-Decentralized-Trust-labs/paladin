@@ -17,13 +17,13 @@ package transaction
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/internal/sequencer/common"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type endorsementRequirement struct {
@@ -128,12 +128,14 @@ func (d *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []
 // it is safe to call this function multiple times and on a frequent basis (e.g. every heartbeat interval while in the endorsement gathering state) as it will not send duplicate requests unless they have timedout
 func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 
+	log.L(ctx).Infof("[Sequencer] sendEndorsementRequests: number of verifiers %d", len(t.PreAssembly.Verifiers))
+
 	if t.pendingEndorsementRequests == nil {
 		//we are starting a new round of endorsement requests so set an interval to remind us to resend any requests that have not been fulfilled on a periodic basis
 		//this is done by emitting events rather so that this behavior is obvious from the state machine definition
 		t.cancelEndorsementRequestTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
 			t.emit(&RequestTimeoutIntervalEvent{
-				BaseEvent: BaseEvent{
+				BaseCoordinatorEvent: BaseCoordinatorEvent{
 					TransactionID: t.ID,
 				},
 			})
@@ -167,8 +169,11 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 }
 
 func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest) error {
+	log.L(ctx).Infof("[Sequencer] coordinator requestEndorsement: number of verifiers %d", len(t.PreAssembly.Verifiers))
+	log.L(ctx).Infof("[Sequencer] coordinator requestEndorsement: number of required verifiers %d", len(t.PreAssembly.RequiredVerifiers))
 	err := t.messageSender.SendEndorsementRequest(
 		ctx,
+		t.ID,
 		idempotencyKey,
 		party,
 		attRequest,
@@ -199,7 +204,7 @@ func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState
 }
 
 func action_SendEndorsementRequests(ctx context.Context, txn *Transaction) error {
-	log.L(ctx).Debugf("[Sequencer] sending endorsement requests for transaction %s. Post assembly info states: %+v", txn.ID, len(txn.PostAssembly.InfoStates))
+	log.L(ctx).Debugf("[Sequencer] sending endorsement requests for transaction %s. Post assembly info states: %+v, verifiers: %+v", txn.ID, len(txn.PostAssembly.InfoStates), len(txn.PreAssembly.Verifiers))
 	return txn.sendEndorsementRequests(ctx)
 }
 
