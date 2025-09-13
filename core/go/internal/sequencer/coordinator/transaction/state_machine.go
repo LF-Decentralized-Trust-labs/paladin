@@ -18,6 +18,7 @@ package transaction
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
@@ -67,7 +68,8 @@ const (
 )
 
 type StateMachine struct {
-	currentState State
+	currentState    State
+	lastStateChange time.Time
 }
 
 // Actions can be specified for transition to a state either as the OnTransitionTo function that will run for all transitions to that state or as the On field in the Transition struct if the action applies
@@ -425,6 +427,8 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
 			// (Odd spacing is intentional to align logs more clearly)
 			log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_STATE)).Debugf("coord    | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			t.metrics.ObserveSequencerTXStateChange(sm.currentState.String(), time.Duration(event.GetEventTime().Sub(sm.lastStateChange).Milliseconds()))
+			sm.lastStateChange = time.Now()
 			previousState := sm.currentState
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]

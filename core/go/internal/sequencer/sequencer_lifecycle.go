@@ -156,7 +156,7 @@ func (dMgr *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX
 				transportWriter: transportWriter,
 			}
 
-			sender, err := sender.NewSender(dMgr.ctx, dMgr.nodeName, transportWriter, common.RealClock(), sequencer.senderEventHandler, dMgr.engineIntegration, 10, &contractAddr, 15000, 10)
+			sender, err := sender.NewSender(dMgr.ctx, dMgr.nodeName, transportWriter, common.RealClock(), sequencer.senderEventHandler, dMgr.engineIntegration, 10, &contractAddr, 15000, 10, dMgr.metrics)
 			if err != nil {
 				log.L(ctx).Errorf("[Sequencer] failed to create distributed sequencer sender for contract %s: %s", contractAddr.String(), err)
 				return nil, err
@@ -285,12 +285,17 @@ func (dMgr *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX
 						return
 					}
 
-					sds := common.NewStateDistributionBuilder(dMgr.components, nil)
+					stateDistributionBuilder := common.NewStateDistributionBuilder(dMgr.components, t.PrivateTransaction)
+					sds, err := stateDistributionBuilder.Build(ctx, t.PrivateTransaction)
+					if err != nil {
+						log.L(ctx).Errorf("Error getting state distributions: %s", err)
+					}
 
-					for _, sd := range sds.StateDistributionSet.Remote {
+					for _, sd := range sds.Remote {
+						log.L(ctx).Infof("Adding remote state distribution %+v", sd.StateDistribution)
 						stateDistributions = append(stateDistributions, &sd.StateDistribution)
 					}
-					localStateDistributions = append(localStateDistributions, sds.StateDistributionSet.Local...)
+					localStateDistributions = append(localStateDistributions, sds.Local...)
 
 					//Now we have the payloads, we can prepare the submission
 					publicTransactionEngine := dMgr.components.PublicTxManager()
@@ -395,6 +400,7 @@ func (dMgr *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX
 					// A new coordinator became idle, update metrics
 					dMgr.updateActiveCoordinators(dMgr.ctx)
 				},
+				dMgr.metrics,
 			)
 			if err != nil {
 				log.L(ctx).Errorf("[Sequencer] failed to create distributed sequencer coordinator for contract %s: %s", contractAddr.String(), err)

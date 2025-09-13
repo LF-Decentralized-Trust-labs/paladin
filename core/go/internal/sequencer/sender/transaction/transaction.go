@@ -22,6 +22,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/sha3"
@@ -47,6 +48,7 @@ type Transaction struct {
 	signerAddress                    *pldtypes.EthAddress
 	latestSubmissionHash             *pldtypes.Bytes32
 	nonce                            *uint64
+	metrics                          metrics.DistributedSequencerMetrics
 }
 
 func NewTransaction(
@@ -56,6 +58,7 @@ func NewTransaction(
 	clock common.Clock,
 	emit common.EmitEvent,
 	engineIntegration common.EngineIntegration,
+	metrics metrics.DistributedSequencerMetrics,
 
 ) (*Transaction, error) {
 	txn := &Transaction{
@@ -63,6 +66,7 @@ func NewTransaction(
 		engineIntegration:  engineIntegration,
 		emit:               emit,
 		messageSender:      messageSender,
+		metrics:            metrics,
 	}
 
 	txn.InitializeStateMachine(State_Initial)

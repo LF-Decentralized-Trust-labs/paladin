@@ -28,7 +28,7 @@ type DistributedSequencerMetrics interface {
 	IncEndorsedTransactions()
 	IncDispatchedTransactions()
 	IncConfirmedTransactions()
-	ObserveSequencerStateChange(stage string, duration time.Duration)
+	ObserveSequencerTXStateChange(state string, duration time.Duration)
 	SetActiveCoordinators(numberOfActiveCoordinators int)
 	SetActiveSequencers(numberOfActiveSequencers int)
 }
@@ -96,8 +96,8 @@ func (dtm *distributedSequencerMetrics) IncConfirmedTransactions() {
 	dtm.confirmedTransactions.Inc()
 }
 
-func (dtm *distributedSequencerMetrics) ObserveSequencerStateChange(stage string, duration time.Duration) {
-	dtm.sequencerStage.WithLabelValues(stage).Observe(duration.Seconds())
+func (dtm *distributedSequencerMetrics) ObserveSequencerTXStateChange(state string, duration time.Duration) {
+	dtm.sequencerStage.WithLabelValues(state).Observe(duration.Seconds())
 }
 
 func (dtm *distributedSequencerMetrics) SetActiveCoordinators(numberOfActiveCoordinators int) {

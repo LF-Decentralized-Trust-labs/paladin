@@ -23,6 +23,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
@@ -85,6 +86,7 @@ type Transaction struct {
 	engineIntegration  common.EngineIntegration
 	notifyOfTransition OnStateTransition
 	emit               common.EmitEvent
+	metrics            metrics.DistributedSequencerMetrics
 }
 
 // TODO think about naming of this compared to the OnTransitionTo func in the state machine
@@ -105,6 +107,7 @@ func NewTransaction(
 	onStateTransition OnStateTransition,
 	onCleanup func(context.Context),
 	onReadyForDispatch func(context.Context, *Transaction),
+	metrics metrics.DistributedSequencerMetrics,
 ) (*Transaction, error) {
 	senderIdentity, senderNode, err := pldtypes.PrivateIdentityLocator(sender).Validate(ctx, "", false)
 	if err != nil {
@@ -128,6 +131,7 @@ func NewTransaction(
 		emit:                  emit,
 		dependencies:          &pldapi.TransactionDependencies{},
 		onReadyForDispatch:    onReadyForDispatch,
+		metrics:               metrics,
 	}
 	txn.InitializeStateMachine(State_Initial)
 	grapher.Add(context.Background(), txn)

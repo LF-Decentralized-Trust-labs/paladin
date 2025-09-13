@@ -43,7 +43,7 @@ func action_SendDelegationRequest(ctx context.Context, s *sender) error {
 		}
 	}
 
-	s.messageSender.SendDelegationRequest(ctx, s.activeCoordinatorNode, privateTransactions, s.currentBlockHeight)
+	// Update internal TX state machines before sending delegation requests to avoid race condition
 	for _, txn := range transactions {
 		err := txn.HandleEvent(ctx, &transaction.DelegatedEvent{
 			BaseEvent: transaction.BaseEvent{
@@ -57,6 +57,9 @@ func action_SendDelegationRequest(ctx context.Context, s *sender) error {
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
 	}
+
+	// Don't send delegation request before internal TX state machine has been updated
+	s.messageSender.SendDelegationRequest(ctx, s.activeCoordinatorNode, privateTransactions, s.currentBlockHeight)
 	return nil
 
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 
@@ -74,6 +75,7 @@ type coordinator struct {
 	coordinatorIdle    func(contractAddress *pldtypes.EthAddress)
 	heartbeatCtx       context.Context
 	heartbeatCancel    context.CancelFunc
+	metrics            metrics.DistributedSequencerMetrics
 
 	/*Algorithms*/
 	transactionSelector TransactionSelector
@@ -97,6 +99,7 @@ func NewCoordinator(
 	readyForDispatch func(context.Context, *transaction.Transaction),
 	coordinatorStarted func(contractAddress *pldtypes.EthAddress, coordinatorNode string),
 	coordinatorIdle func(contractAddress *pldtypes.EthAddress),
+	metrics metrics.DistributedSequencerMetrics,
 ) (*coordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
@@ -117,6 +120,7 @@ func NewCoordinator(
 		coordinatorStarted:                 coordinatorStarted,
 		coordinatorIdle:                    coordinatorIdle,
 		nodeName:                           nodeName,
+		metrics:                            metrics,
 	}
 	c.senderNodePool = make([]string, 0)
 	// for _, member := range senderNodePool {
@@ -255,6 +259,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 				log.L(ctx).Debugf("[Sequencer] transaction %s cleaned up", txn.ID.String())
 			},
 			c.readyForDispatch,
+			c.metrics,
 		)
 		if err != nil {
 			log.L(ctx).Errorf("[Sequencer] error creating transaction: %v", err)
