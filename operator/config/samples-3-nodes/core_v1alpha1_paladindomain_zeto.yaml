@@ -1,0 +1,81 @@
+apiVersion: core.paladin.io/v1alpha1
+kind: PaladinDomain
+metadata:
+  labels:
+    app.kubernetes.io/name: operator-go
+    app.kubernetes.io/managed-by: kustomize
+    paladin.io/domain-name: zeto
+  name: zeto
+spec:
+  smartContractDeployment: zeto-factory
+  allowSigning: true
+  plugin:
+    type: c-shared
+    library: /app/domains/libzeto.so
+  configJSON: |
+    {
+      "domainContracts": {
+        "implementations": [
+          {
+            "name": "Zeto_Anon",
+            "circuits": {
+              "deposit": {
+                "name": "deposit"
+              },
+              "withdraw": {
+                "name": "withdraw"
+              },
+              "transfer": {
+                "name": "anon"
+              },
+              "transferLocked": {
+                "name": "anon"
+              }
+            }
+          },
+          {
+            "name": "Zeto_AnonEnc",
+            "circuits": {
+              "deposit": {
+                "name": "deposit"
+              },
+              "withdraw": {
+                "name": "withdraw"
+              },
+              "transfer": {
+                "name": "anon_enc",
+                "usesEncryption": true
+              },
+              "transferLocked": {
+                "name": "anon_enc",
+                "usesEncryption": true
+              }
+            }
+          },
+          {
+            "name": "Zeto_AnonNullifier",
+            "circuits": {
+              "deposit": {
+                "name": "deposit"
+              },
+              "withdraw": {
+                "name": "withdraw_nullifier",
+                "usesNullifiers": true
+              },
+              "transfer": {
+                "name": "anon_nullifier_transfer",
+                "usesNullifiers": true
+              },
+              "transferLocked": {
+                "name": "anon_nullifier_transferLocked",
+                "usesNullifiers": true
+              }
+            }
+          }
+        ]
+      },
+      "snarkProver": {
+        "circuitsDir": "/app/domains/zeto/zkp",
+        "provingKeysDir": "/app/domains/zeto/zkp"
+      }
+    }

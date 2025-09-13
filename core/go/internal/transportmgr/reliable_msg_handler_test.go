@@ -73,7 +73,7 @@ func TestReceiveMessageStateWithNullifierSendAckRealDB(t *testing.T) {
 			mc.stateManager.On("WriteNullifiersForReceivedStates", mock.Anything, mock.Anything, "domain1", []*components.NullifierUpsert{nullifier}).
 				Return(nil).Once()
 			mkr := componentsmocks.NewKeyResolver(t)
-			mc.privateTxManager.On("BuildNullifier", mock.Anything, mkr, mock.Anything).Return(nullifier, nil)
+			mc.sequencerManager.On("BuildNullifier", mock.Anything, mkr, mock.Anything).Return(nullifier, nil)
 			mc.keyManager.On("KeyResolverForDBTX", mock.Anything).Return(mkr).Once()
 		},
 	)
@@ -216,7 +216,7 @@ func TestHandleStateDistroBadNullifier(t *testing.T) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 			mkr := componentsmocks.NewKeyResolver(t)
-			mc.privateTxManager.On("BuildNullifier", mock.Anything, mkr, mock.Anything).Return(nil, fmt.Errorf("bad nullifier"))
+			mc.sequencerManager.On("BuildNullifier", mock.Anything, mkr, mock.Anything).Return(nil, fmt.Errorf("bad nullifier"))
 			mc.keyManager.On("KeyResolverForDBTX", mock.Anything).Return(mkr).Once()
 		},
 	)
@@ -502,7 +502,7 @@ func TestHandleNullifierFail(t *testing.T) {
 			mc.stateManager.On("WriteNullifiersForReceivedStates", mock.Anything, mock.Anything, "domain1", []*components.NullifierUpsert{nullifier}).
 				Return(fmt.Errorf("pop")).Once()
 			mkr := componentsmocks.NewKeyResolver(t)
-			mc.privateTxManager.On("BuildNullifier", mock.Anything, mkr, mock.Anything).Return(nullifier, nil)
+			mc.sequencerManager.On("BuildNullifier", mock.Anything, mkr, mock.Anything).Return(nullifier, nil)
 			mc.keyManager.On("KeyResolverForDBTX", mock.Anything).Return(mkr).Once()
 		},
 	)

@@ -2,7 +2,7 @@
 
 When we consider the make up of a distributed ledger system that preserves privacy for those transacting on it, there are a necessary set of layers that are present in any implementation.
 
-![Ledger layers](../images/ledger_layers.png)
+![Ledger layers](../images/ledger_layers.png){.zoomable-image}
 
 The Paladin project:
 - Provides an enterprise grade runtime within the these layers can come together

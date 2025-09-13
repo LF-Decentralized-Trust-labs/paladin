@@ -1,0 +1,17 @@
+apiVersion: core.paladin.io/v1alpha1
+kind: PaladinRegistry
+metadata:
+  labels:
+    app.kubernetes.io/name: operator-go
+    app.kubernetes.io/managed-by: kustomize
+    paladin.io/registry-name: evm-registry
+  name: evm-registry
+spec:
+  type: evm
+  evm:
+    smartContractDeployment: registry
+  plugin:
+    type: c-shared
+    library: /app/registries/libevm.so
+  configJSON: |
+    {}

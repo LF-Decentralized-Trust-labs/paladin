@@ -31,6 +31,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/google/uuid"
 )
 
 type InFlightStatus int
@@ -167,7 +168,30 @@ func (pot *PointOfTime) String() string {
 }
 func (it *inFlightTransactionStageController) TriggerNewStageRun(ctx context.Context, stage InFlightTxStage, substatus BaseTxSubStatus) {
 	it.MarkTime(fmt.Sprintf("stage_%s_wait_to_trigger_async_execution", string(stage)))
-	it.stateManager.GetCurrentGeneration(ctx).StartNewStageContext(ctx, stage, substatus)
+
+	var txId string
+	var txIdUUID uuid.UUID
+	err := it.orchestrator.p.DB().
+		Table("public_txn_bindings").
+		Select(`"transaction"`).
+		Where(`"pub_txn_id" IN (?)`, it.stateManager.GetPubTxnID()).
+		Find(&txId).
+		Error
+	if err != nil {
+		log.L(ctx).Warnf("TriggerNewStageRun: context cancelled while retrieving binding for %s: %s", it.stateManager.GetPubTxnID(), err)
+		return
+	}
+
+	if txId != "" {
+		txIdUUID, err = uuid.Parse(txId)
+		if err != nil {
+			log.L(ctx).Warnf("TriggerNewStageRun: context cancelled while retrieving binding for %s: %s", it.stateManager.GetPubTxnID(), err)
+			return
+		}
+	} else {
+		log.L(ctx).Warnf("TriggerNewStageRun: retrieved empty transaction ID for %s", it.stateManager.GetPubTxnID())
+	}
+	it.stateManager.GetCurrentGeneration(ctx).StartNewStageContext(ctx, stage, substatus, txIdUUID)
 }
 
 // ProduceLatestInFlightStageContext produce a in-flight stage context that is passed over to the stage process logic, it provides the following logic:
@@ -645,13 +669,15 @@ func (it *inFlightTransactionStageController) TriggerSignTx(ctx context.Context)
 	return nil
 }
 
-func (it *inFlightTransactionStageController) TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedHash *pldtypes.Bytes32) error {
+func (it *inFlightTransactionStageController) TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedHash *pldtypes.Bytes32, contractAddress string, txnID uuid.UUID) error {
 	generation := it.stateManager.GetCurrentGeneration(ctx)
 	signerNonce := it.stateManager.GetSignerNonce()
 	lastSubmitTime := it.stateManager.GetLastSubmitTime()
 
 	it.executeAsync(func() {
-		txHash, submissionTime, errReason, submissionOutcome, err := it.submitTX(ctx, signedMessage, calculatedHash, signerNonce, lastSubmitTime, generation.IsCancelled)
+		txHash, submissionTime, errReason, submissionOutcome, err := it.submitTX(ctx, signedMessage, calculatedHash, signerNonce, contractAddress, lastSubmitTime, generation.IsCancelled, txnID)
+		// MRW TODO Create Submitted and/or nonce assigned event for the sequencer to handle
+
 		generation.AddSubmitOutput(ctx, txHash, submissionTime, submissionOutcome, errReason, err)
 	}, ctx, generation, false)
 	return nil
