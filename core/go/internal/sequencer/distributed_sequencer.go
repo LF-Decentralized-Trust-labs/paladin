@@ -546,6 +546,7 @@ func (dSmgr *distributedSequencerManager) HandleTransactionConfirmed(ctx context
 			From:         from, // The base ledger signing address
 			Hash:         confirmedTxn.ReceiptInput.OnChain.TransactionHash,
 			RevertReason: confirmedTxn.ReceiptInput.RevertData,
+			Nonce:        nonce,
 		}
 		confirmedEvent.EventTime = time.Now()
 

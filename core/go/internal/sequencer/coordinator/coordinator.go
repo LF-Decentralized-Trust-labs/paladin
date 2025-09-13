@@ -252,6 +252,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			func(ctx context.Context) {
 				//callback function to notify us when the transaction is cleaned up
 				delete(c.transactionsByID, txn.ID)
+				c.metrics.SetCoordinatingTransactions(len(c.transactionsByID), c.contractAddress.String())
 				err := c.grapher.Forget(txn.ID)
 				if err != nil {
 					log.L(ctx).Errorf("[Sequencer] error forgetting transaction %s: %v", txn.ID.String(), err)
@@ -271,6 +272,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			previousTransaction.SetNextTransaction(ctx, newTransaction)
 		}
 		c.transactionsByID[txn.ID] = newTransaction
+		c.metrics.SetCoordinatingTransactions(len(c.transactionsByID), c.contractAddress.String())
 		previousTransaction = newTransaction
 
 		receivedEvent := &transaction.ReceivedEvent{}
