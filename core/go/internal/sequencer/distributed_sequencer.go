@@ -399,8 +399,44 @@ func (dSmgr *distributedSequencerManager) getInitialSenderNodePool(ctx context.C
 	// MRW TODO - we can pre-populate this for pente and zeto, for Noto we can potentially create an initial set but it will change over time
 }
 
+// MRW TODO - move to transport writer with other Send* methods?
+// MRW TODO - the reliable message sends from this function actually fail currently. WriteLockAndDistributeStatesForTransaction
+// attempts to distribute the states post-assembly but the state machine hasn't persisted them at that point (correctly?) so
+// reliable message sends fail as we fail to verify we have the states locally in the DB.
+// Reliable state distribution is currently handled in the dispatch handler, by which point we have persisted them. This
+// needs more discussion to determine the correct combination of potential state & finalized state distribution.
 func (dSmgr *distributedSequencerManager) DistributeStates(ctx context.Context, stateDistributions []*components.StateDistributionWithData) {
-	log.L(dSmgr.ctx).Debugf("[Sequencer] distribute states request (not implemented)")
+	for _, sd := range stateDistributions {
+		log.L(dSmgr.ctx).Infof("Distributing state %+v to node %s", sd, sd.StateDistribution.IdentityLocator)
+	}
+
+	preparedReliableMsgs := make([]*pldapi.ReliableMessage, 0, len(stateDistributions))
+
+	for _, stateDistribution := range stateDistributions {
+		node, _ := pldtypes.PrivateIdentityLocator(stateDistribution.IdentityLocator).Node(ctx, false)
+		log.L(dSmgr.ctx).Infof("State distribution node %s", node)
+		preparedReliableMsgs = append(preparedReliableMsgs, &pldapi.ReliableMessage{
+			Node:        node,
+			MessageType: pldapi.RMTState.Enum(),
+			Metadata:    pldtypes.JSONString(stateDistribution),
+		})
+		dSmgr.components.TransportManager().Send(ctx, &components.FireAndForgetMessageSend{
+			Node:        node,
+			MessageType: string(pldapi.RMTState),
+			Payload:     pldtypes.JSONString(stateDistribution),
+		})
+	}
+
+	log.L(dSmgr.ctx).Infof("Sending %d state distributions to %d nodes", len(stateDistributions), len(preparedReliableMsgs))
+
+	// MRW TODO - assess db TX handling within state machine
+	err := dSmgr.components.Persistence().Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
+		err = dSmgr.components.TransportManager().SendReliable(ctx, dbTX, preparedReliableMsgs...)
+		return err
+	})
+	if err != nil {
+		log.L(dSmgr.ctx).Errorf("Error sending state distributions: %s", err)
+	}
 }
 
 func (dSmgr *distributedSequencerManager) GetBlockHeight() int64 {

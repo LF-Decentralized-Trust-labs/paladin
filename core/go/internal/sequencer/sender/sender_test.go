@@ -52,6 +52,7 @@ func NewSenderForUnitTest(t *testing.T, ctx context.Context, senderIdentityPool 
 		pldtypes.RandAddress(),
 		5,
 		5,
+		nil, // MRW TODO - mock metrics
 	)
 	require.NoError(t, err)
 

@@ -182,6 +182,7 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		func(context.Context, *transaction.Transaction) {},                    // onReadyForDispatch function, not used in tests
 		func(contractAddress *pldtypes.EthAddress, coordinatorNode string) {}, // coordinatorStarted function, not used in tests
 		func(contractAddress *pldtypes.EthAddress) {},                         // coordinatorIdle function, not used in tests
+		nil, // MRW TODO - mock metrics
 	)
 	if err != nil {
 		panic(err)

@@ -20,6 +20,7 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/google/uuid"
 
@@ -55,6 +56,7 @@ type sender struct {
 	clock             common.Clock
 	engineIntegration common.EngineIntegration
 	emit              common.EmitEvent
+	metrics           metrics.DistributedSequencerMetrics
 }
 
 func NewSender(
@@ -68,6 +70,7 @@ func NewSender(
 	contractAddress *pldtypes.EthAddress,
 	heartbeatPeriodMs int,
 	heartbeatThresholdIntervals int,
+	metrics metrics.DistributedSequencerMetrics,
 ) (*sender, error) {
 	s := &sender{
 		nodeName:                    nodeName,
@@ -80,6 +83,7 @@ func NewSender(
 		engineIntegration:           engineIntegration,
 		emit:                        emit,
 		heartbeatThresholdMs:        clock.Duration(heartbeatPeriodMs * heartbeatThresholdIntervals),
+		metrics:                     metrics,
 	}
 	s.InitializeStateMachine(State_Idle)
 	return s, nil
@@ -95,7 +99,7 @@ func (s *sender) propagateEventToTransaction(ctx context.Context, event transact
 }
 
 func (s *sender) createTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
-	newTxn, err := transaction.NewTransaction(ctx, txn, s.messageSender, s.clock, s.emit, s.engineIntegration)
+	newTxn, err := transaction.NewTransaction(ctx, txn, s.messageSender, s.clock, s.emit, s.engineIntegration, s.metrics)
 	if err != nil {
 		log.L(ctx).Errorf("[Sequencer] error creating transaction: %v", err)
 		return err

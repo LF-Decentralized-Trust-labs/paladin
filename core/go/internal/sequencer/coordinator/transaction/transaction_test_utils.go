@@ -328,6 +328,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		nil,
 		func(context.Context) {},               // onCleanup function, not used in tests
 		func(context.Context, *Transaction) {}, // onReadyForDispatch function, not used in tests
+		nil,                                    // MRW TODO - mock metrics
 	)
 	if err != nil {
 		panic(fmt.Sprintf("Error from NewTransaction: %v", err))

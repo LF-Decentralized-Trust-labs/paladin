@@ -151,6 +151,7 @@ func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDe
 		b.contractAddress,
 		TestDefault_HeartbeatIntervalMs,
 		TestDefault_HeartbeatThreshold,
+		nil, // MRW TODO - mock metrics
 	)
 
 	for _, tx := range b.transactions {

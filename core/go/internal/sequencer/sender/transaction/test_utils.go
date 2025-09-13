@@ -176,7 +176,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 	if b.emitFunction == nil {
 		b.emitFunction = func(event common.Event) {}
 	}
-	txn, err := NewTransaction(ctx, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.emitFunction, b.fakeEngineIntegration)
+	txn, err := NewTransaction(ctx, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.emitFunction, b.fakeEngineIntegration, nil) // MRW TODO - mock metrics
 
 	txn.stateMachine.currentState = b.state
 
