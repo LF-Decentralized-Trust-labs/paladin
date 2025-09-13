@@ -31,19 +31,21 @@ type DistributedSequencerMetrics interface {
 	ObserveSequencerTXStateChange(state string, duration time.Duration)
 	SetActiveCoordinators(numberOfActiveCoordinators int)
 	SetActiveSequencers(numberOfActiveSequencers int)
+	SetCoordinatingTransactions(numberOfCoordinatingTransactions int, contractAddress string)
 }
 
 var METRICS_SUBSYSTEM = "distributed_sequencer"
 
 type distributedSequencerMetrics struct {
-	acceptedTransactions   prometheus.Counter
-	assembledTransactions  prometheus.Counter
-	endorsedTransactions   prometheus.Counter
-	dispatchedTransactions prometheus.Counter
-	confirmedTransactions  prometheus.Counter
-	sequencerStage         *prometheus.HistogramVec
-	activeCoordinators     prometheus.Gauge
-	activeSequencers       prometheus.Gauge
+	acceptedTransactions     prometheus.Counter
+	assembledTransactions    prometheus.Counter
+	endorsedTransactions     prometheus.Counter
+	dispatchedTransactions   prometheus.Counter
+	confirmedTransactions    prometheus.Counter
+	sequencerStage           *prometheus.HistogramVec
+	activeCoordinators       prometheus.Gauge
+	activeSequencers         prometheus.Gauge
+	coordinatingTransactions *prometheus.GaugeVec
 }
 
 func InitMetrics(ctx context.Context, registry *prometheus.Registry) *distributedSequencerMetrics {
@@ -60,11 +62,13 @@ func InitMetrics(ctx context.Context, registry *prometheus.Registry) *distribute
 	metrics.confirmedTransactions = prometheus.NewCounter(prometheus.CounterOpts{Name: "confirmed_txns_total",
 		Help: "Distributed sequencer confirmed transactions", Subsystem: METRICS_SUBSYSTEM})
 	metrics.sequencerStage = prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "sequencer_stage",
-		Help: "Distributed sequencer stage", Subsystem: METRICS_SUBSYSTEM}, []string{"stage"})
+		Help: "Distributed sequencer stage", Subsystem: METRICS_SUBSYSTEM, Buckets: []float64{5, 10, 20, 40, 80, 200, 400, 800, 1600}}, []string{"stage"})
 	metrics.activeCoordinators = prometheus.NewGauge(prometheus.GaugeOpts{Name: "active_coordinators",
 		Help: "Distributed sequencer active coordinators", Subsystem: METRICS_SUBSYSTEM})
 	metrics.activeSequencers = prometheus.NewGauge(prometheus.GaugeOpts{Name: "active_sequencers",
 		Help: "Distributed sequencer active sequencers", Subsystem: METRICS_SUBSYSTEM})
+	metrics.coordinatingTransactions = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "coordinating_txns",
+		Help: "Distributed sequencer coordinating transactions", Subsystem: METRICS_SUBSYSTEM}, []string{"contract_address"})
 	registry.MustRegister(metrics.acceptedTransactions)
 	registry.MustRegister(metrics.assembledTransactions)
 	registry.MustRegister(metrics.endorsedTransactions)
@@ -73,6 +77,7 @@ func InitMetrics(ctx context.Context, registry *prometheus.Registry) *distribute
 	registry.MustRegister(metrics.sequencerStage)
 	registry.MustRegister(metrics.activeCoordinators)
 	registry.MustRegister(metrics.activeSequencers)
+	registry.MustRegister(metrics.coordinatingTransactions)
 	return metrics
 }
 
@@ -97,7 +102,7 @@ func (dtm *distributedSequencerMetrics) IncConfirmedTransactions() {
 }
 
 func (dtm *distributedSequencerMetrics) ObserveSequencerTXStateChange(state string, duration time.Duration) {
-	dtm.sequencerStage.WithLabelValues(state).Observe(duration.Seconds())
+	dtm.sequencerStage.WithLabelValues(state).Observe(float64(duration.Milliseconds()))
 }
 
 func (dtm *distributedSequencerMetrics) SetActiveCoordinators(numberOfActiveCoordinators int) {
@@ -106,4 +111,8 @@ func (dtm *distributedSequencerMetrics) SetActiveCoordinators(numberOfActiveCoor
 
 func (dtm *distributedSequencerMetrics) SetActiveSequencers(numberOfActiveSequencers int) {
 	dtm.activeSequencers.Set(float64(numberOfActiveSequencers))
+}
+
+func (dtm *distributedSequencerMetrics) SetCoordinatingTransactions(numberOfCoordinatingTransactions int, contractAddress string) {
+	dtm.coordinatingTransactions.WithLabelValues(contractAddress).Set(float64(numberOfCoordinatingTransactions))
 }
