@@ -26,14 +26,14 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"os"
+	"strconv"
 	"strings"
+	"testing"
+	"time"
 
 	"context"
 	"net"
-	"os"
-	"strconv"
-	"testing"
-	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
@@ -57,6 +57,25 @@ import (
 
 //go:embed abis/SimpleStorage.json
 var simpleStorageBuildJSON []byte // From "gradle copyTestSolidityBuild"
+
+// Besu port constants for different test types
+const (
+	// BesuFreeGasPort - Port for free gas Besu node (default)
+	BesuFreeGasPort = 8545
+
+	// BesuGasPort - Port for gas-priced Besu node
+	BesuGasPort = 8555
+)
+
+// getBesuPort returns the Besu port to use based on environment variable or default
+func getBesuPort() int {
+	if portStr := os.Getenv("BESU_PORT"); portStr != "" {
+		if port, err := strconv.Atoi(portStr); err == nil {
+			return port
+		}
+	}
+	return BesuFreeGasPort // Default to free gas port
+}
 
 func transactionReceiptCondition(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool {
 	//for the given transaction ID, return a function that can be used in an assert.Eventually to check if the transaction has a receipt
@@ -417,6 +436,11 @@ func testConfig(t *testing.T, enableWS bool, seed string) (pldconf.PaladinConfig
 		Encoding: "hex",
 		Inline:   seed,
 	}
+
+	// Configure Besu connection with the port determined by environment variable
+	besuPort := getBesuPort()
+	conf.Blockchain.HTTP.URL = fmt.Sprintf("http://localhost:%d", besuPort)
+	conf.Blockchain.WS.URL = fmt.Sprintf("ws://localhost:%d", besuPort+1) // WS port is typically HTTP port + 1
 
 	conf.Log = pldconf.LogConfig{
 		Level:  confutil.P("debug"),

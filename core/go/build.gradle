@@ -360,12 +360,13 @@ task componentTestPostgres(type: ComponentTest, dependsOn: [
 
 task componentTestWithGasPostgres(type: GasComponentTest, dependsOn: [
         makeMocks,
-        ':testinfra:startTestInfraWithGas',
+        ':testinfra:startTestInfra',
         setupCoverage,
         goGet,
         copyContracts, // Ensure this task depends on copying the test contracts
     ]) {
     mustRunAfter 'componentTestPostgres' // these tests cannot run concurrently
+    environment 'BESU_PORT', '8555' // Use gas-priced Besu port
 }
 
 task buildCoverageTxt(type: Exec, dependsOn: [
