@@ -31,7 +31,7 @@ ext {
         include "mocks/**/*.go"
     }
 
-    targetCoverage = 94.3
+    targetCoverage = 94.4
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr/ptmgrtypes/mock_transaction_flow.go',

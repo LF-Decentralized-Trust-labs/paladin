@@ -345,3 +345,80 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 	assert.Equal(t, SubmissionOutcomeFailedRequiresRetry, outCome)
 	assert.Nil(t, txHash)
 }
+
+func TestTxSubmissionWithNilCalculatedTxHash(t *testing.T) {
+	ctx, o, m, done := newTestOrchestrator(t, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+		conf.Orchestrator.SubmissionRetry.MaxAttempts = confutil.P(1)
+	})
+	defer done()
+	it, _ := newInflightTransaction(o, 1)
+
+	// Test submitTX with nil calculatedTxHash
+	txHash, submitTime, errReason, outcome, err := it.submitTX(ctx,
+		[]byte(testTransactionData),
+		nil, // calculatedTxHash is nil - this should trigger the error path
+		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetLastSubmitTime(),
+		testCancel)
+
+	// Verify the error response
+	assert.Error(t, err)
+	assert.Nil(t, txHash)
+	assert.Nil(t, submitTime)
+	assert.Equal(t, ethclient.ErrorReasonInvalidInputs, errReason)
+	assert.Equal(t, SubmissionOutcomeFailedRequiresRetry, outcome)
+	assert.Contains(t, err.Error(), "missing transaction hash from previous sign stage")
+
+	// Verify that SendRawTransaction was not called since we returned early
+	m.ethClient.AssertNotCalled(t, "SendRawTransaction")
+}
+
+func TestTxSubmissionWithCancelledDuringRetry(t *testing.T) {
+	textTxHashByte32 := pldtypes.MustParseBytes32(testTxHash)
+
+	ctx, o, m, done := newTestOrchestrator(t, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+		conf.Orchestrator.SubmissionRetry.MaxAttempts = confutil.P(2) // Allow retries
+	})
+	defer done()
+	it, ifts := newInflightTransaction(o, 1)
+	ifts.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
+		NewValues: BaseTXUpdateNewValues{
+			TransactionHash: &textTxHashByte32,
+		},
+	})
+
+	// Create a cancelled function that returns false on first call, true on second call
+	callCount := 0
+	cancelledFunc := func(ctx context.Context) bool {
+		callCount++
+		return callCount > 1 // Return true on second call (during retry)
+	}
+
+	// Mock SendRawTransaction to return an error that triggers retry (falls into default case)
+	m.ethClient.On("SendRawTransaction", ctx, mock.Anything).Return(nil, fmt.Errorf("network error")).Once()
+
+	// Test submitTX with the cancelled function - we don't worry about the result as it will be discarded after a cancel
+	it.submitTX(ctx,
+		[]byte(testTransactionData),
+		it.stateManager.GetTransactionHash(),
+		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetLastSubmitTime(),
+		cancelledFunc)
+
+	// Verify that SendRawTransaction was called only once (first attempt)
+	m.ethClient.AssertExpectations(t)
+}
+
+func TestCalculateTransactionHashWithNilInput(t *testing.T) {
+	// Test calculateTransactionHash with nil input - should return nil
+	result := calculateTransactionHash(nil)
+	assert.Nil(t, result)
+}
+
+func TestCalculateTransactionHashWithValidInput(t *testing.T) {
+	// Test calculateTransactionHash with valid input - should return a valid hash
+	testData := []byte("test transaction data")
+	result := calculateTransactionHash(testData)
+	assert.NotNil(t, result)
+	assert.IsType(t, &pldtypes.Bytes32{}, result)
+}
