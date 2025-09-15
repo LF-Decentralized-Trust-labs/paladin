@@ -1743,6 +1743,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#gas-oracle-api-pricing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas oracle API pricing
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#fixed-gas-pricing-transaction-level" class="md-nav__link">
     <span class="md-ellipsis">
       Fixed gas pricing (transaction-level)
@@ -3694,6 +3703,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#gas-oracle-api-pricing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas oracle API pricing
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#fixed-gas-pricing-transaction-level" class="md-nav__link">
     <span class="md-ellipsis">
       Fixed gas pricing (transaction-level)
@@ -3837,27 +3855,73 @@ in order for them to be mined into blocks. Paladin provides several options for 
 <li><strong><code>baseFeeBufferFactor</code></strong>: Multiplier for the base fee to provide a buffer against base fee increases. Default: 1 (no buffer)</li>
 <li><strong><code>cache.enabled</code></strong>: Whether to cache fee history results to reduce RPC calls. Default: true</li>
 </ul>
+<h3 id="gas-oracle-api-pricing">Gas oracle API pricing<a class="headerlink" href="#gas-oracle-api-pricing" title="Permanent link">&para;</a></h3>
+<p>Paladin can retrieve gas prices from external gas oracle APIs, which can provide more accurate or specialized gas price data than the standard <code>eth_feeHistory</code> method. This is particularly useful for chains with limited RPC capabilities or when using specialized gas price services.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>publicTxManager:
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  gasPrice:
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    gasOracleAPI:
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>      url: &quot;https://api.example.com/gas&quot;
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>      auth:
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        username: &quot;your-username&quot;
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        password: &quot;your-password&quot;
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>      httpHeaders:
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        X-API-Key: &quot;your-api-key-here&quot;
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>      template: |
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>        {
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>          &quot;maxFeePerGas&quot;: &quot;{{.maxFeePerGas}}&quot;,
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>          &quot;maxPriorityFeePerGas&quot;: &quot;{{.maxPriorityFeePerGas}}&quot;
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>        }
+</code></pre></div>
+<p>Configuration options:</p>
+<ul>
+<li><strong><code>url</code></strong>: The HTTP endpoint URL for the gas oracle API</li>
+<li><strong><code>template</code></strong>: A Go template string that extracts gas price data from the API response. The template receives the JSON response as data and should output a JSON object with <code>maxFeePerGas</code> and <code>maxPriorityFeePerGas</code> fields</li>
+<li><strong>Authentication</strong>: HTTP client authentication options are supported:</li>
+<li><strong><code>auth.username</code></strong> and <strong><code>auth.password</code></strong>: Basic authentication</li>
+<li><strong><code>httpHeaders</code></strong>: Custom HTTP headers (useful for API keys, bearer tokens, etc.)</li>
+</ul>
+<p>The gas oracle API must:
+- Return a JSON response containing gas price information
+- Be accessible via HTTP GET requests
+- Return gas prices in either hexadecimal format (e.g., <code>"0x2FAF080"</code>) or decimal format (e.g., <code>"50000000"</code>)</p>
+<p>Example API responses that work with the template above:</p>
+<p><strong>Hexadecimal format:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">&quot;maxFeePerGas&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0x2FAF080&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">&quot;maxPriorityFeePerGas&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0x3B9ACA0&quot;</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Decimal format:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">&quot;maxFeePerGas&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;50000000&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">&quot;maxPriorityFeePerGas&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;62500000&quot;</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">}</span>
+</code></pre></div></p>
 <h3 id="fixed-gas-pricing-transaction-level">Fixed gas pricing (transaction-level)<a class="headerlink" href="#fixed-gas-pricing-transaction-level" title="Permanent link">&para;</a></h3>
 <p>You can override gas pricing for individual transactions by setting gas prices directly on the transaction. This disables the gas pricing engine for that specific transaction:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// Go SDK example</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nx">txBuilder</span><span class="p">.</span><span class="nx">PublicTxOptions</span><span class="p">(</span><span class="nx">pldapi</span><span class="p">.</span><span class="nx">PublicTxOptions</span><span class="p">{</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nx">MaxFeePerGas</span><span class="p">:</span><span class="w">         </span><span class="nx">pldtypes</span><span class="p">.</span><span class="nx">Uint64ToUint256</span><span class="p">(</span><span class="mi">20000000000</span><span class="p">),</span><span class="w"> </span><span class="c1">// 20 Gwei</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nx">MaxPriorityFeePerGas</span><span class="p">:</span><span class="w"> </span><span class="nx">pldtypes</span><span class="p">.</span><span class="nx">Uint64ToUint256</span><span class="p">(</span><span class="mi">2000000000</span><span class="p">),</span><span class="w">  </span><span class="c1">// 2 Gwei</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">})</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1">// Go SDK example</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nx">txBuilder</span><span class="p">.</span><span class="nx">PublicTxOptions</span><span class="p">(</span><span class="nx">pldapi</span><span class="p">.</span><span class="nx">PublicTxOptions</span><span class="p">{</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nx">MaxFeePerGas</span><span class="p">:</span><span class="w">         </span><span class="nx">pldtypes</span><span class="p">.</span><span class="nx">Uint64ToUint256</span><span class="p">(</span><span class="mi">20000000000</span><span class="p">),</span><span class="w"> </span><span class="c1">// 20 Gwei</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nx">MaxPriorityFeePerGas</span><span class="p">:</span><span class="w"> </span><span class="nx">pldtypes</span><span class="p">.</span><span class="nx">Uint64ToUint256</span><span class="p">(</span><span class="mi">2000000000</span><span class="p">),</span><span class="w">  </span><span class="c1">// 2 Gwei</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="p">})</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// TypeScript SDK example</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">sendTransaction</span><span class="p">({</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="c1">// ... transaction details</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nx">maxFeePerGas</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;0x4a817c800&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// 20 Gwei</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nx">maxPriorityFeePerGas</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;0x77359400&quot;</span><span class="w"> </span><span class="c1">// 2 Gwei</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">});</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1">// TypeScript SDK example</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">sendTransaction</span><span class="p">({</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="c1">// ... transaction details</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nx">maxFeePerGas</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;0x4a817c800&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// 20 Gwei</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="nx">maxPriorityFeePerGas</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;0x77359400&quot;</span><span class="w"> </span><span class="c1">// 2 Gwei</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">});</span>
 </code></pre></div>
 <p>Transaction-level fixed gas pricing bypasses all automatic gas pricing logic and uses the exact values you specify.</p>
 <h3 id="gas-price-increase-mechanism">Gas price increase mechanism<a class="headerlink" href="#gas-price-increase-mechanism" title="Permanent link">&para;</a></h3>
-<p>When a transaction is rejected for being underpriced, Paladin can automatically increase the gas price by a configurable percentage and resubmit the transaction. This mechanism applies to both node-level fixed pricing and dynamic pricing, but not to transaction-level fixed pricing.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>publicTxManager:
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  gasPrice:
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    increasePercentage: 10
+<p>When a transaction is rejected for being underpriced, Paladin can automatically increase the gas price by a configurable percentage and resubmit the transaction. This mechanism applies to node-level fixed pricing, gas oracle API pricing, and dynamic pricing, but not to transaction-level fixed pricing.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>publicTxManager:
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  gasPrice:
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    increasePercentage: 10
 </code></pre></div>
 <ul>
 <li><strong><code>increasePercentage</code></strong>: Percentage increase to apply when a transaction is underpriced. Default: 10%</li>
@@ -3866,10 +3930,10 @@ in order for them to be mined into blocks. Paladin provides several options for 
 </ul>
 <h3 id="gas-price-caps">Gas price caps<a class="headerlink" href="#gas-price-caps" title="Permanent link">&para;</a></h3>
 <p>To protect against excessive gas spending, you can configure maximum caps for both <code>maxFeePerGas</code> and <code>maxPriorityFeePerGas</code>. These caps apply universally to all gas pricing methods:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>publicTxManager:
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  gasPrice:
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    maxFeePerGasCap: 0x5d21dba00  # 25 Gwei cap
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    maxPriorityFeePerGasCap: 0x77359400  # 2 Gwei cap
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>publicTxManager:
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  gasPrice:
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    maxFeePerGasCap: 0x5d21dba00  # 25 Gwei cap
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    maxPriorityFeePerGasCap: 0x77359400  # 2 Gwei cap
 </code></pre></div>
 <ul>
 <li><strong><code>maxFeePerGasCap</code></strong>: Maximum allowed <code>maxFeePerGas</code> value</li>
@@ -3884,20 +3948,21 @@ in order for them to be mined into blocks. Paladin provides several options for 
 <li><strong>Zero gas price chain</strong>: If the chain is detected as having zero gas prices, return zero values</li>
 <li><strong>Transaction-level fixed pricing</strong>: If gas prices are set on the individual transaction</li>
 <li><strong>Node-level fixed pricing</strong>: If fixed gas prices are configured at the node level</li>
+<li><strong>Gas oracle API</strong>: If a gas oracle API is configured, retrieve gas prices from the external service</li>
 <li><strong>Dynamic pricing</strong>: Use <code>eth_feeHistory</code> to calculate optimal gas prices</li>
 </ol>
-<p>This priority system ensures that transaction-level overrides take precedence while providing fallback mechanisms for automatic gas pricing.</p>
+<p>This priority system ensures that transaction-level overrides take precedence while providing multiple fallback mechanisms for automatic gas pricing.</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>The examples deploy contracts and invoke transactions before waiting for receipts to confirm they have succeesfully been mined. The default wait time in the Paladin Node SDK is 5 seconds. For many
 public chains this will need increasing to a suitable value, based on the block period of the chain. The following is an example of a modification to a <code>waitForReceipt()</code> call:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>const cashToken = await notoFactory
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    .newNoto(verifierNode1, {
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>      name: &quot;NOTO&quot;,
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>      symbol: &quot;NOTO&quot;,
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>      notary: verifierNode1,
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>      notaryMode: &quot;basic&quot;,
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    })
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    .waitForDeploy(20000);  // Allow 20 seconds for the contract deploy to complete
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>const cashToken = await notoFactory
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    .newNoto(verifierNode1, {
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>      name: &quot;NOTO&quot;,
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>      symbol: &quot;NOTO&quot;,
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>      notary: verifierNode1,
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>      notaryMode: &quot;basic&quot;,
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    })
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    .waitForDeploy(20000);  // Allow 20 seconds for the contract deploy to complete
 </code></pre></div>
 <p>Note: the example code won't wait the full 20 seconds if the contract deploy completes early, so setting a large value won't increase the example run time unncessarily.</p>
 <h2 id="funding-signing-addresses-with-gas-tokens-eg-eth">Funding signing addresses with gas tokens e.g. ETH<a class="headerlink" href="#funding-signing-addresses-with-gas-tokens-eg-eth" title="Permanent link">&para;</a></h2>
