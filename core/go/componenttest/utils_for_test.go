@@ -357,7 +357,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtype
 		keys, err := c.KeyManager().QueryKeys(context.Background(), &query.QueryJSON{Limit: confutil.P(1000)})
 		require.NoError(t, err)
 		t.Logf("Key derivation paths used in test from seed %s:", seed)
-		t.Logf("In case of test failure, ensure that all of these derivation paths are being prefunded in testinfra/docker-compose-test-with-gas.yml")
+		t.Logf("In case of test failure, ensure that all of these derivation paths are being prefunded in testinfra/docker-compose-test.yml")
 		for _, key := range keys {
 			if key.KeyHandle != "" {
 				t.Logf("Key: %s %s\n", key.KeyHandle, key.Verifiers[0].Verifier)
