@@ -115,7 +115,11 @@ nav:
       - Atomic interop: architecture/atomic_interop.md
       - Data Transports & Registry: architecture/data_and_registry.md
       - Ledger Layers: architecture/ledger_layers.md
-      - Distributed Sequencer Protocol: architecture/distributed_sequencer.md
+      - Distributed Sequencer:
+          - Overview: architecture/distributed_sequencer_overview.md
+          - Components: architecture/distributed_sequencer_components.md
+          - State Machine: architecture/distributed_sequencer_state_machine.md
+          - Protocol: architecture/distributed_sequencer_protocol.md
   - Getting Started:
     - Installation: 
       - Default Installation: getting-started/installation.md
