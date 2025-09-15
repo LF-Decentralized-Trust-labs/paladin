@@ -139,3 +139,9 @@ func TestLogComponent(t *testing.T) {
 	ctx := WithComponent(context.Background(), "mycomponent")
 	assert.Equal(t, comp, L(ctx).Data["component"])
 }
+
+func TestLogVeryLongComponent(t *testing.T) {
+	comp := Component("very-long-coomponent-name-01234567890123456789012345678901234...")
+	ctx := WithComponent(context.Background(), "very-long-coomponent-name-0123456789012345678901234567890123456789012345678901234567890123456789")
+	assert.Equal(t, comp, L(ctx).Data["component"])
+}
