@@ -109,7 +109,7 @@ func (dMgr *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX
 		if dMgr.sequencers[contractAddr.String()] == nil {
 			// log.L(ctx).Debugf("Creating sequencer for contract address %s", contractAddr.String())
 
-			log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_MISC)).Debugf("creating sequencer for contract address %s", contractAddr.String())
+			log.L(log.WithComponent(ctx, common.SUBCOMP_MISC)).Debugf("creating sequencer for contract address %s", contractAddr.String())
 
 			// Are we handing this off to the sequencer now?
 			// Locally we store mappings of contract address to sender/coordinator pair
@@ -410,7 +410,7 @@ func (dMgr *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX
 			// Until anything changes, start by setting the sender's delegate to the initial choice of coordinator
 			sender.SetActiveCoordinator(dMgr.ctx, coordinator.GetActiveCoordinatorNode(dMgr.ctx))
 
-			log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_LIFECYCLE)).Debugf("created  | %s", contractAddr.String())
+			log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("created  | %s", contractAddr.String())
 			//log.L(ctx).Infof("[SeqLifecycle] | created | %s", contractAddr.String())
 			sequencer.sender = sender
 			sequencer.coordinator = coordinator
@@ -449,7 +449,7 @@ func (dMgr *distributedSequencerManager) stopLowestPrioritySequencer(ctx context
 			sequencer.coordinator.GetCurrentState() == common.CoordinatorState_Observing {
 			// This sequencer is already idle or observing so we can page it out immediately
 
-			log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencer.contractAddress)
+			log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencer.contractAddress)
 			sequencer.sender.Stop()
 			delete(dMgr.sequencers, sequencer.contractAddress)
 			return
@@ -468,13 +468,13 @@ func (dMgr *distributedSequencerManager) stopLowestPrioritySequencer(ctx context
 	// Stop the lowest priority sequencer by emitting an event and waiting for it to move to closed
 	sequencers[0].coordinator.Stop()
 	sequencers[0].sender.Stop()
-	log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencers[0].contractAddress)
+	log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencers[0].contractAddress)
 	delete(dMgr.sequencers, sequencers[0].contractAddress)
 }
 
 func (dMgr *distributedSequencerManager) updateActiveCoordinators(ctx context.Context) {
 	// log.L(ctx).Debugf("[Sequencer] checking number of concurrent coordinators")
-	log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_MISC)).Debugf("checking number of concurrent coordinators")
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MISC)).Debugf("checking number of concurrent coordinators")
 
 	readlock := true
 	dMgr.sequencersLock.RLock()

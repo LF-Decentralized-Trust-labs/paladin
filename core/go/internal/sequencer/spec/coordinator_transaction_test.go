@@ -244,7 +244,7 @@ func TestCoordinatorTransaction_Pooled_ToPreAssemblyBlocked_OnDependencyReverted
 
 }
 
-func TestCoordinatorTransaction_EndorsementGathering_NudgeRequests_OnRequestTimeout_IfPendingRequests(t *testing.T) {
+func TestCoordinatorTransaction_Endorsement_Gathering_NudgeRequests_OnRequestTimeout_IfPendingRequests(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering).
 		NumberOfRequiredEndorsers(3)
@@ -266,7 +266,7 @@ func TestCoordinatorTransaction_EndorsementGathering_NudgeRequests_OnRequestTime
 
 }
 
-func TestCoordinatorTransaction_EndorsementGathering_NudgeRequests_OnRequestTimeout_IfPendingRequests_Partial(t *testing.T) {
+func TestCoordinatorTransaction_Endorsement_Gathering_NudgeRequests_OnRequestTimeout_IfPendingRequests_Partial(t *testing.T) {
 	//emulate the case where only a subset of the endorsement requests have timed out
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering).
@@ -300,7 +300,7 @@ func TestCoordinatorTransaction_EndorsementGathering_NudgeRequests_OnRequestTime
 
 }
 
-func TestCoordinatorTransaction_EndorsementGathering_ToConfirmingDispatch_OnEndorsed_IfAttestationPlanComplete(t *testing.T) {
+func TestCoordinatorTransaction_Endorsement_Gathering_ToConfirmingDispatch_OnEndorsed_IfAttestationPlanComplete(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering).
 		NumberOfRequiredEndorsers(3).
@@ -315,7 +315,7 @@ func TestCoordinatorTransaction_EndorsementGathering_ToConfirmingDispatch_OnEndo
 
 }
 
-func TestCoordinatorTransaction_EndorsementGatheringNoTransition_IfNotAttestationPlanComplete(t *testing.T) {
+func TestCoordinatorTransaction_Endorsement_GatheringNoTransition_IfNotAttestationPlanComplete(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering).
 		NumberOfRequiredEndorsers(3).
@@ -331,7 +331,7 @@ func TestCoordinatorTransaction_EndorsementGatheringNoTransition_IfNotAttestatio
 
 }
 
-func TestCoordinatorTransaction_EndorsementGathering_ToBlocked_OnEndorsed_IfAttestationPlanCompleteAndHasDependenciesNotReady(t *testing.T) {
+func TestCoordinatorTransaction_Endorsement_Gathering_ToBlocked_OnEndorsed_IfAttestationPlanCompleteAndHasDependenciesNotReady(t *testing.T) {
 	ctx := context.Background()
 
 	//we need 2 transactions to know about each other so they need to share a state index
@@ -357,7 +357,7 @@ func TestCoordinatorTransaction_EndorsementGathering_ToBlocked_OnEndorsed_IfAtte
 
 }
 
-func TestCoordinatorTransaction_EndorsementGathering_ToPooled_OnEndorseRejected(t *testing.T) {
+func TestCoordinatorTransaction_Endorsement_Gathering_ToPooled_OnEndorseRejected(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering).
 		NumberOfRequiredEndorsers(3).

@@ -355,7 +355,7 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
-			log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_STATE)).Debugf("coord    | addr | %s | %T | %s -> %s", c.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("coord    | addr | %s | %T | %s -> %s", c.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first
@@ -419,7 +419,7 @@ func (c *coordinator) heartbeatLoop(ctx context.Context) error {
 	if c.heartbeatCtx == nil {
 		c.heartbeatCtx, c.heartbeatCancel = context.WithCancel(ctx)
 
-		log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_STATE)).Debugf("Starting heartbeat loop for %s", c.contractAddress.String())
+		log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("Starting heartbeat loop for %s", c.contractAddress.String())
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 		for {

@@ -120,13 +120,13 @@ func WithLogField(ctx context.Context, key, value string) context.Context {
 	return WithLogger(ctx, loggerFromContext(ctx).WithField(key, value))
 }
 
-// WithLogField adds the specified field to the logger in the context
-func WithComponent(ctx context.Context, component Component, subComponent Component) context.Context {
+// WithComponent adds the specified component to the logger in the context
+func WithComponent(ctx context.Context, component Component) context.Context {
 	EnsureInit()
 	if len(component) > 61 {
 		component = component[0:61] + "..."
 	}
-	return WithLogger(ctx, loggerFromContext(ctx).WithField("component", component).WithField("subcomponent", subComponent))
+	return WithLogger(ctx, loggerFromContext(ctx).WithField("component", component))
 }
 
 // LoggerFromContext returns the logger for the current context, or no logger if there is no context

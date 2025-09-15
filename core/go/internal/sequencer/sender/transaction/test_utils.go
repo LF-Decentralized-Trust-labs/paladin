@@ -193,7 +193,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		txn.latestAssembleRequest = &assembleRequestFromCoordinator{
 			requestID: b.assembleRequestID,
 		}
-	case State_EndorsementGathering:
+	case State_Endorsement_Gathering:
 		txn.currentDelegate = b.currentDelegate
 		b.latestFulfilledAssembleRequestID = uuid.New()
 		txn.latestFulfilledAssembleRequestID = b.latestFulfilledAssembleRequestID

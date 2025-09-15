@@ -141,7 +141,7 @@ func TestSenderTransaction_Delegated_ToAssembling_OnAssembleRequestReceived_PARK
 	assert.Equal(t, transaction.State_Assembling, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Assembling_ToEndorsementGathering_OnAssembleAndSignSuccess(t *testing.T) {
+func TestSenderTransaction_Assembling_ToEndorsement_Gathering_OnAssembleAndSignSuccess(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Assembling)
 	txn, mocks := builder.BuildWithMocks()
@@ -158,7 +158,7 @@ func TestSenderTransaction_Assembling_ToEndorsementGathering_OnAssembleAndSignSu
 	assert.NoError(t, err)
 
 	assert.True(t, mocks.SentMessageRecorder.HasSentAssembleSuccessResponse(), "assemble success response was not sent back to coordinator")
-	assert.Equal(t, transaction.State_EndorsementGathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+	assert.Equal(t, transaction.State_Endorsement_Gathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
 func TestSenderTransaction_Assembling_ToReverted_OnAssembleRevert(t *testing.T) {
@@ -252,9 +252,9 @@ func TestSenderTransaction_Delegated_ToParked_OnAssembleRequestReceived_AfterAss
 	//TODO assert that transaction was finalized as Parked in the database
 }
 
-func TestSenderTransaction_EndorsementGathering_NoTransition_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
+func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
 	ctx := context.Background()
-	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_EndorsementGathering)
+	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering)
 	txn, mocks := builder.BuildWithMocks()
 
 	// NOTE we do not mock AssembleAndSign function because we expect to resend the previous response
@@ -269,7 +269,7 @@ func TestSenderTransaction_EndorsementGathering_NoTransition_OnAssembleRequest_I
 	assert.NoError(t, err)
 
 	assert.True(t, mocks.SentMessageRecorder.HasSentAssembleSuccessResponse(), "assemble success response was not sent back to coordinator")
-	assert.Equal(t, transaction.State_EndorsementGathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+	assert.Equal(t, transaction.State_Endorsement_Gathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
 func TestSenderTransaction_Reverted_DoResendAssembleResponse_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
@@ -350,9 +350,9 @@ func TestSenderTransaction_Parked_Ignore_OnAssembleRequest_IfNotMatchesPreviousR
 
 }
 
-func TestSenderTransaction_EndorsementGathering_ToAssembling_OnAssembleRequest_IfNotMatchesPreviousRequest(t *testing.T) {
+func TestSenderTransaction_Endorsement_Gathering_ToAssembling_OnAssembleRequest_IfNotMatchesPreviousRequest(t *testing.T) {
 	ctx := context.Background()
-	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_EndorsementGathering)
+	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering)
 	txn, mocks := builder.BuildWithMocks()
 	// This should trigger a re-assembly
 	mocks.MockForAssembleAndSignRequestOK().Once()
@@ -376,9 +376,9 @@ func TestSenderTransaction_EndorsementGathering_ToAssembling_OnAssembleRequest_I
 
 }
 
-func TestSenderTransaction_EndorsementGathering_ToPrepared_OnDispatchConfirmationRequestReceivedIfMatches(t *testing.T) {
+func TestSenderTransaction_Endorsement_Gathering_ToPrepared_OnDispatchConfirmationRequestReceivedIfMatches(t *testing.T) {
 	ctx := context.Background()
-	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_EndorsementGathering)
+	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering)
 	txn, mocks := builder.BuildWithMocks()
 
 	hash, err := txn.Hash(ctx)
@@ -397,11 +397,11 @@ func TestSenderTransaction_EndorsementGathering_ToPrepared_OnDispatchConfirmatio
 	assert.Equal(t, transaction.State_Prepared, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_EndorsementGathering_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongCoordinator(t *testing.T) {
+func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongCoordinator(t *testing.T) {
 
 	ctx := context.Background()
 
-	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_EndorsementGathering)
+	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering)
 	txn, mocks := builder.BuildWithMocks()
 
 	hash, err := txn.Hash(ctx)
@@ -417,13 +417,13 @@ func TestSenderTransaction_EndorsementGathering_NoTransition_OnDispatchConfirmat
 	assert.NoError(t, err)
 
 	assert.False(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
-	assert.Equal(t, transaction.State_EndorsementGathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+	assert.Equal(t, transaction.State_Endorsement_Gathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_EndorsementGathering_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
+func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
 
 	ctx := context.Background()
-	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_EndorsementGathering)
+	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering)
 	txn, mocks := builder.BuildWithMocks()
 
 	hash := pldtypes.Bytes32(pldtypes.RandBytes(32))
@@ -438,12 +438,12 @@ func TestSenderTransaction_EndorsementGathering_NoTransition_OnDispatchConfirmat
 	assert.NoError(t, err)
 
 	assert.False(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
-	assert.Equal(t, transaction.State_EndorsementGathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+	assert.Equal(t, transaction.State_Endorsement_Gathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_EndorsementGathering_ToDelegated_OnCoordinatorChanged(t *testing.T) {
+func TestSenderTransaction_Endorsement_Gathering_ToDelegated_OnCoordinatorChanged(t *testing.T) {
 	ctx := context.Background()
-	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_EndorsementGathering).Build()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering).Build()
 
 	err := txn.HandleEvent(ctx, &transaction.CoordinatorChangedEvent{
 		BaseEvent: transaction.BaseEvent{

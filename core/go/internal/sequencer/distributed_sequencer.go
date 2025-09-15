@@ -64,7 +64,7 @@ type distributedSequencerManager struct {
 
 // Init implements Engine.
 func (dSmgr *distributedSequencerManager) PreInit(c components.PreInitComponents) (*components.ManagerInitResult, error) {
-	log.L(log.WithComponent(dSmgr.ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_MISC)).Infof("PreInit distributed sequencer manager")
+	log.L(log.WithComponent(dSmgr.ctx, common.SUBCOMP_MISC)).Infof("PreInit distributed sequencer manager")
 	dSmgr.metrics = metrics.InitMetrics(dSmgr.ctx, c.MetricsManager().Registry())
 
 	return &components.ManagerInitResult{
@@ -79,7 +79,7 @@ func (dSmgr *distributedSequencerManager) PreInit(c components.PreInitComponents
 }
 
 func (dSmgr *distributedSequencerManager) PostInit(c components.AllComponents) error {
-	log.L(log.WithComponent(dSmgr.ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_MISC)).Infof("PostInit distributed sequencer manager")
+	log.L(log.WithComponent(dSmgr.ctx, common.SUBCOMP_MISC)).Infof("PostInit distributed sequencer manager")
 	dSmgr.components = c
 	dSmgr.nodeName = dSmgr.components.TransportManager().LocalNodeName()
 	dSmgr.syncPoints = syncpoints.NewSyncPoints(dSmgr.ctx, &dSmgr.config.Writer, c.Persistence(), c.TxManager(), c.PublicTxManager(), c.TransportManager())
@@ -87,29 +87,32 @@ func (dSmgr *distributedSequencerManager) PostInit(c components.AllComponents) e
 }
 
 func (dSmgr *distributedSequencerManager) Start() error {
-	log.L(log.WithComponent(dSmgr.ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_MISC)).Infof("Starting distributed sequencer manager")
+	log.L(log.WithComponent(dSmgr.ctx, common.SUBCOMP_MISC)).Infof("Starting distributed sequencer manager")
 	dSmgr.syncPoints.Start()
 
 	return nil
 }
 
 func (dSmgr *distributedSequencerManager) Stop() {
-	log.L(log.WithComponent(dSmgr.ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_MISC)).Infof("Stopping distributed sequencer manager")
+	log.L(log.WithComponent(dSmgr.ctx, common.SUBCOMP_MISC)).Infof("Stopping distributed sequencer manager")
 }
 
 func NewDistributedSequencerManager(ctx context.Context, config *pldconf.SequencerManagerConfig) components.SequencerManager {
+
+	dsmCtx, dsmCtxCancel := context.WithCancel(log.WithLogField(ctx, "role", "sequencer"))
 	dSmgr := &distributedSequencerManager{
+		ctx:                           dsmCtx,
+		ctxCancel:                     dsmCtxCancel,
 		config:                        config,
 		sequencers:                    make(map[string]*distributedSequencer),
 		targetActiveCoordinatorsLimit: 10, // MRW TODO configurable
 		targetActiveSequencersLimit:   10, // MRW TODO configurable
 	}
-	dSmgr.ctx, dSmgr.ctxCancel = context.WithCancel(ctx)
 	return dSmgr
 }
 
 func (dSmgr *distributedSequencerManager) OnNewBlockHeight(ctx context.Context, blockHeight int64) {
-	log.L(log.WithComponent(dSmgr.ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_MISC)).Tracef("new block height %d", blockHeight)
+	log.L(log.WithComponent(dSmgr.ctx, common.SUBCOMP_MISC)).Tracef("new block height %d", blockHeight)
 	dSmgr.blockHeight = blockHeight
 }
 

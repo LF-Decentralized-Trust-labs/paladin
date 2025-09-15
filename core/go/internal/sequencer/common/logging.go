@@ -27,5 +27,3 @@ const (
 	SUBCOMP_COORD     log.Component = "Coord"
 	SUBCOMP_MISC      log.Component = "Misc"
 )
-
-const COMPONENT_SEQUENCER = "Sequencer"

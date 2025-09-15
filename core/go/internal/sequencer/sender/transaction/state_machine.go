@@ -37,17 +37,17 @@ const (
 	// We only resend the request if we don't see the heartbeat.
 	// Might need to rethink this and allow for some ack and shorter retry interval to tolerate less reliable networks,
 	// Need to make a decision and document it in a README
-	State_Delegated            // the transaction has been sent to the current active coordinator
-	State_Assembling           // the coordinator has sent an assemble request that we have not replied to yet
-	State_EndorsementGathering //we have responded to an assemble request and are waiting the coordinator to gather endorsements and send us a dispatch confirmation request
-	State_Signing              // we have assembled the transaction and are waiting for the signing module to sign it before we respond to the coordinator with the signed assembled transaction
-	State_Prepared             // we know that the coordinator has got as far as preparing a public transaction and we have sent a positive response to a coordinator's dispatch confirmation request but have not yet received a heartbeat that notifies us that the coordinator has dispatched the transaction to a public transaction manager for submission
-	State_Dispatched           // the active coordinator that this transaction was delegated to has dispatched the transaction to a public transaction manager for submission
-	State_Sequenced            // the transaction has been assigned a nonce by the public transaction manager
-	State_Submitted            // the transaction has been submitted to the blockchain
-	State_Confirmed            // the public transaction has been confirmed by the blockchain as successful
-	State_Reverted             // upon attempting to assemble the transaction, the domain code has determined that the intent is not valid and the transaction is finalized as reverted
-	State_Parked               // upon attempting to assemble the transaction, the domain code has determined that the transaction is not ready to be assembled and it is parked for later processing.  All remaining transactions for the current sender can continue - unless they have an explicit dependency on this transaction
+	State_Delegated             // the transaction has been sent to the current active coordinator
+	State_Assembling            // the coordinator has sent an assemble request that we have not replied to yet
+	State_Endorsement_Gathering //we have responded to an assemble request and are waiting the coordinator to gather endorsements and send us a dispatch confirmation request
+	State_Signing               // we have assembled the transaction and are waiting for the signing module to sign it before we respond to the coordinator with the signed assembled transaction
+	State_Prepared              // we know that the coordinator has got as far as preparing a public transaction and we have sent a positive response to a coordinator's dispatch confirmation request but have not yet received a heartbeat that notifies us that the coordinator has dispatched the transaction to a public transaction manager for submission
+	State_Dispatched            // the active coordinator that this transaction was delegated to has dispatched the transaction to a public transaction manager for submission
+	State_Sequenced             // the transaction has been assigned a nonce by the public transaction manager
+	State_Submitted             // the transaction has been submitted to the blockchain
+	State_Confirmed             // the public transaction has been confirmed by the blockchain as successful
+	State_Reverted              // upon attempting to assemble the transaction, the domain code has determined that the intent is not valid and the transaction is finalized as reverted
+	State_Parked                // upon attempting to assemble the transaction, the domain code has determined that the transaction is not ready to be assembled and it is parked for later processing.  All remaining transactions for the current sender can continue - unless they have an explicit dependency on this transaction
 
 )
 
@@ -150,7 +150,7 @@ func init() {
 				Event_AssembleAndSignSuccess: {
 					Transitions: []Transition{
 						{
-							To: State_EndorsementGathering,
+							To: State_Endorsement_Gathering,
 							On: action_SendAssembleSuccessResponse,
 						},
 					},
@@ -181,7 +181,7 @@ func init() {
 				},
 			},
 		},
-		State_EndorsementGathering: {
+		State_Endorsement_Gathering: {
 			Events: map[EventType]EventHandler{
 				Event_AssembleRequestReceived: {
 					Validator: validator_AssembleRequestMatches,
@@ -429,6 +429,8 @@ func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error
 func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*EventHandler, error) {
 	sm := t.stateMachine
 
+	// MRW TODO - does this event apply to this transaction. Should we check and just return if not?
+
 	//Determine if and how this event applies in the current state and which, if any, transition it triggers
 	eventHandlers := stateDefinitionsMap[sm.currentState].Events
 	eventHandler, isHandlerDefined := eventHandlers[event.Type()]
@@ -491,8 +493,8 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
 			// (Odd spacing is intentional to align logs more clearly)
-			log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_STATE)).Debugf("sdr      | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
-			t.metrics.ObserveSequencerTXStateChange(sm.currentState.String(), time.Duration(event.GetEventTime().Sub(sm.lastStateChange).Milliseconds()))
+			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("sdr      | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			t.metrics.ObserveSequencerTXStateChange("Sender_"+rule.To.String(), time.Duration(event.GetEventTime().Sub(sm.lastStateChange).Milliseconds()))
 			sm.lastStateChange = time.Now()
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
@@ -533,15 +535,15 @@ func guard_Not(guard Guard) Guard {
 func (s State) String() string {
 	switch s {
 	case State_Initial:
-		return "Initial"
+		return "State_Initial"
 	case State_Pending:
 		return "State_Pending"
 	case State_Delegated:
 		return "State_Delegated"
 	case State_Assembling:
 		return "State_Assembling"
-	case State_EndorsementGathering:
-		return "State_EndorsementGathering"
+	case State_Endorsement_Gathering:
+		return "State_Endorsement_Gathering"
 	case State_Signing:
 		return "State_Signing"
 	case State_Prepared:
