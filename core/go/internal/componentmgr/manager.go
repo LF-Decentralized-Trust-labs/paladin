@@ -220,7 +220,6 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	if err == nil {
-		log.L(cm.bgCtx).Info("Initializing distributed sequencer manager")
 		cm.sequencerManager = sequencer.NewDistributedSequencerManager(cm.bgCtx, &cm.conf.SequencerManager)
 		cm.initResults["distributed_sequencer_manager"], err = cm.sequencerManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentDistributedSequencerManagerInitError)

@@ -105,7 +105,7 @@ func (tw *transportWriter) SendDelegationRequest(
 			node = parts[1]
 		}
 
-		log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_MSGTX)).Debugf("delegate | TX   | %s | %s", transaction.ID.String()[0:8], node)
+		log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Debugf("delegate | TX   | %s | %s", transaction.ID.String()[0:8], node)
 		if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
 			MessageType: "DelegationRequest",
 			Payload:     delegationRequestBytes,
@@ -615,7 +615,7 @@ func (tw *transportWriter) Send(ctx context.Context, payload *components.FireAnd
 		// MRW TODO - should return this error, just logging it for now
 	}
 
-	log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_MSGTX)).Debugf("%+v sent to %s", payload.MessageType, payload.Node)
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Debugf("%+v sent to %s", payload.MessageType, payload.Node)
 	if payload.Node == "" || payload.Node == tw.transportManager.LocalNodeName() {
 		// "Localhost" loopback
 		log.L(ctx).Debugf("[Sequencer] sending %s to loopback interface", payload.MessageType)

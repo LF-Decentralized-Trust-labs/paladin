@@ -426,8 +426,8 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
 			// (Odd spacing is intentional to align logs more clearly)
-			log.L(log.WithComponent(ctx, common.COMPONENT_SEQUENCER, common.SUBCOMP_STATE)).Debugf("coord    | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
-			t.metrics.ObserveSequencerTXStateChange(sm.currentState.String(), time.Duration(event.GetEventTime().Sub(sm.lastStateChange).Milliseconds()))
+			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("coord    | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			t.metrics.ObserveSequencerTXStateChange("Coord_"+rule.To.String(), time.Duration(event.GetEventTime().Sub(sm.lastStateChange).Milliseconds()))
 			sm.lastStateChange = time.Now()
 			previousState := sm.currentState
 			sm.currentState = rule.To
@@ -497,31 +497,31 @@ func guard_Or(guards ...Guard) Guard {
 func (s State) String() string {
 	switch s {
 	case State_Initial:
-		return "Initial"
+		return "State_Initial"
 	case State_Pooled:
-		return "Pooled"
+		return "State_Pooled"
 	case State_PreAssembly_Blocked:
-		return "PreAssembly_Blocked"
+		return "State_PreAssembly_Blocked"
 	case State_Assembling:
-		return "Assembling"
+		return "State_Assembling"
 	case State_Reverted:
-		return "Reverted"
+		return "State_Reverted"
 	case State_Endorsement_Gathering:
 		return "State_Endorsement_Gathering"
 	case State_Blocked:
-		return "Blocked"
+		return "State_Blocked"
 	case State_Confirming_Dispatch:
 		return "State_Confirming_Dispatch"
 	case State_Ready_For_Dispatch:
-		return "Ready_For_Dispatch"
+		return "State_Ready_For_Dispatch"
 	case State_Dispatched:
-		return "Dispatched"
+		return "State_Dispatched"
 	case State_Submitted:
-		return "Submitted"
+		return "State_Submitted"
 	case State_Confirmed:
-		return "Confirmed"
+		return "State_Confirmed"
 	case State_Final:
-		return "Final"
+		return "State_Final"
 	}
 	return fmt.Sprintf("Unknown (%d)", s)
 }

@@ -31,7 +31,8 @@ type DistributedSequencerMetrics interface {
 	ObserveSequencerTXStateChange(state string, duration time.Duration)
 	SetActiveCoordinators(numberOfActiveCoordinators int)
 	SetActiveSequencers(numberOfActiveSequencers int)
-	SetCoordinatingTransactions(numberOfCoordinatingTransactions int, contractAddress string)
+	IncCoordinatingTransactions()
+	DecCoordinatingTransactions()
 }
 
 var METRICS_SUBSYSTEM = "distributed_sequencer"
@@ -45,7 +46,7 @@ type distributedSequencerMetrics struct {
 	sequencerStage           *prometheus.HistogramVec
 	activeCoordinators       prometheus.Gauge
 	activeSequencers         prometheus.Gauge
-	coordinatingTransactions *prometheus.GaugeVec
+	coordinatingTransactions prometheus.Gauge
 }
 
 func InitMetrics(ctx context.Context, registry *prometheus.Registry) *distributedSequencerMetrics {
@@ -67,8 +68,8 @@ func InitMetrics(ctx context.Context, registry *prometheus.Registry) *distribute
 		Help: "Distributed sequencer active coordinators", Subsystem: METRICS_SUBSYSTEM})
 	metrics.activeSequencers = prometheus.NewGauge(prometheus.GaugeOpts{Name: "active_sequencers",
 		Help: "Distributed sequencer active sequencers", Subsystem: METRICS_SUBSYSTEM})
-	metrics.coordinatingTransactions = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "coordinating_txns",
-		Help: "Distributed sequencer coordinating transactions", Subsystem: METRICS_SUBSYSTEM}, []string{"contract_address"})
+	metrics.coordinatingTransactions = prometheus.NewGauge(prometheus.GaugeOpts{Name: "coordinating_txns",
+		Help: "Distributed sequencer coordinating transactions", Subsystem: METRICS_SUBSYSTEM})
 	registry.MustRegister(metrics.acceptedTransactions)
 	registry.MustRegister(metrics.assembledTransactions)
 	registry.MustRegister(metrics.endorsedTransactions)
@@ -113,6 +114,9 @@ func (dtm *distributedSequencerMetrics) SetActiveSequencers(numberOfActiveSequen
 	dtm.activeSequencers.Set(float64(numberOfActiveSequencers))
 }
 
-func (dtm *distributedSequencerMetrics) SetCoordinatingTransactions(numberOfCoordinatingTransactions int, contractAddress string) {
-	dtm.coordinatingTransactions.WithLabelValues(contractAddress).Set(float64(numberOfCoordinatingTransactions))
+func (dtm *distributedSequencerMetrics) IncCoordinatingTransactions() {
+	dtm.coordinatingTransactions.Inc()
+}
+func (dtm *distributedSequencerMetrics) DecCoordinatingTransactions() {
+	dtm.coordinatingTransactions.Dec()
 }

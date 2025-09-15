@@ -45,6 +45,8 @@ type EngineIntegration interface {
 	// WriteLockAndDistributeStatesForTransaction is a method that writes a lock to the state and distributes the states for a transaction
 	WriteLockAndDistributeStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error
 
+	ResetTransactions(ctx context.Context, transactionID uuid.UUID)
+
 	GetStateLocks(ctx context.Context) ([]byte, error)
 
 	GetBlockHeight(ctx context.Context) (int64, error)
@@ -89,6 +91,9 @@ func (f *FakeEngineIntegrationForTesting) GetStateLocks(ctx context.Context) ([]
 
 func (f *FakeEngineIntegrationForTesting) GetBlockHeight(ctx context.Context) (int64, error) {
 	return 0, nil
+}
+
+func (f *FakeEngineIntegrationForTesting) ResetTransactions(ctx context.Context, transactionID uuid.UUID) {
 }
 
 func (f *FakeEngineIntegrationForTesting) AssembleAndSign(ctx context.Context, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) (*components.TransactionPostAssembly, error) {
@@ -161,6 +166,10 @@ func (e *engineIntegration) GetStateLocks(ctx context.Context) ([]byte, error) {
 
 func (e *engineIntegration) GetBlockHeight(ctx context.Context) (int64, error) {
 	return e.environment.GetBlockHeight(), nil
+}
+
+func (e *engineIntegration) ResetTransactions(ctx context.Context, transactionID uuid.UUID) {
+	e.domainContext.ResetTransactions(transactionID)
 }
 
 // assemble a transaction that we are not coordinating, using the provided state locks
