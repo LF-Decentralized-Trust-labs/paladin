@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../user-interface/">
+        <link rel="prev" href="../administering_peers/">
       
       
-        <link rel="next" href="../troubleshooting/">
+        <link rel="next" href="../../reference/apis/bidx/">
       
       
       <link rel="icon" href="../../assets/paladin-icon-light.png">
@@ -335,21 +335,17 @@
         
   
   
-    
-  
   
     
     
       
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../installation/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
           
   
     
@@ -378,6 +374,28 @@
     
   
   Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../certificate_management/" class="md-tabs__link">
+          
+  
+    
+  
+  Guides
 
         </a>
       </li>
@@ -1051,10 +1069,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -1069,20 +1085,19 @@
     
     
       
-        
-        
-      
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -1093,7 +1108,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Getting Started
@@ -1155,7 +1170,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1176,7 +1191,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../installation-advanced/" class="md-nav__link">
+      <a href="../../getting-started/installation-advanced/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1197,7 +1212,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../installation-manual/" class="md-nav__link">
+      <a href="../../getting-started/installation-manual/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1226,7 +1241,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-interface/" class="md-nav__link">
+      <a href="../../getting-started/user-interface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1244,30 +1259,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    L1 and L2 Chains
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../getting-started/l1-and-l2-chains.md" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1276,146 +1271,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#introduction" class="md-nav__link">
-    <span class="md-ellipsis">
-      Introduction
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#indexing" class="md-nav__link">
-    <span class="md-ellipsis">
-      Indexing
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#gas-price" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas price
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Gas price">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#fixed-gas-pricing-node-level" class="md-nav__link">
-    <span class="md-ellipsis">
-      Fixed gas pricing (node-level)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dynamic-gas-pricing-using-eth_feehistory" class="md-nav__link">
-    <span class="md-ellipsis">
-      Dynamic gas pricing using eth_feeHistory
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#fixed-gas-pricing-transaction-level" class="md-nav__link">
-    <span class="md-ellipsis">
-      Fixed gas pricing (transaction-level)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-price-increase-mechanism" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas price increase mechanism
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-price-caps" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas price caps
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-pricing-priority" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas pricing priority
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      Examples
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#funding-signing-addresses-with-gas-tokens-eg-eth" class="md-nav__link">
-    <span class="md-ellipsis">
-      Funding signing addresses with gas tokens e.g. ETH
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Funding signing addresses with gas tokens e.g. ETH">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#automatic-funding-of-addresses" class="md-nav__link">
-    <span class="md-ellipsis">
-      Automatic funding of addresses
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1428,7 +1283,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../troubleshooting/" class="md-nav__link">
+      <a href="../../getting-started/troubleshooting/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1700,6 +1555,287 @@
       
   
   
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Guides
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Guides
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../certificate_management/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Certificate Management
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../administering_peers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Administering Peers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    L1 and L2 Chains
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    L1 and L2 Chains
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Introduction
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Indexing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gas-price" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas price
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Gas price">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed-gas-pricing-node-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fixed gas pricing (node-level)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-gas-pricing-using-eth_feehistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dynamic gas pricing using eth_feeHistory
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed-gas-pricing-transaction-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fixed gas pricing (transaction-level)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gas-price-increase-mechanism" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas price increase mechanism
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gas-price-caps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas price caps
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gas-pricing-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gas pricing priority
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Examples
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#funding-signing-addresses-with-gas-tokens-eg-eth" class="md-nav__link">
+    <span class="md-ellipsis">
+      Funding signing addresses with gas tokens e.g. ETH
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Funding signing addresses with gas tokens e.g. ETH">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-funding-of-addresses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Automatic funding of addresses
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
   
   
     
@@ -1729,10 +1865,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -1743,8 +1879,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             Reference
           </label>
@@ -1785,10 +1921,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_1" >
         
           
-          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6_1" id="__nav_6_1_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -1799,8 +1935,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_1">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_1">
             <span class="md-nav__icon md-icon"></span>
             APIs
           </label>
@@ -2082,10 +2218,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2" >
         
           
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6_2" id="__nav_6_2_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -2096,8 +2232,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2">
             <span class="md-nav__icon md-icon"></span>
             Types
           </label>
@@ -3184,10 +3320,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -3198,8 +3334,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_3">
             <span class="md-nav__icon md-icon"></span>
             Kubernetes CRDs
           </label>
@@ -3333,10 +3469,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -3347,8 +3483,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             Contributing
           </label>
@@ -3802,7 +3938,7 @@ preventing transactions on the base ledger from being correlated with each other
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../user-interface/" class="md-footer__link md-footer__link--prev" aria-label="Previous: User Interface">
+          <a href="../administering_peers/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Administering Peers">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3812,20 +3948,20 @@ preventing transactions on the base ledger from being correlated with each other
                 Previous
               </span>
               <div class="md-ellipsis">
-                User Interface
+                Administering Peers
               </div>
             </div>
           </a>
         
         
           
-          <a href="../troubleshooting/" class="md-footer__link md-footer__link--next" aria-label="Next: Troubleshooting">
+          <a href="../../reference/apis/bidx/" class="md-footer__link md-footer__link--next" aria-label="Next: bidx_*">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Troubleshooting
+                bidx_*
               </div>
             </div>
             <div class="md-footer__button md-icon">
