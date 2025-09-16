@@ -53,12 +53,13 @@ func NewPlugin(ctx context.Context) plugintk.PluginBase {
 
 func NewEVMRegistry(callbacks plugintk.RegistryCallbacks) plugintk.RegistryAPI {
 	return &evmRegistry{
-		bgCtx:     context.Background(),
+		bgCtx:     log.WithComponent(context.Background(), "evmregistry"),
 		callbacks: callbacks,
 	}
 }
 
 func (r *evmRegistry) ConfigureRegistry(ctx context.Context, req *prototk.ConfigureRegistryRequest) (*prototk.ConfigureRegistryResponse, error) {
+	ctx = log.WithComponent(ctx, "evmregistry")
 	r.name = req.Name
 
 	err := json.Unmarshal([]byte(req.ConfigJson), &r.conf)
@@ -159,6 +160,7 @@ func (r *evmRegistry) handlePropertySet(ctx context.Context, inEvent *prototk.On
 }
 
 func (r *evmRegistry) HandleRegistryEvents(ctx context.Context, req *prototk.HandleRegistryEventsRequest) (*prototk.HandleRegistryEventsResponse, error) {
+	ctx = log.WithComponent(ctx, "evmregistry")
 
 	entries := []*prototk.RegistryEntry{}
 	properties := []*prototk.RegistryProperty{}

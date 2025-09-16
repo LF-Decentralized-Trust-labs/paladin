@@ -52,7 +52,7 @@ type inflightRequest struct {
 
 func NewIdentityResolver(ctx context.Context, conf *pldconf.IdentityResolverConfig) components.IdentityResolver {
 	return &identityResolver{
-		bgCtx:                 ctx,
+		bgCtx:                 log.WithComponent(ctx, log.Component("identityresolver")),
 		inflightRequests:      make(map[string]*inflightRequest),
 		inflightRequestsMutex: &sync.Mutex{},
 		verifierCache:         cache.NewCache[string, string](&conf.VerifierCache, &pldconf.IdentityResolverDefaults.VerifierCache),
@@ -84,6 +84,7 @@ func (ir *identityResolver) Stop() {
 }
 
 func (ir *identityResolver) ResolveVerifier(ctx context.Context, lookup string, algorithm string, verifierType string) (string, error) {
+	ctx = log.WithComponent(ctx, log.Component("identityresolver"))
 	replyChan := make(chan string, 1)
 	errChan := make(chan error, 1)
 	ir.ResolveVerifierAsync(ctx, lookup, algorithm, verifierType, func(ctx context.Context, verifier string) {
@@ -102,6 +103,7 @@ func (ir *identityResolver) ResolveVerifier(ctx context.Context, lookup string, 
 }
 
 func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup string, algorithm string, verifierType string, resolved func(ctx context.Context, verifier string), failed func(ctx context.Context, err error)) {
+	ctx = log.WithComponent(ctx, log.Component("identityresolver"))
 	// if the verifier lookup is a local key, we can resolve it here
 	// if it is a remote key, we need to delegate to the remote node
 

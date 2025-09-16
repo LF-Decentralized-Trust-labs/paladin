@@ -20,6 +20,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
@@ -55,7 +56,7 @@ func NewStateManager(ctx context.Context, conf *pldconf.StateStoreConfig, p pers
 		abiSchemaCache: cache.NewCache[string, components.Schema](&conf.SchemaCache, SchemaCacheDefaults),
 		domainContexts: make(map[uuid.UUID]*domainContext),
 	}
-	ss.bgCtx, ss.cancelCtx = context.WithCancel(ctx)
+	ss.bgCtx, ss.cancelCtx = context.WithCancel(log.WithComponent(ctx, "statemanager"))
 	return ss
 }
 
@@ -94,6 +95,7 @@ func (ss *stateManager) Stop() {
 // might find new states become available and/or states marked locked for spending
 // become fully unavailable.
 func (ss *stateManager) WriteStateFinalizations(ctx context.Context, dbTX persistence.DBTX, spends []*pldapi.StateSpendRecord, reads []*pldapi.StateReadRecord, confirms []*pldapi.StateConfirmRecord, infoRecords []*pldapi.StateInfoRecord) (err error) {
+	ctx = log.WithComponent(ctx, "statemanager")
 	if len(spends) > 0 {
 		err = dbTX.DB().
 			WithContext(ctx).
@@ -130,6 +132,7 @@ func (ss *stateManager) WriteStateFinalizations(ctx context.Context, dbTX persis
 }
 
 func (ss *stateManager) GetTransactionStates(ctx context.Context, dbTX persistence.DBTX, txID uuid.UUID) (*pldapi.TransactionStates, error) {
+	ctx = log.WithComponent(ctx, "statemanager")
 
 	// We query from the records table, joining in the other fields
 	var records []*transactionStateRecord

@@ -18,6 +18,7 @@ package domainmgr
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
@@ -47,6 +48,7 @@ func (dm *domainManager) rpcQueryTransactions() rpcserver.RPCHandler {
 
 func (dm *domainManager) rpcGetDomain() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context, name string) (*pldapi.Domain, error) {
+		ctx = log.WithComponent(ctx, "domainmanager")
 		domain, err := dm.getDomainByName(ctx, name)
 		if err != nil {
 			return nil, err
@@ -60,6 +62,7 @@ func (dm *domainManager) rpcGetDomain() rpcserver.RPCHandler {
 
 func (dm *domainManager) rpcGetDomainByAddress() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context, address pldtypes.EthAddress) (*pldapi.Domain, error) {
+		ctx = log.WithComponent(ctx, "domainmanager")
 		domain, err := dm.getDomainByAddress(ctx, &address)
 		if err != nil {
 			return nil, err
@@ -75,12 +78,14 @@ func (dm *domainManager) rpcQuerySmartContracts() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		query query.QueryJSON,
 	) ([]*pldapi.DomainSmartContract, error) {
+		ctx = log.WithComponent(ctx, "domainmanager")
 		return dm.querySmartContracts(ctx, &query)
 	})
 }
 
 func (dm *domainManager) rpcGetSmartContractByAddress() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context, address pldtypes.EthAddress) (*pldapi.DomainSmartContract, error) {
+		ctx = log.WithComponent(ctx, "domainmanager")
 		var sc components.DomainSmartContract
 		var err error
 		err = dm.persistence.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {

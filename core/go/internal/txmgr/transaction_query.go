@@ -19,6 +19,7 @@ import (
 	"context"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
@@ -111,6 +112,7 @@ func (tm *txManager) mapPersistedTXResolved(pt *persistedTransaction) *component
 }
 
 func (tm *txManager) QueryTransactions(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*pldapi.Transaction, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	qw := &filters.QueryWrapper[persistedTransaction, pldapi.Transaction]{
 		P:           tm.p,
 		Table:       "transactions",
@@ -136,6 +138,7 @@ func (tm *txManager) QueryTransactionsFull(ctx context.Context, jq *query.QueryJ
 }
 
 func (tm *txManager) QueryTransactionsResolved(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*components.ResolvedTransaction, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	qw := &filters.QueryWrapper[persistedTransaction, components.ResolvedTransaction]{
 		P:           tm.p,
 		Table:       "transactions",
@@ -164,6 +167,7 @@ func (tm *txManager) QueryTransactionsResolved(ctx context.Context, jq *query.Qu
 }
 
 func (tm *txManager) QueryTransactionsFullTx(ctx context.Context, jq *query.QueryJSON, dbTX persistence.DBTX, pending bool) ([]*pldapi.TransactionFull, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	qw := &filters.QueryWrapper[persistedTransaction, pldapi.TransactionFull]{
 		P:           tm.p,
 		Table:       "transactions",
@@ -264,6 +268,7 @@ func (tm *txManager) resolveABIReferencesAndCache(ctx context.Context, dbTX pers
 }
 
 func (tm *txManager) GetTransactionByIDFull(ctx context.Context, id uuid.UUID) (result *pldapi.TransactionFull, err error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	ptxs, err := tm.QueryTransactionsFull(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query(), tm.p.NOTX(), false)
 	if len(ptxs) == 0 || err != nil {
 		return nil, err
@@ -272,6 +277,7 @@ func (tm *txManager) GetTransactionByIDFull(ctx context.Context, id uuid.UUID) (
 }
 
 func (tm *txManager) GetResolvedTransactionByID(ctx context.Context, id uuid.UUID) (*components.ResolvedTransaction, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	// This is cache optimized, because domains rely on the sender node's transaction store as
 	// the only place to read transaction data from for init and assembly.
 	// So we maintain a cache to make that lookup efficient.
@@ -289,6 +295,7 @@ func (tm *txManager) GetResolvedTransactionByID(ctx context.Context, id uuid.UUI
 }
 
 func (tm *txManager) GetTransactionByID(ctx context.Context, id uuid.UUID) (*pldapi.Transaction, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	ptxs, err := tm.QueryTransactions(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query(), tm.p.NOTX(), false)
 	if len(ptxs) == 0 || err != nil {
 		return nil, err
@@ -305,6 +312,7 @@ func (tm *txManager) GetTransactionByIdempotencyKey(ctx context.Context, idempot
 }
 
 func (tm *txManager) GetTransactionDependencies(ctx context.Context, id uuid.UUID) (*pldapi.TransactionDependencies, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	var persistedDeps []*transactionDep
 	err := tm.p.DB().
 		WithContext(ctx).
@@ -338,6 +346,7 @@ func (tm *txManager) queryPublicTransactions(ctx context.Context, jq *query.Quer
 }
 
 func (tm *txManager) GetPublicTransactionByNonce(ctx context.Context, from pldtypes.EthAddress, nonce pldtypes.HexUint64) (*pldapi.PublicTxWithBinding, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	prs, err := tm.publicTxMgr.QueryPublicTxWithBindings(ctx, tm.p.NOTX(),
 		query.NewQueryBuilder().Limit(1).
 			Equal("from", from).
@@ -350,5 +359,6 @@ func (tm *txManager) GetPublicTransactionByNonce(ctx context.Context, from pldty
 }
 
 func (tm *txManager) GetPublicTransactionByHash(ctx context.Context, hash pldtypes.Bytes32) (*pldapi.PublicTxWithBinding, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	return tm.publicTxMgr.GetPublicTransactionForHash(ctx, tm.p.NOTX(), hash)
 }

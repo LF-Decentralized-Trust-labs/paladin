@@ -73,7 +73,6 @@ func TestNewIdentityResolver(t *testing.T) {
 	ir := NewIdentityResolver(ctx, conf)
 
 	assert.NotNil(t, ir)
-	assert.Equal(t, ctx, ir.(*identityResolver).bgCtx)
 	assert.NotNil(t, ir.(*identityResolver).inflightRequests)
 	assert.NotNil(t, ir.(*identityResolver).inflightRequestsMutex)
 }

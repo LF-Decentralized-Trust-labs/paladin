@@ -80,7 +80,7 @@ func NewPluginManager(bgCtx context.Context,
 	conf *pldconf.PluginManagerConfig) components.PluginManager {
 
 	pc := &pluginManager{
-		bgCtx: bgCtx,
+		bgCtx: log.WithComponent(bgCtx, log.Component("pluginmanager")),
 
 		grpcTarget:      grpcTarget,
 		loaderID:        loaderID,
@@ -246,6 +246,7 @@ func (pm *pluginManager) ReloadPluginList() (err error) {
 }
 
 func (pm *pluginManager) WaitForInit(ctx context.Context, pluginType prototk.PluginInfo_PluginType) error {
+	ctx = log.WithComponent(ctx, log.Component("pluginmanager"))
 	for {
 		switch pluginType {
 		case prototk.PluginInfo_DOMAIN:

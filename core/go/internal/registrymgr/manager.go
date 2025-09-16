@@ -59,7 +59,7 @@ type registryManager struct {
 
 func NewRegistryManager(bgCtx context.Context, conf *pldconf.RegistryManagerConfig) components.RegistryManager {
 	return &registryManager{
-		bgCtx:                    bgCtx,
+		bgCtx:                    log.WithComponent(bgCtx, "registrymanager"),
 		conf:                     conf,
 		registriesByID:           make(map[uuid.UUID]*registry),
 		registriesByName:         make(map[string]*registry),
@@ -153,6 +153,7 @@ func (rm *registryManager) RegistryRegistered(name string, id uuid.UUID, toRegis
 }
 
 func (rm *registryManager) GetRegistry(ctx context.Context, name string) (components.Registry, error) {
+	ctx = log.WithComponent(ctx, "registrymanager")
 	rm.mux.Lock()
 	defer rm.mux.Unlock()
 
@@ -175,6 +176,7 @@ func (rm *registryManager) getRegistryNames() []string {
 }
 
 func (rm *registryManager) GetNodeTransports(ctx context.Context, node string) ([]*components.RegistryNodeTransportEntry, error) {
+	ctx = log.WithComponent(ctx, "registrymanager")
 	// Check cache
 	transports, present := rm.transportDetailsCache.Get(node)
 	if present {

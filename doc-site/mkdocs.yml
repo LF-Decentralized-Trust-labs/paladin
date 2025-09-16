@@ -133,6 +133,7 @@ nav:
     - Certificate Management: guides/certificate_management.md
     - Administering Peers: guides/administering_peers.md
     - L1 and L2 Chains: guides/l1-and-l2-chains.md
+    - Logging: guides/logging.md
   - Reference:
     - APIs: reference/apis/*.md
     - Types: reference/types/*.md

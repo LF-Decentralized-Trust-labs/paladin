@@ -61,6 +61,7 @@ type domainContext struct {
 
 // Very important that callers Close domain contexts they open
 func (ss *stateManager) NewDomainContext(ctx context.Context, domain components.Domain, contractAddress pldtypes.EthAddress) components.DomainContext {
+	ctx = log.WithComponent(ctx, "statemanager")
 	id := uuid.New()
 	log.L(ctx).Debugf("Domain context %s for domain %s contract %s closed", id, domain.Name(), contractAddress)
 
@@ -68,7 +69,7 @@ func (ss *stateManager) NewDomainContext(ctx context.Context, domain components.
 	defer ss.domainContextLock.Unlock()
 
 	dc := &domainContext{
-		Context:            log.WithLogField(ctx, "domain_ctx", fmt.Sprintf("%s_%s", domain.Name(), id)),
+		Context:            log.WithComponent(ctx, log.Component(fmt.Sprintf("domain-ctx-%s", domain.Name()))),
 		id:                 id,
 		ss:                 ss,
 		domainName:         domain.Name(),
@@ -83,6 +84,7 @@ func (ss *stateManager) NewDomainContext(ctx context.Context, domain components.
 
 // nil if not found
 func (ss *stateManager) GetDomainContext(ctx context.Context, id uuid.UUID) components.DomainContext {
+	// ctx = log.WithComponent(ctx, "statemanager")
 	ss.domainContextLock.Lock()
 	defer ss.domainContextLock.Unlock()
 

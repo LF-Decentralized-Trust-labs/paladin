@@ -19,6 +19,7 @@ package groupmgr
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
@@ -54,6 +55,7 @@ func (gm *groupManager) initRPC() {
 
 func (gm *groupManager) rpcCreateGroup() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context, spec pldapi.PrivacyGroupInput) (group *pldapi.PrivacyGroup, err error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		err = gm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 			group, err = gm.CreateGroup(ctx, dbTX, &spec)
 			return err
@@ -64,18 +66,21 @@ func (gm *groupManager) rpcCreateGroup() rpcserver.RPCHandler {
 
 func (gm *groupManager) rpcGetGroupByID() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context, domainName string, id pldtypes.HexBytes) (*pldapi.PrivacyGroup, error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		return gm.GetGroupByID(ctx, gm.p.NOTX(), domainName, id)
 	})
 }
 
 func (gm *groupManager) rpcGetGroupByAddress() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context, addr pldtypes.EthAddress) (*pldapi.PrivacyGroup, error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		return gm.GetGroupByAddress(ctx, gm.p.NOTX(), &addr)
 	})
 }
 
 func (gm *groupManager) rpcQueryGroups() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context, jq query.QueryJSON) ([]*pldapi.PrivacyGroup, error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		return gm.QueryGroups(ctx, gm.p.NOTX(), &jq)
 	})
 }
@@ -98,6 +103,7 @@ func (gm *groupManager) rpcSendTransaction() rpcserver.RPCHandler {
 
 func (gm *groupManager) rpcCall() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context, call *pldapi.PrivacyGroupEVMCall) (result pldtypes.RawJSON, err error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		err = gm.Call(ctx, gm.p.NOTX(), &result, call)
 		return result, err
 	})
@@ -105,6 +111,7 @@ func (gm *groupManager) rpcCall() rpcserver.RPCHandler {
 
 func (gm *groupManager) rpcSendMessage() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context, msg *pldapi.PrivacyGroupMessageInput) (msgID *uuid.UUID, err error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		err = gm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 			msgID, err = gm.SendMessage(ctx, dbTX, msg)
 			return err
@@ -115,12 +122,14 @@ func (gm *groupManager) rpcSendMessage() rpcserver.RPCHandler {
 
 func (gm *groupManager) rpcGetMessageByID() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context, id uuid.UUID) (msg *pldapi.PrivacyGroupMessage, err error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		return gm.GetMessageByID(ctx, gm.p.NOTX(), id, false)
 	})
 }
 
 func (gm *groupManager) rpcQueryMessages() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context, jq query.QueryJSON) (msgs []*pldapi.PrivacyGroupMessage, err error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		return gm.QueryMessages(ctx, gm.p.NOTX(), &jq)
 	})
 }
@@ -129,6 +138,7 @@ func (gm *groupManager) rpcCreateMessageListener() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		listener *pldapi.PrivacyGroupMessageListener,
 	) (bool, error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		err := gm.CreateMessageListener(ctx, listener)
 		return err == nil, err
 	})
@@ -138,6 +148,7 @@ func (gm *groupManager) rpcQueryMessageListeners() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		query query.QueryJSON,
 	) ([]*pldapi.PrivacyGroupMessageListener, error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		return gm.QueryMessageListeners(ctx, gm.p.NOTX(), &query)
 	})
 }
@@ -146,6 +157,7 @@ func (gm *groupManager) rpcGetMessageListener() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		name string,
 	) (*pldapi.PrivacyGroupMessageListener, error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		return gm.GetMessageListener(ctx, name), nil
 	})
 }
@@ -154,6 +166,7 @@ func (gm *groupManager) rpcStartMessageListener() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		name string,
 	) (bool, error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		return true, gm.StartMessageListener(ctx, name)
 	})
 }
@@ -162,6 +175,7 @@ func (gm *groupManager) rpcStopMessageListener() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		name string,
 	) (bool, error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		return true, gm.StopMessageListener(ctx, name)
 	})
 }
@@ -170,6 +184,7 @@ func (gm *groupManager) rpcDeleteMessageListener() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		name string,
 	) (bool, error) {
+		ctx = log.WithComponent(ctx, "groupmanager")
 		return true, gm.DeleteMessageListener(ctx, name)
 	})
 }

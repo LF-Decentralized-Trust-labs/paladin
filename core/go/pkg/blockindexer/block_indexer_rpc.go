@@ -19,6 +19,7 @@ package blockindexer
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
@@ -48,6 +49,7 @@ func (bi *blockIndexer) rpcGetBlockByNumber() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		number pldtypes.HexUint64,
 	) (*pldapi.IndexedBlock, error) {
+		ctx = log.WithComponent(ctx, "blockindexer")
 		return bi.GetIndexedBlockByNumber(ctx, number.Uint64())
 	})
 }
@@ -56,6 +58,7 @@ func (bi *blockIndexer) rpcGetTransactionByHash() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		hash pldtypes.Bytes32,
 	) (*pldapi.IndexedTransaction, error) {
+		ctx = log.WithComponent(ctx, "blockindexer")
 		return bi.GetIndexedTransactionByHash(ctx, hash)
 	})
 }
@@ -73,6 +76,7 @@ func (bi *blockIndexer) rpcGetBlockTransactionsByNumber() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		blockNumber pldtypes.HexUint64,
 	) ([]*pldapi.IndexedTransaction, error) {
+		ctx = log.WithComponent(ctx, "blockindexer")
 		return bi.GetBlockTransactionsByNumber(ctx, int64(blockNumber.Uint64()))
 	})
 }
@@ -81,6 +85,7 @@ func (bi *blockIndexer) rpcGetTransactionEventsByHash() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		hash pldtypes.Bytes32,
 	) ([]*pldapi.IndexedEvent, error) {
+		ctx = log.WithComponent(ctx, "blockindexer")
 		return bi.GetTransactionEventsByHash(ctx, hash)
 	})
 }
@@ -88,6 +93,7 @@ func (bi *blockIndexer) rpcGetTransactionEventsByHash() rpcserver.RPCHandler {
 func (bi *blockIndexer) rpcGetConfirmedBlockHeight() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod0(func(ctx context.Context,
 	) (pldtypes.HexUint64, error) {
+		ctx = log.WithComponent(ctx, "blockindexer")
 		return bi.GetConfirmedBlockHeight(ctx)
 	})
 }
@@ -96,6 +102,7 @@ func (bi *blockIndexer) rpcQueryIndexedBlocks() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		jq query.QueryJSON,
 	) ([]*pldapi.IndexedBlock, error) {
+		ctx = log.WithComponent(ctx, "blockindexer")
 		return bi.QueryIndexedBlocks(ctx, &jq)
 	})
 }
@@ -104,6 +111,7 @@ func (bi *blockIndexer) rpcQueryIndexedTransactions() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		jq query.QueryJSON,
 	) ([]*pldapi.IndexedTransaction, error) {
+		ctx = log.WithComponent(ctx, "blockindexer")
 		return bi.QueryIndexedTransactions(ctx, &jq)
 	})
 }
@@ -112,6 +120,7 @@ func (bi *blockIndexer) rpcQueryIndexedEvents() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		jq query.QueryJSON,
 	) ([]*pldapi.IndexedEvent, error) {
+		ctx = log.WithComponent(ctx, "blockindexer")
 		return bi.QueryIndexedEvents(ctx, &jq)
 	})
 }
@@ -122,6 +131,7 @@ func (bi *blockIndexer) rpcDecodeTransactionEvents() rpcserver.RPCHandler {
 		abi abi.ABI,
 		resultFormat pldtypes.JSONFormatOptions,
 	) ([]*pldapi.EventWithData, error) {
+		ctx = log.WithComponent(ctx, "blockindexer")
 		return bi.DecodeTransactionEvents(ctx, hash, abi, resultFormat)
 	})
 }
