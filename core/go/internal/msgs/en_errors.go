@@ -377,6 +377,7 @@ var (
 	MsgPublicTxMgrGasOracleMaxPriorityFeePerGasMissing = pde("PD011948", "maxPriorityFeePerGas not found in templated gas oracle response")
 	MsgPublicTxMgrFeeHistoryEmpty                      = pde("PD011949", "Fee history returned empty data: len(baseFeePerGas)=%d, len(reward)=%d")
 	MsgPublicTxMgrFeeHistoryCallFailed                 = pde("PD011950", "Failed to fetch fee history: %+v")
+	MsgPublicTxMgrInvalidCacheRefreshTime              = pde("PD011951", "Invalid cache refresh time: %s")
 
 	// TransportManager module PD0120XX
 	MsgTransportInvalidMessage                 = pde("PD012000", "Invalid message")

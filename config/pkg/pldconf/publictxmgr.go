@@ -81,6 +81,16 @@ var PublicTxManagerDefaults = &PublicTxManagerConfig{
 			PriorityFeePercentile: confutil.P(85), // Default to 85th percentile for getting transactions onto chain as easily as possible
 			HistoryBlockCount:     confutil.P(20), // Default to 20 blocks for fee history
 			BaseFeeBufferFactor:   confutil.P(1),  // Default to 1x buffer for base fee
+			Cache: GasPriceCacheConfig{
+				Enabled:     confutil.P(true),  // Default to enabled
+				RefreshTime: confutil.P("30s"), // Default to 30 seconds refresh time
+			},
+		},
+		GasOracleAPI: &GasOracleAPIConfig{
+			Cache: GasPriceCacheConfig{
+				Enabled:     confutil.P(true),  // Default to enabled
+				RefreshTime: confutil.P("30s"), // Default to 30 seconds refresh time
+			},
 		},
 	},
 	BalanceManager: BalanceManagerConfig{
@@ -134,6 +144,9 @@ type EthFeeHistoryConfig struct {
 
 	// Factor to multiply base fee by for buffering (default: 1)
 	BaseFeeBufferFactor *int `json:"baseFeeBufferFactor"`
+
+	// Cache configuration for gas price caching
+	Cache GasPriceCacheConfig `json:"cache"`
 }
 
 type GasPriceConfig struct {
@@ -151,7 +164,8 @@ type GasLimitConfig struct {
 
 type GasOracleAPIConfig struct {
 	HTTPClientConfig `json:",inline"`
-	Template         string `json:"template"`
+	Template         string              `json:"template"`
+	Cache            GasPriceCacheConfig `json:"cache"`
 }
 
 type PublicTxManagerOrchestratorConfig struct {
@@ -164,4 +178,13 @@ type PublicTxManagerOrchestratorConfig struct {
 	UnavailableBalanceHandler *string            `json:"unavailableBalanceHandler"`
 	SubmissionRetry           RetryConfigWithMax `json:"submissionRetry"`
 	TimeLineLoggingMaxEntries int                `json:"timelineMaxEntries"`
+}
+
+// GasPriceCacheConfig represents cache configuration for gas price clients
+type GasPriceCacheConfig struct {
+	// Enabled controls whether caching is enabled
+	Enabled *bool `json:"enabled"`
+
+	// RefreshTime specifies how often the cache should be refreshed
+	RefreshTime *string `json:"refreshTime"`
 }
