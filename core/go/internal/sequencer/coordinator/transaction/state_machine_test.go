@@ -50,6 +50,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 		nil,
 		func(context.Context) {},               // onCleanup function, not used in tests
 		func(context.Context, *Transaction) {}, // onReadyForDispatch function, not used in tests
+		nil,
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, txn)

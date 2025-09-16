@@ -51,7 +51,7 @@ func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatRec
 				err := txn.HandleEvent(ctx, txnSubmittedEvent)
 				if err != nil {
 					msg := fmt.Sprintf("[Sequencer] error handling transaction submitted event for transaction %s: %v", txn.ID, err)
-					log.L(ctx).Errorf(msg)
+					log.L(ctx).Error(msg)
 					return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 				}
 				s.submittedTransactionsByHash[*dispatchedTransaction.LatestSubmissionHash] = &dispatchedTransaction.ID
@@ -66,7 +66,7 @@ func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatRec
 
 				if err != nil {
 					msg := fmt.Sprintf("[Sequencer] error handling nonce assigned event for transaction %s: %v", txn.ID, err)
-					log.L(ctx).Errorf(msg)
+					log.L(ctx).Error(msg)
 					return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 				}
 			}

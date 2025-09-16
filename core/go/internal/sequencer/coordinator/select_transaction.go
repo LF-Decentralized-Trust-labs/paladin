@@ -203,21 +203,21 @@ func (ts *transactionSelector) SelectNextTransaction(ctx context.Context, event 
 			// }
 		} else {
 			log.L(ctx).Infof("[Sequencer] no current assembling sender, reset to the coordinator committee")
-			committeeMap := ts.transactionPool.GetCurrentSenderPool(ctx)
+			senderNodePool := ts.transactionPool.GetCurrentSenderPool(ctx)
 			if len(ts.fastQueue) == 0 && len(ts.slowQueue) == 0 {
-				for node := range committeeMap {
-					for _, sender := range committeeMap[node] {
+				for nodeIndex, node := range senderNodePool {
+					for _, sender := range senderNodePool[nodeIndex] {
 						if len(ts.fastQueue) < ts.numSenders {
-							log.L(ctx).Infof("[Sequencer] putting sender '%s' from committee '%s' back to the front of the fast queue", sender, node)
+							log.L(ctx).Infof("[Sequencer] putting sender '%+v' from committee '%s' back to the front of the fast queue", sender, node)
 							//ts.fastQueue <- &senderLocator{node: node, identity: sender}
 						} else {
-							log.L(ctx).Infof("[Sequencer] not putting sender '%s' from committee '%s' back to the front of the slow queue", sender, node)
+							log.L(ctx).Infof("[Sequencer] not putting sender '%+v' from committee '%s' back to the front of the slow queue", sender, node)
 						}
 						if len(ts.slowQueue) < ts.numSenders {
-							log.L(ctx).Infof("[Sequencer] putting sender '%s' from committee '%s' back to the front of the slow queue", sender, node)
+							log.L(ctx).Infof("[Sequencer] putting sender '%+v' from committee '%s' back to the front of the slow queue", sender, node)
 							//ts.slowQueue <- &senderLocator{node: node, identity: sender}
 						} else {
-							log.L(ctx).Infof("[Sequencer] not putting sender '%s' from committee '%s' back to the front of the slow queue", sender, node)
+							log.L(ctx).Infof("[Sequencer] not putting sender '%+v' from committee '%s' back to the front of the slow queue", sender, node)
 						}
 					}
 				}

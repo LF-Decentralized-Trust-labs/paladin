@@ -27,6 +27,7 @@ type Event interface {
 }
 
 type HeartbeatIntervalEvent struct {
+	common.BaseEvent
 }
 
 func (_ *HeartbeatIntervalEvent) Type() EventType {

@@ -33,31 +33,31 @@ packages:
   github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr:
     interfaces:
       InFlightStageActionTriggers:
-  github.com/kaleido-io/paladin/core/internal/sequencer/coordinator:
+  github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator:
     config:
       all: true
       dir: "{{.InterfaceDir}}"
       pkgname: "{{.SrcPackageName}}"
       structname: "Mock{{.InterfaceName}}"
-  github.com/kaleido-io/paladin/core/internal/sequencer/common:
+  github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common:
     config:
       all: true
       dir: "{{.InterfaceDir}}"
       pkgname: "{{.SrcPackageName}}"
       structname: "Mock{{.InterfaceName}}"
-  github.com/kaleido-io/paladin/core/internal/sequencer/coordinator/transaction:
+  github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction:
     config:
       all: true
       dir: "{{.InterfaceDir}}"
       pkgname: "{{.SrcPackageName}}"
       structname: "Mock{{.InterfaceName}}"
-  github.com/kaleido-io/paladin/core/internal/sequencer/sender:
+  github.com/LF-Decentralized-Trust-labso/paladin/core/internal/sequencer/sender:
     config:
       all: true
       dir: "{{.InterfaceDir}}"
       pkgname: "{{.SrcPackageName}}"
       structname: "Mock{{.InterfaceName}}"
-  github.com/kaleido-io/paladin/core/internal/sequencer:
+  github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer:
     config:
       all: true
       dir: "{{.InterfaceDir}}"

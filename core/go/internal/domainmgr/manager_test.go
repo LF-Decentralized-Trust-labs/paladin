@@ -50,6 +50,7 @@ type mockComponents struct {
 	txManager        *componentsmocks.TXManager
 	sequencerManager *componentsmocks.SequencerManager
 	transportMgr     *componentsmocks.TransportManager
+	publicTxManager  *componentsmocks.PublicTxManager
 }
 
 func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *domainManager, *mockComponents, func()) {
@@ -65,6 +66,7 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManager
 		txManager:        componentsmocks.NewTXManager(t),
 		sequencerManager: componentsmocks.NewSequencerManager(t),
 		transportMgr:     componentsmocks.NewTransportManager(t),
+		publicTxManager:  componentsmocks.NewPublicTxManager(t),
 	}
 
 	// Blockchain stuff is always mocked
@@ -78,6 +80,7 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManager
 	allComponents.On("TxManager").Return(mc.txManager)
 	allComponents.On("SequencerManager").Return(mc.sequencerManager)
 	allComponents.On("TransportManager").Return(mc.transportMgr)
+	allComponents.On("PublicTxManager").Return(mc.publicTxManager)
 	mc.transportMgr.On("LocalNodeName").Return("node1").Maybe()
 
 	var p persistence.Persistence
@@ -197,6 +200,7 @@ func TestDomainMissingRegistryAddress(t *testing.T) {
 	componentsmocks.On("TxManager").Return(mc.txManager)
 	componentsmocks.On("SequencerManager").Return(mc.sequencerManager)
 	componentsmocks.On("TransportManager").Return(mc.transportMgr)
+	componentsmocks.On("PublicTxManager").Return(mc.publicTxManager)
 
 	mp, err := mockpersistence.NewSQLMockProvider()
 	require.NoError(t, err)

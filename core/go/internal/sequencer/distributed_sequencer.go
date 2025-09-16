@@ -569,8 +569,6 @@ func (dSmgr *distributedSequencerManager) HandleTransactionConfirmed(ctx context
 }
 
 func (dSmgr *distributedSequencerManager) HandleNonceAssigned(ctx context.Context, nonce uint64, contractAddress string, txID uuid.UUID) error {
-	log.L(dSmgr.ctx).Debug("[Sequencer] HandleNonceAssigned")
-
 	// Get the sequencer for the signer address
 	sequencer, err := dSmgr.LoadSequencer(ctx, dSmgr.components.Persistence().NOTX(), *pldtypes.MustEthAddress(contractAddress), nil, nil)
 	if err != nil {
@@ -592,9 +590,14 @@ func (dSmgr *distributedSequencerManager) HandleNonceAssigned(ctx context.Contex
 			return coordErr
 		}
 
-		senderNode := sequencer.GetCoordinator().GetTransactionByID(ctx, txID).SenderNode()
+		coordTx := sequencer.GetCoordinator().GetTransactionByID(ctx, txID)
+
+		if coordTx == nil {
+			return fmt.Errorf("transaction %s not found in coordinator, cannot handle nonce assignment event", txID)
+		}
 
 		// Forward the event to the sender
+		senderNode := coordTx.SenderNode()
 		transportWriter := sequencer.GetTransportWriter()
 		transportWriter.SendNonceAssigned(ctx, txID, senderNode, pldtypes.MustEthAddress(contractAddress), nonce)
 

@@ -221,7 +221,7 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 func (c *coordinator) HandleEvent(ctx context.Context, event common.Event) error {
 	log.L(ctx).Infof("[Sequencer] coordinator handling new event (contract address %s, active coordinator %s, committee %+v)", c.contractAddress, c.activeCoordinatorNode, c.senderNodePool)
 	for node, party := range c.senderNodePool {
-		log.L(ctx).Infof("[Sequencer] coordinator handling new event: party %s = %s", node, party)
+		log.L(ctx).Infof("[Sequencer] coordinator handling new event: party %d = %s", node, party)
 	}
 
 	if transactionEvent, ok := event.(transaction.Event); ok {

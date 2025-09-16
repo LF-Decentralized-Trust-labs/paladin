@@ -192,18 +192,18 @@ func (it *inFlightTransactionStageController) TriggerNewStageRun(ctx context.Con
 		Find(&txId).
 		Error
 	if err != nil {
-		log.L(ctx).Warnf("TriggerNewStageRun: context cancelled while retrieving binding for %s: %s", it.stateManager.GetPubTxnID(), err)
+		log.L(ctx).Warnf("TriggerNewStageRun: context cancelled while retrieving binding for %d: %s", it.stateManager.GetPubTxnID(), err)
 		return
 	}
 
 	if txId != "" {
 		txIdUUID, err = uuid.Parse(txId)
 		if err != nil {
-			log.L(ctx).Warnf("TriggerNewStageRun: context cancelled while retrieving binding for %s: %s", it.stateManager.GetPubTxnID(), err)
+			log.L(ctx).Warnf("TriggerNewStageRun: context cancelled while retrieving binding for %d: %s", it.stateManager.GetPubTxnID(), err)
 			return
 		}
 	} else {
-		log.L(ctx).Warnf("TriggerNewStageRun: retrieved empty transaction ID for %s", it.stateManager.GetPubTxnID())
+		log.L(ctx).Warnf("TriggerNewStageRun: retrieved empty transaction ID for %d", it.stateManager.GetPubTxnID())
 	}
 	it.stateManager.GetCurrentGeneration(ctx).StartNewStageContext(ctx, stage, substatus, txIdUUID)
 }

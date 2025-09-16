@@ -132,6 +132,7 @@ func (_ *NewBlockEvent) TypeString() string {
 }
 
 type HandoverReceivedEvent struct {
+	common.BaseEvent
 }
 
 func (_ *HandoverReceivedEvent) Type() EventType {

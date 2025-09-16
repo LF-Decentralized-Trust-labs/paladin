@@ -32,14 +32,14 @@ func TestCoordinator_InitializeOK(t *testing.T) {
 
 	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Idle).Build(ctx)
 
-	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 }
 
 func TestCoordinator_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
 	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Idle).
-		CommitteeMembers(sender)
+		SenderIdentityPool(sender)
 	c, _ := builder.Build(ctx)
 
 	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState())
@@ -50,7 +50,7 @@ func TestCoordinator_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Active, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Active, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 
 }
 
@@ -61,7 +61,7 @@ func TestCoordinator_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 
 	err := c.HandleEvent(ctx, &coordinator.HeartbeatReceivedEvent{})
 	assert.NoError(t, err)
-	assert.Equal(t, coordinator.State_Observing, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Observing, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 
 }
 
@@ -70,7 +70,7 @@ func TestCoordinator_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 	sender := "sender@senderNode"
 
 	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Observing).
-		CommitteeMembers(sender).
+		SenderIdentityPool(sender).
 		ActiveCoordinatorBlockHeight(200).
 		CurrentBlockHeight(194) // default tolerance is 5 so this is behind
 	c, _ := builder.Build(ctx)
@@ -81,7 +81,7 @@ func TestCoordinator_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Standby, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Standby, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 }
 
 func TestCoordinator_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
@@ -89,7 +89,7 @@ func TestCoordinator_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 	sender := "sender@senderNode"
 
 	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Observing).
-		CommitteeMembers(sender).
+		SenderIdentityPool(sender).
 		ActiveCoordinatorBlockHeight(200).
 		CurrentBlockHeight(195) // default tolerance is 5 so this is not behind
 	c, mocks := builder.Build(ctx)
@@ -100,7 +100,7 @@ func TestCoordinator_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Elect, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Elect, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 	assert.True(t, mocks.SentMessageRecorder.HasSentHandoverRequest(), "expected handover request to be sent")
 
 }
@@ -109,7 +109,7 @@ func TestCoordinator_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
 	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Standby).
-		CommitteeMembers(sender).
+		SenderIdentityPool(sender).
 		ActiveCoordinatorBlockHeight(200).
 		CurrentBlockHeight(194)
 	c, _ := builder.Build(ctx)
@@ -119,7 +119,7 @@ func TestCoordinator_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Elect, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Elect, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 }
 
 func TestCoordinator_Standby_NoTransition_OnNewBlock_IfStillBehind(t *testing.T) {
@@ -135,7 +135,7 @@ func TestCoordinator_Standby_NoTransition_OnNewBlock_IfStillBehind(t *testing.T)
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Standby, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Standby, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 	assert.False(t, mocks.SentMessageRecorder.HasSentHandoverRequest(), "handover request not expected to be sent")
 }
 
@@ -146,7 +146,7 @@ func TestCoordinator_Elect_ToPrepared_OnHandover(t *testing.T) {
 	err := c.HandleEvent(ctx, &coordinator.HandoverReceivedEvent{})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Prepared, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Prepared, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 }
 
 func TestCoordinator_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(t *testing.T) {
@@ -161,7 +161,7 @@ func TestCoordinator_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(t
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Active, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Active, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 
 	//TODO should have other test cases where there are multiple flush points across multiple signers ( and across multiple coordinators?)
 	//TODO test case where the nonce and signer match but hash does not.  This should still trigger the transition because there will never be another confirmed transaction for that nonce and signer
@@ -184,7 +184,7 @@ func TestCoordinator_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushCompl
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Prepared, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Prepared, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 
 }
 
@@ -203,7 +203,7 @@ func TestCoordinator_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFlig
 		Hash:  *soleTransaction.GetLatestSubmissionHash(),
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 
 }
 
@@ -224,7 +224,7 @@ func TestCoordinator_ActiveNoTransition_OnTransactionConfirmed_IfNotTransactions
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Active, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Active, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 }
 
 func TestCoordinator_Active_ToFlush_OnHandoverRequest(t *testing.T) {
@@ -242,7 +242,7 @@ func TestCoordinator_Active_ToFlush_OnHandoverRequest(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Flush, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Flush, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 
 }
 
@@ -265,7 +265,7 @@ func TestCoordinator_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *t
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Closing, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Closing, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 
 }
 
@@ -289,7 +289,7 @@ func TestCoordinator_FlushNoTransition_OnTransactionConfirmed_IfNotFlushComplete
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Flush, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Flush, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 
 }
 
@@ -306,7 +306,7 @@ func TestCoordinator_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExpi
 	err := c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 
 }
 
@@ -323,6 +323,6 @@ func TestCoordinator_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGracePe
 	err := c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
 
-	assert.Equal(t, coordinator.State_Closing, c.GetCurrentState(), "current state is %s", c.GetCurrentState().String())
+	assert.Equal(t, coordinator.State_Closing, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 
 }

@@ -6,6 +6,7 @@ package sender
 
 import (
 	"context"
+	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
@@ -38,6 +39,50 @@ type MockEvent_Expecter struct {
 
 func (_m *MockEvent) EXPECT() *MockEvent_Expecter {
 	return &MockEvent_Expecter{mock: &_m.Mock}
+}
+
+// GetEventTime provides a mock function for the type MockEvent
+func (_mock *MockEvent) GetEventTime() time.Time {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEventTime")
+	}
+
+	var r0 time.Time
+	if returnFunc, ok := ret.Get(0).(func() time.Time); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(time.Time)
+	}
+	return r0
+}
+
+// MockEvent_GetEventTime_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEventTime'
+type MockEvent_GetEventTime_Call struct {
+	*mock.Call
+}
+
+// GetEventTime is a helper method to define mock.On call
+func (_e *MockEvent_Expecter) GetEventTime() *MockEvent_GetEventTime_Call {
+	return &MockEvent_GetEventTime_Call{Call: _e.mock.On("GetEventTime")}
+}
+
+func (_c *MockEvent_GetEventTime_Call) Run(run func()) *MockEvent_GetEventTime_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockEvent_GetEventTime_Call) Return(time1 time.Time) *MockEvent_GetEventTime_Call {
+	_c.Call.Return(time1)
+	return _c
+}
+
+func (_c *MockEvent_GetEventTime_Call) RunAndReturn(run func() time.Time) *MockEvent_GetEventTime_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // Type provides a mock function for the type MockEvent
@@ -156,8 +201,8 @@ func (_m *MockMessageSender) EXPECT() *MockMessageSender_Expecter {
 }
 
 // SendAssembleResponse provides a mock function for the type MockMessageSender
-func (_mock *MockMessageSender) SendAssembleResponse(ctx context.Context, txID uuid.UUID, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, recipient string) {
-	_mock.Called(ctx, txID, requestID, postAssembly, recipient)
+func (_mock *MockMessageSender) SendAssembleResponse(ctx context.Context, txID uuid.UUID, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string) {
+	_mock.Called(ctx, txID, requestID, postAssembly, preAssembly, recipient)
 	return
 }
 
@@ -171,12 +216,13 @@ type MockMessageSender_SendAssembleResponse_Call struct {
 //   - txID uuid.UUID
 //   - requestID uuid.UUID
 //   - postAssembly *components.TransactionPostAssembly
+//   - preAssembly *components.TransactionPreAssembly
 //   - recipient string
-func (_e *MockMessageSender_Expecter) SendAssembleResponse(ctx interface{}, txID interface{}, requestID interface{}, postAssembly interface{}, recipient interface{}) *MockMessageSender_SendAssembleResponse_Call {
-	return &MockMessageSender_SendAssembleResponse_Call{Call: _e.mock.On("SendAssembleResponse", ctx, txID, requestID, postAssembly, recipient)}
+func (_e *MockMessageSender_Expecter) SendAssembleResponse(ctx interface{}, txID interface{}, requestID interface{}, postAssembly interface{}, preAssembly interface{}, recipient interface{}) *MockMessageSender_SendAssembleResponse_Call {
+	return &MockMessageSender_SendAssembleResponse_Call{Call: _e.mock.On("SendAssembleResponse", ctx, txID, requestID, postAssembly, preAssembly, recipient)}
 }
 
-func (_c *MockMessageSender_SendAssembleResponse_Call) Run(run func(ctx context.Context, txID uuid.UUID, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, recipient string)) *MockMessageSender_SendAssembleResponse_Call {
+func (_c *MockMessageSender_SendAssembleResponse_Call) Run(run func(ctx context.Context, txID uuid.UUID, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string)) *MockMessageSender_SendAssembleResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -194,9 +240,13 @@ func (_c *MockMessageSender_SendAssembleResponse_Call) Run(run func(ctx context.
 		if args[3] != nil {
 			arg3 = args[3].(*components.TransactionPostAssembly)
 		}
-		var arg4 string
+		var arg4 *components.TransactionPreAssembly
 		if args[4] != nil {
-			arg4 = args[4].(string)
+			arg4 = args[4].(*components.TransactionPreAssembly)
+		}
+		var arg5 string
+		if args[5] != nil {
+			arg5 = args[5].(string)
 		}
 		run(
 			arg0,
@@ -204,6 +254,7 @@ func (_c *MockMessageSender_SendAssembleResponse_Call) Run(run func(ctx context.
 			arg2,
 			arg3,
 			arg4,
+			arg5,
 		)
 	})
 	return _c
@@ -214,7 +265,7 @@ func (_c *MockMessageSender_SendAssembleResponse_Call) Return() *MockMessageSend
 	return _c
 }
 
-func (_c *MockMessageSender_SendAssembleResponse_Call) RunAndReturn(run func(ctx context.Context, txID uuid.UUID, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, recipient string)) *MockMessageSender_SendAssembleResponse_Call {
+func (_c *MockMessageSender_SendAssembleResponse_Call) RunAndReturn(run func(ctx context.Context, txID uuid.UUID, requestID uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string)) *MockMessageSender_SendAssembleResponse_Call {
 	_c.Run(run)
 	return _c
 }

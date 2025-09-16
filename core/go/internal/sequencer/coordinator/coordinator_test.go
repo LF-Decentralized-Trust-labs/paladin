@@ -44,7 +44,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentity
 		emit:              func(event common.Event) {},
 	}
 
-	coordinator, err := NewCoordinator(ctx, nil, mocks.messageSender, senderIdentityPool, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1", nil, nil, nil)
+	coordinator, err := NewCoordinator(ctx, nil, mocks.messageSender, senderIdentityPool, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1", nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	return coordinator, mocks

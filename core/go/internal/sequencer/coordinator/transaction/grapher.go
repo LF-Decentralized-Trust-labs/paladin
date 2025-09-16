@@ -67,7 +67,7 @@ func (s *grapher) LookupMinter(ctx context.Context, stateID pldtypes.HexBytes) (
 func (s *grapher) AddMinter(ctx context.Context, stateID pldtypes.HexBytes, transaction *Transaction) error {
 	if txn, ok := s.transactionByOutputState[stateID.String()]; ok {
 		msg := fmt.Sprintf("Duplicate minter. stateID %s already indexed as minted by %s but attempted to add minter %s", stateID.String(), txn.ID.String(), transaction.ID.String())
-		log.L(ctx).Errorf(msg)
+		log.L(ctx).Error(msg)
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
 	s.transactionByOutputState[stateID.String()] = transaction
@@ -123,7 +123,7 @@ func SortTransactions(ctx context.Context, transactions []*Transaction) ([]*Tran
 			// If we didn't find any transaction with no dependencies, it means we have a circular dependency
 			// or some transactions are not in the input list, which should not happen in normal usage
 			msg := "Circular dependency detected or some transactions are not in the input list"
-			log.L(ctx).Errorf(msg)
+			log.L(ctx).Error(msg)
 			return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
 	}
