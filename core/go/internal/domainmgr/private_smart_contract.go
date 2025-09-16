@@ -453,49 +453,8 @@ func (dc *domainContract) EndorseTransaction(dCtx components.DomainContext, read
 		req.InfoStates == nil ||
 		req.Endorsement == nil ||
 		req.Endorser == nil {
-		// Log transaction specification
-		log.L(dCtx.Ctx()).Infof("Transaction specification: %+v", req.TransactionSpecification)
-		// Log verifiers
-		log.L(dCtx.Ctx()).Infof("Verifiers: %+v", req.Verifiers)
-		// Log signatures
-		log.L(dCtx.Ctx()).Infof("Signatures: %+v", req.Signatures)
-		// Log input states
-		log.L(dCtx.Ctx()).Infof("Input states: %+v", req.InputStates)
-		// Log read states
-		log.L(dCtx.Ctx()).Infof("Read states: %+v", req.ReadStates)
-		// Log output states
-		log.L(dCtx.Ctx()).Infof("Output states: %+v", req.OutputStates)
-		// Log info states
-		log.L(dCtx.Ctx()).Infof("Info states: %+v", req.InfoStates)
-		// Log endorsement
-		log.L(dCtx.Ctx()).Infof("Endorsement: %+v", req.Endorsement)
-		// Log endorser
-		log.L(dCtx.Ctx()).Infof("Endorser: %+v", req.Endorser)
-		// Log all fields
-		log.L(dCtx.Ctx()).Infof("EndorseTransaction request is incomplete: %+v", req)
 		return nil, i18n.NewError(dCtx.Ctx(), msgs.MsgDomainReqIncompleteEndorseTransaction)
 	}
-
-	// Log transaction specification
-	log.L(dCtx.Ctx()).Infof("Transaction specification: %+v", req.TransactionSpecification)
-	// Log verifiers
-	log.L(dCtx.Ctx()).Infof("Verifiers: %+v", req.Verifiers)
-	// Log signatures
-	log.L(dCtx.Ctx()).Infof("Signatures: %+v", req.Signatures)
-	// Log input states
-	log.L(dCtx.Ctx()).Infof("Input states: %+v", req.InputStates)
-	// Log read states
-	log.L(dCtx.Ctx()).Infof("Read states: %+v", req.ReadStates)
-	// Log output states
-	log.L(dCtx.Ctx()).Infof("Output states: %+v", req.OutputStates)
-	// Log info states
-	log.L(dCtx.Ctx()).Infof("Info states: %+v", req.InfoStates)
-	// Log endorsement
-	log.L(dCtx.Ctx()).Infof("Endorsement: %+v", req.Endorsement)
-	// Log endorser
-	log.L(dCtx.Ctx()).Infof("Endorser: %+v", req.Endorser)
-	// Log all fields
-	log.L(dCtx.Ctx()).Infof("EndorseTransaction request: %+v", req)
 
 	c := dc.d.newInFlightDomainRequest(readTX, dCtx, true)
 	defer c.close()

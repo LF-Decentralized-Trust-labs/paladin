@@ -7,6 +7,7 @@ package sequencer
 import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -125,6 +126,52 @@ func (_c *MockDistributedSequencer_GetSender_Call) Return(seqSender sender.SeqSe
 }
 
 func (_c *MockDistributedSequencer_GetSender_Call) RunAndReturn(run func() sender.SeqSender) *MockDistributedSequencer_GetSender_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetTransportWriter provides a mock function for the type MockDistributedSequencer
+func (_mock *MockDistributedSequencer) GetTransportWriter() transport.TransportWriter {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTransportWriter")
+	}
+
+	var r0 transport.TransportWriter
+	if returnFunc, ok := ret.Get(0).(func() transport.TransportWriter); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(transport.TransportWriter)
+		}
+	}
+	return r0
+}
+
+// MockDistributedSequencer_GetTransportWriter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTransportWriter'
+type MockDistributedSequencer_GetTransportWriter_Call struct {
+	*mock.Call
+}
+
+// GetTransportWriter is a helper method to define mock.On call
+func (_e *MockDistributedSequencer_Expecter) GetTransportWriter() *MockDistributedSequencer_GetTransportWriter_Call {
+	return &MockDistributedSequencer_GetTransportWriter_Call{Call: _e.mock.On("GetTransportWriter")}
+}
+
+func (_c *MockDistributedSequencer_GetTransportWriter_Call) Run(run func()) *MockDistributedSequencer_GetTransportWriter_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockDistributedSequencer_GetTransportWriter_Call) Return(transportWriter transport.TransportWriter) *MockDistributedSequencer_GetTransportWriter_Call {
+	_c.Call.Return(transportWriter)
+	return _c
+}
+
+func (_c *MockDistributedSequencer_GetTransportWriter_Call) RunAndReturn(run func() transport.TransportWriter) *MockDistributedSequencer_GetTransportWriter_Call {
 	_c.Call.Return(run)
 	return _c
 }

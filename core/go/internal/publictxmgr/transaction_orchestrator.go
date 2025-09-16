@@ -430,7 +430,7 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 		}
 
 		for _, tx := range additional {
-			log.L(ctx).Infof("Retrieving binding for public TX ID %s", tx.PublicTxnID)
+			log.L(ctx).Infof("Retrieving binding for public TX ID %d", tx.PublicTxnID)
 			var txId string
 			err := oc.p.DB().
 				Table("public_txn_bindings").
@@ -439,10 +439,10 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 				Find(&txId).
 				Error
 			if err != nil {
-				log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %s: %s", tx.PublicTxnID, err)
+				log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %d: %s", tx.PublicTxnID, err)
 				continue
 			}
-			log.L(ctx).Infof("Retrieved binding for public TX ID %s: %s", tx.PublicTxnID, txId)
+			log.L(ctx).Infof("Retrieved binding for public TX ID %d: %s", tx.PublicTxnID, txId)
 			if tx.Binding == nil {
 				tx.Binding = &DBPublicTxnBinding{}
 			}
@@ -450,25 +450,25 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 				// Convert txId to UUID
 				txIdUUID, err := uuid.Parse(txId)
 				if err != nil {
-					log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %s: %s", tx.PublicTxnID, err)
+					log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %d: %s", tx.PublicTxnID, err)
 					continue
 				}
 				tx.Binding.Transaction = txIdUUID
 			}
 			if oc.sequencerManager == nil {
-				log.L(ctx).Warnf("Orchestrator poll and process: sequencer manager is nil for %s", tx.PublicTxnID)
+				log.L(ctx).Warnf("Orchestrator poll and process: sequencer manager is nil for %d", tx.PublicTxnID)
 			} else {
 				if tx.To == nil {
-					log.L(ctx).Warnf("Orchestrator poll and process: to address is nil for %s", tx.PublicTxnID)
+					log.L(ctx).Warnf("Orchestrator poll and process: to address is nil for %d", tx.PublicTxnID)
 				} else {
 					if tx.Binding == nil {
-						log.L(ctx).Warnf("Orchestrator poll and process: binding is nil for %s", tx.PublicTxnID)
+						log.L(ctx).Warnf("Orchestrator poll and process: binding is nil for %d", tx.PublicTxnID)
 					} else {
 						err = oc.sequencerManager.HandleTransactionCollected(ctx, oc.signingAddress.String(), tx.To.String(), tx.Binding.Transaction)
 						if err != nil {
-							log.L(ctx).Warnf("Orchestrator poll and process: error while handing TX collected to sequencer for %s: %s", tx.PublicTxnID, err)
+							log.L(ctx).Warnf("Orchestrator poll and process: error while handing TX collected to sequencer for %d: %s", tx.PublicTxnID, err)
 						}
-						log.L(ctx).Infof("Retrieved binding for public TX ID %s: %s", tx.PublicTxnID, txId)
+						log.L(ctx).Infof("Retrieved binding for public TX ID %d: %s", tx.PublicTxnID, txId)
 					}
 				}
 			}

@@ -1066,7 +1066,7 @@ func TestChainedPrivateTXInsertWithIdempotencyKeys(t *testing.T) {
 		mockDomainContractResolve(t, "domain1"),
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
 			// Only the parent Txn we create will get a callback
-			mc.privateTxMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			mc.sequencerMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		},
 	)
 	defer done()

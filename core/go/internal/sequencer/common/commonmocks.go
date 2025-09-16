@@ -6,6 +6,7 @@ package common
 
 import (
 	"context"
+	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/google/uuid"
@@ -737,6 +738,52 @@ func (_c *MockEngineIntegration_GetStateLocks_Call) RunAndReturn(run func(ctx co
 	return _c
 }
 
+// ResetTransactions provides a mock function for the type MockEngineIntegration
+func (_mock *MockEngineIntegration) ResetTransactions(ctx context.Context, transactionID uuid.UUID) {
+	_mock.Called(ctx, transactionID)
+	return
+}
+
+// MockEngineIntegration_ResetTransactions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResetTransactions'
+type MockEngineIntegration_ResetTransactions_Call struct {
+	*mock.Call
+}
+
+// ResetTransactions is a helper method to define mock.On call
+//   - ctx context.Context
+//   - transactionID uuid.UUID
+func (_e *MockEngineIntegration_Expecter) ResetTransactions(ctx interface{}, transactionID interface{}) *MockEngineIntegration_ResetTransactions_Call {
+	return &MockEngineIntegration_ResetTransactions_Call{Call: _e.mock.On("ResetTransactions", ctx, transactionID)}
+}
+
+func (_c *MockEngineIntegration_ResetTransactions_Call) Run(run func(ctx context.Context, transactionID uuid.UUID)) *MockEngineIntegration_ResetTransactions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockEngineIntegration_ResetTransactions_Call) Return() *MockEngineIntegration_ResetTransactions_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockEngineIntegration_ResetTransactions_Call) RunAndReturn(run func(ctx context.Context, transactionID uuid.UUID)) *MockEngineIntegration_ResetTransactions_Call {
+	_c.Run(run)
+	return _c
+}
+
 // WriteLockAndDistributeStatesForTransaction provides a mock function for the type MockEngineIntegration
 func (_mock *MockEngineIntegration) WriteLockAndDistributeStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
 	ret := _mock.Called(ctx, txn)
@@ -819,6 +866,50 @@ type MockEvent_Expecter struct {
 
 func (_m *MockEvent) EXPECT() *MockEvent_Expecter {
 	return &MockEvent_Expecter{mock: &_m.Mock}
+}
+
+// GetEventTime provides a mock function for the type MockEvent
+func (_mock *MockEvent) GetEventTime() time.Time {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEventTime")
+	}
+
+	var r0 time.Time
+	if returnFunc, ok := ret.Get(0).(func() time.Time); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(time.Time)
+	}
+	return r0
+}
+
+// MockEvent_GetEventTime_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEventTime'
+type MockEvent_GetEventTime_Call struct {
+	*mock.Call
+}
+
+// GetEventTime is a helper method to define mock.On call
+func (_e *MockEvent_Expecter) GetEventTime() *MockEvent_GetEventTime_Call {
+	return &MockEvent_GetEventTime_Call{Call: _e.mock.On("GetEventTime")}
+}
+
+func (_c *MockEvent_GetEventTime_Call) Run(run func()) *MockEvent_GetEventTime_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockEvent_GetEventTime_Call) Return(time1 time.Time) *MockEvent_GetEventTime_Call {
+	_c.Call.Return(time1)
+	return _c
+}
+
+func (_c *MockEvent_GetEventTime_Call) RunAndReturn(run func() time.Time) *MockEvent_GetEventTime_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // Type provides a mock function for the type MockEvent

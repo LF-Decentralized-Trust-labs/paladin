@@ -53,7 +53,7 @@ func action_SendDelegationRequest(ctx context.Context, s *sender) error {
 		})
 		if err != nil {
 			msg := fmt.Sprintf("[Sequencer] error handling delegated event for transaction %s: %v", txn.ID, err)
-			log.L(ctx).Errorf(msg)
+			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
 	}

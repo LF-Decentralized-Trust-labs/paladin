@@ -125,13 +125,13 @@ func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persisten
 
 func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) {
 	for _, completion := range txCompletions {
-		// Private transaction manager needs to know about these to update its in-memory state
+		// The sequencer manager needs to know about these to update its in-memory state
 
 		pubBindingTx, err := dm.publicTxManager.QueryPublicTxForTransactions(dm.bgCtx, dm.persistence.NOTX(), []uuid.UUID{completion.TransactionID}, nil)
 		if err != nil {
 			log.L(dm.bgCtx).Errorf("Error getting public transaction by ID: %s", err)
 		}
-		// MRW TODO - there may be multiple public transactions associated with a private transaction
+
 		for _, pubTx := range pubBindingTx {
 			for _, publicTx := range pubTx {
 				log.L(dm.bgCtx).Debugf("Checking public transactions for TX ID %s to find a match for the receipt we are processing %s", completion.TransactionID, publicTx.TransactionHash)
@@ -290,7 +290,6 @@ func (d *domain) recoverTransactionID(ctx context.Context, txIDString string) (*
 }
 
 func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX persistence.DBTX, addr pldtypes.EthAddress, batch *pscEventBatch) (*prototk.HandleEventBatchResponse, error) {
-
 	// We have a domain context for queries, but we never flush it to DB - as the only updates
 	// we allow in this function are those performed within our dbTX.
 	c := d.newInFlightDomainRequest(dbTX, d.dm.stateStore.NewDomainContext(ctx, d, addr), false /* write enabled */)

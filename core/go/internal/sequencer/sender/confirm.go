@@ -76,7 +76,7 @@ func (s *sender) confirmTransaction(
 		})
 		if err != nil {
 			msg := fmt.Sprintf("[Sequencer] error handling confirmed success event for transaction %s: %v", txn.ID, err)
-			log.L(ctx).Errorf(msg)
+			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
 	} else {
@@ -88,7 +88,7 @@ func (s *sender) confirmTransaction(
 		})
 		if err != nil {
 			msg := fmt.Sprintf("[Sequencer] error handling confirmed revert event for transaction %s: %v", txn.ID, err)
-			log.L(ctx).Errorf(msg)
+			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
 	}
