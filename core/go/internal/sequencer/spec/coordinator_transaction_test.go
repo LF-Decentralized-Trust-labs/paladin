@@ -310,7 +310,7 @@ func TestCoordinatorTransaction_Endorsement_Gathering_ToConfirmingDispatch_OnEnd
 	err := txn.HandleEvent(ctx, builder.BuildEndorsedEvent(2))
 	assert.NoError(t, err)
 
-	assert.Equal(t, transaction.State_Confirming_Dispatch, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+	assert.Equal(t, transaction.State_Confirming_Dispatchable, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 	assert.True(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationRequest(), "expected a dispatch confirmation request to be sent, but none were sent")
 
 }
@@ -374,7 +374,7 @@ func TestCoordinatorTransaction_Endorsement_Gathering_ToPooled_OnEndorseRejected
 
 func TestCoordinatorTransaction_ConfirmingDispatch_NudgeRequest_OnRequestTimeout(t *testing.T) {
 	ctx := context.Background()
-	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatch)
+	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatchable)
 	txn, mocks := builder.BuildWithMocks()
 	assert.Equal(t, 1, mocks.SentMessageRecorder.NumberOfSentDispatchConfirmationRequests())
 
@@ -388,14 +388,14 @@ func TestCoordinatorTransaction_ConfirmingDispatch_NudgeRequest_OnRequestTimeout
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, mocks.SentMessageRecorder.NumberOfSentDispatchConfirmationRequests())
-	assert.Equal(t, transaction.State_Confirming_Dispatch, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+	assert.Equal(t, transaction.State_Confirming_Dispatchable, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
 func TestCoordinatorTransaction_ConfirmingDispatch_ToReadyForDispatch_OnDispatchConfirmed(t *testing.T) {
 	ctx := context.Background()
-	txn, mocks := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatch).BuildWithMocks()
+	txn, mocks := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatchable).BuildWithMocks()
 
-	err := txn.HandleEvent(ctx, &transaction.DispatchConfirmedEvent{
+	err := txn.HandleEvent(ctx, &transaction.DispatchRequestApprovedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
@@ -408,9 +408,9 @@ func TestCoordinatorTransaction_ConfirmingDispatch_ToReadyForDispatch_OnDispatch
 
 func TestCoordinatorTransaction_ConfirmingDispatch_NoTransition_OnDispatchConfirmed_IfResponseDoesNotMatchPendingRequest(t *testing.T) {
 	ctx := context.Background()
-	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatch).Build()
+	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatchable).Build()
 
-	err := txn.HandleEvent(ctx, &transaction.DispatchConfirmedEvent{
+	err := txn.HandleEvent(ctx, &transaction.DispatchRequestApprovedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
@@ -418,7 +418,7 @@ func TestCoordinatorTransaction_ConfirmingDispatch_NoTransition_OnDispatchConfir
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, transaction.State_Confirming_Dispatch, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
+	assert.Equal(t, transaction.State_Confirming_Dispatchable, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
 func TestCoordinatorTransaction_Blocked_ToConfirmingDispatch_OnDependencyReady_IfNotHasDependenciesNotReady(t *testing.T) {
@@ -435,7 +435,7 @@ func TestCoordinatorTransaction_Blocked_ToConfirmingDispatch_OnDependencyReady_I
 		Grapher(grapher)
 	txnB := builderB.Build()
 
-	builderC := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatch).
+	builderC := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatchable).
 		Grapher(grapher)
 	txnC, mocksC := builderC.BuildWithMocks()
 
@@ -450,7 +450,7 @@ func TestCoordinatorTransaction_Blocked_ToConfirmingDispatch_OnDependencyReady_I
 	//Was in 2 minds whether to a) trigger transaction A indirectly by causing C to become ready via a dispatch confirmation event or b) trigger it directly by sending a dependency ready event
 	// decided on (a) as it is slightly less white box and less brittle to future refactoring of the implementation
 
-	err := txnC.HandleEvent(ctx, &transaction.DispatchConfirmedEvent{
+	err := txnC.HandleEvent(ctx, &transaction.DispatchRequestApprovedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txnC.ID,
 		},
@@ -458,7 +458,7 @@ func TestCoordinatorTransaction_Blocked_ToConfirmingDispatch_OnDependencyReady_I
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, transaction.State_Confirming_Dispatch, txnA.GetCurrentState(), "current state is %s", txnA.GetCurrentState().String())
+	assert.Equal(t, transaction.State_Confirming_Dispatchable, txnA.GetCurrentState(), "current state is %s", txnA.GetCurrentState().String())
 
 }
 
@@ -471,11 +471,11 @@ func TestCoordinatorTransaction_BlockedNoTransition_OnDependencyReady_IfHasDepen
 	//we need 3 transactions to know about each other so they need to share a state index
 	grapher := transaction.NewGrapher(ctx)
 
-	builderB := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatch).
+	builderB := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatchable).
 		Grapher(grapher)
 	txnB, mocksB := builderB.BuildWithMocks()
 
-	builderC := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatch).
+	builderC := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatchable).
 		Grapher(grapher)
 	txnC := builderC.Build()
 
@@ -490,7 +490,7 @@ func TestCoordinatorTransaction_BlockedNoTransition_OnDependencyReady_IfHasDepen
 	//Was in 2 minds whether to a) trigger transaction A indirectly by causing B to become ready via a dispatch confirmation event or b) trigger it directly by sending a dependency ready event
 	// decided on (a) as it is slightly less white box and less brittle to future refactoring of the implementation
 
-	err := txnB.HandleEvent(ctx, &transaction.DispatchConfirmedEvent{
+	err := txnB.HandleEvent(ctx, &transaction.DispatchRequestApprovedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txnB.ID,
 		},

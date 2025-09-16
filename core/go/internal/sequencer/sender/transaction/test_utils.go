@@ -41,11 +41,12 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 	return &SentMessageRecorder{}
 }
 
-func (r *SentMessageRecorder) SendDispatchConfirmationResponse(ctx context.Context) {
+func (r *SentMessageRecorder) SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
 	r.hasSentConfirmationResponse = true
+	return nil
 }
 
-func (r *SentMessageRecorder) HasSentDispatchConfirmationResponse() bool {
+func (r *SentMessageRecorder) HasSentPreDispatchResponse() bool {
 	return r.hasSentConfirmationResponse
 }
 

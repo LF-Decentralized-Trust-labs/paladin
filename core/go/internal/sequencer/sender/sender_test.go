@@ -125,7 +125,7 @@ func TestSender_SingleTransactionLifecycle(t *testing.T) {
 	assert.True(t, mocks.SentMessageRecorder.HasSentAssembleSuccessResponse())
 
 	//Simulate the coordinator sending a dispatch confirmation
-	err = s.HandleEvent(ctx, &transaction.DispatchConfirmationRequestReceivedEvent{
+	err = s.HandleEvent(ctx, &transaction.PreDispatchRequestReceivedEvent{
 		BaseEvent: transaction.BaseEvent{
 			TransactionID: txn.ID,
 		},
@@ -136,7 +136,7 @@ func TestSender_SingleTransactionLifecycle(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Assert that a dispatch confirmation was returned
-	assert.True(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationResponse())
+	assert.True(t, mocks.SentMessageRecorder.HasSentPreDispatchResponse())
 
 	//simulate the coordinator sending a heartbeat after the transaction was submitted
 	signerAddress := pldtypes.RandAddress()

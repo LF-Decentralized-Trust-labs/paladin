@@ -25,28 +25,28 @@ import (
 )
 
 func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uuid.UUID) error {
-	t.pendingDispatchConfirmationRequest = nil
+	t.pendingPreDispatchRequest = nil
 	return nil
 }
 
-func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error {
+func (t *Transaction) sendPreDispatchRequest(ctx context.Context) error {
 
 	log.L(ctx).Debugf("[Sequencer] Sending dispatch confirmation request for transaction %s", t.ID)
 	log.L(ctx).Debugf("[Sequencer] Do we have endorsements or signatures?")
 	log.L(ctx).Debugf("[Sequencer] %d endorsements", len(t.PostAssembly.Endorsements))
 	log.L(ctx).Debugf("[Sequencer] %d signatures", len(t.PostAssembly.Signatures))
 
-	if t.pendingDispatchConfirmationRequest == nil {
+	if t.pendingPreDispatchRequest == nil {
 		hash, err := t.Hash(ctx)
 		if err != nil {
 			log.L(ctx).Debugf("[Sequencer] Error hashing transaction for dispatch confirmation request: %s", err)
 			return err
 		}
 		log.L(ctx).Debugf("[Sequencer] Creating idempotent request for dispatch confirmation request")
-		t.pendingDispatchConfirmationRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
+		t.pendingPreDispatchRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
 
 			log.L(ctx).Debugf("[Sequencer] Calling SendDispatchConfirmationRequest")
-			return t.messageSender.SendDispatchConfirmationRequest(
+			return t.messageSender.SendPreDispatchRequest(
 				ctx,
 				t.sender,
 				idempotencyKey,
@@ -63,39 +63,39 @@ func (t *Transaction) sendDispatchConfirmationRequest(ctx context.Context) error
 		})
 	}
 
-	sendErr := t.pendingDispatchConfirmationRequest.Nudge(ctx)
+	sendErr := t.pendingPreDispatchRequest.Nudge(ctx)
 
 	// MRW TODO - we are the ones doing the dispatching, so after we've informed the sender we can just update our own state?
-	t.HandleEvent(ctx, &DispatchConfirmedEvent{
-		BaseCoordinatorEvent: BaseCoordinatorEvent{
-			TransactionID: t.ID,
-		},
-		RequestID: t.pendingDispatchConfirmationRequest.IdempotencyKey(),
-	})
+	// t.HandleEvent(ctx, &DispatchConfirmedEvent{
+	// 	BaseCoordinatorEvent: BaseCoordinatorEvent{
+	// 		TransactionID: t.ID,
+	// 	},
+	// 	RequestID: t.pendingDispatchConfirmationRequest.IdempotencyKey(),
+	// })
 
 	return sendErr
 
 }
-func (t *Transaction) nudgeDispatchConfirmationRequest(ctx context.Context) error {
-	if t.pendingDispatchConfirmationRequest == nil {
-		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "nudgeDispatchConfirmationRequest called with no pending request")
+func (t *Transaction) nudgePreDispatchRequest(ctx context.Context) error {
+	if t.pendingPreDispatchRequest == nil {
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "nudgePreDispatchRequest called with no pending request")
 	}
 
-	return t.pendingDispatchConfirmationRequest.Nudge(ctx)
+	return t.pendingPreDispatchRequest.Nudge(ctx)
 }
 
-func validator_MatchesPendingDispatchConfirmationRequest(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
+func validator_MatchesPendingPreDispatchRequest(ctx context.Context, txn *Transaction, event common.Event) (bool, error) {
 	switch event := event.(type) {
-	case *DispatchConfirmedEvent:
-		return txn.pendingDispatchConfirmationRequest != nil && txn.pendingDispatchConfirmationRequest.IdempotencyKey() == event.RequestID, nil
+	case *DispatchRequestApprovedEvent:
+		return txn.pendingPreDispatchRequest != nil && txn.pendingPreDispatchRequest.IdempotencyKey() == event.RequestID, nil
 	}
 	return false, nil
 }
 
-func action_SendDispatchConfirmationRequest(ctx context.Context, txn *Transaction) error {
-	return txn.sendDispatchConfirmationRequest(ctx)
+func action_SendPreDispatchRequest(ctx context.Context, txn *Transaction) error {
+	return txn.sendPreDispatchRequest(ctx)
 }
 
-func action_NudgeDispatchConfirmationRequest(ctx context.Context, txn *Transaction) error {
-	return txn.nudgeDispatchConfirmationRequest(ctx)
+func action_NudgePreDispatchRequest(ctx context.Context, txn *Transaction) error {
+	return txn.nudgePreDispatchRequest(ctx)
 }

@@ -64,13 +64,13 @@ type Transaction struct {
 	onCleanup                                        func(context.Context)                           // function to be called when the transaction is removed from memory, e.g. when it is confirmed or reverted
 	pendingEndorsementRequests                       map[string]map[string]*common.IdempotentRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
 	// Pending endorsements mutex
-	pendingEndorsementsMutex           sync.Mutex // MRW TODO still to confirm if this is needed
-	pendingDispatchConfirmationRequest *common.IdempotentRequest
-	latestError                        string
-	dependencies                       *pldapi.TransactionDependencies
-	previousTransaction                *Transaction
-	nextTransaction                    *Transaction
-	onReadyForDispatch                 func(context.Context, *Transaction)
+	pendingEndorsementsMutex  sync.Mutex // MRW TODO still to confirm if this is needed
+	pendingPreDispatchRequest *common.IdempotentRequest
+	latestError               string
+	dependencies              *pldapi.TransactionDependencies
+	previousTransaction       *Transaction
+	nextTransaction           *Transaction
+	onReadyForDispatch        func(context.Context, *Transaction)
 	// dependencies                                     []uuid.UUID //TODO figure out naming of these fields and their relationship with the PrivateTransaction fields
 	// dependents                                       []uuid.UUID
 

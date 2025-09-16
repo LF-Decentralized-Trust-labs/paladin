@@ -669,81 +669,6 @@ func (_c *MockMessageSender_SendAssembleRequest_Call) RunAndReturn(run func(ctx 
 	return _c
 }
 
-// SendDispatchConfirmationRequest provides a mock function for the type MockMessageSender
-func (_mock *MockMessageSender) SendDispatchConfirmationRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
-	ret := _mock.Called(ctx, transactionSender, idempotencyKey, transactionSpecification, hash)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SendDispatchConfirmationRequest")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uuid.UUID, *prototk.TransactionSpecification, *pldtypes.Bytes32) error); ok {
-		r0 = returnFunc(ctx, transactionSender, idempotencyKey, transactionSpecification, hash)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockMessageSender_SendDispatchConfirmationRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendDispatchConfirmationRequest'
-type MockMessageSender_SendDispatchConfirmationRequest_Call struct {
-	*mock.Call
-}
-
-// SendDispatchConfirmationRequest is a helper method to define mock.On call
-//   - ctx context.Context
-//   - transactionSender string
-//   - idempotencyKey uuid.UUID
-//   - transactionSpecification *prototk.TransactionSpecification
-//   - hash *pldtypes.Bytes32
-func (_e *MockMessageSender_Expecter) SendDispatchConfirmationRequest(ctx interface{}, transactionSender interface{}, idempotencyKey interface{}, transactionSpecification interface{}, hash interface{}) *MockMessageSender_SendDispatchConfirmationRequest_Call {
-	return &MockMessageSender_SendDispatchConfirmationRequest_Call{Call: _e.mock.On("SendDispatchConfirmationRequest", ctx, transactionSender, idempotencyKey, transactionSpecification, hash)}
-}
-
-func (_c *MockMessageSender_SendDispatchConfirmationRequest_Call) Run(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32)) *MockMessageSender_SendDispatchConfirmationRequest_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 uuid.UUID
-		if args[2] != nil {
-			arg2 = args[2].(uuid.UUID)
-		}
-		var arg3 *prototk.TransactionSpecification
-		if args[3] != nil {
-			arg3 = args[3].(*prototk.TransactionSpecification)
-		}
-		var arg4 *pldtypes.Bytes32
-		if args[4] != nil {
-			arg4 = args[4].(*pldtypes.Bytes32)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-			arg4,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMessageSender_SendDispatchConfirmationRequest_Call) Return(err error) *MockMessageSender_SendDispatchConfirmationRequest_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockMessageSender_SendDispatchConfirmationRequest_Call) RunAndReturn(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error) *MockMessageSender_SendDispatchConfirmationRequest_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // SendEndorsementRequest provides a mock function for the type MockMessageSender
 func (_mock *MockMessageSender) SendEndorsementRequest(ctx context.Context, transactionId uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error {
 	ret := _mock.Called(ctx, transactionId, idempotencyKey, party, attRequest, transactionSpecification, verifiers, signatures, inputStates, outputStates, infoStates)
@@ -962,6 +887,81 @@ func (_c *MockMessageSender_SendHeartbeat_Call) Return() *MockMessageSender_Send
 
 func (_c *MockMessageSender_SendHeartbeat_Call) RunAndReturn(run func(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot)) *MockMessageSender_SendHeartbeat_Call {
 	_c.Run(run)
+	return _c
+}
+
+// SendPreDispatchRequest provides a mock function for the type MockMessageSender
+func (_mock *MockMessageSender) SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
+	ret := _mock.Called(ctx, transactionSender, idempotencyKey, transactionSpecification, hash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SendPreDispatchRequest")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uuid.UUID, *prototk.TransactionSpecification, *pldtypes.Bytes32) error); ok {
+		r0 = returnFunc(ctx, transactionSender, idempotencyKey, transactionSpecification, hash)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockMessageSender_SendPreDispatchRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendPreDispatchRequest'
+type MockMessageSender_SendPreDispatchRequest_Call struct {
+	*mock.Call
+}
+
+// SendPreDispatchRequest is a helper method to define mock.On call
+//   - ctx context.Context
+//   - transactionSender string
+//   - idempotencyKey uuid.UUID
+//   - transactionSpecification *prototk.TransactionSpecification
+//   - hash *pldtypes.Bytes32
+func (_e *MockMessageSender_Expecter) SendPreDispatchRequest(ctx interface{}, transactionSender interface{}, idempotencyKey interface{}, transactionSpecification interface{}, hash interface{}) *MockMessageSender_SendPreDispatchRequest_Call {
+	return &MockMessageSender_SendPreDispatchRequest_Call{Call: _e.mock.On("SendPreDispatchRequest", ctx, transactionSender, idempotencyKey, transactionSpecification, hash)}
+}
+
+func (_c *MockMessageSender_SendPreDispatchRequest_Call) Run(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32)) *MockMessageSender_SendPreDispatchRequest_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 uuid.UUID
+		if args[2] != nil {
+			arg2 = args[2].(uuid.UUID)
+		}
+		var arg3 *prototk.TransactionSpecification
+		if args[3] != nil {
+			arg3 = args[3].(*prototk.TransactionSpecification)
+		}
+		var arg4 *pldtypes.Bytes32
+		if args[4] != nil {
+			arg4 = args[4].(*pldtypes.Bytes32)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *MockMessageSender_SendPreDispatchRequest_Call) Return(err error) *MockMessageSender_SendPreDispatchRequest_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockMessageSender_SendPreDispatchRequest_Call) RunAndReturn(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error) *MockMessageSender_SendPreDispatchRequest_Call {
+	_c.Call.Return(run)
 	return _c
 }
 

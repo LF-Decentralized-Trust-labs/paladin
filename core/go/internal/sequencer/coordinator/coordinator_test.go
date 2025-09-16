@@ -119,7 +119,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 
 	// Assert that the coordinator has sent a dispatch confirmation request to the transaction sender and respond with a dispatch confirmation
 	require.True(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationRequest())
-	err = c.HandleEvent(ctx, &transaction.DispatchConfirmedEvent{
+	err = c.HandleEvent(ctx, &transaction.DispatchRequestApprovedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},

@@ -47,9 +47,9 @@ type TransportWriter interface {
 	SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32)
 	SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes)
 	SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot)
-	SendDispatchConfirmationRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error
+	SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error
+	SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
 	SendDispatched(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
-	SendDispatchConfirmationResponse(ctx context.Context)
 	Send(ctx context.Context, payload *components.FireAndForgetMessageSend) error
 }
 
@@ -536,8 +536,8 @@ func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string,
 	}
 }
 
-func (tw *transportWriter) SendDispatchConfirmationRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
-	log.L(ctx).Infof("SendDispatchConfirmationRequest")
+func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
+	log.L(ctx).Info("SendPreDispatchRequest")
 
 	// MRW TODO - should dispatch confirmations also take the hash?
 	dispatchConfirmationRequest := &engineProto.TransactionDispatched{
@@ -560,12 +560,45 @@ func (tw *transportWriter) SendDispatchConfirmationRequest(ctx context.Context, 
 	}
 
 	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
-		MessageType: MessageType_DispatchConfirmationRequest,
+		MessageType: MessageType_PreDispatchRequest,
 		Payload:     dispatchConfirmationRequestBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Node:        node,
 	}); err != nil {
 		log.L(ctx).Errorf("[Sequencer] error sending dispatch confirmation request  message: %s", err)
+	}
+	return err
+}
+
+func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+	log.L(ctx).Info("SendPreDispatchResponse")
+
+	dispatchResponseEvent := &engineProto.TransactionDispatched{
+		Id:              idempotencyKey.String(),
+		TransactionId:   transactionSpecification.TransactionId,
+		ContractAddress: tw.contractAddress.HexString(),
+		Signer:          transactionSender,
+	}
+
+	dispatchResponseEventBytes, err := proto.Marshal(dispatchResponseEvent)
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] error marshalling dispatch confirmation request  message: %s", err)
+	}
+
+	// Split transactionSender into node and domain
+	parts := strings.Split(transactionSender, "@")
+	node := parts[0]
+	if len(parts) > 1 {
+		node = parts[1]
+	}
+
+	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+		MessageType: MessageType_PreDispatchResponse,
+		Payload:     dispatchResponseEventBytes,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
+		Node:        node,
+	}); err != nil {
+		log.L(ctx).Errorf("[Sequencer] error sending dispatched event: %s", err)
 	}
 	return err
 }
@@ -601,11 +634,6 @@ func (tw *transportWriter) SendDispatched(ctx context.Context, transactionSender
 		log.L(ctx).Errorf("[Sequencer] error sending dispatched event: %s", err)
 	}
 	return err
-}
-
-func (tw *transportWriter) SendDispatchConfirmationResponse(ctx context.Context) {
-	log.L(ctx).Errorf("[Sequencer] send dispatch confirmation response not implemented")
-	// MRW TODO - ?
 }
 
 func (tw *transportWriter) Send(ctx context.Context, payload *components.FireAndForgetMessageSend) error {

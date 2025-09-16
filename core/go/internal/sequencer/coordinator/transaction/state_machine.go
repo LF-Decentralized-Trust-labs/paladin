@@ -27,44 +27,44 @@ import (
 type State int
 
 const (
-	State_Initial               State = iota // Initial state before anything is calculated
-	State_Pooled                             // waiting in the pool to be assembled - TODO should rename to "Selectable" or "Selectable_Pooled".  Related to potential rename of `State_PreAssembly_Blocked`
-	State_PreAssembly_Blocked                // has not been assembled yet and cannot be assembled because a dependency never got assembled successfully - i.e. it was either Parked or Reverted is also blocked
-	State_Assembling                         // an assemble request has been sent but we are waiting for the response
-	State_Reverted                           // the transaction has been reverted by the assembler/sender
-	State_Endorsement_Gathering              // assembled and waiting for endorsement
-	State_Blocked                            // is fully endorsed but cannot proceed due to dependencies not being ready for dispatch
-	State_Confirming_Dispatch                // endorsed and waiting for dispatch confirmation
-	State_Ready_For_Dispatch                 // dispatch confirmation received and waiting to be collected by the dispatcher thread.Going into this state is the point of no return
-	State_Dispatched                         // collected by the dispatcher thread but not yet
-	State_Submitted                          // at least one submission has been made to the blockchain
-	State_Confirmed                          // "recently" confirmed on the base ledger.  NOTE: confirmed transactions are not held in memory for ever so getting a list of confirmed transactions will only return those confirmed recently
-	State_Final                              // final state for the transaction. Transactions are removed from memory as soon as they enter this state
+	State_Initial                 State = iota // Initial state before anything is calculated
+	State_Pooled                               // waiting in the pool to be assembled - TODO should rename to "Selectable" or "Selectable_Pooled".  Related to potential rename of `State_PreAssembly_Blocked`
+	State_PreAssembly_Blocked                  // has not been assembled yet and cannot be assembled because a dependency never got assembled successfully - i.e. it was either Parked or Reverted is also blocked
+	State_Assembling                           // an assemble request has been sent but we are waiting for the response
+	State_Reverted                             // the transaction has been reverted by the assembler/sender
+	State_Endorsement_Gathering                // assembled and waiting for endorsement
+	State_Blocked                              // is fully endorsed but cannot proceed due to dependencies not being ready for dispatch
+	State_Confirming_Dispatchable              // endorsed and waiting for confirmation that were are OK to dispatch. The sender can still request not to proceed at this point.
+	State_Ready_For_Dispatch                   // dispatch confirmation received and waiting to be collected by the dispatcher thread.Going into this state is the point of no return
+	State_Dispatched                           // collected by the dispatcher thread but not yet submitted
+	State_Submitted                            // at least one submission has been made to the blockchain
+	State_Confirmed                            // "recently" confirmed on the base ledger.  NOTE: confirmed transactions are not held in memory for ever so getting a list of confirmed transactions will only return those confirmed recently
+	State_Final                                // final state for the transaction. Transactions are removed from memory as soon as they enter this state
 )
 
 type EventType = common.EventType
 
 const (
-	Event_Received                     EventType = iota + common.Event_HeartbeatInterval + 1 // Transaction initially received by the coordinator.  Might seem redundant explicitly modeling this as an event rather than putting this logic into the constructor, but it is useful to make the initial state transition rules explicit in the state machine definitions
-	Event_Selected                                                                           // selected from the pool as the next transaction to be assembled
-	Event_AssembleRequestSent                                                                // assemble request sent to the assembler
-	Event_Assemble_Success                                                                   // assemble response received from the sender
-	Event_Assemble_Revert_Response                                                           // assemble response received from the sender with a revert reason
-	Event_Endorsed                                                                           // endorsement received from one endorser
-	Event_EndorsedRejected                                                                   // endorsement received from one endorser with a revert reason
-	Event_DependencyReady                                                                    // another transaction, for which this transaction has a dependency on, has become ready for dispatch
-	Event_DependencyAssembled                                                                // another transaction, for which this transaction has a dependency on, has been assembled
-	Event_DependencyReverted                                                                 // another transaction, for which this transaction has a dependency on, has been reverted
-	Event_DispatchConfirmed                                                                  // dispatch confirmation received from the sender
-	Event_DispatchConfirmationRejected                                                       // dispatch confirmation response received from the sender with a rejection
-	Event_Collected                                                                          // collected by the dispatcher thread
-	Event_NonceAllocated                                                                     // nonce allocated by the dispatcher thread
-	Event_Submitted                                                                          // submission made to the blockchain.  Each time this event is received, the submission hash is updated
-	Event_Confirmed                                                                          // confirmation received from the blockchain of either a successful or reverted transaction
-	Event_RequestTimeoutInterval                                                             // event emitted by the state machine on a regular period while we have pending requests
-	Event_StateTransition                                                                    // event emitted by the state machine when a state transition occurs.  TODO should this be a separate enum?
-	Event_HeartbeatInterval                                                                  // event emitted by the state machine on a regular period while we have pending requests
-	Event_AssembleTimeout                                                                    // the assemble timeout period has passed since we sent the first assemble request
+	Event_Received                 EventType = iota + common.Event_HeartbeatInterval + 1 // Transaction initially received by the coordinator.  Might seem redundant explicitly modeling this as an event rather than putting this logic into the constructor, but it is useful to make the initial state transition rules explicit in the state machine definitions
+	Event_Selected                                                                       // selected from the pool as the next transaction to be assembled
+	Event_AssembleRequestSent                                                            // assemble request sent to the assembler
+	Event_Assemble_Success                                                               // assemble response received from the sender
+	Event_Assemble_Revert_Response                                                       // assemble response received from the sender with a revert reason
+	Event_Endorsed                                                                       // endorsement received from one endorser
+	Event_EndorsedRejected                                                               // endorsement received from one endorser with a revert reason
+	Event_DependencyReady                                                                // another transaction, for which this transaction has a dependency on, has become ready for dispatch
+	Event_DependencyAssembled                                                            // another transaction, for which this transaction has a dependency on, has been assembled
+	Event_DependencyReverted                                                             // another transaction, for which this transaction has a dependency on, has been reverted
+	Event_DispatchRequestApproved                                                        // dispatch confirmation received from the sender
+	Event_DispatchRequestRejected                                                        // dispatch confirmation response received from the sender with a rejection
+	Event_Collected                                                                      // collected by the dispatcher thread
+	Event_NonceAllocated                                                                 // nonce allocated by the dispatcher thread
+	Event_Submitted                                                                      // submission made to the blockchain.  Each time this event is received, the submission hash is updated
+	Event_Confirmed                                                                      // confirmation received from the blockchain of either a successful or reverted transaction
+	Event_RequestTimeoutInterval                                                         // event emitted by the state machine on a regular period while we have pending requests
+	Event_StateTransition                                                                // event emitted by the state machine when a state transition occurs.  TODO should this be a separate enum?
+	Event_HeartbeatInterval                                                              // event emitted by the state machine on a regular period while we have pending requests
+	Event_AssembleTimeout                                                                // the assemble timeout period has passed since we sent the first assemble request
 )
 
 type StateMachine struct {
@@ -184,7 +184,7 @@ func init() {
 				Event_Endorsed: {
 					Transitions: []Transition{
 						{
-							To: State_Confirming_Dispatch,
+							To: State_Confirming_Dispatchable,
 							If: guard_And(guard_AttestationPlanFulfilled, guard_Not(guard_HasDependenciesNotReady)),
 						},
 						{
@@ -212,17 +212,17 @@ func init() {
 			Events: map[EventType]EventHandler{
 				Event_DependencyReady: {
 					Transitions: []Transition{{
-						To: State_Confirming_Dispatch,
+						To: State_Confirming_Dispatchable,
 						If: guard_And(guard_AttestationPlanFulfilled, guard_Not(guard_HasDependenciesNotReady)),
 					}},
 				},
 			},
 		},
-		State_Confirming_Dispatch: {
-			OnTransitionTo: action_SendDispatchConfirmationRequest,
+		State_Confirming_Dispatchable: {
+			OnTransitionTo: action_SendPreDispatchRequest,
 			Events: map[EventType]EventHandler{
-				Event_DispatchConfirmed: {
-					Validator: validator_MatchesPendingDispatchConfirmationRequest,
+				Event_DispatchRequestApproved: {
+					Validator: validator_MatchesPendingPreDispatchRequest,
 					Transitions: []Transition{
 						{
 							To: State_Ready_For_Dispatch,
@@ -230,7 +230,7 @@ func init() {
 				},
 				Event_RequestTimeoutInterval: {
 					Actions: []ActionRule{{
-						Action: action_NudgeDispatchConfirmationRequest,
+						Action: action_NudgePreDispatchRequest,
 					}},
 				},
 			},
@@ -386,7 +386,7 @@ func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error 
 		err = t.applyEndorsement(ctx, event.Endorsement, event.RequestID)
 	case *EndorsedRejectedEvent:
 		err = t.applyEndorsementRejection(ctx, event.RevertReason, event.Party, event.AttestationRequestName)
-	case *DispatchConfirmedEvent:
+	case *DispatchRequestApprovedEvent:
 		err = t.applyDispatchConfirmation(ctx, event.RequestID)
 	case *CollectedEvent:
 		t.signerAddress = &event.SignerAddress
@@ -510,7 +510,7 @@ func (s State) String() string {
 		return "State_Endorsement_Gathering"
 	case State_Blocked:
 		return "State_Blocked"
-	case State_Confirming_Dispatch:
+	case State_Confirming_Dispatchable:
 		return "State_Confirming_Dispatch"
 	case State_Ready_For_Dispatch:
 		return "State_Ready_For_Dispatch"

@@ -252,7 +252,7 @@ func TestCoordinator_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *t
 	//We have 2 transactions in flight but only one of them has passed the point of no return so we
 	// should consider the flush complete when that one is confirmed
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
-	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatch).Build()
+	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatchable).Build()
 
 	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Flush).
 		Transactions(delegation1, delegation2).

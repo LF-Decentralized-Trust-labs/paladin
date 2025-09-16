@@ -23,10 +23,12 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/testutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type identityForTesting struct {
@@ -134,7 +136,7 @@ func (r *SentMessageRecorder) SendEndorsementRequest(
 	return nil
 }
 
-func (r *SentMessageRecorder) SendDispatchConfirmationRequest(
+func (r *SentMessageRecorder) SendPreDispatchRequest(
 	ctx context.Context,
 	transactionSender string,
 	idempotencyKey uuid.UUID,
@@ -207,7 +209,7 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		//fine grained detail in this state needed to emulate what has already happened wrt endorsement requests and responses so far
 	case State_Blocked:
 		fallthrough
-	case State_Confirming_Dispatch:
+	case State_Confirming_Dispatchable:
 		fallthrough
 	case State_Ready_For_Dispatch:
 		fallthrough
@@ -310,6 +312,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 	if b.grapher == nil {
 		b.grapher = NewGrapher(ctx)
 	}
+	metrics := metrics.InitMetrics(ctx, prometheus.NewRegistry())
 
 	privateTransaction := b.privateTransactionBuilder.Build()
 
@@ -328,7 +331,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		nil,
 		func(context.Context) {},               // onCleanup function, not used in tests
 		func(context.Context, *Transaction) {}, // onReadyForDispatch function, not used in tests
-		nil,                                    // MRW TODO - mock metrics
+		metrics,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("Error from NewTransaction: %v", err))
@@ -341,7 +344,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 
 	if b.state == State_Endorsement_Gathering ||
 		b.state == State_Blocked ||
-		b.state == State_Confirming_Dispatch ||
+		b.state == State_Confirming_Dispatchable ||
 		b.state == State_Ready_For_Dispatch {
 
 		err := b.txn.applyPostAssembly(ctx, b.BuildPostAssembly())
@@ -401,4 +404,8 @@ func (b *TransactionBuilderForTesting) BuildEndorseRejectedEvent(endorserIndex i
 
 func (b *TransactionBuilderForTesting) BuildPostAssembly() *components.TransactionPostAssembly {
 	return b.privateTransactionBuilder.BuildPostAssembly()
+}
+
+func (b *TransactionBuilderForTesting) BuildPreAssembly() *components.TransactionPreAssembly {
+	return b.privateTransactionBuilder.BuildPreAssembly()
 }

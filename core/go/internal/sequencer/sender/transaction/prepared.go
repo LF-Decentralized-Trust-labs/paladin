@@ -18,6 +18,6 @@ import (
 	"context"
 )
 
-func action_ResendDispatchConfirmationResponse(ctx context.Context, txn *Transaction) error {
-	return action_SendDispatchConfirmationResponse(ctx, txn)
+func action_ResendPreDispatchResponse(ctx context.Context, txn *Transaction) error {
+	return action_SendPreDispatchResponse(ctx, txn)
 }
