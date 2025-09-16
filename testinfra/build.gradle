@@ -40,16 +40,17 @@ task besuBootstrapTool(type: Exec) {
     args "."
 }
 
+task startTestInfra(type: DockerCompose, dependsOn: tasks.besuBootstrapTool) {
+    composeFile 'docker-compose-test.yml'
+    projectName 'paladin-testinfra'
+    args 'up', '-d', '--wait', '--wait-timeout', 60
+}
+
+
 task stopTestInfra(type: DockerCompose) {
     composeFile 'docker-compose-test.yml'
     projectName 'paladin-testinfra'
     args 'down', '-v'
-}
-
-task startTestInfra(type: DockerCompose, dependsOn: [tasks.besuBootstrapTool, tasks.stopTestInfra]) {
-    composeFile 'docker-compose-test.yml'
-    projectName 'paladin-testinfra'
-    args 'up', '-d', '--wait', '--wait-timeout', 60
 }
 
 task removeBesuBootstrapTool(type: Exec, dependsOn: stopTestInfra) {

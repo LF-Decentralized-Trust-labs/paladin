@@ -166,7 +166,7 @@ task makeMocks(type: Exec, dependsOn: [":installMockery", protoc, goGet]) {
    executable "mockery"
 }
 
-task clean(type: Delete, dependsOn: [':testinfra:stopTestInfra', ':testinfra:stopTestInfraWithGas']) {
+task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
     delete "${buildDir}"
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
@@ -306,7 +306,7 @@ abstract class GasComponentTest extends Exec {
         args 'test'
         args './componenttest'
         args '-cover'
-        args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..." // toolkit handled seperately
+        args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..."
         args '-covermode=atomic'
         args '-timeout=120s'
         if (project.findProperty('verboseTests') == 'true') {
@@ -314,7 +314,7 @@ abstract class GasComponentTest extends Exec {
         }
         args "-test.gocoverdir=${project.projectDir}/coverage"
 
-        project.helpers.dumpLogsOnFailure(this, ':testinfra:startTestInfraWithGas')
+        project.helpers.dumpLogsOnFailure(this, ':testinfra:startTestInfra')
     }
 }
 
