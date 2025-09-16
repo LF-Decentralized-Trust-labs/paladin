@@ -85,7 +85,7 @@ func (kmsm *exampleSigningModule) ListKeys(ctx context.Context, req *prototk.Lis
 }
 
 func (kmsm *exampleSigningModule) Close(ctx context.Context, req *prototk.CloseRequest) (*prototk.CloseResponse, error) {
-	ctx = log.WithComponent(ctx, "examplesigningmodule")
+	// ctx = log.WithComponent(ctx, "examplesigningmodule")
 	kmsm.signingModule.Close()
 
 	return &prototk.CloseResponse{}, nil

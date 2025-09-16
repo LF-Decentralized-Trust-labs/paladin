@@ -177,7 +177,7 @@ func (gm *groupManager) AddMessageReceiver(ctx context.Context, name string, r c
 }
 
 func (gm *groupManager) GetMessageListener(ctx context.Context, name string) *pldapi.PrivacyGroupMessageListener {
-	ctx = log.WithComponent(ctx, log.Component("groupmanager"))
+	// ctx = log.WithComponent(ctx, log.Component("groupmanager"))
 	gm.messageListenerLock.Lock()
 	defer gm.messageListenerLock.Unlock()
 

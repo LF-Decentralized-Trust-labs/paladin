@@ -185,7 +185,7 @@ func (tm *txManager) AddReceiptReceiver(ctx context.Context, name string, r comp
 }
 
 func (tm *txManager) GetReceiptListener(ctx context.Context, name string) *pldapi.TransactionReceiptListener {
-	ctx = log.WithComponent(ctx, "txmanager")
+	// ctx = log.WithComponent(ctx, "txmanager")
 	tm.receiptListenerLock.Lock()
 	defer tm.receiptListenerLock.Unlock()
 
@@ -208,7 +208,7 @@ func (tm *txManager) StopReceiptListener(ctx context.Context, name string) error
 }
 
 func (tm *txManager) NotifyStatesDBChanged(ctx context.Context) {
-	ctx = log.WithComponent(ctx, "txmanager")
+	// ctx = log.WithComponent(ctx, "txmanager")
 	tm.lastStateUpdateTime.Store(int64(pldtypes.TimestampNow()))
 }
 

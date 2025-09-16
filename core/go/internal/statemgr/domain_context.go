@@ -84,7 +84,7 @@ func (ss *stateManager) NewDomainContext(ctx context.Context, domain components.
 
 // nil if not found
 func (ss *stateManager) GetDomainContext(ctx context.Context, id uuid.UUID) components.DomainContext {
-	ctx = log.WithComponent(ctx, "statemanager")
+	// ctx = log.WithComponent(ctx, "statemanager")
 	ss.domainContextLock.Lock()
 	defer ss.domainContextLock.Unlock()
 

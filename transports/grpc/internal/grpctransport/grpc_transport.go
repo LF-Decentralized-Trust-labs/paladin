@@ -299,7 +299,7 @@ func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessag
 }
 
 func (t *grpcTransport) GetLocalDetails(ctx context.Context, req *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error) {
-	ctx = log.WithComponent(ctx, "grpctransport")
+	// ctx = log.WithComponent(ctx, "grpctransport")
 
 	issuersText := new(strings.Builder)
 

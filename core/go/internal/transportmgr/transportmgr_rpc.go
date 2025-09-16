@@ -43,7 +43,7 @@ func (tm *transportManager) initRPC() {
 func (tm *transportManager) rpcNodeName() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod0(func(ctx context.Context,
 	) (string, error) {
-		ctx = log.WithComponent(ctx, "transportmanager")
+		// ctx = log.WithComponent(ctx, "transportmanager")
 		return tm.localNodeName, nil
 	})
 }
@@ -51,7 +51,7 @@ func (tm *transportManager) rpcNodeName() rpcserver.RPCHandler {
 func (tm *transportManager) rpcLocalTransports() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod0(func(ctx context.Context,
 	) ([]string, error) {
-		ctx = log.WithComponent(ctx, "transportmanager")
+		// ctx = log.WithComponent(ctx, "transportmanager")
 		return tm.getTransportNames(), nil
 	})
 }
@@ -67,14 +67,14 @@ func (tm *transportManager) rpcLocalTransportDetails() rpcserver.RPCHandler {
 
 func (tm *transportManager) rpcPeers() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod0(func(ctx context.Context) ([]*pldapi.PeerInfo, error) {
-		ctx = log.WithComponent(ctx, "transportmanager")
+		// ctx = log.WithComponent(ctx, "transportmanager")
 		return tm.listActivePeerInfo(), nil
 	})
 }
 
 func (tm *transportManager) rpcPeerInfo() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context, nodeName string) (*pldapi.PeerInfo, error) {
-		ctx = log.WithComponent(ctx, "transportmanager")
+		// ctx = log.WithComponent(ctx, "transportmanager")
 		return tm.getPeerInfo(nodeName), nil
 	})
 }

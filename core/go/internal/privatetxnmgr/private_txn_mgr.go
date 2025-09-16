@@ -955,7 +955,7 @@ func (p *privateTxManager) handleAssembleError(ctx context.Context, messagePaylo
 // into the reliability of the event delivery or maybe there is only a consumer of the event and it is responsible
 // for managing multiple subscribers and durability etc...
 func (p *privateTxManager) Subscribe(ctx context.Context, subscriber components.PrivateTxEventSubscriber) {
-	ctx = log.WithComponent(ctx, "privatetxnmanager")
+	// ctx = log.WithComponent(ctx, "privatetxnmanager")
 	p.subscribersLock.Lock()
 	defer p.subscribersLock.Unlock()
 	//TODO implement this
