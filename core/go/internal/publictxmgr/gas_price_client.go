@@ -21,7 +21,9 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"sync"
 	"text/template"
+	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
@@ -33,6 +35,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldresty"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/cache"
 	"github.com/go-resty/resty/v2"
 )
 
@@ -65,11 +68,19 @@ type HybridGasPriceClient struct {
 	// Gas oracle HTTP client for external gas price retrieval
 	gasOracleHTTPClient *resty.Client
 	gasOracleTemplate   *template.Template
+	gasOracleMethod     string
+	gasOracleBody       *string
 
 	// Eth fee history gas pricing configuration (always set with defaults so this works as a fallback option)
 	priorityFeePercentile int
 	historyBlockCount     int
 	baseFeeBufferFactor   int
+
+	// Shared cache for gas price data
+	gasPriceCache         cache.Cache[string, *pldapi.PublicTxGasPricing]
+	gasPriceRefreshTicker *time.Ticker
+	refreshTime           time.Duration
+	cacheMux              sync.RWMutex
 }
 
 func (hGpc *HybridGasPriceClient) HasZeroGasPrice(ctx context.Context) bool {
@@ -138,9 +149,15 @@ func (hGpc *HybridGasPriceClient) estimateEIP1559Fees(ctx context.Context) (*pld
 
 func (hGpc *HybridGasPriceClient) getGasPriceFromGasOracle(ctx context.Context) (*pldapi.PublicTxGasPricing, error) {
 	// Make HTTP request to the gas oracle API
-	resp, err := hGpc.gasOracleHTTPClient.R().
-		SetContext(ctx).
-		Get("")
+	req := hGpc.gasOracleHTTPClient.R().SetContext(ctx)
+
+	// Set body for methods that support it
+	if hGpc.gasOracleMethod != "GET" && hGpc.gasOracleBody != nil {
+		req = req.SetBody(*hGpc.gasOracleBody)
+	}
+
+	// Execute the request using the configured method
+	resp, err := req.Execute(hGpc.gasOracleMethod, "")
 	if err != nil {
 		log.L(ctx).Errorf("Failed to call gas oracle API: %+v", err)
 		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleAPICallFailed, err)
@@ -158,7 +175,8 @@ func (hGpc *HybridGasPriceClient) getGasPriceFromGasOracle(ctx context.Context) 
 		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleResponseParseFailed, err)
 	}
 
-	// Apply the template to extract gas price data
+	// Apply the template to extract gas price data - it should be impossible to hit this error because
+	// we've already validated the template in Init, but it's safest to still handle it here.
 	var templateResult bytes.Buffer
 	if templateErr := hGpc.gasOracleTemplate.Execute(&templateResult, responseData); templateErr != nil {
 		log.L(ctx).Errorf("Failed to execute gas oracle template: %+v", templateErr)
@@ -299,8 +317,9 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 	// 1. zero gas price chain
 	// 2. transaction fixed gas price
 	// 3. fixed gas price
-	// 4. gas oracle api
-	// 5. estimate EIP-1559 fees
+	// 4. cached gas price
+	// 5. gas oracle api
+	// 6. estimate EIP-1559 fees using eth_feeHistory
 	if hGpc.hasZeroGasPrice {
 		// if zero gas price chain, return zero gas price without any kind of retrieval/estimation
 		// there's no validation that we can do on a zero gas price chain so just return right away
@@ -321,7 +340,10 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 
 	if hGpc.fixedGasPrice != nil {
 		gpo = hGpc.fixedGasPrice
+	} else if found, cached := hGpc.getCachedGasPrice(ctx); found {
+		gpo = cached
 	} else {
+		// Get fresh data and cache it
 		var err error
 		if hGpc.gasOracleHTTPClient != nil {
 			gpo, err = hGpc.getGasPriceFromGasOracle(ctx)
@@ -331,6 +353,9 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 		if err != nil {
 			return nil, err
 		}
+
+		// Cache the result
+		hGpc.setCachedGasPrice(gpo)
 	}
 
 	gpo = hGpc.calculateNewGasPrice(previouslySubmittedGPO, gpo, underpriced)
@@ -394,19 +419,38 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 		}
 		hGpc.gasOracleHTTPClient = gasOracleClient
 
-		// Parse the template and return error if parsing fails
-		templateStr := hGpc.conf.GasOracleAPI.Template
+		// Set method and body with defaults from configuration
+		defaults := pldconf.PublicTxManagerDefaults
+		hGpc.gasOracleMethod = confutil.StringOrEmpty(hGpc.conf.GasOracleAPI.Method, *defaults.GasPrice.GasOracleAPI.Method)
+		hGpc.gasOracleBody = hGpc.conf.GasOracleAPI.Body
+
+		if hGpc.gasOracleMethod != resty.MethodGet &&
+			hGpc.gasOracleMethod != resty.MethodPost &&
+			hGpc.gasOracleMethod != resty.MethodPut &&
+			hGpc.gasOracleMethod != resty.MethodPatch {
+			log.L(ctx).Errorf("Invalid HTTP method: %s", hGpc.gasOracleMethod)
+			return i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleInvalidMethod, hGpc.gasOracleMethod)
+		}
+
+		// Parse the response template and return error if parsing fails
+		templateStr := hGpc.conf.GasOracleAPI.ResponseTemplate
 		if templateStr == "" {
-			log.L(ctx).Error("Gas oracle template is empty")
+			log.L(ctx).Error("Gas oracle response template is empty")
 			return i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleTemplateEmpty)
 		}
 		hGpc.gasOracleTemplate, err = template.New("gasOracle").Parse(templateStr)
 		if err != nil {
-			log.L(ctx).Errorf("Failed to parse gas oracle template: %+v", err)
+			log.L(ctx).Errorf("Failed to parse gas oracle response template: %+v", err)
 			return i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleTemplateParseFailed, err)
 		}
 
 		log.L(ctx).Infof("Initialized gas oracle HTTP client for URL: %s", hGpc.conf.GasOracleAPI.URL)
+
+		// Initialize caches based on configuration
+		if err := hGpc.initializeCaches(ctx); err != nil {
+			return err
+		}
+
 		return nil
 	}
 
@@ -420,6 +464,12 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 	hGpc.priorityFeePercentile = confutil.Int(hGpc.conf.EthFeeHistory.PriorityFeePercentile, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.PriorityFeePercentile)
 	hGpc.historyBlockCount = confutil.Int(hGpc.conf.EthFeeHistory.HistoryBlockCount, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.HistoryBlockCount)
 	hGpc.baseFeeBufferFactor = confutil.Int(hGpc.conf.EthFeeHistory.BaseFeeBufferFactor, *pldconf.PublicTxManagerDefaults.GasPrice.EthFeeHistory.BaseFeeBufferFactor)
+
+	// Initialize caches based on configuration
+	if err := hGpc.initializeCaches(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -440,12 +490,146 @@ func (hGpc *HybridGasPriceClient) Start(ctx context.Context, ethClient ethclient
 			log.L(ctx).Warnf("Could not determine gas price from eth_gasPrice: %v", err)
 		}
 	}
+
+	// Start cache refresh ticker if cache is enabled
+	if hGpc.gasPriceCache != nil {
+		hGpc.startGasPriceRefresh(ctx)
+	}
 }
 
 func NewGasPriceClient(ctx context.Context, conf *pldconf.GasPriceConfig) GasPriceClient {
 	return &HybridGasPriceClient{
 		conf: conf,
 	}
+}
+
+// initializeCaches initializes the shared gas price cache based on configuration
+func (hGpc *HybridGasPriceClient) initializeCaches(ctx context.Context) error {
+	// Determine which cache configuration to use (gas oracle takes precedence)
+	var cacheConfig *pldconf.GasPriceCacheConfig
+	var cacheType string
+
+	// Get defaults from configuration
+	defaults := pldconf.PublicTxManagerDefaults
+
+	if hGpc.conf.GasOracleAPI != nil && confutil.Bool(hGpc.conf.GasOracleAPI.Cache.Enabled, *defaults.GasPrice.GasOracleAPI.Cache.Enabled) {
+		cacheConfig = &hGpc.conf.GasOracleAPI.Cache
+		cacheType = "gas oracle"
+	} else if confutil.Bool(hGpc.conf.EthFeeHistory.Cache.Enabled, *defaults.GasPrice.EthFeeHistory.Cache.Enabled) {
+		cacheConfig = &hGpc.conf.EthFeeHistory.Cache
+		cacheType = "eth fee history"
+	}
+
+	// Initialize cache if enabled
+	if cacheConfig != nil {
+		// Parse refresh time using default from configuration
+		var defaultRefreshTime string
+		if cacheType == "gas oracle" {
+			defaultRefreshTime = *defaults.GasPrice.GasOracleAPI.Cache.RefreshTime
+		} else {
+			defaultRefreshTime = *defaults.GasPrice.EthFeeHistory.Cache.RefreshTime
+		}
+		refreshTimeStr := confutil.StringOrEmpty(cacheConfig.RefreshTime, defaultRefreshTime)
+		refreshTime, err := time.ParseDuration(refreshTimeStr)
+		if err != nil {
+			log.L(ctx).Errorf("Invalid %s cache refresh time: %s", cacheType, refreshTimeStr)
+			return i18n.NewError(ctx, msgs.MsgPublicTxMgrInvalidCacheRefreshTime, refreshTimeStr)
+		}
+		hGpc.refreshTime = refreshTime
+
+		// Create shared cache with capacity of 1 (only one gas price value)
+		cacheConf := &pldconf.CacheConfig{
+			Capacity: confutil.P(1),
+		}
+		hGpc.gasPriceCache = cache.NewCache[string, *pldapi.PublicTxGasPricing](cacheConf, cacheConf)
+
+		log.L(ctx).Infof("Initialized shared gas price cache (%s) with refresh time: %s", cacheType, refreshTimeStr)
+	}
+
+	return nil
+}
+
+// getCachedGasPrice retrieves gas price from cache if available
+// Returns true and the cached gas price if found, false otherwise
+func (hGpc *HybridGasPriceClient) getCachedGasPrice(ctx context.Context) (bool, *pldapi.PublicTxGasPricing) {
+	if hGpc.gasPriceCache == nil {
+		return false, nil
+	}
+
+	hGpc.cacheMux.RLock()
+	cached, found := hGpc.gasPriceCache.Get("gas_price")
+	hGpc.cacheMux.RUnlock()
+
+	if found {
+		log.L(ctx).Tracef("Using cached gas price")
+		return true, cached
+	}
+
+	return false, nil
+}
+
+// setCachedGasPrice stores gas price in cache if cache is available
+func (hGpc *HybridGasPriceClient) setCachedGasPrice(gasPrice *pldapi.PublicTxGasPricing) {
+	if hGpc.gasPriceCache == nil {
+		return
+	}
+
+	hGpc.cacheMux.Lock()
+	hGpc.gasPriceCache.Set("gas_price", gasPrice)
+	hGpc.cacheMux.Unlock()
+}
+
+// startGasPriceRefresh starts the background refresh goroutine using a ticker
+func (hGpc *HybridGasPriceClient) startGasPriceRefresh(ctx context.Context) {
+	if hGpc.gasPriceCache == nil {
+		return
+	}
+
+	// Create ticker for refresh interval
+	hGpc.gasPriceRefreshTicker = time.NewTicker(hGpc.refreshTime)
+
+	// Start background goroutine that waits for ticker or context cancellation
+	go func() {
+		defer hGpc.gasPriceRefreshTicker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				// Context cancelled, stop refreshing
+				return
+			case <-hGpc.gasPriceRefreshTicker.C:
+				// Ticker fired, refresh cache
+				hGpc.refreshGasPriceCache(ctx)
+			}
+		}
+	}()
+}
+
+// refreshGasPriceCache refreshes the shared gas price cache
+func (hGpc *HybridGasPriceClient) refreshGasPriceCache(ctx context.Context) {
+	if hGpc.gasPriceCache == nil {
+		return
+	}
+
+	log.L(ctx).Debugf("Refreshing gas price cache")
+
+	// Get fresh data based on which method is configured
+	var gasPrice *pldapi.PublicTxGasPricing
+	var err error
+
+	if hGpc.gasOracleHTTPClient != nil {
+		gasPrice, err = hGpc.getGasPriceFromGasOracle(ctx)
+	} else {
+		gasPrice, err = hGpc.estimateEIP1559Fees(ctx)
+	}
+
+	if err != nil {
+		log.L(ctx).Warnf("Failed to refresh gas price cache: %+v", err)
+		return
+	}
+
+	// Update cache
+	hGpc.setCachedGasPrice(gasPrice)
 }
 
 // mapConfigToAPIGasPricing converts configuration types to API types

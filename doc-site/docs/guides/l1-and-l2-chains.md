@@ -18,6 +18,37 @@ blockIndexer:
 
 Set the `fromBlock` to a recent block near the head of the base ledger chain you are using. Indexing should complete within a few minutes and Paladin can then confirm any new Paladin transactions that are mined into blocks.
 
+## Required confirmations
+
+For public chains, it's important to configure the `requiredConfirmations` setting to ensure transaction finality. The block indexer waits for a specified number of confirmations before marking a transaction as succeeded, which helps protect against chain reorganizations.
+
+### Default behavior
+
+By default, Paladin sets `requiredConfirmations` to `0`, meaning transactions are considered confirmed immediately when they appear in a block. This is suitable for private chains or test networks where chain reorganizations are rare.
+
+### Public chain considerations
+
+Public chains can experience chain reorganizations, especially during periods of network congestion or when multiple validators produce blocks at similar times. Setting `requiredConfirmations` to a higher value provides protection against these reorganizations.
+
+### Configuration example
+
+To set the required confirmations for a public chain, add the following to your configuration:
+
+```***
+blockIndexer:
+  fromBlock: 9024200
+  requiredConfirmations: 12
+```
+
+This configuration tells Paladin to wait for 12 block confirmations before considering a transaction as successfully confirmed. The block indexer will only process and mark transactions as succeeded after they have been included in a block that is at least 12 blocks behind the current chain head.
+
+### Trade-offs
+
+- **Higher confirmations**: More secure against reorganizations but slower transaction confirmation
+- **Lower confirmations**: Faster confirmation but higher risk of transaction reversal due to reorganizations
+
+Choose the number of confirmations based on your application's security requirements and the specific characteristics of the chain you're using.
+
 ## Gas price
 
 Most public chains, whether they are an L1 or an L2, will use paid gas for all transactions. Paladin uses EIP1559 transactions and must set a suitable `maxFeePerGas` and `maxPriorityFeePerGas` value in those transactions
@@ -76,12 +107,13 @@ publicTxManager:
   gasPrice:
     gasOracleAPI:
       url: "https://api.example.com/gas"
+      method: "GET"
       auth:
         username: "your-username"
         password: "your-password"
       httpHeaders:
         X-API-Key: "your-api-key-here"
-      template: |
+      responseTemplate: |
         {
           "maxFeePerGas": "{{.maxFeePerGas}}",
           "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
@@ -91,15 +123,46 @@ publicTxManager:
 Configuration options:
 
 - **`url`**: The HTTP endpoint URL for the gas oracle API
-- **`template`**: A Go template string that extracts gas price data from the API response. The template receives the JSON response as data and should output a JSON object with `maxFeePerGas` and `maxPriorityFeePerGas` fields
+- **`method`**: The HTTP method to use for the request. Default: `"GET"`
+- **`body`**: The request body to send with the request.
+- **`responseTemplate`**: A Go template string that extracts gas price data from the API response. The template receives the JSON response as data and should output a JSON object with `maxFeePerGas` and `maxPriorityFeePerGas` fields
 - **Authentication**: HTTP client authentication options are supported:
   - **`auth.username`** and **`auth.password`**: Basic authentication
   - **`httpHeaders`**: Custom HTTP headers (useful for API keys, bearer tokens, etc.)
 
 The gas oracle API must:
 - Return a JSON response containing gas price information
-- Be accessible via HTTP GET requests
+- Be accessible via HTTP requests (GET, POST, etc.)
 - Return gas prices in either hexadecimal format (e.g., `"0x2FAF080"`) or decimal format (e.g., `"50000000"`)
+
+#### Custom JSON/RPC methods
+
+Gas oracle APIs can also be custom JSON/RPC methods provided by your base ledger node. This is useful when your node supports specialized gas price calculation methods that aren't part of the standard Ethereum JSON/RPC specification.
+
+```
+publicTxManager:
+  gasPrice:
+    gasOracleAPI:
+      url: "http://localhost:8545"  # Your base ledger node
+      method: "POST"
+      body: |
+        {
+          "jsonrpc": "2.0",
+          "method": "custom_feeHistory",
+          "params": [20, "latest", [25, 50, 75]],
+          "id": 1
+        }
+      responseTemplate: |
+        {
+          "maxFeePerGas": "{{.result.maxFeePerGas}}",
+          "maxPriorityFeePerGas": "{{.result.maxPriorityFeePerGas}}"
+        }
+```
+
+**Important considerations for custom JSON/RPC methods:**
+
+- **Authentication**: If your base ledger node requires authentication, you'll need to configure it in both the `blockIndexer` section (for standard RPC calls) and the `gasOracleAPI` section (for gas price calls)
+- **Response format**: The template receives the full JSON/RPC response, so you may need to access nested fields like `{{.result.fieldName}}` instead of `{{.fieldName}}`
 
 Example API responses that work with the template above:
 
@@ -188,6 +251,77 @@ Paladin uses the following priority order when determining gas prices for a tran
 5. **Dynamic pricing**: Use `eth_feeHistory` to calculate optimal gas prices
 
 This priority system ensures that transaction-level overrides take precedence while providing multiple fallback mechanisms for automatic gas pricing.
+
+### Gas price caching
+
+Paladin includes a built-in caching mechanism for gas price data that can significantly improve performance when submitting multiple transactions. The cache is particularly valuable in high-throughput scenarios where multiple transactions are likely to be included in the same block.
+
+#### How it works
+
+The gas price cache stores the most recent gas price data and automatically refreshes it at configurable intervals. When a transaction needs gas pricing, Paladin first checks the cache before making external API calls or RPC requests.
+
+#### Configuration
+
+Both `ethFeeHistory` and `gasOracleAPI` pricing methods support caching:
+
+```
+publicTxManager:
+  gasPrice:
+    ethFeeHistory:
+      cache:
+        enabled: true
+        refreshTime: "30s"
+    gasOracleAPI:
+      url: "https://api.example.com/gas"
+      responseTemplate: |
+        {
+          "maxFeePerGas": "{{.maxFeePerGas}}",
+          "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
+        }
+      cache:
+        enabled: true
+        refreshTime: "30s"
+```
+
+**Cache configuration options:**
+
+- **`enabled`**: Whether to enable caching for gas price data. Default: `true`
+- **`refreshTime`**: How often to refresh the cached gas price data. Default: `"30s"`
+
+#### Refresh time considerations
+
+The refresh time should be carefully considered based on your chain's characteristics and transaction patterns:
+
+- **Block period relationship**: Consider your chain's block period when setting the refresh time. For example, if your chain has 10-second blocks, a 30-second refresh time would cover 3 blocks, while a 60-second refresh time would cover 6 blocks.
+
+- **Higher refresh periods**:
+  - ✅ Reduce API calls and RPC load
+  - ✅ Lower resource usage
+  - ❌ May result in outdated gas price data
+  - ❌ Transactions might be rejected for being underpriced
+
+- **Lower refresh periods**:
+  - ✅ More accurate, up-to-date gas prices
+  - ✅ Better success rates for transaction inclusion
+  - ❌ Increased API calls and resource usage
+  - ❌ Higher costs for external gas oracle services
+
+#### When caching is most valuable
+
+The gas price cache provides the most benefit when:
+
+- **High transaction throughput**: Multiple transactions are submitted frequently
+- **Same-block inclusion**: Transactions are likely to be included in the same or nearby blocks
+- **Stable network conditions**: Gas prices don't change rapidly between blocks
+- **External API usage**: Using gas oracle APIs where each call has a cost
+
+#### Cache behavior
+
+- Only one cache is active at a time (gas oracle API takes precedence over eth fee history)
+- Cache is shared across all transactions and signing addresses
+- Cache refresh happens in the background without blocking transaction submission
+- If cache refresh fails, the previous cached value continues to be used
+- Cache is automatically disabled if the gas pricing method is not configured
 
 ## Examples
 
