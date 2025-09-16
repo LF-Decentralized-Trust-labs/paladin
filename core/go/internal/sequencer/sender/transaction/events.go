@@ -201,19 +201,19 @@ func (_ *AssembleErrorEvent) TypeString() string {
 	return "Event_AssembleError"
 }
 
-type DispatchConfirmationRequestReceivedEvent struct {
+type PreDispatchRequestReceivedEvent struct {
 	BaseEvent
 	RequestID        uuid.UUID
 	Coordinator      string
 	PostAssemblyHash *pldtypes.Bytes32
 }
 
-func (_ *DispatchConfirmationRequestReceivedEvent) Type() EventType {
-	return Event_DispatchConfirmationRequestReceived
+func (_ *PreDispatchRequestReceivedEvent) Type() EventType {
+	return Event_PreDispatchRequestReceived
 }
 
-func (_ *DispatchConfirmationRequestReceivedEvent) TypeString() string {
-	return "Event_DispatchConfirmationRequestReceived"
+func (_ *PreDispatchRequestReceivedEvent) TypeString() string {
+	return "Event_PreDispatchRequestReceived"
 }
 
 type CoordinatorChangedEvent struct {

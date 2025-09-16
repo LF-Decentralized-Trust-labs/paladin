@@ -384,7 +384,7 @@ func TestSenderTransaction_Endorsement_Gathering_ToPrepared_OnDispatchConfirmati
 	hash, err := txn.Hash(ctx)
 	require.NoError(t, err)
 
-	err = txn.HandleEvent(ctx, &transaction.DispatchConfirmationRequestReceivedEvent{
+	err = txn.HandleEvent(ctx, &transaction.PreDispatchRequestReceivedEvent{
 		BaseEvent: transaction.BaseEvent{
 			TransactionID: txn.ID,
 		},
@@ -393,7 +393,7 @@ func TestSenderTransaction_Endorsement_Gathering_ToPrepared_OnDispatchConfirmati
 	})
 	assert.NoError(t, err)
 
-	assert.True(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was not sent back to coordinator")
+	assert.True(t, mocks.SentMessageRecorder.HasSentPreDispatchResponse(), "dispatch confirmation response was not sent back to coordinator")
 	assert.Equal(t, transaction.State_Prepared, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
@@ -407,7 +407,7 @@ func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirma
 	hash, err := txn.Hash(ctx)
 	require.NoError(t, err)
 
-	err = txn.HandleEvent(ctx, &transaction.DispatchConfirmationRequestReceivedEvent{
+	err = txn.HandleEvent(ctx, &transaction.PreDispatchRequestReceivedEvent{
 		BaseEvent: transaction.BaseEvent{
 			TransactionID: txn.ID,
 		},
@@ -416,7 +416,7 @@ func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirma
 	})
 	assert.NoError(t, err)
 
-	assert.False(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
+	assert.False(t, mocks.SentMessageRecorder.HasSentPreDispatchResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
 	assert.Equal(t, transaction.State_Endorsement_Gathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
@@ -428,7 +428,7 @@ func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirma
 
 	hash := pldtypes.Bytes32(pldtypes.RandBytes(32))
 
-	err := txn.HandleEvent(ctx, &transaction.DispatchConfirmationRequestReceivedEvent{
+	err := txn.HandleEvent(ctx, &transaction.PreDispatchRequestReceivedEvent{
 		BaseEvent: transaction.BaseEvent{
 			TransactionID: txn.ID,
 		},
@@ -437,7 +437,7 @@ func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirma
 	})
 	assert.NoError(t, err)
 
-	assert.False(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
+	assert.False(t, mocks.SentMessageRecorder.HasSentPreDispatchResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
 	assert.Equal(t, transaction.State_Endorsement_Gathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
@@ -482,7 +482,7 @@ func TestSenderTransaction_Prepared_NoTransition_Do_Resend_OnDispatchConfirmatio
 	hash, err := txn.Hash(ctx)
 	require.NoError(t, err)
 
-	err = txn.HandleEvent(ctx, &transaction.DispatchConfirmationRequestReceivedEvent{
+	err = txn.HandleEvent(ctx, &transaction.PreDispatchRequestReceivedEvent{
 		BaseEvent: transaction.BaseEvent{
 			TransactionID: txn.ID,
 		},
@@ -491,7 +491,7 @@ func TestSenderTransaction_Prepared_NoTransition_Do_Resend_OnDispatchConfirmatio
 	})
 	assert.NoError(t, err)
 
-	assert.True(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was not sent back to coordinator")
+	assert.True(t, mocks.SentMessageRecorder.HasSentPreDispatchResponse(), "dispatch confirmation response was not sent back to coordinator")
 	assert.Equal(t, transaction.State_Prepared, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
@@ -504,7 +504,7 @@ func TestSenderTransaction_Prepared_Ignore_OnDispatchConfirmationRequestReceived
 	hash, err := txn.Hash(ctx)
 	require.NoError(t, err)
 
-	err = txn.HandleEvent(ctx, &transaction.DispatchConfirmationRequestReceivedEvent{
+	err = txn.HandleEvent(ctx, &transaction.PreDispatchRequestReceivedEvent{
 		BaseEvent: transaction.BaseEvent{
 			TransactionID: txn.ID,
 		},
@@ -513,7 +513,7 @@ func TestSenderTransaction_Prepared_Ignore_OnDispatchConfirmationRequestReceived
 	})
 	assert.NoError(t, err)
 
-	assert.False(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
+	assert.False(t, mocks.SentMessageRecorder.HasSentPreDispatchResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
 	assert.Equal(t, transaction.State_Prepared, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
@@ -525,7 +525,7 @@ func TestSenderTransaction_Prepared_Ignore_OnDispatchConfirmationRequestReceived
 
 	hash := pldtypes.Bytes32(pldtypes.RandBytes(32))
 
-	err := txn.HandleEvent(ctx, &transaction.DispatchConfirmationRequestReceivedEvent{
+	err := txn.HandleEvent(ctx, &transaction.PreDispatchRequestReceivedEvent{
 		BaseEvent: transaction.BaseEvent{
 			TransactionID: txn.ID,
 		},
@@ -534,7 +534,7 @@ func TestSenderTransaction_Prepared_Ignore_OnDispatchConfirmationRequestReceived
 	})
 	assert.NoError(t, err)
 
-	assert.False(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
+	assert.False(t, mocks.SentMessageRecorder.HasSentPreDispatchResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
 	assert.Equal(t, transaction.State_Prepared, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 

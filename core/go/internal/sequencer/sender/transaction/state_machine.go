@@ -54,21 +54,21 @@ const (
 type EventType = common.EventType
 
 const (
-	Event_Created                             EventType = iota // Transaction initially received by the sender or has been loaded from the database after a restart / swap-in
-	Event_ConfirmedSuccess                                     // confirmation received from the blockchain of base ledge transaction successful completion
-	Event_ConfirmedReverted                                    // confirmation received from the blockchain of base ledge transaction failure
-	Event_Delegated                                            // transaction has been delegated to a coordinator
-	Event_AssembleRequestReceived                              // coordinator has requested that we assemble the transaction
-	Event_AssembleAndSignSuccess                               // we have successfully assembled the transaction and signing module has signed the assembled transaction
-	Event_AssembleRevert                                       // we have failed to assemble the transaction
-	Event_AssemblePark                                         // we have parked the transaction
-	Event_AssembleError                                        // an unexpected error occurred while trying to assemble the transaction
-	Event_Dispatched                                           // coordinator has dispatched the transaction to a public transaction manager
-	Event_DispatchConfirmationRequestReceived                  // coordinator has requested confirmation that the transaction has been dispatched
-	Event_Resumed                                              // Received an RPC call to resume a parked transaction
-	Event_NonceAssigned                                        // the public transaction manager has assigned a nonce to the transaction
-	Event_Submitted                                            // the transaction has been submitted to the blockchain
-	Event_CoordinatorChanged                                   // the coordinator has changed
+	Event_Created                    EventType = iota // Transaction initially received by the sender or has been loaded from the database after a restart / swap-in
+	Event_ConfirmedSuccess                            // confirmation received from the blockchain of base ledge transaction successful completion
+	Event_ConfirmedReverted                           // confirmation received from the blockchain of base ledge transaction failure
+	Event_Delegated                                   // transaction has been delegated to a coordinator
+	Event_AssembleRequestReceived                     // coordinator has requested that we assemble the transaction
+	Event_AssembleAndSignSuccess                      // we have successfully assembled the transaction and signing module has signed the assembled transaction
+	Event_AssembleRevert                              // we have failed to assemble the transaction
+	Event_AssemblePark                                // we have parked the transaction
+	Event_AssembleError                               // an unexpected error occurred while trying to assemble the transaction
+	Event_Dispatched                                  // coordinator has dispatched the transaction to a public transaction manager
+	Event_PreDispatchRequestReceived                  // coordinator has requested confirmation that the transaction is OK to be dispatched
+	Event_Resumed                                     // Received an RPC call to resume a parked transaction
+	Event_NonceAssigned                               // the public transaction manager has assigned a nonce to the transaction
+	Event_Submitted                                   // the transaction has been submitted to the blockchain
+	Event_CoordinatorChanged                          // the coordinator has changed
 )
 
 type StateMachine struct {
@@ -204,12 +204,12 @@ func init() {
 						},
 					},
 				},
-				Event_DispatchConfirmationRequestReceived: {
-					Validator: validator_DispatchConfirmationRequestMatchesAssembledDelegation,
+				Event_PreDispatchRequestReceived: {
+					Validator: validator_PreDispatchRequestMatchesAssembledDelegation,
 					Transitions: []Transition{
 						{
 							To: State_Prepared,
-							On: action_SendDispatchConfirmationResponse,
+							On: action_SendPreDispatchResponse,
 						},
 					},
 				},
@@ -229,15 +229,15 @@ func init() {
 						},
 					},
 				},
-				Event_DispatchConfirmationRequestReceived: {
-					Validator: validator_DispatchConfirmationRequestMatchesAssembledDelegation,
+				Event_PreDispatchRequestReceived: {
+					Validator: validator_PreDispatchRequestMatchesAssembledDelegation,
 					// This means that we have already sent a dispatch confirmation response and we get another one.
-					// 3 possibilities, 1) the response got lost and the same coordinator is retrying -> compare the request idempotency key and or validator_DispatchConfirmationRequestMatchesAssembledDelegation
+					// 3 possibilities, 1) the response got lost and the same coordinator is retrying -> compare the request idempotency key and or validator_PreDispatchRequestMatchesAssembledDelegation
 					//                  2) There is a coordinator that we previously delegated to, and assembled for, but since assumed had become unavailable and changed to another coordinator, but the first coordinator is somehow limping along and has got as far as endorsing that previously assembled transaction. But we have already chosen our new horse for this transaction so reject.
 					//                  3) There is a bug somewhere.  Don't attempt to distinguish between 2 and 3.  Just reject the request and let the coordinator deal with it.
 					Actions: []ActionRule{
 						{
-							Action: action_ResendDispatchConfirmationResponse,
+							Action: action_ResendPreDispatchResponse,
 						},
 					},
 				},

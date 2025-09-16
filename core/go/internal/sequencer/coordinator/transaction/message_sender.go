@@ -50,7 +50,7 @@ type MessageSender interface {
 		infoStates []*prototk.EndorsableState,
 	) error
 
-	SendDispatchConfirmationRequest(
+	SendPreDispatchRequest(
 		ctx context.Context,
 		transactionSender string,
 		idempotencyKey uuid.UUID,

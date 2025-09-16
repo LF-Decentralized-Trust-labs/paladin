@@ -141,31 +141,31 @@ func (_ *EndorsedRejectedEvent) TypeString() string {
 	return "Event_EndorsedRejected"
 }
 
-// DispatchConfirmedEvent
-type DispatchConfirmedEvent struct {
+// DispatchRequestApprovedEvent
+type DispatchRequestApprovedEvent struct {
 	BaseCoordinatorEvent
 	RequestID uuid.UUID
 }
 
-func (_ *DispatchConfirmedEvent) Type() EventType {
-	return Event_DispatchConfirmed
+func (_ *DispatchRequestApprovedEvent) Type() EventType {
+	return Event_DispatchRequestApproved
 }
 
-func (_ *DispatchConfirmedEvent) TypeString() string {
-	return "Event_DispatchConfirmed"
+func (_ *DispatchRequestApprovedEvent) TypeString() string {
+	return "Event_DispatchRequestApproved"
 }
 
-// DispatchConfirmationRejectedEvent
-type DispatchConfirmationRejectedEvent struct {
+// DispatchRequestRejectedEvent
+type DispatchRequestRejectedEvent struct {
 	BaseCoordinatorEvent
 }
 
-func (_ *DispatchConfirmationRejectedEvent) Type() EventType {
-	return Event_DispatchConfirmationRejected
+func (_ *DispatchRequestRejectedEvent) Type() EventType {
+	return Event_DispatchRequestRejected
 }
 
-func (_ *DispatchConfirmationRejectedEvent) TypeString() string {
-	return "Event_DispatchConfirmationRejected"
+func (_ *DispatchRequestRejectedEvent) TypeString() string {
+	return "Event_DispatchRequestRejected"
 }
 
 // CollectedEvent

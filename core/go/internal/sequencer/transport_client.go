@@ -59,8 +59,10 @@ func (d *distributedSequencerManager) HandlePaladinMsg(ctx context.Context, mess
 		go d.handleDelegationRequestAcknowledgment(d.ctx, message)
 	case transport.MessageType_Dispatched:
 		go d.handleDispatchedEvent(d.ctx, message)
-	case transport.MessageType_DispatchConfirmationRequest:
-		go d.handleDispatchConfirmationRequest(d.ctx, message)
+	case transport.MessageType_PreDispatchRequest:
+		go d.handlePreDispatchRequest(d.ctx, message)
+	case transport.MessageType_PreDispatchResponse:
+		go d.handlePreDispatchResponse(d.ctx, message)
 	case transport.MessageType_EndorsementRequest:
 		go d.handleEndorsementRequest(d.ctx, message)
 	case transport.MessageType_EndorsementResponse:
@@ -315,23 +317,23 @@ func (d *distributedSequencerManager) handleCoordinatorHeartbeatNotification(ctx
 	seq.GetCoordinator().HandleEvent(ctx, heartbeatEvent)
 }
 
-func (d *distributedSequencerManager) handleDispatchConfirmationRequest(ctx context.Context, message *components.ReceivedMessage) {
-	dispatchConfirmationRequest := &engineProto.TransactionDispatched{}
+func (d *distributedSequencerManager) handlePreDispatchRequest(ctx context.Context, message *components.ReceivedMessage) {
+	preDispatchRequest := &engineProto.TransactionDispatched{}
 
-	err := proto.Unmarshal(message.Payload, dispatchConfirmationRequest)
+	err := proto.Unmarshal(message.Payload, preDispatchRequest)
 	if err != nil {
 		d.logPaladinMessageUnmarshalError(ctx, message, err)
 		return
 	}
 
-	contractAddress := d.parseContractAddressString(ctx, dispatchConfirmationRequest.ContractAddress, message)
+	contractAddress := d.parseContractAddressString(ctx, preDispatchRequest.ContractAddress, message)
 	if contractAddress == nil {
 		return
 	}
 
 	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] failed to obtain sequencer to pass dispatch confirmation event to %v:", err)
+		log.L(ctx).Errorf("[Sequencer] failed to obtain sequencer to pass pre dispatch event to %v:", err)
 		return
 	}
 	if seq == nil {
@@ -339,16 +341,50 @@ func (d *distributedSequencerManager) handleDispatchConfirmationRequest(ctx cont
 		return
 	}
 
-	postAssemblyHash := pldtypes.NewBytes32FromSlice(dispatchConfirmationRequest.PostAssembleHash)
+	postAssemblyHash := pldtypes.NewBytes32FromSlice(preDispatchRequest.PostAssembleHash)
 
-	dispatchConfirmationRequestReceivedEvent := &transaction.DispatchConfirmationRequestReceivedEvent{
-		RequestID:        uuid.MustParse(dispatchConfirmationRequest.Id),
+	preDispatchRequestReceivedEvent := &transaction.PreDispatchRequestReceivedEvent{
+		RequestID:        uuid.MustParse(preDispatchRequest.Id),
 		Coordinator:      message.FromNode,
 		PostAssemblyHash: &postAssemblyHash,
 	}
-	dispatchConfirmationRequestReceivedEvent.TransactionID = uuid.MustParse(dispatchConfirmationRequest.TransactionId[2:34])
-	dispatchConfirmationRequestReceivedEvent.EventTime = time.Now()
-	seq.GetSender().HandleEvent(ctx, dispatchConfirmationRequestReceivedEvent)
+	preDispatchRequestReceivedEvent.TransactionID = uuid.MustParse(preDispatchRequest.TransactionId[2:34])
+	preDispatchRequestReceivedEvent.EventTime = time.Now()
+	seq.GetSender().HandleEvent(ctx, preDispatchRequestReceivedEvent)
+}
+
+func (d *distributedSequencerManager) handlePreDispatchResponse(ctx context.Context, message *components.ReceivedMessage) {
+	preDispatchResponse := &engineProto.TransactionDispatched{}
+
+	err := proto.Unmarshal(message.Payload, preDispatchResponse)
+	if err != nil {
+		d.logPaladinMessageUnmarshalError(ctx, message, err)
+		return
+	}
+
+	contractAddress := d.parseContractAddressString(ctx, preDispatchResponse.ContractAddress, message)
+	if contractAddress == nil {
+		return
+	}
+
+	seq, err := d.LoadSequencer(ctx, d.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if err != nil {
+		log.L(ctx).Errorf("[Sequencer] failed to obtain sequencer to pass pre dispatch event to %v:", err)
+		return
+	}
+	if seq == nil {
+		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		return
+	}
+
+	// MRW TODO - we don't yet return anything other than approved.
+
+	dispatchRequestApprovedEvent := &coordTransaction.DispatchRequestApprovedEvent{
+		RequestID: uuid.MustParse(preDispatchResponse.Id),
+	}
+	dispatchRequestApprovedEvent.TransactionID = uuid.MustParse(preDispatchResponse.TransactionId[2:34])
+	dispatchRequestApprovedEvent.EventTime = time.Now()
+	seq.GetCoordinator().HandleEvent(ctx, dispatchRequestApprovedEvent)
 }
 
 func (d *distributedSequencerManager) handleDispatchedEvent(ctx context.Context, message *components.ReceivedMessage) {

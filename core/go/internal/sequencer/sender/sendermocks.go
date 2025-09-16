@@ -10,6 +10,7 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -328,43 +329,72 @@ func (_c *MockMessageSender_SendDelegationRequest_Call) RunAndReturn(run func(ct
 	return _c
 }
 
-// SendDispatchConfirmationResponse provides a mock function for the type MockMessageSender
-func (_mock *MockMessageSender) SendDispatchConfirmationResponse(ctx context.Context) {
-	_mock.Called(ctx)
-	return
+// SendPreDispatchResponse provides a mock function for the type MockMessageSender
+func (_mock *MockMessageSender) SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+	ret := _mock.Called(ctx, transactionSender, idempotencyKey, transactionSpecification)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SendPreDispatchResponse")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uuid.UUID, *prototk.TransactionSpecification) error); ok {
+		r0 = returnFunc(ctx, transactionSender, idempotencyKey, transactionSpecification)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
 }
 
-// MockMessageSender_SendDispatchConfirmationResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendDispatchConfirmationResponse'
-type MockMessageSender_SendDispatchConfirmationResponse_Call struct {
+// MockMessageSender_SendPreDispatchResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendPreDispatchResponse'
+type MockMessageSender_SendPreDispatchResponse_Call struct {
 	*mock.Call
 }
 
-// SendDispatchConfirmationResponse is a helper method to define mock.On call
+// SendPreDispatchResponse is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockMessageSender_Expecter) SendDispatchConfirmationResponse(ctx interface{}) *MockMessageSender_SendDispatchConfirmationResponse_Call {
-	return &MockMessageSender_SendDispatchConfirmationResponse_Call{Call: _e.mock.On("SendDispatchConfirmationResponse", ctx)}
+//   - transactionSender string
+//   - idempotencyKey uuid.UUID
+//   - transactionSpecification *prototk.TransactionSpecification
+func (_e *MockMessageSender_Expecter) SendPreDispatchResponse(ctx interface{}, transactionSender interface{}, idempotencyKey interface{}, transactionSpecification interface{}) *MockMessageSender_SendPreDispatchResponse_Call {
+	return &MockMessageSender_SendPreDispatchResponse_Call{Call: _e.mock.On("SendPreDispatchResponse", ctx, transactionSender, idempotencyKey, transactionSpecification)}
 }
 
-func (_c *MockMessageSender_SendDispatchConfirmationResponse_Call) Run(run func(ctx context.Context)) *MockMessageSender_SendDispatchConfirmationResponse_Call {
+func (_c *MockMessageSender_SendPreDispatchResponse_Call) Run(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification)) *MockMessageSender_SendPreDispatchResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 uuid.UUID
+		if args[2] != nil {
+			arg2 = args[2].(uuid.UUID)
+		}
+		var arg3 *prototk.TransactionSpecification
+		if args[3] != nil {
+			arg3 = args[3].(*prototk.TransactionSpecification)
+		}
 		run(
 			arg0,
+			arg1,
+			arg2,
+			arg3,
 		)
 	})
 	return _c
 }
 
-func (_c *MockMessageSender_SendDispatchConfirmationResponse_Call) Return() *MockMessageSender_SendDispatchConfirmationResponse_Call {
-	_c.Call.Return()
+func (_c *MockMessageSender_SendPreDispatchResponse_Call) Return(err error) *MockMessageSender_SendPreDispatchResponse_Call {
+	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockMessageSender_SendDispatchConfirmationResponse_Call) RunAndReturn(run func(ctx context.Context)) *MockMessageSender_SendDispatchConfirmationResponse_Call {
-	_c.Run(run)
+func (_c *MockMessageSender_SendPreDispatchResponse_Call) RunAndReturn(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error) *MockMessageSender_SendPreDispatchResponse_Call {
+	_c.Call.Return(run)
 	return _c
 }
 

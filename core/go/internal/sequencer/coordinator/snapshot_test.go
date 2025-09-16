@@ -42,7 +42,7 @@ func TestGetSnapshot_IncludesPooledTransaction(t *testing.T) {
 		transaction.State_Assembling,
 		transaction.State_Endorsement_Gathering,
 		transaction.State_Blocked,
-		transaction.State_Confirming_Dispatch,
+		transaction.State_Confirming_Dispatchable,
 	} {
 		txn := transaction.NewTransactionBuilderForTesting(t, state).Build()
 		c.transactionsByID[txn.ID] = txn

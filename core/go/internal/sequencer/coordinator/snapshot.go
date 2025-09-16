@@ -59,7 +59,7 @@ func (c *coordinator) getSnapshot(ctx context.Context) *common.CoordinatorSnapsh
 			//NOOP - this transaction is just waiting to be cleaned up so we don't include it in the snapshot
 		case transaction.State_Blocked:
 			fallthrough
-		case transaction.State_Confirming_Dispatch:
+		case transaction.State_Confirming_Dispatchable:
 			fallthrough
 		case transaction.State_Endorsement_Gathering:
 			fallthrough

@@ -104,7 +104,7 @@ func (t *Transaction) isNotAssembled() bool {
 	// a failing test if we add new states in the future and forget to update this list
 
 	return t.GetState() != State_Endorsement_Gathering &&
-		t.GetState() != State_Confirming_Dispatch &&
+		t.GetState() != State_Confirming_Dispatchable &&
 		t.GetState() != State_Ready_For_Dispatch &&
 		t.GetState() != State_Dispatched &&
 		t.GetState() != State_Submitted &&
