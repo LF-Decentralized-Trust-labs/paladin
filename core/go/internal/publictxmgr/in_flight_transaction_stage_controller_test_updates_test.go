@@ -18,14 +18,16 @@ package publictxmgr
 import (
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTXStageControllerUpdate(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, _ := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -36,6 +38,7 @@ func TestTXStageControllerUpdate(t *testing.T) {
 			GasPrice: pldtypes.Uint64ToUint256(10),
 		}),
 	})
+	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
 
 	it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{})
 

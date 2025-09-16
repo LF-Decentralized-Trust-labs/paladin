@@ -55,6 +55,10 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 	// successful send with tx hash returned
 	txSendMock := m.ethClient.On("SendRawTransaction", ctx, mock.Anything)
+
+	// successful event notification to distributed sequencer
+	m.sequencerManager.On("HandlePublicTXSubmission", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
 	txSendMock.Run(func(args mock.Arguments) {
 		txRawMessage := args[1].(pldtypes.HexBytes)
 		assert.Equal(t, pldtypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
@@ -227,6 +231,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 
 	// successful send with tx hash returned
 	m.ethClient.On("SendRawTransaction", ctx, mock.Anything).Return(&textTxHashByte32, nil).Once()
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	txHash, _, errReason, outCome, err := it.submitTX(ctx,
 		[]byte(testTransactionData),
@@ -246,6 +251,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		nil,
 		nil,
 	).Once()
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	txHash, _, errReason, outCome, err = it.submitTX(ctx,
 		[]byte(testTransactionData),
@@ -262,8 +268,10 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 
 	// successful send but tx hash mismatch first time
 	m.ethClient.On("SendRawTransaction", ctx, mock.Anything).Return(&textWrongTxHashByte32, nil).Once()
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	// but corrected in the retry
 	m.ethClient.On("SendRawTransaction", ctx, mock.Anything).Return(&textTxHashByte32, nil).Once()
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	txHash, _, errReason, outCome, err = it.submitTX(ctx,
 		[]byte(testTransactionData),
@@ -281,6 +289,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 	// categorized errors should not be retried
 	// underpriced
 	m.ethClient.On("SendRawTransaction", ctx, mock.Anything).Return(nil, fmt.Errorf("transaction underpriced")).Once()
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	txHash, _, errReason, outCome, err = it.submitTX(ctx,
 		[]byte(testTransactionData),
@@ -296,6 +305,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 	assert.Equal(t, testTxHash, txHash.String())
 	// reverted
 	m.ethClient.On("SendRawTransaction", ctx, mock.Anything).Return(nil, fmt.Errorf("execution reverted")).Once()
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	txHash, _, errReason, outCome, err = it.submitTX(ctx,
 		[]byte(testTransactionData),
@@ -311,6 +321,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 	assert.Equal(t, testTxHash, txHash.String())
 	// known transaction
 	m.ethClient.On("SendRawTransaction", ctx, mock.Anything).Return(nil, fmt.Errorf("known transaction")).Once()
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	txHash, _, errReason, outCome, err = it.submitTX(ctx,
 		[]byte(testTransactionData),
@@ -326,6 +337,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 	assert.Equal(t, testTxHash, txHash.String()) // able to use the calculated hash
 	// nonce too low
 	m.ethClient.On("SendRawTransaction", ctx, mock.Anything).Return(nil, fmt.Errorf("nonce too low")).Once()
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	txHash, _, errReason, outCome, err = it.submitTX(ctx,
 		[]byte(testTransactionData),
@@ -343,9 +355,11 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 	// un-categorized errors should be retried
 	// successful send when first time returned un-categorized error
 	m.ethClient.On("SendRawTransaction", ctx, mock.Anything).Return(nil, fmt.Errorf("error submitting transaction")).Once()
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	// but the second time was successful
 	m.ethClient.On("SendRawTransaction", ctx, mock.Anything).Return(&textTxHashByte32, nil).Once()
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	txHash, _, errReason, outCome, err = it.submitTX(ctx,
 		[]byte(testTransactionData),
@@ -364,6 +378,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 	canceledContext, cancel := context.WithCancel(ctx)
 	cancel()
 	m.ethClient.On("SendRawTransaction", canceledContext, mock.Anything).Return(nil, fmt.Errorf("error submitting transaction")).Once()
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	txHash, _, _, outCome, err = it.submitTX(canceledContext,
 		[]byte(testHashedSignedMessage),
 		it.stateManager.GetTransactionHash(),
