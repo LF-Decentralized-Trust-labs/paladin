@@ -3,12 +3,12 @@ name: Docs Site
 on:
   push:
     branches:
-    - main
+      - main
     paths:
-    - 'doc-site/docs/**' 
+      - "doc-site/docs/**"
   pull_request:
     paths:
-        - 'doc-site/docs/**'  
+      - "doc-site/docs/**"
   release:
     types: [released]
 jobs:
@@ -28,7 +28,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: "1.24"
           check-latest: true
           cache-dependency-path: |
             **/*.sum

@@ -72,7 +72,7 @@ task build(type: Exec, dependsOn: [install, copyABI]) {
 
 task start(type: Exec, dependsOn: [build]) {
     dependsOn ':operator:e2e'
-
+    
     executable 'npm'
     args 'run'
     args 'start'

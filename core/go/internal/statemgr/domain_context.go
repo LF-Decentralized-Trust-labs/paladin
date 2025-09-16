@@ -62,7 +62,7 @@ type domainContext struct {
 // Very important that callers Close domain contexts they open
 func (ss *stateManager) NewDomainContext(ctx context.Context, domain components.Domain, contractAddress pldtypes.EthAddress) components.DomainContext {
 	id := uuid.New()
-	log.L(ctx).Debugf("Domain context %s for domain %s contract %s closed", id, domain.Name(), contractAddress)
+	log.L(ctx).Debugf("Domain context %s for domain %s contract %s created", id, domain.Name(), contractAddress)
 
 	ss.domainContextLock.Lock()
 	defer ss.domainContextLock.Unlock()

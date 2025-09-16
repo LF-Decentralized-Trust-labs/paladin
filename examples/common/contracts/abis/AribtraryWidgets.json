@@ -1,0 +1,119 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "AribtraryWidgets",
+  "sourceName": "contracts/testcontracts/ArbitraryWidgets.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "owner",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "locator",
+              "type": "bytes32"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct AribtraryWidgets.Customer",
+          "name": "customer",
+          "type": "tuple"
+        },
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "description",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "price",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string[]",
+              "name": "attributes",
+              "type": "string[]"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct AribtraryWidgets.Widget[]",
+          "name": "widgets",
+          "type": "tuple[]"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "Invoiced",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "components": [
+                {
+                  "internalType": "address",
+                  "name": "owner",
+                  "type": "address"
+                },
+                {
+                  "internalType": "bytes32",
+                  "name": "locator",
+                  "type": "bytes32"
+                }
+              ],
+              "internalType": "struct AribtraryWidgets.Customer",
+              "name": "customer",
+              "type": "tuple"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "string",
+                  "name": "description",
+                  "type": "string"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "price",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "string[]",
+                  "name": "attributes",
+                  "type": "string[]"
+                }
+              ],
+              "internalType": "struct AribtraryWidgets.Widget[]",
+              "name": "widgets",
+              "type": "tuple[]"
+            }
+          ],
+          "internalType": "struct AribtraryWidgets.Invoice",
+          "name": "_invoice",
+          "type": "tuple"
+        }
+      ],
+      "name": "invoice",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080604052348015600f57600080fd5b506103a68061001f6000396000f3fe60806040526004361061001e5760003560e01c8063c2b28dd714610023575b600080fd5b6100366100313660046100a4565b610038565b005b610045602082018261010f565b73ffffffffffffffffffffffffffffffffffffffff167f67fb7d46e97b0a9ba83d2bb5cc38fab4b3fc22bde40ac8c7b11b1bac9005ef0b8261008a604082018261012a565b6040516100999392919061024d565b60405180910390a250565b6000602082840312156100b657600080fd5b813567ffffffffffffffff8111156100cd57600080fd5b8201606081850312156100df57600080fd5b9392505050565b803573ffffffffffffffffffffffffffffffffffffffff8116811461010a57600080fd5b919050565b60006020828403121561012157600080fd5b6100df826100e6565b6000808335601e1984360301811261014157600080fd5b83018035915067ffffffffffffffff82111561015c57600080fd5b6020019150600581901b360382131561017457600080fd5b9250929050565b6000808335601e1984360301811261019257600080fd5b830160208101925035905067ffffffffffffffff8111156101b257600080fd5b80360382131561017457600080fd5b81835281816020850137506000828201602090810191909152601f909101601f19169091010190565b60008383855260208501945060208460051b8201018360005b8681101561024157838303601f1901885261021e828761017b565b6102298582846101c1565b60209a8b019a90955093909301925050600101610203565b50909695505050505050565b60006060820173ffffffffffffffffffffffffffffffffffffffff610271876100e6565b16835260208681013590840152606060408401528390526080600584901b83018101908301856000605e1936839003015b8782101561036257868503607f1901845282358181126102c157600080fd5b89016102cd818061017b565b606088526102df6060890182846101c1565b915050602082013560208801526040820135601e1983360301811261030357600080fd5b60209201918201913567ffffffffffffffff81111561032157600080fd5b8060051b360383131561033357600080fd5b87820360408901526103468282856101ea565b97505050506020830192506020840193506001820191506102a2565b50929897505050505050505056fea2646970667358221220a562ec5c39ccccce9de8765d95adc35cc2630915d6f0e2e01601198a5c48538164736f6c634300081b0033",
+  "deployedBytecode": "0x60806040526004361061001e5760003560e01c8063c2b28dd714610023575b600080fd5b6100366100313660046100a4565b610038565b005b610045602082018261010f565b73ffffffffffffffffffffffffffffffffffffffff167f67fb7d46e97b0a9ba83d2bb5cc38fab4b3fc22bde40ac8c7b11b1bac9005ef0b8261008a604082018261012a565b6040516100999392919061024d565b60405180910390a250565b6000602082840312156100b657600080fd5b813567ffffffffffffffff8111156100cd57600080fd5b8201606081850312156100df57600080fd5b9392505050565b803573ffffffffffffffffffffffffffffffffffffffff8116811461010a57600080fd5b919050565b60006020828403121561012157600080fd5b6100df826100e6565b6000808335601e1984360301811261014157600080fd5b83018035915067ffffffffffffffff82111561015c57600080fd5b6020019150600581901b360382131561017457600080fd5b9250929050565b6000808335601e1984360301811261019257600080fd5b830160208101925035905067ffffffffffffffff8111156101b257600080fd5b80360382131561017457600080fd5b81835281816020850137506000828201602090810191909152601f909101601f19169091010190565b60008383855260208501945060208460051b8201018360005b8681101561024157838303601f1901885261021e828761017b565b6102298582846101c1565b60209a8b019a90955093909301925050600101610203565b50909695505050505050565b60006060820173ffffffffffffffffffffffffffffffffffffffff610271876100e6565b16835260208681013590840152606060408401528390526080600584901b83018101908301856000605e1936839003015b8782101561036257868503607f1901845282358181126102c157600080fd5b89016102cd818061017b565b606088526102df6060890182846101c1565b915050602082013560208801526040820135601e1983360301811261030357600080fd5b60209201918201913567ffffffffffffffff81111561032157600080fd5b8060051b360383131561033357600080fd5b87820360408901526103468282856101ea565b97505050506020830192506020840193506001820191506102a2565b50929897505050505050505056fea2646970667358221220a562ec5c39ccccce9de8765d95adc35cc2630915d6f0e2e01601198a5c48538164736f6c634300081b0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

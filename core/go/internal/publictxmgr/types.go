@@ -305,7 +305,7 @@ type PersistenceOutput struct {
 type InFlightStageActionTriggers interface {
 	TriggerRetrieveGasPrice(ctx context.Context) error
 	TriggerSignTx(ctx context.Context) error
-	TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32) error
+	TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32, contractAddress string, txnID uuid.UUID) error
 	TriggerStatusUpdate(ctx context.Context) error
 }
 
@@ -399,7 +399,7 @@ type InFlightTransactionStateGeneration interface {
 	IsCurrent(ctx context.Context) bool
 
 	// stage management
-	StartNewStageContext(ctx context.Context, stageType InFlightTxStage, substatus BaseTxSubStatus)
+	StartNewStageContext(ctx context.Context, stageType InFlightTxStage, substatus BaseTxSubStatus, txIdUUID uuid.UUID)
 	GetStage(ctx context.Context) InFlightTxStage
 	SetTransientPreviousStageOutputs(tpso *TransientPreviousStageOutputs)
 	GetRunningStageContext(ctx context.Context) *RunningStageContext

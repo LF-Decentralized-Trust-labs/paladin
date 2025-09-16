@@ -44,7 +44,7 @@ type mockComponents struct {
 	domainManager    *componentsmocks.DomainManager
 	keyManager       *componentsmocks.KeyManager
 	txManager        *componentsmocks.TXManager
-	privateTxManager *componentsmocks.PrivateTxManager
+	sequencerManager *componentsmocks.SequencerManager
 	identityResolver *componentsmocks.IdentityResolver
 	groupManager     *componentsmocks.GroupManager
 }
@@ -56,7 +56,7 @@ func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	mc.domainManager = componentsmocks.NewDomainManager(t)
 	mc.keyManager = componentsmocks.NewKeyManager(t)
 	mc.txManager = componentsmocks.NewTXManager(t)
-	mc.privateTxManager = componentsmocks.NewPrivateTxManager(t)
+	mc.sequencerManager = componentsmocks.NewSequencerManager(t)
 	mc.identityResolver = componentsmocks.NewIdentityResolver(t)
 	mc.groupManager = componentsmocks.NewGroupManager(t)
 	if realDB {
@@ -76,7 +76,7 @@ func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	mc.c.On("DomainManager").Return(mc.domainManager).Maybe()
 	mc.c.On("KeyManager").Return(mc.keyManager).Maybe()
 	mc.c.On("TxManager").Return(mc.txManager).Maybe()
-	mc.c.On("PrivateTxManager").Return(mc.privateTxManager).Maybe()
+	mc.c.On("SequencerManager").Return(mc.sequencerManager).Maybe()
 	mc.c.On("IdentityResolver").Return(mc.identityResolver).Maybe()
 	mc.c.On("GroupManager").Return(mc.groupManager).Maybe()
 	return mc
