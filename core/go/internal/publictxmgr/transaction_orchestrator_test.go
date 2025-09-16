@@ -24,6 +24,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/google/uuid"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
@@ -53,6 +54,7 @@ func newInflightTransaction(o *orchestrator, nonce uint64, txMods ...func(tx *DB
 		Nonce:   &nonce,
 		Gas:     2000,
 		Created: pldtypes.TimestampNow(),
+		To:      pldtypes.EthAddressBytes(pldtypes.RandBytes(20)),
 	}
 	for _, txMod := range txMods {
 		txMod(tx)
@@ -82,6 +84,11 @@ func TestNewOrchestratorLoadsSecondTxAndQueuesBalanceCheck(t *testing.T) {
 	}
 	// Do not return any submissions for it
 	m.db.ExpectQuery("SELECT.*public_submissions").WillReturnRows(sqlmock.NewRows([]string{}))
+
+	// To pass the necessary events to the sequencer the orchestrator needs to retrieve the pub-id to tx-id binding
+	for i := 0; i < 2; i++ {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	addressBalanceChecked := make(chan bool)
 	m.ethClient.On("GetBalance", mock.Anything, o.signingAddress, "latest").Return(pldtypes.Uint64ToUint256(100), nil).Run(func(args mock.Arguments) {
@@ -137,10 +144,10 @@ func TestNewOrchestratorPollingRemoveCompleted(t *testing.T) {
 	o.inFlightTxs = []*inFlightTransactionStageController{mockIT}
 	o.state = OrchestratorStateRunning
 
-	for i := 0; i < 2; i++ {
-		// return empty rows - once for max nonce calculation, and then again for the actual query
-		m.db.ExpectQuery("SELECT.*public_txn").WillReturnRows(sqlmock.NewRows([]string{}))
-	}
+	m.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{}))
+	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	m.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{}))
+	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
 
 	ocDone, _ := o.Start(ctx)
 

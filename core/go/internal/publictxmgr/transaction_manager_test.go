@@ -58,6 +58,7 @@ type mocksAndTestControl struct {
 	allComponents       *componentsmocks.AllComponents
 	db                  sqlmock.Sqlmock // unless realDB
 	keyManager          components.KeyManager
+	sequencerManager    *componentsmocks.SequencerManager
 	ethClientFactory    *ethclientmocks.EthClientFactory
 	ethClient           *ethclientmocks.EthClient
 	blockIndexer        *blockindexermocks.BlockIndexer
@@ -76,6 +77,7 @@ func baseMocks(t *testing.T) *mocksAndTestControl {
 		ethClient:        ethclientmocks.NewEthClient(t),
 		blockIndexer:     blockindexermocks.NewBlockIndexer(t),
 		txManager:        componentsmocks.NewTXManager(t),
+		sequencerManager: componentsmocks.NewSequencerManager(t),
 	}
 	mocks.allComponents.On("EthClientFactory").Return(mocks.ethClientFactory).Maybe()
 	mocks.ethClientFactory.On("SharedWS").Return(mocks.ethClient).Maybe()
@@ -84,6 +86,7 @@ func baseMocks(t *testing.T) *mocksAndTestControl {
 	mocks.allComponents.On("TxManager").Return(mocks.txManager).Maybe()
 	mocks.allComponents.On("TxManager").Return(mocks.txManager).Maybe()
 	mocks.allComponents.On("MetricsManager").Return(mm).Maybe()
+	mocks.allComponents.On("SequencerManager").Return(mocks.sequencerManager).Maybe()
 	return mocks
 }
 
@@ -490,7 +493,6 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, tx.From)
 	assert.Equal(t, uint64(1223451), tx.Gas.Uint64())
-
 }
 
 func TestEngineSuspendResumeRealDB(t *testing.T) {
@@ -521,6 +523,11 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 		},
 	}
 
+	// Handing events to the sequencer requires the private transaction ID, so make sure we include that in the DB
+	pubTx.Bindings = []*components.PaladinTXReference{
+		{TransactionID: uuid.New(), TransactionType: pldapi.TransactionTypePrivate.Enum()},
+	}
+
 	// We can get the nonce
 	m.ethClient.On("GetTransactionCount", mock.Anything, mock.Anything).Return(confutil.P(pldtypes.HexUint64(1122334455)), nil)
 	// ... but attempting to get it onto the chain is going to block failing
@@ -531,6 +538,12 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
+
+	// TX manager will query TX bindings to pass events to the sequencer. Fake up just enough in `public_txn_bindings`
+	// err = m.allComponents.Persistence().NOTX().DB().Exec(`INSERT INTO "public_txn_bindings" ("pub_txn_id", "transaction", "tx_type", "sender", "contract_address") VALUES (?, ?, ?, ?, ?)`,
+	// 	1, uuid.New(), pldapi.TransactionTypePrivate.Enum(), "signer1", "").
+	// 	Error
+	// require.NoError(t, err)
 
 	// Wait for the orchestrator to kick off and pick this TX up
 	getIFT := func() *inFlightTransactionStageController {
@@ -607,6 +620,7 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 
 	confirmations := make(chan *blockindexer.IndexedTransactionNotify, 1)
 	srtx := m.ethClient.On("SendRawTransaction", mock.Anything, mock.Anything)
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	srtx.Run(func(args mock.Arguments) {
 		signedMessage := args[1].(pldtypes.HexBytes)
 

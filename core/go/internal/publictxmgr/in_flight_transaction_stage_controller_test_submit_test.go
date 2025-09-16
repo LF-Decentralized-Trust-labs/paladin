@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	"github.com/google/uuid"
@@ -35,7 +36,7 @@ import (
 )
 
 func TestProduceLatestInFlightStageContextSubmitPanic(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -49,6 +50,11 @@ func TestProduceLatestInFlightStageContextSubmitPanic(t *testing.T) {
 			GasPrice: pldtypes.Uint64ToUint256(10),
 		},
 	})
+
+	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
+	for i := 0; i < 2; i++ {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// switch to submit
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
@@ -76,7 +82,7 @@ func TestProduceLatestInFlightStageContextSubmitPanic(t *testing.T) {
 }
 
 func TestProduceLatestInFlightStageContextSubmitComplete(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -90,6 +96,11 @@ func TestProduceLatestInFlightStageContextSubmitComplete(t *testing.T) {
 			GasPrice: pldtypes.Uint64ToUint256(10),
 		},
 	})
+
+	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
+	for i := 0; i < 2; i++ {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// switch to submit
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
@@ -140,7 +151,7 @@ func TestProduceLatestInFlightStageContextSubmitComplete(t *testing.T) {
 }
 
 func TestProduceLatestInFlightStageContextCannotSubmit(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -155,6 +166,11 @@ func TestProduceLatestInFlightStageContextCannotSubmit(t *testing.T) {
 			MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(32146027800),
 		},
 	})
+
+	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
+	for i := 0; i < 2; i++ {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// switch to submit
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
@@ -174,7 +190,7 @@ func TestProduceLatestInFlightStageContextCannotSubmit(t *testing.T) {
 }
 
 func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -189,6 +205,11 @@ func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.
 		},
 		FirstSubmit: confutil.P(pldtypes.TimestampNow()),
 	})
+
+	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
+	for i := 0; i < 2; i++ {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// switch to submit
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
@@ -259,7 +280,7 @@ func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.
 }
 
 func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -274,6 +295,11 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 		},
 		FirstSubmit: confutil.P(pldtypes.TimestampNow()),
 	})
+
+	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
+	for i := 0; i < 2; i++ {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// switch to submit
 	txHash := confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001")))
@@ -378,7 +404,7 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 }
 
 func TestProduceLatestInFlightStageContextSubmitRePrepare(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -393,6 +419,11 @@ func TestProduceLatestInFlightStageContextSubmitRePrepare(t *testing.T) {
 		},
 		TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
 	})
+
+	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
+	for i := 0; i < 2; i++ {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// switch to submit
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
@@ -491,6 +522,10 @@ func TestTriggerSubmitTx(t *testing.T) {
 		sendRawTransactionMock.Return(nil, fmt.Errorf("pop"))
 		close(called)
 	}).Once()
+
+	// successful event notification to distributed sequencer
+	m.sequencerManager.On("HandlePublicTXSubmission", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
 	err := it.TriggerSubmitTx(ctx, nil, confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))), it.stateManager.GetTo().String(), uuid.New())
 	require.NoError(t, err)
 	<-called

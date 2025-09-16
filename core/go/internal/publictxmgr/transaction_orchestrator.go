@@ -486,7 +486,6 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 			return
 		}
 
-		// MRW TODO - emit nonce allocated events here?
 		for _, tx := range additional {
 			log.L(ctx).Infof("Handling nonce assignment for public TX ID %d", tx.PublicTxnID)
 			log.L(ctx).Infof("Handling nonce assignment for signing address %s", oc.signingAddress.String())
@@ -506,7 +505,7 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 				Find(&txId).
 				Error
 			if err != nil {
-				log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %d: %s", tx.PublicTxnID, err)
+				log.L(ctx).Warnf("Error retrieving binding for public TX ID %d: %s", tx.PublicTxnID, err)
 				return
 			}
 			log.L(ctx).Infof("Retrieved binding for public TX ID %d: %s", tx.PublicTxnID, txId)
@@ -515,7 +514,7 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 				// Convert txId to UUID
 				txIdUUID, err := uuid.Parse(txId)
 				if err != nil {
-					log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %d: %s", tx.PublicTxnID, err)
+					log.L(ctx).Warnf("Error parsing binding for public TX ID %d: %s", tx.PublicTxnID, err)
 					return
 				}
 
