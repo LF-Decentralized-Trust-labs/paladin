@@ -378,6 +378,7 @@ var (
 	MsgPublicTxMgrFeeHistoryEmpty                      = pde("PD011949", "Fee history returned empty data: len(baseFeePerGas)=%d, len(reward)=%d")
 	MsgPublicTxMgrFeeHistoryCallFailed                 = pde("PD011950", "Failed to fetch fee history: %+v")
 	MsgPublicTxMgrInvalidCacheRefreshTime              = pde("PD011951", "Invalid cache refresh time: %s")
+	MsgPublicTxMgrGasOracleInvalidMethod               = pde("PD011952", "Invalid HTTP method for gas oracle API: %s")
 
 	// TransportManager module PD0120XX
 	MsgTransportInvalidMessage                 = pde("PD012000", "Invalid message")

@@ -394,7 +394,7 @@ func TestInitWithCacheEnabledGasOracle(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
+			ResponseTemplate: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
 			Cache: pldconf.GasPriceCacheConfig{
 				Enabled:     confutil.P(true),
 				RefreshTime: confutil.P("45s"),
@@ -462,7 +462,7 @@ func TestInitWithGasOracleCacheTakesPrecedence(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
+			ResponseTemplate: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
 			Cache: pldconf.GasPriceCacheConfig{
 				Enabled:     confutil.P(true),
 				RefreshTime: confutil.P("60s"),
@@ -488,7 +488,7 @@ func TestInitWithGasOracleEmptyTemplate(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: "", // Empty template
+			ResponseTemplate: "", // Empty template
 		},
 	}
 
@@ -505,7 +505,7 @@ func TestInitWithGasOracleTemplateParseError(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{{invalid template syntax`, // Invalid template syntax
+			ResponseTemplate: `{{invalid template syntax`, // Invalid template syntax
 		},
 	}
 
@@ -536,7 +536,7 @@ func TestInitWithGasOracleInvalidURL(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "://invalid-url", // Invalid URL format
 			},
-			Template: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
+			ResponseTemplate: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
 		},
 	}
 
@@ -553,7 +553,7 @@ func TestInitWithGasOracleInvalidCacheRefreshTime(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
+			ResponseTemplate: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
 			Cache: pldconf.GasPriceCacheConfig{
 				Enabled:     confutil.P(true),
 				RefreshTime: confutil.P("invalid-duration"), // Invalid duration
@@ -945,7 +945,7 @@ func TestGetGasPriceObjectWithGasOracleCache(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
+			ResponseTemplate: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
 			Cache: pldconf.GasPriceCacheConfig{
 				Enabled:     confutil.P(true),
 				RefreshTime: confutil.P("30s"),
@@ -1149,7 +1149,7 @@ func TestRefreshGasPriceCacheWithGasOracle(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
+			ResponseTemplate: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
 			Cache: pldconf.GasPriceCacheConfig{
 				Enabled:     confutil.P(true),
 				RefreshTime: confutil.P("30s"),
@@ -1230,7 +1230,7 @@ func TestRefreshGasPriceCacheWithError(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
+			ResponseTemplate: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
 			Cache: pldconf.GasPriceCacheConfig{
 				Enabled:     confutil.P(true),
 				RefreshTime: confutil.P("30s"),
@@ -1293,7 +1293,7 @@ func TestStartGasPriceRefreshWithTickerAndCancellation(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
+			ResponseTemplate: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
 			Cache: pldconf.GasPriceCacheConfig{
 				Enabled:     confutil.P(true),
 				RefreshTime: confutil.P("50ms"), // Very short refresh period for testing
@@ -1924,7 +1924,7 @@ func TestGetGasPriceFromGasOracleSuccess(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{
+			ResponseTemplate: `{
 				"maxFeePerGas": "{{.maxFeePerGas}}",
 				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
 			}`,
@@ -1973,7 +1973,7 @@ func TestGetGasPriceFromGasOracleHTTPError(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{
+			ResponseTemplate: `{
 				"maxFeePerGas": "{{.maxFeePerGas}}",
 				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
 			}`,
@@ -2008,7 +2008,7 @@ func TestGetGasPriceFromGasOracleInvalidJSON(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{
+			ResponseTemplate: `{
 				"maxFeePerGas": "{{.maxFeePerGas}}",
 				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
 			}`,
@@ -2043,7 +2043,7 @@ func TestGetGasPriceFromGasOracleTemplateExecutionFailure(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{
+			ResponseTemplate: `{
 				"maxFeePerGas": "{{.data.maxFeePerGas}}",
 				"maxPriorityFeePerGas": "{{.data.maxPriorityFeePerGas}}"
 			}`,
@@ -2082,7 +2082,7 @@ func TestGetGasPriceFromGasOracleMissingMaxFeePerGas(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{
+			ResponseTemplate: `{
 				"maxFeePerGas": "{{.maxFeePerGas}}",
 				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
 			}`,
@@ -2120,7 +2120,7 @@ func TestGetGasPriceFromGasOracleMissingMaxPriorityFeePerGas(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{
+			ResponseTemplate: `{
 				"maxFeePerGas": "{{.maxFeePerGas}}",
 				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
 			}`,
@@ -2158,7 +2158,7 @@ func TestGetGasPriceFromGasOracleDifferentURL(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.different-provider.com/eth/gas",
 			},
-			Template: `{
+			ResponseTemplate: `{
 				"maxFeePerGas": "{{.maxFeePerGas}}",
 				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
 			}`,
@@ -2205,7 +2205,7 @@ func TestGetGasPriceFromGasOracleComplexTemplate(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{
+			ResponseTemplate: `{
 				"maxFeePerGas": "{{.result.gasPrice.maxFeePerGas}}",
 				"maxPriorityFeePerGas": "{{.result.gasPrice.maxPriorityFeePerGas}}"
 			}`,
@@ -2252,7 +2252,7 @@ func TestGetGasPriceFromGasOracleNetworkError(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{
+			ResponseTemplate: `{
 				"maxFeePerGas": "{{.maxFeePerGas}}",
 				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
 			}`,
@@ -2286,7 +2286,7 @@ func TestGetGasPriceFromGasOracleTemplateParseError(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{
+			ResponseTemplate: `{
 				"maxFeePerGas": "{{.nonexistentField}}",
 				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
 			}`,
@@ -2324,7 +2324,7 @@ func TestGetGasPriceFromGasOracleTemplateExecutionError(t *testing.T) {
 			HTTPClientConfig: pldconf.HTTPClientConfig{
 				URL: "https://api.example.com/gas",
 			},
-			Template: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
+			ResponseTemplate: `{"maxFeePerGas": "{{.maxFeePerGas}}", "maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"}`,
 		},
 	}
 
@@ -2349,4 +2349,78 @@ func TestGetGasPriceFromGasOracleTemplateExecutionError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "Failed to parse template result as PublicTxGasPricing JSON")
+}
+
+func TestGetGasPriceFromGasOracleWithPOSTMethod(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		GasOracleAPI: &pldconf.GasOracleAPIConfig{
+			HTTPClientConfig: pldconf.HTTPClientConfig{
+				URL: "https://api.example.com/gas",
+			},
+			Method: confutil.P("POST"),
+			Body: confutil.P(`{
+				"jsonrpc": "2.0",
+				"method": "custom_feeHistory",
+				"params": [20, "latest", [25, 50, 75]],
+				"id": 1
+			}`),
+			ResponseTemplate: `{
+				"maxFeePerGas": "{{.result.maxFeePerGas}}",
+				"maxPriorityFeePerGas": "{{.result.maxPriorityFeePerGas}}"
+			}`,
+		},
+	}
+
+	ctx, hgc, _ := NewTestGasPriceClient(t, conf, false)
+
+	err := hgc.Init(ctx)
+	require.NoError(t, err)
+
+	// Setup httpmock for the specific client after it's created
+	httpmock.ActivateNonDefault(hgc.gasOracleHTTPClient.GetClient())
+	defer httpmock.DeactivateAndReset()
+	httpmock.Reset()
+
+	// Mock response for JSON/RPC call
+	mockResponse := `{
+		"jsonrpc": "2.0",
+		"id": 1,
+		"result": {
+			"maxFeePerGas": "0x2FAF080",
+			"maxPriorityFeePerGas": "0x3B9ACA0"
+		}
+	}`
+	httpmock.RegisterResponder("POST", "https://api.example.com/gas",
+		httpmock.NewStringResponder(200, mockResponse))
+
+	result, err := hgc.getGasPriceFromGasOracle(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Verify the gas price values
+	assert.Equal(t, pldtypes.Uint64ToUint256(50000000), result.MaxFeePerGas)         // 0x2FAF080
+	assert.Equal(t, pldtypes.Uint64ToUint256(62500000), result.MaxPriorityFeePerGas) // 0x3B9ACA0
+}
+
+func TestInitWithGasOracleInvalidMethod(t *testing.T) {
+	conf := &pldconf.GasPriceConfig{
+		FixedGasPrice: nil,
+		GasOracleAPI: &pldconf.GasOracleAPIConfig{
+			HTTPClientConfig: pldconf.HTTPClientConfig{
+				URL: "https://api.example.com/gas",
+			},
+			Method: confutil.P("DELETE"), // Unsupported method
+			ResponseTemplate: `{
+				"maxFeePerGas": "{{.maxFeePerGas}}",
+				"maxPriorityFeePerGas": "{{.maxPriorityFeePerGas}}"
+			}`,
+		},
+	}
+
+	ctx, hgc, _ := NewTestGasPriceClient(t, conf, false)
+
+	err := hgc.Init(ctx)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Invalid HTTP method for gas oracle API: DELETE")
 }

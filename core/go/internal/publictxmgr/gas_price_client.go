@@ -68,6 +68,8 @@ type HybridGasPriceClient struct {
 	// Gas oracle HTTP client for external gas price retrieval
 	gasOracleHTTPClient *resty.Client
 	gasOracleTemplate   *template.Template
+	gasOracleMethod     string
+	gasOracleBody       *string
 
 	// Eth fee history gas pricing configuration (always set with defaults so this works as a fallback option)
 	priorityFeePercentile int
@@ -147,9 +149,15 @@ func (hGpc *HybridGasPriceClient) estimateEIP1559Fees(ctx context.Context) (*pld
 
 func (hGpc *HybridGasPriceClient) getGasPriceFromGasOracle(ctx context.Context) (*pldapi.PublicTxGasPricing, error) {
 	// Make HTTP request to the gas oracle API
-	resp, err := hGpc.gasOracleHTTPClient.R().
-		SetContext(ctx).
-		Get("")
+	req := hGpc.gasOracleHTTPClient.R().SetContext(ctx)
+
+	// Set body for methods that support it
+	if hGpc.gasOracleMethod != "GET" && hGpc.gasOracleBody != nil {
+		req = req.SetBody(*hGpc.gasOracleBody)
+	}
+
+	// Execute the request using the configured method
+	resp, err := req.Execute(hGpc.gasOracleMethod, "")
 	if err != nil {
 		log.L(ctx).Errorf("Failed to call gas oracle API: %+v", err)
 		return nil, i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleAPICallFailed, err)
@@ -311,7 +319,7 @@ func (hGpc *HybridGasPriceClient) GetGasPriceObject(ctx context.Context, txFixed
 	// 3. fixed gas price
 	// 4. cached gas price
 	// 5. gas oracle api
-	// 6. estimate EIP-1559 fees
+	// 6. estimate EIP-1559 fees using eth_feeHistory
 	if hGpc.hasZeroGasPrice {
 		// if zero gas price chain, return zero gas price without any kind of retrieval/estimation
 		// there's no validation that we can do on a zero gas price chain so just return right away
@@ -411,15 +419,28 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 		}
 		hGpc.gasOracleHTTPClient = gasOracleClient
 
-		// Parse the template and return error if parsing fails
-		templateStr := hGpc.conf.GasOracleAPI.Template
+		// Set method and body with defaults from configuration
+		defaults := pldconf.PublicTxManagerDefaults
+		hGpc.gasOracleMethod = confutil.StringOrEmpty(hGpc.conf.GasOracleAPI.Method, *defaults.GasPrice.GasOracleAPI.Method)
+		hGpc.gasOracleBody = hGpc.conf.GasOracleAPI.Body
+
+		if hGpc.gasOracleMethod != resty.MethodGet &&
+			hGpc.gasOracleMethod != resty.MethodPost &&
+			hGpc.gasOracleMethod != resty.MethodPut &&
+			hGpc.gasOracleMethod != resty.MethodPatch {
+			log.L(ctx).Errorf("Invalid HTTP method: %s", hGpc.gasOracleMethod)
+			return i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleInvalidMethod, hGpc.gasOracleMethod)
+		}
+
+		// Parse the response template and return error if parsing fails
+		templateStr := hGpc.conf.GasOracleAPI.ResponseTemplate
 		if templateStr == "" {
-			log.L(ctx).Error("Gas oracle template is empty")
+			log.L(ctx).Error("Gas oracle response template is empty")
 			return i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleTemplateEmpty)
 		}
 		hGpc.gasOracleTemplate, err = template.New("gasOracle").Parse(templateStr)
 		if err != nil {
-			log.L(ctx).Errorf("Failed to parse gas oracle template: %+v", err)
+			log.L(ctx).Errorf("Failed to parse gas oracle response template: %+v", err)
 			return i18n.NewError(ctx, msgs.MsgPublicTxMgrGasOracleTemplateParseFailed, err)
 		}
 

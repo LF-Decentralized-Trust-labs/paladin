@@ -87,6 +87,7 @@ var PublicTxManagerDefaults = &PublicTxManagerConfig{
 			},
 		},
 		GasOracleAPI: &GasOracleAPIConfig{
+			Method: confutil.P("GET"), // Default to GET method
 			Cache: GasPriceCacheConfig{
 				Enabled:     confutil.P(true),  // Default to enabled
 				RefreshTime: confutil.P("30s"), // Default to 30 seconds refresh time
@@ -164,7 +165,9 @@ type GasLimitConfig struct {
 
 type GasOracleAPIConfig struct {
 	HTTPClientConfig `json:",inline"`
-	Template         string              `json:"template"`
+	Method           *string             `json:"method"`
+	Body             *string             `json:"body"`
+	ResponseTemplate string              `json:"responseTemplate"`
 	Cache            GasPriceCacheConfig `json:"cache"`
 }
 
