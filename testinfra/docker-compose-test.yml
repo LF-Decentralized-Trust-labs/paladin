@@ -7,23 +7,28 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: my-secret
-  besu_bootstrap:
+
+  # Free gas Besu setup
+  besu_bootstrap_free:
     image: paladin/besu_bootstrap
     user: 0:0
     volumes:
-      - besu_data:/var/besu:rw
+      - besu_free_data:/var/besu:rw
     command:
+      - --min-gas-price=0
+      - --zero-base-fee=true
       - /var/besu
-  besu:
+
+  besu_free:
     image: hyperledger/besu:24.10.0
     user: 0:0
     volumes:
-      - besu_data:/var/besu:rw
+      - besu_free_data:/var/besu:rw
     ports:
-      - 8545:8545
-      - 8546:8546
+      - 8545:8545  # HTTP RPC
+      - 8546:8546  # WebSocket RPC
     depends_on:
-      besu_bootstrap:
+      besu_bootstrap_free:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "timeout 10s bash -c ':> /dev/tcp/localhost/8545'"]
@@ -44,10 +49,61 @@ services:
       - --data-path=/var/besu/data
       - --node-private-key-file=/var/besu/key
       - --revert-reason-enabled
-      - --host-allowlist=localhost,besu,127.0.0.1
+      - --host-allowlist=localhost,besu_free,127.0.0.1
       - --rpc-http-host=0.0.0.0
       - --rpc-ws-host=0.0.0.0
       - --min-gas-price=0
+
+  # Gas-priced Besu setup
+  besu_bootstrap_gas:
+    image: paladin/besu_bootstrap
+    user: 0:0
+    volumes:
+      - besu_gas_data:/var/besu:rw
+    command:
+      - --min-gas-price=1000000000
+      - --zero-base-fee=false
+      - --seeds=b461057bef2aeaf43816f95b3c41b667d6fa56342f278d9237d7463226fd101d,a461057bef2aeaf43816f95b3c41b667d6fa56342f278d9237d7463226fd101e,c461057bef2aeaf43816f95b3c41b667d6fa56342f278d9237d7463226fd101f
+      - --prefunded-derivation-paths=m/44'/60'/1',m/44'/60'/1'/0/0,m/44'/60'/2'/0/0,m/44'/60'/2'/0/0/0,m/44'/60'/3'/0/0/0
+      - /var/besu
+
+  besu_gas:
+    image: hyperledger/besu:24.10.0
+    user: 0:0
+    volumes:
+      - besu_gas_data:/var/besu:rw
+    ports:
+      - 8555:8545  # HTTP RPC (different port)
+      - 8556:8546  # WebSocket RPC (different port)
+    depends_on:
+      besu_bootstrap_gas:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 10s bash -c ':> /dev/tcp/localhost/8545'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command:
+      - --logging=DEBUG
+      - --rpc-http-enabled
+      - --rpc-http-api=ETH,QBFT,WEB3,DEBUG
+      - --rpc-ws-enabled
+      - --rpc-ws-api=ETH,QBFT,WEB3,DEBUG
+      - --tx-pool=SEQUENCED
+      - --tx-pool-limit-by-account-percentage=1.0
+      - --tx-pool-max-size=1000000
+      - --target-gas-limit=30000000
+      - --genesis-file=/var/besu/genesis.json
+      - --data-path=/var/besu/data
+      - --node-private-key-file=/var/besu/key
+      - --revert-reason-enabled
+      - --host-allowlist=localhost,besu_gas,127.0.0.1
+      - --rpc-http-host=0.0.0.0
+      - --rpc-ws-host=0.0.0.0
+      - --min-gas-price=1000000000
+
 volumes:
-  besu_data:
+  besu_free_data:
+    driver: local
+  besu_gas_data:
     driver: local

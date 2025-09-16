@@ -18,13 +18,17 @@ package main
 import (
 	"crypto/rand"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"math/big"
 	"os"
 	"path"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/testinfra/pkg/besugenesis"
+	"github.com/LF-Decentralized-Trust-labs/paladin/testinfra/pkg/testutils"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 )
@@ -32,11 +36,23 @@ import (
 func main() {
 	// NOTE: To get the right permissions, this needs to run inside docker against the volume of Besu
 
+	// Parse command line flags
+	var minGasPriceStr string
+	var zeroBaseFee bool
+	var seeds string
+	var derivationPaths string
+	flag.StringVar(&minGasPriceStr, "min-gas-price", "0", "Minimum gas price in wei (0 for free gas)")
+	flag.BoolVar(&zeroBaseFee, "zero-base-fee", true, "Enable zero base fee (free gas)")
+	flag.StringVar(&seeds, "seeds", "", "Comma-separated list of hex-encoded seeds for account generation (optional)")
+	flag.StringVar(&derivationPaths, "prefunded-derivation-paths", "", "Comma-separated list of BIP32 derivation paths for prefunded accounts (optional)")
+	flag.Parse()
+
 	// Validate dir is ok
-	if len(os.Args) < 2 {
+	args := flag.Args()
+	if len(args) < 1 {
 		exitErrorf("missing directory")
 	}
-	dir := os.Args[1]
+	dir := args[0]
 	dataDir := path.Join(dir, "data")
 	keyFile := path.Join(dir, "key")
 	keyPubFile := path.Join(dir, "key.pub")
@@ -60,13 +76,55 @@ func main() {
 	writeFileStr(keyFile, (ethtypes.HexBytes0xPrefix)(kp.PrivateKeyBytes()))
 	writeFileStr(keyPubFile, (ethtypes.HexBytes0xPrefix)(kp.PublicKeyBytes()))
 
+	// Parse minimum gas price
+	var minGasPrice *big.Int
+	if minGasPriceStr != "0" {
+		gasPrice, err := strconv.ParseInt(minGasPriceStr, 10, 64)
+		if err != nil {
+			exitErrorf("invalid min-gas-price: %s", err)
+		}
+		minGasPrice = big.NewInt(gasPrice)
+	}
+
+	// Get prefunded test accounts
+	var prefundedAccounts map[string]*big.Int
+	var err error
+
+	if seeds != "" && derivationPaths != "" {
+		// Use custom seeds and derivation paths
+		seedList := strings.Split(seeds, ",")
+		for i, seed := range seedList {
+			seedList[i] = strings.TrimSpace(seed)
+		}
+		paths := strings.Split(derivationPaths, ",")
+		for i, path := range paths {
+			paths[i] = strings.TrimSpace(path)
+		}
+		fmt.Printf("Generating prefunded accounts with %d seeds: %v\n", len(seedList), seedList)
+		fmt.Printf("Using derivation paths: %v\n", paths)
+		prefundedAccounts, err = testutils.GetPrefundedAccountsWithMultipleSeeds(seedList, paths)
+	} else if seeds != "" || derivationPaths != "" {
+		// Both parameters must be provided together
+		exitErrorf("both --seeds and --prefunded-derivation-paths must be provided together")
+	} else {
+		// Use default behavior (no prefunded accounts)
+		fmt.Println("No prefunded accounts specified")
+		prefundedAccounts = make(map[string]*big.Int)
+	}
+
+	if err != nil {
+		exitErrorf("failed to get prefunded accounts: %s", err)
+	}
+
 	// Write the genesis
 	oneEth := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
 	genesis := &besugenesis.GenesisJSON{
 		Config: besugenesis.GenesisConfig{
 			ChainID:     1337,
+			LondonBlock: 0, // Enable EIP-1559 from genesis
 			CancunTime:  0,
-			ZeroBaseFee: ptrTo(true),
+			ZeroBaseFee: ptrTo(zeroBaseFee),
+			MinGasPrice: minGasPrice,
 			QBFT: &besugenesis.QBFTConfig{
 				BlockPeriodSeconds:      ptrTo(1), // this is overwritten by the BlockPeriodMilliseconds
 				EpochLength:             ptrTo(30000),
@@ -81,14 +139,26 @@ func main() {
 		Difficulty: 1,
 		MixHash:    randBytes(32),
 		Coinbase:   ethtypes.MustNewAddress("0x0000000000000000000000000000000000000000"),
-		Alloc: map[string]besugenesis.AllocEntry{
-			kp.Address.String(): {
-				Balance: *ethtypes.NewHexInteger(
-					new(big.Int).Mul(oneEth, big.NewInt(1000000000)),
-				),
-			},
-		},
-		ExtraData: besugenesis.BuildQBFTExtraData(kp.Address),
+		Alloc:      make(map[string]besugenesis.AllocEntry),
+		ExtraData:  besugenesis.BuildQBFTExtraData(kp.Address),
+	}
+
+	// Add the validator account (generated key)
+	validatorBalance := new(big.Int).Mul(oneEth, big.NewInt(1000000000))
+	genesis.Alloc[kp.Address.String()] = besugenesis.AllocEntry{
+		Balance: *ethtypes.NewHexInteger(validatorBalance),
+	}
+	fmt.Printf("Validator account: %s (balance: %s ETH)\n", kp.Address.String(), new(big.Int).Div(validatorBalance, oneEth).String())
+
+	// Add prefunded test accounts
+	if len(prefundedAccounts) > 0 {
+		fmt.Printf("Prefunded accounts (%d):\n", len(prefundedAccounts))
+		for address, balance := range prefundedAccounts {
+			genesis.Alloc[address] = besugenesis.AllocEntry{
+				Balance: *ethtypes.NewHexInteger(balance),
+			}
+			fmt.Printf("  %s (balance: %s ETH)\n", address, new(big.Int).Div(balance, oneEth).String())
+		}
 	}
 	writeFileJSON(genesisFile, &genesis)
 
