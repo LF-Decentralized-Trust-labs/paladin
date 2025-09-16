@@ -27,6 +27,7 @@ import (
 )
 
 func (p *privateTxManager) BuildNullifier(ctx context.Context, kr components.KeyResolver, s *components.StateDistributionWithData) (*components.NullifierUpsert, error) {
+	ctx = log.WithComponent(ctx, "privatetxnmanager")
 	// We need to call the signing engine with the local identity to build the nullifier
 	log.L(ctx).Infof("Generating nullifier for state %s on node %s (algorithm=%s,verifierType=%s,payloadType=%s)",
 		s.StateID, p.nodeName, *s.NullifierAlgorithm, *s.NullifierVerifierType, *s.NullifierPayloadType)
@@ -53,7 +54,7 @@ func (p *privateTxManager) BuildNullifier(ctx context.Context, kr components.Key
 }
 
 func (p *privateTxManager) BuildNullifiers(ctx context.Context, stateDistributions []*components.StateDistributionWithData) (nullifiers []*components.NullifierUpsert, err error) {
-
+	ctx = log.WithComponent(ctx, "privatetxnmanager")
 	nullifiers = []*components.NullifierUpsert{}
 	err = p.components.Persistence().Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		for _, s := range stateDistributions {

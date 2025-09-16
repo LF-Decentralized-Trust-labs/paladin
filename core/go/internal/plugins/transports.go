@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
@@ -86,6 +87,7 @@ func (br *TransportBridge) RequestReply(ctx context.Context, reqMsg plugintk.Plu
 }
 
 func (br *TransportBridge) ConfigureTransport(ctx context.Context, req *prototk.ConfigureTransportRequest) (res *prototk.ConfigureTransportResponse, err error) {
+	ctx = log.WithComponent(ctx, "transport-bridge")
 	err = br.toPlugin.RequestReply(ctx,
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
 			dm.Message().RequestToTransport = &prototk.TransportMessage_ConfigureTransport{ConfigureTransport: req}
@@ -101,6 +103,7 @@ func (br *TransportBridge) ConfigureTransport(ctx context.Context, req *prototk.
 }
 
 func (br *TransportBridge) SendMessage(ctx context.Context, req *prototk.SendMessageRequest) (res *prototk.SendMessageResponse, err error) {
+	ctx = log.WithComponent(ctx, "transport-bridge")
 	err = br.toPlugin.RequestReply(ctx,
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
 			dm.Message().RequestToTransport = &prototk.TransportMessage_SendMessage{SendMessage: req}
@@ -116,6 +119,7 @@ func (br *TransportBridge) SendMessage(ctx context.Context, req *prototk.SendMes
 }
 
 func (br *TransportBridge) GetLocalDetails(ctx context.Context, req *prototk.GetLocalDetailsRequest) (res *prototk.GetLocalDetailsResponse, err error) {
+	ctx = log.WithComponent(ctx, "transport-bridge")
 	err = br.toPlugin.RequestReply(ctx,
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
 			dm.Message().RequestToTransport = &prototk.TransportMessage_GetLocalDetails{GetLocalDetails: req}
@@ -131,6 +135,7 @@ func (br *TransportBridge) GetLocalDetails(ctx context.Context, req *prototk.Get
 }
 
 func (br *TransportBridge) ActivatePeer(ctx context.Context, req *prototk.ActivatePeerRequest) (res *prototk.ActivatePeerResponse, err error) {
+	ctx = log.WithComponent(ctx, "transport-bridge")
 	err = br.toPlugin.RequestReply(ctx,
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
 			dm.Message().RequestToTransport = &prototk.TransportMessage_ActivatePeer{ActivatePeer: req}
@@ -146,6 +151,7 @@ func (br *TransportBridge) ActivatePeer(ctx context.Context, req *prototk.Activa
 }
 
 func (br *TransportBridge) DeactivatePeer(ctx context.Context, req *prototk.DeactivatePeerRequest) (res *prototk.DeactivatePeerResponse, err error) {
+	ctx = log.WithComponent(ctx, "transport-bridge")
 	err = br.toPlugin.RequestReply(ctx,
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
 			dm.Message().RequestToTransport = &prototk.TransportMessage_DeactivatePeer{DeactivatePeer: req}

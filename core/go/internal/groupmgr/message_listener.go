@@ -121,7 +121,7 @@ func (pm *persistedMessage) mapToAPI() *pldapi.PrivacyGroupMessage {
 }
 
 func (gm *groupManager) CreateMessageListener(ctx context.Context, spec *pldapi.PrivacyGroupMessageListener) error {
-
+	ctx = log.WithComponent(ctx, log.Component("groupmanager"))
 	log.L(ctx).Infof("Creating message listener '%s'", spec.Name)
 	if _, err := gm.validateListenerSpec(ctx, spec); err != nil {
 		return err
@@ -164,6 +164,7 @@ func (rr *registeredMessageReceiver) Close() {
 }
 
 func (gm *groupManager) AddMessageReceiver(ctx context.Context, name string, r components.PrivacyGroupMessageReceiver) (components.PrivacyGroupMessageReceiverCloser, error) {
+	ctx = log.WithComponent(ctx, log.Component("groupmanager"))
 	gm.messageListenerLock.Lock()
 	defer gm.messageListenerLock.Unlock()
 
@@ -176,7 +177,7 @@ func (gm *groupManager) AddMessageReceiver(ctx context.Context, name string, r c
 }
 
 func (gm *groupManager) GetMessageListener(ctx context.Context, name string) *pldapi.PrivacyGroupMessageListener {
-
+	ctx = log.WithComponent(ctx, log.Component("groupmanager"))
 	gm.messageListenerLock.Lock()
 	defer gm.messageListenerLock.Unlock()
 

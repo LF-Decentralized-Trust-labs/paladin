@@ -47,12 +47,13 @@ func NewPlugin() plugintk.PluginBase {
 
 func NewStatic(callbacks plugintk.RegistryCallbacks) plugintk.RegistryAPI {
 	return &staticRegistry{
-		bgCtx:     context.Background(),
+		bgCtx:     log.WithComponent(context.Background(), "staticregistry"),
 		callbacks: callbacks,
 	}
 }
 
 func (r *staticRegistry) ConfigureRegistry(ctx context.Context, req *prototk.ConfigureRegistryRequest) (*prototk.ConfigureRegistryResponse, error) {
+	ctx = log.WithComponent(ctx, "staticregistry")
 	r.name = req.Name
 
 	err := json.Unmarshal([]byte(req.ConfigJson), &r.conf)

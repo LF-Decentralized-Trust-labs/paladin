@@ -19,6 +19,7 @@ package statemgr
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
@@ -46,6 +47,7 @@ func (ss *stateManager) rpcListSchema() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		domain string,
 	) ([]*pldapi.Schema, error) {
+		ctx = log.WithComponent(ctx, "statemanager")
 		return ss.ListSchemasForJSON(ctx, ss.p.NOTX(), domain)
 	})
 }
@@ -57,6 +59,7 @@ func (ss *stateManager) rpcStoreState() rpcserver.RPCHandler {
 		schema pldtypes.Bytes32,
 		data pldtypes.RawJSON,
 	) (*pldapi.State, error) {
+		ctx = log.WithComponent(ctx, "statemanager")
 		var state *pldapi.State
 		err := ss.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 			newStates, err := ss.WriteReceivedStates(ctx, dbTX, domain, []*components.StateUpsertOutsideContext{
@@ -82,6 +85,7 @@ func (ss *stateManager) rpcQueryStates() rpcserver.RPCHandler {
 		query query.QueryJSON,
 		status pldapi.StateStatusQualifier,
 	) ([]*pldapi.State, error) {
+		ctx = log.WithComponent(ctx, "statemanager")
 		return ss.FindStates(ctx, ss.p.NOTX(), domain, schema, &query, &components.StateQueryOptions{StatusQualifier: status})
 	})
 }
@@ -94,6 +98,7 @@ func (ss *stateManager) rpcQueryContractStates() rpcserver.RPCHandler {
 		query query.QueryJSON,
 		status pldapi.StateStatusQualifier,
 	) ([]*pldapi.State, error) {
+		ctx = log.WithComponent(ctx, "statemanager")
 		return ss.FindContractStates(ctx, ss.p.NOTX(), domain, contractAddress, schema, &query, status)
 	})
 }
@@ -105,6 +110,7 @@ func (ss *stateManager) rpcQueryNullifiers() rpcserver.RPCHandler {
 		query query.QueryJSON,
 		status pldapi.StateStatusQualifier,
 	) ([]*pldapi.State, error) {
+		ctx = log.WithComponent(ctx, "statemanager")
 		return ss.FindNullifiers(ctx, ss.p.NOTX(), domain, schema, &query, status)
 	})
 }
@@ -117,6 +123,7 @@ func (ss *stateManager) rpcQueryContractNullifiers() rpcserver.RPCHandler {
 		query query.QueryJSON,
 		status pldapi.StateStatusQualifier,
 	) ([]*pldapi.State, error) {
+		ctx = log.WithComponent(ctx, "statemanager")
 		return ss.FindContractNullifiers(ctx, ss.p.NOTX(), domain, contractAddress, schema, &query, status)
 	})
 }
@@ -126,6 +133,7 @@ func (ss *stateManager) rpcGetSchemaByID() rpcserver.RPCHandler {
 		domain string,
 		schemaID pldtypes.Bytes32,
 	) (*pldapi.Schema, error) {
+		ctx = log.WithComponent(ctx, "statemanager")
 		return ss.GetSchemaByID(ctx, ss.p.NOTX(), domain, schemaID, false /* null on not found */)
 	})
 }

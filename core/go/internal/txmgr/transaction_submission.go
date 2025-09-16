@@ -284,6 +284,7 @@ func (tm *txManager) prepareTransactionNewDBTX(ctx context.Context, tx *pldapi.T
 }
 
 func (tm *txManager) CallTransaction(ctx context.Context, dbTX persistence.DBTX, result any, call *pldapi.TransactionCall) (err error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 
 	txi, err := tm.resolveNewTransaction(ctx, dbTX, &call.TransactionInput, pldapi.SubmitModeCall)
 	if err != nil {
@@ -349,6 +350,7 @@ func (tm *txManager) callTransactionPublic(ctx context.Context, result any, call
 }
 
 func (tm *txManager) PrepareChainedPrivateTransaction(ctx context.Context, dbTX persistence.DBTX, origSender string, origTxID uuid.UUID, origDomain string, origDomainAddress *pldtypes.EthAddress, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (chained *components.ChainedPrivateTransaction, err error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	tx.Type = pldapi.TransactionTypePrivate.Enum()
 	if tx.IdempotencyKey == "" {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrPrivateChainedTXIdemKey)
@@ -439,6 +441,7 @@ func (tm *txManager) writeChainingRecords(ctx context.Context, dbTX persistence.
 }
 
 func (tm *txManager) SendTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	return tm.processNewTransactions(ctx, dbTX, txs, pldapi.SubmitModeAuto)
 }
 
@@ -460,6 +463,7 @@ func (tm *txManager) prepareTransactionsNewDBTX(ctx context.Context, txs []*plda
 }
 
 func (tm *txManager) PrepareTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	return tm.processNewTransactions(ctx, dbTX, txs, pldapi.SubmitModeExternal)
 }
 
@@ -658,6 +662,7 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX persistence
 }
 
 func (tm *txManager) ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*components.ResolvedFunction, *abi.ComponentValue, pldtypes.RawJSON, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	fn, err := tm.resolveFunction(ctx, dbTX, tx.ABI, tx.ABIReference, tx.Function, tx.To)
 	if err != nil {
 		return nil, nil, nil, err
