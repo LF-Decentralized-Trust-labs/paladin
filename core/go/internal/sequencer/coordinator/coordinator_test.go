@@ -22,8 +22,12 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/testutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,14 +41,31 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentity
 	if senderIdentityPool == nil {
 		senderIdentityPool = []string{"member1@node1"}
 	}
+	metrics := metrics.InitMetrics(context.Background(), prometheus.NewRegistry())
 	mocks := &coordinatorDependencyMocks{
 		messageSender:     NewMockMessageSender(t),
 		clock:             &common.FakeClockForTesting{},
 		engineIntegration: common.NewMockEngineIntegration(t),
 		emit:              func(event common.Event) {},
 	}
+	mockDomainAPI := componentsmocks.NewDomainSmartContract(t)
 
-	coordinator, err := NewCoordinator(ctx, nil, mocks.messageSender, senderIdentityPool, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1", nil, nil, nil, nil)
+	// MRW TODO - it might be good to unit test various coordinator modes
+	mockDomainAPI.On("ContractConfig").Return(&prototk.ContractConfig{
+		CoordinatorSelection: prototk.ContractConfig_COORDINATOR_ENDORSER,
+	})
+
+	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.messageSender, senderIdentityPool, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1",
+		func(context.Context, *transaction.Transaction) {
+			// Not used
+		},
+		func(contractAddress *pldtypes.EthAddress, coordinatorNode string) {
+			// Not used
+		},
+		func(contractAddress *pldtypes.EthAddress) {
+			// Not used
+		},
+		metrics)
 	require.NoError(t, err)
 
 	return coordinator, mocks
@@ -65,7 +86,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 
 	ctx := context.Background()
 	sender := "sender@senderNode"
-	builder := NewCoordinatorBuilderForTesting(State_Idle).SenderIdentityPool(sender)
+	builder := NewCoordinatorBuilderForTesting(t, State_Idle)
 	c, mocks := builder.Build(ctx)
 
 	// Start by simulating the sender and delegate a transaction to the coordinator
@@ -91,6 +112,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 		},
 		RequestID:    mocks.SentMessageRecorder.SentAssembleRequestIdempotencyKey(),
 		PostAssembly: transactionBuilder.BuildPostAssembly(),
+		PreAssembly:  transactionBuilder.BuildPreAssembly(),
 	})
 	assert.NoError(t, err)
 

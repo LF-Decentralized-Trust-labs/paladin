@@ -96,18 +96,18 @@ func (_c *MockSeqCoordinator_GetActiveCoordinatorNode_Call) RunAndReturn(run fun
 }
 
 // GetCurrentState provides a mock function for the type MockSeqCoordinator
-func (_mock *MockSeqCoordinator) GetCurrentState() common.CoordinatorState {
+func (_mock *MockSeqCoordinator) GetCurrentState() State {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetCurrentState")
 	}
 
-	var r0 common.CoordinatorState
-	if returnFunc, ok := ret.Get(0).(func() common.CoordinatorState); ok {
+	var r0 State
+	if returnFunc, ok := ret.Get(0).(func() State); ok {
 		r0 = returnFunc()
 	} else {
-		r0 = ret.Get(0).(common.CoordinatorState)
+		r0 = ret.Get(0).(State)
 	}
 	return r0
 }
@@ -129,12 +129,12 @@ func (_c *MockSeqCoordinator_GetCurrentState_Call) Run(run func()) *MockSeqCoord
 	return _c
 }
 
-func (_c *MockSeqCoordinator_GetCurrentState_Call) Return(coordinatorState common.CoordinatorState) *MockSeqCoordinator_GetCurrentState_Call {
-	_c.Call.Return(coordinatorState)
+func (_c *MockSeqCoordinator_GetCurrentState_Call) Return(state State) *MockSeqCoordinator_GetCurrentState_Call {
+	_c.Call.Return(state)
 	return _c
 }
 
-func (_c *MockSeqCoordinator_GetCurrentState_Call) RunAndReturn(run func() common.CoordinatorState) *MockSeqCoordinator_GetCurrentState_Call {
+func (_c *MockSeqCoordinator_GetCurrentState_Call) RunAndReturn(run func() State) *MockSeqCoordinator_GetCurrentState_Call {
 	_c.Call.Return(run)
 	return _c
 }

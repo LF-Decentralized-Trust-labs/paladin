@@ -26,7 +26,7 @@ import (
 
 func TestGetSnapshot_OK(t *testing.T) {
 	ctx := context.Background()
-	c, _ := NewCoordinatorBuilderForTesting(State_Idle).Build(ctx)
+	c, _ := NewCoordinatorBuilderForTesting(t, State_Idle).Build(ctx)
 	snapshot := c.getSnapshot(ctx)
 	assert.NotNil(t, snapshot)
 }

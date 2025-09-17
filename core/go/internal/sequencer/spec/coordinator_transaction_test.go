@@ -19,7 +19,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
@@ -113,6 +112,7 @@ func TestCoordinatorTransaction_Assembling_ToEndorsing_OnAssembleResponse(t *tes
 			TransactionID: txn.ID,
 		},
 		PostAssembly: txnBuilder.BuildPostAssembly(),
+		PreAssembly:  txnBuilder.BuildPreAssembly(),
 		RequestID:    mocks.SentMessageRecorder.SentAssembleRequestIdempotencyKey(),
 	})
 	assert.NoError(t, err)
@@ -564,7 +564,7 @@ func TestCoordinatorTransaction_Confirmed_ToFinal_OnHeartbeatInterval_IfHasBeenI
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirmed).HeartbeatIntervalsSinceStateChange(4).Build()
 
-	err := txn.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
+	err := txn.HandleEvent(ctx, &transaction.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, transaction.State_Final, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
@@ -574,7 +574,7 @@ func TestCoordinatorTransaction_Confirmed_NoTransition_OnHeartbeatInterval_IfNot
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirmed).HeartbeatIntervalsSinceStateChange(3).Build()
 
-	err := txn.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
+	err := txn.HandleEvent(ctx, &transaction.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, transaction.State_Confirmed, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())

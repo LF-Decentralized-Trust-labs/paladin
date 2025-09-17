@@ -31,6 +31,7 @@ import (
 type SeqSender interface {
 	HandleEvent(ctx context.Context, event common.Event) error
 	SetActiveCoordinator(ctx context.Context, coordinator string) error
+	GetTxStatus(ctx context.Context, txID uuid.UUID) (status components.PrivateTxStatus, err error)
 	Stop()
 }
 

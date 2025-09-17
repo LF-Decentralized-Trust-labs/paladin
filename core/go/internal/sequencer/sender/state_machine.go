@@ -20,9 +20,11 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/google/uuid"
 )
 
 type State int
@@ -129,7 +131,7 @@ func init() {
 				Event_HeartbeatReceived: {
 					Actions: []ActionRule{{
 						If:     guard_HasDroppedTransactions,
-						Action: action_SendDelegationRequest,
+						Action: action_SendDroppedTXDelegationRequest,
 					}},
 				},
 				Event_Base_Ledger_Transaction_Reverted: {
@@ -194,6 +196,23 @@ func (s *sender) SetActiveCoordinator(ctx context.Context, coordinator string) e
 	s.activeCoordinatorNode = coordinator
 	log.L(ctx).Infof("[Sequencer] initial active coordinator set to %s", s.activeCoordinatorNode)
 	return nil
+}
+
+func (s *sender) GetTxStatus(ctx context.Context, txID uuid.UUID) (status components.PrivateTxStatus, err error) {
+	if txn, ok := s.transactionsByID[txID]; !ok {
+		endorsements := txn.GetEndorsementStatus(ctx)
+		return components.PrivateTxStatus{
+			TxID:         txID.String(),
+			Status:       txn.GetCurrentState().String(),
+			LatestEvent:  txn.GetLatestEvent(),
+			Endorsements: endorsements,
+			// MRW TODO - latest error, failure message etc.
+		}, nil
+	}
+	return components.PrivateTxStatus{
+		TxID:   txID.String(),
+		Status: "unknown",
+	}, nil
 }
 
 // Function evaluateEvent evaluates whether the event is relevant given the current state of the coordinator

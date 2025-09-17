@@ -29,6 +29,7 @@ import (
 type endorsementRequirement struct {
 	attRequest *prototk.AttestationRequest
 	party      string
+	endorsed   bool
 }
 
 func (t *Transaction) applyEndorsement(ctx context.Context, endorsement *prototk.AttestationResult, requestID uuid.UUID) error {
@@ -72,28 +73,28 @@ func (t *Transaction) applyEndorsementRejection(ctx context.Context, revertReaso
 	return nil
 }
 
-func (d *Transaction) IsEndorsed(ctx context.Context) bool {
-	return !d.hasUnfulfilledEndorsementRequirements(ctx)
+func (t *Transaction) IsEndorsed(ctx context.Context) bool {
+	return !t.hasUnfulfilledEndorsementRequirements(ctx)
 }
 
-func (d *Transaction) hasUnfulfilledEndorsementRequirements(ctx context.Context) bool {
-	return len(d.unfulfilledEndorsementRequirements(ctx)) > 0
+func (t *Transaction) hasUnfulfilledEndorsementRequirements(ctx context.Context) bool {
+	return len(t.unfulfilledEndorsementRequirements(ctx)) > 0
 }
 
-func (d *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []*endorsementRequirement {
+func (t *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []*endorsementRequirement {
 	unfulfilledEndorsementRequirements := make([]*endorsementRequirement, 0)
-	if d.PostAssembly == nil {
+	if t.PostAssembly == nil {
 		log.L(ctx).Debug("[Sequencer] PostAssembly is nil so there are no outstanding endorsement requirements")
 		return unfulfilledEndorsementRequirements
 	}
-	for _, attRequest := range d.PostAssembly.AttestationPlan {
+	for _, attRequest := range t.PostAssembly.AttestationPlan {
 		log.L(ctx).Debugf("[Sequencer] unfulfilled endorsement plan - payload length = %d", len(attRequest.Payload))
 		if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
 			for _, party := range attRequest.Parties {
 				// MRW TODO - tidy up these logs
 				log.L(ctx).Debugf("[Sequencer] party %s must endorse this request. Checking for endorsement", party)
 				found := false
-				for _, endorsement := range d.PostAssembly.Endorsements {
+				for _, endorsement := range t.PostAssembly.Endorsements {
 					log.L(ctx).Debugf("[Sequencer] existing endorsement from party %s", endorsement.Verifier.Lookup)
 					found = endorsement.Name == attRequest.Name &&
 						party == endorsement.Verifier.Lookup &&
@@ -109,7 +110,7 @@ func (d *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []
 					}
 				}
 				if !found {
-					log.L(ctx).Debugf("[Sequencer] no endorsement exists from party %s for transaction %s", party, d.ID)
+					log.L(ctx).Debugf("[Sequencer] no endorsement exists from party %s for transaction %s", party, t.ID)
 					unfulfilledEndorsementRequirements = append(unfulfilledEndorsementRequirements, &endorsementRequirement{party: party, attRequest: attRequest})
 				}
 			}

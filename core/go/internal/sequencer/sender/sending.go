@@ -26,8 +26,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 )
 
-func action_SendDelegationRequest(ctx context.Context, s *sender) error {
-	log.L(ctx).Infof("[Sequencer] action_SendDelegationRequest")
+func sendDelegationRequest(ctx context.Context, s *sender, includeAlreadyDelegated bool) error {
 	transactions, err := s.transactionsOrderedByCreatedTime(ctx)
 	if err != nil {
 		log.L(ctx).Errorf("[Sequencer] failed to get transactions ordered by created time: %v", err)
@@ -38,7 +37,9 @@ func action_SendDelegationRequest(ctx context.Context, s *sender) error {
 	// TODO - this is another place where we are checking state outside the state machine
 	privateTransactions := make([]*components.PrivateTransaction, 0)
 	for _, txn := range transactions {
-		if txn.GetCurrentState() == transaction.State_Pending {
+		if includeAlreadyDelegated && txn.GetCurrentState() == transaction.State_Delegated {
+			privateTransactions = append(privateTransactions, txn.PrivateTransaction)
+		} else if txn.GetCurrentState() == transaction.State_Pending {
 			privateTransactions = append(privateTransactions, txn.PrivateTransaction)
 		}
 	}
@@ -61,7 +62,14 @@ func action_SendDelegationRequest(ctx context.Context, s *sender) error {
 	// Don't send delegation request before internal TX state machine has been updated
 	s.messageSender.SendDelegationRequest(ctx, s.activeCoordinatorNode, privateTransactions, s.currentBlockHeight)
 	return nil
+}
 
+func action_SendDroppedTXDelegationRequest(ctx context.Context, s *sender) error {
+	return sendDelegationRequest(ctx, s, true)
+}
+
+func action_SendDelegationRequest(ctx context.Context, s *sender) error {
+	return sendDelegationRequest(ctx, s, false)
 }
 
 func guard_HasDroppedTransactions(ctx context.Context, s *sender) bool {

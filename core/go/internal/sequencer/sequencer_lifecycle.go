@@ -177,7 +177,7 @@ func (dMgr *distributedSequencerManager) LoadSequencer(ctx context.Context, dbTX
 				10,
 				&contractAddr,
 				50,
-				3,
+				4, // MRW TODO - make configurable
 				dMgr.nodeName,
 				func(ctx context.Context, t *coordTransaction.Transaction) {
 					// MRW TODO - move to sequencer module?
@@ -436,8 +436,8 @@ func (dMgr *distributedSequencerManager) stopLowestPrioritySequencer(ctx context
 
 	// If any sequencers are already closing we can wait for them to close instead of stopping a different one
 	for _, sequencer := range dMgr.sequencers {
-		if sequencer.coordinator.GetCurrentState() == common.CoordinatorState_Flush ||
-			sequencer.coordinator.GetCurrentState() == common.CoordinatorState_Closing {
+		if sequencer.coordinator.GetCurrentState() == coordinator.State_Flush ||
+			sequencer.coordinator.GetCurrentState() == coordinator.State_Closing {
 
 			// To avoid blocking the start of new sequencer that has caused us to purge the lowest priority one,
 			// we don't wait for the closing ones to complete. The aim is to allow the node to remain stable while
@@ -445,8 +445,8 @@ func (dMgr *distributedSequencerManager) stopLowestPrioritySequencer(ctx context
 			// own time.
 			log.L(ctx).Debugf("[Sequencer] coordinator %s is closing, waiting for it to close", sequencer.contractAddress)
 			return
-		} else if sequencer.coordinator.GetCurrentState() == common.CoordinatorState_Idle ||
-			sequencer.coordinator.GetCurrentState() == common.CoordinatorState_Observing {
+		} else if sequencer.coordinator.GetCurrentState() == coordinator.State_Idle ||
+			sequencer.coordinator.GetCurrentState() == coordinator.State_Observing {
 			// This sequencer is already idle or observing so we can page it out immediately
 
 			log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencer.contractAddress)
@@ -488,7 +488,7 @@ func (dMgr *distributedSequencerManager) updateActiveCoordinators(ctx context.Co
 	// If any sequencers are already closing we can wait for them to close instead of stopping a different one
 	for _, sequencer := range dMgr.sequencers {
 		log.L(ctx).Debugf("[Sequencer] coordinator %s state %s", sequencer.contractAddress, sequencer.coordinator.GetCurrentState())
-		if sequencer.coordinator.GetCurrentState() == common.CoordinatorState_Active {
+		if sequencer.coordinator.GetCurrentState() == coordinator.State_Active {
 			log.L(ctx).Debugf("[Sequencer] coordinator %s is active", sequencer.contractAddress)
 			activeCoordinators++
 		}

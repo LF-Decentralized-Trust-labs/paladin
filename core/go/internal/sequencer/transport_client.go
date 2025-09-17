@@ -314,7 +314,7 @@ func (d *distributedSequencerManager) handleCoordinatorHeartbeatNotification(ctx
 		seq.GetCoordinator().HandleEvent(ctx, heartbeatIntervalEvent)
 	}
 
-	seq.GetCoordinator().HandleEvent(ctx, heartbeatEvent)
+	seq.GetSender().HandleEvent(ctx, heartbeatEvent)
 }
 
 func (d *distributedSequencerManager) handlePreDispatchRequest(ctx context.Context, message *components.ReceivedMessage) {

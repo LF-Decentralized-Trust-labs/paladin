@@ -348,9 +348,7 @@ func (tm *txManager) rpcDebugTransactionStatus() rpcserver.RPCHandler {
 		id uuid.UUID,
 	) (components.PrivateTxStatus, error) {
 		tm.metrics.IncRpc("debugTransactionStatus")
-		// MRW TODO
-		return components.PrivateTxStatus{}, nil
-		// return tm.privateTxMgr.GetTxStatus(ctx, contractAddress, id)
+		return tm.sequencerMgr.GetTxStatus(ctx, contractAddress, id)
 	})
 }
 

@@ -24,6 +24,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/sha3"
 )
@@ -100,6 +101,31 @@ func (t *Transaction) Hash(ctx context.Context) (*pldtypes.Bytes32, error) {
 
 }
 
+func (t *Transaction) GetEndorsementStatus(ctx context.Context) []components.PrivateTxEndorsementStatus {
+	endorsementRequestStates := make([]components.PrivateTxEndorsementStatus, len(t.PostAssembly.AttestationPlan))
+	for i, attRequest := range t.PostAssembly.AttestationPlan {
+		if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
+			for _, party := range attRequest.Parties {
+				found := false
+				// MRW TODO - endorsement request time
+				endorsementRequestState := &components.PrivateTxEndorsementStatus{Party: party, EndorsementReceived: false}
+				for _, endorsement := range t.PostAssembly.Endorsements {
+					log.L(ctx).Debugf("[Sequencer] existing endorsement from party %s", endorsement.Verifier.Lookup)
+					found = endorsement.Name == attRequest.Name &&
+						party == endorsement.Verifier.Lookup &&
+						attRequest.VerifierType == endorsement.Verifier.VerifierType
+					if found {
+						endorsementRequestState.EndorsementReceived = true
+						break
+					}
+				}
+				endorsementRequestStates[i] = *endorsementRequestState
+			}
+		}
+	}
+	return endorsementRequestStates
+}
+
 func ptrTo[T any](v T) *T {
 	return &v
 }
@@ -109,6 +135,10 @@ func ptrTo[T any](v T) *T {
 
 func (t *Transaction) GetCurrentState() State {
 	return t.stateMachine.currentState
+}
+
+func (t *Transaction) GetLatestEvent() string {
+	return t.stateMachine.latestEvent
 }
 
 func (t *Transaction) GetSignerAddress() *pldtypes.EthAddress {

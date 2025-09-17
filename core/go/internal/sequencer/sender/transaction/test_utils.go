@@ -23,10 +23,12 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/testutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -99,6 +101,8 @@ type TransactionBuilderForTesting struct {
 	latestSubmissionHash *pldtypes.Bytes32
 	signerAddress        *pldtypes.EthAddress
 	nonce                *uint64
+
+	metrics metrics.DistributedSequencerMetrics
 }
 
 // Function NewTransactionBuilderForTesting creates a TransactionBuilderForTesting with random values for all fields.
@@ -111,6 +115,7 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		fakeClock:                 &common.FakeClockForTesting{},
 		fakeEngineIntegration:     &common.FakeEngineIntegrationForTesting{},
 		sentMessageRecorder:       NewSentMessageRecorder(),
+		metrics:                   metrics.InitMetrics(context.Background(), prometheus.NewRegistry()),
 	}
 
 	switch state {
@@ -177,7 +182,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 	if b.emitFunction == nil {
 		b.emitFunction = func(event common.Event) {}
 	}
-	txn, err := NewTransaction(ctx, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.emitFunction, b.fakeEngineIntegration, nil) // MRW TODO - mock metrics
+	txn, err := NewTransaction(ctx, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.emitFunction, b.fakeEngineIntegration, b.metrics)
 
 	txn.stateMachine.currentState = b.state
 

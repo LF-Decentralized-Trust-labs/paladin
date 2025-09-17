@@ -73,7 +73,10 @@ func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatRec
 		}
 	}
 
-	//TODO process other lists in the heartbeat event
+	// TODO process other lists in the heartbeat event.
+	// Note: sending dropped transaction re-delegations (i.e. those we are tracking but which th heartbeat doesn't mention)
+	// is handled by state machine guards
+
 	return nil
 }
 

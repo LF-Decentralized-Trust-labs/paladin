@@ -39,7 +39,7 @@ type SeqCoordinator interface {
 	GetActiveCoordinatorNode(ctx context.Context) string
 	HandleEvent(ctx context.Context, event common.Event) error
 	UpdateSenderNodePool(ctx context.Context, senderNode string)
-	GetCurrentState() common.CoordinatorState
+	GetCurrentState() State
 	Stop()
 }
 
@@ -448,6 +448,6 @@ func (c *coordinator) Stop() {
 //TODO the following getter methods are not safe to call on anything other than the sequencer goroutine because they are reading data structures that are being modified by the state machine.
 // We should consider making them safe to call from any goroutine by maintaining a copy of the data structures that are updated async from the sequencer thread under a mutex
 
-func (c *coordinator) GetCurrentState() common.CoordinatorState {
-	return common.CoordinatorState(c.stateMachine.currentState.String())
+func (c *coordinator) GetCurrentState() State {
+	return c.stateMachine.currentState
 }

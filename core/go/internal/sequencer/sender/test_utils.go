@@ -20,9 +20,11 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	uuid "github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -71,6 +73,7 @@ type SenderBuilderForTesting struct {
 	contractAddress  *pldtypes.EthAddress
 	emitFunction     func(event common.Event)
 	transactions     []*transaction.Transaction
+	metrics          metrics.DistributedSequencerMetrics
 }
 
 type SenderDependencyMocks struct {
@@ -82,7 +85,8 @@ type SenderDependencyMocks struct {
 
 func NewSenderBuilderForTesting(state State) *SenderBuilderForTesting {
 	return &SenderBuilderForTesting{
-		state: state,
+		state:   state,
+		metrics: metrics.InitMetrics(context.Background(), prometheus.NewRegistry()),
 	}
 }
 
@@ -151,7 +155,7 @@ func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDe
 		b.contractAddress,
 		TestDefault_HeartbeatIntervalMs,
 		TestDefault_HeartbeatThreshold,
-		nil, // MRW TODO - mock metrics
+		b.metrics,
 	)
 
 	for _, tx := range b.transactions {
