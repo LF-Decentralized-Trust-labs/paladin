@@ -450,40 +450,18 @@ func (dSmgr *distributedSequencerManager) GetNodeName() string {
 	return dSmgr.nodeName
 }
 
-// func (dSmgr *distributedSequencerManager) getSequencerForContract(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract, tx *components.PrivateTransaction) (*distributedSequencer, error) {
-// 	return nil, nil
-// }
+func (dSmgr *distributedSequencerManager) GetTxStatus(ctx context.Context, domainAddress string, txID uuid.UUID) (status components.PrivateTxStatus, err error) {
+	// MRW TODO - what type of TX status does this return?
+	// MRW TODO - this returns status that we happen to have in memory at the moment and might be useful for debugging
 
-// func (dSmgr *distributedSequencerManager) GetTxStatus(ctx context.Context, domainAddress string, txID uuid.UUID) (status components.PrivateTxStatus, err error) { // MRW TODO - what type of TX status does this return?
-// this returns status that we happen to have in memory at the moment and might be useful for debugging
-
-// dSmgr.sequencersLock.RLock()
-// defer dSmgr.sequencersLock.RUnlock()
-// targetSequencer := dSmgr.sequencers[domainAddress]
-// if targetSequencer == nil {
-// 	return components.PrivateTxStatus{
-// 		TxID:   txID.String(),
-// 		Status: "unknown",
-// 	}, nil
-
-// } else {
-// 	return targetSequencer.GetTxStatus(ctx, txID)
-// }
-// MRW TODO - what does this look like for distributed sequencer?
-//	return nil, nil
-// }
-
-func (dSmgr *distributedSequencerManager) HandleNewEvent(ctx context.Context, event string) error {
-	log.L(dSmgr.ctx).Debug("[Sequencer] HandleNewEvent (not implemented)")
-	// dSmgr.sequencersLock.RLock()
-	// defer dSmgr.sequencersLock.RUnlock()
-	// targetSequencer := dSmgr.sequencers[event.GetContractAddress()]
-	// if targetSequencer == nil { // this is an event that belongs to a contract that's not in flight, throw it away and rely on the engine to trigger the action again when the sequencer is wake up. (an enhanced version is to add weight on queueing an sequencer)
-	// 	log.L(ctx).Warnf("Ignored %T event for domain contract %s and transaction %s . If this happens a lot, check the sequencer idle timeout is set to a reasonable number", event, event.GetContractAddress(), event.GetTransactionID())
-	// } else {
-	// 	targetSequencer.HandleEvent(ctx, event)
-	// }
-	return nil
+	sequencer, err := dSmgr.LoadSequencer(ctx, dSmgr.components.Persistence().NOTX(), *pldtypes.MustEthAddress(domainAddress), nil, nil)
+	if err != nil || sequencer == nil {
+		return components.PrivateTxStatus{
+			TxID:   txID.String(),
+			Status: "unknown",
+		}, err
+	}
+	return sequencer.GetSender().GetTxStatus(ctx, txID)
 }
 
 func (dSmgr *distributedSequencerManager) HandleTransactionCollected(ctx context.Context, signerAddress string, contractAddress string, txID uuid.UUID) error {
@@ -506,64 +484,6 @@ func (dSmgr *distributedSequencerManager) HandleTransactionCollected(ctx context
 
 		return sequencer.GetCoordinator().HandleEvent(ctx, collectedEvent)
 	}
-
-	return nil
-}
-
-func (dSmgr *distributedSequencerManager) HandleTransactionConfirmed(ctx context.Context, confirmedTxn *components.TxCompletion, from *pldtypes.EthAddress, nonce uint64) error {
-	log.L(dSmgr.ctx).Infof("[Sequencer] handling confirmed transaction %s", confirmedTxn.TransactionID)
-
-	// A transaction can be confirmed after the coordinating node has restarted. The coordinator doesn't persist the private TX, it relies
-	// on the sending node to delegate the private TX to it. handleDeleationRequest first checks if a public TX for that request has been confirmed
-	// on chain, so in in this context we will assume we have the private TX in memory from which we can determine the originating node for confirmation events.
-
-	contractAddress := pldtypes.EthAddress{}
-	if confirmedTxn.PSC != nil {
-		contractAddress = confirmedTxn.PSC.Address()
-	}
-
-	log.L(dSmgr.ctx).Infof("[Sequencer] handling confirmed transaction %s from %s, contract address %s", confirmedTxn.TransactionID, from, contractAddress)
-
-	sequencer, err := dSmgr.LoadSequencer(ctx, dSmgr.components.Persistence().NOTX(), contractAddress, nil, nil)
-	if err != nil {
-		// MRW TODO - deploys happen without a dedicated sequencer, so this isn't a hard error. We ought
-		// to validate if the transaction being confirmed is a deploy, but leaving as-is for now.
-		log.L(dSmgr.ctx).Warnf("[Sequencer] failed to obtain sequencer to pass transaction confirmed event to %v:", err)
-		return err
-	}
-
-	if sequencer != nil {
-		mtx := sequencer.GetCoordinator().GetTransactionByID(ctx, confirmedTxn.TransactionID)
-		if mtx == nil {
-			return fmt.Errorf("[Sequencer] coordinator not tracking transaction ID %s", confirmedTxn.TransactionID)
-		}
-
-		log.L(dSmgr.ctx).Infof("[Sequencer] handing TX confirmed event to coordinator")
-
-		if from == nil {
-			return fmt.Errorf("[Sequencer] nil From address for confirmed transaction %s", confirmedTxn.TransactionID)
-		}
-
-		confirmedEvent := &coordinator.TransactionConfirmedEvent{
-			TxID:         confirmedTxn.TransactionID,
-			From:         from, // The base ledger signing address
-			Hash:         confirmedTxn.ReceiptInput.OnChain.TransactionHash,
-			RevertReason: confirmedTxn.ReceiptInput.RevertData,
-			Nonce:        nonce,
-		}
-		confirmedEvent.EventTime = time.Now()
-
-		coordErr := sequencer.GetCoordinator().HandleEvent(ctx, confirmedEvent)
-		if coordErr != nil {
-			return coordErr
-		}
-
-		// Forward the event to the sending node
-		transportWriter := sequencer.GetTransportWriter()
-		transportWriter.SendTransactionConfirmed(ctx, confirmedTxn.TransactionID, mtx.SenderNode(), &contractAddress, nonce, confirmedTxn.ReceiptInput.RevertData)
-
-	}
-	dSmgr.metrics.IncConfirmedTransactions()
 
 	return nil
 }
@@ -637,6 +557,72 @@ func (dSmgr *distributedSequencerManager) HandlePublicTXSubmission(ctx context.C
 		transportWriter.SendTransactionSubmitted(ctx, txID, senderNode, pldtypes.MustEthAddress(contractAddress), txHash)
 	}
 	return nil
+}
+
+func (dSmgr *distributedSequencerManager) HandleTransactionConfirmed(ctx context.Context, confirmedTxn *components.TxCompletion, from *pldtypes.EthAddress, nonce uint64) error {
+	log.L(dSmgr.ctx).Infof("[Sequencer] handling confirmed transaction %s", confirmedTxn.TransactionID)
+
+	// A transaction can be confirmed after the coordinating node has restarted. The coordinator doesn't persist the private TX, it relies
+	// on the sending node to delegate the private TX to it. handleDeleationRequest first checks if a public TX for that request has been confirmed
+	// on chain, so in in this context we will assume we have the private TX in memory from which we can determine the originating node for confirmation events.
+
+	contractAddress := pldtypes.EthAddress{}
+	if confirmedTxn.PSC != nil {
+		contractAddress = confirmedTxn.PSC.Address()
+	}
+
+	log.L(dSmgr.ctx).Infof("[Sequencer] handling confirmed transaction %s from %s, contract address %s", confirmedTxn.TransactionID, from, contractAddress)
+
+	sequencer, err := dSmgr.LoadSequencer(ctx, dSmgr.components.Persistence().NOTX(), contractAddress, nil, nil)
+	if err != nil {
+		// MRW TODO - deploys happen without a dedicated sequencer, so this isn't a hard error. We ought
+		// to validate if the transaction being confirmed is a deploy, but leaving as-is for now.
+		log.L(dSmgr.ctx).Warnf("[Sequencer] failed to obtain sequencer to pass transaction confirmed event to %v:", err)
+		return err
+	}
+
+	if sequencer != nil {
+		mtx := sequencer.GetCoordinator().GetTransactionByID(ctx, confirmedTxn.TransactionID)
+		if mtx == nil {
+			return fmt.Errorf("[Sequencer] coordinator not tracking transaction ID %s", confirmedTxn.TransactionID)
+		}
+
+		log.L(dSmgr.ctx).Infof("[Sequencer] handing TX confirmed event to coordinator")
+
+		if from == nil {
+			return fmt.Errorf("[Sequencer] nil From address for confirmed transaction %s", confirmedTxn.TransactionID)
+		}
+
+		confirmedEvent := &coordinator.TransactionConfirmedEvent{
+			TxID:         confirmedTxn.TransactionID,
+			From:         from, // The base ledger signing address
+			Hash:         confirmedTxn.ReceiptInput.OnChain.TransactionHash,
+			RevertReason: confirmedTxn.ReceiptInput.RevertData,
+			Nonce:        nonce,
+		}
+		confirmedEvent.EventTime = time.Now()
+
+		coordErr := sequencer.GetCoordinator().HandleEvent(ctx, confirmedEvent)
+		if coordErr != nil {
+			return coordErr
+		}
+
+		// Forward the event to the sending node
+		transportWriter := sequencer.GetTransportWriter()
+		transportWriter.SendTransactionConfirmed(ctx, confirmedTxn.TransactionID, mtx.SenderNode(), &contractAddress, nonce, confirmedTxn.ReceiptInput.RevertData)
+
+	}
+	dSmgr.metrics.IncConfirmedTransactions()
+
+	return nil
+}
+
+func (dSmgr *distributedSequencerManager) HandleTransactionFailed(ctx context.Context, dbTX persistence.DBTX, confirms []*components.PublicTxMatch) error {
+	// MRW TODO - populate failure receipts and distribute to sequencer
+	privateFailureReceipts := make([]*components.ReceiptInputWithOriginator, len(confirms))
+
+	// Distribute the receipts to the correct location - either local if we were the submitter, or remote.
+	return dSmgr.WriteOrDistributeReceiptsPostSubmit(ctx, dbTX, privateFailureReceipts)
 }
 
 func (dSmgr *distributedSequencerManager) BuildNullifiers(ctx context.Context, stateDistributions []*components.StateDistributionWithData) (nullifiers []*components.NullifierUpsert, err error) {
@@ -733,6 +719,23 @@ func (dSmgr *distributedSequencerManager) CallPrivateSmartContract(ctx context.C
 
 	// Do the actual call
 	return psc.ExecCall(dCtx, dSmgr.components.Persistence().NOTX(), call, verifiers)
+}
+
+func (dSmgr *distributedSequencerManager) WriteOrDistributeReceiptsPostSubmit(ctx context.Context, dbTX persistence.DBTX, receipts []*components.ReceiptInputWithOriginator) error {
+
+	// MRW TODO - handle failure of a transaction wrt its chained transactions
+	// There may be some cases (a small number?) where we decide we can continue with the next transaction.
+	// for _, r := range receipts {
+	// 	if r.ReceiptType != components.RT_Success && r.DomainContractAddress != "" {
+	// 		seq := p.getSequencerIfActive(ctx, r.DomainContractAddress)
+	// 		if seq != nil {
+	// 			log.L(ctx).Errorf("Due to transaction error the sequencer for smart contract %s in domain %s is STOPPING", seq.contractAddress, r.Domain)
+	// 			seq.Stop()
+	// 		}
+	// 	}
+	// }
+
+	return dSmgr.syncPoints.WriteOrDistributeReceipts(ctx, dbTX, receipts)
 }
 
 // MRW TODO - move to sequencer module?

@@ -86,6 +86,7 @@ func TestSender_SingleTransactionLifecycle(t *testing.T) {
 
 	err := s.HandleEvent(ctx, heartbeatEvent)
 	assert.NoError(t, err)
+	assert.True(t, s.GetCurrentState() == State_Observing)
 
 	// Start by creating a transaction with the sender
 	transactionBuilder := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender(senderLocator).NumberOfRequiredEndorsers(1)
@@ -184,6 +185,7 @@ func TestSender_DelegateDroppedTransactions(t *testing.T) {
 
 	err := s.HandleEvent(ctx, heartbeatEvent)
 	assert.NoError(t, err)
+	assert.True(t, s.GetCurrentState() == State_Observing)
 
 	transactionBuilder1 := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender(senderLocator).NumberOfRequiredEndorsers(1)
 	txn1 := transactionBuilder1.BuildSparse()
@@ -225,6 +227,7 @@ func TestSender_DelegateDroppedTransactions(t *testing.T) {
 	assert.NoError(t, err)
 
 	require.True(t, mocks.SentMessageRecorder.HasSentDelegationRequest())
+
 	require.True(t, mocks.SentMessageRecorder.HasDelegatedTransaction(txn1.ID))
 	require.True(t, mocks.SentMessageRecorder.HasDelegatedTransaction(txn2.ID))
 

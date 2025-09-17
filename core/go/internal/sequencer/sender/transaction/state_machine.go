@@ -74,6 +74,7 @@ const (
 type StateMachine struct {
 	currentState    State
 	lastStateChange time.Time
+	latestEvent     string
 }
 
 // Actions can be specified for transition to a state either as the OnTransitionTo function that will run for all transitions to that state or as the On field in the Transition struct if the action applies
@@ -495,6 +496,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 			// (Odd spacing is intentional to align logs more clearly)
 			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("sdr      | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			t.metrics.ObserveSequencerTXStateChange("Sender_"+rule.To.String(), time.Duration(event.GetEventTime().Sub(sm.lastStateChange).Milliseconds()))
+			sm.latestEvent = event.TypeString()
 			sm.lastStateChange = time.Now()
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]

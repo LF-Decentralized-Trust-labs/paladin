@@ -425,6 +425,72 @@ func (_m *MockSeqSender) EXPECT() *MockSeqSender_Expecter {
 	return &MockSeqSender_Expecter{mock: &_m.Mock}
 }
 
+// GetTxStatus provides a mock function for the type MockSeqSender
+func (_mock *MockSeqSender) GetTxStatus(ctx context.Context, txID uuid.UUID) (components.PrivateTxStatus, error) {
+	ret := _mock.Called(ctx, txID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTxStatus")
+	}
+
+	var r0 components.PrivateTxStatus
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) (components.PrivateTxStatus, error)); ok {
+		return returnFunc(ctx, txID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) components.PrivateTxStatus); ok {
+		r0 = returnFunc(ctx, txID)
+	} else {
+		r0 = ret.Get(0).(components.PrivateTxStatus)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = returnFunc(ctx, txID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockSeqSender_GetTxStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTxStatus'
+type MockSeqSender_GetTxStatus_Call struct {
+	*mock.Call
+}
+
+// GetTxStatus is a helper method to define mock.On call
+//   - ctx context.Context
+//   - txID uuid.UUID
+func (_e *MockSeqSender_Expecter) GetTxStatus(ctx interface{}, txID interface{}) *MockSeqSender_GetTxStatus_Call {
+	return &MockSeqSender_GetTxStatus_Call{Call: _e.mock.On("GetTxStatus", ctx, txID)}
+}
+
+func (_c *MockSeqSender_GetTxStatus_Call) Run(run func(ctx context.Context, txID uuid.UUID)) *MockSeqSender_GetTxStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockSeqSender_GetTxStatus_Call) Return(status components.PrivateTxStatus, err error) *MockSeqSender_GetTxStatus_Call {
+	_c.Call.Return(status, err)
+	return _c
+}
+
+func (_c *MockSeqSender_GetTxStatus_Call) RunAndReturn(run func(ctx context.Context, txID uuid.UUID) (components.PrivateTxStatus, error)) *MockSeqSender_GetTxStatus_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // HandleEvent provides a mock function for the type MockSeqSender
 func (_mock *MockSeqSender) HandleEvent(ctx context.Context, event common.Event) error {
 	ret := _mock.Called(ctx, event)

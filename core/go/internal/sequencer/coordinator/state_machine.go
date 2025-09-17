@@ -272,7 +272,7 @@ func (c *coordinator) evaluateEvent(ctx context.Context, event common.Event) (*E
 			}
 			if !valid {
 				//This is perfectly normal sometimes an event happens and is no longer relevant to the coordinator so we just ignore it and move on
-				log.L(ctx).Debugf("[Sequencer] oordinator event %s is not valid for current state %s: %t", event.TypeString(), sm.currentState.String(), valid)
+				log.L(ctx).Debugf("[Sequencer] coordinator event %s is not valid for current state %s: %t", event.TypeString(), sm.currentState.String(), valid)
 				return nil, nil
 			}
 		}
@@ -394,7 +394,9 @@ func action_SendHandoverRequest(ctx context.Context, c *coordinator) error {
 }
 
 func action_StopHeartbeating(ctx context.Context, c *coordinator) error {
-	c.heartbeatCancel()
+	if c.heartbeatCancel != nil {
+		c.heartbeatCancel()
+	}
 	return nil
 }
 

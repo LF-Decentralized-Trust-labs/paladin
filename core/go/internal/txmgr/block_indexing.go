@@ -35,7 +35,7 @@ func (tm *txManager) blockIndexerPreCommit(
 
 	// Log all the transactions we've been passed
 	for _, tx := range transactions {
-		log.L(ctx).Infof("Received block %d transaction %s hash=%s type=%s. Are we going to put it in the receipts table?",
+		log.L(ctx).Infof("Received block %d transaction %s hash=%s type=%+v. Are we going to put it in the receipts table?",
 			tx.BlockNumber, tx.ContractAddress, tx.Hash, tx.Nonce)
 	}
 
@@ -81,14 +81,13 @@ func (tm *txManager) blockIndexerPreCommit(
 		return err
 	}
 
-	// MRW TODO
 	// Deliver the failures to the distributed sequencer
-	// if len(failedForPrivateTx) > 0 {
-	// 	err = tm.privateTxMgr.NotifyFailedPublicTx(ctx, dbTX, failedForPrivateTx)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
+	if len(failedForPrivateTx) > 0 {
+		err = tm.sequencerMgr.HandleTransactionFailed(ctx, dbTX, failedForPrivateTx)
+		if err != nil {
+			return err
+		}
+	}
 
 	dbTX.AddPostCommit(func(ctx context.Context) {
 		// We need to notify the public TX manager when the DB transaction for these has completed,

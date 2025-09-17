@@ -18,12 +18,17 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"testing"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func privateTransactionMatcher(txID ...uuid.UUID) func(*components.PrivateTransaction) bool {
@@ -74,6 +79,7 @@ func (r *SentMessageRecorder) HasSentHeartbeat() bool {
 type CoordinatorBuilderForTesting struct {
 	state                                    State
 	senderIdentityPool                       []string
+	domainAPI                                components.DomainSmartContract
 	contractAddress                          *pldtypes.EthAddress
 	currentBlockHeight                       *uint64
 	activeCoordinatorBlockHeight             *uint64
@@ -85,6 +91,7 @@ type CoordinatorBuilderForTesting struct {
 	emitFunction                             func(event common.Event)
 	transactions                             []*transaction.Transaction
 	heartbeatsUntilClosingGracePeriodExpires *int
+	metrics                                  metrics.DistributedSequencerMetrics
 }
 
 type CoordinatorDependencyMocks struct {
@@ -94,9 +101,16 @@ type CoordinatorDependencyMocks struct {
 	emittedEvents       []common.Event
 }
 
-func NewCoordinatorBuilderForTesting(state State) *CoordinatorBuilderForTesting {
+func NewCoordinatorBuilderForTesting(t *testing.T, state State) *CoordinatorBuilderForTesting {
+
+	domainAPI := componentsmocks.NewDomainSmartContract(t)
+	domainAPI.On("ContractConfig").Return(&prototk.ContractConfig{
+		CoordinatorSelection: prototk.ContractConfig_COORDINATOR_ENDORSER,
+	})
 	return &CoordinatorBuilderForTesting{
-		state: state,
+		state:     state,
+		domainAPI: domainAPI,
+		metrics:   metrics.InitMetrics(context.Background(), prometheus.NewRegistry()),
 	}
 }
 
@@ -166,7 +180,7 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 
 	coordinator, err := NewCoordinator(
 		ctx,
-		nil,
+		b.domainAPI,
 		mocks.SentMessageRecorder,
 		b.senderIdentityPool,
 		mocks.Clock,
@@ -182,7 +196,7 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		func(context.Context, *transaction.Transaction) {},                    // onReadyForDispatch function, not used in tests
 		func(contractAddress *pldtypes.EthAddress, coordinatorNode string) {}, // coordinatorStarted function, not used in tests
 		func(contractAddress *pldtypes.EthAddress) {},                         // coordinatorIdle function, not used in tests
-		nil, // MRW TODO - mock metrics
+		b.metrics,
 	)
 	if err != nil {
 		panic(err)

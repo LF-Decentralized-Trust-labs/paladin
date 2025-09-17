@@ -30,7 +30,7 @@ import (
 func TestCoordinator_InitializeOK(t *testing.T) {
 	ctx := context.Background()
 
-	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Idle).Build(ctx)
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Idle).Build(ctx)
 
 	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 }
@@ -38,8 +38,9 @@ func TestCoordinator_InitializeOK(t *testing.T) {
 func TestCoordinator_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
-	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Idle).
-		SenderIdentityPool(sender)
+
+	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Idle)
+	builder.SenderIdentityPool(sender)
 	c, _ := builder.Build(ctx)
 
 	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState())
@@ -56,7 +57,7 @@ func TestCoordinator_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 
 func TestCoordinator_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 	ctx := context.Background()
-	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Idle).Build(ctx)
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Idle).Build(ctx)
 	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState())
 
 	err := c.HandleEvent(ctx, &coordinator.HeartbeatReceivedEvent{})
@@ -69,7 +70,7 @@ func TestCoordinator_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
 
-	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Observing).
+	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Observing).
 		SenderIdentityPool(sender).
 		ActiveCoordinatorBlockHeight(200).
 		CurrentBlockHeight(194) // default tolerance is 5 so this is behind
@@ -88,7 +89,7 @@ func TestCoordinator_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
 
-	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Observing).
+	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Observing).
 		SenderIdentityPool(sender).
 		ActiveCoordinatorBlockHeight(200).
 		CurrentBlockHeight(195) // default tolerance is 5 so this is not behind
@@ -108,7 +109,7 @@ func TestCoordinator_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 func TestCoordinator_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
 	sender := "sender@senderNode"
-	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Standby).
+	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Standby).
 		SenderIdentityPool(sender).
 		ActiveCoordinatorBlockHeight(200).
 		CurrentBlockHeight(194)
@@ -125,7 +126,7 @@ func TestCoordinator_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 func TestCoordinator_Standby_NoTransition_OnNewBlock_IfStillBehind(t *testing.T) {
 	ctx := context.Background()
 
-	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Standby).
+	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Standby).
 		ActiveCoordinatorBlockHeight(200).
 		CurrentBlockHeight(193)
 	c, mocks := builder.Build(ctx)
@@ -141,7 +142,7 @@ func TestCoordinator_Standby_NoTransition_OnNewBlock_IfStillBehind(t *testing.T)
 
 func TestCoordinator_Elect_ToPrepared_OnHandover(t *testing.T) {
 	ctx := context.Background()
-	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Elect).Build(ctx)
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Elect).Build(ctx)
 
 	err := c.HandleEvent(ctx, &coordinator.HandoverReceivedEvent{})
 	assert.NoError(t, err)
@@ -151,7 +152,7 @@ func TestCoordinator_Elect_ToPrepared_OnHandover(t *testing.T) {
 
 func TestCoordinator_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(t *testing.T) {
 	ctx := context.Background()
-	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Prepared)
+	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Prepared)
 	c, _ := builder.Build(ctx)
 
 	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
@@ -171,7 +172,7 @@ func TestCoordinator_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(t
 func TestCoordinator_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushCompleted(t *testing.T) {
 	ctx := context.Background()
 
-	builder := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Prepared)
+	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Prepared)
 	c, _ := builder.Build(ctx)
 
 	otherHash := pldtypes.Bytes32(pldtypes.RandBytes(32))
@@ -193,7 +194,7 @@ func TestCoordinator_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFlig
 
 	soleTransaction := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
-	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Active).
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Active).
 		Transactions(soleTransaction).
 		Build(ctx)
 
@@ -213,7 +214,7 @@ func TestCoordinator_ActiveNoTransition_OnTransactionConfirmed_IfNotTransactions
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
-	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Active).
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Active).
 		Transactions(delegation1, delegation2).
 		Build(ctx)
 
@@ -233,7 +234,7 @@ func TestCoordinator_Active_ToFlush_OnHandoverRequest(t *testing.T) {
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
-	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Active).
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Active).
 		Transactions(delegation1, delegation2).
 		Build(ctx)
 
@@ -254,7 +255,7 @@ func TestCoordinator_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *t
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Confirming_Dispatchable).Build()
 
-	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Flush).
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Flush).
 		Transactions(delegation1, delegation2).
 		Build(ctx)
 
@@ -278,7 +279,7 @@ func TestCoordinator_FlushNoTransition_OnTransactionConfirmed_IfNotFlushComplete
 	delegation1 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 	delegation2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
-	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Flush).
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Flush).
 		Transactions(delegation1, delegation2).
 		Build(ctx)
 
@@ -298,7 +299,7 @@ func TestCoordinator_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExpi
 
 	d := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
-	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Closing).
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Closing).
 		HeartbeatsUntilClosingGracePeriodExpires(1).
 		Transactions(d).
 		Build(ctx)
@@ -315,7 +316,7 @@ func TestCoordinator_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGracePe
 
 	d := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
-	c, _ := coordinator.NewCoordinatorBuilderForTesting(coordinator.State_Closing).
+	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Closing).
 		HeartbeatsUntilClosingGracePeriodExpires(2).
 		Transactions(d).
 		Build(ctx)
