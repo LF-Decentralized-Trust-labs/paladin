@@ -12,6 +12,6 @@ For the Pente domain for example, there may be 2 parties who wish to modify the 
 
 The component of Paladin that manages the sequencing of private transactions for all domains is called the **Distributed Sequencer**.
 
-![Distributed Sequencer Architecture](../sequencer.png){.zoomable-image}
+![Distributed Sequencer Architecture](./diagrams/paladin-sequencer.svg){.zoomable-image}
 
 The term "distributed" refers to the fact that for multi-party domains, only one Paladin node can be sequencing transactions at a given time. The sequencing of transactions is distributed among the Paladin nodes to share the workload and resources across the peers and to ensure that if one node has a failure another node can take over transaction sequencing.
