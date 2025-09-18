@@ -56,7 +56,7 @@ paladinNodes:
       - zeto
       - pente
     registries:
-      - evm-reg
+      - evm-registry
     transports:
       - name: grpc
         plugin:
@@ -250,7 +250,7 @@ paladinNodes:
     - zeto
     - pente
   registries:
-    - evm-reg
+    - evm-registry
   transports:
     - name: grpc
       plugin:

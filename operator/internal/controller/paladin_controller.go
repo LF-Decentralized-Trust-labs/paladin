@@ -1018,10 +1018,11 @@ func (r *PaladinReconciler) generatePaladinDomains(ctx context.Context, node *co
 		// or wholely defined by reference to the CR attached.
 		// We do not attempt to merge
 		pldConf.Domains[domain.Name] = &pldconf.DomainConfig{
-			Plugin:          r.mapPluginConfig(domain.Spec.Plugin),
-			Config:          domainConf,
-			RegistryAddress: domain.Status.RegistryAddress,
-			AllowSigning:    domain.Spec.AllowSigning,
+			Plugin:               r.mapPluginConfig(domain.Spec.Plugin),
+			Config:               domainConf,
+			RegistryAddress:      domain.Status.RegistryAddress,
+			AllowSigning:         domain.Spec.AllowSigning,
+			FixedSigningIdentity: domain.Spec.FixedSigningIdentity,
 		}
 	}
 
@@ -1146,12 +1147,16 @@ func (r *PaladinReconciler) generatePaladinTransports(ctx context.Context, node 
 
 		tlsIdx := len(availableTLSSecrets)
 		availableTLSSecrets = append(availableTLSSecrets, secret.Name)
-		transportConf["tls"] = &pldconf.TLSConfig{
+		tlsConf := &pldconf.TLSConfig{
 			Enabled:    true,
 			ClientAuth: true,
 			CertFile:   fmt.Sprintf("/cert%.3d/tls.crt", tlsIdx),
 			KeyFile:    fmt.Sprintf("/cert%.3d/tls.key", tlsIdx),
 		}
+		if secret.Data["ca.crt"] != nil {
+			tlsConf.CAFile = fmt.Sprintf("/cert%.3d/ca.crt", tlsIdx)
+		}
+		transportConf["tls"] = tlsConf
 		if transportConf["externalHostname"] == nil {
 			transportConf["externalHostname"] = generatePaladinServiceHostname(node.Name, node.Namespace)
 		}

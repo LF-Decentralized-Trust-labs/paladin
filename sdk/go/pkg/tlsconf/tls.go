@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/pem"
 	"os"
 	"regexp"
 	"strings"
@@ -39,8 +40,9 @@ const (
 )
 
 type TLSConfigDetailed struct {
-	TLSConfig   *tls.Config
-	Certificate *tls.Certificate
+	TLSConfig     *tls.Config
+	Certificate   *tls.Certificate
+	CACertificate *x509.Certificate // Add CA certificate for issuer publishing
 }
 
 func BuildTLSConfig(ctx context.Context, config *pldconf.TLSConfig, tlsType TLSType) (*tls.Config, error) {
@@ -82,6 +84,15 @@ func BuildTLSConfigExt(ctx context.Context, config *pldconf.TLSConfig, tlsType T
 			ok := rootCAs.AppendCertsFromPEM(caBytes)
 			if !ok {
 				err = i18n.NewError(ctx, pldmsgs.MsgTLSInvalidCAFile)
+			} else {
+				// Parse CA certificate for issuer publishing
+				block, _ := pem.Decode(caBytes)
+				if block != nil && block.Type == "CERTIFICATE" {
+					caCert, parseErr := x509.ParseCertificate(block.Bytes)
+					if parseErr == nil {
+						detail.CACertificate = caCert
+					}
+				}
 			}
 		}
 	case config.CA != "":
@@ -89,6 +100,15 @@ func BuildTLSConfigExt(ctx context.Context, config *pldconf.TLSConfig, tlsType T
 		ok := rootCAs.AppendCertsFromPEM([]byte(config.CA))
 		if !ok {
 			err = i18n.NewError(ctx, pldmsgs.MsgTLSInvalidCAFile)
+		} else {
+			// Parse CA certificate for issuer publishing
+			block, _ := pem.Decode([]byte(config.CA))
+			if block != nil && block.Type == "CERTIFICATE" {
+				caCert, parseErr := x509.ParseCertificate(block.Bytes)
+				if parseErr == nil {
+					detail.CACertificate = caCert
+				}
+			}
 		}
 	default:
 		rootCAs, err = x509.SystemCertPool()

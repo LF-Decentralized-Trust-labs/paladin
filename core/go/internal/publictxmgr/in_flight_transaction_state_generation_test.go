@@ -59,11 +59,6 @@ func TestStateVersionBasic(t *testing.T) {
 	assert.Nil(t, version.GetStageTriggerError(ctx))
 	assert.Empty(t, version.GetStage(ctx))
 	assert.NotNil(t, version.GetStageStartTime(ctx))
-	assert.False(t, version.ValidatedTransactionHashMatchState(ctx))
-	version.SetValidatedTransactionHashMatchState(ctx, true)
-	assert.True(t, version.ValidatedTransactionHashMatchState(ctx))
-	version.SetValidatedTransactionHashMatchState(ctx, false)
-	assert.False(t, version.ValidatedTransactionHashMatchState(ctx))
 }
 
 func TestStateVersionTransactionFromRetrieveGasPriceToTracking(t *testing.T) {
@@ -194,7 +189,8 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 		for i := 0; i < expectedNumberOfGasPriceSuccessOutput; i++ {
 			go func() {
 				version.AddGasPriceOutput(ctx, &pldapi.PublicTxGasPricing{
-					GasPrice: pldtypes.Int64ToInt256(100),
+					MaxFeePerGas:         pldtypes.Int64ToInt256(100),
+					MaxPriorityFeePerGas: pldtypes.Int64ToInt256(10),
 				}, nil)
 				countChanel <- true
 			}()
@@ -323,9 +319,11 @@ func TestStateManagerTxPersistenceManagementUpdateErrors(t *testing.T) {
 	assert.Nil(t, err)
 
 	rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{
-		NewSubmission: &DBPubTxnSubmission{
-			from:            "0x12345",
-			TransactionHash: pldtypes.RandBytes32(),
+		NewValues: BaseTXUpdateNewValues{
+			NewSubmission: &DBPubTxnSubmission{
+				from:            "0x12345",
+				TransactionHash: pldtypes.RandBytes32(),
+			},
 		},
 	}
 

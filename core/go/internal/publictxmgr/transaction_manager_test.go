@@ -90,6 +90,8 @@ func baseMocks(t *testing.T) *mocksAndTestControl {
 func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig)) (context.Context, *pubTxManager, *mocksAndTestControl, func()) {
 	// log.SetLevel("debug")
 	ctx := context.Background()
+	maxFeePerGasStr := pldtypes.Uint64ToUint256(0).HexString0xPrefix()
+	maxPriorityFeePerGasStr := pldtypes.Uint64ToUint256(0).HexString0xPrefix()
 	conf := &pldconf.PublicTxManagerConfig{
 		Manager: pldconf.PublicTxManagerManagerConfig{
 			Interval:                 confutil.P("1h"),
@@ -106,7 +108,10 @@ func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...fu
 			TimeLineLoggingMaxEntries: 10,
 		},
 		GasPrice: pldconf.GasPriceConfig{
-			FixedGasPrice: 0,
+			FixedGasPrice: &pldconf.FixedGasPricing{
+				MaxFeePerGas:         &maxFeePerGasStr,
+				MaxPriorityFeePerGas: &maxPriorityFeePerGasStr,
+			},
 		},
 	}
 
@@ -175,7 +180,7 @@ func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...fu
 
 	if mocks.disableManagerStart {
 		pmgr.ethClient = pmgr.ethClientFactory.SharedWS()
-		pmgr.gasPriceClient.Init(ctx, pmgr.ethClient)
+		pmgr.gasPriceClient.Start(ctx, pmgr.ethClient)
 	} else {
 		err = pmgr.Start()
 		require.NoError(t, err)
@@ -197,13 +202,15 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 		conf.Manager.Interval = confutil.P("50ms")
 		conf.Orchestrator.Interval = confutil.P("50ms")
 		conf.Manager.OrchestratorIdleTimeout = confutil.P("1ms")
+		conf.GasLimit.GasEstimateFactor = confutil.P(1.0)
 		conf.GasPrice.FixedGasPrice = nil
+
+		// eth_gasPrice- is called on start up to detect that this is not a zero gas price chain
+		mocks.ethClient.On("GasPrice", mock.Anything).Return(pldtypes.MustParseHexUint256("100"), nil)
 	})
 	defer done()
 
-	// Mock a gas price
 	chainID, _ := rand.Int(rand.Reader, big.NewInt(100000000000000))
-	m.ethClient.On("GasPrice", mock.Anything).Return(pldtypes.MustParseHexUint256("1000000000000000"), nil)
 	m.ethClient.On("ChainID").Return(chainID.Int64())
 
 	// Resolve the key ourselves for comparison
@@ -211,8 +218,28 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	require.NoError(t, err)
 	resolvedKey := pldtypes.MustEthAddress(keyMapping.Verifier.Verifier)
 
-	// create some transactions that are successfully added
+	// Mock gas price and estimation - we need to set the result of three calls where the values relate to each other
 	const transactionCount = 10
+	baseFee := pldtypes.MustParseHexUint256("100")
+	reward := pldtypes.MustParseHexUint256("50")
+	gasLimit := pldtypes.HexUint64(10)
+
+	// (baseFee + reward) * gasLimit * transactionCount = balance
+	// (100 + 50) * 10 * 10 = 15000
+	balance := pldtypes.MustParseHexUint256("15000")
+
+	// 1. eth_feeHistory - for dynamic gas pricing
+	m.ethClient.On("FeeHistory", mock.Anything, 20, "latest", []float64{85}).Return(&ethclient.FeeHistoryResult{
+		BaseFeePerGas: []pldtypes.HexUint256{*baseFee},
+		Reward:        [][]pldtypes.HexUint256{{*reward}},
+	}, nil)
+	// 2. eth_estimateGas
+	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
+		Return(ethclient.EstimateGasResult{GasLimit: gasLimit}, nil)
+	// 3. eth_getBalance - for ensuring that the account has enough gas to pay for the transactions
+	m.ethClient.On("GetBalance", mock.Anything, *resolvedKey, "latest").Return(balance, nil)
+
+	// create some transactions that are successfully added
 	txIDs := make([]uuid.UUID, transactionCount)
 	txs := make([]*components.PublicTxSubmission, transactionCount)
 	for i := range txIDs {
@@ -233,9 +260,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 
 	}
 
-	// gas estimate and nonce should be cached - so are once'd
-	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
-		Return(ethclient.EstimateGasResult{GasLimit: pldtypes.HexUint64(10)}, nil)
+	// nonce should be cached - so is once'd
 	baseNonce := uint64(11223000)
 	m.ethClient.On("GetTransactionCount", mock.Anything, mock.Anything).
 		Return(confutil.P(pldtypes.HexUint64(baseNonce)), nil).Once()
@@ -306,11 +331,14 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	srtx.Run(func(args mock.Arguments) {
 		signedMessage := args[1].(pldtypes.HexBytes)
 
+		// We need to decode the TX to find the nonce
 		signer, ethTx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(signedMessage), m.ethClient.ChainID())
 		require.NoError(t, err)
 		assert.Equal(t, *resolvedKey, pldtypes.EthAddress(*signer))
 
-		// We need to decode the TX to find the nonce
+		assert.Equal(t, uint64(150), ethTx.MaxFeePerGas.Uint64())
+		assert.Equal(t, uint64(50), ethTx.MaxPriorityFeePerGas.Uint64())
+
 		txHash := calculateTransactionHash(signedMessage)
 		confirmation := &blockindexer.IndexedTransactionNotify{
 			IndexedTransaction: pldapi.IndexedTransaction{
@@ -499,7 +527,6 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 		conf.Orchestrator.Interval = confutil.P("50ms")
 		conf.Manager.OrchestratorIdleTimeout = confutil.P("1ms")
 		conf.Orchestrator.StageRetryTime = confutil.P("0ms") // without this we stick in the stage for 10s before we look to suspend
-		conf.GasPrice.FixedGasPrice = nil
 	})
 	defer done()
 
@@ -507,10 +534,8 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 	require.NoError(t, err)
 	resolvedKey := *pldtypes.MustEthAddress(keyMapping.Verifier.Verifier)
 
-	// Mock a gas price
 	chainID, _ := rand.Int(rand.Reader, big.NewInt(100000000000000))
 	m.ethClient.On("ChainID").Return(chainID.Int64()).Maybe()
-	m.ethClient.On("GasPrice", mock.Anything).Return(pldtypes.MustParseHexUint256("1000000000000000"), nil)
 
 	pubTx := &components.PublicTxSubmission{
 		PublicTxInput: pldapi.PublicTxInput{
@@ -577,7 +602,6 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 		conf.Manager.Interval = confutil.P("50ms")
 		conf.Orchestrator.Interval = confutil.P("50ms")
 		conf.Manager.OrchestratorIdleTimeout = confutil.P("1ms")
-		conf.GasPrice.FixedGasPrice = nil
 	})
 	defer done()
 
@@ -585,10 +609,8 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 	require.NoError(t, err)
 	resolvedKey := pldtypes.MustEthAddress(keyMapping.Verifier.Verifier)
 
-	// Mock a gas price
 	chainID, _ := rand.Int(rand.Reader, big.NewInt(100000000000000))
 	m.ethClient.On("ChainID").Return(chainID.Int64())
-	m.ethClient.On("GasPrice", mock.Anything).Return(pldtypes.MustParseHexUint256("1000000000000000"), nil)
 
 	txID := uuid.New()
 	pubTxSub := &components.PublicTxSubmission{
@@ -757,4 +779,156 @@ func TestGasEstimateFactor(t *testing.T) {
 
 	require.NoError(t, ptm.ValidateTransaction(ctx, ptm.p.NOTX(), tx))
 	assert.Equal(t, pldtypes.MustParseHexUint64("0xc5f0"), *tx.Gas)
+}
+
+func TestSuspendTransactionNoOrchestrator(t *testing.T) {
+	ctx, ptm, _, done := newTestPublicTxManager(t, true) // Use real DB
+	defer done()
+
+	// Create a test address and nonce
+	testAddress := pldtypes.MustEthAddress("0x1234567890123456789012345678901234567890")
+	testNonce := uint64(12345)
+
+	// First, insert a test transaction into the database (omit PublicTxnID - it's auto-generated)
+	dbTX := ptm.p.DB().WithContext(ctx)
+	err := dbTX.Table("public_txns").Create(&DBPublicTxn{
+		From:      *testAddress,
+		Nonce:     &testNonce,
+		Suspended: false,
+	}).Error
+	require.NoError(t, err)
+
+	// Call SuspendTransaction - this should trigger persistSuspendedFlag since no orchestrator is in flight
+	err = ptm.SuspendTransaction(ctx, *testAddress, testNonce)
+	assert.NoError(t, err)
+
+	// Verify the transaction was actually suspended in the database
+	var updatedTx DBPublicTxn
+	err = dbTX.Table("public_txns").
+		Where(`"from" = ? AND nonce = ?`, *testAddress, testNonce).
+		First(&updatedTx).Error
+	require.NoError(t, err)
+	assert.True(t, updatedTx.Suspended)
+}
+
+func TestResumeTransactionNoOrchestrator(t *testing.T) {
+	ctx, ptm, _, done := newTestPublicTxManager(t, true) // Use real DB
+	defer done()
+
+	// Create a test address and nonce
+	testAddress := pldtypes.MustEthAddress("0x1234567890123456789012345678901234567890")
+	testNonce := uint64(12346)
+
+	// First, insert a test transaction into the database (suspended) (omit PublicTxnID - it's auto-generated)
+	dbTX := ptm.p.DB().WithContext(ctx)
+	err := dbTX.Table("public_txns").Create(&DBPublicTxn{
+		From:      *testAddress,
+		Nonce:     &testNonce,
+		Suspended: true,
+	}).Error
+	require.NoError(t, err)
+
+	// Call ResumeTransaction - this should trigger persistSuspendedFlag since no orchestrator is in flight
+	err = ptm.ResumeTransaction(ctx, *testAddress, testNonce)
+	assert.NoError(t, err)
+
+	// Verify the transaction was actually resumed in the database
+	var updatedTx DBPublicTxn
+	err = dbTX.Table("public_txns").
+		Where(`"from" = ? AND nonce = ?`, *testAddress, testNonce).
+		First(&updatedTx).Error
+	require.NoError(t, err)
+	assert.False(t, updatedTx.Suspended)
+}
+
+func TestDispatchActionInvalidAction(t *testing.T) {
+	ctx, ptm, _, done := newTestPublicTxManager(t, false) // Use mock DB
+	defer done()
+
+	// Create a test address and nonce
+	testAddress := pldtypes.MustEthAddress("0x1234567890123456789012345678901234567890")
+	testNonce := uint64(12345)
+
+	// Call dispatchAction with an invalid action type (beyond the defined constants)
+	// This should trigger the default return case (line 71)
+	invalidAction := AsyncRequestType(999) // Invalid action type
+	err := ptm.dispatchAction(ctx, *testAddress, testNonce, invalidAction)
+
+	// The default case should return nil (no error)
+	assert.NoError(t, err)
+}
+
+func TestCheckTransactionCompletedNotFound(t *testing.T) {
+	ctx, ptm, _, done := newTestPublicTxManager(t, true) // Use real DB
+	defer done()
+
+	// Test with a non-existent transaction ID
+	completed, err := ptm.CheckTransactionCompleted(ctx, 99999)
+	assert.NoError(t, err)
+	assert.False(t, completed)
+}
+
+func TestCheckTransactionCompletedNotCompleted(t *testing.T) {
+	ctx, ptm, _, done := newTestPublicTxManager(t, true) // Use real DB
+	defer done()
+
+	// Create a test transaction that is not completed
+	testAddress := pldtypes.MustEthAddress("0x1234567890123456789012345678901234567890")
+	testNonce := uint64(12347)
+
+	// Insert a transaction without completion (omit PublicTxnID - it's auto-generated)
+	dbTX := ptm.p.DB().WithContext(ctx)
+	err := dbTX.Table("public_txns").Create(&DBPublicTxn{
+		From:      *testAddress,
+		Nonce:     &testNonce,
+		Suspended: false,
+		Completed: nil, // No completion record
+	}).Error
+	require.NoError(t, err)
+
+	// Retrieve the transaction to get the actual PublicTxnID
+	var insertedTx DBPublicTxn
+	err = dbTX.Table("public_txns").
+		Where(`"from" = ? AND nonce = ?`, *testAddress, testNonce).
+		First(&insertedTx).Error
+	require.NoError(t, err)
+
+	// Check if it's completed - should return false
+	completed, err := ptm.CheckTransactionCompleted(ctx, insertedTx.PublicTxnID)
+	assert.NoError(t, err)
+	assert.False(t, completed)
+}
+
+func TestCheckTransactionCompletedWithCompletion(t *testing.T) {
+	ctx, ptm, _, done := newTestPublicTxManager(t, true) // Use real DB
+	defer done()
+
+	// Create a test transaction that is completed
+	testAddress := pldtypes.MustEthAddress("0x1234567890123456789012345678901234567890")
+	testNonce := uint64(12348)
+	testTxHash := pldtypes.MustParseBytes32("0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
+
+	// Insert a transaction with completion (omit PublicTxnID - it's auto-generated)
+	dbTX := ptm.p.DB().WithContext(ctx)
+	err := dbTX.Table("public_txns").Create(&DBPublicTxn{
+		From:      *testAddress,
+		Nonce:     &testNonce,
+		Suspended: false,
+		Completed: &DBPublicTxnCompletion{
+			TransactionHash: testTxHash,
+		},
+	}).Error
+	require.NoError(t, err)
+
+	// Retrieve the transaction to get the actual PublicTxnID
+	var insertedTx DBPublicTxn
+	err = dbTX.Table("public_txns").
+		Where(`"from" = ? AND nonce = ?`, *testAddress, testNonce).
+		First(&insertedTx).Error
+	require.NoError(t, err)
+
+	// Check if it's completed - should return true
+	completed, err := ptm.CheckTransactionCompleted(ctx, insertedTx.PublicTxnID)
+	assert.NoError(t, err)
+	assert.True(t, completed)
 }

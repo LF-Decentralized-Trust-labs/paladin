@@ -40,6 +40,8 @@ var (
 	initAtLeastOnce atomic.Bool
 )
 
+type Component string
+
 type (
 	ctxLogKey struct{}
 )
@@ -116,6 +118,15 @@ func WithLogField(ctx context.Context, key, value string) context.Context {
 		value = value[0:61] + "..."
 	}
 	return WithLogger(ctx, loggerFromContext(ctx).WithField(key, value))
+}
+
+// WithComponent adds the specified component to the logger in the context
+func WithComponent(ctx context.Context, component Component) context.Context {
+	EnsureInit()
+	if len(component) > 61 {
+		component = component[0:61] + "..."
+	}
+	return WithLogger(ctx, loggerFromContext(ctx).WithField("component", component))
 }
 
 // LoggerFromContext returns the logger for the current context, or no logger if there is no context

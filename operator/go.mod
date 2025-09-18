@@ -5,9 +5,6 @@ go 1.24.0
 toolchain go1.24.3
 
 require (
-	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/google/uuid v1.6.0
-	github.com/hyperledger/firefly-signer v1.1.21
 	github.com/LF-Decentralized-Trust-labs/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
 	github.com/LF-Decentralized-Trust-labs/paladin/domains/noto v0.0.0-00010101000000-000000000000
@@ -15,6 +12,9 @@ require (
 	github.com/LF-Decentralized-Trust-labs/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/LF-Decentralized-Trust-labs/paladin/testinfra v0.0.0-00010101000000-000000000000
 	github.com/LF-Decentralized-Trust-labs/paladin/toolkit v0.0.0-00010101000000-000000000000
+	github.com/Masterminds/sprig/v3 v3.3.0
+	github.com/google/uuid v1.6.0
+	github.com/hyperledger/firefly-signer v1.1.21
 	github.com/onsi/ginkgo/v2 v2.17.2
 	github.com/onsi/gomega v1.33.1
 	github.com/pelletier/go-toml/v2 v2.2.3

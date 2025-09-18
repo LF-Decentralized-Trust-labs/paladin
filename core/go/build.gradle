@@ -371,7 +371,7 @@ task checkCoverage(type: GoCheckCoverage, dependsOn: [aggregateCoverage]) {
 }
 
 task test {
-    finalizedBy checkCoverage
+    dependsOn checkCoverage
 }
 
 task testcov(type: Exec, dependsOn: [test, aggregateCoverage]) {

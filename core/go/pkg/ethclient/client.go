@@ -52,6 +52,7 @@ type EthClient interface {
 	CallContractNoResolve(ctx context.Context, tx *ethsigner.Transaction, block string, opts ...CallOption) (res CallResult, err error)
 	GetTransactionCount(ctx context.Context, fromAddr pldtypes.EthAddress) (transactionCount *pldtypes.HexUint64, err error)
 	SendRawTransaction(ctx context.Context, rawTX pldtypes.HexBytes) (*pldtypes.Bytes32, error)
+	FeeHistory(ctx context.Context, blockCount int, newestBlock string, rewardPercentiles []float64) (*FeeHistoryResult, error)
 }
 
 // Higher level client interface to the base Ethereum ledger for TX submission.
@@ -116,6 +117,14 @@ type CallResult struct {
 	Data          pldtypes.HexBytes
 	DecodedResult *abi.ComponentValue
 	RevertData    pldtypes.HexBytes
+}
+
+// FeeHistoryResult represents the result of eth_feeHistory RPC call
+type FeeHistoryResult struct {
+	OldestBlock   pldtypes.HexUint64      `json:"oldestBlock"`
+	BaseFeePerGas []pldtypes.HexUint256   `json:"baseFeePerGas"`
+	GasUsedRatio  []float64               `json:"gasUsedRatio"`
+	Reward        [][]pldtypes.HexUint256 `json:"reward"`
 }
 
 // Convenience func that bypasses errors and uses the serializer provided
@@ -321,6 +330,15 @@ func (ec *ethClient) GetTransactionCount(ctx context.Context, fromAddr pldtypes.
 		return nil, rpcErr
 	}
 	return &transactionCount, nil
+}
+
+func (ec *ethClient) FeeHistory(ctx context.Context, blockCount int, newestBlock string, rewardPercentiles []float64) (*FeeHistoryResult, error) {
+	var feeHistory FeeHistoryResult
+	if rpcErr := ec.rpc.CallRPC(ctx, &feeHistory, "eth_feeHistory", blockCount, newestBlock, rewardPercentiles); rpcErr != nil {
+		log.L(ctx).Errorf("eth_feeHistory failed: %+v", rpcErr)
+		return nil, rpcErr
+	}
+	return &feeHistory, nil
 }
 
 func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction, opts ...CallOption) (pldtypes.HexBytes, error) {
