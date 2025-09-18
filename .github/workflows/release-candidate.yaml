@@ -144,19 +144,11 @@ jobs:
     with:
       new_tag: ${{ needs.setup.outputs.tag }}
 
-  # Testing the rollout compatibility between v0.9.0 and v0.10.0-RC.*
-  # This is a temporary step that should be removed after the v0.10.0 release
-  test-v9-to-v10:
-    needs: [setup, release-solidity-contracts, release-typescript-sdk]
-    uses: ./.github/workflows/test-v9-to-v10.yaml
-    with:
-      new_tag: ${{ needs.setup.outputs.tag }}
-
   # ================================ CREATE RC RELEASE ================================
   # Only create the RC release after all tests have passed
   # This step bundles all built artifacts and creates the GitHub release
   create-rc-release:
-    needs: [setup, test-rollout-compatibility, test-v9-to-v10]
+    needs: [setup, test-rollout-compatibility]
     runs-on: ubuntu-latest
     steps:
       - name: Download Helm artifacts
