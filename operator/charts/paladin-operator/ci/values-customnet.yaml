@@ -1,0 +1,230 @@
+# values.yaml
+
+mode: customnet
+
+# List of Paladin nodes to install
+paladinNodes:
+
+  # Paladin node
+  - name: "bank1"
+
+    # ======== Base Ledger Endpoint Configuration ========
+    baseLedgerEndpoint:
+      type: endpoint
+      endpoint:
+        jsonrpc: "http://besu-standalone-besu-node.ci-besu.svc.cluster.local:32645"  
+        ws: "ws://besu-standalone-besu-node.ci-besu.svc.cluster.local:32646"         
+        auth:
+          enabled: true
+          secretName: "besu-auth-credentials"  # Kubernetes Secret containing auth credentials (if required)
+
+    # ======== Domains ========
+    # List of domain names this node participates in. Must match labels on domain CRs.
+    domains:
+      - noto
+      - zeto
+      - pente
+
+    # ======== Registries ========
+    # Registry names this node interacts with. Must match labels on registry CRs.
+    registries:
+      - evm-reg
+
+    # ======== Transports ========
+    transports:
+      - name: grpc
+        plugin:
+          type: c-shared
+          library: /app/transports/libgrpc.so
+        config:
+          port: 9000
+          address: 0.0.0.0
+          externalHostname: ""  # External hostname if accessible outside cluster; leave empty if not required
+        ports:
+          transportGrpc:
+            port: 9000
+            targetPort: 9000
+        tls:
+          secretName: paladin-mtls  # Kubernetes Secret for TLS
+          certName: paladin-mtls    # Certificate name within the Secret
+
+    # ======== Service ========
+    service:
+      type: ClusterIP  # Options: NodePort | ClusterIP | LoadBalancer
+      ports:
+        rpcHttp:
+          port: 8548
+        rpcWs:
+          port: 8549
+
+    # ======== Database ========
+    database:
+      mode: sidecarPostgres  # Options: sidecarPostgres | embeddedSQLite
+      migrationMode: auto    # Options: auto | manual
+      # pvcTemplate:         # Optional - Use a custom PVC for the DB
+      #   storageClassName: ""
+      #   accessModes:
+      #   - ReadWriteOnce
+      #   capacity:
+      #     storage: 10Gi
+
+    # ======== Secret Backed Signers ========
+    secretBackedSigners:
+
+      # Scenario 1 (default): Auto-generate an HD wallet seed phrase
+      # Operator generates and stores the seed phrase in the specified secret
+      - name: signer-auto-wallet
+        secret: bank.keys  # Name of the secret (should not already exist)
+        type: autoHDWallet
+        keySelector: .*     # Select all keys
+
+      # Scenario 2: Pre-configured HD wallet
+      # Uncomment and configure if using an existing seed phrase
+      # - name: signer-pre-configured
+      #   secret: bank.keys  # Existing secret containing keys.yaml with seed phrase
+      #   type: preConfigured
+      #   keySelector: .*      # Select all keys
+
+    # ======== Additional Config ========
+    # Inline Paladin configuration; CR fields take precedence if duplicated
+    config: |
+      log:
+        level: warn
+      publicTxManager:
+        gasLimit:
+          gasEstimateFactor: 2.0
+        gasPrice:
+          fixedGasPrice:
+            maxFeePerGas: 0x15580CC4
+            maxPriorityFeePerGas: 0x15580CC4
+        blockIndexer:
+          commitBatchSize: 5
+
+      besu:
+        auth:
+          enabled: true
+          secretName: besu-auth-credentials
+          usernameKey: username
+          passwordKey: password
+        rpc:
+          http:
+            port: 32645  # Besu HTTP RPC port
+          ws:
+            port: 32646  # Besu WebSocket RPC port
+          graphql:
+            port: 32647  # Besu GraphQL port
+
+    # ======== Paladin Registration ========
+    # Register Paladin node to the network
+    paladinRegistration:
+      registryAdminNode: bank1  # The admin node that manages the registry
+      registryAdminKey: registry.operator
+      registry: evm-registry
+
+  # Paladin node
+  - name: "bank2"
+
+    # ======== Base Ledger Endpoint Configuration ========
+    baseLedgerEndpoint:
+      type: endpoint
+      endpoint:
+        jsonrpc: "http://besu-standalone-besu-node.ci-besu.svc.cluster.local:32645" 
+        ws: "ws://besu-standalone-besu-node.ci-besu.svc.cluster.local:32646"          
+        auth:
+          enabled: true
+          secretName: "besu-auth-credentials"  # Kubernetes Secret containing auth credentials (if required)
+
+    # ======== Domains ========
+    # List of domain names this node participates in. Must match labels on domain CRs.
+    domains:
+      - noto
+      - zeto
+      - pente
+
+    # ======== Registries ========
+    # Registry names this node interacts with. Must match labels on registry CRs.
+    registries:
+      - evm-reg
+
+    # ======== Transports ========
+    transports:
+      - name: grpc
+        plugin:
+          type: c-shared
+          library: /app/transports/libgrpc.so
+        config:
+          port: 9000
+          address: 0.0.0.0
+          externalHostname: ""  # External hostname if accessible outside cluster; leave empty if not required
+        ports:
+          transportGrpc:
+            port: 9000
+            targetPort: 9000
+        tls:
+          secretName: paladin-mtls  # Kubernetes Secret for TLS
+          certName: paladin-mtls    # Certificate name within the Secret
+
+    # ======== Service ========
+    service:
+      type: ClusterIP 
+      ports:
+        rpcHttp:
+          port: 8648
+        rpcWs:
+          port: 8649
+
+    # ======== Database ========
+    database:
+      mode: sidecarPostgres  # Options: sidecarPostgres | embeddedSQLite
+      migrationMode: auto    # Options: auto | manual
+      # pvcTemplate:         # Optional - Use a custom PVC for the DB
+      #   storageClassName: ""
+      #   accessModes:
+      #   - ReadWriteOnce
+      #   capacity:
+      #     storage: 10Gi
+
+    # ======== Secret Backed Signers ========
+    secretBackedSigners:
+
+      # Scenario 1 (default): Auto-generate an HD wallet seed phrase
+      # Operator generates and stores the seed phrase in the specified secret
+      - name: signer-auto-wallet
+        secret: bank.keys  # Name of the secret (should not already exist)
+        type: autoHDWallet
+        keySelector: .*     # Select all keys
+
+    # ======== Additional Config ========
+    # Inline Paladin configuration; CR fields take precedence if duplicated
+    config: |
+      log:
+        level: warn
+      publicTxManager:
+        gasLimit:
+          gasEstimateFactor: 2.0
+      gasPrice:
+        fixedGasPrice:
+          maxFeePerGas: 0x15580CC4
+          maxPriorityFeePerGas: 0x15580CC4
+      blockIndexer:
+        commitBatchSize: 5
+      besu:
+        auth:
+          enabled: true
+          secretName: besu-auth-credentials
+          usernameKey: username
+          passwordKey: password
+        rpc:
+          http:
+            port: 32645  # Besu HTTP RPC port
+          ws:
+            port: 32646  # Besu WebSocket RPC port
+          graphql:
+            port: 32647  # Besu GraphQL port
+
+    # ======== Paladin Registration ========
+    # Register Paladin node to the network
+    paladinRegistration:
+      registryAdminNode: bank1  # The admin node that manages the registry
+      registryAdminKey: registry.operator
+      registry: evm-registry
