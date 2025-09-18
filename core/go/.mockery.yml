@@ -22,8 +22,6 @@ packages:
   github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components:
     config:
       all: true
-    interfaces:
-      KeyManager:
   github.com/LF-Decentralized-Trust-labs/paladin/core/internal/componentmgr:
     config:
       all: true
@@ -33,12 +31,6 @@ packages:
   github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr:
     interfaces:
       InFlightStageActionTriggers:
-  github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator:
-    config:
-      all: true
-      dir: "{{.InterfaceDir}}"
-      pkgname: "{{.SrcPackageName}}"
-      structname: "Mock{{.InterfaceName}}"
   github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common:
     config:
       all: true
