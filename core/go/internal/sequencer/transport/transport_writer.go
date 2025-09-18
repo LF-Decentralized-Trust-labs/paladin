@@ -50,16 +50,14 @@ type TransportWriter interface {
 	SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error
 	SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
 	SendDispatched(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
-	Send(ctx context.Context, payload *components.FireAndForgetMessageSend) error
 }
 
-func NewTransportWriter(domainName string, contractAddress *pldtypes.EthAddress, nodeID string, transportManager components.TransportManager, loopbackHandler func(ctx context.Context, message *components.ReceivedMessage)) TransportWriter {
+func NewTransportWriter(contractAddress *pldtypes.EthAddress, nodeID string, transportManager components.TransportManager, loopbackHandler func(ctx context.Context, message *components.ReceivedMessage)) TransportWriter {
 	loopbackTransport := NewLoopbackTransportWriter(loopbackHandler)
 	return &transportWriter{
 		nodeID:            nodeID,
 		transportManager:  transportManager,
 		loopbackTransport: loopbackTransport,
-		domainName:        domainName,
 		contractAddress:   contractAddress,
 	}
 }
@@ -68,7 +66,6 @@ type transportWriter struct {
 	nodeID            string
 	transportManager  components.TransportManager
 	loopbackTransport LoopbackTransportManager
-	domainName        string
 	contractAddress   *pldtypes.EthAddress
 }
 
@@ -106,7 +103,7 @@ func (tw *transportWriter) SendDelegationRequest(
 		}
 
 		log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Debugf("delegate | TX   | %s | %s", transaction.ID.String()[0:8], node)
-		if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+		if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 			MessageType: "DelegationRequest",
 			Payload:     delegationRequestBytes,
 			Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -138,7 +135,7 @@ func (tw *transportWriter) SendDelegationRequestAcknowledgment(
 		return err
 	}
 
-	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: "DelegationRequestAcknowledgment",
 		Payload:     delegationRequestAcknowledgmentBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -258,7 +255,7 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, txID uuid
 		partyNode = partyFull[1]
 	}
 
-	err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+	err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: "EndorsementRequest",
 		Node:        partyNode,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -308,7 +305,7 @@ func (tw *transportWriter) SendEndorsementResponse(ctx context.Context, transact
 		Payload:     endorsementResponseBytes,
 	}
 
-	err = tw.Send(ctx, payload)
+	err = tw.send(ctx, payload)
 
 	return err
 }
@@ -350,7 +347,7 @@ func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNo
 		Payload:     assembleRequestBytes,
 	}
 
-	err = tw.Send(ctx, payload)
+	err = tw.send(ctx, payload)
 
 	return err
 }
@@ -379,7 +376,7 @@ func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.U
 		log.L(ctx).Error("[Sequencer] error marshalling assemble response", err)
 	}
 
-	err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+	err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: "AssembleResponse",
 		Node:        recipient,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -404,7 +401,7 @@ func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordi
 		log.L(ctx).Errorf("[Sequencer] error marshalling handover request message: %s", err)
 	}
 
-	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: MessageType_HandoverRequest,
 		Payload:     handoverRequestBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -430,7 +427,7 @@ func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID
 		log.L(ctx).Errorf("[Sequencer] error marshalling nonce assigned event: %s", err)
 	}
 
-	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: MessageType_NonceAssigned,
 		Payload:     nonceAssignedBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -463,7 +460,7 @@ func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uu
 		node = parts[1]
 	}
 
-	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: MessageType_TransactionSubmitted,
 		Payload:     txSubmittedBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -497,7 +494,7 @@ func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uu
 		node = parts[1]
 	}
 
-	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: MessageType_TransactionConfirmed,
 		Payload:     txConfirmedBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -526,7 +523,7 @@ func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string,
 		log.L(ctx).Errorf("[Sequencer] error marshalling heartbeat request  message: %s", err)
 	}
 
-	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: MessageType_CoordinatorHeartbeatNotification,
 		Payload:     heartbeatRequestBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -559,7 +556,7 @@ func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, transacti
 		node = parts[1]
 	}
 
-	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: MessageType_PreDispatchRequest,
 		Payload:     dispatchConfirmationRequestBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -592,7 +589,7 @@ func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transact
 		node = parts[1]
 	}
 
-	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: MessageType_PreDispatchResponse,
 		Payload:     dispatchResponseEventBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -625,7 +622,7 @@ func (tw *transportWriter) SendDispatched(ctx context.Context, transactionSender
 		node = parts[1]
 	}
 
-	if err = tw.Send(ctx, &components.FireAndForgetMessageSend{
+	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: MessageType_Dispatched,
 		Payload:     dispatchedEventBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
@@ -636,8 +633,7 @@ func (tw *transportWriter) SendDispatched(ctx context.Context, transactionSender
 	return err
 }
 
-func (tw *transportWriter) Send(ctx context.Context, payload *components.FireAndForgetMessageSend) error {
-
+func (tw *transportWriter) send(ctx context.Context, payload *components.FireAndForgetMessageSend) error {
 	if payload.Node == "" {
 		log.L(ctx).Error("[Sequencer] attempt to send sequencer event without specifying destination node name")
 		// MRW TODO - should return this error, just logging it for now

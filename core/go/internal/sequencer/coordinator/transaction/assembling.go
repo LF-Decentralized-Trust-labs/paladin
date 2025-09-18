@@ -46,7 +46,6 @@ func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *compo
 	return t.calculatePostAssembleDependencies(ctx)
 }
 
-// MRW TODO what's the destination for the assemble request?
 func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 	//assemble requests have a short and long timeout
 	// the short timeout is for toleration of unreliable networks whereby the action is to retry the request with the same idempotency key

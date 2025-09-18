@@ -15,15 +15,6 @@
 
 package lifecycle
 
-import (
-	"context"
-
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	sequencer "github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-)
-
 type SequencerLifecycle interface {
 
 	// Loads the distributed sequencer for a specific contract. The requested sequencer may be:
@@ -33,5 +24,5 @@ type SequencerLifecycle interface {
 	// LoadSequencer returns a running sequencer capable of handling transactions. The sequencer may be stopped
 	// at any time depending on how many other sequencers are required and how many can be accommodated in parallel
 	// but it can always be reloaded with any context it had before it was stopped
-	LoadSequencer(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract, tx *components.PrivateTransaction) (sequencer.DistributedSequencer, error)
+	//LoadSequencer(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract, tx *components.PrivateTransaction) (sequencer.Sequencer, error)
 }

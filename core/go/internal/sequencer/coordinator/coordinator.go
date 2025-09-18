@@ -34,12 +34,12 @@ import (
 )
 
 type SeqCoordinator interface {
+	GetActiveCoordinatorNode(ctx context.Context) string
+	GetCurrentState() State
 	GetTransactionsReadyToDispatch(ctx context.Context) ([]*components.PrivateTransaction, error)
 	GetTransactionByID(ctx context.Context, txID uuid.UUID) *transaction.Transaction
-	GetActiveCoordinatorNode(ctx context.Context) string
 	HandleEvent(ctx context.Context, event common.Event) error
 	UpdateSenderNodePool(ctx context.Context, senderNode string)
-	GetCurrentState() State
 	Stop()
 }
 
