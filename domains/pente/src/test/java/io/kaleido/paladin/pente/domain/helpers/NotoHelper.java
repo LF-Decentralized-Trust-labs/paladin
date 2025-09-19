@@ -206,7 +206,7 @@ public class NotoHelper {
                 ), true));
     }
 
-    public void delegateLock(String sender, JsonHex.Bytes32 lockId, JsonHex.Address delegate, JsonNode unlockParams) throws IOException {
+    public void delegateLock(String sender, JsonHex.Bytes32 lockId, JsonHex.Address delegate) throws IOException {
         testbed.getRpcClient().request("testbed_invoke", new Testbed.TransactionInput(
                 "private",
                 "",
@@ -214,7 +214,6 @@ public class NotoHelper {
                 JsonHex.addressFrom(address),
                 new HashMap<>() {{
                     put("lockId", lockId);
-                    put("unlock", unlockParams);
                     put("delegate", delegate);
                     put("data", "0x");
                 }},
