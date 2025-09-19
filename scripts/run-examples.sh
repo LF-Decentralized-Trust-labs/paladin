@@ -244,6 +244,11 @@ run_example() {
         
         # Run the example command, passing the cache path as an argument.
         cmd="$command -- --cache $example_cache_path --config $config_file"
+        if [ "$VERSION_TAG_ARG" = "v0.10.0" ]; then
+            # version 10 does not support the cache path
+            cmd="$command"
+        fi
+
         print_status "Running command: $cmd"
         if ! npm run $cmd; then
             print_error "Example $example_name failed to run command '$command'"
@@ -251,6 +256,11 @@ run_example() {
             break
         else
             print_status "Completed $example_name command: $command"
+        fi
+
+        if [ "$VERSION_TAG_ARG" = "v0.10.0" ]; then
+            # copy path from the example to the common cache path
+            cp -rf data "$BASE_CACHE_DIR/$VERSION_TAG_ARG/$example_name"
         fi
     done
     
