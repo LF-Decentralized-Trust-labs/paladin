@@ -45,6 +45,7 @@ type Transaction struct {
 	currentDelegate                  string
 	latestAssembleRequest            *assembleRequestFromCoordinator
 	latestFulfilledAssembleRequestID uuid.UUID
+	latestPreDispatchRequestID       uuid.UUID
 	emit                             common.EmitEvent
 	signerAddress                    *pldtypes.EthAddress
 	latestSubmissionHash             *pldtypes.Bytes32

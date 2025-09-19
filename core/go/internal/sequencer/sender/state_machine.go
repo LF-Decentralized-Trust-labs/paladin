@@ -150,8 +150,8 @@ func (s *sender) InitializeStateMachine(initialState State) {
 	}
 }
 
-func (s *sender) HandleEvent(ctx context.Context, event common.Event) error {
-
+// Process a state machine event immediately. Should only be called on the sequencer loop, or in tests to avoid timing conditions
+func (s *sender) ProcessEvent(ctx context.Context, event common.Event) error {
 	log.L(ctx).Infof("Distributed sender handling new event (contract address %s, node name %s)", s.contractAddress, s.nodeName)
 
 	if transactionEvent, ok := event.(transaction.Event); ok {
@@ -183,7 +183,15 @@ func (s *sender) HandleEvent(ctx context.Context, event common.Event) error {
 	//Determine whether this event triggers a state transition
 	err = s.evaluateTransitions(ctx, event, *eventHandler)
 	return err
+}
 
+// Queue a state machine event for the sequencer loop to process. Should be called by most Paladin components to ensure memory integrity of
+// sequencer state machine and transactions.
+func (s *sender) QueueEvent(ctx context.Context, event common.Event) error {
+	log.L(ctx).Infof("Pushing sender event onto event queue: %s", event.TypeString())
+	s.senderEvents <- event
+	log.L(ctx).Infof("Pushed sender event onto event queue: %s", event.TypeString())
+	return nil
 }
 
 func (s *sender) SetActiveCoordinator(ctx context.Context, coordinator string) error {
@@ -287,7 +295,7 @@ func (s *sender) evaluateTransitions(ctx context.Context, event common.Event, ev
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, s) { //if there is no guard defined, or the guard returns true
-			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("sdr      | addr | %s | %T | %s -> %s", s.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("sdr      | %s | %T | %s -> %s", s.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
 
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]

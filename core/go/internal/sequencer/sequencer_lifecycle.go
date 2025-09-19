@@ -40,12 +40,12 @@ import (
 
 func (seq *sequencer) senderEventHandler(event common.Event) {
 	log.L(seq.ctx).Debugf("[Sequencer] handing off TX-emitted event to sequencer sender: %+v", event)
-	seq.sender.HandleEvent(seq.ctx, event)
+	seq.sender.ProcessEvent(seq.ctx, event)
 }
 
 func (seq *sequencer) coordinatorEventHandler(event common.Event) {
 	log.L(seq.ctx).Debugf("[Sequencer] handing off TX-emitted event to sequencer coordinator: %+v", event)
-	seq.coordinator.HandleEvent(seq.ctx, event)
+	seq.coordinator.ProcessEvent(seq.ctx, event)
 }
 
 type Sequencer interface {
@@ -55,12 +55,15 @@ type Sequencer interface {
 }
 
 type sequencer struct {
-	ctx             context.Context
-	sender          sender.SeqSender
-	transportWriter transport.TransportWriter
-	coordinator     coordinator.SeqCoordinator
-	contractAddress string
-	lastTXTime      time.Time
+	ctx               context.Context
+	sender            sender.SeqSender
+	transportWriter   transport.TransportWriter
+	coordinator       coordinator.SeqCoordinator
+	contractAddress   string
+	lastTXTime        time.Time
+	senderEvents      chan common.Event
+	coordinatorEvents chan common.Event
+	closeEventHandler context.CancelFunc
 	// lastCallTime time.Time // MRW TODO - this isn't really a sequencer-relevant metric?
 }
 
@@ -415,7 +418,6 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			if tx != nil {
 				sMgr.sequencers[contractAddr.String()].lastTXTime = time.Now()
 			}
-			return sequencer, nil
 		}
 	}
 
@@ -507,5 +509,7 @@ func (sMgr *sequencerManager) updateActiveCoordinators(ctx context.Context) {
 
 		// Stop the lowest priority coordinator by emitting an event asking it to handover to another coordinator
 		sequencers[0].coordinator.Stop()
+		log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencers[0].contractAddress)
+		delete(sMgr.sequencers, sequencers[0].contractAddress)
 	}
 }

@@ -45,7 +45,7 @@ func TestCoordinator_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 
 	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState())
 
-	err := c.HandleEvent(ctx, &coordinator.TransactionsDelegatedEvent{
+	err := c.ProcessEvent(ctx, &coordinator.TransactionsDelegatedEvent{
 		Sender:       sender,
 		Transactions: testutil.NewPrivateTransactionBuilderListForTesting(1).Address(builder.GetContractAddress()).BuildSparse(),
 	})
@@ -60,7 +60,7 @@ func TestCoordinator_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Idle).Build(ctx)
 	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState())
 
-	err := c.HandleEvent(ctx, &coordinator.HeartbeatReceivedEvent{})
+	err := c.ProcessEvent(ctx, &coordinator.HeartbeatReceivedEvent{})
 	assert.NoError(t, err)
 	assert.Equal(t, coordinator.State_Observing, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
 
@@ -76,7 +76,7 @@ func TestCoordinator_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 		CurrentBlockHeight(194) // default tolerance is 5 so this is behind
 	c, _ := builder.Build(ctx)
 
-	err := c.HandleEvent(ctx, &coordinator.TransactionsDelegatedEvent{
+	err := c.ProcessEvent(ctx, &coordinator.TransactionsDelegatedEvent{
 		Sender:       sender,
 		Transactions: testutil.NewPrivateTransactionBuilderListForTesting(1).Address(builder.GetContractAddress()).BuildSparse(),
 	})
@@ -95,7 +95,7 @@ func TestCoordinator_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 		CurrentBlockHeight(195) // default tolerance is 5 so this is not behind
 	c, mocks := builder.Build(ctx)
 
-	err := c.HandleEvent(ctx, &coordinator.TransactionsDelegatedEvent{
+	err := c.ProcessEvent(ctx, &coordinator.TransactionsDelegatedEvent{
 		Sender:       sender,
 		Transactions: testutil.NewPrivateTransactionBuilderListForTesting(1).Address(builder.GetContractAddress()).BuildSparse(),
 	})
@@ -115,7 +115,7 @@ func TestCoordinator_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 		CurrentBlockHeight(194)
 	c, _ := builder.Build(ctx)
 
-	err := c.HandleEvent(ctx, &coordinator.NewBlockEvent{
+	err := c.ProcessEvent(ctx, &coordinator.NewBlockEvent{
 		BlockHeight: 195, // default tolerance is 5 in the test setup so we are not behind
 	})
 	assert.NoError(t, err)
@@ -131,7 +131,7 @@ func TestCoordinator_Standby_NoTransition_OnNewBlock_IfStillBehind(t *testing.T)
 		CurrentBlockHeight(193)
 	c, mocks := builder.Build(ctx)
 
-	err := c.HandleEvent(ctx, &coordinator.NewBlockEvent{
+	err := c.ProcessEvent(ctx, &coordinator.NewBlockEvent{
 		BlockHeight: 194, // default tolerance is 5 in the test setup so this is still behind
 	})
 	assert.NoError(t, err)
@@ -144,7 +144,7 @@ func TestCoordinator_Elect_ToPrepared_OnHandover(t *testing.T) {
 	ctx := context.Background()
 	c, _ := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Elect).Build(ctx)
 
-	err := c.HandleEvent(ctx, &coordinator.HandoverReceivedEvent{})
+	err := c.ProcessEvent(ctx, &coordinator.HandoverReceivedEvent{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, coordinator.State_Prepared, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
@@ -155,7 +155,7 @@ func TestCoordinator_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(t
 	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Prepared)
 	c, _ := builder.Build(ctx)
 
-	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
+	err := c.ProcessEvent(ctx, &coordinator.TransactionConfirmedEvent{
 		From:  builder.GetFlushPointSignerAddress(),
 		Nonce: builder.GetFlushPointNonce(),
 		Hash:  builder.GetFlushPointHash(),
@@ -178,7 +178,7 @@ func TestCoordinator_PreparedNoTransition_OnTransactionConfirmed_IfNotFlushCompl
 	otherHash := pldtypes.Bytes32(pldtypes.RandBytes(32))
 	otherNonce := builder.GetFlushPointNonce() - 1
 
-	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
+	err := c.ProcessEvent(ctx, &coordinator.TransactionConfirmedEvent{
 		From:  builder.GetFlushPointSignerAddress(),
 		Nonce: otherNonce,
 		Hash:  otherHash,
@@ -198,7 +198,7 @@ func TestCoordinator_Active_ToIdle_OnTransactionConfirmed_IfNoTransactionsInFlig
 		Transactions(soleTransaction).
 		Build(ctx)
 
-	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
+	err := c.ProcessEvent(ctx, &coordinator.TransactionConfirmedEvent{
 		From:  soleTransaction.GetSignerAddress(),
 		Nonce: *soleTransaction.GetNonce(),
 		Hash:  *soleTransaction.GetLatestSubmissionHash(),
@@ -218,7 +218,7 @@ func TestCoordinator_ActiveNoTransition_OnTransactionConfirmed_IfNotTransactions
 		Transactions(delegation1, delegation2).
 		Build(ctx)
 
-	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
+	err := c.ProcessEvent(ctx, &coordinator.TransactionConfirmedEvent{
 		From:  delegation1.GetSignerAddress(),
 		Nonce: *delegation1.GetNonce(),
 		Hash:  *delegation1.GetLatestSubmissionHash(),
@@ -238,7 +238,7 @@ func TestCoordinator_Active_ToFlush_OnHandoverRequest(t *testing.T) {
 		Transactions(delegation1, delegation2).
 		Build(ctx)
 
-	err := c.HandleEvent(ctx, &coordinator.HandoverRequestEvent{
+	err := c.ProcessEvent(ctx, &coordinator.HandoverRequestEvent{
 		Requester: "newCoordinator",
 	})
 	assert.NoError(t, err)
@@ -259,7 +259,7 @@ func TestCoordinator_Flush_ToClosing_OnTransactionConfirmed_IfFlushComplete(t *t
 		Transactions(delegation1, delegation2).
 		Build(ctx)
 
-	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
+	err := c.ProcessEvent(ctx, &coordinator.TransactionConfirmedEvent{
 		From:  delegation1.GetSignerAddress(),
 		Nonce: *delegation1.GetNonce(),
 		Hash:  *delegation1.GetLatestSubmissionHash(),
@@ -283,7 +283,7 @@ func TestCoordinator_FlushNoTransition_OnTransactionConfirmed_IfNotFlushComplete
 		Transactions(delegation1, delegation2).
 		Build(ctx)
 
-	err := c.HandleEvent(ctx, &coordinator.TransactionConfirmedEvent{
+	err := c.ProcessEvent(ctx, &coordinator.TransactionConfirmedEvent{
 		From:  delegation1.GetSignerAddress(),
 		Nonce: *delegation1.GetNonce(),
 		Hash:  *delegation1.GetLatestSubmissionHash(),
@@ -304,7 +304,7 @@ func TestCoordinator_Closing_ToIdle_OnHeartbeatInterval_IfClosingGracePeriodExpi
 		Transactions(d).
 		Build(ctx)
 
-	err := c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
+	err := c.ProcessEvent(ctx, &common.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState(), "current state is %s", c.GetCurrentState())
@@ -321,7 +321,7 @@ func TestCoordinator_ClosingNoTransition_OnHeartbeatInterval_IfNotClosingGracePe
 		Transactions(d).
 		Build(ctx)
 
-	err := c.HandleEvent(ctx, &common.HeartbeatIntervalEvent{})
+	err := c.ProcessEvent(ctx, &common.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, coordinator.State_Closing, c.GetCurrentState(), "current state is %s", c.GetCurrentState())

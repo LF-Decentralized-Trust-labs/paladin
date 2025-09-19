@@ -426,7 +426,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
 			// (Odd spacing is intentional to align logs more clearly)
-			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("coord    | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("coord-tx | %s   | %s | %T | %s -> %s", t.PrivateTransaction.Address[0:8], t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			t.metrics.ObserveSequencerTXStateChange("Coord_"+rule.To.String(), time.Duration(event.GetEventTime().Sub(sm.lastStateChange).Milliseconds()))
 			sm.lastStateChange = time.Now()
 			previousState := sm.currentState
@@ -511,7 +511,7 @@ func (s State) String() string {
 	case State_Blocked:
 		return "State_Blocked"
 	case State_Confirming_Dispatchable:
-		return "State_Confirming_Dispatch"
+		return "State_Confirming_Dispatchable"
 	case State_Ready_For_Dispatch:
 		return "State_Ready_For_Dispatch"
 	case State_Dispatched:

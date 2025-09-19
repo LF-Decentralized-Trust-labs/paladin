@@ -218,7 +218,8 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 	}
 }
 
-func (c *coordinator) HandleEvent(ctx context.Context, event common.Event) error {
+// Process a state machine event immediately. Should only be called on the sequencer loop, or in tests to avoid timing conditions
+func (c *coordinator) ProcessEvent(ctx context.Context, event common.Event) error {
 	log.L(ctx).Infof("[Sequencer] coordinator handling new event (contract address %s, active coordinator %s, committee %+v)", c.contractAddress, c.activeCoordinatorNode, c.senderNodePool)
 	for node, party := range c.senderNodePool {
 		log.L(ctx).Infof("[Sequencer] coordinator handling new event: party %d = %s", node, party)
@@ -251,7 +252,15 @@ func (c *coordinator) HandleEvent(ctx context.Context, event common.Event) error
 	//Determine whether this event triggers a state transition
 	err = c.evaluateTransitions(ctx, event, *eventHandler)
 	return err
+}
 
+// Queue a state machine event for the sequencer loop to process. Should be called by most Paladin components to ensure memory integrity of
+// sequencer state machine and transactions.
+func (c *coordinator) QueueEvent(ctx context.Context, event common.Event) error {
+	log.L(ctx).Infof("[Sequencer] coordinator pushing event onto event queue: %s", event.TypeString())
+	c.coordinatorEvents <- event
+	log.L(ctx).Infof("[Sequencer] coordinator pushed event onto event queue: %s", event.TypeString())
+	return nil
 }
 
 // Function evaluateEvent evaluates whether the event is relevant given the current state of the coordinator
@@ -355,7 +364,7 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
-			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("coord    | addr | %s | %T | %s -> %s", c.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("coord    | %s   | %T | %s -> %s", c.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first
@@ -421,7 +430,7 @@ func (c *coordinator) heartbeatLoop(ctx context.Context) error {
 	if c.heartbeatCtx == nil {
 		c.heartbeatCtx, c.heartbeatCancel = context.WithCancel(ctx)
 
-		log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("Starting heartbeat loop for %s", c.contractAddress.String())
+		log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("coord   | %s | Starting heartbeat loop", c.contractAddress.String()[0:8])
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 		for {

@@ -399,7 +399,6 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 }
 
 func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error {
-
 	//determine whether this event is valid for the current state
 	eventHandler, err := t.evaluateEvent(ctx, event)
 	if err != nil || eventHandler == nil {
@@ -423,7 +422,6 @@ func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error
 	//Determine whether this event triggers a state transition
 	err = t.evaluateTransitions(ctx, event, *eventHandler)
 	return err
-
 }
 
 // Function evaluateEvent evaluates whether the event is relevant given the current state of the transaction
@@ -494,7 +492,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
 			// (Odd spacing is intentional to align logs more clearly)
-			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("sdr      | TX   | %s | %T | %s -> %s", t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("sdr-tx   | %s   | %s | %T | %s -> %s", t.PrivateTransaction.Address[0:8], t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			t.metrics.ObserveSequencerTXStateChange("Sender_"+rule.To.String(), time.Duration(event.GetEventTime().Sub(sm.lastStateChange).Milliseconds()))
 			sm.latestEvent = event.TypeString()
 			sm.lastStateChange = time.Now()

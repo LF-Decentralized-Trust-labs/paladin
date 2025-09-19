@@ -643,8 +643,17 @@ func (tw *transportWriter) send(ctx context.Context, payload *components.FireAnd
 	if payload.Node == "" || payload.Node == tw.transportManager.LocalNodeName() {
 		// "Localhost" loopback
 		log.L(ctx).Debugf("[Sequencer] sending %s to loopback interface", payload.MessageType)
-		err := tw.loopbackTransport.Send(ctx, payload)
-		return err
+
+		// Run the loopback transport in a goroutine to avoid blocking the main thread. This is important for the
+		// channel-based event queue to ensure the queue consumer is not blocked when we happen to be sending
+		// to ourselves
+		go func() {
+			err := tw.loopbackTransport.Send(ctx, payload)
+			if err != nil {
+				log.L(ctx).Errorf("[Sequencer] error sending %s to loopback interface: %s", payload.MessageType, err)
+			}
+		}()
+		return nil
 	}
 	log.L(ctx).Debugf("[Sequencer] sending %s to node: %s", payload.MessageType, payload.Node)
 	err := tw.transportManager.Send(ctx, payload)

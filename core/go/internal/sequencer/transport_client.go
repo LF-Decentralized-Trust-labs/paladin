@@ -150,7 +150,7 @@ func (sMgr *sequencerManager) handleAssembleRequest(ctx context.Context, message
 	assembleRequestEvent.PreAssembly = assembleRequest.PreAssembly
 	assembleRequestEvent.EventTime = time.Now()
 
-	seq.GetSender().HandleEvent(ctx, assembleRequestEvent)
+	seq.GetSender().QueueEvent(ctx, assembleRequestEvent)
 }
 
 func (sMgr *sequencerManager) handleAssembleResponse(ctx context.Context, message *components.ReceivedMessage) {
@@ -215,7 +215,7 @@ func (sMgr *sequencerManager) handleAssembleResponse(ctx context.Context, messag
 		assembleResponseEvent.PostAssembly = postAssembly
 		assembleResponseEvent.PreAssembly = preAssembly
 		assembleResponseEvent.EventTime = time.Now()
-		seq.GetCoordinator().HandleEvent(ctx, assembleResponseEvent)
+		seq.GetCoordinator().QueueEvent(ctx, assembleResponseEvent)
 	case prototk.AssembleTransactionResponse_PARK:
 		log.L(ctx).Errorf("[Sequencer] coordinator state machine cannot move from Assembling to Parked")
 	case prototk.AssembleTransactionResponse_REVERT:
@@ -225,7 +225,7 @@ func (sMgr *sequencerManager) handleAssembleResponse(ctx context.Context, messag
 		assembleResponseEvent.RequestID = uuid.MustParse(assembleResponse.AssembleRequestId)
 		assembleResponseEvent.PostAssembly = postAssembly
 		assembleResponseEvent.EventTime = time.Now()
-		seq.GetCoordinator().HandleEvent(ctx, assembleResponseEvent)
+		seq.GetCoordinator().QueueEvent(ctx, assembleResponseEvent)
 	default:
 		log.L(ctx).Errorf("[Sequencer] received unexpected assemble response type %s", postAssembly.AssemblyResult)
 	}
@@ -261,7 +261,7 @@ func (sMgr *sequencerManager) handleAssembleError(ctx context.Context, message *
 		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
 		return
 	}
-	seq.GetCoordinator().HandleEvent(ctx, assembleErrorEvent)
+	seq.GetCoordinator().QueueEvent(ctx, assembleErrorEvent)
 }
 
 func (sMgr *sequencerManager) handleCoordinatorHeartbeatNotification(ctx context.Context, message *components.ReceivedMessage) {
@@ -311,10 +311,10 @@ func (sMgr *sequencerManager) handleCoordinatorHeartbeatNotification(ctx context
 		heartbeatIntervalEvent := &coordTransaction.HeartbeatIntervalEvent{}
 		heartbeatIntervalEvent.TransactionID = transaction.ID
 		heartbeatIntervalEvent.EventTime = time.Now()
-		seq.GetCoordinator().HandleEvent(ctx, heartbeatIntervalEvent)
+		seq.GetCoordinator().QueueEvent(ctx, heartbeatIntervalEvent)
 	}
 
-	seq.GetSender().HandleEvent(ctx, heartbeatEvent)
+	seq.GetSender().QueueEvent(ctx, heartbeatEvent)
 }
 
 func (sMgr *sequencerManager) handlePreDispatchRequest(ctx context.Context, message *components.ReceivedMessage) {
@@ -350,7 +350,12 @@ func (sMgr *sequencerManager) handlePreDispatchRequest(ctx context.Context, mess
 	}
 	preDispatchRequestReceivedEvent.TransactionID = uuid.MustParse(preDispatchRequest.TransactionId[2:34])
 	preDispatchRequestReceivedEvent.EventTime = time.Now()
-	seq.GetSender().HandleEvent(ctx, preDispatchRequestReceivedEvent)
+
+	// MRW TODO - still not sure where we should make the decision as to whether or not to approve dispatch.
+	// For now we just proceed and send an approval response. It's possible that the check belongs in the state machine
+	// validator function for PreDispatchRequestReceivedEvent?
+
+	seq.GetSender().QueueEvent(ctx, preDispatchRequestReceivedEvent)
 }
 
 func (sMgr *sequencerManager) handlePreDispatchResponse(ctx context.Context, message *components.ReceivedMessage) {
@@ -384,7 +389,7 @@ func (sMgr *sequencerManager) handlePreDispatchResponse(ctx context.Context, mes
 	}
 	dispatchRequestApprovedEvent.TransactionID = uuid.MustParse(preDispatchResponse.TransactionId[2:34])
 	dispatchRequestApprovedEvent.EventTime = time.Now()
-	seq.GetCoordinator().HandleEvent(ctx, dispatchRequestApprovedEvent)
+	seq.GetCoordinator().QueueEvent(ctx, dispatchRequestApprovedEvent)
 }
 
 func (sMgr *sequencerManager) handleDispatchedEvent(ctx context.Context, message *components.ReceivedMessage) {
@@ -415,7 +420,7 @@ func (sMgr *sequencerManager) handleDispatchedEvent(ctx context.Context, message
 	dispatchConfirmedEvent.TransactionID = uuid.MustParse(dispatchedEvent.TransactionId[2:34])
 	dispatchConfirmedEvent.EventTime = time.Now()
 
-	seq.GetSender().HandleEvent(ctx, dispatchConfirmedEvent)
+	seq.GetSender().QueueEvent(ctx, dispatchConfirmedEvent)
 }
 
 func (sMgr *sequencerManager) handleDelegationRequest(ctx context.Context, message *components.ReceivedMessage) {
@@ -459,7 +464,7 @@ func (sMgr *sequencerManager) handleDelegationRequest(ctx context.Context, messa
 	// Anyone who delegates a transaction to us is a candidate sender and should be sent heartbeats for TX confirmation processing
 	seq.GetCoordinator().UpdateSenderNodePool(ctx, message.FromNode)
 
-	seq.GetCoordinator().HandleEvent(ctx, transactionDelegatedEvent)
+	seq.GetCoordinator().QueueEvent(ctx, transactionDelegatedEvent)
 }
 
 func (sMgr *sequencerManager) handleDelegationRequestAcknowledgment(ctx context.Context, message *components.ReceivedMessage) {
@@ -713,7 +718,7 @@ func (sMgr *sequencerManager) handleEndorsementResponse(ctx context.Context, mes
 	endorsementResponseEvent.Endorsement = endorsement
 	endorsementResponseEvent.EventTime = time.Now()
 
-	seq.GetCoordinator().HandleEvent(ctx, endorsementResponseEvent)
+	seq.GetCoordinator().QueueEvent(ctx, endorsementResponseEvent)
 }
 
 func (sMgr *sequencerManager) handleNonceAssigned(ctx context.Context, message *components.ReceivedMessage) {
@@ -744,7 +749,7 @@ func (sMgr *sequencerManager) handleNonceAssigned(ctx context.Context, message *
 	nonceAssignedEvent.Nonce = uint64(nonceAssigned.Nonce)
 	nonceAssignedEvent.EventTime = time.Now()
 
-	seq.GetSender().HandleEvent(ctx, nonceAssignedEvent)
+	seq.GetSender().QueueEvent(ctx, nonceAssignedEvent)
 }
 
 func (sMgr *sequencerManager) handleTransactionSubmitted(ctx context.Context, message *components.ReceivedMessage) {
@@ -775,7 +780,7 @@ func (sMgr *sequencerManager) handleTransactionSubmitted(ctx context.Context, me
 	transactionSubmittedEvent.LatestSubmissionHash = pldtypes.Bytes32(transactionSubmitted.Hash)
 	transactionSubmittedEvent.EventTime = time.Now()
 
-	seq.GetSender().HandleEvent(ctx, transactionSubmittedEvent)
+	seq.GetSender().QueueEvent(ctx, transactionSubmittedEvent)
 }
 
 func (sMgr *sequencerManager) handleTransactionConfirmed(ctx context.Context, message *components.ReceivedMessage) {
@@ -806,11 +811,11 @@ func (sMgr *sequencerManager) handleTransactionConfirmed(ctx context.Context, me
 		transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionConfirmed.TransactionId)
 		transactionSubmittedEvent.RevertReason = transactionConfirmed.RevertReason
 		transactionSubmittedEvent.EventTime = time.Now()
-		seq.GetSender().HandleEvent(ctx, transactionSubmittedEvent)
+		seq.GetSender().QueueEvent(ctx, transactionSubmittedEvent)
 	} else {
 		transactionSubmittedEvent := &senderTransaction.ConfirmedSuccessEvent{}
 		transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionConfirmed.TransactionId)
 		transactionSubmittedEvent.EventTime = time.Now()
-		seq.GetSender().HandleEvent(ctx, transactionSubmittedEvent)
+		seq.GetSender().QueueEvent(ctx, transactionSubmittedEvent)
 	}
 }

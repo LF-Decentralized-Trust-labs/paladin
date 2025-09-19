@@ -491,12 +491,12 @@ func (_c *MockSeqSender_GetTxStatus_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
-// HandleEvent provides a mock function for the type MockSeqSender
-func (_mock *MockSeqSender) HandleEvent(ctx context.Context, event common.Event) error {
+// ProcessEvent provides a mock function for the type MockSeqSender
+func (_mock *MockSeqSender) ProcessEvent(ctx context.Context, event common.Event) error {
 	ret := _mock.Called(ctx, event)
 
 	if len(ret) == 0 {
-		panic("no return value specified for HandleEvent")
+		panic("no return value specified for ProcessEvent")
 	}
 
 	var r0 error
@@ -508,19 +508,19 @@ func (_mock *MockSeqSender) HandleEvent(ctx context.Context, event common.Event)
 	return r0
 }
 
-// MockSeqSender_HandleEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HandleEvent'
-type MockSeqSender_HandleEvent_Call struct {
+// MockSeqSender_ProcessEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ProcessEvent'
+type MockSeqSender_ProcessEvent_Call struct {
 	*mock.Call
 }
 
-// HandleEvent is a helper method to define mock.On call
+// ProcessEvent is a helper method to define mock.On call
 //   - ctx context.Context
 //   - event common.Event
-func (_e *MockSeqSender_Expecter) HandleEvent(ctx interface{}, event interface{}) *MockSeqSender_HandleEvent_Call {
-	return &MockSeqSender_HandleEvent_Call{Call: _e.mock.On("HandleEvent", ctx, event)}
+func (_e *MockSeqSender_Expecter) ProcessEvent(ctx interface{}, event interface{}) *MockSeqSender_ProcessEvent_Call {
+	return &MockSeqSender_ProcessEvent_Call{Call: _e.mock.On("ProcessEvent", ctx, event)}
 }
 
-func (_c *MockSeqSender_HandleEvent_Call) Run(run func(ctx context.Context, event common.Event)) *MockSeqSender_HandleEvent_Call {
+func (_c *MockSeqSender_ProcessEvent_Call) Run(run func(ctx context.Context, event common.Event)) *MockSeqSender_ProcessEvent_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -538,12 +538,69 @@ func (_c *MockSeqSender_HandleEvent_Call) Run(run func(ctx context.Context, even
 	return _c
 }
 
-func (_c *MockSeqSender_HandleEvent_Call) Return(err error) *MockSeqSender_HandleEvent_Call {
+func (_c *MockSeqSender_ProcessEvent_Call) Return(err error) *MockSeqSender_ProcessEvent_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockSeqSender_HandleEvent_Call) RunAndReturn(run func(ctx context.Context, event common.Event) error) *MockSeqSender_HandleEvent_Call {
+func (_c *MockSeqSender_ProcessEvent_Call) RunAndReturn(run func(ctx context.Context, event common.Event) error) *MockSeqSender_ProcessEvent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueueEvent provides a mock function for the type MockSeqSender
+func (_mock *MockSeqSender) QueueEvent(ctx context.Context, event common.Event) error {
+	ret := _mock.Called(ctx, event)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueueEvent")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, common.Event) error); ok {
+		r0 = returnFunc(ctx, event)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockSeqSender_QueueEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueueEvent'
+type MockSeqSender_QueueEvent_Call struct {
+	*mock.Call
+}
+
+// QueueEvent is a helper method to define mock.On call
+//   - ctx context.Context
+//   - event common.Event
+func (_e *MockSeqSender_Expecter) QueueEvent(ctx interface{}, event interface{}) *MockSeqSender_QueueEvent_Call {
+	return &MockSeqSender_QueueEvent_Call{Call: _e.mock.On("QueueEvent", ctx, event)}
+}
+
+func (_c *MockSeqSender_QueueEvent_Call) Run(run func(ctx context.Context, event common.Event)) *MockSeqSender_QueueEvent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 common.Event
+		if args[1] != nil {
+			arg1 = args[1].(common.Event)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockSeqSender_QueueEvent_Call) Return(err error) *MockSeqSender_QueueEvent_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockSeqSender_QueueEvent_Call) RunAndReturn(run func(ctx context.Context, event common.Event) error) *MockSeqSender_QueueEvent_Call {
 	_c.Call.Return(run)
 	return _c
 }

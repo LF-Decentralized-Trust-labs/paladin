@@ -38,7 +38,7 @@ func TestStateMachine_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 	s, _ := sender.NewSenderBuilderForTesting(sender.State_Idle).Build(ctx)
 	assert.Equal(t, sender.State_Idle, s.GetCurrentState())
 
-	err := s.HandleEvent(ctx, &sender.HeartbeatReceivedEvent{})
+	err := s.ProcessEvent(ctx, &sender.HeartbeatReceivedEvent{})
 	assert.NoError(t, err)
 	assert.Equal(t, sender.State_Observing, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 
@@ -51,7 +51,7 @@ func TestStateMachine_Idle_ToSending_OnTransactionCreated(t *testing.T) {
 	assert.Equal(t, sender.State_Idle, s.GetCurrentState())
 
 	txn := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender("sender@node1").Build()
-	err := s.HandleEvent(ctx, &sender.TransactionCreatedEvent{
+	err := s.ProcessEvent(ctx, &sender.TransactionCreatedEvent{
 		Transaction: txn,
 	})
 	assert.NoError(t, err)
@@ -66,7 +66,7 @@ func TestStateMachine_Observing_ToSending_OnTransactionCreated(t *testing.T) {
 	s, mocks := builder.Build(ctx)
 
 	txn := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender("sender@node1").Build()
-	err := s.HandleEvent(ctx, &sender.TransactionCreatedEvent{
+	err := s.ProcessEvent(ctx, &sender.TransactionCreatedEvent{
 		Transaction: txn,
 	})
 	assert.NoError(t, err)
@@ -84,7 +84,7 @@ func TestStateMachine_Sending_ToObserving_OnTransactionConfirmed_IfNoTransaction
 		Transactions(soleTransaction).
 		Build(ctx)
 
-	err := s.HandleEvent(ctx, &sender.TransactionConfirmedEvent{
+	err := s.ProcessEvent(ctx, &sender.TransactionConfirmedEvent{
 		From:  soleTransaction.GetSignerAddress(),
 		Nonce: *soleTransaction.GetNonce(),
 		Hash:  *soleTransaction.GetLatestSubmissionHash(),
@@ -102,7 +102,7 @@ func TestStateMachine_Sending_NoTransition_OnTransactionConfirmed_IfHasTransacti
 		Transactions(txn1, txn2).
 		Build(ctx)
 
-	err := s.HandleEvent(ctx, &sender.TransactionConfirmedEvent{
+	err := s.ProcessEvent(ctx, &sender.TransactionConfirmedEvent{
 		From:  txn1.GetSignerAddress(),
 		Nonce: *txn1.GetNonce(),
 		Hash:  *txn1.GetLatestSubmissionHash(),
@@ -116,12 +116,12 @@ func TestStateMachine_Observing_ToIdle_OnHeartbeatInterval_IfHeartbeatThresholdE
 	builder := sender.NewSenderBuilderForTesting(sender.State_Observing)
 	s, mocks := builder.Build(ctx)
 
-	err := s.HandleEvent(ctx, &sender.HeartbeatReceivedEvent{})
+	err := s.ProcessEvent(ctx, &sender.HeartbeatReceivedEvent{})
 	assert.NoError(t, err)
 
 	mocks.Clock.Advance(builder.GetCoordinatorHeartbeatThresholdMs() + 1)
 
-	err = s.HandleEvent(ctx, &sender.HeartbeatIntervalEvent{})
+	err = s.ProcessEvent(ctx, &sender.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
 	assert.Equal(t, sender.State_Idle, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 }
@@ -130,12 +130,12 @@ func TestStateMachine_Observing_NoTransition_OnHeartbeatInterval_IfHeartbeatThre
 	ctx := context.Background()
 	builder := sender.NewSenderBuilderForTesting(sender.State_Observing)
 	s, mocks := builder.Build(ctx)
-	err := s.HandleEvent(ctx, &sender.HeartbeatReceivedEvent{})
+	err := s.ProcessEvent(ctx, &sender.HeartbeatReceivedEvent{})
 	assert.NoError(t, err)
 
 	mocks.Clock.Advance(builder.GetCoordinatorHeartbeatThresholdMs() - 1)
 
-	err = s.HandleEvent(ctx, &sender.HeartbeatIntervalEvent{})
+	err = s.ProcessEvent(ctx, &sender.HeartbeatIntervalEvent{})
 	assert.NoError(t, err)
 	assert.Equal(t, sender.State_Observing, s.GetCurrentState(), "current state is %s", s.GetCurrentState().String())
 }
@@ -148,13 +148,13 @@ func TestStateMachine_Sending_DoDelegateTransactions_OnHeartbeatReceived_IfHasDr
 	s, mocks := builder.Build(ctx)
 
 	txn1 := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender("sender@node1").Build()
-	err := s.HandleEvent(ctx, &sender.TransactionCreatedEvent{
+	err := s.ProcessEvent(ctx, &sender.TransactionCreatedEvent{
 		Transaction: txn1,
 	})
 	assert.NoError(t, err)
 
 	txn2 := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender("sender@node1").Build()
-	err = s.HandleEvent(ctx, &sender.TransactionCreatedEvent{
+	err = s.ProcessEvent(ctx, &sender.TransactionCreatedEvent{
 		Transaction: txn2,
 	})
 	assert.NoError(t, err)
@@ -171,7 +171,7 @@ func TestStateMachine_Sending_DoDelegateTransactions_OnHeartbeatReceived_IfHasDr
 		},
 	}
 
-	err = s.HandleEvent(ctx, heartbeatEvent)
+	err = s.ProcessEvent(ctx, heartbeatEvent)
 	assert.NoError(t, err)
 	assert.True(t, mocks.SentMessageRecorder.HasSentDelegationRequest())
 }

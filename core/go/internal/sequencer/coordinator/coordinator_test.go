@@ -92,7 +92,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	// Start by simulating the sender and delegate a transaction to the coordinator
 	transactionBuilder := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender(sender).NumberOfRequiredEndorsers(1)
 	txn := transactionBuilder.BuildSparse()
-	err := c.HandleEvent(ctx, &TransactionsDelegatedEvent{
+	err := c.ProcessEvent(ctx, &TransactionsDelegatedEvent{
 		Sender:       sender,
 		Transactions: []*components.PrivateTransaction{txn},
 	})
@@ -106,7 +106,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 
 	// Assert that a request has been sent to the sender and respond with an assembled transaction
 	require.True(t, mocks.SentMessageRecorder.HasSentAssembleRequest())
-	err = c.HandleEvent(ctx, &transaction.AssembleSuccessEvent{
+	err = c.ProcessEvent(ctx, &transaction.AssembleSuccessEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
@@ -124,7 +124,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 
 	// Assert that the coordinator has sent an endorsement request to the endorser and respond with an endorsement
 	require.Equal(t, 1, mocks.SentMessageRecorder.NumberOfSentEndorsementRequests())
-	err = c.HandleEvent(ctx, &transaction.EndorsedEvent{
+	err = c.ProcessEvent(ctx, &transaction.EndorsedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
@@ -141,7 +141,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 
 	// Assert that the coordinator has sent a dispatch confirmation request to the transaction sender and respond with a dispatch confirmation
 	require.True(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationRequest())
-	err = c.HandleEvent(ctx, &transaction.DispatchRequestApprovedEvent{
+	err = c.ProcessEvent(ctx, &transaction.DispatchRequestApprovedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
@@ -166,7 +166,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 
 	// Simulate the dispatcher thread collecting the transaction and dispatching it to a public transaction manager with a signing address
 	signerAddress := pldtypes.RandAddress()
-	err = c.HandleEvent(ctx, &transaction.CollectedEvent{
+	err = c.ProcessEvent(ctx, &transaction.CollectedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
@@ -183,7 +183,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	assert.Equal(t, signerAddress.String(), snapshot.DispatchedTransactions[0].Signer.String(), "Snapshot should contain the dispatched transaction with signer address %s", signerAddress.String())
 
 	// Simulate the dispatcher thread allocating a nonce for the transaction
-	err = c.HandleEvent(ctx, &transaction.NonceAllocatedEvent{
+	err = c.ProcessEvent(ctx, &transaction.NonceAllocatedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
@@ -203,7 +203,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 
 	// Simulate the public transaction manager submitting the transaction
 	submissionHash := pldtypes.Bytes32(pldtypes.RandBytes(32))
-	err = c.HandleEvent(ctx, &transaction.SubmittedEvent{
+	err = c.ProcessEvent(ctx, &transaction.SubmittedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},
@@ -223,7 +223,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	require.NotNil(t, snapshot.DispatchedTransactions[0].LatestSubmissionHash, "Snapshot should contain the dispatched transaction with a submission hash")
 
 	// Simulate the block indexer confirming the transaction
-	err = c.HandleEvent(ctx, &transaction.ConfirmedEvent{
+	err = c.ProcessEvent(ctx, &transaction.ConfirmedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
 		},

@@ -141,7 +141,7 @@ func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDe
 
 	b.emitFunction = func(event common.Event) {
 		mocks.emittedEvents = append(mocks.emittedEvents, event)
-		_ = sender.HandleEvent(ctx, event)
+		_ = sender.ProcessEvent(ctx, event)
 	}
 	var err error
 	sender, err = NewSender(

@@ -368,7 +368,7 @@ func (sMgr *sequencerManager) handleNewTx(ctx context.Context, dbTX persistence.
 
 	dbTX.AddPostCommit(func(ctx context.Context) {
 		log.L(ctx).Debugf("[Sequencer] passing TransactionCreatedEvent to the sequencer sender")
-		sequencer.GetSender().HandleEvent(ctx, txCreatedEvent)
+		sequencer.GetSender().QueueEvent(ctx, txCreatedEvent)
 		sMgr.metrics.IncAcceptedTransactions()
 	})
 
@@ -462,7 +462,7 @@ func (sMgr *sequencerManager) HandleTransactionCollected(ctx context.Context, si
 			SignerAddress: *pldtypes.MustEthAddress(signerAddress),
 		}
 
-		return sequencer.GetCoordinator().HandleEvent(ctx, collectedEvent)
+		return sequencer.GetCoordinator().QueueEvent(ctx, collectedEvent)
 	}
 
 	return nil
@@ -484,7 +484,7 @@ func (sMgr *sequencerManager) HandleNonceAssigned(ctx context.Context, nonce uin
 			Nonce: nonce,
 		}
 
-		coordErr := sequencer.GetCoordinator().HandleEvent(ctx, coordinatorNonceAllocatedEvent)
+		coordErr := sequencer.GetCoordinator().QueueEvent(ctx, coordinatorNonceAllocatedEvent)
 
 		if coordErr != nil {
 			return coordErr
@@ -524,7 +524,7 @@ func (sMgr *sequencerManager) HandlePublicTXSubmission(ctx context.Context, txHa
 			},
 			SubmissionHash: *txHash,
 		}
-		coordErr := sequencer.GetCoordinator().HandleEvent(ctx, coordinatorSubmittedEvent)
+		coordErr := sequencer.GetCoordinator().QueueEvent(ctx, coordinatorSubmittedEvent)
 
 		if coordErr != nil {
 			return coordErr
@@ -582,7 +582,7 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 		}
 		confirmedEvent.EventTime = time.Now()
 
-		coordErr := sequencer.GetCoordinator().HandleEvent(ctx, confirmedEvent)
+		coordErr := sequencer.GetCoordinator().QueueEvent(ctx, confirmedEvent)
 		if coordErr != nil {
 			return coordErr
 		}
