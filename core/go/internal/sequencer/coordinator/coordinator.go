@@ -23,22 +23,30 @@ import (
 	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
 
 type SeqCoordinator interface {
+	// Asynchronously update the state machine by queueing an event to be processed. Most
+	// callers should use this interface.
+	QueueEvent(ctx context.Context, event common.Event) error
+
+	// Synchronously update the state machine by processing this event. Primarily used for testing the state machine.
+	ProcessEvent(ctx context.Context, event common.Event) error
+
 	GetActiveCoordinatorNode(ctx context.Context) string
 	GetCurrentState() State
 	GetTransactionsReadyToDispatch(ctx context.Context) ([]*components.PrivateTransaction, error)
 	GetTransactionByID(ctx context.Context, txID uuid.UUID) *transaction.Transaction
-	HandleEvent(ctx context.Context, event common.Event) error
 	UpdateSenderNodePool(ctx context.Context, senderNode string)
 	Stop()
 }
@@ -79,6 +87,10 @@ type coordinator struct {
 
 	/*Algorithms*/
 	transactionSelector TransactionSelector
+
+	/* Event loop */
+	coordinatorEvents chan common.Event
+	stopEventLoop     chan struct{}
 }
 
 func NewCoordinator(
@@ -121,6 +133,8 @@ func NewCoordinator(
 		coordinatorIdle:                    coordinatorIdle,
 		nodeName:                           nodeName,
 		metrics:                            metrics,
+		coordinatorEvents:                  make(chan common.Event, 1),
+		stopEventLoop:                      make(chan struct{}),
 	}
 	c.senderNodePool = make([]string, 0)
 	// for _, member := range senderNodePool {
@@ -153,8 +167,26 @@ func NewCoordinator(
 		return nil, err
 	}
 	c.activeCoordinatorNode = activeCoordinator
+
+	// Start event processing loop
+	go c.eventLoop(ctx)
+
 	return c, nil
 
+}
+
+func (c *coordinator) eventLoop(ctx context.Context) error {
+	for {
+		log.L(ctx).Infof("[Sequencer] sender event loop waiting for next event")
+		select {
+		case event := <-c.coordinatorEvents:
+			log.L(ctx).Infof("[Sequencer] coordinator pulled event from the queue: %s", event.TypeString())
+			c.ProcessEvent(ctx, event)
+		case <-c.stopEventLoop:
+			log.L(ctx).Infof("[Sequencer] coordinator event loop cancelled")
+			return i18n.NewError(ctx, msgs.MsgContextCanceled)
+		}
+	}
 }
 
 func (c *coordinator) sendHandoverRequest(ctx context.Context) {
@@ -438,11 +470,9 @@ func ptrTo[T any](v T) *T {
 func (c *coordinator) Stop() {
 	log.L(context.Background()).Infof("[Sequencer] stopping coordinator for contract %s", c.contractAddress.String())
 
-	// Opt-out of being the coordinator
-	handoverRequestEvent := &HandoverRequestEvent{}
-	handoverRequestEvent.EventTime = time.Now()
-	handoverRequestEvent.Requester = c.activeCoordinatorNode
-	c.HandleEvent(context.Background(), handoverRequestEvent)
+	// MRW TODO - The state machine doesn't really have a "please take over from me" path. Not a current priority
+	// but clean "please take over" path may be needed in the future
+	c.stopEventLoop <- struct{}{}
 }
 
 //TODO the following getter methods are not safe to call on anything other than the sequencer goroutine because they are reading data structures that are being modified by the state machine.

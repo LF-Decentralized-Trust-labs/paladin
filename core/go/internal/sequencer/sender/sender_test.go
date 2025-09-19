@@ -84,14 +84,14 @@ func TestSender_SingleTransactionLifecycle(t *testing.T) {
 	contractAddress := builder.GetContractAddress()
 	heartbeatEvent.ContractAddress = &contractAddress
 
-	err := s.HandleEvent(ctx, heartbeatEvent)
+	err := s.ProcessEvent(ctx, heartbeatEvent)
 	assert.NoError(t, err)
 	assert.True(t, s.GetCurrentState() == State_Observing)
 
 	// Start by creating a transaction with the sender
 	transactionBuilder := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender(senderLocator).NumberOfRequiredEndorsers(1)
 	txn := transactionBuilder.BuildSparse()
-	err = s.HandleEvent(ctx, &TransactionCreatedEvent{
+	err = s.ProcessEvent(ctx, &TransactionCreatedEvent{
 		Transaction: txn,
 	})
 	assert.NoError(t, err)
@@ -111,7 +111,7 @@ func TestSender_SingleTransactionLifecycle(t *testing.T) {
 
 	//Simulate the coordinator sending an assemble request
 	assembleRequestIdempotencyKey := uuid.New()
-	err = s.HandleEvent(ctx, &transaction.AssembleRequestReceivedEvent{
+	err = s.ProcessEvent(ctx, &transaction.AssembleRequestReceivedEvent{
 		BaseEvent: transaction.BaseEvent{
 			TransactionID: txn.ID,
 		},
@@ -126,7 +126,7 @@ func TestSender_SingleTransactionLifecycle(t *testing.T) {
 	assert.True(t, mocks.SentMessageRecorder.HasSentAssembleSuccessResponse())
 
 	//Simulate the coordinator sending a dispatch confirmation
-	err = s.HandleEvent(ctx, &transaction.PreDispatchRequestReceivedEvent{
+	err = s.ProcessEvent(ctx, &transaction.PreDispatchRequestReceivedEvent{
 		BaseEvent: transaction.BaseEvent{
 			TransactionID: txn.ID,
 		},
@@ -154,11 +154,11 @@ func TestSender_SingleTransactionLifecycle(t *testing.T) {
 			LatestSubmissionHash: &submissionHash,
 		},
 	}
-	err = s.HandleEvent(ctx, heartbeatEvent)
+	err = s.ProcessEvent(ctx, heartbeatEvent)
 	assert.NoError(t, err)
 
 	// Simulate the block indexer confirming the transaction
-	err = s.HandleEvent(ctx, &TransactionConfirmedEvent{
+	err = s.ProcessEvent(ctx, &TransactionConfirmedEvent{
 		From:  signerAddress,
 		Nonce: 42,
 		Hash:  submissionHash,
@@ -183,13 +183,13 @@ func TestSender_DelegateDroppedTransactions(t *testing.T) {
 	contractAddress := builder.GetContractAddress()
 	heartbeatEvent.ContractAddress = &contractAddress
 
-	err := s.HandleEvent(ctx, heartbeatEvent)
+	err := s.ProcessEvent(ctx, heartbeatEvent)
 	assert.NoError(t, err)
 	assert.True(t, s.GetCurrentState() == State_Observing)
 
 	transactionBuilder1 := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender(senderLocator).NumberOfRequiredEndorsers(1)
 	txn1 := transactionBuilder1.BuildSparse()
-	err = s.HandleEvent(ctx, &TransactionCreatedEvent{
+	err = s.ProcessEvent(ctx, &TransactionCreatedEvent{
 		Transaction: txn1,
 	})
 	assert.NoError(t, err)
@@ -204,7 +204,7 @@ func TestSender_DelegateDroppedTransactions(t *testing.T) {
 		Sender(senderLocator).
 		NumberOfRequiredEndorsers(1)
 	txn2 := transactionBuilder2.BuildSparse()
-	err = s.HandleEvent(ctx, &TransactionCreatedEvent{
+	err = s.ProcessEvent(ctx, &TransactionCreatedEvent{
 		Transaction: txn2,
 	})
 	assert.NoError(t, err)
@@ -223,7 +223,7 @@ func TestSender_DelegateDroppedTransactions(t *testing.T) {
 		},
 	}
 
-	err = s.HandleEvent(ctx, heartbeatEvent)
+	err = s.ProcessEvent(ctx, heartbeatEvent)
 	assert.NoError(t, err)
 
 	require.True(t, mocks.SentMessageRecorder.HasSentDelegationRequest())

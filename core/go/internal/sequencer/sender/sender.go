@@ -19,17 +19,25 @@ import (
 	"context"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/google/uuid"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
 
 type SeqSender interface {
-	HandleEvent(ctx context.Context, event common.Event) error
+	// Asynchronously update the state machine by queueing an event to be processed. Most
+	// callers should use this interface.
+	QueueEvent(ctx context.Context, event common.Event) error
+
+	// Synchronously update the state machine by processing this event. Primarily used for testing the state machine.
+	ProcessEvent(ctx context.Context, event common.Event) error
+
 	SetActiveCoordinator(ctx context.Context, coordinator string) error
 	GetTxStatus(ctx context.Context, txID uuid.UUID) (status components.PrivateTxStatus, err error)
 	Stop()
@@ -58,6 +66,10 @@ type sender struct {
 	engineIntegration common.EngineIntegration
 	emit              common.EmitEvent
 	metrics           metrics.DistributedSequencerMetrics
+
+	/* Event loop */
+	senderEvents  chan common.Event
+	stopEventLoop chan struct{}
 }
 
 func NewSender(
@@ -85,9 +97,26 @@ func NewSender(
 		emit:                        emit,
 		heartbeatThresholdMs:        clock.Duration(heartbeatPeriodMs * heartbeatThresholdIntervals),
 		metrics:                     metrics,
+		senderEvents:                make(chan common.Event, 1),
+		stopEventLoop:               make(chan struct{}),
 	}
 	s.InitializeStateMachine(State_Idle)
+	go s.eventLoop(ctx)
 	return s, nil
+}
+
+func (s *sender) eventLoop(ctx context.Context) error {
+	for {
+		log.L(ctx).Infof("[Sequencer] sender event loop waiting for next event")
+		select {
+		case event := <-s.senderEvents:
+			log.L(ctx).Infof("[Sequencer] sender pulled event from the queue: %s", event.TypeString())
+			s.ProcessEvent(ctx, event)
+		case <-s.stopEventLoop:
+			log.L(ctx).Infof("[Sequencer] sender event loop cancelled")
+			return i18n.NewError(ctx, msgs.MsgContextCanceled)
+		}
+	}
 }
 
 func (s *sender) propagateEventToTransaction(ctx context.Context, event transaction.Event) error {
@@ -166,6 +195,7 @@ func ptrTo[T any](v T) *T {
 // This hook point provides a place to perform any tidy up actions needed in the sender
 func (s *sender) Stop() {
 	log.L(context.Background()).Infof("Stopping sender for contract %s", s.contractAddress.String())
+	s.stopEventLoop <- struct{}{}
 }
 
 //TODO the following getter methods are not safe to call on anything other than the sequencer goroutine because they are reading data structures that are being modified by the state machine.
