@@ -182,8 +182,6 @@ jobs:
           RUN_COMMANDS: verify
           PALADIN_ABI_VERSION: ${{ needs.validate-tags.outputs.previous_tag }}
           PALADIN_SDK_VERSION: ${{ needs.validate-tags.outputs.previous_tag }}
-          # this two examples are not supported in version 0.9.0
-          IGNORE_EXAMPLES: event-listener,private-stablecoin
         run: |
           # Run the examples script
           ./scripts/run-examples.sh paladin

@@ -17,7 +17,7 @@ import PaladinClient, {
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
-import { nodeConnections } from "paladin-example-common";
+import { nodeConnections, findLatestContractDataFile, getCachePath } from "paladin-example-common";
 
 const logger = console;
 
@@ -54,23 +54,6 @@ export interface ContractData {
   timestamp: string;
 }
 
-function findLatestContractDataFile(dataDir: string): string | null {
-  if (!fs.existsSync(dataDir)) {
-    return null;
-  }
-
-  const files = fs.readdirSync(dataDir)
-    .filter(file => file.startsWith('contract-data-') && file.endsWith('.json'))
-    .sort((a, b) => {
-      const timestampA = a.replace('contract-data-', '').replace('.json', '');
-      const timestampB = b.replace('contract-data-', '').replace('.json', '');
-      return new Date(timestampB).getTime() - new Date(timestampA).getTime(); // Descending order (newest first)
-    })
-    .reverse();
-
-  return files.length > 0 ? path.join(dataDir, files[0]) : null;
-}
-
 async function main(): Promise<boolean> {
   // --- Initialization from Imported Config ---
   if (nodeConnections.length < 3) {
@@ -88,7 +71,7 @@ async function main(): Promise<boolean> {
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
   // Use command-line argument for data directory if provided, otherwise use default
-  const dataDir = process.argv[2] || path.join(__dirname, '..', '..', 'data');
+  const dataDir = getCachePath();
   const dataFile = findLatestContractDataFile(dataDir);
   
   if (!dataFile) {

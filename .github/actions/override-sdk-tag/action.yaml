@@ -1,0 +1,26 @@
+name: Override SDK tag
+description: 'Override the SDK tag in the examples'
+inputs:
+  sdk_version:
+    description: 'The version of the SDK to install'
+    required: true
+      
+runs:
+  using: 'composite'
+  steps:
+    - name: Override SDK tag
+      shell: bash
+      run: |
+        echo "sdk_version: ${{ inputs.sdk_version }}"
+        # remove the v prefix from the tag if its there
+        sdk_version=$(echo "${{ inputs.sdk_version }}" | sed 's/^v//')
+
+        for example in $(ls -d examples/*); do
+          echo "Overriding $example"
+          cd $example
+          # override only if the package.json has 'paladin-sdk' as a dependency
+          if grep -q "paladin-sdk" package.json; then
+            npm install @lfdecentralizedtrust-labs/paladin-sdk@$sdk_version
+          fi
+          cd ../..
+        done  
