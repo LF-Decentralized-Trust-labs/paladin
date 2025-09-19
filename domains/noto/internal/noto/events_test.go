@@ -151,7 +151,7 @@ func TestHandleEventBatch_NotoLock(t *testing.T) {
 	req := &prototk.HandleEventBatchRequest{
 		Events: []*prototk.OnChainEvent{
 			{
-				SoliditySignature: eventSignatures[EventLocked],
+				SoliditySignature: eventSignatures[EventLock],
 				DataJson:          string(notoEventJson),
 			},
 		},
@@ -182,7 +182,7 @@ func TestHandleEventBatch_NotoLockBadData(t *testing.T) {
 	req := &prototk.HandleEventBatchRequest{
 		Events: []*prototk.OnChainEvent{
 			{
-				SoliditySignature: eventSignatures[EventLocked],
+				SoliditySignature: eventSignatures[EventLock],
 				DataJson:          "!!wrong",
 			}},
 		ContractInfo: &prototk.ContractInfo{
@@ -215,7 +215,7 @@ func TestHandleEventBatch_NotoLockBadTransactionData(t *testing.T) {
 	req := &prototk.HandleEventBatchRequest{
 		Events: []*prototk.OnChainEvent{
 			{
-				SoliditySignature: eventSignatures[EventLocked],
+				SoliditySignature: eventSignatures[EventLock],
 				DataJson:          string(notoEventJson),
 			}},
 		ContractInfo: &prototk.ContractInfo{

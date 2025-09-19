@@ -131,7 +131,7 @@ export async function doLock(
   for (const log of results?.logs || []) {
     const event = noto.interface.parseLog(log);
     expect(event).to.exist;
-    expect(event?.name).to.equal("Locked");
+    expect(event?.name).to.equal("Lock");
     expect(event?.args.states.inputs).to.deep.equal(inputs);
     expect(event?.args.states.outputs).to.deep.equal(outputs);
     expect(event?.args.states.lockedOutputs).to.deep.equal(lockedOutputs);
@@ -209,7 +209,7 @@ export async function doPrepareUnlock(
   for (const log of results?.logs || []) {
     const event = noto.interface.parseLog(log);
     expect(event).to.exist;
-    expect(event?.name).to.equal("LockUpdated");
+    expect(event?.name).to.equal("LockUpdate");
     expect(event?.args.lockedInputs).to.deep.equal(lockedInputs);
     expect(event?.args.options).to.equal(options);
     expect(event?.args.data).to.equal(data);
@@ -236,7 +236,7 @@ export async function doDelegateLock(
   for (const log of results?.logs || []) {
     const event = noto.interface.parseLog(log);
     expect(event).to.exist;
-    expect(event?.name).to.equal("LockDelegated");
+    expect(event?.name).to.equal("LockDelegation");
     expect(event?.args.delegate).to.deep.equal(delegate);
     expect(event?.args.data).to.deep.equal(data);
   }

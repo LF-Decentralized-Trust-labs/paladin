@@ -20,7 +20,7 @@ interface IConfidentialTokenLockable is IConfidentialToken {
         bytes32[] lockedOutputs;
     }
 
-    event Locked(
+    event Lock(
         bytes32 txId,
         address indexed operator,
         bytes32 lockId,
@@ -42,7 +42,7 @@ interface IConfidentialTokenLockable is IConfidentialToken {
         bytes data
     );
 
-    event LockUpdated(
+    event LockUpdate(
         bytes32 txId,
         address indexed operator,
         bytes32 lockId,
@@ -52,7 +52,7 @@ interface IConfidentialTokenLockable is IConfidentialToken {
         bytes data
     );
 
-    event LockDelegated(
+    event LockDelegation(
         bytes32 txId,
         address indexed operator,
         bytes32 lockId,

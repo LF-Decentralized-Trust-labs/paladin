@@ -75,10 +75,10 @@ var (
 
 var (
 	EventTransfer       = "Transfer"
-	EventLocked         = "Locked"
+	EventLock           = "Lock"
 	EventTransferLocked = "TransferLocked"
-	EventLockUpdated    = "LockUpdated"
-	EventLockDelegated  = "LockDelegated"
+	EventLockUpdate     = "LockUpdate"
+	EventLockDelegation = "LockDelegation"
 
 	// Old variant 0 events
 	EventNotoTransfer       = "NotoTransfer"
@@ -90,10 +90,10 @@ var (
 
 var allEvents = []string{
 	EventTransfer,
-	EventLocked,
+	EventLock,
 	EventTransferLocked,
-	EventLockUpdated,
-	EventLockDelegated,
+	EventLockUpdate,
+	EventLockDelegation,
 }
 
 var allEventsV0 = []string{

@@ -367,7 +367,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
             _lockDelegates[lockId] = delegate;
         }
 
-        emit Locked(
+        emit Lock(
             txId,
             msg.sender,
             lockId,
@@ -478,7 +478,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         }
         _checkLockedInputs(lockId, lockedInputs);
         _setLockOptions(lockId, options);
-        emit LockUpdated(
+        emit LockUpdate(
             txId,
             msg.sender,
             lockId,
@@ -510,7 +510,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         bytes calldata data
     ) external virtual override onlyNotaryOrDelegate(lockId) txIdNotUsed(txId) {
         _lockDelegates[lockId] = delegate;
-        emit LockDelegated(txId, msg.sender, lockId, delegate, signature, data);
+        emit LockDelegation(txId, msg.sender, lockId, delegate, signature, data);
     }
 
     function _setLockOptions(
