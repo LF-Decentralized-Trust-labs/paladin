@@ -15,6 +15,12 @@ interface INoto is IConfidentialTokenLockable {
         //   Unlock(bytes32[] lockedInputs,bytes32[] lockedOutputs,bytes32[] outputs,bytes data)
         // If set to non-zero, this is the only valid outcome for the lock.
         bytes32 unlockHash;
+
+        // The time at which a lock delegation expires, in seconds since the Unix epoch.
+        // If set to zero, the lock delegation never expires.
+        // After expiration, any lock delegation is ignored, and control of the locked
+        // states returns to the original creator.
+        uint256 expiration;
     }
 
     function initialize(

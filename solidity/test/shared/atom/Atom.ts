@@ -3,6 +3,7 @@ import { ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 import { Atom, Noto } from "../../../typechain-types";
 import {
+  createLockOptions,
   deployNotoInstance,
   fakeTXO,
   newUnlockHash,
@@ -89,10 +90,7 @@ describe("Atom", function () {
     const atomAddr = createAtomEvent?.args.addr;
 
     // Do the delegation/approval transactions
-    const options = ethers.AbiCoder.defaultAbiCoder().encode(
-      ["tuple(bytes32)"],
-      [[unlockHash]]
-    );
+    const options = createLockOptions(unlockHash, 0);
     await noto
       .connect(notary1)
       .setLockOptions(randomBytes32(), lockId, [f1txo1, f1txo2], options, "0x", "0x");

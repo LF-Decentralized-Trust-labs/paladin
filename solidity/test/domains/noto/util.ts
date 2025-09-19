@@ -37,6 +37,17 @@ export function fakeTXO() {
   return randomBytes32();
 }
 
+export function createLockOptions(unlockHash?: string, expiration?: number) {
+  const options = {
+    unlockHash: unlockHash || "0x0000000000000000000000000000000000000000000000000000000000000000",
+    expiration: expiration || 0
+  };
+  return ethers.AbiCoder.defaultAbiCoder().encode(
+    ["tuple(bytes32,uint256)"],
+    [[options.unlockHash, options.expiration]]
+  );
+}
+
 export async function deployNotoInstance(
   notoFactory: NotoFactory,
   notary: string
@@ -113,7 +124,8 @@ export async function doLock(
   inputs: string[],
   outputs: string[],
   lockedOutputs: string[],
-  data: string
+  data: string,
+  options?: string
 ) {
   const tx = await noto
     .connect(notary)
@@ -121,7 +133,7 @@ export async function doLock(
       lockId,
       { inputs, outputs, lockedOutputs },
       ZeroAddress,
-      "0x",
+      options || "0x",
       "0x",
       data
     );
@@ -196,10 +208,7 @@ export async function doPrepareUnlock(
   unlockHash: string,
   data: string
 ) {
-  const options = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["tuple(bytes32)"],
-    [[unlockHash]]
-  );
+  const options = createLockOptions(unlockHash, 0);
   const tx = await noto
     .connect(notary)
     .setLockOptions(txId, lockId, lockedInputs, options, "0x", data);

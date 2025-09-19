@@ -3,6 +3,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Noto } from "../../../typechain-types";
 import {
+  createLockOptions,
   deployNotoInstance,
   doDelegateLock,
   doLock,
@@ -370,5 +371,103 @@ describe("Noto", function () {
     await expect(
       doMint(txId1, notary, noto, [txo3, txo4], randomBytes32())
     ).rejectedWith("NotoDuplicateTransaction");
+  });
+
+  it("lock expiration functionality", async function () {
+    const { noto, notary } = await loadFixture(deployNotoFixture);
+    const [_, delegate] = await ethers.getSigners();
+
+    const txo1 = fakeTXO();
+    const txo2 = fakeTXO();
+    const txo3 = fakeTXO();
+    const txo4 = fakeTXO();
+
+    const lockId = randomBytes32();
+    const locked1 = fakeTXO();
+
+    // Make two UTXOs
+    await doTransfer(
+      randomBytes32(),
+      notary,
+      noto,
+      [],
+      [txo1, txo2],
+      randomBytes32()
+    );
+
+    // Get current block timestamp
+    const currentBlock = await ethers.provider.getBlock("latest");
+    const currentTime = currentBlock!.timestamp;
+
+    // Lock with expiration set to 1 second in the future
+    const expirationTime = currentTime + 1;
+    const options = createLockOptions(undefined, expirationTime);
+
+    await doLock(
+      randomBytes32(),
+      notary,
+      noto,
+      lockId,
+      [txo1, txo2],
+      [txo3],
+      [locked1],
+      randomBytes32(),
+      options
+    );
+
+    // Delegate the lock
+    await doDelegateLock(
+      randomBytes32(),
+      notary,
+      noto,
+      lockId,
+      delegate.address,
+      randomBytes32()
+    );
+
+    // Verify delegate is set
+    const delegateBefore = await noto.getLockDelegate(lockId);
+    expect(delegateBefore).to.equal(delegate.address);
+
+    // Wait for expiration
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // Try to unlock as delegate - should fail because lock is expired
+    await expect(
+      doUnlock(
+        randomBytes32(),
+        delegate,
+        noto,
+        lockId,
+        [locked1],
+        [],
+        [txo4],
+        randomBytes32()
+      )
+    ).to.be.rejectedWith("NotoLockExpired");
+
+    // Try to delegate again as delegate - should fail because lock is expired
+    await expect(
+      doDelegateLock(
+        randomBytes32(),
+        delegate,
+        noto,
+        lockId,
+        delegate.address,
+        randomBytes32()
+      )
+    ).to.be.rejectedWith("NotoLockExpired");
+
+    // Notary should be able to unlock after expiration
+    await doUnlock(
+      randomBytes32(),
+      notary,
+      noto,
+      lockId,
+      [locked1],
+      [],
+      [txo4],
+      randomBytes32()
+    );
   });
 });

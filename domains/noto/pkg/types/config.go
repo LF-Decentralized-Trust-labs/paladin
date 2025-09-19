@@ -124,9 +124,11 @@ var NotoVariantLegacy pldtypes.HexUint64 = 0x0000
 var NotoVariantDefault pldtypes.HexUint64 = 0x0001
 
 type NotoLockOptions struct {
-	UnlockHash pldtypes.Bytes32 `json:"unlockHash"`
+	UnlockHash pldtypes.Bytes32   `json:"unlockHash"`
+	Expiration pldtypes.HexUint64 `json:"expiration"`
 }
 
 var NotoLockOptionsABI = &abi.ParameterArray{
 	{Name: "unlockHash", Type: "bytes32"},
+	{Name: "expiration", Type: "uint256"},
 }

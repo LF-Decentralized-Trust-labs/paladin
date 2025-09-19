@@ -222,6 +222,17 @@ func TestPrepareUnlock(t *testing.T) {
 	expectedFunction := mustParseJSON(interfaceBuild.ABI.Functions()["setLockOptions"])
 	assert.JSONEq(t, expectedFunction, prepareRes.Transaction.FunctionAbiJson)
 	assert.Nil(t, prepareRes.Transaction.ContractAddress)
+
+	expectedOptions := types.NotoLockOptions{
+		UnlockHash: pldtypes.Bytes32(unlockHash),
+		Expiration: pldtypes.HexUint64(0),
+	}
+	expectedOptionsJSON, err := json.Marshal(expectedOptions)
+	require.NoError(t, err)
+	expectedOptionsEncoded, err := types.NotoLockOptionsABI.EncodeABIDataJSONCtx(ctx, expectedOptionsJSON)
+	require.NoError(t, err)
+	expectedOptionsHex := fmt.Sprintf("0x%x", expectedOptionsEncoded)
+
 	assert.JSONEq(t, fmt.Sprintf(`{
 		"lockId": "%s",
 		"lockedInputs": ["%s"],
@@ -229,7 +240,7 @@ func TestPrepareUnlock(t *testing.T) {
 		"proof": "%s",
 		"txId": "0x015e1881f2ba769c22d05c841f06949ec6e1bd573f5e1e0328885494212f077d",
 		"data": "0x00010000015e1881f2ba769c22d05c841f06949ec6e1bd573f5e1e0328885494212f077d000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000034cc7840e186de23c4127b4853c878708d2642f1942959692885e098f1944547d69101a0740ec8096b83653600fa7553d676fc92bcc6e203c3572d2cac4f1db2f26b394af655bdc794a6d7cd7f8004eec20bffb374e4ddd24cdaefe554878d945"
-	}`, lockID, inputCoin.ID, unlockHash, signatureBytes), prepareRes.Transaction.ParamsJson)
+	}`, lockID, inputCoin.ID, expectedOptionsHex, signatureBytes), prepareRes.Transaction.ParamsJson)
 
 	var invokeFn abi.Entry
 	err = json.Unmarshal([]byte(prepareRes.Transaction.FunctionAbiJson), &invokeFn)

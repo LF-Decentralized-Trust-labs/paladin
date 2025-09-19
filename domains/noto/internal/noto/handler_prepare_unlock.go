@@ -131,6 +131,7 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 
 	lockOptions := types.NotoLockOptions{
 		UnlockHash: pldtypes.Bytes32(unlockHash),
+		Expiration: pldtypes.HexUint64(0), // Default to no expiration
 	}
 	lockOptionsJSON, err := json.Marshal(lockOptions)
 	if err != nil {

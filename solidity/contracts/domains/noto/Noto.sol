@@ -72,10 +72,28 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
     }
 
     modifier onlyNotaryOrDelegate(bytes32 lockId) {
-        if (_lockDelegates[lockId] == address(0)) {
-            requireNotary(msg.sender);
+        LockOptions storage options = _lockOptions[lockId];
+        bool isDelegated = _lockDelegates[lockId] != address(0);
+        bool isExpired = options.expiration != 0 &&
+            block.timestamp > options.expiration;
+
+        if (isDelegated) {
+            if (isExpired) {
+                // Delegated + expired locks can only be used by the notary
+                if (msg.sender != notary) {
+                    revert NotoLockExpired(
+                        lockId,
+                        options.expiration,
+                        block.timestamp
+                    );
+                }
+            } else {
+                // Delegated + active locks can only be used by the delegate
+                requireLockDelegate(lockId, msg.sender);
+            }
         } else {
-            requireLockDelegate(lockId, msg.sender);
+            // Undelegated locks can only be used by the notary
+            requireNotary(msg.sender);
         }
         _;
     }
@@ -510,7 +528,14 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         bytes calldata data
     ) external virtual override onlyNotaryOrDelegate(lockId) txIdNotUsed(txId) {
         _lockDelegates[lockId] = delegate;
-        emit LockDelegation(txId, msg.sender, lockId, delegate, signature, data);
+        emit LockDelegation(
+            txId,
+            msg.sender,
+            lockId,
+            delegate,
+            signature,
+            data
+        );
     }
 
     function _setLockOptions(
@@ -519,6 +544,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
     ) internal virtual {
         LockOptions memory lockOptions = abi.decode(options, (LockOptions));
         _lockOptions[lockId].unlockHash = lockOptions.unlockHash;
+        _lockOptions[lockId].expiration = lockOptions.expiration;
     }
 
     /**
