@@ -2,6 +2,7 @@ import { PaladinConfig } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import https from "https";
 import fs from "fs";
 import path from "path";
+import minimist from 'minimist'; 
 
 /**
  * Defines the connectivity information for a single network node in JSON format.
@@ -74,7 +75,10 @@ function loadConfigFromFile(configPath?: string): NodeConnection[] {
   
   if (configPath) {
     // Use the provided config path
-    filePath = path.resolve(configPath);
+    // filePath = path.resolve(configPath);
+    filePath = configPath;
+    console.log("filePath:", filePath);
+
   } else {
     // Use the default config file - try multiple possible locations
     const possiblePaths = [
@@ -118,20 +122,48 @@ function loadConfigFromFile(configPath?: string): NodeConnection[] {
  * Gets the config path from command line arguments
  */
 function getConfigPathFromArgs(): string | undefined {
-  const args = process.argv.slice(2);
-  const configIndex = args.findIndex(arg => arg === '--config' || arg === '-c');
+
+  const parsedArgs = minimist(process.argv.slice(2));
+  console.log("Parsed arguments:", parsedArgs);
+  return parsedArgs.config;
   
-  if (configIndex !== -1 && configIndex + 1 < args.length) {
-    return args[configIndex + 1];
-  }
-  
-  // Also check for positional argument (last argument)
-  if (args.length > 0 && !args[args.length - 1].startsWith('-')) {
-    return args[args.length - 1];
-  }
-  
-  return undefined;
 }
+
+
+/**
+ * Gets the cache path from command line arguments
+ */
+function getCachePath(): string   {
+
+  const parsedArgs = minimist(process.argv.slice(2));
+  console.log("Parsed arguments:", parsedArgs);
+  if (parsedArgs.cache) {
+    return parsedArgs.cache;
+  }
+  return path.join(__dirname, '..', '..', 'data');
+}
+
+/**
+ * Finds the latest contract data file in the cache directory
+ */
+function findLatestContractDataFile(dataDir: string): string | null {
+
+  if (!fs.existsSync(dataDir)) {
+    return null;
+  }
+
+  const files = fs.readdirSync(dataDir)
+    .filter(file => file.startsWith('contract-data-') && file.endsWith('.json'))
+    .sort((a, b) => {
+      const timestampA = a.replace('contract-data-', '').replace('.json', '');
+      const timestampB = b.replace('contract-data-', '').replace('.json', '');
+      return new Date(timestampB).getTime() - new Date(timestampA).getTime(); // Descending order (newest first)
+    })
+    .reverse();
+
+  return files.length > 0 ? path.join(dataDir, files[0]) : null;
+}
+
 
 /**
  * Get the configuration, optionally from a custom path
@@ -148,4 +180,4 @@ const nodeConnections: NodeConnection[] = getNodeConnections();
 export default nodeConnections;
 
 // Export both configurations for flexibility
-export { nodeConnections };
+export { nodeConnections, findLatestContractDataFile, getCachePath};

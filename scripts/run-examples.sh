@@ -202,6 +202,8 @@ run_example() {
     
     print_header "Running example: $example_name"
     echo "=========================================="
+
+    config_file="../common/config.json"
     
     cd "$examples_dir"
     
@@ -241,9 +243,9 @@ run_example() {
         command=$(echo "$command" | xargs) # trim whitespace
         
         # Run the example command, passing the cache path as an argument.
-        # The '--' tells npm to pass the argument to the script, not to npm itself.
-        print_status "Running $example_name with 'npm run $command'"
-        if ! npm run $command -- "$example_cache_path"; then
+        cmd="$command -- --cache $example_cache_path --config $config_file"
+        print_status "Running command: $cmd"
+        if ! npm run $cmd; then
             print_error "Example $example_name failed to run command '$command'"
             exit_code=1
             break
@@ -297,16 +299,6 @@ main() {
 
         # Check if example should run based on metadata and current version
         if [ -f "$examples_dir/package.json" ]; then
-            if [ "$BUILD_PALADIN_SDK" = "false" ] || [ "$BUILD_PALADIN_ABI" = "false" ]; then
-                # skip event-listener and private-stablecoin examples
-                # TODO: remove this once we release v0.10.0
-                if [ "$example_name" = "event-listener" ] || [ "$example_name" = "private-stablecoin" ]; then
-                    print_status "Skipping example $example_name (not supported for current version)"
-                    skipped_examples+=("$example_name")
-                    continue
-                fi
-            fi
-
             # ignore examples if IGNORE_EXAMPLES is set
             if [ "$IGNORE_EXAMPLES" != "" ]; then
                 if [[ "$IGNORE_EXAMPLES" == *$example_name* ]]; then

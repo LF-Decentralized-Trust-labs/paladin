@@ -113,13 +113,6 @@ jobs:
         id: cache_data
         shell: bash
         run: |
-          # TODO: remove this once we have a v0.11.0 release
-          # Check if we have any previous tags to process
-          tags_array=$(echo '${{ steps.get_tags.outputs.tags }}' | jq -r '.[]')
-          if [[ -z "$tags_array" ]]; then
-            echo "No previous tags found, skipping Phase 1"
-            exit 0
-          fi
           
           # This loop simulates a real-world cluster being upgraded over time.
           # For each historical version, we install it, check out its corresponding source code,
