@@ -24,6 +24,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
@@ -84,6 +85,7 @@ type Transaction struct {
 	messageSender      MessageSender
 	grapher            Grapher
 	engineIntegration  common.EngineIntegration
+	syncPoints         syncpoints.SyncPoints
 	notifyOfTransition OnStateTransition
 	emit               common.EmitEvent
 	metrics            metrics.DistributedSequencerMetrics
@@ -100,6 +102,7 @@ func NewTransaction(
 	clock common.Clock,
 	emit common.EmitEvent,
 	engineIntegration common.EngineIntegration,
+	syncPoints syncpoints.SyncPoints,
 	requestTimeout,
 	assembleTimeout common.Duration,
 	finalizingGracePeriod int,
@@ -126,6 +129,7 @@ func NewTransaction(
 		assembleTimeout:       assembleTimeout,
 		finalizingGracePeriod: finalizingGracePeriod,
 		engineIntegration:     engineIntegration,
+		syncPoints:            syncPoints,
 		notifyOfTransition:    onStateTransition,
 		onCleanup:             onCleanup,
 		emit:                  emit,

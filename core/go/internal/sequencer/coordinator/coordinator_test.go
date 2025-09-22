@@ -23,6 +23,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/testutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
@@ -46,6 +47,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentity
 		messageSender:     NewMockMessageSender(t),
 		clock:             &common.FakeClockForTesting{},
 		engineIntegration: common.NewMockEngineIntegration(t),
+		syncPoints:        &syncpoints.MockSyncPoints{},
 		emit:              func(event common.Event) {},
 	}
 	mockDomainAPI := componentsmocks.NewDomainSmartContract(t)
@@ -55,7 +57,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentity
 		CoordinatorSelection: prototk.ContractConfig_COORDINATOR_ENDORSER,
 	})
 
-	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.messageSender, senderIdentityPool, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1",
+	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.messageSender, senderIdentityPool, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1",
 		func(context.Context, *transaction.Transaction) {
 			// Not used
 		},
@@ -76,6 +78,7 @@ type coordinatorDependencyMocks struct {
 	clock             *common.FakeClockForTesting
 	engineIntegration *common.MockEngineIntegration
 	emit              common.EmitEvent
+	syncPoints        syncpoints.SyncPoints
 }
 
 func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {

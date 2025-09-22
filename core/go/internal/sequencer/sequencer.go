@@ -283,7 +283,6 @@ func (sMgr *sequencerManager) revertDeploy(ctx context.Context, tx *components.P
 	}
 	tryFinalize()
 	return deployError
-
 }
 
 func (sMgr *sequencerManager) HandleNewTx(ctx context.Context, dbTX persistence.DBTX, txi *components.ValidatedTransaction) error {

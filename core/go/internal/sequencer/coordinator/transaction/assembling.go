@@ -24,8 +24,26 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 )
+
+func (t *Transaction) revertTransaction(ctx context.Context, revertReason string) error {
+	var tryFinalize func()
+	tryFinalize = func() {
+		t.syncPoints.QueueTransactionFinalize(ctx, t.Domain, pldtypes.EthAddress{}, t.sender, t.ID, revertReason,
+			func(ctx context.Context) {
+				log.L(ctx).Debugf("[Sequencer] finalized deployment transaction: %s", t.ID)
+			},
+			func(ctx context.Context, err error) {
+				log.L(ctx).Errorf("[Sequencer] error finalizing deployment: %s", err)
+				tryFinalize()
+			})
+	}
+	tryFinalize()
+	return nil
+}
 
 func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *components.TransactionPostAssembly) error {
 
@@ -34,6 +52,9 @@ func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *compo
 	if t.cancelAssembleTimeoutSchedule != nil {
 		t.cancelAssembleTimeoutSchedule()
 		t.cancelAssembleTimeoutSchedule = nil
+	}
+	if t.PostAssembly.AssemblyResult == prototk.AssembleTransactionResponse_REVERT {
+		return t.revertTransaction(ctx, *postAssembly.RevertReason)
 	}
 	for _, state := range postAssembly.OutputStates {
 		err := t.grapher.AddMinter(ctx, state.ID, t)

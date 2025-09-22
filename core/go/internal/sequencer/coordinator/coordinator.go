@@ -27,6 +27,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 
@@ -77,6 +78,7 @@ type coordinator struct {
 	messageSender      MessageSender
 	clock              common.Clock
 	engineIntegration  common.EngineIntegration
+	syncPoints         syncpoints.SyncPoints
 	emit               common.EmitEvent
 	readyForDispatch   func(context.Context, *transaction.Transaction)
 	coordinatorStarted func(contractAddress *pldtypes.EthAddress, coordinatorNode string)
@@ -101,6 +103,7 @@ func NewCoordinator(
 	clock common.Clock,
 	emit common.EmitEvent,
 	engineIntegration common.EngineIntegration,
+	syncPoints syncpoints.SyncPoints,
 	requestTimeout,
 	assembleTimeout common.Duration,
 	blockRangeSize int64,
@@ -127,6 +130,7 @@ func NewCoordinator(
 		requestTimeout:                     requestTimeout,
 		assembleTimeout:                    assembleTimeout,
 		engineIntegration:                  engineIntegration,
+		syncPoints:                         syncPoints,
 		emit:                               emit,
 		readyForDispatch:                   readyForDispatch,
 		coordinatorStarted:                 coordinatorStarted,
@@ -259,6 +263,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			c.clock,
 			c.emit,
 			c.engineIntegration,
+			c.syncPoints,
 			c.requestTimeout,
 			c.assembleTimeout,
 			c.closingGracePeriod,
