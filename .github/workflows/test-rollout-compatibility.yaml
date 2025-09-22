@@ -155,21 +155,16 @@ jobs:
 
           echo "--- Verifying Backwards Compatibility ---"
           
-          # TODO: remove this once we have a v0.11.0 release
-          # Check if we have any previous tags to verify
-          tags_array=$(echo '${{ steps.get_tags.outputs.tags }}' | jq -r '.[]')
-          if [[ -z "$tags_array" ]]; then
-            echo "No previous tags found, skipping Phase 2"
-            exit 0
-          fi
-          
           # This loop tests two critical user scenarios after an upgrade.
           # For each historical version, we check out its code to get the original examples and dependencies.
           for tag in $tags_array; do
             echo "--- Verifying data from $tag ---"
-            
-            echo "Checking out git ref $tag..."
-            git checkout "$tag"
+
+            # version 10 does not support the cache path, so we use a later tag for this test
+            if [ "$tag" != "v0.10.0" ]; then
+              echo "Checking out git ref $tag..."
+              git checkout "$tag"
+            fi
             
             # Scenario 1: A user has upgraded their server (the chart) but NOT their client code.
             # We test if the old SDK can still interact with the new server to verify old data.
