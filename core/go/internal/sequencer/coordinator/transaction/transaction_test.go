@@ -21,6 +21,7 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -206,6 +207,7 @@ type transactionDependencyMocks struct {
 	messageSender     *MockMessageSender
 	clock             *common.FakeClockForTesting
 	engineIntegration *common.MockEngineIntegration
+	syncPoints        syncpoints.SyncPoints
 }
 
 func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, *transactionDependencyMocks) {
@@ -216,6 +218,7 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		messageSender:     NewMockMessageSender(t),
 		clock:             &common.FakeClockForTesting{},
 		engineIntegration: common.NewMockEngineIntegration(t),
+		syncPoints:        &syncpoints.MockSyncPoints{},
 	}
 	txn, err := NewTransaction(
 		context.Background(),
@@ -227,6 +230,7 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		mocks.clock,
 		func(_ common.Event) {},
 		mocks.engineIntegration,
+		mocks.syncPoints,
 		mocks.clock.Duration(1000),
 		mocks.clock.Duration(5000),
 		5,

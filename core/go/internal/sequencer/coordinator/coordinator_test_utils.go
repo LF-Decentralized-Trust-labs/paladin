@@ -24,6 +24,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
@@ -98,6 +99,7 @@ type CoordinatorDependencyMocks struct {
 	SentMessageRecorder *SentMessageRecorder
 	Clock               *common.FakeClockForTesting
 	EngineIntegration   *common.FakeEngineIntegrationForTesting
+	SyncPoints          syncpoints.SyncPoints
 	emittedEvents       []common.Event
 }
 
@@ -172,6 +174,7 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		SentMessageRecorder: NewSentMessageRecorder(),
 		Clock:               &common.FakeClockForTesting{},
 		EngineIntegration:   &common.FakeEngineIntegrationForTesting{},
+		SyncPoints:          &syncpoints.MockSyncPoints{},
 	}
 
 	b.emitFunction = func(event common.Event) {
@@ -186,6 +189,7 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		mocks.Clock,
 		b.emitFunction,
 		mocks.EngineIntegration,
+		mocks.SyncPoints,
 		mocks.Clock.Duration(1000), // Request timeout
 		mocks.Clock.Duration(5000), // Assemble timeout
 		100,                        // Block range size

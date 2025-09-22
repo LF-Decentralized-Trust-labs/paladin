@@ -20,6 +20,7 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,6 +31,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 	messageSender := NewMockMessageSender(t)
 	clock := &common.FakeClockForTesting{}
 	engineIntegration := common.NewMockEngineIntegration(t)
+	syncPoints := &syncpoints.MockSyncPoints{}
 	txn, err := NewTransaction(
 		ctx,
 		"sender@node1",
@@ -43,6 +45,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 			assert.Failf(t, "unexpected event", "%T", event)
 		},
 		engineIntegration,
+		syncPoints,
 		clock.Duration(1000),
 		clock.Duration(5000),
 		5,

@@ -171,6 +171,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				common.RealClock(),
 				sequencer.coordinatorEventHandler,
 				sMgr.engineIntegration,
+				sMgr.syncPoints,
 				reqTimeout,
 				assembleTimeout,
 				10,

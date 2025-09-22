@@ -24,6 +24,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/testutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
@@ -167,6 +168,7 @@ type TransactionBuilderForTesting struct {
 	sentMessageRecorder                *SentMessageRecorder
 	fakeClock                          *common.FakeClockForTesting
 	fakeEngineIntegration              *common.FakeEngineIntegrationForTesting
+	syncPoints                         syncpoints.SyncPoints
 	grapher                            Grapher
 	txn                                *Transaction
 	requestTimeout                     int
@@ -195,6 +197,7 @@ func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuil
 		fakeEngineIntegration:     &common.FakeEngineIntegrationForTesting{},
 		assembleTimeout:           5000,
 		requestTimeout:            100,
+		syncPoints:                &syncpoints.MockSyncPoints{},
 		privateTransactionBuilder: testutil.NewPrivateTransactionBuilderForTesting(),
 	}
 
@@ -324,6 +327,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		b.fakeClock,
 		func(_ common.Event) {},
 		b.fakeEngineIntegration,
+		b.syncPoints,
 		b.fakeClock.Duration(b.requestTimeout),
 		b.fakeClock.Duration(b.assembleTimeout),
 		5,
