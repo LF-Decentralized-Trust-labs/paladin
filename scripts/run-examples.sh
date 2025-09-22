@@ -227,13 +227,14 @@ run_example() {
     
     mkdir -p logs
     
+    local cmd_cache_path=""
     # Construct cache directory path if provided
     # default is <example_dir>/data
-    local example_cache_path=""
     if [ -n "$BASE_CACHE_DIR" ] && [ -n "$VERSION_TAG_ARG" ]; then
         example_cache_path="$BASE_CACHE_DIR/$VERSION_TAG_ARG/$example_name"
         print_status "Using cache path: $example_cache_path"
         mkdir -p "$example_cache_path"
+        cmd_cache_path="--cache $example_cache_path"
     fi
     
     # Split RUN_COMMANDS by comma and run each command
@@ -243,7 +244,7 @@ run_example() {
         command=$(echo "$command" | xargs) # trim whitespace
         
         # Run the example command, passing the cache path as an argument.
-        cmd="$command -- --cache $example_cache_path --config $config_file"
+        cmd="$command -- $cmd_cache_path --config $config_file"
         print_status "Running command: $cmd"
         if ! npm run $cmd; then
             print_error "Example $example_name failed to run command '$command'"
