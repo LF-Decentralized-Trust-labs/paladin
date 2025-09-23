@@ -151,21 +151,21 @@ jobs:
     needs: [setup]
     runs-on: ubuntu-latest
     steps:
-      - name: Download Helm artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: helm-artifacts
-          path: helm-artifacts/
+      # - name: Download Helm artifacts
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: helm-artifacts
+      #     path: helm-artifacts/
 
-      - name: Download Solidity artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: contracts
-          path: contracts/
+      # - name: Download Solidity artifacts
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: contracts
+      #     path: contracts/
 
-      - name: List downloaded artifacts
-        run: |
-          ls -R
+      # - name: List downloaded artifacts
+      #   run: |
+      #     ls -R
 
       - name: override examples sdk version
         uses: ./.github/actions/override-sdk-version/action.yaml
@@ -180,13 +180,13 @@ jobs:
           generate_release_notes: true
           make_latest: "false" # RC releases are never marked as latest
           prerelease: true
-          files: |
-            helm-artifacts/basenet.yaml
-            helm-artifacts/customnet.yaml
-            helm-artifacts/attach.yaml
-            helm-artifacts/devnet.yaml
-            helm-artifacts/artifacts.tar.gz
-            contracts/abis.tar.gz
-            contracts/zeto-abis.tar.gz
+          # files: |
+          #   helm-artifacts/basenet.yaml
+          #   helm-artifacts/customnet.yaml
+          #   helm-artifacts/attach.yaml
+          #   helm-artifacts/devnet.yaml
+          #   helm-artifacts/artifacts.tar.gz
+          #   contracts/abis.tar.gz
+          #   contracts/zeto-abis.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
