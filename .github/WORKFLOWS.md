@@ -36,7 +36,7 @@ When a developer opens a PR, several automated checks are triggered to validate 
 
 All checks must pass before PRs can be merged to the main branch.
 
-## Changes Pushed to Main 🌟
+## Changes Pushed to Main
 Once changes are merged into the `main` branch, workflows prepare the project for production:
 
 - **[Build (push)](workflows/on-push.yml):**  
@@ -53,10 +53,10 @@ Once changes are merged into the `main` branch, workflows prepare the project fo
 - **[Update Documentation](workflows/docs.yaml):**  
   Detects documentation updates and publishes the latest content to the documentation site.
 
-## Release Time 🚀
+## Release Time
 Paladin follows a two-stage release process to ensure quality and stability:
 
-### Stage 1: Release Candidate (RC) 🧪
+### [Stage 1: Release Candidate (RC)](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/release-candidate.yaml)
 Release candidates are created first for testing and validation:
 
 - **[Release Candidate Workflow](workflows/release-candidate.yaml):**  
@@ -75,7 +75,7 @@ Release candidates are created first for testing and validation:
     Packages contract ABIs and deployment artifacts for distribution.
   - **GitHub Release:** Creates a pre-release with all artifacts
  
-### Stage 2: Final Release 🎯
+### [Stage 2: Final Release](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/release.yaml)
 Once the RC has been tested and validated, the final release can be created:
 
 - **[Release Orchestrator](workflows/release.yaml):**  
