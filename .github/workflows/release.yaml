@@ -5,6 +5,10 @@
 # This workflow (phase 2) creates the final release after RC testing has been completed.
 name: Release
 
+permissions:
+  contents: write
+  packages: write
+  id-token: write
 on:
   push:
     tags:
