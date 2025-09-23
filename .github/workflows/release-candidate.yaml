@@ -170,7 +170,7 @@ jobs:
       #     path: contracts/
 
       - name: override examples sdk version
-        uses: ./.github/actions/override-sdk-version/action.yaml
+        uses: ./.github/actions/override-sdk-version
         with:
           sdk_version: ${{ needs.setup.outputs.tag }}
 
