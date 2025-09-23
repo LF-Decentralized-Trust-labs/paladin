@@ -356,6 +356,8 @@ task componentTestPostgres(type: ComponentTest, dependsOn: [
         copyContracts, // Ensure this task depends on copying the test contracts
     ]) {
     mustRunAfter 'unitTestPostgres' // these tests cannot run concurrently
+    environment 'BESU_PORT', '8555' // Use gas-free Besu port
+
 }
 
 task componentTestWithGasPostgres(type: GasComponentTest, dependsOn: [
