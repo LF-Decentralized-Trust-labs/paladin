@@ -44,7 +44,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test seed constants for predictable account generation
+// Test seed constants for predictable account generation to make testing against pre-funded Besu accounts possible
 // These seeds are used to generate consistent test accounts across test runs
 const (
 	// TestSeed1 - Primary test seed for most component tests
