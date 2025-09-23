@@ -15,12 +15,16 @@ runs:
         # remove the v prefix from the tag if its there
         sdk_version=$(echo "${{ inputs.sdk_version }}" | sed 's/^v//')
 
-        for example in $(ls -d examples/*); do
-          echo "Overriding $example"
-          cd $example
-          # override only if the package.json has 'paladin-sdk' as a dependency
-          if grep -q "paladin-sdk" package.json; then
-            npm install @lfdecentralizedtrust-labs/paladin-sdk@$sdk_version
+        # Use a glob pattern that only matches directories.
+        for example in examples/*/; do
+          # Check if the path exists to handle the case where no directories are found.
+          if [ -d "$example" ]; then
+            echo "Overriding $example"
+            cd "$example"
+            # override only if the package.json has 'paladin-sdk' as a dependency
+            if grep -q "paladin-sdk" package.json; then
+              npm install @lfdecentralizedtrust-labs/paladin-sdk@$sdk_version
+            fi
+            cd ../..
           fi
-          cd ../..
-        done  
+        done
