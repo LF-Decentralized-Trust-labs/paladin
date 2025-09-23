@@ -145,17 +145,43 @@ jobs:
     with:
       new_tag: ${{ needs.setup.outputs.tag }}
 
+  # ================================ Prepare release ================================
+  # Override SDK version in examples and create a release branch
+  prepare-release:
+    needs: [setup, test-rollout-compatibility]
+    runs-on: ubuntu-latest
+    outputs:
+      new_sha: ${{ steps.commit.outputs.NEW_SHA }}
+
+    steps:
+    - name: Checkout repository code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: override examples sdk version
+      uses: ./.github/actions/override-sdk-version
+      with:
+        sdk_version: ${{ needs.setup.outputs.tag }}
+
+    - name: Commit changes
+      id: commit
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add examples/
+        git commit -m "chore: Update SDK version in examples to ${{ needs.setup.outputs.tag }}"
+        git push origin HEAD:release-${{ needs.setup.outputs.tag }}
+        echo "NEW_SHA=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+
   # ================================ CREATE RC RELEASE ================================
   # Only create the RC release after all tests have passed
   # This step bundles all built artifacts and creates the GitHub release
   create-rc-release:
-    needs: [setup, test-rollout-compatibility]
+    needs: [setup, prepare-release]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository code
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Download Helm artifacts
         uses: actions/download-artifact@v4
@@ -168,26 +194,11 @@ jobs:
         with:
           name: contracts
           path: contracts/
-
-      - name: override examples sdk version
-        uses: ./.github/actions/override-sdk-version/action.yaml
-        with:
-          sdk_version: ${{ needs.setup.outputs.tag }}
-
-      - name: Commit changes
-        id: commit
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add examples/
-          git commit -m "chore: Update SDK version in examples to ${{ needs.setup.outputs.tag }}"
-          echo "NEW_SHA=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
-
       - name: Create release candidate with all artifacts
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.setup.outputs.tag }}
-          target_commitish: ${{ steps.commit.outputs.NEW_SHA }} # Use the commit sha with the updated examples
+          target_commitish: ${{ needs.prepare-release.outputs.new_sha }} # Use the commit sha with the updated examples
           body: "Release Candidate ${{ needs.setup.outputs.tag }}"
           generate_release_notes: true
           make_latest: "false" # RC releases are never marked as latest
