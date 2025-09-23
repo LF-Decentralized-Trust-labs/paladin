@@ -9,25 +9,25 @@
       
       
       
-        <link rel="prev" href="../abidecodeddata/">
+        <link rel="prev" href="../l1-and-l2-chains/">
       
       
-        <link rel="next" href="../blockchaineventlistenercheckpoint/">
+        <link rel="next" href="../../reference/apis/bidx/">
       
       
-      <link rel="icon" href="../../../assets/paladin-icon-light.png">
+      <link rel="icon" href="../../assets/paladin-icon-light.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.44">
     
     
       
-        <title>BlockchainEventListener - Paladin</title>
+        <title>Logging - Paladin</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.0253249f.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.0253249f.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -46,9 +46,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../stylesheets/paladin.css">
+      <link rel="stylesheet" href="../../stylesheets/paladin.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
   
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#example" class="md-skip">
+        <a href="#logging-guide" class="md-skip">
           Skip to content
         </a>
       
@@ -99,7 +99,7 @@
             <div class="md-banner__inner md-grid md-typeset">
               
   You're not viewing the latest version.
-  <a href="../../../.."> 
+  <a href="../../.."> 
     <strong>Click here to go to latest.</strong>
   </a>
 
@@ -147,7 +147,7 @@
 
     <!-- Link to home -->
     <a
-      href="../../.."
+      href="../.."
       title="Paladin"
       class="md-header__button md-logo"
       aria-label="Paladin"
@@ -176,8 +176,8 @@
 -->
 
 <!-- Logo -->
-<img src="../../../assets/paladin-logo-dark.svg#only-dark" alt="Paladin" />
-<img src="../../../assets/paladin-logo-light.svg#only-light" alt="Paladin" />
+<img src="../../assets/paladin-logo-dark.svg#only-dark" alt="Paladin" />
+<img src="../../assets/paladin-logo-light.svg#only-light" alt="Paladin" />
     </a>
 
     <!-- Button to open drawer -->
@@ -196,7 +196,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              BlockchainEventListener
+              Logging
             
           </span>
         </div>
@@ -299,7 +299,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../.." class="md-tabs__link">
+        <a href="../.." class="md-tabs__link">
           
   
     
@@ -319,7 +319,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../architecture/overview/" class="md-tabs__link">
+        <a href="../../architecture/overview/" class="md-tabs__link">
           
   
     
@@ -345,7 +345,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../getting-started/installation/" class="md-tabs__link">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
           
   
     
@@ -368,7 +368,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../tutorials/" class="md-tabs__link">
+        <a href="../../tutorials/" class="md-tabs__link">
           
   
     
@@ -384,11 +384,13 @@
         
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../../guides/certificate_management/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../certificate_management/" class="md-tabs__link">
           
   
     
@@ -404,21 +406,17 @@
         
   
   
-    
-  
   
     
     
       
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../apis/bidx/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../reference/apis/bidx/" class="md-tabs__link">
           
   
     
@@ -441,7 +439,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../contributing/how-to-contribute/" class="md-tabs__link">
+        <a href="../../contributing/how-to-contribute/" class="md-tabs__link">
           
   
     
@@ -459,7 +457,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../faqs/" class="md-tabs__link">
+      <a href="../../faqs/" class="md-tabs__link">
         
   
     
@@ -476,7 +474,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../glossary/" class="md-tabs__link">
+      <a href="../../glossary/" class="md-tabs__link">
         
   
     
@@ -516,7 +514,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.."
+    <a href="../.."
     title="Paladin"
     class="md-header__button md-logo"
     aria-label="Paladin"
@@ -544,8 +542,8 @@
 -->
 
 <!-- Logo -->
-<img src="../../../assets/paladin-logo-dark.svg#only-dark" alt="Paladin" />
-<img src="../../../assets/paladin-logo-light.svg#only-light" alt="Paladin" />
+<img src="../../assets/paladin-logo-dark.svg#only-dark" alt="Paladin" />
+<img src="../../assets/paladin-logo-light.svg#only-light" alt="Paladin" />
     </a>
     Paladin
   </label>
@@ -606,7 +604,7 @@
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../.." class="md-nav__link ">
+            <a href="../.." class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -639,7 +637,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../concepts/tokens/" class="md-nav__link">
+      <a href="../../concepts/tokens/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -660,7 +658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../concepts/private_evm/" class="md-nav__link">
+      <a href="../../concepts/private_evm/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -681,7 +679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../concepts/advanced_crypto/" class="md-nav__link">
+      <a href="../../concepts/advanced_crypto/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -702,7 +700,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../concepts/atomic_programmability/" class="md-nav__link">
+      <a href="../../concepts/atomic_programmability/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -723,7 +721,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../concepts/full_stack/" class="md-nav__link">
+      <a href="../../concepts/full_stack/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -744,7 +742,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../concepts/cloud_native/" class="md-nav__link">
+      <a href="../../concepts/cloud_native/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -836,7 +834,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture/overview/" class="md-nav__link">
+      <a href="../../architecture/overview/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -857,7 +855,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture/programming_model/" class="md-nav__link">
+      <a href="../../architecture/programming_model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -878,7 +876,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture/domains/" class="md-nav__link">
+      <a href="../../architecture/domains/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -899,7 +897,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture/zeto/" class="md-nav__link">
+      <a href="../../architecture/zeto/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -920,7 +918,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture/noto/" class="md-nav__link">
+      <a href="../../architecture/noto/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -941,7 +939,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture/pente/" class="md-nav__link">
+      <a href="../../architecture/pente/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -962,7 +960,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture/key_management/" class="md-nav__link">
+      <a href="../../architecture/key_management/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -983,7 +981,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture/state_store/" class="md-nav__link">
+      <a href="../../architecture/state_store/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1004,7 +1002,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture/atomic_interop/" class="md-nav__link">
+      <a href="../../architecture/atomic_interop/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1025,7 +1023,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture/data_and_registry/" class="md-nav__link">
+      <a href="../../architecture/data_and_registry/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1046,7 +1044,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture/ledger_layers/" class="md-nav__link">
+      <a href="../../architecture/ledger_layers/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1172,7 +1170,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1193,7 +1191,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/installation-advanced/" class="md-nav__link">
+      <a href="../../getting-started/installation-advanced/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1214,7 +1212,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/installation-manual/" class="md-nav__link">
+      <a href="../../getting-started/installation-manual/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1243,7 +1241,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/user-interface/" class="md-nav__link">
+      <a href="../../getting-started/user-interface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1264,7 +1262,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/l1-and-l2-chains.md" class="md-nav__link">
+      <a href="../../getting-started/l1-and-l2-chains.md" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1285,7 +1283,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/troubleshooting/" class="md-nav__link">
+      <a href="../../getting-started/troubleshooting/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1352,7 +1350,7 @@
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../tutorials/" class="md-nav__link ">
+            <a href="../../tutorials/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -1385,7 +1383,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tutorials/hello-world/" class="md-nav__link">
+      <a href="../../tutorials/hello-world/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1406,7 +1404,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tutorials/public-storage/" class="md-nav__link">
+      <a href="../../tutorials/public-storage/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1427,7 +1425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tutorials/private-storage/" class="md-nav__link">
+      <a href="../../tutorials/private-storage/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1448,7 +1446,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tutorials/notarized-tokens/" class="md-nav__link">
+      <a href="../../tutorials/notarized-tokens/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1469,7 +1467,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tutorials/zkp-cbdc/" class="md-nav__link">
+      <a href="../../tutorials/zkp-cbdc/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1490,7 +1488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tutorials/private-stablecoin/" class="md-nav__link">
+      <a href="../../tutorials/private-stablecoin/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1511,7 +1509,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tutorials/atomic-swap/" class="md-nav__link">
+      <a href="../../tutorials/atomic-swap/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1532,7 +1530,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tutorials/bond-issuance/" class="md-nav__link">
+      <a href="../../tutorials/bond-issuance/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1557,157 +1555,12 @@
       
   
   
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-      
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Guides
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            Guides
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../guides/certificate_management/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Certificate Management
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../guides/administering_peers/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Administering Peers
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../guides/l1-and-l2-chains/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    L1 and L2 Chains
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../guides/logging/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Logging
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
     
   
   
   
     
     
-      
-        
-      
-        
       
         
       
@@ -1730,10 +1583,303 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Guides
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Guides
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../certificate_management/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Certificate Management
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../administering_peers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Administering Peers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../l1-and-l2-chains/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    L1 and L2 Chains
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#log-level-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Log Level Configuration
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Log Level Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setting-log-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting Log Levels
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#available-log-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Available Log Levels
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#log-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Log Structure
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Log Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#component-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Component Reference
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kubernetes-log-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      Kubernetes Log Filtering
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Kubernetes Log Filtering">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-log-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Log Filtering
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filtering-by-log-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Filtering by Log Level
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#real-time-log-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      Real-time Log Monitoring
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -1744,7 +1890,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             Reference
@@ -1814,7 +1960,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apis/bidx/" class="md-nav__link">
+      <a href="../../reference/apis/bidx/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1835,7 +1981,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apis/keymgr/" class="md-nav__link">
+      <a href="../../reference/apis/keymgr/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1856,7 +2002,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apis/pgroup/" class="md-nav__link">
+      <a href="../../reference/apis/pgroup/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1877,7 +2023,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apis/pstate/" class="md-nav__link">
+      <a href="../../reference/apis/pstate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1898,7 +2044,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apis/ptx/" class="md-nav__link">
+      <a href="../../reference/apis/ptx/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1919,7 +2065,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apis/reg/" class="md-nav__link">
+      <a href="../../reference/apis/reg/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1940,7 +2086,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../apis/transport/" class="md-nav__link">
+      <a href="../../reference/apis/transport/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1966,10 +2112,8 @@
                 
   
   
-    
   
   
-  
     
     
       
@@ -2079,11 +2223,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2" >
         
           
           <label class="md-nav__link" for="__nav_6_2" id="__nav_6_2_label" tabindex="0">
@@ -2097,7 +2243,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6_2">
             <span class="md-nav__icon md-icon"></span>
             Types
@@ -2111,7 +2257,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../abidecodeddata/" class="md-nav__link">
+      <a href="../../reference/types/abidecodeddata/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2129,28 +2275,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    BlockchainEventListener
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../reference/types/blockchaineventlistener/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2159,42 +2287,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
-    <span class="md-ellipsis">
-      Example
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#field-descriptions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Field Descriptions
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2207,7 +2299,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../blockchaineventlistenercheckpoint/" class="md-nav__link">
+      <a href="../../reference/types/blockchaineventlistenercheckpoint/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2228,7 +2320,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../blockchaineventlisteneroptions/" class="md-nav__link">
+      <a href="../../reference/types/blockchaineventlisteneroptions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2249,7 +2341,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../blockchaineventlistenersource/" class="md-nav__link">
+      <a href="../../reference/types/blockchaineventlistenersource/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2270,7 +2362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../blockchaineventlistenerstatus/" class="md-nav__link">
+      <a href="../../reference/types/blockchaineventlistenerstatus/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2291,7 +2383,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../eventwithdata/" class="md-nav__link">
+      <a href="../../reference/types/eventwithdata/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2312,7 +2404,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../indexedblock/" class="md-nav__link">
+      <a href="../../reference/types/indexedblock/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2333,7 +2425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../indexedevent/" class="md-nav__link">
+      <a href="../../reference/types/indexedevent/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2354,7 +2446,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../indexedtransaction/" class="md-nav__link">
+      <a href="../../reference/types/indexedtransaction/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2375,7 +2467,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../jsonformatoptions/" class="md-nav__link">
+      <a href="../../reference/types/jsonformatoptions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2396,7 +2488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../keymappingandverifier/" class="md-nav__link">
+      <a href="../../reference/types/keymappingandverifier/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2417,7 +2509,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../onchainlocation/" class="md-nav__link">
+      <a href="../../reference/types/onchainlocation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2438,7 +2530,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../peerinfo/" class="md-nav__link">
+      <a href="../../reference/types/peerinfo/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2459,7 +2551,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../preparedtransaction/" class="md-nav__link">
+      <a href="../../reference/types/preparedtransaction/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2480,7 +2572,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../privacygroup/" class="md-nav__link">
+      <a href="../../reference/types/privacygroup/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2501,7 +2593,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../privacygroupevmcall/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupevmcall/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2522,7 +2614,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../privacygroupevmtxinput/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupevmtxinput/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2543,7 +2635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../privacygroupinput/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupinput/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2564,7 +2656,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../privacygroupmessage/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupmessage/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2585,7 +2677,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../privacygroupmessageinput/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupmessageinput/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2606,7 +2698,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../privacygroupmessagelistener/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupmessagelistener/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2627,7 +2719,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../privacygroupwithabi/" class="md-nav__link">
+      <a href="../../reference/types/privacygroupwithabi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2648,7 +2740,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../publictx/" class="md-nav__link">
+      <a href="../../reference/types/publictx/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2669,7 +2761,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../queryjson/" class="md-nav__link">
+      <a href="../../reference/types/queryjson/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2690,7 +2782,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../registryentry/" class="md-nav__link">
+      <a href="../../reference/types/registryentry/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2711,7 +2803,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../registryentrywithproperties/" class="md-nav__link">
+      <a href="../../reference/types/registryentrywithproperties/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2732,7 +2824,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../registryproperty/" class="md-nav__link">
+      <a href="../../reference/types/registryproperty/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2753,7 +2845,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reliablemessage/" class="md-nav__link">
+      <a href="../../reference/types/reliablemessage/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2774,7 +2866,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reliablemessageack/" class="md-nav__link">
+      <a href="../../reference/types/reliablemessageack/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2795,7 +2887,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../schema/" class="md-nav__link">
+      <a href="../../reference/types/schema/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2816,7 +2908,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../simpletypes/" class="md-nav__link">
+      <a href="../../reference/types/simpletypes/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2837,7 +2929,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../state/" class="md-nav__link">
+      <a href="../../reference/types/state/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2858,7 +2950,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../stateconfirm/" class="md-nav__link">
+      <a href="../../reference/types/stateconfirm/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2879,7 +2971,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../stateconfirmrecord/" class="md-nav__link">
+      <a href="../../reference/types/stateconfirmrecord/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2900,7 +2992,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../statelock/" class="md-nav__link">
+      <a href="../../reference/types/statelock/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2921,7 +3013,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../statespend/" class="md-nav__link">
+      <a href="../../reference/types/statespend/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2942,7 +3034,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../statespendrecord/" class="md-nav__link">
+      <a href="../../reference/types/statespendrecord/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2963,7 +3055,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../statestatusqualifier/" class="md-nav__link">
+      <a href="../../reference/types/statestatusqualifier/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2984,7 +3076,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../storedabi/" class="md-nav__link">
+      <a href="../../reference/types/storedabi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3005,7 +3097,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../transaction/" class="md-nav__link">
+      <a href="../../reference/types/transaction/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3026,7 +3118,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../transactioncall/" class="md-nav__link">
+      <a href="../../reference/types/transactioncall/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3047,7 +3139,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../transactionfull/" class="md-nav__link">
+      <a href="../../reference/types/transactionfull/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3068,7 +3160,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../transactioninput/" class="md-nav__link">
+      <a href="../../reference/types/transactioninput/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3089,7 +3181,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../transactionreceipt/" class="md-nav__link">
+      <a href="../../reference/types/transactionreceipt/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3110,7 +3202,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../transactionreceiptfilters/" class="md-nav__link">
+      <a href="../../reference/types/transactionreceiptfilters/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3131,7 +3223,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../transactionreceiptfull/" class="md-nav__link">
+      <a href="../../reference/types/transactionreceiptfull/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3152,7 +3244,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../transactionreceiptlistener/" class="md-nav__link">
+      <a href="../../reference/types/transactionreceiptlistener/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3173,7 +3265,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../transactionreceiptlisteneroptions/" class="md-nav__link">
+      <a href="../../reference/types/transactionreceiptlisteneroptions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3194,7 +3286,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../transactionstates/" class="md-nav__link">
+      <a href="../../reference/types/transactionstates/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3267,7 +3359,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../crds/core.paladin.io/" class="md-nav__link">
+      <a href="../../reference/crds/core.paladin.io/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3296,7 +3388,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../architecture/" class="md-nav__link">
+      <a href="../../reference/architecture/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3317,7 +3409,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../commands/" class="md-nav__link">
+      <a href="../../reference/commands/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3338,7 +3430,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../roadmap/" class="md-nav__link">
+      <a href="../../reference/roadmap/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3416,7 +3508,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/how-to-contribute/" class="md-nav__link">
+      <a href="../../contributing/how-to-contribute/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3437,7 +3529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/reporting-a-bug/" class="md-nav__link">
+      <a href="../../contributing/reporting-a-bug/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3458,7 +3550,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/requesting-a-change/" class="md-nav__link">
+      <a href="../../contributing/requesting-a-change/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3479,7 +3571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/asking-a-question/" class="md-nav__link">
+      <a href="../../contributing/asking-a-question/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3507,7 +3599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../faqs/" class="md-nav__link">
+      <a href="../../faqs/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3527,7 +3619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../glossary/" class="md-nav__link">
+      <a href="../../glossary/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3557,6 +3649,8 @@
   
   
   
+    
+  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -3565,20 +3659,110 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
-      Example
+      Overview
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#field-descriptions" class="md-nav__link">
+  <a href="#log-level-configuration" class="md-nav__link">
     <span class="md-ellipsis">
-      Field Descriptions
+      Log Level Configuration
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Log Level Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setting-log-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting Log Levels
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#available-log-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Available Log Levels
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#log-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Log Structure
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Log Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#component-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Component Reference
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kubernetes-log-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      Kubernetes Log Filtering
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Kubernetes Log Filtering">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-log-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Log Filtering
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filtering-by-log-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Filtering by Log Level
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#real-time-log-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      Real-time Log Monitoring
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3600,63 +3784,195 @@
   
 
 
-  <h1>BlockchainEventListener</h1>
-
-<h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">&quot;created&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">&quot;started&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">&quot;sources&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">&quot;options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">}</span>
+<h1 id="logging-guide">Logging Guide<a class="headerlink" href="#logging-guide" title="Permanent link">&para;</a></h1>
+<p>This guide covers Paladin's logging system, including component-based logging and how to filter logs in Kubernetes environments.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>Paladin uses structured logging with component-based context to provide clear visibility into system operations. Each log entry includes a <code>component</code> field that identifies which part of the system generated the log message.</p>
+<h2 id="log-level-configuration">Log Level Configuration<a class="headerlink" href="#log-level-configuration" title="Permanent link">&para;</a></h2>
+<h3 id="setting-log-levels">Setting Log Levels<a class="headerlink" href="#setting-log-levels" title="Permanent link">&para;</a></h3>
+<p>Log levels are configured in the YAML configuration file under the <code>log</code> section.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">log</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug</span>
 </code></pre></div>
-<h3 id="field-descriptions">Field Descriptions<a class="headerlink" href="#field-descriptions" title="Permanent link">&para;</a></h3>
+<h3 id="available-log-levels">Available Log Levels<a class="headerlink" href="#available-log-levels" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
-<th>Field Name</th>
+<th>Level</th>
 <th>Description</th>
-<th>Type</th>
+<th>Use Case</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>name</code></td>
-<td>Unique name for the blockchain event listener</td>
-<td><code>string</code></td>
+<td><code>trace</code></td>
+<td>Most detailed information for debugging</td>
+<td>Detailed tracing of function calls and internal operations</td>
 </tr>
 <tr>
-<td><code>created</code></td>
-<td>Time the listener was created</td>
-<td><a href="../simpletypes/#timestamp"><code>Timestamp</code></a></td>
+<td><code>debug</code></td>
+<td>Detailed information for debugging</td>
+<td>Development and troubleshooting</td>
 </tr>
 <tr>
-<td><code>started</code></td>
-<td>If the listener is started - can be set to false to disable delivery server-side</td>
-<td><code>bool</code></td>
+<td><code>info</code></td>
+<td>General information about system operation</td>
+<td>Normal operation monitoring</td>
 </tr>
 <tr>
-<td><code>sources</code></td>
-<td>Sources of events</td>
-<td><a href="../blockchaineventlistenersource/#blockchaineventlistenersource"><code>BlockchainEventListenerSource[]</code></a></td>
+<td><code>warn</code></td>
+<td>Warning messages for potentially harmful situations</td>
+<td>Issues that don't stop operation</td>
 </tr>
 <tr>
-<td><code>options</code></td>
-<td>Options for the event listener</td>
-<td><a href="../blockchaineventlisteneroptions/#blockchaineventlisteneroptions"><code>BlockchainEventListenerOptions</code></a></td>
+<td><code>error</code></td>
+<td>Error messages for failed operations</td>
+<td>Critical issues requiring attention</td>
 </tr>
 </tbody>
 </table>
+<h2 id="log-structure">Log Structure<a class="headerlink" href="#log-structure" title="Permanent link">&para;</a></h2>
+<p>Paladin logs are structured text with the following key fields:</p>
+<ul>
+<li><strong><code>timestamp</code></strong>: ISO 8601 timestamp in brackets <code>[2025-09-16T14:02:51.439Z]</code></li>
+<li><strong><code>level</code></strong>: Log level (TRACE, DEBUG, INFO, WARN, ERROR)</li>
+<li><strong><code>message</code></strong>: Human-readable log message</li>
+<li><strong><code>component</code></strong>: Identifies the system component (see table below)</li>
+<li><strong><code>pid</code></strong>: Process ID</li>
+<li><strong><code>role</code></strong>: Additional context about the operation role</li>
+<li><strong>Additional fields</strong>: Component-specific context (transaction IDs, addresses, etc.)</li>
+</ul>
+<h3 id="component-reference">Component Reference<a class="headerlink" href="#component-reference" title="Permanent link">&para;</a></h3>
+<p>The following table lists all components that are included in Paladin logs based on actual <code>log.WithComponent</code> calls in the codebase:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>blockindexer</code></td>
+<td>Monitors blockchain events and indexes transactions</td>
+</tr>
+<tr>
+<td><code>domainmanager</code></td>
+<td>Manages domain plugins and smart contracts</td>
+</tr>
+<tr>
+<td><code>evmregistry</code></td>
+<td>EVM-based registry implementation</td>
+</tr>
+<tr>
+<td><code>examplesigningmodule</code></td>
+<td>Example signing module for testing</td>
+</tr>
+<tr>
+<td><code>grpctransport</code></td>
+<td>gRPC-based transport implementation</td>
+</tr>
+<tr>
+<td><code>groupmanager</code></td>
+<td>Group management system</td>
+</tr>
+<tr>
+<td><code>identityresolver</code></td>
+<td>Identity resolution service</td>
+</tr>
+<tr>
+<td><code>keymanager</code></td>
+<td>Key management system</td>
+</tr>
+<tr>
+<td><code>keyresolver</code></td>
+<td>Key resolution utilities</td>
+</tr>
+<tr>
+<td><code>noto</code></td>
+<td>Noto domain implementation</td>
+</tr>
+<tr>
+<td><code>pluginmanager</code></td>
+<td>Plugin management system</td>
+</tr>
+<tr>
+<td><code>privatetxnmanager</code></td>
+<td>Private transaction manager</td>
+</tr>
+<tr>
+<td><code>publictxnmanager</code></td>
+<td>Public transaction manager</td>
+</tr>
+<tr>
+<td><code>registrymanager</code></td>
+<td>Registry management system</td>
+</tr>
+<tr>
+<td><code>schema</code></td>
+<td>Schema management utilities</td>
+</tr>
+<tr>
+<td><code>statemanager</code></td>
+<td>State management system</td>
+</tr>
+<tr>
+<td><code>staticregistry</code></td>
+<td>Static registry implementation</td>
+</tr>
+<tr>
+<td><code>transportmanager</code></td>
+<td>Transport management system</td>
+</tr>
+<tr>
+<td><code>txmanager</code></td>
+<td>Transaction manager</td>
+</tr>
+<tr>
+<td><code>zeto</code></td>
+<td>Zeto domain implementation</td>
+</tr>
+</tbody>
+</table>
+<h2 id="kubernetes-log-filtering">Kubernetes Log Filtering<a class="headerlink" href="#kubernetes-log-filtering" title="Permanent link">&para;</a></h2>
+<h3 id="basic-log-filtering">Basic Log Filtering<a class="headerlink" href="#basic-log-filtering" title="Permanent link">&para;</a></h3>
+<p>To filter logs by component in Kubernetes:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Filter logs for a specific component</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;component=txmanager&quot;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Filter logs for multiple components</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">&quot;component=(txmanager|statemanager)&quot;</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Filter logs excluding certain components</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;component=retry&quot;</span>
+</code></pre></div>
+<h3 id="filtering-by-log-level">Filtering by Log Level<a class="headerlink" href="#filtering-by-log-level" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Show only error logs</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w">  </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;ERROR&quot;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Show warnings and errors</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w">  </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">&quot;(WARN|ERROR)&quot;</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Exclude debug logs</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w">  </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;DEBUG&quot;</span>
+</code></pre></div>
+<h3 id="real-time-log-monitoring">Real-time Log Monitoring<a class="headerlink" href="#real-time-log-monitoring" title="Permanent link">&para;</a></h3>
+<p>For real-time monitoring of specific components:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Follow logs for transaction manager in real-time</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;component=txmanager&quot;</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Follow error logs from all components</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;ERROR&quot;</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Follow logs for multiple components</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">&quot;component=(txmanager|statemanager|domainmanager)&quot;</span>
+</code></pre></div>
 
 
 
 
 
 
-
-  
-  
 
 
 
@@ -3682,7 +3998,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../abidecodeddata/" class="md-footer__link md-footer__link--prev" aria-label="Previous: ABIDecodedData">
+          <a href="../l1-and-l2-chains/" class="md-footer__link md-footer__link--prev" aria-label="Previous: L1 and L2 Chains">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3692,20 +4008,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                ABIDecodedData
+                L1 and L2 Chains
               </div>
             </div>
           </a>
         
         
           
-          <a href="../blockchaineventlistenercheckpoint/" class="md-footer__link md-footer__link--next" aria-label="Next: BlockchainEventListenerCheckpoint">
+          <a href="../../reference/apis/bidx/" class="md-footer__link md-footer__link--next" aria-label="Next: bidx_*">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                BlockchainEventListenerCheckpoint
+                bidx_*
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -3734,10 +4050,10 @@
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../../..", "features": ["content.code.copy", "navigation.expand", "navigation.footer", "navigation.instant", "navigation.tabs", "navigation.tabs.sticky", "navigation.sidebar", "navigation.tracking", "navigation.path", "navigation.indexes"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy", "navigation.expand", "navigation.footer", "navigation.instant", "navigation.tabs", "navigation.tabs.sticky", "navigation.sidebar", "navigation.tracking", "navigation.path", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.83f73b43.min.js"></script>
+      <script src="../../assets/javascripts/bundle.83f73b43.min.js"></script>
       
     
   </body>
