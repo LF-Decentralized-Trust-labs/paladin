@@ -26,7 +26,6 @@ jobs:
         with:
           # Fetch all history and tags to build the full upgrade path.
           fetch-depth: 0
-          ref: ${{ github.ref }}
           fetch-tags: true
       - name: Get all previous release tags
         id: get_tags
@@ -150,7 +149,7 @@ jobs:
           
           # We check out the new tag here primarily to validate the new chart installation
           # with the corresponding version of the validation script.
-          git checkout main
+          git checkout ${{ github.sha }}
           IMAGE_TAG="$NEW_TAG" ./scripts/default-installation-validation.sh paladin
 
           echo "--- Verifying Backwards Compatibility ---"
@@ -185,7 +184,7 @@ jobs:
         run: |
           NEW_TAG="${{ inputs.new_tag }}"
           echo "--- Testing Release Candidate $NEW_TAG ---"
-          git checkout ${{ github.ref }}
+          git checkout ${{ github.sha }}
           
           RUN_COMMANDS=start,verify BUILD_PALADIN_SDK=true BUILD_PALADIN_ABI=true ./scripts/run-examples.sh
           
