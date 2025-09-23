@@ -149,6 +149,8 @@ jobs:
   # Only create the RC release after all tests have passed
   # This step bundles all built artifacts and creates the GitHub release
   create-rc-release:
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     needs: [setup]
     runs-on: ubuntu-latest
     steps:
@@ -192,7 +194,6 @@ jobs:
           generate_release_notes: true
           make_latest: "false" # RC releases are never marked as latest
           prerelease: true
-          draft: true
           # files: |
           #   helm-artifacts/basenet.yaml
           #   helm-artifacts/customnet.yaml
@@ -201,5 +202,3 @@ jobs:
           #   helm-artifacts/artifacts.tar.gz
           #   contracts/abis.tar.gz
           #   contracts/zeto-abis.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
