@@ -183,6 +183,11 @@ jobs:
     needs: [setup, release-solidity-contracts, release-typescript-sdk]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - name: Download Helm artifacts
         uses: actions/download-artifact@v4
         with:
@@ -204,6 +209,15 @@ jobs:
         with:
           sdk_version: ${{ needs.setup.outputs.tag }}
 
+      - name: Commit changes
+        id: commit
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add examples/
+          git commit -m "chore: Update SDK version in examples to ${{ needs.setup.outputs.tag }}"
+          echo "NEW_SHA=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+  
       - name: Create final release with all artifacts
         uses: softprops/action-gh-release@v2
         with:
