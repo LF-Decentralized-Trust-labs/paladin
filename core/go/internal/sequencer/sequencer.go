@@ -119,7 +119,7 @@ func (sMgr *sequencerManager) OnNewBlockHeight(ctx context.Context, blockHeight 
 // Synchronous function to submit a deployment request which is asynchronously processed
 // Private transaction manager will receive a notification when the public transaction is confirmed
 // (same as for invokes)
-func (sMgr *sequencerManager) handleDeployTx(ctx context.Context, tx *components.PrivateContractDeploy) error {
+func (sMgr *sequencerManager) handleDeployTx(ctx context.Context, dbTX persistence.DBTX, tx *components.PrivateContractDeploy) error {
 	log.L(ctx).Debugf("[Sequencer] handling new private contract deploy transaction: %v", tx)
 	if tx.Domain == "" {
 		return i18n.NewError(ctx, msgs.MsgDomainNotProvided)
@@ -133,6 +133,8 @@ func (sMgr *sequencerManager) handleDeployTx(ctx context.Context, tx *components
 		return i18n.WrapError(ctx, err, msgs.MsgDomainNotFound, tx.Domain)
 	}
 
+	// MRW TODO - should we retrieve the privacy group members here in order to use them to
+	// decide on the next active coordinator?
 	err = domain.InitDeploy(ctx, tx)
 	if err != nil {
 		return i18n.WrapError(ctx, err, msgs.MsgDeployInitFailed)
@@ -141,12 +143,12 @@ func (sMgr *sequencerManager) handleDeployTx(ctx context.Context, tx *components
 	// this is a transaction that will confirm just like invoke transactions
 	// unlike invoke transactions, we don't yet have the sequencer thread to dispatch to so we start a new go routine for each deployment
 	// TODO - should have a pool of deployment threads? Maybe size of pool should be one? Or at least one per domain?
-	go sMgr.deploymentLoop(log.WithLogField(sMgr.ctx, "role", "deploy-loop"), domain, tx)
+	go sMgr.deploymentLoop(log.WithLogField(sMgr.ctx, "role", "deploy-loop"), dbTX, domain, tx)
 
 	return nil
 }
 
-func (sMgr *sequencerManager) deploymentLoop(ctx context.Context, domain components.Domain, tx *components.PrivateContractDeploy) {
+func (sMgr *sequencerManager) deploymentLoop(ctx context.Context, dbTX persistence.DBTX, domain components.Domain, tx *components.PrivateContractDeploy) {
 	log.L(ctx).Info("[Sequencer] starting deployment loop")
 
 	var err error
@@ -154,6 +156,7 @@ func (sMgr *sequencerManager) deploymentLoop(ctx context.Context, domain compone
 	// Resolve keys synchronously on this go routine so that we can return an error if any key resolution fails
 	tx.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.RequiredVerifiers))
 	for i, v := range tx.RequiredVerifiers {
+		fmt.Printf("Resolving verifier %+v\n", v)
 		// TODO: This is a synchronous cross-node exchange, done sequentially for each verifier.
 		// Potentially needs to move to an event-driven model like on invocation.
 		verifier, resolveErr := sMgr.components.IdentityResolver().ResolveVerifier(ctx, v.Lookup, v.Algorithm, v.VerifierType)
@@ -176,6 +179,7 @@ func (sMgr *sequencerManager) deploymentLoop(ctx context.Context, domain compone
 		log.L(ctx).Errorf("[Sequencer] error evaluating deployment: %s", err)
 		return
 	}
+
 	log.L(ctx).Info("[Sequencer] deployment completed successfully. ")
 }
 
@@ -292,7 +296,8 @@ func (sMgr *sequencerManager) HandleNewTx(ctx context.Context, dbTX persistence.
 		if txi.Transaction.SubmitMode.V() != pldapi.SubmitModeAuto {
 			return i18n.NewError(ctx, msgs.MsgPrivateTxMgrPrepareNotSupportedDeploy)
 		}
-		return sMgr.handleDeployTx(ctx, &components.PrivateContractDeploy{
+		fmt.Printf("Node %s handling deploy transaction %s\n", sMgr.nodeName, tx.ID)
+		return sMgr.handleDeployTx(ctx, dbTX, &components.PrivateContractDeploy{
 			ID:     *tx.ID,
 			Domain: tx.Domain,
 			From:   tx.From,
@@ -312,7 +317,6 @@ func (sMgr *sequencerManager) HandleNewTx(ctx context.Context, dbTX persistence.
 		Domain:  tx.Domain,
 		Address: *tx.To,
 		Intent:  intent,
-		//Signer:  tx.From, // MRW TODO - I don't think there's ever a need to do this
 	}, &txi.ResolvedTransaction)
 }
 
@@ -392,33 +396,33 @@ func (sMgr *sequencerManager) DistributeStates(ctx context.Context, stateDistrib
 		log.L(sMgr.ctx).Infof("Distributing state %+v to node %s", sd, sd.StateDistribution.IdentityLocator)
 	}
 
-	preparedReliableMsgs := make([]*pldapi.ReliableMessage, 0, len(stateDistributions))
+	// preparedReliableMsgs := make([]*pldapi.ReliableMessage, 0, len(stateDistributions))
 
-	for _, stateDistribution := range stateDistributions {
-		node, _ := pldtypes.PrivateIdentityLocator(stateDistribution.IdentityLocator).Node(ctx, false)
-		log.L(sMgr.ctx).Infof("State distribution node %s", node)
-		preparedReliableMsgs = append(preparedReliableMsgs, &pldapi.ReliableMessage{
-			Node:        node,
-			MessageType: pldapi.RMTState.Enum(),
-			Metadata:    pldtypes.JSONString(stateDistribution),
-		})
-		sMgr.components.TransportManager().Send(ctx, &components.FireAndForgetMessageSend{
-			Node:        node,
-			MessageType: string(pldapi.RMTState),
-			Payload:     pldtypes.JSONString(stateDistribution),
-		})
-	}
+	// for _, stateDistribution := range stateDistributions {
+	// 	node, _ := pldtypes.PrivateIdentityLocator(stateDistribution.IdentityLocator).Node(ctx, false)
+	// 	log.L(sMgr.ctx).Infof("State distribution node %s", node)
+	// 	preparedReliableMsgs = append(preparedReliableMsgs, &pldapi.ReliableMessage{
+	// 		Node:        node,
+	// 		MessageType: pldapi.RMTState.Enum(),
+	// 		Metadata:    pldtypes.JSONString(stateDistribution),
+	// 	})
+	// 	sMgr.components.TransportManager().Send(ctx, &components.FireAndForgetMessageSend{
+	// 		Node:        node,
+	// 		MessageType: string(pldapi.RMTState),
+	// 		Payload:     pldtypes.JSONString(stateDistribution),
+	// 	})
+	// }
 
-	log.L(sMgr.ctx).Infof("Sending %d state distributions to %d nodes", len(stateDistributions), len(preparedReliableMsgs))
+	// log.L(sMgr.ctx).Infof("Sending %d state distributions to %d nodes", len(stateDistributions), len(preparedReliableMsgs))
 
-	// MRW TODO - assess db TX handling within state machine
-	err := sMgr.components.Persistence().Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
-		err = sMgr.components.TransportManager().SendReliable(ctx, dbTX, preparedReliableMsgs...)
-		return err
-	})
-	if err != nil {
-		log.L(sMgr.ctx).Errorf("Error sending state distributions: %s", err)
-	}
+	// // MRW TODO - assess db TX handling within state machine
+	// err := sMgr.components.Persistence().Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
+	// 	err = sMgr.components.TransportManager().SendReliable(ctx, dbTX, preparedReliableMsgs...)
+	// 	return err
+	// })
+	// if err != nil {
+	// 	log.L(sMgr.ctx).Errorf("Error sending state distributions: %s", err)
+	// }
 }
 
 func (sMgr *sequencerManager) GetBlockHeight() int64 {
@@ -546,7 +550,12 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 	// on chain, so in in this context we will assume we have the private TX in memory from which we can determine the originating node for confirmation events.
 
 	contractAddress := pldtypes.EthAddress{}
-	if confirmedTxn.PSC != nil {
+	deploy := confirmedTxn.ReceiptInput.ContractAddress != nil
+	if deploy {
+		// Creation of a new contract
+		contractAddress = *confirmedTxn.ReceiptInput.ContractAddress
+	} else {
+		// Invoke of an existing contract
 		contractAddress = confirmedTxn.PSC.Address()
 	}
 
@@ -554,41 +563,46 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 
 	sequencer, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), contractAddress, nil, nil)
 	if err != nil {
-		// MRW TODO - deploys happen without a dedicated sequencer, so this isn't a hard error. We ought
-		// to validate if the transaction being confirmed is a deploy, but leaving as-is for now.
-		log.L(sMgr.ctx).Warnf("[Sequencer] failed to obtain sequencer to pass transaction confirmed event to %v:", err)
+		// MRW TODO - this should be a hard error now?
+		log.L(sMgr.ctx).Errorf("[Sequencer] failed to obtain sequencer to pass transaction confirmed event to %v:", err)
 		return err
 	}
 
 	if sequencer != nil {
-		mtx := sequencer.GetCoordinator().GetTransactionByID(ctx, confirmedTxn.TransactionID)
-		if mtx == nil {
-			return fmt.Errorf("[Sequencer] coordinator not tracking transaction ID %s", confirmedTxn.TransactionID)
+		if !deploy {
+			mtx := sequencer.GetCoordinator().GetTransactionByID(ctx, confirmedTxn.TransactionID)
+			if mtx == nil {
+				return fmt.Errorf("[Sequencer] coordinator not tracking transaction ID %s", confirmedTxn.TransactionID)
+			}
+
+			log.L(sMgr.ctx).Infof("[Sequencer] handing TX confirmed event to coordinator")
+
+			if from == nil {
+				return fmt.Errorf("[Sequencer] nil From address for confirmed transaction %s", confirmedTxn.TransactionID)
+			}
+
+			confirmedEvent := &coordinator.TransactionConfirmedEvent{
+				TxID:         confirmedTxn.TransactionID,
+				From:         from, // The base ledger signing address
+				Hash:         confirmedTxn.ReceiptInput.OnChain.TransactionHash,
+				RevertReason: confirmedTxn.ReceiptInput.RevertData,
+				Nonce:        nonce,
+			}
+			confirmedEvent.EventTime = time.Now()
+
+			coordErr := sequencer.GetCoordinator().QueueEvent(ctx, confirmedEvent)
+			if coordErr != nil {
+				return coordErr
+			}
+
+			// Forward the event to the sending node
+			transportWriter := sequencer.GetTransportWriter()
+			transportWriter.SendTransactionConfirmed(ctx, confirmedTxn.TransactionID, mtx.SenderNode(), &contractAddress, nonce, confirmedTxn.ReceiptInput.RevertData)
+		} else {
+			// For a deploy we won't have tracked the transaction through the state machine, but we can load it ready for upcoming transactions and start
+			// of with ourselves as the active coordinator
+			sequencer.GetCoordinator().SetActiveCoordinatorNode(ctx, sMgr.nodeName)
 		}
-
-		log.L(sMgr.ctx).Infof("[Sequencer] handing TX confirmed event to coordinator")
-
-		if from == nil {
-			return fmt.Errorf("[Sequencer] nil From address for confirmed transaction %s", confirmedTxn.TransactionID)
-		}
-
-		confirmedEvent := &coordinator.TransactionConfirmedEvent{
-			TxID:         confirmedTxn.TransactionID,
-			From:         from, // The base ledger signing address
-			Hash:         confirmedTxn.ReceiptInput.OnChain.TransactionHash,
-			RevertReason: confirmedTxn.ReceiptInput.RevertData,
-			Nonce:        nonce,
-		}
-		confirmedEvent.EventTime = time.Now()
-
-		coordErr := sequencer.GetCoordinator().QueueEvent(ctx, confirmedEvent)
-		if coordErr != nil {
-			return coordErr
-		}
-
-		// Forward the event to the sending node
-		transportWriter := sequencer.GetTransportWriter()
-		transportWriter.SendTransactionConfirmed(ctx, confirmedTxn.TransactionID, mtx.SenderNode(), &contractAddress, nonce, confirmedTxn.ReceiptInput.RevertData)
 
 	}
 	sMgr.metrics.IncConfirmedTransactions()
@@ -597,6 +611,7 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 }
 
 func (sMgr *sequencerManager) HandleTransactionFailed(ctx context.Context, dbTX persistence.DBTX, confirms []*components.PublicTxMatch) error {
+	log.L(sMgr.ctx).Infof("[Sequencer] handling transaction failed for %d transactions", len(confirms))
 	// MRW TODO - populate failure receipts and distribute to sequencer
 	privateFailureReceipts := make([]*components.ReceiptInputWithOriginator, len(confirms))
 

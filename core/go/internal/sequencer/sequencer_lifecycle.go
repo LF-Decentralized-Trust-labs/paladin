@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
@@ -38,33 +39,22 @@ import (
 	"github.com/google/uuid"
 )
 
+// Callback for the sender TX state machine to emit events back into the sequencer
 func (seq *sequencer) senderEventHandler(event common.Event) {
-	log.L(seq.ctx).Debugf("[Sequencer] handing off TX-emitted event to sequencer sender: %+v", event)
 	seq.sender.ProcessEvent(seq.ctx, event)
 }
 
+// Callback for the sender TX state machine to emit events back into the sequencer
 func (seq *sequencer) coordinatorEventHandler(event common.Event) {
-	log.L(seq.ctx).Debugf("[Sequencer] handing off TX-emitted event to sequencer coordinator: %+v", event)
 	seq.coordinator.ProcessEvent(seq.ctx, event)
 }
 
+// Components needing to interact with the sequencer can make certain calls into
+// the coordinator, the originator, or the transport writer
 type Sequencer interface {
 	GetCoordinator() coordinator.SeqCoordinator
 	GetSender() sender.SeqSender
 	GetTransportWriter() transport.TransportWriter
-}
-
-type sequencer struct {
-	ctx               context.Context
-	sender            sender.SeqSender
-	transportWriter   transport.TransportWriter
-	coordinator       coordinator.SeqCoordinator
-	contractAddress   string
-	lastTXTime        time.Time
-	senderEvents      chan common.Event
-	coordinatorEvents chan common.Event
-	closeEventHandler context.CancelFunc
-	// lastCallTime time.Time // MRW TODO - this isn't really a sequencer-relevant metric?
 }
 
 func (seq *sequencer) GetCoordinator() coordinator.SeqCoordinator {
@@ -79,6 +69,26 @@ func (seq *sequencer) GetTransportWriter() transport.TransportWriter {
 	return seq.transportWriter
 }
 
+// An instance of a sequencer (one instance per domain contract)
+type sequencer struct {
+	ctx context.Context
+
+	// The 3 main components of the sequencer
+	sender          sender.SeqSender
+	transportWriter transport.TransportWriter
+	coordinator     coordinator.SeqCoordinator
+
+	// Sequencer attributes
+	contractAddress string
+	lastTXTime      time.Time
+
+	// Channels for passing events into the originator and coordinator event loops respectively
+	senderEvents      chan common.Event
+	coordinatorEvents chan common.Event
+	closeEventHandler context.CancelFunc
+}
+
+// Return the sequencer for the requested contract address, instantiating it first if this is its first use
 func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract, tx *components.PrivateTransaction) (Sequencer, error) {
 	var err error
 	if domainAPI == nil {
@@ -118,7 +128,6 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				log.L(ctx).Debugf("Max concurrent sequencers reached, stopping lowest priority sequencer")
 				sMgr.stopLowestPrioritySequencer(ctx)
 			}
-
 			sMgr.metrics.SetActiveSequencers(len(sMgr.sequencers))
 
 			if tx == nil {
@@ -132,21 +141,25 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				log.L(ctx).Errorf("[Sequencer] failed to get domain API for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
-			senderNodePool, err := sMgr.getInitialSenderNodePool(ctx, tx, domainAPI)
-
-			if err != nil {
-				log.L(ctx).Errorf("[Sequencer] failed to get transaction committee for contract %s: %s", contractAddr.String(), err)
-				return nil, err
-			}
 
 			if domainAPI == nil {
 				err := i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "No domain provided to create sequencer")
 				log.L(ctx).Error(err)
 				return nil, err
 			}
+
+			senderNodePool, err := sMgr.getInitialSenderNodePool(ctx, tx, domainAPI)
+			if err != nil {
+				log.L(ctx).Errorf("[Sequencer] failed to get transaction sender node pool for contract %s: %s", contractAddr.String(), err)
+				return nil, err
+			}
+
+			// Create a new domain context for the sequencer. This will be re-used for the lifetime of the sequencer
 			dCtx := sMgr.components.StateManager().NewDomainContext(sMgr.ctx, domainAPI.Domain(), contractAddr)
 
+			// Create a transport writer for the sequencer to communicate with sequencers on other peers
 			transportWriter := transport.NewTransportWriter(&contractAddr, sMgr.nodeName, sMgr.components.TransportManager(), sMgr.HandlePaladinMsg)
+
 			sMgr.engineIntegration = common.NewEngineIntegration(sMgr.ctx, sMgr.components, sMgr.nodeName, domainAPI, dCtx, sMgr, sMgr)
 
 			sequencer := &sequencer{
@@ -407,11 +420,20 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				return nil, err
 			}
 
-			// Until anything changes, start by setting the sender's delegate to the initial choice of coordinator
-			sender.SetActiveCoordinator(sMgr.ctx, coordinator.GetActiveCoordinatorNode(sMgr.ctx))
+			// Start by populating the pool of originators with the endorsers of this transaction. At this point
+			// we don't have anything else to use to determine who our candidate coordinators are.
+			if tx != nil && tx.PreAssembly != nil && tx.PreAssembly.RequiredVerifiers != nil {
+				for _, verifiers := range tx.PreAssembly.RequiredVerifiers {
+					if strings.Contains(verifiers.Lookup, "@") {
+						parts := strings.Split(verifiers.Lookup, "@")
+						coordinator.UpdateSenderNodePool(ctx, parts[1])
+					}
+				}
 
-			log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("created  | %s", contractAddr.String())
-			//log.L(ctx).Infof("[SeqLifecycle] | created | %s", contractAddr.String())
+				// Get the best candidate for an initial coordinator, and use as the delegate for any originated transactions
+				sender.SetActiveCoordinator(sMgr.ctx, coordinator.GetActiveCoordinatorNode(sMgr.ctx))
+			}
+
 			sequencer.sender = sender
 			sequencer.coordinator = coordinator
 			sMgr.sequencers[contractAddr.String()] = sequencer
@@ -419,6 +441,24 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			if tx != nil {
 				sMgr.sequencers[contractAddr.String()].lastTXTime = time.Now()
 			}
+
+			log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("created  | %s", contractAddr.String())
+		}
+	} else {
+		// MRW TODO - move to a common function
+		// We already have a sequencer initialized but we might not have an initial coordinator selected
+		// Start by populating the pool of originators with the endorsers of this transaction. At this point
+		// we don't have anything else to use to determine who our candidate coordinators are.
+		if tx != nil && tx.PreAssembly != nil && tx.PreAssembly.RequiredVerifiers != nil {
+			for _, verifiers := range tx.PreAssembly.RequiredVerifiers {
+				if strings.Contains(verifiers.Lookup, "@") {
+					parts := strings.Split(verifiers.Lookup, "@")
+					sMgr.sequencers[contractAddr.String()].GetCoordinator().UpdateSenderNodePool(ctx, parts[1])
+				}
+			}
+
+			// Get the best candidate for an initial coordinator, and use as the delegate for any originated transactions
+			sMgr.sequencers[contractAddr.String()].GetSender().SetActiveCoordinator(sMgr.ctx, sMgr.sequencers[contractAddr.String()].GetCoordinator().GetActiveCoordinatorNode(sMgr.ctx))
 		}
 	}
 
