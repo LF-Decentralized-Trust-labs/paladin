@@ -27,7 +27,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -112,9 +111,6 @@ type CoordinatorDependencyMocks struct {
 func NewCoordinatorBuilderForTesting(t *testing.T, state State) *CoordinatorBuilderForTesting {
 
 	domainAPI := componentsmocks.NewDomainSmartContract(t)
-	domainAPI.On("ContractConfig").Return(&prototk.ContractConfig{
-		CoordinatorSelection: prototk.ContractConfig_COORDINATOR_ENDORSER,
-	})
 	return &CoordinatorBuilderForTesting{
 		state:     state,
 		domainAPI: domainAPI,

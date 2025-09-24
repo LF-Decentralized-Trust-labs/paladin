@@ -20,9 +20,11 @@ import (
 	"testing"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestCoordinatorTransaction_Initial_ToPooled_OnReceived_IfNoInflightDependencies(t *testing.T) {
@@ -182,6 +184,8 @@ func TestCoordinatorTransaction_Assembling_ToReverted_OnAssembleRevertResponse(t
 
 	txn, mocks := txnBuilder.BuildWithMocks()
 
+	mocks.SyncPoints.(*syncpoints.MockSyncPoints).On("QueueTransactionFinalize", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
 	err := txn.HandleEvent(ctx, &transaction.AssembleRevertResponseEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
 			TransactionID: txn.ID,
@@ -224,6 +228,8 @@ func TestCoordinatorTransaction_Pooled_ToPreAssemblyBlocked_OnDependencyReverted
 		Grapher(grapher).
 		Reverts("some revert reason")
 	txn1, mocks1 := builder1.BuildWithMocks()
+
+	mocks1.SyncPoints.(*syncpoints.MockSyncPoints).On("QueueTransactionFinalize", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	builder2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Pooled).
 		Grapher(grapher).
