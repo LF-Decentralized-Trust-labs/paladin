@@ -22,6 +22,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -204,7 +205,7 @@ func TestTransaction_RemovesItselfFromGrapher(t *testing.T) {
 }
 
 type transactionDependencyMocks struct {
-	messageSender     *MockMessageSender
+	transportWriter   *transport.MockTransportWriter
 	clock             *common.FakeClockForTesting
 	engineIntegration *common.MockEngineIntegration
 	syncPoints        syncpoints.SyncPoints
@@ -215,7 +216,7 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		grapher = NewGrapher(context.Background())
 	}
 	mocks := &transactionDependencyMocks{
-		messageSender:     NewMockMessageSender(t),
+		transportWriter:   transport.NewMockTransportWriter(t),
 		clock:             &common.FakeClockForTesting{},
 		engineIntegration: common.NewMockEngineIntegration(t),
 		syncPoints:        &syncpoints.MockSyncPoints{},
@@ -226,7 +227,7 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		&components.PrivateTransaction{
 			ID: uuid.New(),
 		},
-		mocks.messageSender,
+		mocks.transportWriter,
 		mocks.clock,
 		func(_ common.Event) {},
 		mocks.engineIntegration,

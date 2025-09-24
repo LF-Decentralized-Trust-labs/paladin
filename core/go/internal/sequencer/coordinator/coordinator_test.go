@@ -25,6 +25,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/testutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
@@ -44,7 +45,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentity
 	}
 	metrics := metrics.InitMetrics(context.Background(), prometheus.NewRegistry())
 	mocks := &coordinatorDependencyMocks{
-		messageSender:     NewMockMessageSender(t),
+		transportWriter:   transport.NewMockTransportWriter(t),
 		clock:             &common.FakeClockForTesting{},
 		engineIntegration: common.NewMockEngineIntegration(t),
 		syncPoints:        &syncpoints.MockSyncPoints{},
@@ -57,7 +58,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentity
 		CoordinatorSelection: prototk.ContractConfig_COORDINATOR_ENDORSER,
 	})
 
-	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.messageSender, senderIdentityPool, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1",
+	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.transportWriter, senderIdentityPool, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1",
 		func(context.Context, *transaction.Transaction) {
 			// Not used
 		},
@@ -74,7 +75,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentity
 }
 
 type coordinatorDependencyMocks struct {
-	messageSender     *MockMessageSender
+	transportWriter   *transport.MockTransportWriter
 	clock             *common.FakeClockForTesting
 	engineIntegration *common.MockEngineIntegration
 	emit              common.EmitEvent

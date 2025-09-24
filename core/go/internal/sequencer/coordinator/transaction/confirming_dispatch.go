@@ -46,7 +46,7 @@ func (t *Transaction) sendPreDispatchRequest(ctx context.Context) error {
 		t.pendingPreDispatchRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
 
 			log.L(ctx).Debugf("[Sequencer] Calling SendDispatchConfirmationRequest")
-			return t.messageSender.SendPreDispatchRequest(
+			return t.transportWriter.SendPreDispatchRequest(
 				ctx,
 				t.sender,
 				idempotencyKey,

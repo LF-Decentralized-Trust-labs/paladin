@@ -36,17 +36,17 @@ import (
 )
 
 type TransportWriter interface {
-	SendDelegationRequest(ctx context.Context, coordinatorLocator string, transactions []*components.PrivateTransaction, blockHeight uint64)
+	SendDelegationRequest(ctx context.Context, coordinatorLocator string, transactions []*components.PrivateTransaction, blockHeight uint64) error
 	SendDelegationRequestAcknowledgment(ctx context.Context, delegatingNodeName string, delegationId string, delegateNodeName string, transactionID string) error
 	SendEndorsementRequest(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error
 	SendEndorsementResponse(ctx context.Context, transactionId, idempotencyKey, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, endorsementNam, party, node string) error
 	SendAssembleRequest(ctx context.Context, assemblingNode string, txID uuid.UUID, idempotencyId uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error
-	SendAssembleResponse(ctx context.Context, txID uuid.UUID, assembleRequestId uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string)
-	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress)
-	SendNonceAssigned(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64)
-	SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32)
-	SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes)
-	SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot)
+	SendAssembleResponse(ctx context.Context, txID uuid.UUID, assembleRequestId uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string) error
+	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) error
+	SendNonceAssigned(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64) error
+	SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error
+	SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error
+	SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot) error
 	SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error
 	SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
 	SendDispatched(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
@@ -74,7 +74,7 @@ func (tw *transportWriter) SendDelegationRequest(
 	coordinatorLocator string,
 	transactions []*components.PrivateTransaction,
 	blockHeight uint64,
-) {
+) error {
 	log.L(ctx).Infof("[Sequencer] SendDelegationRequest coordinator locator: %s", coordinatorLocator)
 	log.L(ctx).Infof("[Sequencer] SendDelegationRequest - we currently have %d transactions to handle", len(transactions))
 	for _, transaction := range transactions {
@@ -112,6 +112,7 @@ func (tw *transportWriter) SendDelegationRequest(
 			log.L(ctx).Errorf("[Sequencer] error sending delegationRequest message: %s", err)
 		}
 	}
+	return nil
 }
 
 func (tw *transportWriter) SendDelegationRequestAcknowledgment(
@@ -352,7 +353,7 @@ func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNo
 	return err
 }
 
-func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.UUID, assembleRequestId uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string) {
+func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.UUID, assembleRequestId uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string) error {
 
 	postAssemblyBytes, err := json.Marshal(postAssembly)
 	if err != nil {
@@ -386,9 +387,11 @@ func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.U
 		// Log the error but continue sending to the other recipients
 		log.L(ctx).Errorf("[Sequencer] error sending assemble response to %s: %s", recipient, err)
 	}
+
+	return err
 }
 
-func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) {
+func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) error {
 	if contractAddress == nil {
 		err := fmt.Errorf("Attempt to send handover request without specifying contract address")
 		log.L(ctx).Error(err.Error())
@@ -409,9 +412,11 @@ func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordi
 	}); err != nil {
 		log.L(ctx).Errorf("[Sequencer] error sending handover request message: %s", err)
 	}
+
+	return err
 }
 
-func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID, senderNode string, contractAddress *pldtypes.EthAddress, nonce uint64) {
+func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID, senderNode string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
 	if contractAddress == nil {
 		err := fmt.Errorf("Attempt to send nonce assigned event request without specifying contract address")
 		log.L(ctx).Error(err.Error())
@@ -435,9 +440,11 @@ func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID
 	}); err != nil {
 		log.L(ctx).Errorf("[Sequencer] error sending nonce assigned event: %s", err)
 	}
+
+	return err
 }
 
-func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) {
+func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
 	if contractAddress == nil {
 		err := fmt.Errorf("Attempt to send TX submitted event without specifying contract address")
 		log.L(ctx).Error(err.Error())
@@ -468,9 +475,11 @@ func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uu
 	}); err != nil {
 		log.L(ctx).Errorf("[Sequencer] error sending transaction submitted event: %s", err)
 	}
+
+	return err
 }
 
-func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) {
+func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
 	if contractAddress == nil {
 		err := fmt.Errorf("Attempt to send TX submitted event without specifying contract address")
 		log.L(ctx).Error(err.Error())
@@ -502,9 +511,11 @@ func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uu
 	}); err != nil {
 		log.L(ctx).Errorf("[Sequencer] error sending transaction confirmed event: %s", err)
 	}
+
+	return err
 }
 
-func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot) {
+func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot) error {
 
 	coordinatorSnapshotBytes, err := json.Marshal(coordinatorSnapshot)
 	if err != nil {
@@ -531,6 +542,8 @@ func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string,
 	}); err != nil {
 		log.L(ctx).Errorf("[Sequencer] error sending heartbeat request  message: %s", err)
 	}
+
+	return err
 }
 
 func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {

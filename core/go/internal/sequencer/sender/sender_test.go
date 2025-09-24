@@ -22,6 +22,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/testutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +36,7 @@ func NewSenderForUnitTest(t *testing.T, ctx context.Context, senderIdentityPool 
 		senderIdentityPool = []string{"member1@node1"}
 	}
 	mocks := &senderDependencyMocks{
-		messageSender:     NewMockMessageSender(t),
+		transportWriter:   transport.NewMockTransportWriter(t),
 		clock:             &common.FakeClockForTesting{},
 		engineIntegration: common.NewMockEngineIntegration(t),
 		emit:              func(event common.Event) {},
@@ -44,7 +45,7 @@ func NewSenderForUnitTest(t *testing.T, ctx context.Context, senderIdentityPool 
 	sender, err := NewSender(
 		ctx,
 		"member1@node1",
-		mocks.messageSender,
+		mocks.transportWriter,
 		mocks.clock,
 		mocks.emit,
 		mocks.engineIntegration,
@@ -60,7 +61,7 @@ func NewSenderForUnitTest(t *testing.T, ctx context.Context, senderIdentityPool 
 }
 
 type senderDependencyMocks struct {
-	messageSender     *MockMessageSender
+	transportWriter   *transport.MockTransportWriter
 	clock             *common.FakeClockForTesting
 	engineIntegration *common.MockEngineIntegration
 	emit              common.EmitEvent
