@@ -28,7 +28,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,11 +51,6 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentity
 		emit:              func(event common.Event) {},
 	}
 	mockDomainAPI := componentsmocks.NewDomainSmartContract(t)
-
-	// MRW TODO - it might be good to unit test various coordinator modes
-	mockDomainAPI.On("ContractConfig").Return(&prototk.ContractConfig{
-		CoordinatorSelection: prototk.ContractConfig_COORDINATOR_ENDORSER,
-	})
 
 	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.transportWriter, senderIdentityPool, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1",
 		func(context.Context, *transaction.Transaction) {

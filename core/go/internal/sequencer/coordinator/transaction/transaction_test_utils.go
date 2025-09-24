@@ -343,6 +343,7 @@ type transactionDependencyFakes struct {
 	SentMessageRecorder *SentMessageRecorder
 	Clock               *common.FakeClockForTesting
 	EngineIntegration   *common.FakeEngineIntegrationForTesting
+	SyncPoints          syncpoints.SyncPoints
 }
 
 func (b *TransactionBuilderForTesting) BuildWithMocks() (*Transaction, *transactionDependencyFakes) {
@@ -350,6 +351,7 @@ func (b *TransactionBuilderForTesting) BuildWithMocks() (*Transaction, *transact
 		SentMessageRecorder: b.sentMessageRecorder,
 		Clock:               b.fakeClock,
 		EngineIntegration:   b.fakeEngineIntegration,
+		SyncPoints:          b.syncPoints,
 	}
 	return b.Build(), mocks
 }
