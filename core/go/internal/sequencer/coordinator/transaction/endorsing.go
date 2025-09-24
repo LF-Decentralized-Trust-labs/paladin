@@ -172,7 +172,7 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest) error {
 	log.L(ctx).Infof("[Sequencer] coordinator requestEndorsement: number of verifiers %d", len(t.PreAssembly.Verifiers))
 	log.L(ctx).Infof("[Sequencer] coordinator requestEndorsement: number of required verifiers %d", len(t.PreAssembly.RequiredVerifiers))
-	err := t.messageSender.SendEndorsementRequest(
+	err := t.transportWriter.SendEndorsementRequest(
 		ctx,
 		t.ID,
 		idempotencyKey,

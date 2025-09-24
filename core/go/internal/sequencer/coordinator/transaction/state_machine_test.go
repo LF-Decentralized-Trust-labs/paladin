@@ -21,6 +21,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -28,7 +29,7 @@ import (
 func TestStateMachine_InitializeOK(t *testing.T) {
 	ctx := context.Background()
 
-	messageSender := NewMockMessageSender(t)
+	transportWriter := transport.NewMockTransportWriter(t)
 	clock := &common.FakeClockForTesting{}
 	engineIntegration := common.NewMockEngineIntegration(t)
 	syncPoints := &syncpoints.MockSyncPoints{}
@@ -38,7 +39,7 @@ func TestStateMachine_InitializeOK(t *testing.T) {
 		&components.PrivateTransaction{
 			ID: uuid.New(),
 		},
-		messageSender,
+		transportWriter,
 		clock,
 		func(event common.Event) {
 			//don't expect any events during initialize

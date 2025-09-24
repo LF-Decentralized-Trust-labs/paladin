@@ -77,17 +77,17 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 
 func action_SendAssembleRevertResponse(ctx context.Context, txn *Transaction) error {
 	log.L(ctx).Debugf("[Sequencer] sending assemble revert response for transaction %s to %s", txn.ID.String(), txn.currentDelegate)
-	txn.messageSender.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
+	txn.transportWriter.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
 	return nil
 }
 func action_SendAssembleParkResponse(ctx context.Context, txn *Transaction) error {
 	log.L(ctx).Debugf("[Sequencer] sending assemble park response for transaction %s to %s", txn.ID.String(), txn.currentDelegate)
-	txn.messageSender.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
+	txn.transportWriter.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
 	return nil
 }
 
 func action_SendAssembleSuccessResponse(ctx context.Context, txn *Transaction) error {
 	log.L(ctx).Debugf("[Sequencer] sending assemble success response for transaction %s to %s", txn.ID.String(), txn.currentDelegate)
-	txn.messageSender.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
+	txn.transportWriter.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
 	return nil
 }

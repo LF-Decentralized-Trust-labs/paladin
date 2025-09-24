@@ -30,6 +30,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 
@@ -84,7 +85,7 @@ type coordinator struct {
 
 	/* Dependencies */
 	domainAPI          components.DomainSmartContract
-	messageSender      MessageSender
+	transportWriter    transport.TransportWriter
 	clock              common.Clock
 	engineIntegration  common.EngineIntegration
 	syncPoints         syncpoints.SyncPoints
@@ -107,7 +108,7 @@ type coordinator struct {
 func NewCoordinator(
 	ctx context.Context,
 	domainAPI components.DomainSmartContract,
-	messageSender MessageSender,
+	transportWriter transport.TransportWriter,
 	senderNodePool []string,
 	clock common.Clock,
 	emit common.EmitEvent,
@@ -129,7 +130,7 @@ func NewCoordinator(
 		heartbeatIntervalsSinceStateChange: 0,
 		transactionsByID:                   make(map[uuid.UUID]*transaction.Transaction),
 		domainAPI:                          domainAPI,
-		messageSender:                      messageSender,
+		transportWriter:                    transportWriter,
 		blockRangeSize:                     blockRangeSize,
 		contractAddress:                    contractAddress,
 		blockHeightTolerance:               blockHeightTolerance,
@@ -176,7 +177,7 @@ func (c *coordinator) eventLoop(ctx context.Context) error {
 }
 
 func (c *coordinator) sendHandoverRequest(ctx context.Context) {
-	c.messageSender.SendHandoverRequest(ctx, c.activeCoordinatorNode, c.contractAddress)
+	c.transportWriter.SendHandoverRequest(ctx, c.activeCoordinatorNode, c.contractAddress)
 }
 
 func (c *coordinator) GetActiveCoordinatorNode(ctx context.Context) string {
@@ -274,7 +275,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			ctx,
 			sender,
 			txn,
-			c.messageSender,
+			c.transportWriter,
 			c.clock,
 			c.emit,
 			c.engineIntegration,

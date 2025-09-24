@@ -42,9 +42,10 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 	return &SentMessageRecorder{}
 }
 
-func (r *SentMessageRecorder) SendDelegationRequest(ctx context.Context, coordinator string, transactions []*components.PrivateTransaction, sendersBlockHeight uint64) {
+func (r *SentMessageRecorder) SendDelegationRequest(ctx context.Context, coordinator string, transactions []*components.PrivateTransaction, sendersBlockHeight uint64) error {
 	r.delegatedTransactions = transactions
 	r.hasSentDelegationRequest = true
+	return nil
 }
 
 func (r *SentMessageRecorder) HasSentDelegationRequest() bool {

@@ -88,7 +88,7 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 			return err
 		}
 
-		return t.messageSender.SendAssembleRequest(ctx, t.senderNode, t.ID, idempotencyKey, t.PreAssembly, stateLocks, blockHeight)
+		return t.transportWriter.SendAssembleRequest(ctx, t.senderNode, t.ID, idempotencyKey, t.PreAssembly, stateLocks, blockHeight)
 	})
 	t.cancelAssembleTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
 		t.emit(&RequestTimeoutIntervalEvent{

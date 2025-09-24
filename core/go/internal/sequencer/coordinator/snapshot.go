@@ -34,7 +34,7 @@ func (c *coordinator) sendHeartbeat(ctx context.Context, contractAddress *pldtyp
 	for _, node := range c.senderNodePool {
 		// MRW TODO - still don't know where we're sending this
 		log.L(ctx).Infof("[Sequencer] sending heartbeat to %s", node)
-		c.messageSender.SendHeartbeat(ctx, node, contractAddress, snapshot)
+		c.transportWriter.SendHeartbeat(ctx, node, contractAddress, snapshot)
 	}
 	return nil
 }

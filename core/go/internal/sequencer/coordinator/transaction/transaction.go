@@ -25,6 +25,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
@@ -82,7 +83,7 @@ type Transaction struct {
 	finalizingGracePeriod int // number of heartbeat intervals that the transaction will remain in one of the terminal states ( Reverted or Confirmed) before it is removed from memory and no longer reported in heartbeats
 	// Dependencies
 	clock              common.Clock
-	messageSender      MessageSender
+	transportWriter    transport.TransportWriter
 	grapher            Grapher
 	engineIntegration  common.EngineIntegration
 	syncPoints         syncpoints.SyncPoints
@@ -98,7 +99,7 @@ func NewTransaction(
 	ctx context.Context,
 	sender string,
 	pt *components.PrivateTransaction,
-	messageSender MessageSender,
+	transportWriter transport.TransportWriter,
 	clock common.Clock,
 	emit common.EmitEvent,
 	engineIntegration common.EngineIntegration,
@@ -122,7 +123,7 @@ func NewTransaction(
 		senderIdentity:        senderIdentity,
 		senderNode:            senderNode,
 		PrivateTransaction:    pt,
-		messageSender:         messageSender,
+		transportWriter:       transportWriter,
 		clock:                 clock,
 		grapher:               grapher,
 		requestTimeout:        requestTimeout,

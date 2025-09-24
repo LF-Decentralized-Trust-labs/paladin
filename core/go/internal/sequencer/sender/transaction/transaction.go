@@ -23,6 +23,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
@@ -41,7 +42,7 @@ type Transaction struct {
 	stateMachine *StateMachine
 	*components.PrivateTransaction
 	engineIntegration                common.EngineIntegration
-	messageSender                    MessageSender
+	transportWriter                  transport.TransportWriter
 	currentDelegate                  string
 	latestAssembleRequest            *assembleRequestFromCoordinator
 	latestFulfilledAssembleRequestID uuid.UUID
@@ -56,7 +57,7 @@ type Transaction struct {
 func NewTransaction(
 	ctx context.Context,
 	pt *components.PrivateTransaction,
-	messageSender MessageSender,
+	transportWriter transport.TransportWriter,
 	clock common.Clock,
 	emit common.EmitEvent,
 	engineIntegration common.EngineIntegration,
@@ -67,7 +68,7 @@ func NewTransaction(
 		PrivateTransaction: pt,
 		engineIntegration:  engineIntegration,
 		emit:               emit,
-		messageSender:      messageSender,
+		transportWriter:    transportWriter,
 		metrics:            metrics,
 	}
 
