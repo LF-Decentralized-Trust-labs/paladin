@@ -359,9 +359,9 @@ func testConfig(t *testing.T, enableWS bool, configPath string) (pldconf.Paladin
 
 	// For running in this unit test the dirs are different to the sample config
 	// conf.DB.SQLite.DebugQueries = true
-	conf.DB.SQLite.MigrationsDir = "../db/migrations/sqlite"
+	conf.DB.SQLite.MigrationsDir = "../../db/migrations/sqlite"
 	// conf.DB.Postgres.DebugQueries = true
-	conf.DB.Postgres.MigrationsDir = "../db/migrations/postgres"
+	conf.DB.Postgres.MigrationsDir = "../../db/migrations/postgres"
 
 	httpPort, err := getFreePort()
 	require.NoError(t, err, "Error finding a free port for http")

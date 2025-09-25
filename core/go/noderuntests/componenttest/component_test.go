@@ -45,7 +45,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var CONFIG_PATH = "../test/config/sqlite.memory.config.yaml"
+var CONFIG_PATH = "../../test/config/sqlite.memory.config.yaml"
 
 func deployDomainRegistry(t *testing.T) *pldtypes.EthAddress {
 	return testutils.DeployDomainRegistry(t, CONFIG_PATH)
