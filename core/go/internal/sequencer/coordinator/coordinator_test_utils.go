@@ -189,7 +189,6 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		mocks.SentMessageRecorder,
 		b.senderIdentityPool,
 		mocks.Clock,
-		b.emitFunction,
 		mocks.EngineIntegration,
 		mocks.SyncPoints,
 		mocks.Clock.Duration(1000), // Request timeout

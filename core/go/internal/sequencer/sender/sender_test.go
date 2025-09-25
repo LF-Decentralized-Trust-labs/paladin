@@ -47,7 +47,6 @@ func NewSenderForUnitTest(t *testing.T, ctx context.Context, senderIdentityPool 
 		"member1@node1",
 		mocks.transportWriter,
 		mocks.clock,
-		mocks.emit,
 		mocks.engineIntegration,
 		100,
 		pldtypes.RandAddress(),

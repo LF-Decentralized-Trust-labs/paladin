@@ -65,7 +65,6 @@ type sender struct {
 	transportWriter   transport.TransportWriter
 	clock             common.Clock
 	engineIntegration common.EngineIntegration
-	emit              common.EmitEvent
 	metrics           metrics.DistributedSequencerMetrics
 
 	/* Event loop */
@@ -78,7 +77,6 @@ func NewSender(
 	nodeName string,
 	transportWriter transport.TransportWriter,
 	clock common.Clock,
-	emit common.EmitEvent,
 	engineIntegration common.EngineIntegration,
 	blockRangeSize uint64,
 	contractAddress *pldtypes.EthAddress,
@@ -95,7 +93,6 @@ func NewSender(
 		contractAddress:             contractAddress,
 		clock:                       clock,
 		engineIntegration:           engineIntegration,
-		emit:                        emit,
 		heartbeatThresholdMs:        clock.Duration(heartbeatPeriodMs * heartbeatThresholdIntervals),
 		metrics:                     metrics,
 		senderEvents:                make(chan common.Event, 1),
@@ -130,7 +127,7 @@ func (s *sender) propagateEventToTransaction(ctx context.Context, event transact
 }
 
 func (s *sender) createTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
-	newTxn, err := transaction.NewTransaction(ctx, txn, s.transportWriter, s.clock, s.emit, s.engineIntegration, s.metrics)
+	newTxn, err := transaction.NewTransaction(ctx, txn, s.transportWriter, s.ProcessEvent, s.engineIntegration, s.metrics)
 	if err != nil {
 		log.L(ctx).Errorf("[Sequencer] error creating transaction: %v", err)
 		return err

@@ -371,7 +371,9 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		privateTransaction,
 		b.sentMessageRecorder,
 		b.fakeClock,
-		func(_ common.Event) {},
+		func(ctx context.Context, event common.Event) error {
+			return nil
+		},
 		b.fakeEngineIntegration,
 		b.syncPoints,
 		b.fakeClock.Duration(b.requestTimeout),
