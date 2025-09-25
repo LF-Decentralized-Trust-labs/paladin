@@ -41,12 +41,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var CONFIG_PATH = "../../test/config/postgres.config.yaml"
+
 func deployDomainRegistry(t *testing.T) *pldtypes.EthAddress {
-	return testutils.DeployDomainRegistry(t, "../test/config/postgres.config.yaml")
+	return testutils.DeployDomainRegistry(t, CONFIG_PATH)
 }
 
 func newInstanceForComponentTesting(t *testing.T, deployDomainRegistry func(*testing.T) *pldtypes.EthAddress, binding *any, peerNodes []interface{}, domainConfig interface{}, enableWS bool) testutils.ComponentTestInstance {
-	return testutils.NewInstanceForComponentTesting(t, deployDomainRegistry(t), binding, peerNodes, domainConfig, enableWS, "../test/config/postgres.config.yaml")
+	return testutils.NewInstanceForComponentTesting(t, deployDomainRegistry(t), binding, peerNodes, domainConfig, enableWS, CONFIG_PATH)
 }
 
 func subscribeAndSendDataToChannel(ctx context.Context, t *testing.T, wsClient pldclient.PaladinWSClient, listenerName string, data chan string) {

@@ -281,7 +281,32 @@ abstract class ComponentTest extends Exec {
         workingDir '.'
         executable 'go'
         args 'test'
-        args './componenttest', './pkg/testbed'
+        args './noderuntests/componenttest', './pkg/testbed'
+        args '-cover'
+        args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..." // toolkit handled seperately
+        args '-covermode=atomic'
+        args '-timeout=120s'
+        if (project.findProperty('verboseTests') == 'true') {
+            args '-v'
+        }
+        args "-test.gocoverdir=${project.projectDir}/coverage"
+
+        project.helpers.dumpLogsOnFailure(this, ':testinfra:startTestInfra')
+    }
+}
+
+abstract class CoordinationTest extends Exec {
+    CoordinationTest() {
+        inputs.files(project.goFiles)
+        inputs.files(project.fileTree("testbed") {
+            include "**/*.json"
+        })
+        outputs.dir('coverage')
+
+        workingDir '.'
+        executable 'go'
+        args 'test'
+        args './noderuntests/coordinationtest', './pkg/testbed'
         args '-cover'
         args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..." // toolkit handled seperately
         args '-covermode=atomic'
@@ -335,6 +360,15 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [
     mustRunAfter 'unitTestPostgres' // these tests cannot run concurrently
 }
 
+task coordinationTestPostgres(type: CoordinationTest, dependsOn: [
+        makeMocks,
+        ':testinfra:startTestInfra',
+        setupCoverage,
+        goGet,
+        copyContracts, // Ensure this task depends on copying the test contracts
+    ]) {
+}
+
 task buildCoverageTxt(type: Exec, dependsOn: [
         protoc,
         unitTestSQLite,
@@ -370,7 +404,7 @@ task checkCoverage(type: GoCheckCoverage, dependsOn: [aggregateCoverage]) {
 }
 
 task test {
-    finalizedBy checkCoverage
+    dependsOn checkCoverage
 }
 
 task testcov(type: Exec, dependsOn: [test, aggregateCoverage]) {
