@@ -1819,21 +1819,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Funding signing addresses with gas tokens e.g. ETH">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#automatic-funding-of-addresses" class="md-nav__link">
-    <span class="md-ellipsis">
-      Automatic funding of addresses
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
     </ul>
@@ -3832,21 +3817,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Funding signing addresses with gas tokens e.g. ETH">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#automatic-funding-of-addresses" class="md-nav__link">
-    <span class="md-ellipsis">
-      Automatic funding of addresses
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
     </ul>
@@ -4141,25 +4111,13 @@ publicTxManager:
 <li>Cache is automatically disabled if the gas pricing method is not configured</li>
 </ul>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
-<p>The examples deploy contracts and invoke transactions before waiting for receipts to confirm they have succeesfully been mined. The default wait time in the Paladin Node SDK is 5 seconds. For many
-public chains this will need increasing to a suitable value, based on the block period of the chain. The following is an example of a modification to a <code>waitForReceipt()</code> call:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>const cashToken = await notoFactory
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    .newNoto(verifierNode1, {
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>      name: &quot;NOTO&quot;,
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>      symbol: &quot;NOTO&quot;,
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>      notary: verifierNode1,
-<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>      notaryMode: &quot;basic&quot;,
-<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    })
-<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    .waitForDeploy(20000);  // Allow 20 seconds for the contract deploy to complete
-</code></pre></div>
-<p>Note: the example code won't wait the full 20 seconds if the contract deploy completes early, so setting a large value won't increase the example run time unncessarily.</p>
+<p>The examples deploy contracts and invoke transactions before waiting for receipts to confirm they have succeesfully been mined. The default wait time in the Paladin examples is 30 seconds. This should be sufficient for most public chains, but it can be increased by modifying (<code>DEFAULT_POLL_TIMEOUT</code> in the examples config file)[<a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/common/src/config.ts">https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/common/src/config.ts</a>].</p>
+<p>Note: the example code won't wait the full polling period if the contract deploy completes early, so setting a large value won't increase the example run time unncessarily.</p>
 <h2 id="funding-signing-addresses-with-gas-tokens-eg-eth">Funding signing addresses with gas tokens e.g. ETH<a class="headerlink" href="#funding-signing-addresses-with-gas-tokens-eg-eth" title="Permanent link">&para;</a></h2>
 <p>Paladin uses a number of signing keys for the different domains and for initial deployment of the Paladin contracts. It also uses a new signing key for every public transaction as part of its approach to
 preventing transactions on the base ledger from being correlated with each other.</p>
 <p>A Paladin node can be configured to use predetermined signing keys, for example by using a pre-configured HD wallet mnemonic from which all signing keys are derived.</p>
 <p>It is necessary to ensure the addresses used by Paladin have sufficient gas tokens to fund transactions.</p>
-<h3 id="automatic-funding-of-addresses">Automatic funding of addresses<a class="headerlink" href="#automatic-funding-of-addresses" title="Permanent link">&para;</a></h3>
-<p>TBC</p>
 
 
 
