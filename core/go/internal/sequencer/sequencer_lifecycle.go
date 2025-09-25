@@ -39,16 +39,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Callback for the sender TX state machine to emit events back into the sequencer
-func (seq *sequencer) senderEventHandler(event common.Event) {
-	seq.sender.ProcessEvent(seq.ctx, event)
-}
-
-// Callback for the sender TX state machine to emit events back into the sequencer
-func (seq *sequencer) coordinatorEventHandler(event common.Event) {
-	seq.coordinator.ProcessEvent(seq.ctx, event)
-}
-
 // Components needing to interact with the sequencer can make certain calls into
 // the coordinator, the originator, or the transport writer
 type Sequencer interface {
@@ -168,7 +158,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				transportWriter: transportWriter,
 			}
 
-			sender, err := sender.NewSender(sMgr.ctx, sMgr.nodeName, transportWriter, common.RealClock(), sequencer.senderEventHandler, sMgr.engineIntegration, 10, &contractAddr, 15000, 10, sMgr.metrics)
+			sender, err := sender.NewSender(sMgr.ctx, sMgr.nodeName, transportWriter, common.RealClock(), sMgr.engineIntegration, 10, &contractAddr, 15000, 10, sMgr.metrics)
 			if err != nil {
 				log.L(ctx).Errorf("[Sequencer] failed to create sequencer sender for contract %s: %s", contractAddr.String(), err)
 				return nil, err
@@ -182,7 +172,6 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				transportWriter,
 				senderNodePool,
 				common.RealClock(),
-				sequencer.coordinatorEventHandler,
 				sMgr.engineIntegration,
 				sMgr.syncPoints,
 				reqTimeout,

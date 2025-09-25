@@ -91,11 +91,15 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 		return t.transportWriter.SendAssembleRequest(ctx, t.senderNode, t.ID, idempotencyKey, t.PreAssembly, stateLocks, blockHeight)
 	})
 	t.cancelAssembleTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
-		t.emit(&RequestTimeoutIntervalEvent{
+		err := t.eventHandler(ctx, &RequestTimeoutIntervalEvent{
 			BaseCoordinatorEvent: BaseCoordinatorEvent{
 				TransactionID: t.ID,
 			},
 		})
+		if err != nil {
+			log.L(ctx).Errorf("[Sequencer] error handling RequestTimeoutIntervalEvent: %s", err)
+			return
+		}
 	})
 	return t.pendingAssembleRequest.Nudge(ctx)
 }

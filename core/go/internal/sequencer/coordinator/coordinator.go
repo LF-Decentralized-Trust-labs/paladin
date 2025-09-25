@@ -89,7 +89,6 @@ type coordinator struct {
 	clock              common.Clock
 	engineIntegration  common.EngineIntegration
 	syncPoints         syncpoints.SyncPoints
-	emit               common.EmitEvent
 	readyForDispatch   func(context.Context, *transaction.Transaction)
 	coordinatorStarted func(contractAddress *pldtypes.EthAddress, coordinatorNode string)
 	coordinatorIdle    func(contractAddress *pldtypes.EthAddress)
@@ -111,7 +110,6 @@ func NewCoordinator(
 	transportWriter transport.TransportWriter,
 	senderNodePool []string,
 	clock common.Clock,
-	emit common.EmitEvent,
 	engineIntegration common.EngineIntegration,
 	syncPoints syncpoints.SyncPoints,
 	requestTimeout,
@@ -141,7 +139,6 @@ func NewCoordinator(
 		assembleTimeout:                    assembleTimeout,
 		engineIntegration:                  engineIntegration,
 		syncPoints:                         syncPoints,
-		emit:                               emit,
 		readyForDispatch:                   readyForDispatch,
 		coordinatorStarted:                 coordinatorStarted,
 		coordinatorIdle:                    coordinatorIdle,
@@ -277,7 +274,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			txn,
 			c.transportWriter,
 			c.clock,
-			c.emit,
+			c.ProcessEvent,
 			c.engineIntegration,
 			c.syncPoints,
 			c.requestTimeout,

@@ -52,7 +52,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentity
 	}
 	mockDomainAPI := componentsmocks.NewDomainSmartContract(t)
 
-	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.transportWriter, senderIdentityPool, mocks.clock, mocks.emit, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1",
+	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.transportWriter, senderIdentityPool, mocks.clock, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1",
 		func(context.Context, *transaction.Transaction) {
 			// Not used
 		},

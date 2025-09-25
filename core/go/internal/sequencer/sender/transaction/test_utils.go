@@ -139,7 +139,7 @@ type TransactionBuilderForTesting struct {
 	sentMessageRecorder       *SentMessageRecorder
 	fakeClock                 *common.FakeClockForTesting
 	fakeEngineIntegration     *common.FakeEngineIntegrationForTesting
-	emitFunction              func(event common.Event)
+	eventHandler              func(ctx context.Context, event common.Event) error
 
 	/* Assembling State*/
 	assembleRequestID uuid.UUID
@@ -218,8 +218,9 @@ func (b *TransactionBuilderForTesting) BuildWithMocks() (*Transaction, *Transact
 		EngineIntegration:   b.fakeEngineIntegration,
 		transactionBuilder:  b,
 	}
-	b.emitFunction = func(event common.Event) {
+	b.eventHandler = func(ctx context.Context, event common.Event) error {
 		mocks.emittedEvents = append(mocks.emittedEvents, event)
+		return nil
 	}
 	return b.Build(), mocks
 }
@@ -228,10 +229,12 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 	ctx := context.Background()
 
 	privateTransaction := b.privateTransactionBuilder.Build()
-	if b.emitFunction == nil {
-		b.emitFunction = func(event common.Event) {}
+	if b.eventHandler == nil {
+		b.eventHandler = func(ctx context.Context, event common.Event) error {
+			return nil
+		}
 	}
-	txn, err := NewTransaction(ctx, privateTransaction, b.sentMessageRecorder, b.fakeClock, b.emitFunction, b.fakeEngineIntegration, b.metrics)
+	txn, err := NewTransaction(ctx, privateTransaction, b.sentMessageRecorder, b.eventHandler, b.fakeEngineIntegration, b.metrics)
 
 	txn.stateMachine.currentState = b.state
 

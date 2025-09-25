@@ -72,7 +72,7 @@ type SenderBuilderForTesting struct {
 	nodeName         *string
 	committeeMembers []string
 	contractAddress  *pldtypes.EthAddress
-	emitFunction     func(event common.Event)
+	eventHandler     func(ctx context.Context, event common.Event) error
 	transactions     []*transaction.Transaction
 	metrics          metrics.DistributedSequencerMetrics
 }
@@ -140,17 +140,12 @@ func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDe
 
 	var sender *sender
 
-	b.emitFunction = func(event common.Event) {
-		mocks.emittedEvents = append(mocks.emittedEvents, event)
-		_ = sender.ProcessEvent(ctx, event)
-	}
 	var err error
 	sender, err = NewSender(
 		ctx,
 		*b.nodeName,
 		mocks.SentMessageRecorder,
 		mocks.Clock,
-		b.emitFunction,
 		mocks.EngineIntegration,
 		100, // Block range size
 		b.contractAddress,

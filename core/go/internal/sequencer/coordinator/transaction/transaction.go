@@ -88,7 +88,7 @@ type Transaction struct {
 	engineIntegration  common.EngineIntegration
 	syncPoints         syncpoints.SyncPoints
 	notifyOfTransition OnStateTransition
-	emit               common.EmitEvent
+	eventHandler       func(context.Context, common.Event) error
 	metrics            metrics.DistributedSequencerMetrics
 }
 
@@ -101,7 +101,7 @@ func NewTransaction(
 	pt *components.PrivateTransaction,
 	transportWriter transport.TransportWriter,
 	clock common.Clock,
-	emit common.EmitEvent,
+	eventHandler func(context.Context, common.Event) error,
 	engineIntegration common.EngineIntegration,
 	syncPoints syncpoints.SyncPoints,
 	requestTimeout,
@@ -133,7 +133,7 @@ func NewTransaction(
 		syncPoints:            syncPoints,
 		notifyOfTransition:    onStateTransition,
 		onCleanup:             onCleanup,
-		emit:                  emit,
+		eventHandler:          eventHandler,
 		dependencies:          &pldapi.TransactionDependencies{},
 		onReadyForDispatch:    onReadyForDispatch,
 		metrics:               metrics,

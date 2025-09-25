@@ -43,11 +43,11 @@ type Transaction struct {
 	*components.PrivateTransaction
 	engineIntegration                common.EngineIntegration
 	transportWriter                  transport.TransportWriter
+	eventHandler                     func(context.Context, common.Event) error
 	currentDelegate                  string
 	latestAssembleRequest            *assembleRequestFromCoordinator
 	latestFulfilledAssembleRequestID uuid.UUID
 	latestPreDispatchRequestID       uuid.UUID
-	emit                             common.EmitEvent
 	signerAddress                    *pldtypes.EthAddress
 	latestSubmissionHash             *pldtypes.Bytes32
 	nonce                            *uint64
@@ -58,8 +58,7 @@ func NewTransaction(
 	ctx context.Context,
 	pt *components.PrivateTransaction,
 	transportWriter transport.TransportWriter,
-	clock common.Clock,
-	emit common.EmitEvent,
+	eventHandler func(context.Context, common.Event) error,
 	engineIntegration common.EngineIntegration,
 	metrics metrics.DistributedSequencerMetrics,
 
@@ -67,7 +66,7 @@ func NewTransaction(
 	txn := &Transaction{
 		PrivateTransaction: pt,
 		engineIntegration:  engineIntegration,
-		emit:               emit,
+		eventHandler:       eventHandler,
 		transportWriter:    transportWriter,
 		metrics:            metrics,
 	}
