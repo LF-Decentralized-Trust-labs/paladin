@@ -11,8 +11,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -260,12 +258,12 @@ func (_c *MockSeqCoordinator_GetTransactionsReadyToDispatch_Call) RunAndReturn(r
 	return _c
 }
 
-// HandleEvent provides a mock function for the type MockSeqCoordinator
-func (_mock *MockSeqCoordinator) HandleEvent(ctx context.Context, event common.Event) error {
+// ProcessEvent provides a mock function for the type MockSeqCoordinator
+func (_mock *MockSeqCoordinator) ProcessEvent(ctx context.Context, event common.Event) error {
 	ret := _mock.Called(ctx, event)
 
 	if len(ret) == 0 {
-		panic("no return value specified for HandleEvent")
+		panic("no return value specified for ProcessEvent")
 	}
 
 	var r0 error
@@ -277,19 +275,19 @@ func (_mock *MockSeqCoordinator) HandleEvent(ctx context.Context, event common.E
 	return r0
 }
 
-// MockSeqCoordinator_HandleEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HandleEvent'
-type MockSeqCoordinator_HandleEvent_Call struct {
+// MockSeqCoordinator_ProcessEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ProcessEvent'
+type MockSeqCoordinator_ProcessEvent_Call struct {
 	*mock.Call
 }
 
-// HandleEvent is a helper method to define mock.On call
+// ProcessEvent is a helper method to define mock.On call
 //   - ctx context.Context
 //   - event common.Event
-func (_e *MockSeqCoordinator_Expecter) HandleEvent(ctx interface{}, event interface{}) *MockSeqCoordinator_HandleEvent_Call {
-	return &MockSeqCoordinator_HandleEvent_Call{Call: _e.mock.On("HandleEvent", ctx, event)}
+func (_e *MockSeqCoordinator_Expecter) ProcessEvent(ctx interface{}, event interface{}) *MockSeqCoordinator_ProcessEvent_Call {
+	return &MockSeqCoordinator_ProcessEvent_Call{Call: _e.mock.On("ProcessEvent", ctx, event)}
 }
 
-func (_c *MockSeqCoordinator_HandleEvent_Call) Run(run func(ctx context.Context, event common.Event)) *MockSeqCoordinator_HandleEvent_Call {
+func (_c *MockSeqCoordinator_ProcessEvent_Call) Run(run func(ctx context.Context, event common.Event)) *MockSeqCoordinator_ProcessEvent_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -307,13 +305,116 @@ func (_c *MockSeqCoordinator_HandleEvent_Call) Run(run func(ctx context.Context,
 	return _c
 }
 
-func (_c *MockSeqCoordinator_HandleEvent_Call) Return(err error) *MockSeqCoordinator_HandleEvent_Call {
+func (_c *MockSeqCoordinator_ProcessEvent_Call) Return(err error) *MockSeqCoordinator_ProcessEvent_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockSeqCoordinator_HandleEvent_Call) RunAndReturn(run func(ctx context.Context, event common.Event) error) *MockSeqCoordinator_HandleEvent_Call {
+func (_c *MockSeqCoordinator_ProcessEvent_Call) RunAndReturn(run func(ctx context.Context, event common.Event) error) *MockSeqCoordinator_ProcessEvent_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// QueueEvent provides a mock function for the type MockSeqCoordinator
+func (_mock *MockSeqCoordinator) QueueEvent(ctx context.Context, event common.Event) error {
+	ret := _mock.Called(ctx, event)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueueEvent")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, common.Event) error); ok {
+		r0 = returnFunc(ctx, event)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockSeqCoordinator_QueueEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueueEvent'
+type MockSeqCoordinator_QueueEvent_Call struct {
+	*mock.Call
+}
+
+// QueueEvent is a helper method to define mock.On call
+//   - ctx context.Context
+//   - event common.Event
+func (_e *MockSeqCoordinator_Expecter) QueueEvent(ctx interface{}, event interface{}) *MockSeqCoordinator_QueueEvent_Call {
+	return &MockSeqCoordinator_QueueEvent_Call{Call: _e.mock.On("QueueEvent", ctx, event)}
+}
+
+func (_c *MockSeqCoordinator_QueueEvent_Call) Run(run func(ctx context.Context, event common.Event)) *MockSeqCoordinator_QueueEvent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 common.Event
+		if args[1] != nil {
+			arg1 = args[1].(common.Event)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockSeqCoordinator_QueueEvent_Call) Return(err error) *MockSeqCoordinator_QueueEvent_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockSeqCoordinator_QueueEvent_Call) RunAndReturn(run func(ctx context.Context, event common.Event) error) *MockSeqCoordinator_QueueEvent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetActiveCoordinatorNode provides a mock function for the type MockSeqCoordinator
+func (_mock *MockSeqCoordinator) SetActiveCoordinatorNode(ctx context.Context, coordinatorNode string) {
+	_mock.Called(ctx, coordinatorNode)
+	return
+}
+
+// MockSeqCoordinator_SetActiveCoordinatorNode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetActiveCoordinatorNode'
+type MockSeqCoordinator_SetActiveCoordinatorNode_Call struct {
+	*mock.Call
+}
+
+// SetActiveCoordinatorNode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - coordinatorNode string
+func (_e *MockSeqCoordinator_Expecter) SetActiveCoordinatorNode(ctx interface{}, coordinatorNode interface{}) *MockSeqCoordinator_SetActiveCoordinatorNode_Call {
+	return &MockSeqCoordinator_SetActiveCoordinatorNode_Call{Call: _e.mock.On("SetActiveCoordinatorNode", ctx, coordinatorNode)}
+}
+
+func (_c *MockSeqCoordinator_SetActiveCoordinatorNode_Call) Run(run func(ctx context.Context, coordinatorNode string)) *MockSeqCoordinator_SetActiveCoordinatorNode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockSeqCoordinator_SetActiveCoordinatorNode_Call) Return() *MockSeqCoordinator_SetActiveCoordinatorNode_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockSeqCoordinator_SetActiveCoordinatorNode_Call) RunAndReturn(run func(ctx context.Context, coordinatorNode string)) *MockSeqCoordinator_SetActiveCoordinatorNode_Call {
+	_c.Run(run)
 	return _c
 }
 
@@ -551,416 +652,6 @@ func (_c *MockEvent_TypeString_Call) Return(s string) *MockEvent_TypeString_Call
 }
 
 func (_c *MockEvent_TypeString_Call) RunAndReturn(run func() string) *MockEvent_TypeString_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// NewMockMessageSender creates a new instance of MockMessageSender. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
-// The first argument is typically a *testing.T value.
-func NewMockMessageSender(t interface {
-	mock.TestingT
-	Cleanup(func())
-}) *MockMessageSender {
-	mock := &MockMessageSender{}
-	mock.Mock.Test(t)
-
-	t.Cleanup(func() { mock.AssertExpectations(t) })
-
-	return mock
-}
-
-// MockMessageSender is an autogenerated mock type for the MessageSender type
-type MockMessageSender struct {
-	mock.Mock
-}
-
-type MockMessageSender_Expecter struct {
-	mock *mock.Mock
-}
-
-func (_m *MockMessageSender) EXPECT() *MockMessageSender_Expecter {
-	return &MockMessageSender_Expecter{mock: &_m.Mock}
-}
-
-// SendAssembleRequest provides a mock function for the type MockMessageSender
-func (_mock *MockMessageSender) SendAssembleRequest(ctx context.Context, assemblingNode string, transactionID uuid.UUID, idempotencyID uuid.UUID, transactionPreassembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error {
-	ret := _mock.Called(ctx, assemblingNode, transactionID, idempotencyID, transactionPreassembly, stateLocksJSON, blockHeight)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SendAssembleRequest")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uuid.UUID, uuid.UUID, *components.TransactionPreAssembly, []byte, int64) error); ok {
-		r0 = returnFunc(ctx, assemblingNode, transactionID, idempotencyID, transactionPreassembly, stateLocksJSON, blockHeight)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockMessageSender_SendAssembleRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendAssembleRequest'
-type MockMessageSender_SendAssembleRequest_Call struct {
-	*mock.Call
-}
-
-// SendAssembleRequest is a helper method to define mock.On call
-//   - ctx context.Context
-//   - assemblingNode string
-//   - transactionID uuid.UUID
-//   - idempotencyID uuid.UUID
-//   - transactionPreassembly *components.TransactionPreAssembly
-//   - stateLocksJSON []byte
-//   - blockHeight int64
-func (_e *MockMessageSender_Expecter) SendAssembleRequest(ctx interface{}, assemblingNode interface{}, transactionID interface{}, idempotencyID interface{}, transactionPreassembly interface{}, stateLocksJSON interface{}, blockHeight interface{}) *MockMessageSender_SendAssembleRequest_Call {
-	return &MockMessageSender_SendAssembleRequest_Call{Call: _e.mock.On("SendAssembleRequest", ctx, assemblingNode, transactionID, idempotencyID, transactionPreassembly, stateLocksJSON, blockHeight)}
-}
-
-func (_c *MockMessageSender_SendAssembleRequest_Call) Run(run func(ctx context.Context, assemblingNode string, transactionID uuid.UUID, idempotencyID uuid.UUID, transactionPreassembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64)) *MockMessageSender_SendAssembleRequest_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 uuid.UUID
-		if args[2] != nil {
-			arg2 = args[2].(uuid.UUID)
-		}
-		var arg3 uuid.UUID
-		if args[3] != nil {
-			arg3 = args[3].(uuid.UUID)
-		}
-		var arg4 *components.TransactionPreAssembly
-		if args[4] != nil {
-			arg4 = args[4].(*components.TransactionPreAssembly)
-		}
-		var arg5 []byte
-		if args[5] != nil {
-			arg5 = args[5].([]byte)
-		}
-		var arg6 int64
-		if args[6] != nil {
-			arg6 = args[6].(int64)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-			arg4,
-			arg5,
-			arg6,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMessageSender_SendAssembleRequest_Call) Return(err error) *MockMessageSender_SendAssembleRequest_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockMessageSender_SendAssembleRequest_Call) RunAndReturn(run func(ctx context.Context, assemblingNode string, transactionID uuid.UUID, idempotencyID uuid.UUID, transactionPreassembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error) *MockMessageSender_SendAssembleRequest_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SendEndorsementRequest provides a mock function for the type MockMessageSender
-func (_mock *MockMessageSender) SendEndorsementRequest(ctx context.Context, transactionId uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error {
-	ret := _mock.Called(ctx, transactionId, idempotencyKey, party, attRequest, transactionSpecification, verifiers, signatures, inputStates, outputStates, infoStates)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SendEndorsementRequest")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, uuid.UUID, string, *prototk.AttestationRequest, *prototk.TransactionSpecification, []*prototk.ResolvedVerifier, []*prototk.AttestationResult, []*prototk.EndorsableState, []*prototk.EndorsableState, []*prototk.EndorsableState) error); ok {
-		r0 = returnFunc(ctx, transactionId, idempotencyKey, party, attRequest, transactionSpecification, verifiers, signatures, inputStates, outputStates, infoStates)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockMessageSender_SendEndorsementRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendEndorsementRequest'
-type MockMessageSender_SendEndorsementRequest_Call struct {
-	*mock.Call
-}
-
-// SendEndorsementRequest is a helper method to define mock.On call
-//   - ctx context.Context
-//   - transactionId uuid.UUID
-//   - idempotencyKey uuid.UUID
-//   - party string
-//   - attRequest *prototk.AttestationRequest
-//   - transactionSpecification *prototk.TransactionSpecification
-//   - verifiers []*prototk.ResolvedVerifier
-//   - signatures []*prototk.AttestationResult
-//   - inputStates []*prototk.EndorsableState
-//   - outputStates []*prototk.EndorsableState
-//   - infoStates []*prototk.EndorsableState
-func (_e *MockMessageSender_Expecter) SendEndorsementRequest(ctx interface{}, transactionId interface{}, idempotencyKey interface{}, party interface{}, attRequest interface{}, transactionSpecification interface{}, verifiers interface{}, signatures interface{}, inputStates interface{}, outputStates interface{}, infoStates interface{}) *MockMessageSender_SendEndorsementRequest_Call {
-	return &MockMessageSender_SendEndorsementRequest_Call{Call: _e.mock.On("SendEndorsementRequest", ctx, transactionId, idempotencyKey, party, attRequest, transactionSpecification, verifiers, signatures, inputStates, outputStates, infoStates)}
-}
-
-func (_c *MockMessageSender_SendEndorsementRequest_Call) Run(run func(ctx context.Context, transactionId uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState)) *MockMessageSender_SendEndorsementRequest_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 uuid.UUID
-		if args[1] != nil {
-			arg1 = args[1].(uuid.UUID)
-		}
-		var arg2 uuid.UUID
-		if args[2] != nil {
-			arg2 = args[2].(uuid.UUID)
-		}
-		var arg3 string
-		if args[3] != nil {
-			arg3 = args[3].(string)
-		}
-		var arg4 *prototk.AttestationRequest
-		if args[4] != nil {
-			arg4 = args[4].(*prototk.AttestationRequest)
-		}
-		var arg5 *prototk.TransactionSpecification
-		if args[5] != nil {
-			arg5 = args[5].(*prototk.TransactionSpecification)
-		}
-		var arg6 []*prototk.ResolvedVerifier
-		if args[6] != nil {
-			arg6 = args[6].([]*prototk.ResolvedVerifier)
-		}
-		var arg7 []*prototk.AttestationResult
-		if args[7] != nil {
-			arg7 = args[7].([]*prototk.AttestationResult)
-		}
-		var arg8 []*prototk.EndorsableState
-		if args[8] != nil {
-			arg8 = args[8].([]*prototk.EndorsableState)
-		}
-		var arg9 []*prototk.EndorsableState
-		if args[9] != nil {
-			arg9 = args[9].([]*prototk.EndorsableState)
-		}
-		var arg10 []*prototk.EndorsableState
-		if args[10] != nil {
-			arg10 = args[10].([]*prototk.EndorsableState)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-			arg4,
-			arg5,
-			arg6,
-			arg7,
-			arg8,
-			arg9,
-			arg10,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMessageSender_SendEndorsementRequest_Call) Return(err error) *MockMessageSender_SendEndorsementRequest_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockMessageSender_SendEndorsementRequest_Call) RunAndReturn(run func(ctx context.Context, transactionId uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error) *MockMessageSender_SendEndorsementRequest_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SendHandoverRequest provides a mock function for the type MockMessageSender
-func (_mock *MockMessageSender) SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) {
-	_mock.Called(ctx, activeCoordinator, contractAddress)
-	return
-}
-
-// MockMessageSender_SendHandoverRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendHandoverRequest'
-type MockMessageSender_SendHandoverRequest_Call struct {
-	*mock.Call
-}
-
-// SendHandoverRequest is a helper method to define mock.On call
-//   - ctx context.Context
-//   - activeCoordinator string
-//   - contractAddress *pldtypes.EthAddress
-func (_e *MockMessageSender_Expecter) SendHandoverRequest(ctx interface{}, activeCoordinator interface{}, contractAddress interface{}) *MockMessageSender_SendHandoverRequest_Call {
-	return &MockMessageSender_SendHandoverRequest_Call{Call: _e.mock.On("SendHandoverRequest", ctx, activeCoordinator, contractAddress)}
-}
-
-func (_c *MockMessageSender_SendHandoverRequest_Call) Run(run func(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress)) *MockMessageSender_SendHandoverRequest_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 *pldtypes.EthAddress
-		if args[2] != nil {
-			arg2 = args[2].(*pldtypes.EthAddress)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMessageSender_SendHandoverRequest_Call) Return() *MockMessageSender_SendHandoverRequest_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockMessageSender_SendHandoverRequest_Call) RunAndReturn(run func(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress)) *MockMessageSender_SendHandoverRequest_Call {
-	_c.Run(run)
-	return _c
-}
-
-// SendHeartbeat provides a mock function for the type MockMessageSender
-func (_mock *MockMessageSender) SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot) {
-	_mock.Called(ctx, targetNode, contractAddress, coordinatorSnapshot)
-	return
-}
-
-// MockMessageSender_SendHeartbeat_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendHeartbeat'
-type MockMessageSender_SendHeartbeat_Call struct {
-	*mock.Call
-}
-
-// SendHeartbeat is a helper method to define mock.On call
-//   - ctx context.Context
-//   - targetNode string
-//   - contractAddress *pldtypes.EthAddress
-//   - coordinatorSnapshot *common.CoordinatorSnapshot
-func (_e *MockMessageSender_Expecter) SendHeartbeat(ctx interface{}, targetNode interface{}, contractAddress interface{}, coordinatorSnapshot interface{}) *MockMessageSender_SendHeartbeat_Call {
-	return &MockMessageSender_SendHeartbeat_Call{Call: _e.mock.On("SendHeartbeat", ctx, targetNode, contractAddress, coordinatorSnapshot)}
-}
-
-func (_c *MockMessageSender_SendHeartbeat_Call) Run(run func(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot)) *MockMessageSender_SendHeartbeat_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 *pldtypes.EthAddress
-		if args[2] != nil {
-			arg2 = args[2].(*pldtypes.EthAddress)
-		}
-		var arg3 *common.CoordinatorSnapshot
-		if args[3] != nil {
-			arg3 = args[3].(*common.CoordinatorSnapshot)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMessageSender_SendHeartbeat_Call) Return() *MockMessageSender_SendHeartbeat_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockMessageSender_SendHeartbeat_Call) RunAndReturn(run func(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot)) *MockMessageSender_SendHeartbeat_Call {
-	_c.Run(run)
-	return _c
-}
-
-// SendPreDispatchRequest provides a mock function for the type MockMessageSender
-func (_mock *MockMessageSender) SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
-	ret := _mock.Called(ctx, transactionSender, idempotencyKey, transactionSpecification, hash)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SendPreDispatchRequest")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uuid.UUID, *prototk.TransactionSpecification, *pldtypes.Bytes32) error); ok {
-		r0 = returnFunc(ctx, transactionSender, idempotencyKey, transactionSpecification, hash)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockMessageSender_SendPreDispatchRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendPreDispatchRequest'
-type MockMessageSender_SendPreDispatchRequest_Call struct {
-	*mock.Call
-}
-
-// SendPreDispatchRequest is a helper method to define mock.On call
-//   - ctx context.Context
-//   - transactionSender string
-//   - idempotencyKey uuid.UUID
-//   - transactionSpecification *prototk.TransactionSpecification
-//   - hash *pldtypes.Bytes32
-func (_e *MockMessageSender_Expecter) SendPreDispatchRequest(ctx interface{}, transactionSender interface{}, idempotencyKey interface{}, transactionSpecification interface{}, hash interface{}) *MockMessageSender_SendPreDispatchRequest_Call {
-	return &MockMessageSender_SendPreDispatchRequest_Call{Call: _e.mock.On("SendPreDispatchRequest", ctx, transactionSender, idempotencyKey, transactionSpecification, hash)}
-}
-
-func (_c *MockMessageSender_SendPreDispatchRequest_Call) Run(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32)) *MockMessageSender_SendPreDispatchRequest_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 uuid.UUID
-		if args[2] != nil {
-			arg2 = args[2].(uuid.UUID)
-		}
-		var arg3 *prototk.TransactionSpecification
-		if args[3] != nil {
-			arg3 = args[3].(*prototk.TransactionSpecification)
-		}
-		var arg4 *pldtypes.Bytes32
-		if args[4] != nil {
-			arg4 = args[4].(*pldtypes.Bytes32)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-			arg4,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMessageSender_SendPreDispatchRequest_Call) Return(err error) *MockMessageSender_SendPreDispatchRequest_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockMessageSender_SendPreDispatchRequest_Call) RunAndReturn(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error) *MockMessageSender_SendPreDispatchRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }

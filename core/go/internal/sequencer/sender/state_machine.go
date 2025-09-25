@@ -198,9 +198,6 @@ func (s *sender) SetActiveCoordinator(ctx context.Context, coordinator string) e
 	if coordinator == "" {
 		return i18n.NewError(ctx, msgs.MsgDistSeqInternalError, "Cannot set active coordinator to an empty string")
 	}
-	if s.activeCoordinatorNode != "" {
-		return i18n.NewError(ctx, msgs.MsgDistSeqInternalError, "SetActiveCoordinator should only be used when an active coordinator has not yet been set")
-	}
 	s.activeCoordinatorNode = coordinator
 	log.L(ctx).Infof("[Sequencer] initial active coordinator set to %s", s.activeCoordinatorNode)
 	return nil

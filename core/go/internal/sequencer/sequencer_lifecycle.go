@@ -396,7 +396,11 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 					sMgr.updateActiveCoordinators(sMgr.ctx)
 
 					// The sender needs to know where to delegate transactions to
-					sender.SetActiveCoordinator(sMgr.ctx, coordinatorNode)
+					err := sender.SetActiveCoordinator(sMgr.ctx, coordinatorNode)
+					if err != nil {
+						log.L(ctx).Errorf("[Sequencer] failed to set active coordinator for contract %s: %s", contractAddr.String(), err)
+						return
+					}
 				},
 				func(contractAddress *pldtypes.EthAddress) {
 					// A new coordinator became idle, update metrics
@@ -420,7 +424,10 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				}
 
 				// Get the best candidate for an initial coordinator, and use as the delegate for any originated transactions
-				sender.SetActiveCoordinator(sMgr.ctx, coordinator.GetActiveCoordinatorNode(sMgr.ctx))
+				err := sender.SetActiveCoordinator(sMgr.ctx, coordinator.GetActiveCoordinatorNode(sMgr.ctx))
+				if err != nil {
+					log.L(ctx).Errorf("[Sequencer] failed to set active coordinator for contract %s: %s", contractAddr.String(), err)
+				}
 			}
 
 			sequencer.sender = sender
@@ -461,43 +468,44 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 // Must be called within the sequencer's write lock
 func (sMgr *sequencerManager) stopLowestPrioritySequencer(ctx context.Context) {
 	log.L(ctx).Debugf("[Sequencer] max concurrent sequencers reached, stopping lowest priority sequencer")
+	if len(sMgr.sequencers) != 0 {
+		// If any sequencers are already closing we can wait for them to close instead of stopping a different one
+		for _, sequencer := range sMgr.sequencers {
+			if sequencer.coordinator.GetCurrentState() == coordinator.State_Flush ||
+				sequencer.coordinator.GetCurrentState() == coordinator.State_Closing {
 
-	// If any sequencers are already closing we can wait for them to close instead of stopping a different one
-	for _, sequencer := range sMgr.sequencers {
-		if sequencer.coordinator.GetCurrentState() == coordinator.State_Flush ||
-			sequencer.coordinator.GetCurrentState() == coordinator.State_Closing {
+				// To avoid blocking the start of new sequencer that has caused us to purge the lowest priority one,
+				// we don't wait for the closing ones to complete. The aim is to allow the node to remain stable while
+				// still being responsive to new contract activity so a closing sequencer is allowed to page out in its
+				// own time.
+				log.L(ctx).Debugf("[Sequencer] coordinator %s is closing, waiting for it to close", sequencer.contractAddress)
+				return
+			} else if sequencer.coordinator.GetCurrentState() == coordinator.State_Idle ||
+				sequencer.coordinator.GetCurrentState() == coordinator.State_Observing {
+				// This sequencer is already idle or observing so we can page it out immediately
 
-			// To avoid blocking the start of new sequencer that has caused us to purge the lowest priority one,
-			// we don't wait for the closing ones to complete. The aim is to allow the node to remain stable while
-			// still being responsive to new contract activity so a closing sequencer is allowed to page out in its
-			// own time.
-			log.L(ctx).Debugf("[Sequencer] coordinator %s is closing, waiting for it to close", sequencer.contractAddress)
-			return
-		} else if sequencer.coordinator.GetCurrentState() == coordinator.State_Idle ||
-			sequencer.coordinator.GetCurrentState() == coordinator.State_Observing {
-			// This sequencer is already idle or observing so we can page it out immediately
-
-			log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencer.contractAddress)
-			sequencer.sender.Stop()
-			delete(sMgr.sequencers, sequencer.contractAddress)
-			return
+				log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencer.contractAddress)
+				sequencer.sender.Stop()
+				delete(sMgr.sequencers, sequencer.contractAddress)
+				return
+			}
 		}
-	}
 
-	// Order existing sequencers by LRU time
-	sequencers := make([]*sequencer, 0)
-	for _, sequencer := range sMgr.sequencers {
-		sequencers = append(sequencers, sequencer)
-	}
-	sort.Slice(sequencers, func(i, j int) bool {
-		return sequencers[i].lastTXTime.Before(sequencers[j].lastTXTime)
-	})
+		// Order existing sequencers by LRU time
+		sequencers := make([]*sequencer, 0)
+		for _, sequencer := range sMgr.sequencers {
+			sequencers = append(sequencers, sequencer)
+		}
+		sort.Slice(sequencers, func(i, j int) bool {
+			return sequencers[i].lastTXTime.Before(sequencers[j].lastTXTime)
+		})
 
-	// Stop the lowest priority sequencer by emitting an event and waiting for it to move to closed
-	sequencers[0].coordinator.Stop()
-	sequencers[0].sender.Stop()
-	log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencers[0].contractAddress)
-	delete(sMgr.sequencers, sequencers[0].contractAddress)
+		// Stop the lowest priority sequencer by emitting an event and waiting for it to move to closed
+		sequencers[0].coordinator.Stop()
+		sequencers[0].sender.Stop()
+		log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencers[0].contractAddress)
+		delete(sMgr.sequencers, sequencers[0].contractAddress)
+	}
 }
 
 func (sMgr *sequencerManager) updateActiveCoordinators(ctx context.Context) {
