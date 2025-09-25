@@ -140,8 +140,8 @@ besu:
   nodeNamePrefix: node
   image:
     repository: hyperledger/besu
-    tag: latest
-    pullPolicy: Always
+    tag: 25.8.0
+    pullPolicy: IfNotPresent
   labels:
     app: besu
   baseNodePort: 31545

@@ -20,7 +20,7 @@ services:
       - /var/besu
 
   besu_free:
-    image: hyperledger/besu:24.10.0
+    image: hyperledger/besu:25.8.0
     user: 0:0
     volumes:
       - besu_free_data:/var/besu:rw
@@ -68,7 +68,7 @@ services:
       - /var/besu
 
   besu_gas:
-    image: hyperledger/besu:24.10.0
+    image: hyperledger/besu:25.8.0
     user: 0:0
     volumes:
       - besu_gas_data:/var/besu:rw
