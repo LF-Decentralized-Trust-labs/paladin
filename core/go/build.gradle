@@ -296,28 +296,6 @@ abstract class ComponentTest extends Exec {
     }
 }
 
-abstract class GasComponentTest extends Exec {
-    GasComponentTest() {
-        inputs.files(project.goFiles)
-        outputs.dir('coverage')
-
-        workingDir '.'
-        executable 'go'
-        args 'test'
-        args './componenttest'
-        args '-cover'
-        args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..."
-        args '-covermode=atomic'
-        args '-timeout=120s'
-        if (project.findProperty('verboseTests') == 'true') {
-            args '-v'
-        }
-        args "-test.gocoverdir=${project.projectDir}/coverage"
-
-        project.helpers.dumpLogsOnFailure(this, ':testinfra:startTestInfra')
-    }
-}
-
 task setupCoverage(dependsOn: [protoc, copyContracts, makeMocks]) {
     inputs.files(goFiles)
     outputs.dir('coverage')
@@ -348,7 +326,7 @@ task unitTestPostgres(type: UnitTests, dependsOn: [
     mustRunAfter 'unitTestSQLite' // these tests cannot run concurrently
 }
 
-task componentTestPostgres(type: ComponentTest, dependsOn: [
+task componentTestSQLite(type: ComponentTest, dependsOn: [
         makeMocks,
         ':testinfra:startTestInfra',
         setupCoverage,
@@ -356,27 +334,14 @@ task componentTestPostgres(type: ComponentTest, dependsOn: [
         copyContracts, // Ensure this task depends on copying the test contracts
     ]) {
     mustRunAfter 'unitTestPostgres' // these tests cannot run concurrently
-    environment 'BESU_PORT', '8555' // Use gas-free Besu port
-
-}
-
-task componentTestWithGasPostgres(type: GasComponentTest, dependsOn: [
-        makeMocks,
-        ':testinfra:startTestInfra',
-        setupCoverage,
-        goGet,
-        copyContracts, // Ensure this task depends on copying the test contracts
-    ]) {
-    mustRunAfter 'componentTestPostgres' // these tests cannot run concurrently
-    environment 'BESU_PORT', '8555' // Use gas-priced Besu port
 }
 
 task buildCoverageTxt(type: Exec, dependsOn: [
         protoc,
         unitTestSQLite,
         unitTestPostgres,
-        componentTestPostgres,
-        componentTestWithGasPostgres
+        componentTestSQLite,
+        // componentTestPostgres
     ]) {
     inputs.files(fileTree(project.mkdir('coverage')) {
         include "covcounters.*"

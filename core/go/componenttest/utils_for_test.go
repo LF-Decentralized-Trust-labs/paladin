@@ -26,14 +26,14 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
-	"os"
-	"strconv"
 	"strings"
-	"testing"
-	"time"
 
 	"context"
 	"net"
+	"os"
+	"strconv"
+	"testing"
+	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
@@ -44,9 +44,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/config"
 	"github.com/LF-Decentralized-Trust-labs/paladin/registries/static/pkg/static"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldclient"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
 	"github.com/LF-Decentralized-Trust-labs/paladin/transports/grpc/pkg/grpc"
@@ -57,16 +55,6 @@ import (
 
 //go:embed abis/SimpleStorage.json
 var simpleStorageBuildJSON []byte // From "gradle copyTestSolidityBuild"
-
-// getBesuPort returns the Besu port to use based on environment variable or default
-func getBesuPort() int {
-	if portStr := os.Getenv("BESU_PORT"); portStr != "" {
-		if port, err := strconv.Atoi(portStr); err == nil {
-			return port
-		}
-	}
-	return 0
-}
 
 func transactionReceiptCondition(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool {
 	//for the given transaction ID, return a function that can be used in an assert.Eventually to check if the transaction has a receipt
@@ -131,7 +119,7 @@ func deployDomainRegistry(t *testing.T) *pldtypes.EthAddress {
 	//Actually, we only need a bare bones engine that is capable of deploying the base ledger contracts
 	// could make do with assembling some core components like key manager, eth client factory, block indexer, persistence and any other dependencies they pull in
 	// but is easier to just create a throwaway component manager with no domains
-	tmpConf, _ := testConfig(t, false, TestSeed1)
+	tmpConf, _ := testConfig(t, false)
 	// wouldn't need to do this if we just created the core coponents directly
 	f, err := os.CreateTemp("", "component-test.*.sock")
 	require.NoError(t, err)
@@ -179,7 +167,7 @@ func newNodeConfiguration(t *testing.T, nodeName string) *nodeConfiguration {
 	}
 }
 
-func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtypes.EthAddress, binding *nodeConfiguration, peerNodes []*nodeConfiguration, domainConfig interface{}, enableWS bool, seed string) (*componentTestInstance, func()) {
+func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtypes.EthAddress, binding *nodeConfiguration, peerNodes []*nodeConfiguration, domainConfig interface{}, enableWS bool) *componentTestInstance {
 	if binding == nil {
 		binding = newNodeConfiguration(t, "default")
 	}
@@ -194,7 +182,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtype
 	err = os.Remove(grpcTarget)
 	require.NoError(t, err)
 
-	conf, wsConfig := testConfig(t, enableWS, seed)
+	conf, wsConfig := testConfig(t, enableWS)
 	i := &componentTestInstance{
 		grpcTarget: grpcTarget,
 		name:       binding.name,
@@ -342,19 +330,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtype
 		return addr.String()
 	}
 
-	return i, func() {
-		// log all the key derivation paths that were used
-		c := pldclient.Wrap(i.client).ReceiptPollingInterval(250 * time.Millisecond)
-		keys, err := c.KeyManager().QueryKeys(context.Background(), &query.QueryJSON{Limit: confutil.P(1000)})
-		require.NoError(t, err)
-		t.Logf("Key derivation paths used in test from seed %s:", seed)
-		t.Logf("In case of test failure, ensure that all of these derivation paths are being prefunded in testinfra/docker-compose-test.yml")
-		for _, key := range keys {
-			if key.KeyHandle != "" {
-				t.Logf("Key: %s %s\n", key.KeyHandle, key.Verifiers[0].Verifier)
-			}
-		}
-	}
+	return i
 
 }
 
@@ -385,7 +361,7 @@ func initPostgres(t *testing.T, ctx context.Context) (dns string, cleanup func()
 	}
 }
 
-func testConfig(t *testing.T, enableWS bool, seed string) (pldconf.PaladinConfig, pldconf.WSClientConfig) {
+func testConfig(t *testing.T, enableWS bool) (pldconf.PaladinConfig, pldconf.WSClientConfig) {
 	ctx := context.Background()
 
 	var conf *pldconf.PaladinConfig
@@ -421,18 +397,10 @@ func testConfig(t *testing.T, enableWS bool, seed string) (pldconf.PaladinConfig
 
 	conf.TransportManagerConfig.ReliableMessageWriter.BatchMaxSize = confutil.P(1)
 
-	// Use the provided seed for consistent test accounts
-	// This seed will generate the same accounts every time for testing
 	conf.Wallets[0].Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
 		Encoding: "hex",
-		Inline:   seed,
+		Inline:   pldtypes.RandHex(32),
 	}
-
-	// Configure Besu connection with the port determined by environment variable
-	besuPort := getBesuPort()
-	require.NotZero(t, besuPort, "BESU_PORT environment variable is not set")
-	conf.Blockchain.HTTP.URL = fmt.Sprintf("http://localhost:%d", besuPort)
-	conf.Blockchain.WS.URL = fmt.Sprintf("ws://localhost:%d", besuPort+1) // WS port is typically HTTP port + 1
 
 	conf.Log = pldconf.LogConfig{
 		Level:  confutil.P("debug"),
@@ -524,11 +492,10 @@ func (p *partyForTesting) peer(peers ...*nodeConfiguration) {
 	p.peers = append(p.peers, peers...)
 }
 
-func (p *partyForTesting) start(t *testing.T, domainConfig interface{}, seed string) func() {
-	var instanceDone func()
-	p.instance, instanceDone = newInstanceForComponentTesting(t, p.domainRegistryAddress, p.nodeConfig, p.peers, domainConfig, false, seed)
+func (p *partyForTesting) start(t *testing.T, domainConfig interface{}) {
+	p.instance = newInstanceForComponentTesting(t, p.domainRegistryAddress, p.nodeConfig, p.peers, domainConfig, false)
 	p.client = p.instance.client
-	return instanceDone
+
 }
 
 func (p *partyForTesting) deploySimpleDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.ConstructorParameters) *pldtypes.EthAddress {
