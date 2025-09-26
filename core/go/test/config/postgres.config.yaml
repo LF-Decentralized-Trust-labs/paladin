@@ -35,4 +35,4 @@ wallets:
           keys:
             seed:
               encoding: none
-              inline: REPLACED BY GENERATED KEY IN TEST
+              inline: b7dd582ee8badc827c8dea7480d3d21ee058bfc8f88b1a4237c6dcb0dfcb76a2

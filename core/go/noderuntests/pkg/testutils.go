@@ -386,9 +386,22 @@ func testConfig(t *testing.T, enableWS bool, configPath string) (pldconf.Paladin
 
 	conf.TransportManagerConfig.ReliableMessageWriter.BatchMaxSize = confutil.P(1)
 
+	// Postgres config typically passes in a fixed seed so re-runs against the same DB
+	// use consistent signing keys. Sqlite in-memory config typically relies on a random
+	// seed for each run
+	var key string
+	parsedKey, err := pldtypes.ParseHexBytes(context.Background(), conf.Wallets[0].Signer.KeyStore.Static.Keys["seed"].Inline)
+	if err == nil {
+		// Valid hex in the config - use it
+		key = parsedKey.HexString()
+	} else {
+		// No hex or a comment, generate a key to use
+		key = pldtypes.RandHex(32)
+	}
+
 	conf.Wallets[0].Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
 		Encoding: "hex",
-		Inline:   pldtypes.RandHex(32),
+		Inline:   key,
 	}
 
 	conf.Log = pldconf.LogConfig{
