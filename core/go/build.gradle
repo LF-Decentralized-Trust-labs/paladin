@@ -39,6 +39,9 @@ ext {
         'github.com/LF-Decentralized-Trust-labs/paladin/toolkit/prototk',
         'github.com/LF-Decentralized-Trust-labs/paladin/core/internal/plugins/loader',
         'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/testbed',
+        'test_utils',
+        'testutil',
+        'mocks',
     ]
 }
 
@@ -150,7 +153,12 @@ task protoc(type: ProtoCompile, dependsOn: [
     }
 }
 
-task goGet(type:Exec, dependsOn:[protoc, copyContracts, ":toolkit:go:goGet"]) {
+task makeMocks(type: Exec, dependsOn: [":installMockery", protoc]) {
+   executable "mockery"
+}
+
+
+task goGet(type:Exec, dependsOn:[protoc, copyContracts, makeMocks, ":toolkit:go:goGet"]) {
     workingDir '.'
 
     inputs.files('go.mod')
@@ -159,10 +167,6 @@ task goGet(type:Exec, dependsOn:[protoc, copyContracts, ":toolkit:go:goGet"]) {
 
     executable 'go'
     args 'get'
-}
-
-task makeMocks(type: Exec, dependsOn: [":installMockery", protoc, goGet]) {
-   executable "mockery"
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
@@ -255,6 +259,7 @@ abstract class UnitTests extends Exec {
     UnitTests() {
         inputs.files(project.goFiles)
         outputs.dir('coverage')
+        outputs.upToDateWhen { false } // Always run when requested (even if no input files have changed)
 
         workingDir '.'
         executable 'go'
@@ -277,6 +282,7 @@ abstract class ComponentTest extends Exec {
             include "**/*.json"
         })
         outputs.dir('coverage')
+        outputs.upToDateWhen { false } // Always run when requested (even if no input files have changed)
 
         workingDir '.'
         executable 'go'
@@ -302,6 +308,7 @@ abstract class CoordinationTest extends Exec {
             include "**/*.json"
         })
         outputs.dir('coverage')
+        outputs.upToDateWhen { false } // Always run when requested (even if no input files have changed)
 
         workingDir '.'
         executable 'go'
@@ -374,7 +381,7 @@ task buildCoverageTxt(type: Exec, dependsOn: [
         unitTestSQLite,
         unitTestPostgres,
         componentTestSQLite,
-        // componentTestPostgres
+        coordinationTestPostgres
     ]) {
     inputs.files(fileTree(project.mkdir('coverage')) {
         include "covcounters.*"
