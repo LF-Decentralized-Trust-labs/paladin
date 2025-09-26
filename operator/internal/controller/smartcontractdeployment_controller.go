@@ -71,8 +71,6 @@ var SmartContractDeploymentCRMap = CRMap[corev1alpha1.SmartContractDeployment, *
 func (r *SmartContractDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	// TODO: Add an admission webhook to make the bytecode and ABI immutable
-
 	// Fetch the SmartContractDeployment instance
 	var scd corev1alpha1.SmartContractDeployment
 	if err := r.Get(ctx, req.NamespacedName, &scd); err != nil {
