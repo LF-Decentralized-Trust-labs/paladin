@@ -39,6 +39,7 @@ ext {
         'github.com/LF-Decentralized-Trust-labs/paladin/toolkit/prototk',
         'github.com/LF-Decentralized-Trust-labs/paladin/core/internal/plugins/loader',
         'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/testbed',
+        'github.com/LF-Decentralized-Trust-labs/paladin/core/noderuntests',
         'test_utils',
         'testutil',
         'mocks',
