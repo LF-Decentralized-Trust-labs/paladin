@@ -21,7 +21,13 @@ import PaladinClient, {
   ZetoFactory,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import { ethers } from "ethers";
-import { checkDeploy, checkReceipt } from "paladin-example-common";
+import {
+  checkDeploy,
+  checkReceipt,
+  DEFAULT_POLL_TIMEOUT,
+  LONG_POLL_TIMEOUT,
+  POLL_INTERVAL,
+} from "paladin-example-common";
 import { newAtomFactory } from "./helpers/atom";
 import { newERC20Tracker } from "./helpers/erc20tracker";
 import * as fs from 'fs';
@@ -96,7 +102,7 @@ async function main(): Promise<boolean> {
     .newZeto(cashIssuer, {
       tokenName: "Zeto_Anon",
     })
-    .waitForDeploy(10000);
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(zetoCash)) return false;
 
   // Create a Pente privacy group for the asset issuer only
@@ -108,7 +114,7 @@ async function main(): Promise<boolean> {
       evmVersion: "shanghai",
       externalCallsEnabled: true,
     })
-    .waitForDeploy(10000);
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(issuerGroup)) return false;
 
   // Deploy private tracker to the issuer privacy group
@@ -136,7 +142,7 @@ async function main(): Promise<boolean> {
         },
       },
     })
-    .waitForDeploy(10000);
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(notoAsset)) return false;
 
   // Issue asset
@@ -147,7 +153,7 @@ async function main(): Promise<boolean> {
       amount: issuedAssetAmount,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   // Issue cash
@@ -162,7 +168,7 @@ async function main(): Promise<boolean> {
         },
       ],
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   // Lock the asset for the swap
@@ -173,7 +179,7 @@ async function main(): Promise<boolean> {
       amount: assetAmount,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
   receipt = await paladin2.ptx.getTransactionReceiptFull(receipt.id);
 
@@ -194,7 +200,7 @@ async function main(): Promise<boolean> {
       recipients: [{ to: investor2, amount: assetAmount }],
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
   receipt = await paladin2.ptx.getTransactionReceiptFull(receipt.id);
 
@@ -215,15 +221,14 @@ async function main(): Promise<boolean> {
       amount: cashAmount,
       delegate: investor2Address,
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
   
   // Poll for the lock operation to be fully settled
   logger.log("Waiting for lock operation to settle...");
   let lockedStateId: string | undefined;
   const pollStartTime = Date.now();
-  const pollTimeout = 120000; // 2 minutes
-  while (Date.now() - pollStartTime < pollTimeout) {
+  while (Date.now() - pollStartTime < LONG_POLL_TIMEOUT) {
     const lockedStates = await paladin3.ptx.getStateReceipt(receipt.id);
     const confirmedLockedState = lockedStates?.confirmed?.find(
       (state) => state.data["locked"]
@@ -236,7 +241,7 @@ async function main(): Promise<boolean> {
   }
 
   if (lockedStateId === undefined) {
-    logger.error(`Timed out after ${pollTimeout / 1000}s waiting for locked state in state receipt`);
+    logger.error(`Timed out after ${LONG_POLL_TIMEOUT / 1000}s waiting for locked state in state receipt`);
     return false;
   }
   logger.log(`Locked state ID: ${lockedStateId}`);
@@ -256,7 +261,7 @@ async function main(): Promise<boolean> {
   }).id;
   
   logger.log(`Prepared transaction ID: ${txID}`);
-  const preparedCashTransfer = await paladin3.pollForPreparedTransaction(txID, pollTimeout); // 2 minutes
+  const preparedCashTransfer = await paladin3.pollForPreparedTransaction(txID, LONG_POLL_TIMEOUT);
   if (!preparedCashTransfer) {
     logger.error(`Failed to get prepared transaction for ID: ${txID}`);
     return false;
@@ -296,7 +301,7 @@ async function main(): Promise<boolean> {
       delegate: atom.address,
       data: "0x",
     })
-    .waitForReceipt(pollTimeout);
+    .waitForReceipt(LONG_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   // Approve cash transfer operation
@@ -307,7 +312,7 @@ async function main(): Promise<boolean> {
       utxos: [lockedStateId],
       delegate: atom.address,
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   // execute the swap
@@ -342,12 +347,13 @@ async function main(): Promise<boolean> {
       logger.log("All balances are non-zero, proceeding...");
       break;
     }
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // if 60 second passed from the beginning of the loop than fail the test
-    if (Date.now() - startTime > 60000) {
-      logger.error("Failed to get final balances after 60 seconds");
+    // if LONG_POLL_TIMEOUT ms passed from the beginning of the loop than fail the test
+    if (Date.now() - startTime > LONG_POLL_TIMEOUT) {
+      logger.error(`Failed to get final balances after ${LONG_POLL_TIMEOUT / 1000} seconds`);
       return false;
     }
+
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
   }
 
   // Save contract data to file for later use

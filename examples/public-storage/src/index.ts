@@ -18,7 +18,7 @@ import PaladinClient, {
 import storageJson from "./abis/Storage.json";
 import * as fs from 'fs';
 import * as path from 'path';
-import { nodeConnections } from "paladin-example-common";
+import { nodeConnections, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 
 const logger = console;
 
@@ -44,7 +44,7 @@ async function main(): Promise<boolean> {
   });
 
   // Wait for deployment receipt
-  const deploymentReceipt = await paladin.pollForReceipt(deploymentTxID, 10000);
+  const deploymentReceipt = await paladin.pollForReceipt(deploymentTxID, DEFAULT_POLL_TIMEOUT);
   if (!deploymentReceipt?.contractAddress) {
     logger.error("Deployment failed!");
     return false;
@@ -71,7 +71,7 @@ async function main(): Promise<boolean> {
   });
 
   // Wait for the store transaction receipt
-  const storeReceipt = await paladin.pollForReceipt(storeTxID, 10000);
+  const storeReceipt = await paladin.pollForReceipt(storeTxID, DEFAULT_POLL_TIMEOUT);
   if (!storeReceipt?.transactionHash) {
     logger.error("Failed to store value in the contract!");
     return false;

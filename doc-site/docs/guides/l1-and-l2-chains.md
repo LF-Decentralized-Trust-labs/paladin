@@ -325,21 +325,9 @@ The gas price cache provides the most benefit when:
 
 ## Examples
 
-The examples deploy contracts and invoke transactions before waiting for receipts to confirm they have succeesfully been mined. The default wait time in the Paladin Node SDK is 5 seconds. For many
-public chains this will need increasing to a suitable value, based on the block period of the chain. The following is an example of a modification to a `waitForReceipt()` call:
+The examples deploy contracts and invoke transactions before waiting for receipts to confirm they have succeesfully been mined. The default wait time in the Paladin examples is 30 seconds. This should be sufficient for most public chains, but it can be increased by modifying (`DEFAULT_POLL_TIMEOUT` in the examples config file)[https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/common/src/config.ts].
 
-```
-const cashToken = await notoFactory
-    .newNoto(verifierNode1, {
-      name: "NOTO",
-      symbol: "NOTO",
-      notary: verifierNode1,
-      notaryMode: "basic",
-    })
-    .waitForDeploy(20000);  // Allow 20 seconds for the contract deploy to complete
-```
-
-Note: the example code won't wait the full 20 seconds if the contract deploy completes early, so setting a large value won't increase the example run time unncessarily.
+Note: the example code won't wait the full polling period if the contract deploy completes early, so setting a large value won't increase the example run time unncessarily.
 
 ## Funding signing addresses with gas tokens e.g. ETH
 
@@ -349,7 +337,3 @@ preventing transactions on the base ledger from being correlated with each other
 A Paladin node can be configured to use predetermined signing keys, for example by using a pre-configured HD wallet mnemonic from which all signing keys are derived.
 
 It is necessary to ensure the addresses used by Paladin have sufficient gas tokens to fund transactions.
-
-### Automatic funding of addresses
-
-TBC

@@ -16,7 +16,7 @@ import PaladinClient from "@lfdecentralizedtrust-labs/paladin-sdk";
 import storageJson from "../abis/Storage.json";
 import * as fs from 'fs';
 import * as path from 'path';
-import { nodeConnections } from "paladin-example-common";
+import { nodeConnections, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 
 const logger = console;
 
@@ -167,7 +167,7 @@ async function main(): Promise<boolean> {
     }
 
     // Wait for the store transaction receipt
-    const storeReceipt = await paladin.pollForReceipt(storeTxID, 10000);
+    const storeReceipt = await paladin.pollForReceipt(storeTxID, DEFAULT_POLL_TIMEOUT);
     if (!storeReceipt?.transactionHash) {
       logger.error("STEP 4: Receipt retrieval failed!");
       return false;
@@ -223,7 +223,7 @@ async function main(): Promise<boolean> {
     }
 
     // Wait for the restore transaction receipt
-    const restoreReceipt = await paladin.pollForReceipt(restoreTxID, 10000);
+    const restoreReceipt = await paladin.pollForReceipt(restoreTxID, DEFAULT_POLL_TIMEOUT);
     if (!restoreReceipt?.transactionHash) {
       logger.error("STEP 5: Receipt retrieval failed!");
       return false;

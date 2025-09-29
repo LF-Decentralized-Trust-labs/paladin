@@ -18,7 +18,7 @@ import PaladinClient, {
 import helloWorldJson from "./abis/HelloWorld.json";
 import * as fs from 'fs';
 import * as path from 'path';
-import { nodeConnections } from "paladin-example-common";
+import { nodeConnections, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 
 const logger = console;
 
@@ -46,7 +46,7 @@ async function main(): Promise<boolean> {
   });
 
   // Wait for the deployment receipt
-  const deploymentReceipt = await paladin.pollForReceipt(deploymentTxID, 10000, true);
+  const deploymentReceipt = await paladin.pollForReceipt(deploymentTxID, DEFAULT_POLL_TIMEOUT, true);
   if (!deploymentReceipt?.contractAddress) {
     logger.error("STEP 1: Deployment failed!");
     return false;
@@ -74,7 +74,7 @@ async function main(): Promise<boolean> {
   }
 
   // Wait for the function call receipt
-  const functionReceipt = await paladin.pollForReceipt(sayHelloTxID, 10000, true);
+  const functionReceipt = await paladin.pollForReceipt(sayHelloTxID, DEFAULT_POLL_TIMEOUT, true);
   if (!functionReceipt?.transactionHash) {
     logger.error("STEP 2: Receipt retrieval failed!");
     return false;

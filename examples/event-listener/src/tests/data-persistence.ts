@@ -13,14 +13,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import PaladinClient, {
-  PaladinVerifier,
   PenteFactory,
   TransactionType,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
 import helloWorldJson from "../abis/HelloWorld.json";
-import { nodeConnections } from "paladin-example-common";
+import { nodeConnections, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 
 const logger = console;
 
@@ -319,11 +318,8 @@ async function main(): Promise<boolean> {
 
     logger.log(`STEP 8: Test transaction sent with ID: ${txId}`);
 
-    // Wait a moment for the transaction to be processed
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
     // Try to get the transaction receipt
-    const receipt = await paladin.pollForReceipt(txId, 10000);
+    const receipt = await paladin.pollForReceipt(txId, DEFAULT_POLL_TIMEOUT);
     if (!receipt) {
       logger.error("STEP 8: Failed to get test transaction receipt!");
       return false;

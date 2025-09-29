@@ -19,7 +19,13 @@ import PaladinClient, {
   PenteFactory,
   TransactionType,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
-import { checkDeploy, checkReceipt } from "paladin-example-common";
+import {
+  checkDeploy,
+  checkReceipt,
+  DEFAULT_POLL_TIMEOUT,
+  LONG_POLL_TIMEOUT,
+  POLL_INTERVAL,
+} from "paladin-example-common";
 import atomJson from "./abis/Atom.json";
 import atomFactoryJson from "./abis/AtomFactory.json";
 import bondTrackerPublicJson from "./abis/BondTrackerPublic.json";
@@ -60,7 +66,7 @@ async function main(): Promise<boolean> {
       notary: cashIssuer,
       notaryMode: "basic",
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(notoCash)) return false;
 
   // Issue some cash
@@ -71,7 +77,7 @@ async function main(): Promise<boolean> {
       amount: 100000,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   let balanceInvestor = await notoCash.balanceOf(cashIssuer, {
@@ -90,7 +96,7 @@ async function main(): Promise<boolean> {
       evmVersion: "shanghai",
       externalCallsEnabled: true,
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(issuerCustodianGroup)) return false;
 
   // Deploy the public bond tracker on the base ledger (controlled by the privacy group)
@@ -111,7 +117,7 @@ async function main(): Promise<boolean> {
       faceValue_: 1,
     },
   });
-  receipt = await paladin1.pollForReceipt(txID, 10000);
+  receipt = await paladin1.pollForReceipt(txID, DEFAULT_POLL_TIMEOUT);
   if (receipt?.contractAddress === undefined) {
     logger.error("Failed!");
     return false;
@@ -158,7 +164,7 @@ async function main(): Promise<boolean> {
     from: bondIssuer.lookup,
     data: {},
   });
-  receipt = await paladin1.pollForReceipt(txID, 10000);
+  receipt = await paladin1.pollForReceipt(txID, DEFAULT_POLL_TIMEOUT);
   if (receipt?.contractAddress === undefined) {
     logger.error("Failed!");
     return false;
@@ -174,7 +180,7 @@ async function main(): Promise<boolean> {
       amount: 1000,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
   let balanceCustodian = await notoBond.balanceOf(bondIssuer, {
     account: bondCustodian.lookup,
@@ -191,7 +197,7 @@ async function main(): Promise<boolean> {
       discountPrice: 1,
       minimumDenomination: 1,
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   // Add allowed investors
@@ -199,7 +205,7 @@ async function main(): Promise<boolean> {
   receipt = await investorList
     .using(paladin2)
     .addInvestor(bondCustodian, { addr: await investor.address() })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   // Create a Pente privacy group between the bond investor and bond custodian
@@ -211,7 +217,7 @@ async function main(): Promise<boolean> {
       evmVersion: "shanghai",
       externalCallsEnabled: true,
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (investorCustodianGroup === undefined) {
     logger.error("Failed!");
     return false;
@@ -240,7 +246,7 @@ async function main(): Promise<boolean> {
       amount: 100,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
   receipt = await paladin3.ptx.getTransactionReceiptFull(receipt.id);
   let domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
@@ -266,7 +272,7 @@ async function main(): Promise<boolean> {
       recipients: [{ to: bondCustodian, amount: 100 }],
       data: "0x",
     })
-    .waitForReceipt(5000, true);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT, true);
   if (!checkReceipt(receipt)) return false;
   domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const cashUnlockParams = domainReceipt?.lockInfo?.unlockParams;
@@ -284,7 +290,7 @@ async function main(): Promise<boolean> {
       amount: 100,
       data: "0x",
     })
-    .waitForReceipt(5000, true);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT, true);
   if (!checkReceipt(receipt)) return false;
   domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const bondLockId = domainReceipt?.lockInfo?.lockId;
@@ -309,7 +315,7 @@ async function main(): Promise<boolean> {
       recipients: [{ to: investor, amount: 100 }],
       data: "0x",
     })
-    .waitForReceipt(5000, true);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT, true);
   if (!checkReceipt(receipt)) return false;
   domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const assetUnlockParams = domainReceipt?.lockInfo?.unlockParams;
@@ -327,7 +333,7 @@ async function main(): Promise<boolean> {
       to: notoCash.address,
       encodedCall: cashUnlockCall,
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   // Pass the prepared bond transfer to the subscription contract
@@ -338,7 +344,7 @@ async function main(): Promise<boolean> {
       to: notoBond.address,
       encodedCall: assetUnlockCall,
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   // Prepare bond distribution (initializes atomic swap of payment and bond units)
@@ -346,7 +352,7 @@ async function main(): Promise<boolean> {
   receipt = await bondSubscription
     .using(paladin2)
     .distribute(bondCustodian)
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   // Extract the address of the created Atom
@@ -375,7 +381,7 @@ async function main(): Promise<boolean> {
       delegate: atomAddress,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   // Approve the bond transfer
@@ -388,7 +394,7 @@ async function main(): Promise<boolean> {
       delegate: atomAddress,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
   // Execute the atomic transfer
@@ -401,7 +407,7 @@ async function main(): Promise<boolean> {
     to: atomAddress,
     data: {},
   });
-  receipt = await paladin2.pollForReceipt(txID, 10000);
+  receipt = await paladin2.pollForReceipt(txID, DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
 
 
@@ -412,22 +418,22 @@ async function main(): Promise<boolean> {
   let finalBondBalanceCustodian: NotoBalanceOfResult | undefined;
   const startTime = Date.now();
   while (true) {
-  // Get final balances after the bond distribution
-  finalCashBalanceInvestor = await notoCash
-    .using(paladin3)
-    .balanceOf(investor, { account: investor.lookup });
+    // Get final balances after the bond distribution
+    finalCashBalanceInvestor = await notoCash
+      .using(paladin3)
+      .balanceOf(investor, { account: investor.lookup });
 
-  finalBondBalanceInvestor = await notoBond
-    .using(paladin3)
-    .balanceOf(investor, { account: investor.lookup });
+    finalBondBalanceInvestor = await notoBond
+      .using(paladin3)
+      .balanceOf(investor, { account: investor.lookup });
 
-  finalCashBalanceCustodian = await notoCash
-    .using(paladin2)
-    .balanceOf(bondCustodian, { account: bondCustodian.lookup });
+    finalCashBalanceCustodian = await notoCash
+      .using(paladin2)
+      .balanceOf(bondCustodian, { account: bondCustodian.lookup });
 
     finalBondBalanceCustodian = await notoBond
-    .using(paladin2)
-    .balanceOf(bondCustodian, { account: bondCustodian.lookup });
+      .using(paladin2)
+      .balanceOf(bondCustodian, { account: bondCustodian.lookup });
 
     if (finalCashBalanceInvestor?.totalBalance !== "0" &&
       finalBondBalanceInvestor?.totalBalance !== "0" &&
@@ -435,12 +441,13 @@ async function main(): Promise<boolean> {
       finalBondBalanceCustodian?.totalBalance !== "0") {
       break;
     }
-    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    if (Date.now() - startTime > 60000) {
-      logger.error("Failed to get final balances after 60 seconds");
+    if (Date.now() - startTime > LONG_POLL_TIMEOUT) {
+      logger.error(`Failed to get final balances after ${LONG_POLL_TIMEOUT / 1000} seconds`);
       return false;
     }
+
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
   }
 
       // Save contract data to file for later use

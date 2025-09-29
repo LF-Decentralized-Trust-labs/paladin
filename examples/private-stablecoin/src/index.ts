@@ -19,7 +19,7 @@ import PaladinClient, {
   algorithmZetoSnarkBJJ,
   IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
-import { checkDeploy, checkReceipt } from "paladin-example-common";
+import { checkDeploy, checkReceipt, DEFAULT_POLL_TIMEOUT, LONG_POLL_TIMEOUT } from "paladin-example-common";
 import erc20Abi from "./zeto-abis/SampleERC20.json";
 import kycAbi from "./zeto-abis/IZetoKyc.json";
 import { buildBabyjub } from "circomlibjs";
@@ -78,7 +78,7 @@ async function deployERC20(
     abi: erc20Abi.abi,
     bytecode: erc20Abi.bytecode,
   });
-  const result = await paladin.pollForReceipt(txId, 10000);
+  const result = await paladin.pollForReceipt(txId, DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(result)) {
     throw new Error("Failed to deploy ERC20 token");
   }
@@ -103,7 +103,7 @@ async function mintERC20(
     function: "mint",
     abi: erc20Abi.abi,
   });
-  const result = await paladin.pollForReceipt(txId, 10000);
+  const result = await paladin.pollForReceipt(txId, DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(result)) {
     throw new Error("Failed to mint ERC20 tokens");
   }
@@ -124,7 +124,7 @@ async function approveERC20(
     from: from.lookup,
     data: { value: amount, spender },
   });
-  const result = await paladin.pollForReceipt(txId, 10000);
+  const result = await paladin.pollForReceipt(txId, DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(result)) {
     throw new Error("Failed to approve ERC20 transfer");
   }
@@ -218,7 +218,7 @@ async function main(): Promise<boolean> {
     .setERC20(financialInstitution, {
       erc20: publicStablecoinAddress,
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(setERC20Receipt)) return false;
   logger.log("     ✓ ERC20 connected to Zeto contract\n");
 
@@ -241,7 +241,7 @@ async function main(): Promise<boolean> {
     function: "register",
     abi: kycAbi.abi,
   });
-  let kycReceipt = await paladin1.pollForReceipt(kycTxId, 10000);
+  let kycReceipt = await paladin1.pollForReceipt(kycTxId, DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(kycReceipt)) return false;
   logger.log("     ✓ Financial Institution registered for KYC");
 
@@ -259,7 +259,7 @@ async function main(): Promise<boolean> {
     function: "register",
     abi: kycAbi.abi,
   });
-  kycReceipt = await paladin1.pollForReceipt(kycTxId, 10000);
+  kycReceipt = await paladin1.pollForReceipt(kycTxId, DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(kycReceipt)) return false;
   logger.log("     ✓ Client A registered for KYC");
 
@@ -277,7 +277,7 @@ async function main(): Promise<boolean> {
     function: "register",
     abi: kycAbi.abi,
   });
-  kycReceipt = await paladin1.pollForReceipt(kycTxId, 10000);
+  kycReceipt = await paladin1.pollForReceipt(kycTxId, DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(kycReceipt)) return false;
   logger.log("     ✓ Client B registered for KYC\n");
 
@@ -341,7 +341,7 @@ async function main(): Promise<boolean> {
     .deposit(clientA, {
       amount: 75000,
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(depositReceipt)) return false;
   logger.log(
     "     ✓ Deposit successful - public tokens converted to private tokens"
@@ -380,7 +380,7 @@ async function main(): Promise<boolean> {
         },
       ],
     })
-    .waitForReceipt(30000); // Wait up to 30 seconds for transfer to give less powerful laptops time to generate ZK proof
+    .waitForReceipt(LONG_POLL_TIMEOUT); // Wait longer for transfer to give less powerful laptops time to generate ZK proof
   if (!checkReceipt(transferReceipt)) return false;
   logger.log("     ✓ Private transfer successful");
   logger.log("     ✓ Transfer amount and parties remain private");
@@ -414,7 +414,7 @@ async function main(): Promise<boolean> {
     .withdraw(clientB, {
       amount: 15000, // Withdraw 15,000 tokens
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(withdrawReceipt)) return false;
   logger.log(
     "     ✓ Withdrawal successful - private tokens converted back to public"

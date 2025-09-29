@@ -15,8 +15,7 @@
 import PaladinClient, {
   PenteFactory,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
-import { checkDeploy } from "paladin-example-common";
-import storageJson from "../abis/Storage.json";
+import { DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import { PrivateStorage } from "../helpers/storage";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -195,7 +194,7 @@ async function main(): Promise<boolean> {
       from: verifierNode1.lookup,
       function: "store",
       data: { num: newValueToStore },
-    }).waitForReceipt(10000);
+    }).waitForReceipt(DEFAULT_POLL_TIMEOUT);
 
     if (!storeReceipt?.transactionHash) {
       logger.error("STEP 7: Function call failed!");
@@ -255,7 +254,7 @@ async function main(): Promise<boolean> {
       from: verifierNode1.lookup,
       function: "store",
       data: { num: contractData.storedValue },
-    }).waitForReceipt(10000);
+    }).waitForReceipt(DEFAULT_POLL_TIMEOUT);
 
     if (!restoreReceipt?.transactionHash) {
       logger.error("STEP 8: Function call failed!");

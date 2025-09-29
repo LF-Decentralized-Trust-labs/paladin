@@ -19,7 +19,7 @@ import PaladinClient, {
   TransactionType,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import { nanoid } from "nanoid";
-import { checkDeploy } from "paladin-example-common";
+import { checkDeploy, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import helloWorldJson from "./abis/HelloWorld.json";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -58,7 +58,7 @@ async function main(): Promise<boolean> {
     bytecode: helloWorldJson.bytecode,
     from: verifierNode1.lookup,
   });
-  const receipt = await deploy.waitForReceipt(10000);
+  const receipt = await deploy.waitForReceipt(DEFAULT_POLL_TIMEOUT);
   const contractAddress = await deploy.waitForDeploy();
   if (!receipt || !contractAddress) {
     logger.error("Failed to deploy the contract. No address returned.");
@@ -204,14 +204,13 @@ async function main(): Promise<boolean> {
   // Wait for event data to be properly captured
   logger.log("Waiting for event data to be captured...");
   const startTime = Date.now();
-  const maxWaitTime = 60000; // Reduced to 30 seconds
   
   while (!receivedEventData || !receivedReceiptId) {
     await new Promise((resolve) => setTimeout(resolve, 500)); // Reduced polling interval
     
-    // If maxWaitTime passed from the beginning of the loop then fail the test
-    if (Date.now() - startTime > maxWaitTime) {
-      logger.error(`Failed to capture event data after ${maxWaitTime/1000} seconds`);
+    // If DEFAULT_POLL_TIMEOUT passed from the beginning of the loop then fail the test
+    if (Date.now() - startTime > DEFAULT_POLL_TIMEOUT) {
+      logger.error(`Failed to capture event data after ${DEFAULT_POLL_TIMEOUT/1000} seconds`);
       logger.error(`received: ${received}, receivedEventData: ${!!receivedEventData}, receivedReceiptId: ${!!receivedReceiptId}`);
       return false;
     }

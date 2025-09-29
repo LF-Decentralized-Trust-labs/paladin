@@ -3,6 +3,11 @@ import https from "https";
 import fs from "fs";
 import path from "path";
 
+
+export const DEFAULT_POLL_TIMEOUT = 30000;
+export const LONG_POLL_TIMEOUT = 120000;
+export const POLL_INTERVAL = 1000;
+
 /**
  * Defines the connectivity information for a single network node in JSON format.
  */

@@ -15,7 +15,7 @@
 import PaladinClient, {
   PenteFactory,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
-import { checkDeploy } from "paladin-example-common";
+import { checkDeploy, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import storageJson from "./abis/Storage.json";
 import { PrivateStorage } from "./helpers/storage";
 import * as fs from 'fs';
@@ -78,7 +78,7 @@ async function main(): Promise<boolean> {
     from: verifierNode1.lookup,
     function: "store",
     data: { num: valueToStore },
-  }).waitForReceipt(10000);
+  }).waitForReceipt(DEFAULT_POLL_TIMEOUT);
   
   // Validate store transaction was successful
   if (!storeReceipt?.success) {

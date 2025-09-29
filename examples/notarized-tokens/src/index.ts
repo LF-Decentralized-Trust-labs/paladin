@@ -18,7 +18,7 @@ import PaladinClient, {
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContractData } from "./tests/data-persistence";
-import { nodeConnections } from "paladin-example-common";
+import { nodeConnections, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import assert from "assert";
 
 const logger = console;
@@ -69,7 +69,7 @@ async function main(): Promise<boolean> {
       amount: mintAmount,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!mintReceipt) {
     logger.error("Failed to mint cash tokens!");
     return false;
@@ -111,7 +111,7 @@ async function main(): Promise<boolean> {
       amount: transferToNode2Amount,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!transferToNode2) {
     logger.error("Failed to transfer cash to Node2!");
     return false;
@@ -148,7 +148,7 @@ async function main(): Promise<boolean> {
       amount: transferToNode3Amount,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!transferToNode3) {
     logger.error("Failed to transfer cash to Node3!");
     return false;

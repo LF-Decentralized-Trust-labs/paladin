@@ -22,7 +22,7 @@ import erc20Abi from "./zeto-abis/SampleERC20.json";
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContractData } from "./tests/data-persistence";
-import { nodeConnections } from "paladin-example-common";
+import { nodeConnections, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 
 const logger = console;
 
@@ -58,7 +58,7 @@ async function main(): Promise<boolean> {
     .newZeto(cbdcIssuer, {
       tokenName: "Zeto_AnonNullifier",
     })
-    .waitForDeploy(10000);
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(zetoCBDC1)) return false;
 
   // Issue some cash
@@ -78,7 +78,7 @@ async function main(): Promise<boolean> {
         },
       ],
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
   let bank1Balance = await zetoCBDC1
     .using(paladin1)
@@ -111,7 +111,7 @@ async function main(): Promise<boolean> {
         },
       ],
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
   
   // Add a small delay to ensure state is settled
@@ -139,7 +139,7 @@ async function main(): Promise<boolean> {
     .newZeto(cbdcIssuer, {
       tokenName: "Zeto_AnonNullifier",
     })
-    .waitForDeploy(10000);
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(zetoCBDC2)) return false;
 
   logger.log("- Deploying ERC20 token to manage the CBDC supply publicly...");
@@ -151,7 +151,7 @@ async function main(): Promise<boolean> {
     .setERC20(cbdcIssuer, {
       erc20: erc20Address as string,
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(result2)) return false;
 
   logger.log("- Issuing CBDC to bank1 with public minting in ERC20...");
@@ -167,7 +167,7 @@ async function main(): Promise<boolean> {
     .deposit(bank1, {
       amount: depositAmount,
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(result4)) return false;
   const bank1BalanceAfterDeposit = await zetoCBDC2
     .using(paladin1)
@@ -191,7 +191,7 @@ async function main(): Promise<boolean> {
         },
       ],
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
   
   // Add a small delay to ensure state is settled
@@ -216,7 +216,7 @@ async function main(): Promise<boolean> {
     .withdraw(bank1, {
       amount: withdrawAmount,
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(result5)) return false;
 
   // Add a small delay to ensure state is settled
@@ -306,7 +306,7 @@ async function deployERC20(
     abi: erc20Abi.abi,
     bytecode: erc20Abi.bytecode,
   });
-  const result1 = await paladin.pollForReceipt(txId1, 120000); // 2 minutes
+  const result1 = await paladin.pollForReceipt(txId1, DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(result1)) {
     throw new Error("Failed to deploy ERC20 token");
   }
@@ -332,7 +332,7 @@ async function mintERC20(
     function: "mint",
     abi: erc20Abi.abi,
   });
-  const result3 = await paladin.pollForReceipt(txId2, 120000);
+  const result3 = await paladin.pollForReceipt(txId2, DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(result3)) {
     throw new Error("Failed to mint ERC20 tokens to bank1");
   }
@@ -354,7 +354,7 @@ async function approveERC20(
     from: from.lookup,
     data: { value: amount, spender },
   });
-  const result1 = await paladin.pollForReceipt(txID1, 120000);
+  const result1 = await paladin.pollForReceipt(txID1, DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(result1)) {
     throw new Error("Failed to approve transfer");
   }
