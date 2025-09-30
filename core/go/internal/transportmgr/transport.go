@@ -241,6 +241,12 @@ func (t *transport) getLocalDetails(ctx context.Context) (string, error) {
 }
 
 func (t *transport) close() {
+	// log.L(t.ctx).Infof("Stopping transport %s", t.name)
+	// go func() {
+	// 	t.api.StopTransport(t.ctx, &prototk.StopTransportRequest{})
+	// }()
+	// // Allow 2 seconds for message to be received, then cancel the context
+	// log.L(t.ctx).Infof("Closing the context for transport %s", t.name)
 	t.cancelCtx()
 	<-t.initDone
 }

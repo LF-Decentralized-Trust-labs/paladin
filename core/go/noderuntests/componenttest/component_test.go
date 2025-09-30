@@ -52,11 +52,11 @@ func deployDomainRegistry(t *testing.T) *pldtypes.EthAddress {
 }
 
 func newInstanceForComponentTesting(t *testing.T, deployDomainAddress *pldtypes.EthAddress, binding interface{}, peerNodes []interface{}, domainConfig interface{}, enableWS bool) testutils.ComponentTestInstance {
-	return testutils.NewInstanceForComponentTesting(t, deployDomainAddress, binding, peerNodes, domainConfig, enableWS, CONFIG_PATH)
+	return testutils.NewInstanceForTesting(t, deployDomainAddress, binding, peerNodes, domainConfig, enableWS, CONFIG_PATH, false)
 }
 
 func startNode(t *testing.T, party testutils.Party, domainConfig interface{}) {
-	party.Start(t, domainConfig, CONFIG_PATH)
+	party.Start(t, domainConfig, CONFIG_PATH, false)
 }
 
 func TestRunSimpleStorageEthTransaction(t *testing.T) {

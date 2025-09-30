@@ -21,133 +21,356 @@ package coordinationtest
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
 	testutils "github.com/LF-Decentralized-Trust-labs/paladin/core/noderuntests/pkg"
-	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/noderuntests/pkg/domains"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	"github.com/google/uuid"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldclient"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/solutils"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var CONFIG_PATH = "../../test/config/postgres.coordinationtest.config.yaml"
-
-func deployDomainRegistry(t *testing.T) *pldtypes.EthAddress {
-	return testutils.DeployDomainRegistry(t, CONFIG_PATH)
+// Map of node names to config paths. Each node needs its own DB and static signing key
+var CONFIG_PATHS = map[string]string{
+	"alice": "../../test/config/postgres.coordinationtest.alice.config.yaml",
+	"bob":   "../../test/config/postgres.coordinationtest.bob.config.yaml",
 }
 
-func newInstanceForComponentTesting(t *testing.T, deployDomainRegistry func(*testing.T) *pldtypes.EthAddress, binding interface{}, peerNodes []interface{}, domainConfig interface{}, enableWS bool) testutils.ComponentTestInstance {
-	return testutils.NewInstanceForComponentTesting(t, deployDomainRegistry(t), binding, peerNodes, domainConfig, enableWS, CONFIG_PATH)
+func deployDomainRegistry(t *testing.T, nodeName string) *pldtypes.EthAddress {
+	return testutils.DeployDomainRegistry(t, CONFIG_PATHS[nodeName])
 }
 
-func subscribeAndSendDataToChannel(ctx context.Context, t *testing.T, wsClient pldclient.PaladinWSClient, listenerName string, data chan string) {
-	sub, err := wsClient.PTX().SubscribeBlockchainEvents(ctx, listenerName)
-	require.NoError(t, err)
-	go func() {
-		for {
-			select {
-			case subNotification, ok := <-sub.Notifications():
-				if ok {
-					eventData := make([]string, 0)
-					var batch pldapi.TransactionEventBatch
-					_ = json.Unmarshal(subNotification.GetResult(), &batch)
-					for _, e := range batch.Events {
-						t.Logf("Received event on %s from %d/%d/%d : %s", listenerName, e.BlockNumber, e.TransactionIndex, e.LogIndex, e.Data.String())
-						eventData = append(eventData, e.Data.String())
-					}
-					require.NoError(t, subNotification.Ack(ctx))
-					// send after the ack otherwise the main test can complete when it receives the last values and the websocket is closed before the ack
-					// can be sent
-					for _, d := range eventData {
-						data <- d
-					}
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
+func startNode(t *testing.T, party testutils.Party, domainConfig interface{}) {
+	party.Start(t, domainConfig, CONFIG_PATHS[party.GetName()], true)
 }
 
-func TestRunSimpleStorageEthTransaction2(t *testing.T) {
-	ctx, cancelCtx := context.WithCancel(context.Background())
-	defer cancelCtx()
+func stopNode(t *testing.T, party testutils.Party) {
+	party.Stop(t)
+}
 
-	logrus.SetLevel(logrus.DebugLevel)
+func TestTransactionSuccessAfterStartStopSingleNode(t *testing.T) {
+	// We want to test that we can start some nodes, send some transactions, restart the nodes and send some more transactions
 
-	instance := newInstanceForComponentTesting(t, deployDomainRegistry, nil, nil, nil, true)
-	c := pldclient.Wrap(instance.GetClient()).ReceiptPollingInterval(250 * time.Millisecond)
+	ctx := context.Background()
+	domainRegistryAddress := deployDomainRegistry(t, "alice")
 
-	build, err := solutils.LoadBuild(ctx, simpleStorageBuildJSON)
-	require.NoError(t, err)
+	alice := testutils.NewPartyForTesting(t, "alice", domainRegistryAddress)
+	bob := testutils.NewPartyForTesting(t, "bob", domainRegistryAddress)
 
-	simpleStorage := c.ForABI(ctx, build.ABI).Public().From("key1")
+	alice.AddPeer(bob.GetNodeConfig())
+	bob.AddPeer(alice.GetNodeConfig())
 
-	res := simpleStorage.Clone().
-		Constructor().
-		Bytecode(build.Bytecode).
-		Inputs(`{"x":11223344}`).
-		Send().Wait(5 * time.Second)
-	require.NoError(t, res.Error())
-	contractAddr := res.Receipt().ContractAddress
+	domainConfig := &domains.SimpleDomainConfig{
+		SubmitMode: domains.ENDORSER_SUBMISSION,
+	}
 
-	// set up the event listener
-	success, err := c.PTX().CreateBlockchainEventListener(ctx, &pldapi.BlockchainEventListener{
-		Name: "listener1",
-		Sources: []pldapi.BlockchainEventListenerSource{{
-			ABI:     abi.ABI{build.ABI.Events()["Changed"]},
-			Address: contractAddr,
-		}},
+	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+
+	t.Cleanup(func() {
+		stopNode(t, bob)
 	})
+
+	constructorParameters := &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken1",
+		Symbol:          "FT1",
+		EndorsementMode: domains.SelfEndorsement,
+	}
+
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	// Start a private transaction on alices node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bobs node
+	var aliceTxID uuid.UUID
+	idempotencyKey := uuid.New().String()
+	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+                    "from": "",
+                    "to": "` + bob.GetIdentityLocator() + `",
+                    "amount": "123000000000000000000"
+                }`),
+		},
+	})
+
 	require.NoError(t, err)
-	require.True(t, success)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, aliceTxID, alice.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
 
-	wsClient, err := c.WebSocket(ctx, instance.GetWSConfig())
+	// Start a private transaction on bobs node
+	// This is a transfer which relies on bobs node being aware of the state created by alice's mint to bob above
+	var bobTx1ID uuid.UUID
+	idempotencyKey = uuid.New().String()
+	err = bob.GetClient().CallRPC(ctx, &bobTx1ID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-bob-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           bob.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+                    "from": "` + bob.GetIdentityLocator() + `",
+                    "to": "` + alice.GetIdentityLocator() + `",
+                    "amount": "123000000000000000000"
+                }`),
+		},
+	})
+
 	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, bobTx1ID)
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, bobTx1ID, bob.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
 
-	eventData := make(chan string)
-	subscribeAndSendDataToChannel(ctx, t, wsClient, "listener1", eventData)
+	stopNode(t, alice)
 
-	success, err = c.PTX().StartBlockchainEventListener(ctx, "listener1")
+	var verifierResult string
+	err = bob.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
+		bob.GetIdentityLocator(),
+		algorithms.ECDSA_SECP256K1,
+		verifiers.ETH_ADDRESS,
+	)
 	require.NoError(t, err)
-	require.True(t, success)
+	require.NotNil(t, verifierResult)
 
-	data := <-eventData
-	assert.JSONEq(t, `{"x":"11223344"}`, data)
+	err = alice.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
+		bob.GetIdentityLocator(),
+		algorithms.ECDSA_SECP256K1,
+		verifiers.ETH_ADDRESS,
+	)
+	require.Error(t, err)
+	require.NotNil(t, verifierResult)
 
-	var getX pldtypes.RawJSON
-	err = simpleStorage.Clone().
-		Function("get").
-		To(contractAddr).
-		Outputs(&getX).
-		Call()
+	startNode(t, alice, domainConfig)
+
+	err = alice.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
+		alice.GetIdentityLocator(),
+		algorithms.ECDSA_SECP256K1,
+		verifiers.ETH_ADDRESS,
+	)
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"x":"11223344"}`, getX.Pretty())
+	require.NotNil(t, verifierResult)
 
-	res = simpleStorage.Clone().
-		Function("set").
-		To(contractAddr).
-		Inputs(`{"_x":99887766}`).
-		Send().Wait(5 * time.Second)
-	require.NoError(t, res.Error())
+	err = alice.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
+		bob.GetIdentityLocator(),
+		algorithms.ECDSA_SECP256K1,
+		verifiers.ETH_ADDRESS,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, verifierResult)
 
-	data = <-eventData
-	assert.JSONEq(t, `{"x":"99887766"}`, data)
+	// Start a private transaction on alices node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bobs node
+	idempotencyKey = uuid.New().String()
+	err = alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx2-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+                    "from": "",
+                    "to": "` + bob.GetIdentityLocator() + `",
+                    "amount": "123000000000000000000"
+                }`),
+		},
+	})
 
-	res = simpleStorage.Clone().
-		Function("set").
-		To(contractAddr).
-		Inputs(`{"_x":1234}`).
-		Send().Wait(5 * time.Second)
-	require.NoError(t, res.Error())
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, aliceTxID, alice.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
 
-	data = <-eventData
-	assert.JSONEq(t, `{"x":"1234"}`, data)
+	t.Cleanup(func() {
+		stopNode(t, alice)
+	})
+}
+
+// MRW TODO - tempoorarily run the test twice to ensure node start/stop is reliable
+func TestTransactionSuccessAfterStartStopSingleNodeAgain(t *testing.T) {
+	// We want to test that we can start some nodes, send some transactions, restart the nodes and send some more transactions
+
+	ctx := context.Background()
+	domainRegistryAddress := deployDomainRegistry(t, "alice")
+
+	alice := testutils.NewPartyForTesting(t, "alice", domainRegistryAddress)
+	bob := testutils.NewPartyForTesting(t, "bob", domainRegistryAddress)
+
+	alice.AddPeer(bob.GetNodeConfig())
+	bob.AddPeer(alice.GetNodeConfig())
+
+	domainConfig := &domains.SimpleDomainConfig{
+		SubmitMode: domains.ENDORSER_SUBMISSION,
+	}
+
+	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+
+	t.Cleanup(func() {
+		stopNode(t, bob)
+	})
+
+	constructorParameters := &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken1",
+		Symbol:          "FT1",
+		EndorsementMode: domains.SelfEndorsement,
+	}
+
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	// Start a private transaction on alices node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bobs node
+	var aliceTxID uuid.UUID
+	idempotencyKey := uuid.New().String()
+	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+                    "from": "",
+                    "to": "` + bob.GetIdentityLocator() + `",
+                    "amount": "123000000000000000000"
+                }`),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, aliceTxID, alice.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+
+	// Start a private transaction on bobs node
+	// This is a transfer which relies on bobs node being aware of the state created by alice's mint to bob above
+	var bobTx1ID uuid.UUID
+	idempotencyKey = uuid.New().String()
+	err = bob.GetClient().CallRPC(ctx, &bobTx1ID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-bob-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           bob.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+                    "from": "` + bob.GetIdentityLocator() + `",
+                    "to": "` + alice.GetIdentityLocator() + `",
+                    "amount": "123000000000000000000"
+                }`),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, bobTx1ID)
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, bobTx1ID, bob.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+
+	stopNode(t, alice)
+
+	var verifierResult string
+	err = bob.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
+		bob.GetIdentityLocator(),
+		algorithms.ECDSA_SECP256K1,
+		verifiers.ETH_ADDRESS,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, verifierResult)
+
+	err = alice.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
+		bob.GetIdentityLocator(),
+		algorithms.ECDSA_SECP256K1,
+		verifiers.ETH_ADDRESS,
+	)
+	require.Error(t, err)
+	require.NotNil(t, verifierResult)
+
+	startNode(t, alice, domainConfig)
+
+	err = alice.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
+		alice.GetIdentityLocator(),
+		algorithms.ECDSA_SECP256K1,
+		verifiers.ETH_ADDRESS,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, verifierResult)
+
+	err = alice.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
+		bob.GetIdentityLocator(),
+		algorithms.ECDSA_SECP256K1,
+		verifiers.ETH_ADDRESS,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, verifierResult)
+
+	// Start a private transaction on alices node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bobs node
+	idempotencyKey = uuid.New().String()
+	err = alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx2-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+                    "from": "",
+                    "to": "` + bob.GetIdentityLocator() + `",
+                    "amount": "123000000000000000000"
+                }`),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, aliceTxID, alice.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+
+	t.Cleanup(func() {
+		stopNode(t, alice)
+	})
 }

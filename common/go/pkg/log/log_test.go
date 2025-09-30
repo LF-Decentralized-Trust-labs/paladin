@@ -78,7 +78,7 @@ func TestSettingDefaultLevel(t *testing.T) {
 }
 
 func TestSetFormatting(t *testing.T) {
-	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstae defaults for other tests */ }()
+	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstate defaults for other tests */ }()
 	InitConfig(&pldconf.LogConfig{
 		DisableColor: confutil.P(true),
 		UTC:          confutil.P(true),
@@ -87,7 +87,7 @@ func TestSetFormatting(t *testing.T) {
 }
 
 func TestSetFormattingStderr(t *testing.T) {
-	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstae defaults for other tests */ }()
+	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstate defaults for other tests */ }()
 	InitConfig(&pldconf.LogConfig{
 		Output: confutil.P("stderr"),
 	})
@@ -95,7 +95,7 @@ func TestSetFormattingStderr(t *testing.T) {
 }
 
 func TestSetFormattingStdout(t *testing.T) {
-	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstae defaults for other tests */ }()
+	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstate defaults for other tests */ }()
 	InitConfig(&pldconf.LogConfig{
 		Output: confutil.P("stdout"),
 	})
@@ -103,7 +103,7 @@ func TestSetFormattingStdout(t *testing.T) {
 }
 
 func TestSetFormattingIncludeCodeInfo(t *testing.T) {
-	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstae defaults for other tests */ }()
+	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstate defaults for other tests */ }()
 	InitConfig(&pldconf.LogConfig{
 		Format: confutil.P("detailed"),
 	})
@@ -111,7 +111,7 @@ func TestSetFormattingIncludeCodeInfo(t *testing.T) {
 }
 
 func TestSetFormattingJSONEnabled(t *testing.T) {
-	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstae defaults for other tests */ }()
+	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstate defaults for other tests */ }()
 	InitConfig(&pldconf.LogConfig{
 		Format: confutil.P("json"),
 	})
@@ -119,7 +119,7 @@ func TestSetFormattingJSONEnabled(t *testing.T) {
 }
 
 func TestSetFormattingFile(t *testing.T) {
-	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstae defaults for other tests */ }()
+	defer func() { InitConfig(&pldconf.LogConfig{}) /* reinstate defaults for other tests */ }()
 	logFile := path.Join(t.TempDir(), "paladin.log")
 	InitConfig(&pldconf.LogConfig{
 		Output: confutil.P("file"),
@@ -132,4 +132,16 @@ func TestSetFormattingFile(t *testing.T) {
 	fileExists, err := os.Stat(logFile)
 	require.NoError(t, err)
 	assert.False(t, fileExists.IsDir())
+}
+
+func TestLogComponent(t *testing.T) {
+	comp := Component("mycomponent")
+	ctx := WithComponent(context.Background(), "mycomponent")
+	assert.Equal(t, comp, L(ctx).Data["component"])
+}
+
+func TestLogVeryLongComponent(t *testing.T) {
+	comp := Component("very-long-coomponent-name-01234567890123456789012345678901234...")
+	ctx := WithComponent(context.Background(), "very-long-coomponent-name-0123456789012345678901234567890123456789012345678901234567890123456789")
+	assert.Equal(t, comp, L(ctx).Data["component"])
 }

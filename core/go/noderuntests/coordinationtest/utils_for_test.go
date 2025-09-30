@@ -29,9 +29,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed abis/SimpleStorage.json
-var simpleStorageBuildJSON []byte // From "gradle copyTestSolidityBuild"
-
 func transactionReceiptCondition(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool {
 	//for the given transaction ID, return a function that can be used in an assert.Eventually to check if the transaction has a receipt
 	return func() bool {
@@ -40,17 +37,6 @@ func transactionReceiptCondition(t *testing.T, ctx context.Context, txID uuid.UU
 		require.NoError(t, err)
 		require.False(t, (txFull.Receipt != nil && txFull.Receipt.Success == false), "Have transaction receipt but not successful")
 		return txFull.Receipt != nil && (!isDeploy || (txFull.Receipt.ContractAddress != nil && *txFull.Receipt.ContractAddress != pldtypes.EthAddress{}))
-	}
-}
-
-func transactionRevertedCondition(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client) func() bool {
-	//for the given transaction ID, return a function that can be used in an assert.Eventually to check if the transaction has been reverted
-	return func() bool {
-		txFull := pldapi.TransactionFull{}
-		err := rpcClient.CallRPC(ctx, &txFull, "ptx_getTransactionFull", txID)
-		require.NoError(t, err)
-		return txFull.Receipt != nil &&
-			!txFull.Receipt.Success
 	}
 }
 
