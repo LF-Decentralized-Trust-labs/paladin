@@ -234,7 +234,7 @@ func (ph *pluginHandler[M]) sender() {
 		select {
 		case msg = <-ph.sendChl:
 		case <-ph.ctx.Done():
-			log.L(ph.ctx).Debugf("domain handler ending")
+			log.L(ph.ctx).Debugf("plugin handler ending")
 			return
 		}
 		if err := ph.stream.Send(msg.Message()); err != nil {

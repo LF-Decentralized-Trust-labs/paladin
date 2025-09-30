@@ -53,25 +53,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed abis/SimpleStorage.json
-var simpleStorageBuildJSON []byte // From "gradle copyTestSolidityBuild"
-
-func transactionReceiptCondition(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool {
-	//for the given transaction ID, return a function that can be used in an assert.Eventually to check if the transaction has a receipt
-	return func() bool {
-		txFull := pldapi.TransactionFull{}
-		err := rpcClient.CallRPC(ctx, &txFull, "ptx_getTransactionFull", txID)
-		require.NoError(t, err)
-		require.False(t, (txFull.Receipt != nil && txFull.Receipt.Success == false), "Have transaction receipt but not successful")
-		return txFull.Receipt != nil && (!isDeploy || (txFull.Receipt.ContractAddress != nil && *txFull.Receipt.ContractAddress != pldtypes.EthAddress{}))
-	}
-}
-
 type ComponentTestInstance interface {
 	GetName() string
 	GetClient() rpcclient.Client
 	GetWSConfig() *pldconf.WSClientConfig
 	ResolveEthereumAddress(identity string) string
+	GetComponentManager() componentmgr.ComponentManager
+	GetPluginManager() plugins.UnitTestPluginLoader
 }
 
 type componentTestInstance struct {
@@ -82,6 +70,7 @@ type componentTestInstance struct {
 	client                 rpcclient.Client
 	resolveEthereumAddress func(identity string) string
 	cm                     componentmgr.ComponentManager
+	pluginManager          plugins.UnitTestPluginLoader
 	wsConfig               *pldconf.WSClientConfig
 }
 
@@ -122,7 +111,15 @@ func (testutils *componentTestInstance) ResolveEthereumAddress(identity string) 
 	return testutils.resolveEthereumAddress(identity)
 }
 
-func NewInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtypes.EthAddress, bindingConfig interface{}, peerNodes []interface{}, domainConfig interface{}, enableWS bool, configPath string) ComponentTestInstance {
+func (testutils *componentTestInstance) GetComponentManager() componentmgr.ComponentManager {
+	return testutils.cm
+}
+
+func (testutils *componentTestInstance) GetPluginManager() plugins.UnitTestPluginLoader {
+	return testutils.pluginManager
+}
+
+func NewInstanceForTesting(t *testing.T, domainRegistryAddress *pldtypes.EthAddress, bindingConfig interface{}, peerNodes []interface{}, domainConfig interface{}, enableWS bool, configPath string, manualTestCleanup bool) ComponentTestInstance {
 	var binding *nodeConfiguration
 	if bindingConfig == nil {
 		binding = NewNodeConfiguration(t, "default")
@@ -235,16 +232,10 @@ func NewInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtype
 		},
 	}
 
-	//uncomment for debugging
-	//i.conf.DB.SQLite.DSN = "./sql." + i.name + ".db"
-	//uncomment to use postgres - TODO once all tests are using postgres, we can parameterize this and run in both modes
-	//i.conf.DB.Type = "postgres"
-
 	if i.conf.DB.Type == "postgres" {
-		dns, cleanUp := initPostgres(t, context.Background())
+		dns, cleanUp := initPostgres(t, context.Background(), binding.name)
 		i.conf.DB.Postgres.DSN = dns
 		t.Cleanup(cleanUp)
-
 	}
 
 	var pl plugins.UnitTestPluginLoader
@@ -265,16 +256,21 @@ func NewInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtype
 	}
 	pc := i.cm.PluginManager()
 	pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), loaderMap)
+	i.pluginManager = pl
 	require.NoError(t, err)
 	go pl.Run()
 
 	err = i.cm.CompleteStart()
 	require.NoError(t, err)
 
-	t.Cleanup(func() {
-		pl.Stop()
-		i.cm.Stop()
-	})
+	// Coordination tests start and stop nodes during the test, so they
+	// manually handle cleaning up the plugin and component managers
+	if !manualTestCleanup {
+		t.Cleanup(func() {
+			pl.Stop()
+			i.cm.Stop()
+		})
+	}
 
 	client, err := rpcclient.NewHTTPClient(log.WithLogField(context.Background(), "client-for", binding.name), &pldconf.HTTPClientConfig{URL: "http://localhost:" + strconv.Itoa(*i.conf.RPCServer.HTTP.Port)})
 	require.NoError(t, err)
@@ -291,24 +287,43 @@ func NewInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtype
 	return i
 }
 
-func initPostgres(t *testing.T, ctx context.Context) (dns string, cleanup func()) {
+func initPostgres(t *testing.T, ctx context.Context, nodeName string) (dns string, cleanup func()) {
 	dbDSN := func(dbname string) string {
 		return fmt.Sprintf("postgres://postgres:my-secret@localhost:5432/%s?sslmode=disable", dbname)
 	}
-	componentTestdbName := "ct_" + uuid.New().String()
+	componentTestdbName := fmt.Sprintf("coordtestbed%s", nodeName)
 	log.L(ctx).Infof("Component test Postgres DB: %s", componentTestdbName)
 
 	// First create the database - using the super user
-
 	adminDB, err := sql.Open("postgres", dbDSN("postgres"))
-	if err == nil {
-		_, err = adminDB.Exec(fmt.Sprintf(`CREATE DATABASE "%s";`, componentTestdbName))
+	// Check if the database already exists
+	res, err := adminDB.Query(fmt.Sprintf(`SELECT 1 FROM pg_database WHERE datname = '%s';`, componentTestdbName))
+
+	require.NoError(t, err)
+
+	if res != nil && res.Next() {
+		log.L(ctx).Infof("Database already exists: %s", componentTestdbName)
+
+		err = adminDB.Close()
+		require.NoError(t, err)
+
+		// Don't delete the existing DB after the tests
+		return dbDSN(componentTestdbName), func() {}
 	}
+
+	// DB doesn't already exist so try to create it
+	_, err = adminDB.Exec(fmt.Sprintf(`CREATE DATABASE "%s";`, componentTestdbName))
+
+	if err != nil {
+		log.L(ctx).Errorf("Error creating database: %s", err)
+		require.NoError(t, err)
+	}
+
 	if err == nil {
 		err = adminDB.Close()
 	}
-	require.NoError(t, err)
 
+	// If we created the database to run the tests, delete it at the end
 	return dbDSN(componentTestdbName), func() {
 		adminDB, err := sql.Open("postgres", dbDSN("postgres"))
 		if err == nil {
@@ -413,6 +428,8 @@ func testConfig(t *testing.T, enableWS bool, configPath string) (pldconf.Paladin
 	}
 	log.InitConfig(&conf.Log)
 
+	initPostgres(t, context.Background(), conf.NodeName)
+
 	return *conf, wsConfig
 }
 
@@ -468,10 +485,12 @@ func buildTestCertificate(t *testing.T, subject pkix.Name, ca *x509.Certificate,
 
 type Party interface {
 	GetIdentity() string
+	GetName() string
 	GetNodeConfig() *nodeConfiguration
 	GetClient() rpcclient.Client
 	AddPeer(peers ...interface{})
-	Start(t *testing.T, domainConfig any, configPath string)
+	Start(t *testing.T, domainConfig any, configPath string, manualTestCleanup bool)
+	Stop(t *testing.T)
 	GetIdentityLocator() string
 	DeploySimpleDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.ConstructorParameters,
 		transactionReceiptCondition func(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool,
@@ -483,6 +502,10 @@ type Party interface {
 
 func (p *partyForTesting) GetIdentity() string {
 	return p.identity
+}
+
+func (p *partyForTesting) GetName() string {
+	return p.name
 }
 
 func (p *partyForTesting) GetNodeConfig() *nodeConfiguration {
@@ -560,6 +583,7 @@ func (p *partyForTesting) DeploySimpleStorageDomainInstanceContract(t *testing.T
 }
 
 type partyForTesting struct {
+	name                  string
 	identity              string // identity used to resolve the verifier on its local node
 	identityLocator       string // fully qualified locator for the identity that can be used on other nodes
 	instance              ComponentTestInstance
@@ -570,8 +594,9 @@ type partyForTesting struct {
 }
 
 func NewPartyForTesting(t *testing.T, name string, domainRegistryAddress *pldtypes.EthAddress) *partyForTesting {
-	nodeName := name + "Node"
+	nodeName := name
 	party := &partyForTesting{
+		name:                  name,
 		peers:                 make([]interface{}, 0),
 		domainRegistryAddress: domainRegistryAddress,
 		identity:              fmt.Sprintf("wallets.org1.%s", name),
@@ -586,8 +611,12 @@ func (p *partyForTesting) AddPeer(peers ...interface{}) {
 	p.peers = append(p.peers, peers...)
 }
 
-func (p *partyForTesting) Start(t *testing.T, domainConfig any, configPath string) {
-	p.instance = NewInstanceForComponentTesting(t, p.domainRegistryAddress, p.nodeConfig, p.peers, domainConfig, false, configPath)
+func (p *partyForTesting) Start(t *testing.T, domainConfig any, configPath string, manualTestCleanup bool) {
+	p.instance = NewInstanceForTesting(t, p.domainRegistryAddress, p.nodeConfig, p.peers, domainConfig, false, configPath, manualTestCleanup)
 	p.client = p.instance.GetClient()
+}
 
+func (p *partyForTesting) Stop(t *testing.T) {
+	p.instance.GetComponentManager().Stop()
+	p.instance.GetPluginManager().Stop()
 }

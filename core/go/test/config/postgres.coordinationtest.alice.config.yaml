@@ -1,8 +1,8 @@
-nodeName: node1
+nodeName: alice
 db:
   type: postgres
   postgres:
-    dsn: "postgres://postgres:my-secret@localhost:5432/coordtestbed?sslmode=disable"
+    dsn: "postgres://postgres:my-secret@localhost:5432/coordtestbedalice?sslmode=disable"
     autoMigrate: true
     migrationsDir: "../db/migrations/postgres"
     debugQueries: false
