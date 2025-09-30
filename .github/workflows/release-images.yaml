@@ -43,11 +43,11 @@ jobs:
       dockerhub_repository: ${{ steps.dockerhub_repo.outputs.repository }}
       ghcr_repository: ${{ steps.ghcr_repo.outputs.repository }}
       tags: ${{ steps.determine-tags.outputs.tags }}
-    env:
-      LATEST: 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Determine tags
         id: determine-tags

@@ -98,8 +98,8 @@ prometheus:
 postgres: # the postgres container runs as a sidecar to the paladin container
   image:
     repository: postgres
-    tag: latest
-    pullPolicy: Always
+    tag: 17.6
+    pullPolicy: IfNotPresent
 
 # Smart Contracts References
 # Provide either 'deployment' or 'address':

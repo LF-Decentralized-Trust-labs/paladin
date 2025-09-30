@@ -18,7 +18,7 @@ import PaladinClient, {
 import storageJson from "./abis/Storage.json";
 import * as fs from 'fs';
 import * as path from 'path';
-import { nodeConnections, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
+import { nodeConnections, getCachePath, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 
 const logger = console;
 
@@ -115,7 +115,7 @@ async function main(): Promise<boolean> {
   };
 
   // Use command-line argument for data directory if provided, otherwise use default
-  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
+  const dataDir = getCachePath();
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
