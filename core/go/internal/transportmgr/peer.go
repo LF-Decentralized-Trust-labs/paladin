@@ -34,6 +34,11 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+type msgWithErrChan struct {
+	*prototk.PaladinMsg
+	errChan chan error
+}
+
 type peer struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
@@ -470,8 +475,14 @@ func (p *peer) sender() {
 			case msg := <-p.sendQueue:
 				resendTimer.Stop()
 				// send and spin straight round
-				if err := p.send(msg, nil); err != nil {
+				if err := p.send(msg.PaladinMsg, nil); err != nil {
 					log.L(p.ctx).Errorf("failed to send message '%s' after short retry (discarding): %s", msg.MessageId, err)
+					if msg.errChan != nil {
+						msg.errChan <- err
+					}
+				}
+				if msg.errChan != nil {
+					close(msg.errChan)
 				}
 			}
 		}
