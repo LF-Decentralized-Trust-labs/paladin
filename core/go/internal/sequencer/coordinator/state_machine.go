@@ -385,8 +385,6 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 					log.L(ctx).Errorf("[Sequencer] error transitioning coordinator to state %v: %v", sm.currentState, err)
 					return err
 				}
-			} else {
-				log.L(ctx).Debugf("[Sequencer] no OnTransitionTo function defined for state %v", sm.currentState)
 			}
 
 			c.heartbeatIntervalsSinceStateChange = 0

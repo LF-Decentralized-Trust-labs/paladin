@@ -136,7 +136,7 @@ func (s *sender) createTransaction(ctx context.Context, txn *components.PrivateT
 	s.transactionsOrdered = append(s.transactionsOrdered, &txn.ID)
 	createdEvent := &transaction.CreatedEvent{}
 	createdEvent.TransactionID = txn.ID
-	err = newTxn.HandleEvent(context.Background(), createdEvent)
+	err = newTxn.HandleEvent(ctx, createdEvent)
 	if err != nil {
 		log.L(ctx).Errorf("[Sequencer] error handling CreatedEvent for transaction %s: %v", txn.ID.String(), err)
 		return err

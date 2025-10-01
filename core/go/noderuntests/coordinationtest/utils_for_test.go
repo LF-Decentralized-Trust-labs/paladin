@@ -40,10 +40,15 @@ func transactionReceiptCondition(t *testing.T, ctx context.Context, txID uuid.UU
 	}
 }
 
-func transactionLatencyThreshold(t *testing.T) time.Duration {
+func transactionLatencyThresholdCustom(t *testing.T, customThreshold *time.Duration) time.Duration {
 	// normally we would expect a transaction to be confirmed within a couple of seconds but
 	// if we are in a debug session, we want to give it much longer
-	threshold := 2 * time.Second
+	var threshold time.Duration
+	if customThreshold != nil {
+		threshold = *customThreshold
+	} else {
+		threshold = 2 * time.Second
+	}
 
 	deadline, ok := t.Deadline()
 	if !ok {
@@ -63,4 +68,8 @@ func transactionLatencyThreshold(t *testing.T) time.Duration {
 	t.Logf("Using transaction latency threshold of %v", threshold)
 
 	return threshold
+}
+
+func transactionLatencyThreshold(t *testing.T) time.Duration {
+	return transactionLatencyThresholdCustom(t, nil)
 }

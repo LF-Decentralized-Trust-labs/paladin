@@ -165,8 +165,8 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			}
 
 			// MRW TODO - config these values
-			reqTimeout := time.Duration(60) * time.Second
-			assembleTimeout := time.Duration(60) * time.Second
+			reqTimeout := 10 * time.Second
+			assembleTimeout := 60 * time.Second
 			coordinator, err := coordinator.NewCoordinator(sMgr.ctx,
 				domainAPI,
 				transportWriter,

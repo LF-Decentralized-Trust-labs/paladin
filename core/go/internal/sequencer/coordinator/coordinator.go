@@ -331,7 +331,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 
 		receivedEvent := &transaction.ReceivedEvent{}
 		receivedEvent.TransactionID = txn.ID
-		err = c.transactionsByID[txn.ID].HandleEvent(context.Background(), receivedEvent)
+		err = c.transactionsByID[txn.ID].HandleEvent(ctx, receivedEvent)
 		if err != nil {
 			log.L(ctx).Errorf("[Sequencer] error handling ReceivedEvent for transaction %s: %v", txn.ID.String(), err)
 			return err

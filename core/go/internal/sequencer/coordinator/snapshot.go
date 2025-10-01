@@ -30,11 +30,12 @@ func action_SendHeartbeat(ctx context.Context, c *coordinator) error {
 
 func (c *coordinator) sendHeartbeat(ctx context.Context, contractAddress *pldtypes.EthAddress) error {
 	snapshot := c.getSnapshot(ctx)
-	log.L(ctx).Infof("[Sequencer] sending heartbeat for sequencer %s", contractAddress.String())
+	log.L(ctx).Debugf("[Sequencer] sending heartbeats for sequencer %s", contractAddress.String())
 	for _, node := range c.senderNodePool {
-		// MRW TODO - still don't know where we're sending this
-		log.L(ctx).Infof("[Sequencer] sending heartbeat to %s", node)
-		c.transportWriter.SendHeartbeat(ctx, node, contractAddress, snapshot)
+		if node != c.nodeName {
+			log.L(ctx).Debugf("[Sequencer] sending heartbeat to %s", node)
+			c.transportWriter.SendHeartbeat(ctx, node, contractAddress, snapshot)
+		}
 	}
 	return nil
 }

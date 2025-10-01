@@ -86,8 +86,8 @@ func TestTransactionSuccessAfterStartStopSingleNode(t *testing.T) {
 
 	contractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
-	// Start a private transaction on alices node
-	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bobs node
+	// Start a private transaction on alice's node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
 	var aliceTxID uuid.UUID
 	idempotencyKey := uuid.New().String()
 	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
@@ -115,8 +115,8 @@ func TestTransactionSuccessAfterStartStopSingleNode(t *testing.T) {
 		"Transaction did not receive a receipt",
 	)
 
-	// Start a private transaction on bobs node
-	// This is a transfer which relies on bobs node being aware of the state created by alice's mint to bob above
+	// Start a private transaction on bob's node
+	// This is a transfer which relies on bob's node being aware of the state created by alice's mint to bob above
 	var bobTx1ID uuid.UUID
 	idempotencyKey = uuid.New().String()
 	err = bob.GetClient().CallRPC(ctx, &bobTx1ID, "ptx_sendTransaction", &pldapi.TransactionInput{
@@ -164,6 +164,9 @@ func TestTransactionSuccessAfterStartStopSingleNode(t *testing.T) {
 	require.NotNil(t, verifierResult)
 
 	startNode(t, alice, domainConfig)
+	t.Cleanup(func() {
+		stopNode(t, alice)
+	})
 
 	err = alice.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
 		alice.GetIdentityLocator(),
@@ -181,8 +184,8 @@ func TestTransactionSuccessAfterStartStopSingleNode(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, verifierResult)
 
-	// Start a private transaction on alices node
-	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bobs node
+	// Start a private transaction on alice's node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
 	idempotencyKey = uuid.New().String()
 	err = alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
 		ABI: *domains.SimpleTokenTransferABI(),
@@ -208,16 +211,12 @@ func TestTransactionSuccessAfterStartStopSingleNode(t *testing.T) {
 		100*time.Millisecond,
 		"Transaction did not receive a receipt",
 	)
-
-	t.Cleanup(func() {
-		stopNode(t, alice)
-	})
 }
 
-// MRW TODO - tempoorarily run the test twice to ensure node start/stop is reliable
-func TestTransactionSuccessAfterStartStopSingleNodeAgain(t *testing.T) {
-	// We want to test that we can start some nodes, send some transactions, restart the nodes and send some more transactions
-
+func TestTransactionSuccessIfOneNodeStoppedButNotARequiredVerifier(t *testing.T) {
+	// Test that we can start 2 nodes, then submit a transaction while one of them is stopped.
+	// The  node that is stopped is not a required verifier so the transaction should succeed
+	// without restarting that node.
 	ctx := context.Background()
 	domainRegistryAddress := deployDomainRegistry(t, "alice")
 
@@ -233,7 +232,6 @@ func TestTransactionSuccessAfterStartStopSingleNodeAgain(t *testing.T) {
 
 	startNode(t, alice, domainConfig)
 	startNode(t, bob, domainConfig)
-
 	t.Cleanup(func() {
 		stopNode(t, bob)
 	})
@@ -247,8 +245,8 @@ func TestTransactionSuccessAfterStartStopSingleNodeAgain(t *testing.T) {
 
 	contractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
-	// Start a private transaction on alices node
-	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bobs node
+	// Start a private transaction on alice's node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
 	var aliceTxID uuid.UUID
 	idempotencyKey := uuid.New().String()
 	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
@@ -276,8 +274,10 @@ func TestTransactionSuccessAfterStartStopSingleNodeAgain(t *testing.T) {
 		"Transaction did not receive a receipt",
 	)
 
-	// Start a private transaction on bobs node
-	// This is a transfer which relies on bobs node being aware of the state created by alice's mint to bob above
+	// Stop alice's node before submitting a transaction request to bob's node.
+	stopNode(t, alice)
+
+	// Start a private transaction on bob's node, TO bob's identifier. Alice isn't involved at all so isn't a required verifier
 	var bobTx1ID uuid.UUID
 	idempotencyKey = uuid.New().String()
 	err = bob.GetClient().CallRPC(ctx, &bobTx1ID, "ptx_sendTransaction", &pldapi.TransactionInput{
@@ -289,68 +289,67 @@ func TestTransactionSuccessAfterStartStopSingleNodeAgain(t *testing.T) {
 			Type:           pldapi.TransactionTypePrivate.Enum(),
 			From:           bob.GetIdentity(),
 			Data: pldtypes.RawJSON(`{
-                    "from": "` + bob.GetIdentityLocator() + `",
-                    "to": "` + alice.GetIdentityLocator() + `",
-                    "amount": "123000000000000000000"
-                }`),
+	                "from": "` + bob.GetIdentityLocator() + `",
+	                "to": "` + bob.GetIdentityLocator() + `",
+	                "amount": "123000000000000000000"
+	            }`),
 		},
 	})
 
 	require.NoError(t, err)
 	assert.NotEqual(t, uuid.UUID{}, bobTx1ID)
+
+	// Check that even though alice's node is stopped, since it is not a required verifier
+	// the transaction should succeed.
 	assert.Eventually(t,
 		transactionReceiptCondition(t, ctx, bobTx1ID, bob.GetClient(), false),
 		transactionLatencyThreshold(t),
 		100*time.Millisecond,
-		"Transaction did not receive a receipt",
+		"Transaction received a receipt that it shouldn't have",
 	)
+}
 
-	stopNode(t, alice)
+func TestTransactionSuccessIfOneRequiredVerifierStoppedDuringSubmission(t *testing.T) {
+	// Test that we can start 2 nodes, stop one of them, then submit a transaction where both nodes
+	// are required verifiers. After the node is restarted the transaction should proceed.
+	ctx := context.Background()
+	domainRegistryAddress := deployDomainRegistry(t, "alice")
 
-	var verifierResult string
-	err = bob.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
-		bob.GetIdentityLocator(),
-		algorithms.ECDSA_SECP256K1,
-		verifiers.ETH_ADDRESS,
-	)
-	require.NoError(t, err)
-	require.NotNil(t, verifierResult)
+	alice := testutils.NewPartyForTesting(t, "alice", domainRegistryAddress)
+	bob := testutils.NewPartyForTesting(t, "bob", domainRegistryAddress)
 
-	err = alice.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
-		bob.GetIdentityLocator(),
-		algorithms.ECDSA_SECP256K1,
-		verifiers.ETH_ADDRESS,
-	)
-	require.Error(t, err)
-	require.NotNil(t, verifierResult)
+	alice.AddPeer(bob.GetNodeConfig())
+	bob.AddPeer(alice.GetNodeConfig())
+
+	domainConfig := &domains.SimpleDomainConfig{
+		SubmitMode: domains.ENDORSER_SUBMISSION,
+	}
 
 	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+	t.Cleanup(func() {
+		stopNode(t, bob)
+	})
 
-	err = alice.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
-		alice.GetIdentityLocator(),
-		algorithms.ECDSA_SECP256K1,
-		verifiers.ETH_ADDRESS,
-	)
-	require.NoError(t, err)
-	require.NotNil(t, verifierResult)
+	constructorParameters := &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken1",
+		Symbol:          "FT1",
+		EndorsementMode: domains.SelfEndorsement,
+	}
 
-	err = alice.GetClient().CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
-		bob.GetIdentityLocator(),
-		algorithms.ECDSA_SECP256K1,
-		verifiers.ETH_ADDRESS,
-	)
-	require.NoError(t, err)
-	require.NotNil(t, verifierResult)
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
-	// Start a private transaction on alices node
-	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bobs node
-	idempotencyKey = uuid.New().String()
-	err = alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+	// Start a private transaction on alice's node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
+	var aliceTxID uuid.UUID
+	idempotencyKey := uuid.New().String()
+	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
 		ABI: *domains.SimpleTokenTransferABI(),
 		TransactionBase: pldapi.TransactionBase{
 			To:             contractAddress,
 			Domain:         "domain1",
-			IdempotencyKey: "tx2-alice-" + idempotencyKey,
+			IdempotencyKey: "tx1-alice-" + idempotencyKey,
 			Type:           pldapi.TransactionTypePrivate.Enum(),
 			From:           alice.GetIdentity(),
 			Data: pldtypes.RawJSON(`{
@@ -370,7 +369,50 @@ func TestTransactionSuccessAfterStartStopSingleNodeAgain(t *testing.T) {
 		"Transaction did not receive a receipt",
 	)
 
+	// Stop alice's node before submitting a transaction request to bob's node.
+	stopNode(t, alice)
+
+	// Start a private transaction on bob's node, TO alice's identifier. This can't proceed while her node is stopped.
+	var bobTx1ID uuid.UUID
+	idempotencyKey = uuid.New().String()
+	err = bob.GetClient().CallRPC(ctx, &bobTx1ID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-bob-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           bob.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+	                "from": "` + bob.GetIdentityLocator() + `",
+	                "to": "` + alice.GetIdentityLocator() + `",
+	                "amount": "123000000000000000000"
+	            }`),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, bobTx1ID)
+
+	// Check that we don't receive a receipt in the usual time
+	assert.Never(t,
+		transactionReceiptCondition(t, ctx, bobTx1ID, bob.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction received a receipt that it shouldn't have",
+	)
+
+	startNode(t, alice, domainConfig)
 	t.Cleanup(func() {
 		stopNode(t, alice)
 	})
+
+	// Check that we did receive a receipt in the usual time
+	customThreshold := 15 * time.Second
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, bobTx1ID, bob.GetClient(), false),
+		transactionLatencyThresholdCustom(t, &customThreshold),
+		100*time.Millisecond,
+		"Transaction received a receipt that it shouldn't have",
+	)
 }
