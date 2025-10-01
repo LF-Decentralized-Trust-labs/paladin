@@ -47,7 +47,7 @@ import (
 
 type sequencerManager struct {
 	ctx                           context.Context
-	ctxCancel                     func()
+	cancelCtx                     func()
 	config                        *pldconf.SequencerManagerConfig
 	components                    components.AllComponents
 	nodeName                      string
@@ -95,6 +95,7 @@ func (sMgr *sequencerManager) Start() error {
 
 func (sMgr *sequencerManager) Stop() {
 	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_MISC)).Infof("Stopping distributed sequencer manager")
+	sMgr.cancelCtx()
 }
 
 func NewDistributedSequencerManager(ctx context.Context, config *pldconf.SequencerManagerConfig) components.SequencerManager {
@@ -102,7 +103,7 @@ func NewDistributedSequencerManager(ctx context.Context, config *pldconf.Sequenc
 	dsmCtx, dsmCtxCancel := context.WithCancel(log.WithLogField(ctx, "role", "sequencer"))
 	sMgr := &sequencerManager{
 		ctx:                           dsmCtx,
-		ctxCancel:                     dsmCtxCancel,
+		cancelCtx:                     dsmCtxCancel,
 		config:                        config,
 		sequencers:                    make(map[string]*sequencer),
 		targetActiveCoordinatorsLimit: 10, // MRW TODO configurable
