@@ -417,7 +417,7 @@ func action_SelectTransaction(ctx context.Context, c *coordinator) error {
 	// Start heartbeating
 	go c.heartbeatLoop(ctx)
 
-	// Seleect our next transaction
+	// Select our next transaction
 	return c.selectNextTransaction(ctx, nil)
 }
 
@@ -436,11 +436,13 @@ func (c *coordinator) heartbeatLoop(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				c.sendHeartbeat(ctx, c.contractAddress)
+				c.sendHeartbeat(c.heartbeatCtx, c.contractAddress)
 			case <-c.heartbeatCtx.Done():
+			case <-ctx.Done():
 				log.L(ctx).Infof("[SeqState] Ending heartbeat loop for %s", c.contractAddress.String())
 				c.heartbeatCtx = nil
 				c.heartbeatCancel = nil
+				return nil
 			}
 		}
 	}
