@@ -495,7 +495,7 @@ func TestSendContextClosed(t *testing.T) {
 
 	p := &peer{
 		transport: tp.t,
-		sendQueue: make(chan *prototk.PaladinMsg),
+		sendQueue: make(chan *msgWithErrChan),
 	}
 	tm.peers = map[string]*peer{
 		"node2": p,

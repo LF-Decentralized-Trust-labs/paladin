@@ -180,6 +180,23 @@ func init() {
 						},
 					},
 				},
+				Event_AssembleRequestReceived: {
+					// For some reason we've been asked to assemble again. We must not have moved to endorsement gathering,
+					// reverted, or parked. This could be because of a temporary issue preventing assembly (e.g. we couldn't
+					// resolve a remote verifier while it was offline). Assuming this is a new request, action it.
+					Validator: validator_AssembleRequestMatches,
+					Actions: []ActionRule{
+						{
+							If:     guard_Not(guard_AssembleRequestMatchesPreviousResponse),
+							Action: action_AssembleAndSign,
+						},
+						{
+							If:     guard_AssembleRequestMatchesPreviousResponse,
+							Action: action_ResendAssembleSuccessResponse,
+						},
+					},
+					// No transition - we're still assembling
+				},
 			},
 		},
 		State_Endorsement_Gathering: {
@@ -516,8 +533,6 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 					log.L(ctx).Errorf("[Sequencer] error transitioning sender transaction to state %v: %v", sm.currentState, err)
 					return err
 				}
-			} else {
-				log.L(ctx).Debugf("[Sequencer] no OnTransitionTo function defined for state %v", sm.currentState)
 			}
 
 			break
