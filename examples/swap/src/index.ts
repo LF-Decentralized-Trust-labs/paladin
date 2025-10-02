@@ -86,6 +86,7 @@ async function main(): Promise<boolean> {
   }
 
   const issuedAssetAmount = 1000;
+  const issuedAssetAmountToLarge = 10000000;
   const issuedCashAmount = 10000;
   const assetAmount = 100;
   const cashAmount = 10;
@@ -145,9 +146,23 @@ async function main(): Promise<boolean> {
     .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(notoAsset)) return false;
 
-  // Issue asset
+  // Issue asset above threshold first
   logger.log("Issuing asset to investor1...");
   let receipt = await notoAsset
+    .mint(assetIssuer, {
+      to: investor1,
+      amount: issuedAssetAmountToLarge, // WILL TRIP
+      data: "0x",
+    })
+    .waitForReceipt(10000);
+  if (checkReceipt(receipt)) {
+    logger.log("Should have failed");
+    return false;
+  }
+
+  // Issue asset
+  logger.log("Issuing asset to investor1 (good one this time)...");
+  receipt = await notoAsset
     .mint(assetIssuer, {
       to: investor1,
       amount: issuedAssetAmount,
