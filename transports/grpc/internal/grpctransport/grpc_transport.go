@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
@@ -330,4 +331,21 @@ func (t *grpcTransport) GetLocalDetails(ctx context.Context, req *prototk.GetLoc
 		TransportDetails: string(jsonDetails),
 	}, nil
 
+}
+
+func (t *grpcTransport) StopTransport(ctx context.Context, req *prototk.StopTransportRequest) (*prototk.StopTransportResponse, error) {
+	log.L(t.bgCtx).Infof("Stopping gRPC server for plugin %s", t.name)
+
+	gracefullyStopped := make(chan struct{})
+	go func() {
+		defer close(gracefullyStopped)
+		t.grpcServer.GracefulStop()
+	}()
+	select {
+	case <-gracefullyStopped:
+	case <-time.After(500 * time.Millisecond): // TODO does this need to be configurable?
+		t.grpcServer.Stop()
+	}
+
+	return &prototk.StopTransportResponse{}, nil
 }

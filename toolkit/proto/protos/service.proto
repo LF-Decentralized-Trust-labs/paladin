@@ -128,6 +128,7 @@ message TransportMessage {
     GetLocalDetailsRequest get_local_details =              1030;
     ActivatePeerRequest activate_peer =                     1040;
     DeactivatePeerRequest deactivate_peer =                 1050;
+    StopTransportRequest stop_transport =                   1060;
   }
 
   oneof response_from_transport {
@@ -136,6 +137,7 @@ message TransportMessage {
     GetLocalDetailsResponse get_local_details_res =         1031;
     ActivatePeerResponse activate_peer_res =                1041;
     DeactivatePeerResponse deactivate_peer_res =            1051;
+    StopTransportResponse stop_transport_res =              1061;
   }
 
   // Request/reply exchanges initiated by the transport, to the paladin node

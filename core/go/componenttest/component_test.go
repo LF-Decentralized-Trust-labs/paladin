@@ -57,6 +57,28 @@ const (
 	TestSeed3 = "c461057bef2aeaf43816f95b3c41b667d6fa56342f278d9237d7463226fd101f"
 )
 
+// This function helps work around a timing issue with sqlite in-memory DB. If a node attempts to connect to a peer
+// while mid-transaction (e.g. issuing SendReliable during a runBatch) sqlite blocks the SELECT query it issues to
+// look up the peer's connection details, which hangs the test.If the peers are already connected, this issue doesn't
+// arise, and if using postgres it also doesn't arise. This util function resolves all identities between all clients
+// to ensure peers are connected before running the test. This is over zealous when running the entire suite because
+// the peers will have connected in the first test, but when running an individual test it allows the test to pass.
+func ensurePeerConnections(t *testing.T, ctx context.Context, clients []rpcclient.Client, identities []string) {
+	// For every client, resolve every identity
+	for _, client := range clients {
+		for _, identity := range identities {
+			var verifierResult string
+			err := client.CallRPC(ctx, &verifierResult, "ptx_resolveVerifier",
+				identity,
+				algorithms.ECDSA_SECP256K1,
+				verifiers.ETH_ADDRESS,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, verifierResult)
+		}
+	}
+}
+
 func TestRunSimpleStorageEthTransaction(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
@@ -1029,12 +1051,15 @@ func TestNotaryDelegated(t *testing.T) {
 
 	instance2, instance2Done := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig, notaryNodeConfig}, nil, false, TestSeed2)
 	defer instance2Done()
+	client2 := instance2.client
 	bobIdentity := "wallets.org2.bob@" + instance2.name
 
 	instance3, instance3Done := newInstanceForComponentTesting(t, domainRegistryAddress, notaryNodeConfig, []*nodeConfiguration{aliceNodeConfig, bobNodeConfig}, nil, false, TestSeed3)
 	defer instance3Done()
 	client3 := instance3.client
 	notaryIdentity := "wallets.org3.notary@" + instance3.name
+
+	ensurePeerConnections(t, ctx, []rpcclient.Client{client1, client2, client3}, []string{aliceIdentity, bobIdentity, notaryIdentity})
 
 	// send JSON RPC message to node 3 ( notary) to deploy a private contract
 	var dplyTxID uuid.UUID
@@ -1170,12 +1195,15 @@ func TestNotaryDelegatedPrepare(t *testing.T) {
 
 	instance2, instance2Done := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig, notaryNodeConfig}, nil, false, TestSeed2)
 	defer instance2Done()
+	client2 := instance2.client
 	bobIdentity := "wallets.org2.bob@" + instance2.name
 
 	instance3, instance3Done := newInstanceForComponentTesting(t, domainRegistryAddress, notaryNodeConfig, []*nodeConfiguration{aliceNodeConfig, bobNodeConfig}, nil, false, TestSeed3)
 	defer instance3Done()
 	client3 := instance3.client
 	notaryIdentity := "wallets.org3.notary@" + instance3.name
+
+	ensurePeerConnections(t, ctx, []rpcclient.Client{client1, client2, client3}, []string{aliceIdentity, bobIdentity, notaryIdentity})
 
 	// send JSON RPC message to node 3 ( notary) to deploy a private contract
 	var dplyTxID uuid.UUID
@@ -1579,12 +1607,15 @@ func TestNotaryEndorseConcurrentSpends(t *testing.T) {
 
 	instance2, instance2Done := newInstanceForComponentTesting(t, domainRegistryAddress, bobNodeConfig, []*nodeConfiguration{aliceNodeConfig, notaryNodeConfig}, nil, false, TestSeed2)
 	defer instance2Done()
+	client2 := instance2.client
 	bobIdentity := "wallets.org2.bob@" + instance2.name
 
 	instance3, instance3Done := newInstanceForComponentTesting(t, domainRegistryAddress, notaryNodeConfig, []*nodeConfiguration{aliceNodeConfig, bobNodeConfig}, nil, false, TestSeed3)
 	defer instance3Done()
 	client3 := instance3.client
 	notaryIdentity := "wallets.org3.notary@" + instance3.name
+
+	ensurePeerConnections(t, ctx, []rpcclient.Client{client1, client2, client3}, []string{aliceIdentity, bobIdentity, notaryIdentity})
 
 	// send JSON RPC message to node 3 ( notary) to deploy a private contract
 	var dplyTxID uuid.UUID

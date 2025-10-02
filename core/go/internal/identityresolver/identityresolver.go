@@ -189,7 +189,11 @@ func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup str
 			select {
 			case <-ctx.Done():
 				return
-			case <-errChan:
+			case x, ok := <-errChan:
+				if !ok {
+					return
+				}
+				err = x
 				log.L(ctx).Errorf("Failed to send resolve verifier request to %s: %s", remoteNodeId, err)
 				ir.handleResolveVerifierError(ctx, resolveVerifierRequestBytes, requestID.String())
 				return

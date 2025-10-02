@@ -30,6 +30,7 @@ type TransportAPI interface {
 	GetLocalDetails(context.Context, *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error)
 	ActivatePeer(context.Context, *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error)
 	DeactivatePeer(context.Context, *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error)
+	StopTransport(context.Context, *prototk.StopTransportRequest) (*prototk.StopTransportResponse, error)
 }
 
 type TransportCallbacks interface {
@@ -138,10 +139,23 @@ func (th *transportHandler) RequestToPlugin(ctx context.Context, iReq PluginMess
 		resMsg := &prototk.TransportMessage_DeactivatePeerRes{}
 		resMsg.DeactivatePeerRes, err = th.api.DeactivatePeer(ctx, input.DeactivatePeer)
 		res.ResponseFromTransport = resMsg
+	case *prototk.TransportMessage_StopTransport:
+		resMsg := &prototk.TransportMessage_StopTransportRes{}
+		resMsg.StopTransportRes, err = th.api.StopTransport(ctx, input.StopTransport)
+		res.ResponseFromTransport = resMsg
 	default:
 		err = i18n.NewError(ctx, pldmsgs.MsgPluginUnsupportedRequest, input)
 	}
 	return th.Wrap(res), err
+}
+
+func (th *transportHandler) ClosePlugin(ctx context.Context) (PluginMessage[prototk.TransportMessage], error) {
+	res, err := th.api.StopTransport(ctx, &prototk.StopTransportRequest{})
+	return th.Wrap(&prototk.TransportMessage{
+		ResponseFromTransport: &prototk.TransportMessage_StopTransportRes{
+			StopTransportRes: res,
+		},
+	}), err
 }
 
 func (th *transportHandler) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
@@ -172,6 +186,7 @@ type TransportAPIFunctions struct {
 	GetLocalDetails    func(context.Context, *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error)
 	ActivatePeer       func(context.Context, *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error)
 	DeactivatePeer     func(context.Context, *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error)
+	StopTransport      func(context.Context, *prototk.StopTransportRequest) (*prototk.StopTransportResponse, error)
 }
 
 type TransportAPIBase struct {
@@ -196,4 +211,8 @@ func (tb *TransportAPIBase) ActivatePeer(ctx context.Context, req *prototk.Activ
 
 func (tb *TransportAPIBase) DeactivatePeer(ctx context.Context, req *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error) {
 	return callPluginImpl(ctx, req, tb.Functions.DeactivatePeer)
+}
+
+func (tb *TransportAPIBase) StopTransport(ctx context.Context, req *prototk.StopTransportRequest) (*prototk.StopTransportResponse, error) {
+	return callPluginImpl(ctx, req, tb.Functions.StopTransport)
 }

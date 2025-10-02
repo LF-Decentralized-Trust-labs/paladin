@@ -50,7 +50,7 @@ type peer struct {
 	statsLock sync.Mutex
 
 	persistedMsgsAvailable chan struct{}
-	sendQueue              chan *prototk.PaladinMsg
+	sendQueue              chan *msgWithErrChan
 
 	// Send loop state (no lock as only used on the loop)
 	lastFullScan          time.Time
@@ -187,7 +187,7 @@ func (tm *transportManager) connectPeer(ctx context.Context, nodeName string, se
 				Activated: pldtypes.TimestampNow(),
 			},
 			persistedMsgsAvailable: make(chan struct{}, 1),
-			sendQueue:              make(chan *prototk.PaladinMsg, tm.senderBufferLen),
+			sendQueue:              make(chan *msgWithErrChan, tm.senderBufferLen),
 			senderDone:             make(chan struct{}),
 		}
 		p.ctx, p.cancelCtx = context.WithCancel(
