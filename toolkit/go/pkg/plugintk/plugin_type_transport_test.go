@@ -88,6 +88,19 @@ func TestTransportCallback_GetTransportDetails(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestTransportCallbackBad(t *testing.T) {
+	ctx, _, _, callbacks, inOutMap, done := setupTransportTests(t)
+	defer done()
+
+	inOutMap[fmt.Sprintf("%T", &prototk.TransportMessage_GetTransportDetails{})] = func(dm *prototk.TransportMessage) {
+		dm.ResponseToTransport = &prototk.TransportMessage_GetTransportDetailsRes{
+			GetTransportDetailsRes: &prototk.GetTransportDetailsResponse{},
+		}
+	}
+	_, err := callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{})
+	require.NoError(t, err)
+}
+
 func TestTransportFunction_ConfigureTransport(t *testing.T) {
 	_, exerciser, funcs, _, _, done := setupTransportTests(t)
 	defer done()
