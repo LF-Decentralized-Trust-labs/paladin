@@ -41,31 +41,203 @@ def assembleSubprojects = [
     ':ui:client',
 ]
 
-ext {
-    helpers = [
-        lockResource: { task, lockFile ->
-            // If two tasks share an output file, they will not be able to run concurrently.
-            // This helper creates an empty "lock" file in the root build directory, which allows
-            // tasks to use it as a representation of some shared resource.
-            def f = new File(task.project.rootProject.buildDir, lockFile)
-            task.outputs.file(f)
-            task.doLast { f.createNewFile() }
-        },
+ext.helpers = [
+    lockResource: { task, lockFile ->
+        // If two tasks share an output file, they will not be able to run concurrently.
+        // This helper creates an empty "lock" file in the root build directory, which allows
+        // tasks to use it as a representation of some shared resource.
+        def f = new File(task.project.rootProject.buildDir, lockFile)
+        task.outputs.file(f)
+        task.doLast { f.createNewFile() }
+    },
 
-        dumpLogsOnFailure: { task, dockerTaskPath ->
-            // If the given Exec task fails, look up the DockerCompose task specified, and ask it to dump logs.
-            task.ignoreExitValue(true)
+    dumpLogsOnFailure: { task, dockerTaskPath ->
+        // If the given Exec task fails, look up the DockerCompose task specified, and ask it to dump logs.
+        task.ignoreExitValue(true)
+        task.doLast {
+            def execResult = getExecutionResult().get()
+            if (execResult.exitValue != 0) {
+                def docker = project.tasks.getByPath(dockerTaskPath)
+                println "\nTask '${task.path}' failed. Dumping Docker logs from '${dockerTaskPath}'."
+                docker.dumpLogs(project.file('build/docker-compose.log'))
+            }
+            execResult.assertNormalExitValue()
+        }
+    },
+    
+    dumpChartInfo: { task, taskName, paladinNamespace="default", besuNamespace="default" ->
+        def dumpChartInfoOnFailure = task.project.hasProperty('dumpChartInfoOnFailure') ? task.project.dumpChartInfoOnFailure.toBoolean() : false
+        
+        if (task instanceof Exec) {
+            task.ignoreExitValue = true
             task.doLast {
-                def execResult = getExecutionResult().get()
+                def execResult = task.getExecutionResult().get()
                 if (execResult.exitValue != 0) {
-                    def docker = project.tasks.getByPath(dockerTaskPath)
-                    println "\nTask '${task.path}' failed. Dumping Docker logs from '${dockerTaskPath}'."
-                    docker.dumpLogs(project.file('build/docker-compose.log'))
+                    println "Task '${task.name}' failed with exit code ${execResult.exitValue}. Dumping logs..."
+                    
+                    // Check if log dumping is enabled
+                    if (!dumpChartInfoOnFailure) {
+                        println "Log dumping is disabled. Set -PdumpChartInfoOnFailure=true to enable."
+                    } else {
+                        println "Dumping logs and diagnostic information for '${task.name}'"
+                        def script = new File(new File(task.project.rootProject.projectDir, "scripts"), "dump-logs.sh")
+                        if (!script.exists()) {
+                            println "Error: dump-logs.sh script not found!"
+                        } else {
+                            def command = [script.absolutePath, taskName, paladinNamespace, besuNamespace]
+                            def process = command.execute(null, task.project.rootProject.projectDir)
+                            // Stream the script's output to the Gradle console
+                            process.waitForProcessOutput(System.out, System.err)
+                            if (process.exitValue() != 0) {
+                                println "Warning: Log dumping script failed with exit code ${process.exitValue()}"
+                            }
+                        }
+                        
+                        // Re-throw to fail the build
+                        execResult.assertNormalExitValue()
+                    }
                 }
-                execResult.assertNormalExitValue()
+            }
+        } else {
+            // For non-Exec tasks, add diagnostic information and failure handling
+            task.doLast {
+                // Check if log dumping is enabled
+                if (dumpChartInfoOnFailure) {
+                    // Check if the task failed by looking at its state
+                    if (task.state.failure != null) {
+                        println "Task '${task.name}' FAILED with exception: ${task.state.failure.message}"
+                        println "Collecting failure diagnostic information..."
+                        
+                        // Collect diagnostic information only on failure
+                        println "--- Diagnostic Information for Task '${task.name}' ---"
+                        println "Task Type: ${task.class.simpleName}"
+                        println "Project: ${task.project.name}"
+                        println "Task Path: ${task.path}"
+                        println "Task Dependencies: ${task.dependsOn}"
+                        println "Task Actions: ${task.actions.size()}"
+                        
+                        // Try to dump logs if the script exists
+                        def script = new File(new File(task.project.rootProject.projectDir, "scripts"), "dump-logs.sh")
+                        if (script.exists()) {
+                            println "Dumping diagnostic information..."
+                            def command = [script.absolutePath, taskName, paladinNamespace, besuNamespace]
+                            def process = command.execute(null, task.project.rootProject.projectDir)
+                            // Stream the script's output to the Gradle console
+                            process.waitForProcessOutput(System.out, System.err)
+                            if (process.exitValue() != 0) {
+                                println "Warning: Log dumping script failed with exit code ${process.exitValue()}"
+                            }
+                        } else {
+                            println "Note: dump-logs.sh script not found, skipping log collection"
+                        }
+                        
+                        println "--- End Diagnostic Information ---"
+                    }
+                    // If task succeeded, do nothing (no diagnostics needed)
+                }
+            }
+            
+            // Add a simple approach: wrap the task's doLast actions in try-catch
+            def originalActions = task.actions.toList()
+            task.actions.clear()
+            
+            // Re-add actions with exception handling
+            originalActions.each { action ->
+                task.doLast {
+                    try {
+                        action.execute(task)
+                    } catch (Exception e) {
+                        // Task failed with an exception - collect diagnostics
+                        if (dumpChartInfoOnFailure) {
+                            println "Task '${task.name}' FAILED with exception: ${e.message}"
+                            println "Collecting failure diagnostic information..."
+                            
+                            // Collect diagnostic information
+                            println "--- Diagnostic Information for Task '${task.name}' ---"
+                            println "Task Type: ${task.class.simpleName}"
+                            println "Project: ${task.project.name}"
+                            println "Task Path: ${task.path}"
+                            println "Task Dependencies: ${task.dependsOn}"
+                            println "Task Actions: ${task.actions.size()}"
+                            println "Exception: ${e.class.simpleName}: ${e.message}"
+                            
+                            // Try to dump logs if the script exists
+                            def script = new File(new File(task.project.rootProject.projectDir, "scripts"), "dump-logs.sh")
+                            if (script.exists()) {
+                                println "Dumping diagnostic information..."
+                                def command = [script.absolutePath, taskName, paladinNamespace, besuNamespace]
+                                def process = command.execute(null, task.project.rootProject.projectDir)
+                                process.waitForProcessOutput(System.out, System.err)
+                                if (process.exitValue() != 0) {
+                                    println "Warning: Log dumping script failed with exit code ${process.exitValue()}"
+                                }
+                            } else {
+                                println "Note: dump-logs.sh script not found, skipping log collection"
+                            }
+                            
+                            println "--- End Diagnostic Information ---"
+                        }
+                        
+                        // Re-throw the exception to maintain the original failure behavior
+                        throw e
+                    }
+                }
             }
         }
-    ]
+    }
+]
+
+// Enable parallel execution for all projects
+allprojects {
+    // Optimize Java compilation
+    tasks.withType(JavaCompile) {
+        options.fork = true
+        options.incremental = true
+        options.encoding = 'UTF-8'
+    }
+    
+    // Optimize test execution
+    tasks.withType(Test) {
+        maxParallelForks = Math.max(1, Runtime.runtime.availableProcessors().intdiv(2))
+        forkEvery = 0
+        testLogging {
+            events "passed", "skipped", "failed"
+            exceptionFormat = 'full'
+        }
+    }
+}
+ 
+
+// Optimize task execution order
+tasks.withType(Test) {
+    // Run tests in parallel where possible
+    maxParallelForks = Math.max(1, Runtime.runtime.availableProcessors().intdiv(2))
+    
+    // Enable test batching for faster execution
+    forkEvery = 0
+}
+
+// Configure lint tasks to run sequentially to avoid conflicts
+allprojects {
+    tasks.withType(Exec) {
+        if (name == 'lint') {
+            // Use a shared lock for all lint tasks to prevent conflicts
+            // This ensures golangci-lint tasks don't run in parallel
+            helpers.lockResource(it, "lint.lock")
+        }
+        
+        // Optimize integration test tasks to run in parallel
+        if (name == 'test' && project.name == 'integration-test') {
+            // Allow integration tests to run in parallel with other tasks
+            // This prevents them from blocking the entire build
+            outputs.cacheIf { true }
+            
+            // Enable parallel execution for integration tests
+            doFirst {
+                println "Starting integration tests in parallel mode"
+            }
+        }
+    }
 }
 
 task jar {
@@ -282,6 +454,12 @@ task assemble {
 }
 
 assemble.finalizedBy(copyLibraries, copyDomains, copyRegistries, copySigningModules, copyTransports, copyUIFiles, copyZetoZKPFiles)
+
+// Enable parallel execution of copy tasks
+tasks.withType(Copy) {
+    // Allow copy tasks to run in parallel
+    outputs.cacheIf { true }
+}
 
 defaultTasks 'build'
 

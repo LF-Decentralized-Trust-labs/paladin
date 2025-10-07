@@ -94,7 +94,7 @@ async function main(): Promise<boolean> {
 
   // STEP 2: Get verifier and recreate privacy group connection
   logger.log("STEP 2: Recreating privacy group connection...");
-  const [verifierNode1] = paladin.getVerifiers(`member@${nodeConnections[0].id}`);
+  const [verifierNode1] = paladin.getVerifiers(`group_member@${nodeConnections[0].id}`);
 
   // Recreate privacy group connection
   const penteFactory = new PenteFactory(paladin, "pente");
