@@ -429,7 +429,6 @@ func TestTransactionSuccessChainedTransaction(t *testing.T) {
 	alice.AddPeer(bob.GetNodeConfig())
 	bob.AddPeer(alice.GetNodeConfig())
 
-	// Configure the simple domain with a hook address
 	domainConfig := &domains.SimpleDomainConfig{
 		SubmitMode: domains.ENDORSER_SUBMISSION,
 	}
@@ -449,7 +448,7 @@ func TestTransactionSuccessChainedTransaction(t *testing.T) {
 		EndorsementMode: domains.SelfEndorsement,
 	}
 
-	// Deploy a token that will be call as a chained transaction
+	// Deploy a token that will be call as a chained transaction, e.g. like a Pente hook contract
 	contractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
 	constructorParameters = &domains.ConstructorParameters{
@@ -460,11 +459,11 @@ func TestTransactionSuccessChainedTransaction(t *testing.T) {
 		HookAddress:     contractAddress.String(), // Cause the contract to pass the request on to the contract at the hook address
 	}
 
-	// Deploy a token that will create a chained private transaction to the previous token
+	// Deploy a token that will create a chained private transaction to the previous token e.g. like a Noto with a Pente hook
 	chainedContractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
-	// Start a private transaction on alice's node
-	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
+	// Start a private transaction on alice's node. This should result in 2 Paladin transactions and 1 public transaction. The
+	// original transaction should return a success receipt.
 	var aliceTxID uuid.UUID
 	idempotencyKey := uuid.New().String()
 	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
@@ -485,8 +484,18 @@ func TestTransactionSuccessChainedTransaction(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+
+	// Alice's node should have the full transaction and receipt
 	assert.Eventually(t,
 		transactionReceiptCondition(t, ctx, aliceTxID, alice.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+
+	// Bob's node has the receipt, but not necesarily the original transaction
+	assert.Eventually(t,
+		transactionReceiptConditionReceiptOnly(t, ctx, aliceTxID, bob.GetClient(), false),
 		transactionLatencyThreshold(t),
 		100*time.Millisecond,
 		"Transaction did not receive a receipt",
