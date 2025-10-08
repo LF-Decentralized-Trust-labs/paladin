@@ -157,7 +157,6 @@ func (sMgr *sequencerManager) deploymentLoop(ctx context.Context, dbTX persisten
 	// Resolve keys synchronously on this go routine so that we can return an error if any key resolution fails
 	tx.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.RequiredVerifiers))
 	for i, v := range tx.RequiredVerifiers {
-		fmt.Printf("Resolving verifier %+v\n", v)
 		// TODO: This is a synchronous cross-node exchange, done sequentially for each verifier.
 		// Potentially needs to move to an event-driven model like on invocation.
 		verifier, resolveErr := sMgr.components.IdentityResolver().ResolveVerifier(ctx, v.Lookup, v.Algorithm, v.VerifierType)
@@ -297,7 +296,6 @@ func (sMgr *sequencerManager) HandleNewTx(ctx context.Context, dbTX persistence.
 		if txi.Transaction.SubmitMode.V() != pldapi.SubmitModeAuto {
 			return i18n.NewError(ctx, msgs.MsgPrivateTxMgrPrepareNotSupportedDeploy)
 		}
-		fmt.Printf("Node %s handling deploy transaction %s\n", sMgr.nodeName, tx.ID)
 		return sMgr.handleDeployTx(ctx, dbTX, &components.PrivateContractDeploy{
 			ID:     *tx.ID,
 			Domain: tx.Domain,

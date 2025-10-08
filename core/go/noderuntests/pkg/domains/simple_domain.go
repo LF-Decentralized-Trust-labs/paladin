@@ -719,7 +719,6 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 				err = json.Unmarshal([]byte(configJSON), &constructorParameters)
 				require.NoError(t, err)
 
-				fmt.Println("constructorParameters", constructorParameters)
 				switch constructorParameters.EndorsementMode {
 				case SelfEndorsement:
 					contractConfig.CoordinatorSelection = prototk.ContractConfig_COORDINATOR_SENDER
