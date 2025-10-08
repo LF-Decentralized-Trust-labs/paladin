@@ -351,7 +351,7 @@ func (sMgr *sequencerManager) handlePreDispatchRequest(ctx context.Context, mess
 	preDispatchRequestReceivedEvent.TransactionID = uuid.MustParse(preDispatchRequest.TransactionId[2:34])
 	preDispatchRequestReceivedEvent.EventTime = time.Now()
 
-	// MRW TODO - still not sure where we should make the decision as to whether or not to approve dispatch.
+	// MRW TODO - not sure where we should make the decision as to whether or not to approve dispatch.
 	// For now we just proceed and send an approval response. It's possible that the check belongs in the state machine
 	// validator function for PreDispatchRequestReceivedEvent?
 

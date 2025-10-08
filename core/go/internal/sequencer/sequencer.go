@@ -48,7 +48,7 @@ import (
 type sequencerManager struct {
 	ctx                           context.Context
 	cancelCtx                     func()
-	config                        *pldconf.SequencerManagerConfig
+	config                        *pldconf.SequencerConfig
 	components                    components.AllComponents
 	nodeName                      string
 	sequencersLock                sync.RWMutex
@@ -98,7 +98,7 @@ func (sMgr *sequencerManager) Stop() {
 	sMgr.cancelCtx()
 }
 
-func NewDistributedSequencerManager(ctx context.Context, config *pldconf.SequencerManagerConfig) components.SequencerManager {
+func NewDistributedSequencerManager(ctx context.Context, config *pldconf.SequencerConfig) components.SequencerManager {
 
 	dsmCtx, dsmCtxCancel := context.WithCancel(log.WithLogField(ctx, "role", "sequencer"))
 	sMgr := &sequencerManager{

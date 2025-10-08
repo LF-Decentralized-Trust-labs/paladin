@@ -24,6 +24,8 @@ import (
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
@@ -164,9 +166,6 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				return nil, err
 			}
 
-			// MRW TODO - config these values
-			reqTimeout := 10 * time.Second
-			assembleTimeout := 60 * time.Second
 			coordinator, err := coordinator.NewCoordinator(sMgr.ctx,
 				domainAPI,
 				transportWriter,
@@ -174,12 +173,12 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				common.RealClock(),
 				sMgr.engineIntegration,
 				sMgr.syncPoints,
-				reqTimeout,
-				assembleTimeout,
+				confutil.DurationMin(sMgr.config.RequestTimeout, pldconf.SequencerMinimum.RequestTimeout, *pldconf.SequencerDefaults.RequestTimeout),
+				confutil.DurationMin(sMgr.config.AssembleTimeout, pldconf.SequencerMinimum.AssembleTimeout, *pldconf.SequencerDefaults.AssembleTimeout),
 				10,
 				&contractAddr,
-				50,
-				4, // MRW TODO - make configurable
+				confutil.Uint64Min(sMgr.config.BlockHeightTolerance, pldconf.SequencerMinimum.BlockHeightTolerance, *pldconf.SequencerDefaults.BlockHeightTolerance),
+				confutil.IntMin(sMgr.config.ClosingGracePeriod, pldconf.SequencerMinimum.ClosingGracePeriod, *pldconf.SequencerDefaults.ClosingGracePeriod),
 				sMgr.nodeName,
 				func(ctx context.Context, t *coordTransaction.Transaction) {
 					// MRW TODO - move to sequencer module?
@@ -212,7 +211,6 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 					}
 					// MRW TODO - is there an else/if here for ContractConfig_SUBMITTER_SENDER or is this handled by the current default of randomly generate an address?
 
-					// MRW TODO - What is the correct signer to set here?
 					if t.Signer == "" {
 						log.L(ctx).Infof("Transaction %s has no signer. Allocating random signer", t.ID.String())
 						t.Signer = fmt.Sprintf("domains.%s.submit.%s", contractAddr, uuid.New())
@@ -231,7 +229,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 					}
 
 					log.L(ctx).Infof("Preparing transaction %s which has %d endorsements", t.ID.String(), len(t.PostAssembly.Endorsements))
-					// Need to prepate the transaction
+					// Need to prepare the transaction
 					readTX := sMgr.components.Persistence().NOTX() // no DB transaction required here
 					log.L(ctx).Infof("Preparing transaction %s", t.ID.String())
 					err = domainAPI.PrepareTransaction(dCtx, readTX, t.PrivateTransaction)
@@ -383,12 +381,13 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 					}
 
 					// We also need to trigger ourselves for any private TX we chained
-					if len(dispatchBatch.PrivateDispatches) > 0 {
-						log.L(ctx).Infof("[Sequencer] Chaining %d private transactions", len(dispatchBatch.PrivateDispatches))
-						if err := sMgr.components.TxManager().ChainPrivateTransactions(ctx, sMgr.components.Persistence().NOTX(), dispatchBatch.PrivateDispatches); err != nil {
-							log.L(ctx).Errorf("Sequencer failed to notify private TX manager for chained transaction")
-						}
+					for _, dispatch := range dispatchBatch.PrivateDispatches {
+						// Create a new DB transaction and handle the new transaction
+						sMgr.components.Persistence().Transaction(ctx, func(ctx context.Context, dbTx persistence.DBTX) error {
+							return sMgr.HandleNewTx(ctx, dbTx, dispatch.NewTransaction)
+						})
 					}
+					log.L(ctx).Tracef("[Sequencer] Chained %d private transactions", len(dispatchBatch.PrivateDispatches))
 				},
 				func(contractAddress *pldtypes.EthAddress, coordinatorNode string) {
 					// A new coordinator started, it might be us or it might be another node.

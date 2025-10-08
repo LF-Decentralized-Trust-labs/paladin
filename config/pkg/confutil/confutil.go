@@ -77,6 +77,15 @@ func Int64Slice(sVal []int64, def []int64) []int64 {
 	return sVal
 }
 
+func Uint64Min(iVal *uint64, min uint64, def uint64) uint64 {
+	if iVal == nil {
+		return def
+	} else if *iVal < min {
+		return min
+	}
+	return *iVal
+}
+
 func Float64Min(iVal *float64, min float64, def float64) float64 {
 	if iVal == nil {
 		return def

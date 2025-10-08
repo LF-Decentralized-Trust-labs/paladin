@@ -114,7 +114,7 @@ func (m *mockContractConfig) GetSubmitterSelection() interface{} {
 
 func newSequencerManagerForTesting(t *testing.T, mocks *sequencerLifecycleTestMocks) *sequencerManager {
 	ctx := context.Background()
-	config := &pldconf.SequencerManagerConfig{}
+	config := &pldconf.SequencerConfig{}
 
 	sm := &sequencerManager{
 		ctx:                           ctx,

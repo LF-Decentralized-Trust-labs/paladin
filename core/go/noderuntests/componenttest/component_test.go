@@ -465,7 +465,8 @@ func TestPrivateTransactionsDeployAndExecute(t *testing.T) {
                     "from": "wallets.org1.aaaaaa",
                     "name": "FakeToken1",
                     "symbol": "FT1",
-					"endorsementMode": "` + domains.SelfEndorsement + `"
+					"endorsementMode": "` + domains.SelfEndorsement + `",
+					"hookAddress": ""
                 }`),
 		},
 	})
@@ -554,7 +555,8 @@ func TestPrivateTransactionsMintThenTransfer(t *testing.T) {
                     "from": "wallets.org1.aaaaaa",
                     "name": "FakeToken1",
                     "symbol": "FT1",
-					"endorsementMode": "` + domains.SelfEndorsement + `"
+					"endorsementMode": "` + domains.SelfEndorsement + `",
+					"hookAddress": ""
                 }`),
 		},
 	})
@@ -655,7 +657,8 @@ func TestPrivateTransactionRevertedAssembleFailed(t *testing.T) {
 					"from": "wallets.org1.aaaaaa",
 					"name": "FakeToken1",
 					"symbol": "FT1",
-					"endorsementMode": "` + domains.SelfEndorsement + `"
+					"endorsementMode": "` + domains.SelfEndorsement + `",
+					"hookAddress": ""
 				}`),
 		},
 	})
@@ -778,7 +781,8 @@ func TestDeployOnOneNodeInvokeOnAnother(t *testing.T) {
                     "from": "` + aliceIdentity + `",
                     "name": "FakeToken1",
                     "symbol": "FT1",
-					"endorsementMode": "` + domains.SelfEndorsement + `"
+					"endorsementMode": "` + domains.SelfEndorsement + `",
+					"hookAddress": ""
                 }`),
 		},
 	})
@@ -1064,7 +1068,8 @@ func TestNotaryDelegated(t *testing.T) {
 					"notary": "` + notaryIdentity + `",
 					"name": "FakeToken1",
 					"symbol": "FT1",
-					"endorsementMode": "NotaryEndorsement"
+					"endorsementMode": "NotaryEndorsement",
+					"hookAddress": ""
 				}`),
 		},
 	})
@@ -1206,7 +1211,8 @@ func TestNotaryDelegatedPrepare(t *testing.T) {
 					"name": "FakeToken1",
 					"symbol": "FT1",
 					"endorsementMode": "NotaryEndorsement",
-					"deleteSubmitToSender": true
+					"deleteSubmitToSender": true,
+					"hookAddress": ""
 				}`),
 		},
 	})
@@ -1327,7 +1333,8 @@ func TestSingleNodeSelfEndorseConcurrentSpends(t *testing.T) {
                     "from": "wallets.org1.aaaaaa",
                     "name": "FakeToken1",
                     "symbol": "FT1",
-					"endorsementMode": "` + domains.SelfEndorsement + `"
+					"endorsementMode": "` + domains.SelfEndorsement + `",
+					"hookAddress": ""
                 }`),
 		},
 	})
@@ -1458,7 +1465,8 @@ func TestSingleNodeSelfEndorseSeriesOfTransfers(t *testing.T) {
                     "from": "wallets.org1.aaaaaa",
                     "name": "FakeToken1",
                     "symbol": "FT1",
-					"endorsementMode": "` + domains.SelfEndorsement + `"
+					"endorsementMode": "` + domains.SelfEndorsement + `",
+					"hookAddress": ""
                 }`),
 		},
 	})
@@ -1612,7 +1620,8 @@ func TestNotaryEndorseConcurrentSpends(t *testing.T) {
 					"notary": "` + notaryIdentity + `",
 					"name": "FakeToken1",
 					"symbol": "FT1",
-					"endorsementMode": "NotaryEndorsement"
+					"endorsementMode": "NotaryEndorsement",
+					"hookAddress": ""
 				}`),
 		},
 	})
@@ -1751,7 +1760,8 @@ func TestNotaryEndorseSeriesOfTransfers(t *testing.T) {
 					"notary": "` + notaryIdentity + `",
 					"name": "FakeToken1",
 					"symbol": "FT1",
-					"endorsementMode": "NotaryEndorsement"
+					"endorsementMode": "NotaryEndorsement",
+					"hookAddress": ""
 				}`),
 		},
 	})

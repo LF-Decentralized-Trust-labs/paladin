@@ -78,7 +78,8 @@ task copyTestContracts(type: Copy) {
     from fileTree(configurations.compiledContracts.asPath) {
         include 'contracts/testcontracts/SimpleStorage.sol/SimpleStorage.json'
     }
-    into 'componenttest/abis'
+    into 'noderuntests/pkg/domains/abis'
+    into 'noderuntests/componenttest/abis'
 
     // Flatten all paths into the destination folder
     eachFile { path = name }
@@ -91,7 +92,7 @@ task copyTestDomainContracts(type: Copy) {
         include 'contracts/domains/componenttest/SimpleDomain.sol/SimpleDomain.json'
         include 'contracts/domains/componenttest/SimpleToken.sol/SimpleToken.json'
     }
-    into 'componenttest/domains/abis'
+    into 'noderuntests/pkg/domains/abis'
 
     // Flatten all paths into the destination folder
     eachFile { path = name }

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -194,6 +195,34 @@ func SimpleTokenTransferABI() *abi.ABI {
 	return &abi.ABI{mustParseABIEntry(simpleTokenTransferABI)}
 }
 
+const simpleTokenTransferWithOriginTXABI = `{
+	"type": "function",
+	"name": "transfer",
+	"inputs": [
+	  {
+		"name": "from",
+		"type": "string"
+	  },
+	  {
+		"name": "to",
+		"type": "string"
+	  },
+	  {
+		"name": "amount",
+		"type": "uint256"
+	  },
+	  {
+		"name": "originTxId",
+		"type": "string"
+	  }
+	],
+	"outputs": null
+}`
+
+func SimpleTokenTransferWithOriginTXABI() *abi.ABI {
+	return &abi.ABI{mustParseABIEntry(simpleTokenTransferWithOriginTXABI)}
+}
+
 // ABI used by paladin to parse the constructor parameters
 // different for each endorsement mode
 const simpleTokenSelfEndorsementConstructorABI = `{
@@ -213,6 +242,10 @@ const simpleTokenSelfEndorsementConstructorABI = `{
     },
     {
       "name": "endorsementMode",
+      "type": "string"
+    },
+    {
+      "name": "hookAddress",
       "type": "string"
     }
   ],
@@ -237,7 +270,11 @@ const simpleTokenNotaryEndorsementConstructorABI = `{
 	  {
 		"name": "endorsementMode",
 		"type": "string"
-	  }
+	  },
+      {
+        "name": "hookAddress",
+        "type": "string"
+      }
 	],
 	"outputs": null
 }`
@@ -260,7 +297,11 @@ const simpleTokenPrivacyGroupEndorsementConstructorABI = `{
 	  {
 		"name": "endorsementMode",
 		"type": "string"
-	  }
+	  },
+      {
+        "name": "hookAddress",
+        "type": "string"
+      }
 	],
 	"outputs": null
 }`
@@ -268,7 +309,6 @@ const simpleTokenPrivacyGroupEndorsementConstructorABI = `{
 func SimpleTokenConstructorABI(endorsementMode string) *abi.ABI {
 	switch endorsementMode {
 	case SelfEndorsement:
-
 		return &abi.ABI{mustParseABIEntry(simpleTokenSelfEndorsementConstructorABI)}
 	case NotaryEndorsement:
 		return &abi.ABI{mustParseABIEntry(simpleTokenNotaryEndorsementConstructorABI)}
@@ -289,6 +329,7 @@ type ConstructorParameters struct {
 	Name            string   `json:"name"`
 	Symbol          string   `json:"symbol"`
 	EndorsementMode string   `json:"endorsementMode"`
+	HookAddress     string   `json:"hookAddress"`
 }
 
 // Go struct used in test (test + domain) to work with JSON structure for `params` on the base ledger factory function
@@ -298,13 +339,15 @@ type FactoryParameters struct {
 	EndorsementMode        string   `json:"endorsementMode"`
 	NotaryLocator          string   `json:"notaryLocator"`
 	EndorsementSetLocators []string `json:"endorsementSetLocators"`
+	HookAddress            string   `json:"hookAddress"`
 }
 
 // JSON structure passed into the paladin transaction for the transfer
 type fakeTransferParser struct {
-	From   string               `json:"from,omitempty"`
-	To     string               `json:"to,omitempty"`
-	Amount *ethtypes.HexInteger `json:"amount"`
+	From       string               `json:"from,omitempty"`
+	To         string               `json:"to,omitempty"`
+	Amount     *ethtypes.HexInteger `json:"amount"`
+	OriginTxId string               `json:"originTxId"`
 }
 
 // JSON structure for the state data
@@ -324,6 +367,7 @@ var contractDataABI = &abi.ParameterArray{
 	{Name: "endorsementMode", Type: "string"},
 	{Name: "notaryLocator", Type: "string"},
 	{Name: "endorsementSetLocators", Type: "string[]"},
+	{Name: "hookAddress", Type: "string"},
 }
 
 // golang struct to parse and serialize the data received from the block indexer when the base ledger factor contract
@@ -333,6 +377,7 @@ type simpleTokenConfigParser struct {
 	EndorsementMode string   `json:"endorsementMode"`
 	NotaryLocator   string   `json:"notaryLocator"`
 	EndorsementSet  []string `json:"endorsementSetLocators"`
+	HookAddress     string   `json:"hookAddress"`
 }
 
 func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
@@ -425,8 +470,21 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 		}
 
 		validateTransferTransactionInput := func(tx *prototk.TransactionSpecification) (*ethtypes.Address0xHex, simpleTokenConfigParser, *fakeTransferParser) {
-			assert.JSONEq(t, simpleTokenTransferABI, tx.FunctionAbiJson)
-			assert.Equal(t, "function transfer(string memory from, string memory to, uint256 amount) external { }", tx.FunctionSignature)
+
+			// We have 2 transfer(...) functions - one which takes just 3 params, the other takes a 4th for an origin TX ID for basic chained TX testing. Check
+			// the transfer TX input is for one of these 2 functions.
+			var txABI interface{}
+			json.Unmarshal([]byte(tx.FunctionAbiJson), &txABI)
+			var simpleTokenABI interface{}
+			json.Unmarshal([]byte(simpleTokenTransferABI), &simpleTokenABI)
+			var simpleTokenWithOriginTXABI interface{}
+			json.Unmarshal([]byte(simpleTokenTransferWithOriginTXABI), &simpleTokenWithOriginTXABI)
+
+			assert.True(t, reflect.DeepEqual(txABI, simpleTokenABI) || reflect.DeepEqual(txABI, simpleTokenWithOriginTXABI))
+			assert.True(t,
+				tx.FunctionSignature == "function transfer(string memory from, string memory to, uint256 amount, string memory originTxId) external { }" ||
+					tx.FunctionSignature == "function transfer(string memory from, string memory to, uint256 amount) external { }")
+
 			var inputs fakeTransferParser
 			err := json.Unmarshal([]byte(tx.FunctionParamsJson), &inputs)
 			require.NoError(t, err)
@@ -634,6 +692,7 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 					EndorsementSetLocators: constructorParameters.EndorsementSet,
 					EndorsementMode:        constructorParameters.EndorsementMode,
 					NotaryLocator:          constructorParameters.Notary,
+					HookAddress:            constructorParameters.HookAddress,
 				}
 				return &prototk.PrepareDeployResponse{
 					Signer: confutil.P(fmt.Sprintf("domain1.transactions.%s", req.Transaction.TransactionId)),
@@ -660,6 +719,7 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 				err = json.Unmarshal([]byte(configJSON), &constructorParameters)
 				require.NoError(t, err)
 
+				fmt.Println("constructorParameters", constructorParameters)
 				switch constructorParameters.EndorsementMode {
 				case SelfEndorsement:
 					contractConfig.CoordinatorSelection = prototk.ContractConfig_COORDINATOR_SENDER
@@ -997,6 +1057,7 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 			},
 
 			PrepareTransaction: func(ctx context.Context, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+				_, config, params := validateTransferTransactionInput(req.Transaction)
 				var signerSignature pldtypes.HexBytes
 				for _, att := range req.AttestationResult {
 					if att.AttestationType == prototk.AttestationType_SIGN && att.Name == "sender" {
@@ -1011,15 +1072,59 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 				for i, s := range req.OutputStates {
 					newStateIds[i] = s.Id
 				}
+
+				// Either prepare a public call to `executeNotarized` on the chain or a private chained call to `transfer` on another contract
+				// The simple domain doesn't actually honour the original transaction but it succeeds and should allow the original transaction
+				// to return a receipt
+
+				if config.HookAddress == "" {
+					smartContractFunction := "executeNotarized"
+					args := map[string]interface{}{
+						"txId":      req.Transaction.TransactionId,
+						"inputs":    spentStateIds,
+						"outputs":   newStateIds,
+						"signature": signerSignature,
+					}
+
+					// We have a very basic hook capability whereby if transfer() is called with an origin TX ID (i.e.
+					// the transaction we're currently preparing is a chained transaction) we need the underlying base ledger
+					// transaction to emit an event for both this ID and the origin ID. Note, we don't make any effort to get
+					// the base ledger event to emit states related to the original TX ID. We just need enough to confirm both
+					// transactions and exercise the chained TX logic.
+					if params.OriginTxId != "" {
+						smartContractFunction = "executeNotarizedHook"
+						args["originTxId"] = params.OriginTxId
+					}
+
+					transactionType := prototk.PreparedTransaction_PUBLIC
+					return &prototk.PrepareTransactionResponse{
+						Transaction: &prototk.PreparedTransaction{
+							FunctionAbiJson: toJSONString(t, simpleTokenABI.Functions()[smartContractFunction]),
+							ParamsJson:      toJSONString(t, args),
+							Type:            transactionType,
+						},
+					}, nil
+				}
+
+				// This is a chained transaction. We'll simply decode the original transfer() request and send that to the hook contract address
+				// this domain contract has been configured with. We pass our own TX ID in the originTxId param so the base ledger can emit an
+				// event that we will recognise and make our TX as complete.
+				var originalTXParams fakeTransferParser
+				err := json.Unmarshal([]byte(req.Transaction.FunctionParamsJson), &originalTXParams)
+				require.NoError(t, err)
+
+				transactionType := prototk.PreparedTransaction_PRIVATE
 				return &prototk.PrepareTransactionResponse{
 					Transaction: &prototk.PreparedTransaction{
-						FunctionAbiJson: toJSONString(t, simpleTokenABI.Functions()["executeNotarized"]),
+						ContractAddress: &config.HookAddress,
+						FunctionAbiJson: toJSONString(t, SimpleTokenTransferWithOriginTXABI().Functions()["transfer"]),
 						ParamsJson: toJSONString(t, map[string]interface{}{
-							"txId":      req.Transaction.TransactionId,
-							"inputs":    spentStateIds,
-							"outputs":   newStateIds,
-							"signature": signerSignature,
+							"to":         originalTXParams.To,
+							"from":       originalTXParams.From,
+							"amount":     originalTXParams.Amount.String(),
+							"originTxId": req.Transaction.TransactionId,
 						}),
+						Type: transactionType,
 					},
 				}, nil
 			},

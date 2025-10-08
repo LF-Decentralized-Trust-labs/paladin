@@ -75,11 +75,12 @@ type componentTestInstance struct {
 }
 
 type nodeConfiguration struct {
-	address string
-	port    int
-	cert    string
-	key     string
-	name    string
+	address         string
+	port            int
+	cert            string
+	key             string
+	name            string
+	sequencerConfig *pldconf.SequencerConfig
 }
 
 func NewNodeConfiguration(t *testing.T, nodeName string) *nodeConfiguration {
@@ -145,6 +146,13 @@ func NewInstanceForTesting(t *testing.T, domainRegistryAddress *pldtypes.EthAddr
 		wsConfig:   &wsConfig,
 	}
 	i.ctx = log.WithLogField(context.Background(), "node-name", binding.name)
+
+	if binding.sequencerConfig != nil {
+		i.conf.SequencerManager.RequestTimeout = binding.sequencerConfig.RequestTimeout
+		i.conf.SequencerManager.AssembleTimeout = binding.sequencerConfig.AssembleTimeout
+		i.conf.SequencerManager.BlockHeightTolerance = binding.sequencerConfig.BlockHeightTolerance
+		i.conf.SequencerManager.ClosingGracePeriod = binding.sequencerConfig.ClosingGracePeriod
+	}
 
 	i.conf.BlockIndexer.FromBlock = json.RawMessage(`"latest"`)
 	i.conf.DomainManagerConfig.Domains = make(map[string]*pldconf.DomainConfig, 1)
@@ -498,6 +506,7 @@ type Party interface {
 	DeploySimpleStorageDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.SimpleStorageConstructorParameters,
 		transactionReceiptCondition func(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool,
 		transactionLatencyThreshold func(t *testing.T) time.Duration) *pldtypes.EthAddress
+	OverrideSequencerConfig(config *pldconf.SequencerConfig)
 }
 
 func (p *partyForTesting) GetIdentity() string {
@@ -518,6 +527,10 @@ func (p *partyForTesting) GetClient() rpcclient.Client {
 
 func (p *partyForTesting) GetIdentityLocator() string {
 	return p.identityLocator
+}
+
+func (p *partyForTesting) OverrideSequencerConfig(config *pldconf.SequencerConfig) {
+	p.nodeConfig.sequencerConfig = config
 }
 
 func (p *partyForTesting) DeploySimpleDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.ConstructorParameters, transactionReceiptCondition func(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool, transactionLatencyThreshold func(t *testing.T) time.Duration) *pldtypes.EthAddress {

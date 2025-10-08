@@ -32,7 +32,7 @@ type PaladinConfig struct {
 	BlockIndexer           BlockIndexerConfig     `json:"blockIndexer"`
 	TempDir                *string                `json:"tempDir"`
 	TxManager              TxManagerConfig        `json:"txManager"`
-	SequencerManager       SequencerManagerConfig `json:"sequencerManager"`
+	SequencerManager       SequencerConfig        `json:"sequencerManager"`
 	PublicTxManager        PublicTxManagerConfig  `json:"publicTxManager"`
 	IdentityResolver       IdentityResolverConfig `json:"identityResolver"`
 	GroupManager           GroupManagerConfig     `json:"groupManager"`
