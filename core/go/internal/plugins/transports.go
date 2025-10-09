@@ -165,3 +165,18 @@ func (br *TransportBridge) DeactivatePeer(ctx context.Context, req *prototk.Deac
 	)
 	return
 }
+
+func (br *TransportBridge) StopTransport(ctx context.Context, req *prototk.StopTransportRequest) (res *prototk.StopTransportResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
+			dm.Message().RequestToTransport = &prototk.TransportMessage_StopTransport{StopTransport: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) bool {
+			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_StopTransportRes); ok {
+				res = r.StopTransportRes
+			}
+			return res != nil
+		},
+	)
+	return
+}

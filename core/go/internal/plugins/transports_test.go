@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	pb "google.golang.org/protobuf/proto"
 )
 
 type testTransportManager struct {
@@ -137,6 +138,9 @@ func TestTransportRequestsOK(t *testing.T) {
 			assert.Equal(t, "node1", danr.NodeName)
 			return &prototk.DeactivatePeerResponse{}, nil
 		},
+		StopTransport: func(ctx context.Context, danr *prototk.StopTransportRequest) (*prototk.StopTransportResponse, error) {
+			return &prototk.StopTransportResponse{}, nil
+		},
 	}
 
 	ttm := &testTransportManager{
@@ -198,6 +202,10 @@ func TestTransportRequestsOK(t *testing.T) {
 	danr, err := transportAPI.DeactivatePeer(ctx, &prototk.DeactivatePeerRequest{NodeName: "node1"})
 	require.NoError(t, err)
 	assert.NotNil(t, danr)
+
+	stsr, err := transportAPI.StopTransport(ctx, &prototk.StopTransportRequest{})
+	require.NoError(t, err)
+	assert.NotNil(t, stsr)
 
 	// This is the point the transport manager would call us to say the transport is initialized
 	// (once it's happy it's updated its internal state)
@@ -400,4 +408,70 @@ func TestTransportRegisterPartialSuccess(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Fatal("error callback did not complete in time")
 	}
+}
+
+func TestTransportBridgeRequestReplyInvalidRequest(t *testing.T) {
+	// Create a mock TransportBridge with minimal setup
+	br := &TransportBridge{
+		plugin:     &plugin[prototk.TransportMessage]{},
+		pluginType: "test-transport",
+		pluginName: "test-plugin",
+		pluginId:   "test-id",
+		manager:    &testTransportManager{},
+	}
+
+	// Create a mock plugin message with an invalid RequestFromTransport type
+	// We'll use a nil interface to trigger the default case
+	reqMsg := &mockTransportPluginMessage{
+		msg: &prototk.TransportMessage{
+			RequestFromTransport: nil, // This will trigger the default case
+		},
+	}
+
+	// Call RequestReply and expect an error
+	ctx := context.Background()
+	resFn, err := br.RequestReply(ctx, reqMsg)
+
+	// Verify that we get an error and no response function
+	assert.Nil(t, resFn)
+	assert.Error(t, err)
+
+	// Verify the error is the expected i18n error
+	assert.Contains(t, err.Error(), "PD011203: Invalid request body")
+}
+
+// Mock implementation of PluginMessage for testing
+type mockTransportPluginMessage struct {
+	msg *prototk.TransportMessage
+}
+
+func (m *mockTransportPluginMessage) Header() *prototk.Header {
+	if m.msg.Header == nil {
+		m.msg.Header = &prototk.Header{}
+	}
+	return m.msg.Header
+}
+
+func (m *mockTransportPluginMessage) RequestToPlugin() any {
+	return m.msg.RequestToTransport
+}
+
+func (m *mockTransportPluginMessage) ResponseFromPlugin() any {
+	return m.msg.ResponseFromTransport
+}
+
+func (m *mockTransportPluginMessage) RequestFromPlugin() any {
+	return m.msg.RequestFromTransport
+}
+
+func (m *mockTransportPluginMessage) ResponseToPlugin() any {
+	return m.msg.ResponseToTransport
+}
+
+func (m *mockTransportPluginMessage) Message() *prototk.TransportMessage {
+	return m.msg
+}
+
+func (m *mockTransportPluginMessage) ProtoMessage() pb.Message {
+	return m.msg
 }
