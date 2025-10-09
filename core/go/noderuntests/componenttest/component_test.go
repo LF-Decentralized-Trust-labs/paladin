@@ -946,7 +946,7 @@ func TestCreateStateOnOneNodeSpendOnAnother(t *testing.T) {
 		EndorsementMode: domains.SelfEndorsement,
 	}
 
-	contractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
 	// Start a private transaction on alices node
 	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bobs node
@@ -1920,7 +1920,7 @@ func TestPrivacyGroupEndorsement(t *testing.T) {
 		EndorsementMode: domains.PrivacyGroupEndorsement,
 	}
 	// send JSON RPC message to node 1 to deploy a private contract
-	contractAddress := alice.DeploySimpleStorageDomainInstanceContract(t, domains.PrivacyGroupEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+	contractAddress := alice.DeploySimpleStorageDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
 	// Start a private transaction on alice's node
 	// this should require endorsement from bob and carol
@@ -2046,7 +2046,7 @@ func TestPrivacyGroupEndorsementConcurrent(t *testing.T) {
 		EndorsementMode: domains.PrivacyGroupEndorsement,
 	}
 	// send JSON RPC message to node 1 to deploy a private contract
-	contractAddress := alice.DeploySimpleStorageDomainInstanceContract(t, domains.PrivacyGroupEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+	contractAddress := alice.DeploySimpleStorageDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 	var initTxID uuid.UUID
 	err := alice.GetClient().CallRPC(ctx, &initTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
 		ABI: *domains.SimpleStorageInitABI(),

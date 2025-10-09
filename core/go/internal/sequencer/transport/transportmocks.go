@@ -619,16 +619,16 @@ func (_c *MockTransportWriter_SendEndorsementRequest_Call) RunAndReturn(run func
 }
 
 // SendEndorsementResponse provides a mock function for the type MockTransportWriter
-func (_mock *MockTransportWriter) SendEndorsementResponse(ctx context.Context, transactionId string, idempotencyKey string, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, endorsementNam string, party string, node string) error {
-	ret := _mock.Called(ctx, transactionId, idempotencyKey, contractAddress, attResult, endorsementResult, endorsementNam, party, node)
+func (_mock *MockTransportWriter) SendEndorsementResponse(ctx context.Context, transactionId string, idempotencyKey string, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, revertReason string, endorsementName string, party string, node string) error {
+	ret := _mock.Called(ctx, transactionId, idempotencyKey, contractAddress, attResult, endorsementResult, revertReason, endorsementName, party, node)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendEndorsementResponse")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, *prototk.AttestationResult, *components.EndorsementResult, string, string, string) error); ok {
-		r0 = returnFunc(ctx, transactionId, idempotencyKey, contractAddress, attResult, endorsementResult, endorsementNam, party, node)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, *prototk.AttestationResult, *components.EndorsementResult, string, string, string, string) error); ok {
+		r0 = returnFunc(ctx, transactionId, idempotencyKey, contractAddress, attResult, endorsementResult, revertReason, endorsementName, party, node)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -647,14 +647,15 @@ type MockTransportWriter_SendEndorsementResponse_Call struct {
 //   - contractAddress string
 //   - attResult *prototk.AttestationResult
 //   - endorsementResult *components.EndorsementResult
-//   - endorsementNam string
+//   - revertReason string
+//   - endorsementName string
 //   - party string
 //   - node string
-func (_e *MockTransportWriter_Expecter) SendEndorsementResponse(ctx interface{}, transactionId interface{}, idempotencyKey interface{}, contractAddress interface{}, attResult interface{}, endorsementResult interface{}, endorsementNam interface{}, party interface{}, node interface{}) *MockTransportWriter_SendEndorsementResponse_Call {
-	return &MockTransportWriter_SendEndorsementResponse_Call{Call: _e.mock.On("SendEndorsementResponse", ctx, transactionId, idempotencyKey, contractAddress, attResult, endorsementResult, endorsementNam, party, node)}
+func (_e *MockTransportWriter_Expecter) SendEndorsementResponse(ctx interface{}, transactionId interface{}, idempotencyKey interface{}, contractAddress interface{}, attResult interface{}, endorsementResult interface{}, revertReason interface{}, endorsementName interface{}, party interface{}, node interface{}) *MockTransportWriter_SendEndorsementResponse_Call {
+	return &MockTransportWriter_SendEndorsementResponse_Call{Call: _e.mock.On("SendEndorsementResponse", ctx, transactionId, idempotencyKey, contractAddress, attResult, endorsementResult, revertReason, endorsementName, party, node)}
 }
 
-func (_c *MockTransportWriter_SendEndorsementResponse_Call) Run(run func(ctx context.Context, transactionId string, idempotencyKey string, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, endorsementNam string, party string, node string)) *MockTransportWriter_SendEndorsementResponse_Call {
+func (_c *MockTransportWriter_SendEndorsementResponse_Call) Run(run func(ctx context.Context, transactionId string, idempotencyKey string, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, revertReason string, endorsementName string, party string, node string)) *MockTransportWriter_SendEndorsementResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -692,6 +693,10 @@ func (_c *MockTransportWriter_SendEndorsementResponse_Call) Run(run func(ctx con
 		if args[8] != nil {
 			arg8 = args[8].(string)
 		}
+		var arg9 string
+		if args[9] != nil {
+			arg9 = args[9].(string)
+		}
 		run(
 			arg0,
 			arg1,
@@ -702,6 +707,7 @@ func (_c *MockTransportWriter_SendEndorsementResponse_Call) Run(run func(ctx con
 			arg6,
 			arg7,
 			arg8,
+			arg9,
 		)
 	})
 	return _c
@@ -712,7 +718,7 @@ func (_c *MockTransportWriter_SendEndorsementResponse_Call) Return(err error) *M
 	return _c
 }
 
-func (_c *MockTransportWriter_SendEndorsementResponse_Call) RunAndReturn(run func(ctx context.Context, transactionId string, idempotencyKey string, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, endorsementNam string, party string, node string) error) *MockTransportWriter_SendEndorsementResponse_Call {
+func (_c *MockTransportWriter_SendEndorsementResponse_Call) RunAndReturn(run func(ctx context.Context, transactionId string, idempotencyKey string, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, revertReason string, endorsementName string, party string, node string) error) *MockTransportWriter_SendEndorsementResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -92,16 +92,16 @@ func (t *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []
 		if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
 			for _, party := range attRequest.Parties {
 				// MRW TODO - tidy up these logs
-				log.L(ctx).Debugf("[Sequencer] party %s must endorse this request. Checking for endorsement", party)
+				log.L(ctx).Debugf("party %s must endorse this request. Checking for endorsement", party)
 				found := false
 				for _, endorsement := range t.PostAssembly.Endorsements {
-					log.L(ctx).Debugf("[Sequencer] existing endorsement from party %s", endorsement.Verifier.Lookup)
+					log.L(ctx).Debugf("existing endorsement from party %s", endorsement.Verifier.Lookup)
 					found = endorsement.Name == attRequest.Name &&
 						party == endorsement.Verifier.Lookup &&
 						attRequest.VerifierType == endorsement.Verifier.VerifierType
 
 					if found {
-						log.L(ctx).Infof("[Sequencer] endorsement found: request[name=%s,party=%s,verifierType=%s] endorsement[name=%s,party=%s,verifierType=%s] verifier=%s",
+						log.L(ctx).Infof("endorsement found: request[name=%s,party=%s,verifierType=%s] endorsement[name=%s,party=%s,verifierType=%s] verifier=%s",
 							attRequest.Name, party, attRequest.VerifierType,
 							endorsement.Name, endorsement.Verifier.Lookup, endorsement.Verifier.VerifierType,
 							endorsement.Verifier.Verifier,
@@ -110,16 +110,15 @@ func (t *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []
 					}
 				}
 				if !found {
-					log.L(ctx).Debugf("[Sequencer] no endorsement exists from party %s for transaction %s", party, t.ID)
+					log.L(ctx).Debugf("no endorsement exists from party %s for transaction %s", party, t.ID)
 					unfulfilledEndorsementRequirements = append(unfulfilledEndorsementRequirements, &endorsementRequirement{party: party, attRequest: attRequest})
 				}
 			}
 		}
 	}
 
-	// MRW TODO - the logging in this function is super-verbose and probably duplicated
 	for _, req := range unfulfilledEndorsementRequirements {
-		log.L(ctx).Debugf("[Sequencer] unfulfilled endorsement requirement: %+v", req)
+		log.L(ctx).Debugf("unfulfilled endorsement requirement: %+v", req)
 	}
 	return unfulfilledEndorsementRequirements
 }

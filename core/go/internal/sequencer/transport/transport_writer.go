@@ -39,7 +39,7 @@ type TransportWriter interface {
 	SendDelegationRequest(ctx context.Context, coordinatorLocator string, transactions []*components.PrivateTransaction, blockHeight uint64) error
 	SendDelegationRequestAcknowledgment(ctx context.Context, delegatingNodeName string, delegationId string, delegateNodeName string, transactionID string) error
 	SendEndorsementRequest(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error
-	SendEndorsementResponse(ctx context.Context, transactionId, idempotencyKey, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, endorsementNam, party, node string) error
+	SendEndorsementResponse(ctx context.Context, transactionId, idempotencyKey, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, revertReason, endorsementName, party, node string) error
 	SendAssembleRequest(ctx context.Context, assemblingNode string, txID uuid.UUID, idempotencyId uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error
 	SendAssembleResponse(ctx context.Context, txID uuid.UUID, assembleRequestId uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string) error
 	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) error
@@ -265,21 +265,12 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, txID uuid
 	return err
 }
 
-func (tw *transportWriter) SendEndorsementResponse(ctx context.Context, transactionId, idempotencyKey, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, endorsementName, party, node string) error {
+func (tw *transportWriter) SendEndorsementResponse(ctx context.Context, transactionId, idempotencyKey, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, revertReason, endorsementName, party, node string) error {
 
-	//endorsedEvent := &coordTransaction.EndorsedEvent{}
 	endorsementResponse := &engineProto.EndorsementResponse{}
 
-	switch endorsementResult.Result {
-	case prototk.EndorseTransactionResponse_REVERT:
-		revertReason := "(no revert reason)"
-		if endorsementResult.RevertReason != nil {
-			revertReason = *endorsementResult.RevertReason
-		}
+	if revertReason != "" {
 		endorsementResponse.RevertReason = &revertReason
-	case prototk.EndorseTransactionResponse_ENDORSER_SUBMIT:
-		log.L(ctx).Infof("[Sequencer] endorsement response - submit it")
-		attResult.Constraints = append(attResult.Constraints, prototk.AttestationResult_ENDORSER_MUST_SUBMIT)
 	}
 
 	attResultAny, err := anypb.New(attResult)

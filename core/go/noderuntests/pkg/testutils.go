@@ -500,10 +500,10 @@ type Party interface {
 	Start(t *testing.T, domainConfig any, configPath string, manualTestCleanup bool)
 	Stop(t *testing.T)
 	GetIdentityLocator() string
-	DeploySimpleDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.ConstructorParameters,
+	DeploySimpleDomainInstanceContract(t *testing.T, constructorParameters *domains.ConstructorParameters,
 		transactionReceiptCondition func(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool,
 		transactionLatencyThreshold func(t *testing.T) time.Duration) *pldtypes.EthAddress
-	DeploySimpleStorageDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.SimpleStorageConstructorParameters,
+	DeploySimpleStorageDomainInstanceContract(t *testing.T, constructorParameters *domains.SimpleStorageConstructorParameters,
 		transactionReceiptCondition func(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool,
 		transactionLatencyThreshold func(t *testing.T) time.Duration) *pldtypes.EthAddress
 	OverrideSequencerConfig(config *pldconf.SequencerConfig)
@@ -533,12 +533,12 @@ func (p *partyForTesting) OverrideSequencerConfig(config *pldconf.SequencerConfi
 	p.nodeConfig.sequencerConfig = config
 }
 
-func (p *partyForTesting) DeploySimpleDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.ConstructorParameters, transactionReceiptCondition func(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool, transactionLatencyThreshold func(t *testing.T) time.Duration) *pldtypes.EthAddress {
+func (p *partyForTesting) DeploySimpleDomainInstanceContract(t *testing.T, constructorParameters *domains.ConstructorParameters, transactionReceiptCondition func(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool, transactionLatencyThreshold func(t *testing.T) time.Duration) *pldtypes.EthAddress {
 
 	var dplyTxID uuid.UUID
 
 	err := p.client.CallRPC(context.Background(), &dplyTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
-		ABI: *domains.SimpleTokenConstructorABI(endorsementMode),
+		ABI: *domains.SimpleTokenConstructorABI(constructorParameters.EndorsementMode),
 		TransactionBase: pldapi.TransactionBase{
 			Type:   pldapi.TransactionTypePrivate.Enum(),
 			Domain: "domain1",
@@ -563,14 +563,14 @@ func (p *partyForTesting) DeploySimpleDomainInstanceContract(t *testing.T, endor
 	return dplyTxFull.Receipt.ContractAddress
 }
 
-func (p *partyForTesting) DeploySimpleStorageDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.SimpleStorageConstructorParameters,
+func (p *partyForTesting) DeploySimpleStorageDomainInstanceContract(t *testing.T, constructorParameters *domains.SimpleStorageConstructorParameters,
 	transactionReceiptCondition func(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool,
 	transactionLatencyThreshold func(t *testing.T) time.Duration) *pldtypes.EthAddress {
 
 	var dplyTxID uuid.UUID
 
 	err := p.client.CallRPC(context.Background(), &dplyTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
-		ABI: *domains.SimpleStorageConstructorABI(endorsementMode),
+		ABI: *domains.SimpleStorageConstructorABI(constructorParameters.EndorsementMode),
 		TransactionBase: pldapi.TransactionBase{
 			Type:   pldapi.TransactionTypePrivate.Enum(),
 			Domain: "simpleStorageDomain",

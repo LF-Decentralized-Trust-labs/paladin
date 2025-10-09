@@ -190,7 +190,7 @@ func (r *SentMessageRecorder) SendDispatched(ctx context.Context, transactionSen
 	return nil
 }
 
-func (r *SentMessageRecorder) SendEndorsementResponse(ctx context.Context, transactionId, idempotencyKey, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, endorsementNam, party, node string) error {
+func (r *SentMessageRecorder) SendEndorsementResponse(ctx context.Context, transactionId, idempotencyKey, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, revertReason, endorsementName, party, node string) error {
 	return nil
 }
 

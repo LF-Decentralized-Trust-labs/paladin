@@ -84,7 +84,7 @@ func TestTransactionSuccessAfterStartStopSingleNode(t *testing.T) {
 		EndorsementMode: domains.SelfEndorsement,
 	}
 
-	contractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
 	// Start a private transaction on alice's node
 	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
@@ -243,7 +243,7 @@ func TestTransactionSuccessIfOneNodeStoppedButNotARequiredVerifier(t *testing.T)
 		EndorsementMode: domains.SelfEndorsement,
 	}
 
-	contractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
 	// Start a private transaction on alice's node
 	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
@@ -338,7 +338,7 @@ func TestTransactionSuccessIfOneRequiredVerifierStoppedDuringSubmission(t *testi
 		EndorsementMode: domains.SelfEndorsement,
 	}
 
-	contractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
 	// Start a private transaction on alice's node
 	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
@@ -449,7 +449,7 @@ func TestTransactionSuccessChainedTransaction(t *testing.T) {
 	}
 
 	// Deploy a token that will be call as a chained transaction, e.g. like a Pente hook contract
-	contractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
 	constructorParameters = &domains.ConstructorParameters{
 		From:            alice.GetIdentity(),
@@ -460,7 +460,266 @@ func TestTransactionSuccessChainedTransaction(t *testing.T) {
 	}
 
 	// Deploy a token that will create a chained private transaction to the previous token e.g. like a Noto with a Pente hook
-	chainedContractAddress := alice.DeploySimpleDomainInstanceContract(t, domains.SelfEndorsement, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+	chainedContractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	// Start a private transaction on alice's node. This should result in 2 Paladin transactions and 1 public transaction. The
+	// original transaction should return a success receipt.
+	var aliceTxID uuid.UUID
+	idempotencyKey := uuid.New().String()
+	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             chainedContractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+	                "from": "",
+	                "to": "` + bob.GetIdentityLocator() + `",
+	                "amount": "123000000000000000000"
+	            }`),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+
+	// Alice's node should have the full transaction and receipt
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, aliceTxID, alice.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+
+	// Bob's node has the receipt, but not necesarily the original transaction
+	assert.Eventually(t,
+		transactionReceiptConditionReceiptOnly(t, ctx, aliceTxID, bob.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+}
+
+func TestTransactionSuccessChainedTransactionSelfEndorsementThenPrivacyGroupEndorsement(t *testing.T) {
+
+	ctx := context.Background()
+	domainRegistryAddress := deployDomainRegistry(t, "alice")
+
+	// Create 2 parties, configured to use a hook address when the simple domain is invoked
+	alice := testutils.NewPartyForTesting(t, "alice", domainRegistryAddress)
+	bob := testutils.NewPartyForTesting(t, "bob", domainRegistryAddress)
+
+	alice.AddPeer(bob.GetNodeConfig())
+	bob.AddPeer(alice.GetNodeConfig())
+
+	domainConfig := &domains.SimpleDomainConfig{
+		SubmitMode: domains.ONE_TIME_USE_KEYS,
+	}
+
+	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+
+	t.Cleanup(func() {
+		stopNode(t, bob)
+		stopNode(t, alice)
+	})
+
+	constructorParameters := &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken1",
+		Symbol:          "FT1",
+		EndorsementMode: domains.PrivacyGroupEndorsement,
+		EndorsementSet:  []string{alice.GetIdentityLocator(), bob.GetIdentityLocator()},
+	}
+
+	// Deploy a token that will be called as a chained transaction, e.g. like a Pente hook contract
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	constructorParameters = &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken2",
+		Symbol:          "FT2",
+		EndorsementMode: domains.SelfEndorsement,
+		HookAddress:     contractAddress.String(), // Cause the contract to pass the request on to the contract at the hook address
+	}
+
+	// Deploy a token that will create a chained private transaction to the previous token e.g. like a Noto with a Pente hook
+	chainedContractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	// Start a private transaction on alice's node. This should result in 2 Paladin transactions and 1 public transaction. The
+	// original transaction should return a success receipt.
+	var aliceTxID uuid.UUID
+	idempotencyKey := uuid.New().String()
+	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             chainedContractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+	                "from": "",
+	                "to": "` + bob.GetIdentityLocator() + `",
+	                "amount": "123000000000000000000"
+	            }`),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+
+	// Alice's node should have the full transaction and receipt
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, aliceTxID, alice.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+
+	// Bob's node has the receipt, but not necesarily the original transaction
+	assert.Eventually(t,
+		transactionReceiptConditionReceiptOnly(t, ctx, aliceTxID, bob.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+}
+
+func TestTransactionSuccessChainedTransactionPrivacyGroupEndorsementThenSelfEndorsement(t *testing.T) {
+
+	ctx := context.Background()
+	domainRegistryAddress := deployDomainRegistry(t, "alice")
+
+	// Create 2 parties, configured to use a hook address when the simple domain is invoked
+	alice := testutils.NewPartyForTesting(t, "alice", domainRegistryAddress)
+	bob := testutils.NewPartyForTesting(t, "bob", domainRegistryAddress)
+
+	alice.AddPeer(bob.GetNodeConfig())
+	bob.AddPeer(alice.GetNodeConfig())
+
+	domainConfig := &domains.SimpleDomainConfig{
+		SubmitMode: domains.ONE_TIME_USE_KEYS,
+	}
+
+	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+
+	t.Cleanup(func() {
+		stopNode(t, bob)
+		stopNode(t, alice)
+	})
+
+	constructorParameters := &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken1",
+		Symbol:          "FT1",
+		EndorsementMode: domains.SelfEndorsement,
+	}
+
+	// Deploy a token that will be call as a chained transaction, e.g. like a Pente hook contract
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	constructorParameters = &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken2",
+		Symbol:          "FT2",
+		EndorsementMode: domains.PrivacyGroupEndorsement,
+		EndorsementSet:  []string{alice.GetIdentityLocator(), bob.GetIdentityLocator()},
+		HookAddress:     contractAddress.String(), // Cause the contract to pass the request on to the contract at the hook address
+	}
+
+	// Deploy a token that will create a chained private transaction to the previous token e.g. like a Noto with a Pente hook
+	chainedContractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	// Start a private transaction on alice's node. This should result in 2 Paladin transactions and 1 public transaction. The
+	// original transaction should return a success receipt.
+	var aliceTxID uuid.UUID
+	idempotencyKey := uuid.New().String()
+	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             chainedContractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+	                "from": "",
+	                "to": "` + bob.GetIdentityLocator() + `",
+	                "amount": "123000000000000000000"
+	            }`),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+
+	// Alice's node should have the full transaction and receipt
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, aliceTxID, alice.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+
+	// Bob's node has the receipt, but not necesarily the original transaction
+	assert.Eventually(t,
+		transactionReceiptConditionReceiptOnly(t, ctx, aliceTxID, bob.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+}
+
+func TestTransactionSuccessChainedTransactionPrivacyGroupEndorsementThenPrivacyGroupEndorsement(t *testing.T) {
+
+	ctx := context.Background()
+	domainRegistryAddress := deployDomainRegistry(t, "alice")
+
+	// Create 2 parties, configured to use a hook address when the simple domain is invoked
+	alice := testutils.NewPartyForTesting(t, "alice", domainRegistryAddress)
+	bob := testutils.NewPartyForTesting(t, "bob", domainRegistryAddress)
+
+	alice.AddPeer(bob.GetNodeConfig())
+	bob.AddPeer(alice.GetNodeConfig())
+
+	domainConfig := &domains.SimpleDomainConfig{
+		SubmitMode: domains.ONE_TIME_USE_KEYS,
+	}
+
+	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+
+	t.Cleanup(func() {
+		stopNode(t, bob)
+		stopNode(t, alice)
+	})
+
+	constructorParameters := &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken1",
+		Symbol:          "FT1",
+		EndorsementMode: domains.PrivacyGroupEndorsement,
+		EndorsementSet:  []string{alice.GetIdentityLocator(), bob.GetIdentityLocator()},
+	}
+
+	// Deploy a token that will be call as a chained transaction, e.g. like a Pente hook contract
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	constructorParameters = &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken2",
+		Symbol:          "FT2",
+		EndorsementMode: domains.PrivacyGroupEndorsement,
+		EndorsementSet:  []string{alice.GetIdentityLocator(), bob.GetIdentityLocator()},
+		HookAddress:     contractAddress.String(), // Cause the contract to pass the request on to the contract at the hook address
+	}
+
+	// Deploy a token that will create a chained private transaction to the previous token e.g. like a Noto with a Pente hook
+	chainedContractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
 
 	// Start a private transaction on alice's node. This should result in 2 Paladin transactions and 1 public transaction. The
 	// original transaction should return a success receipt.

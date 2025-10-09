@@ -635,7 +635,14 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 		Verifier:        endorsementResult.Endorser,
 	}
 
+	revertReason := ""
+
 	switch endorsementResult.Result {
+	case prototk.EndorseTransactionResponse_REVERT:
+		revertReason = "(no revert reason)"
+		if endorsementResult.RevertReason != nil {
+			revertReason = *endorsementResult.RevertReason
+		}
 	case prototk.EndorseTransactionResponse_SIGN:
 		//log.L(ctx).Infof("[Sequencer] endorsement response resulted in signing request for transaction %s", endorsementRequest.TransactionId)
 
@@ -662,10 +669,14 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 			}
 			attResult.Payload = signaturePayload
 			//log.L(ctx).Debugf("[Sequencer] handleEndorsementRequest payload %x signed %x by %s (%s)", transactionEndorsement.Payload, signaturePayload, unqualifiedLookup, resolvedKey.Verifier.Verifier)
-			attResult.Constraints = append(attResult.Constraints, prototk.AttestationResult_ENDORSER_MUST_SUBMIT)
 			// MRW TODO - is this manual extrapolation of TX ID from 32 char hex string required?
 
+		} else {
+			// This can presumably never happen, since this endorsement request came to us
+			log.L(ctx).Errorf("handleEndorsementRequest received isn't for this node: %s", signerNode)
 		}
+	case prototk.EndorseTransactionResponse_ENDORSER_SUBMIT:
+		attResult.Constraints = append(attResult.Constraints, prototk.AttestationResult_ENDORSER_MUST_SUBMIT)
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
@@ -679,7 +690,7 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 	}
 
 	sMgr.metrics.IncEndorsedTransactions()
-	seq.GetTransportWriter().SendEndorsementResponse(ctx, endorsementRequest.TransactionId, endorsementRequest.IdempotencyKey, contractAddress.String(), attResult, endorsementResult, transactionEndorsement.Name, endorsementRequest.Party, message.FromNode)
+	seq.GetTransportWriter().SendEndorsementResponse(ctx, endorsementRequest.TransactionId, endorsementRequest.IdempotencyKey, contractAddress.String(), attResult, endorsementResult, revertReason, transactionEndorsement.Name, endorsementRequest.Party, message.FromNode)
 }
 
 func (sMgr *sequencerManager) handleEndorsementResponse(ctx context.Context, message *components.ReceivedMessage) {
