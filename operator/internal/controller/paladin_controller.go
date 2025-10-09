@@ -959,12 +959,14 @@ func (r *PaladinReconciler) generatePaladinSigners(ctx context.Context, node *co
 			Signer:                  &pldconf.SignerConfig{},
 		}
 
-		// Upsert a secret if we've been asked to. We use a mnemonic in this case (rather than directly generating a 32byte seed)
-		if s.Type == corev1alpha1.SignerType_AutoHDWallet {
+		if s.DerivationType == corev1alpha1.DerivationType_BIP32 {
 			wallet.Signer.KeyDerivation.Type = pldconf.KeyDerivationTypeBIP32
 			wallet.Signer.KeyDerivation.SeedKeyPath = pldconf.StaticKeyReference{Name: "seed"}
-			if err := r.generateBIP39SeedSecretIfNotExist(ctx, node, s.Secret); err != nil {
-				return err
+			if s.Type == corev1alpha1.SignerType_AutoHDWallet {
+				// Upsert a secret if we've been asked to. We use a mnemonic in this case (rather than directly generating a 32byte seed)
+				if err := r.generateBIP39SeedSecretIfNotExist(ctx, node, s.Secret); err != nil {
+					return err
+				}
 			}
 		}
 

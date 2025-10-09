@@ -78,9 +78,10 @@ var _ = Describe("Paladin Controller", func() {
 						BesuNode: "node1",
 						SecretBackedSigners: []corev1alpha1.SecretBackedSigner{
 							{
-								Name:   "signer-1",
-								Secret: "node1.keys",
-								Type:   "autoHDWallet",
+								Name:           "signer-1",
+								Secret:         "node1.keys",
+								Type:           "autoHDWallet",
+								DerivationType: "bip32",
 							},
 						},
 						Transports: []corev1alpha1.TransportConfig{
