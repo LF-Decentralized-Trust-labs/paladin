@@ -84,7 +84,7 @@ Paladin can automatically retrieve optimal gas prices using the `eth_feeHistory`
 publicTxManager:
   gasPrice:
     ethFeeHistory:
-      tipPercentile: 85
+      priorityFeePercentile: 85
       historyBlockCount: 20
       baseFeeBufferFactor: 1
       cache:
