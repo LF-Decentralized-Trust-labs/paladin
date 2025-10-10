@@ -24,7 +24,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/text/language"

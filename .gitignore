@@ -60,3 +60,5 @@ bin/
 
 ### Proto ###
 *.pb.go
+
+**.tar.gz

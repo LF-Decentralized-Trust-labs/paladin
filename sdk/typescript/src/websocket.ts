@@ -3,13 +3,16 @@ import { Transform } from "stream";
 import WebSocket from "ws";
 import { Logger } from "./interfaces/logger";
 import {
+  PrivacyGroupWebSocketEvent,
   WebSocketClientOptions,
   WebSocketEvent,
-  WebSocketEventCallback,
-  WebSocketSubscription,
+  WebSocketEventCallback
 } from "./interfaces/websocket";
 
-export class PaladinWebSocketClient {
+abstract class PaladinWebSocketClientBase<
+  TMessageTypes extends string,
+  TEvent
+> {
   private logger: Logger;
   private socket: WebSocket | undefined;
   private closed? = () => {};
@@ -20,8 +23,8 @@ export class PaladinWebSocketClient {
   private counter = 1;
 
   constructor(
-    private options: WebSocketClientOptions,
-    private callback: WebSocketEventCallback
+    private options: WebSocketClientOptions<TMessageTypes>,
+    private callback: WebSocketEventCallback<TEvent>
   ) {
     this.logger = options.logger ?? console;
     this.connect();
@@ -55,12 +58,8 @@ export class PaladinWebSocketClient {
           this.logger.log("Connected");
         }
         this.schedulePing();
-        for (const subOrName of this.options.subscriptions ?? []) {
+        for (const sub of this.options.subscriptions ?? []) {
           // Automatically connect subscriptions
-          const sub: WebSocketSubscription =
-            typeof subOrName === "string"
-              ? { type: "receipts", name: subOrName }
-              : subOrName;
           this.subscribe(sub.type, sub.name);
           this.logger.log(`Started listening on subscription ${sub.name}`);
         }
@@ -101,7 +100,7 @@ export class PaladinWebSocketClient {
         );
       })
       .on("message", (data) => {
-        const event: WebSocketEvent = JSON.parse(data.toString());
+        const event: TEvent = JSON.parse(data.toString());
         this.callback(this, event);
       });
   }
@@ -162,14 +161,6 @@ export class PaladinWebSocketClient {
     });
   }
 
-  subscribe(type: string, name: string) {
-    this.sendRpc("ptx_subscribe", [type, name]);
-  }
-
-  ack(subscription: string) {
-    this.sendRpc("ptx_ack", [subscription]);
-  }
-
   async close(wait?: boolean): Promise<void> {
     const closedPromise = new Promise<void>((resolve) => {
       this.closed = resolve;
@@ -184,5 +175,43 @@ export class PaladinWebSocketClient {
       if (wait) await closedPromise;
       this.socket = undefined;
     }
+  }
+
+  abstract subscribe(type: TMessageTypes, name: string): void;
+  abstract ack(subscription: string): void;
+  abstract nack(subscription: string): void;
+}
+
+export class PaladinWebSocketClient extends PaladinWebSocketClientBase<
+  "receipts" | "blockchainevents",
+  WebSocketEvent
+> {
+  subscribe(type: "receipts" | "blockchainevents", name: string) {
+    this.sendRpc("ptx_subscribe", [type, name]);
+  }
+
+  ack(subscription: string) {
+    this.sendRpc("ptx_ack", [subscription]);
+  }
+
+  nack(subscription: string) {
+    this.sendRpc("ptx_nack", [subscription]);
+  }
+}
+
+export class PrivacyGroupWebSocketClient extends PaladinWebSocketClientBase<
+  "messages",
+  PrivacyGroupWebSocketEvent
+> {
+  subscribe(type: "messages", name: string) {
+    this.sendRpc("pgroup_subscribe", [type, name]);
+  }
+
+  ack(subscription: string) {
+    this.sendRpc("pgroup_ack", [subscription]);
+  }
+
+  nack(subscription: string) {
+    this.sendRpc("pgroup_nack", [subscription]);
   }
 }

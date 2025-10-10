@@ -39,6 +39,20 @@ task install_sdk(type: Exec) {
     executable 'npm'
     args 'install' 
     args 'file:../../sdk/typescript' // use local sdk
+<<<<<<<< HEAD:examples/bond/build.gradle
+========
+
+    inputs.files(configurations.buildSDK)
+    inputs.files(configurations.buildCommon)
+    inputs.files('package.json')
+    outputs.files('package-lock.json')
+    outputs.dir('node_modules')
+}
+
+task install(type: Exec, dependsOn: install_sdk) {
+    executable 'npm'
+    args 'install' 
+>>>>>>>> refs/rewritten/main-39:examples/event-listener/build.gradle
 
     inputs.files(configurations.buildSDK)
     inputs.files(configurations.buildCommon)
@@ -98,4 +112,9 @@ task clean(type: Delete) {
     delete 'build'
     delete 'src/abis'
     delete 'src/zeto-abis'
+<<<<<<<< HEAD:examples/bond/build.gradle
+========
+    delete 'data'
+    delete 'logs'
+>>>>>>>> refs/rewritten/main-39:examples/event-listener/build.gradle
 }

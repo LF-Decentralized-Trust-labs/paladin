@@ -12,4 +12,6 @@ spec:
     type: c-shared
     library: /app/domains/libnoto.so
   configJSON: |
-    {}
+    {
+      "factoryVersion": 1
+    }

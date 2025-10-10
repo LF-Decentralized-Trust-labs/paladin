@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -20,25 +20,26 @@ import (
 	"crypto/rand"
 	"strings"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/pldmsgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signer/keystores"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signer/signers"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/pldmsgs"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signer/keystores"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signer/signers"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 )
 
-// SigningModule provides functions for the signerapi request/reply functions from the signerapil interface defined
+// SigningModule provides functions for the signerapi request/reply functions from the signerapi interface defined
 // in signing_module.
 // This module can be wrapped and loaded into the core Paladin runtime as an embedded module called directly
 // within the runtime, or wrapped in a remote process connected over a transport like HTTP, WebSockets, gRPC etc.
 type SigningModule interface {
 	AddInMemorySigner(prefix string, signer signerapi.InMemorySigner) // late bind support for signers only (keystores are construction only)
-	Resolve(ctx context.Context, req *signerapi.ResolveKeyRequest) (res *signerapi.ResolveKeyResponse, err error)
-	Sign(ctx context.Context, req *signerapi.SignRequest) (res *signerapi.SignResponse, err error)
-	List(ctx context.Context, req *signerapi.ListKeysRequest) (res *signerapi.ListKeysResponse, err error)
+	Resolve(ctx context.Context, req *prototk.ResolveKeyRequest) (res *prototk.ResolveKeyResponse, err error)
+	Sign(ctx context.Context, req *prototk.SignWithKeyRequest) (res *prototk.SignWithKeyResponse, err error)
+	List(ctx context.Context, req *prototk.ListKeysRequest) (res *prototk.ListKeysResponse, err error)
 	Close()
 }
 
@@ -165,7 +166,7 @@ func (sm *signingModule[C]) getSignerForAlgorithm(ctx context.Context, algorithm
 	return signer, nil
 }
 
-func (sm *signingModule[C]) newKeyForAlgorithms(ctx context.Context, requiredIdentifiers []*signerapi.PublicKeyIdentifierType) ([]byte, error) {
+func (sm *signingModule[C]) newKeyForAlgorithms(ctx context.Context, requiredIdentifiers []*prototk.PublicKeyIdentifierType) ([]byte, error) {
 	var keyLen = 0
 	for _, requiredIdentifier := range requiredIdentifiers {
 		var algoKeyLen int
@@ -189,7 +190,7 @@ func (sm *signingModule[C]) newKeyForAlgorithms(ctx context.Context, requiredIde
 	return buff, err
 }
 
-func (sm *signingModule[C]) signInMemory(ctx context.Context, algorithm, payloadType string, privateKey, payload []byte) (res *signerapi.SignResponse, err error) {
+func (sm *signingModule[C]) signInMemory(ctx context.Context, algorithm, payloadType string, privateKey, payload []byte) (res *prototk.SignWithKeyResponse, err error) {
 	var resultBytes []byte
 	signer, err := sm.getSignerForAlgorithm(ctx, algorithm)
 	if err == nil {
@@ -198,12 +199,12 @@ func (sm *signingModule[C]) signInMemory(ctx context.Context, algorithm, payload
 	if err != nil {
 		return nil, err
 	}
-	return &signerapi.SignResponse{
+	return &prototk.SignWithKeyResponse{
 		Payload: resultBytes,
 	}, nil
 }
 
-func (sm *signingModule[C]) Resolve(ctx context.Context, req *signerapi.ResolveKeyRequest) (res *signerapi.ResolveKeyResponse, err error) {
+func (sm *signingModule[C]) Resolve(ctx context.Context, req *prototk.ResolveKeyRequest) (res *prototk.ResolveKeyResponse, err error) {
 
 	if len(req.Name) == 0 {
 		return nil, i18n.NewError(ctx, pldmsgs.MsgSigningKeyCannotBeEmpty)
@@ -228,10 +229,10 @@ func (sm *signingModule[C]) Resolve(ctx context.Context, req *signerapi.ResolveK
 	return sm.buildResolveResponseWithIdentifiers(ctx, keyHandle, privateKey, req.RequiredIdentifiers)
 }
 
-func (sm *signingModule[C]) buildResolveResponseWithIdentifiers(ctx context.Context, keyHandle string, privateKey []byte, requiredIdentifiers []*signerapi.PublicKeyIdentifierType) (*signerapi.ResolveKeyResponse, error) {
-	identifiers := make([]*signerapi.PublicKeyIdentifier, len(requiredIdentifiers))
+func (sm *signingModule[C]) buildResolveResponseWithIdentifiers(ctx context.Context, keyHandle string, privateKey []byte, requiredIdentifiers []*prototk.PublicKeyIdentifierType) (*prototk.ResolveKeyResponse, error) {
+	identifiers := make([]*prototk.PublicKeyIdentifier, len(requiredIdentifiers))
 	for i, required := range requiredIdentifiers {
-		resolved := &signerapi.PublicKeyIdentifier{
+		resolved := &prototk.PublicKeyIdentifier{
 			Algorithm:    required.Algorithm,
 			VerifierType: required.VerifierType,
 		}
@@ -244,13 +245,13 @@ func (sm *signingModule[C]) buildResolveResponseWithIdentifiers(ctx context.Cont
 		}
 		identifiers[i] = resolved
 	}
-	return &signerapi.ResolveKeyResponse{
+	return &prototk.ResolveKeyResponse{
 		KeyHandle:   keyHandle,
 		Identifiers: identifiers,
 	}, nil
 }
 
-func (sm *signingModule[C]) Sign(ctx context.Context, req *signerapi.SignRequest) (res *signerapi.SignResponse, err error) {
+func (sm *signingModule[C]) Sign(ctx context.Context, req *prototk.SignWithKeyRequest) (res *prototk.SignWithKeyResponse, err error) {
 	// If we are delegating resolution to the keystore (hence all our in memory signers are disabled)
 	// then that's what we do in all cases. An individual signer works in one mode or the other
 	if sm.keyStoreSigner != nil {
@@ -268,7 +269,7 @@ func (sm *signingModule[C]) Sign(ctx context.Context, req *signerapi.SignRequest
 	return sm.signInMemory(ctx, req.Algorithm, req.PayloadType, privateKey, req.Payload)
 }
 
-func (sm *signingModule[C]) List(ctx context.Context, req *signerapi.ListKeysRequest) (res *signerapi.ListKeysResponse, err error) {
+func (sm *signingModule[C]) List(ctx context.Context, req *prototk.ListKeysRequest) (res *prototk.ListKeysResponse, err error) {
 	listableStore, isListable := sm.keyStore.(signerapi.KeyStoreListable)
 	if !isListable || sm.disableKeyListing {
 		return nil, i18n.NewError(ctx, pldmsgs.MsgSigningKeyListingNotSupported)

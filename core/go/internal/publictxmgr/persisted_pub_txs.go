@@ -17,9 +17,9 @@
 package publictxmgr
 
 import (
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 // public_transactions
@@ -48,6 +48,8 @@ type DBPublicTxnBinding struct {
 	PublicTxnID     uint64                                `gorm:"column:pub_txn_id;primaryKey"`
 	Transaction     uuid.UUID                             `gorm:"column:transaction"`
 	TransactionType pldtypes.Enum[pldapi.TransactionType] `gorm:"column:tx_type"`
+	Sender          string                                `gorm:"column:sender"`
+	ContractAddress string                                `gorm:"column:contract_address"`
 }
 
 func (DBPublicTxnBinding) TableName() string {

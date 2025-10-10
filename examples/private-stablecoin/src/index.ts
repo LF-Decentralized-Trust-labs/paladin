@@ -1,3 +1,17 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   PaladinVerifier,
   TransactionType,
@@ -9,13 +23,12 @@ import { checkDeploy, checkReceipt } from "paladin-example-common";
 import erc20Abi from "./zeto-abis/SampleERC20.json";
 import kycAbi from "./zeto-abis/IZetoKyc.json";
 import { buildBabyjub } from "circomlibjs";
-import * as fs from 'fs';
-import * as path from 'path';
-import { ContractData } from "./verify-deployed";
-import { nodeConnections } from "../../common/src/config";
+import * as fs from "fs";
+import * as path from "path";
+import { ContractData } from "./tests/data-persistence";
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
- 
 
 async function getBabyjubPublicKey(
   verifier: PaladinVerifier
@@ -141,24 +154,36 @@ async function getERC20Balance(
 }
 
 async function main(): Promise<boolean> {
-    // --- Initialization from Imported Config ---
-    if (nodeConnections.length < 3) {
-      logger.error("The environment config must provide at least 3 nodes for this scenario.");
-      return false;
-    }
-    
-    logger.log("Initializing Paladin clients from the environment configuration...");
-    const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
-    const [paladin1, paladin2, paladin3] = clients;
+  // --- Initialization from Imported Config ---
+  if (nodeConnections.length < 3) {
+    logger.error(
+      "The environment config must provide at least 3 nodes for this scenario."
+    );
+    return false;
+  }
 
-    // Generate unique identity names for this run to avoid Merkle tree conflicts
-    const runId = Math.random().toString(36).substring(2, 8);
-    logger.log(`Using run ID: ${runId} for unique identities`);
+  logger.log(
+    "Initializing Paladin clients from the environment configuration..."
+  );
+  const clients = nodeConnections.map(
+    (node) => new PaladinClient(node.clientOptions)
+  );
+  const [paladin1, paladin2, paladin3] = clients;
 
-    // Get verifiers for the financial institution and clients with unique names
-    const [financialInstitution] = paladin1.getVerifiers(`bank-${runId}@${nodeConnections[0].id}`);
-    const [clientA] = paladin2.getVerifiers(`client-a-${runId}@${nodeConnections[1].id}`);
-    const [clientB] = paladin3.getVerifiers(`client-b-${runId}@${nodeConnections[2].id}`);
+  // Generate unique identity names for this run to avoid Merkle tree conflicts
+  const runId = Math.random().toString(36).substring(2, 8);
+  logger.log(`Using run ID: ${runId} for unique identities`);
+
+  // Get verifiers for the financial institution and clients with unique names
+  const [financialInstitution] = paladin1.getVerifiers(
+    `bank-${runId}@${nodeConnections[0].id}`
+  );
+  const [clientA] = paladin2.getVerifiers(
+    `client-a-${runId}@${nodeConnections[1].id}`
+  );
+  const [clientB] = paladin3.getVerifiers(
+    `client-b-${runId}@${nodeConnections[2].id}`
+  );
 
   logger.log("=== Private Stablecoin with KYC and Deposit/Withdraw ===");
   logger.log(
@@ -461,7 +486,7 @@ async function main(): Promise<boolean> {
   logger.log("  - Enterprise-grade privacy with regulatory compliance");
 
   // Save contract data to file for later use
-  const contractData : ContractData = {
+  const contractData: ContractData = {
     runId: runId,
     privateStablecoinAddress: privateStablecoin.address,
     publicStablecoinAddress: publicStablecoinAddress,
@@ -469,33 +494,33 @@ async function main(): Promise<boolean> {
     kycDetails: {
       financialInstitution: {
         lookup: financialInstitution.lookup,
-        publicKey: bankPublicKey
+        publicKey: bankPublicKey,
       },
       clientA: {
         lookup: clientA.lookup,
-        publicKey: clientAPublicKey
+        publicKey: clientAPublicKey,
       },
       clientB: {
         lookup: clientB.lookup,
-        publicKey: clientBPublicKey
-      }
+        publicKey: clientBPublicKey,
+      },
     },
     operations: {
       deposit: {
         amount: 75000,
         receiptId: depositReceipt.id,
-        transactionHash: depositReceipt.transactionHash
+        transactionHash: depositReceipt.transactionHash,
       },
       transfer: {
         amount: 25000,
         receiptId: transferReceipt.id,
-        transactionHash: transferReceipt.transactionHash
+        transactionHash: transferReceipt.transactionHash,
       },
       withdraw: {
         amount: 15000,
         receiptId: withdrawReceipt.id,
-        transactionHash: withdrawReceipt.transactionHash
-      }
+        transactionHash: withdrawReceipt.transactionHash,
+      },
     },
     finalBalances: {
       clientA: {
@@ -503,32 +528,33 @@ async function main(): Promise<boolean> {
         private: {
           totalBalance: clientAPrivateBalance.totalBalance,
           totalStates: clientAPrivateBalance.totalStates,
-          overflow: clientAPrivateBalance.overflow
-        }
+          overflow: clientAPrivateBalance.overflow,
+        },
       },
       clientB: {
         public: clientBPublicBalance,
         private: {
           totalBalance: clientBPrivateBalance.totalBalance,
           totalStates: clientBPrivateBalance.totalStates,
-          overflow: clientBPrivateBalance.overflow
-        }
-      }
+          overflow: clientBPrivateBalance.overflow,
+        },
+      },
     },
     participants: {
       financialInstitution: financialInstitution.lookup,
       clientA: clientA.lookup,
-      clientB: clientB.lookup
+      clientB: clientB.lookup,
     },
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, "..", "data");
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const dataFile = path.join(dataDir, `contract-data-${timestamp}.json`);
   fs.writeFileSync(dataFile, JSON.stringify(contractData, null, 2));
   logger.log(`Contract data saved to ${dataFile}`);

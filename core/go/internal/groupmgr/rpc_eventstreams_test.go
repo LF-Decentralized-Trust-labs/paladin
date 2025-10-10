@@ -23,16 +23,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/wsclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/wsclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -123,7 +123,8 @@ func TestRPCEventListenerE2E(t *testing.T) {
 	subIDChan := make(chan string)
 	unSubChan := make(chan bool)
 	messages := make(chan *pldapi.PrivacyGroupMessage)
-	ackReady := make(chan struct{}) // will be closed once we have subID
+	ackReady := make(chan struct{})          // will be closed once we have subID
+	subscriptionReady := make(chan struct{}) // signal when subscription is fully set up
 
 	var unSubReqID atomic.Uint64
 	var subID atomic.Pointer[string]
@@ -155,6 +156,8 @@ func TestRPCEventListenerE2E(t *testing.T) {
 						subIDStr := rpcPayload.Result.StringValue()
 						subID.Store(&subIDStr)
 						subIDChan <- subIDStr
+						// Signal that subscription is fully ready
+						close(subscriptionReady)
 					case unSubReqID.Load(): // Unsubscribe reply
 						unSubChan <- true
 						return
@@ -186,9 +189,27 @@ func TestRPCEventListenerE2E(t *testing.T) {
 		}
 	}()
 
+	// Wait for subscription with timeout
+	var subIDStr string
+	select {
+	case subIDStr = <-subIDChan:
+		_, err = uuid.Parse(subIDStr)
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Subscription timeout")
+	}
+
+	// Wait for subscription to be fully ready before sending messages
+	select {
+	case <-subscriptionReady:
+		// Subscription is ready
+	case <-time.After(5 * time.Second):
+		t.Fatal("Subscription ready timeout")
+	}
+
 	testMsgs := make([]*pldapi.PrivacyGroupMessageInput, 6)
 	testMsgIDs := make([]uuid.UUID, len(testMsgs))
-	for i := 0; i < len(testMsgs); i++ {
+	for i := range testMsgs {
 		testMsgs[i] = &pldapi.PrivacyGroupMessageInput{
 			Domain: "domain1",
 			Group:  groupID,
@@ -199,7 +220,7 @@ func TestRPCEventListenerE2E(t *testing.T) {
 
 	// Send first 3
 	err = gm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			msgID, err := gm.SendMessage(ctx, dbTX, testMsgs[i])
 			require.NoError(t, err)
 			testMsgIDs[i] = *msgID
@@ -207,16 +228,6 @@ func TestRPCEventListenerE2E(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
-
-	// Wait for subscription with timeout
-	var subIDStr string
-	select {
-	case subIDStr = <-subIDChan:
-		_, err = uuid.Parse(subIDStr)
-		require.NoError(t, err)
-	case <-time.After(5 * time.Second):
-		t.Fatal("Subscription timeout")
-	}
 
 	close(ackReady)
 
@@ -316,6 +327,7 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 	// Channels for coordination
 	subIDChan := make(chan string)
 	unSubChan := make(chan bool)
+	subscriptionReady := make(chan struct{}) // Signal when subscription is fully set up
 	sentNack := false
 	messages := make(chan *pldapi.PrivacyGroupMessage)
 	var unSubReqID atomic.Uint64
@@ -352,6 +364,8 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 						require.NoError(t, err)
 						subID.Store(&subIDStr)
 						subIDChan <- subIDStr
+						// Signal that subscription is fully ready
+						close(subscriptionReady)
 					case unSubReqID.Load(): // Unsubscribe reply
 						unSubChan <- true
 					}
@@ -390,6 +404,24 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 		}
 	}()
 
+	// Wait for subscription reply to ensure everything is set up
+	var sid string
+	select {
+	case sid = <-subIDChan:
+		require.NotEmpty(t, sid)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Subscription timeout")
+	}
+
+	// Wait for subscription to be fully ready before sending message
+	select {
+	case <-subscriptionReady:
+		// Subscription is ready
+	case <-time.After(5 * time.Second):
+		t.Fatal("Subscription ready timeout")
+	}
+
+	// Now send the message after subscription is confirmed and ready
 	var sentMsgID uuid.UUID
 	err = gm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		id, err := gm.SendMessage(ctx, dbTX, &pldapi.PrivacyGroupMessageInput{
@@ -405,20 +437,11 @@ func TestRPCEventListenerE2ENack(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Wait for subscription reply, then trigger reader's NACK logic
-	var sid string
-	select {
-	case sid = <-subIDChan:
-		require.NotEmpty(t, sid)
-	case <-time.After(5 * time.Second):
-		t.Fatal("Subscription timeout")
-	}
-
 	// The reader goroutine will first NACK and then, upon redelivery, push into `messages`
 	select {
 	case redelivered := <-messages:
 		require.Equal(t, sentMsgID, redelivered.ID)
-	case <-time.After(10 * time.Second):
+	case <-time.After(15 * time.Second):
 		t.Fatal("Did not receive redelivered message")
 	}
 

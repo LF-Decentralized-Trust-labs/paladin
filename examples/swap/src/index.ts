@@ -1,3 +1,17 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   INotoDomainReceipt,
   IPreparedTransaction,
@@ -10,52 +24,63 @@ import { ethers } from "ethers";
 import { checkDeploy, checkReceipt } from "paladin-example-common";
 import { newAtomFactory } from "./helpers/atom";
 import { newERC20Tracker } from "./helpers/erc20tracker";
-import * as fs from 'fs';
-import * as path from 'path';
-import { ContractData } from "./verify-deployed";
-import { nodeConnections } from "../../common/src/config";
+import * as fs from "fs";
+import * as path from "path";
+import { ContractData } from "./tests/data-persistence";
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
 
 async function main(): Promise<boolean> {
   // --- Initialization from Imported Config ---
   if (nodeConnections.length < 3) {
-    logger.error("The environment config must provide at least 3 nodes for this scenario.");
+    logger.error(
+      "The environment config must provide at least 3 nodes for this scenario."
+    );
     return false;
   }
-  
-  logger.log("Initializing Paladin clients from the environment configuration...");
-  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
+
+  logger.log(
+    "Initializing Paladin clients from the environment configuration..."
+  );
+  const clients = nodeConnections.map(
+    (node) => new PaladinClient(node.clientOptions)
+  );
   const [paladin1, paladin2, paladin3] = clients;
 
   const [cashIssuer, assetIssuer] = paladin1.getVerifiers(
     `cashIssuer@${nodeConnections[0].id}`,
     `assetIssuer@${nodeConnections[0].id}`
   );
-  const [investor1] = paladin2.getVerifiers(`investor1@${nodeConnections[1].id}`);
-  const [investor2] = paladin3.getVerifiers(`investor2@${nodeConnections[2].id}`);
+  const [investor1] = paladin2.getVerifiers(
+    `investor1@${nodeConnections[1].id}`
+  );
+  const [investor2] = paladin3.getVerifiers(
+    `investor2@${nodeConnections[2].id}`
+  );
 
   // TODO: eliminate the need for this call
-  async function encodeZetoTransfer(preparedCashTransfer: IPreparedTransaction) {
+  async function encodeZetoTransfer(
+    preparedCashTransfer: IPreparedTransaction
+  ) {
     try {
       const zetoTransferAbi = await paladin3.ptx.getStoredABI(
         preparedCashTransfer.transaction.abiReference ?? ""
       );
-      
+
       if (!zetoTransferAbi) {
         throw new Error("Failed to get stored ABI for prepared transaction");
       }
-      
-      const encodedData = new ethers.Interface(zetoTransferAbi.abi).encodeFunctionData(
-        "transferLocked",
-        [
-          preparedCashTransfer.transaction.data.inputs,
-          preparedCashTransfer.transaction.data.outputs,
-          preparedCashTransfer.transaction.data.proof,
-          preparedCashTransfer.transaction.data.data,
-        ]
-      );
-      
+
+      const encodedData = new ethers.Interface(
+        zetoTransferAbi.abi
+      ).encodeFunctionData("transferLocked", [
+        preparedCashTransfer.transaction.data.inputs,
+        preparedCashTransfer.transaction.data.outputs,
+        preparedCashTransfer.transaction.data.proof,
+        preparedCashTransfer.transaction.data.data,
+      ]);
+
       logger.log("Successfully encoded Zeto transfer data");
       return encodedData;
     } catch (error) {
@@ -110,6 +135,8 @@ async function main(): Promise<boolean> {
   const notoFactory = new NotoFactory(paladin1, "noto");
   const notoAsset = await notoFactory
     .newNoto(assetIssuer, {
+      name: "NOTO",
+      symbol: "NOTO",
       notary: assetIssuer,
       notaryMode: "hooks",
       options: {
@@ -201,12 +228,12 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(10000);
   if (!checkReceipt(receipt)) return false;
-  
+
   // Poll for the lock operation to be fully settled
   logger.log("Waiting for lock operation to settle...");
   let lockedStateId: string | undefined;
   const pollStartTime = Date.now();
-  const pollTimeout = 30000; // 30 seconds
+  const pollTimeout = 120000; // 2 minutes
   while (Date.now() - pollStartTime < pollTimeout) {
     const lockedStates = await paladin3.ptx.getStateReceipt(receipt.id);
     const confirmedLockedState = lockedStates?.confirmed?.find(
@@ -220,7 +247,11 @@ async function main(): Promise<boolean> {
   }
 
   if (lockedStateId === undefined) {
-    logger.error(`Timed out after ${pollTimeout / 1000}s waiting for locked state in state receipt`);
+    logger.error(
+      `Timed out after ${
+        pollTimeout / 1000
+      }s waiting for locked state in state receipt`
+    );
     return false;
   }
   logger.log(`Locked state ID: ${lockedStateId}`);
@@ -238,14 +269,17 @@ async function main(): Promise<boolean> {
       },
     ],
   }).id;
-  
+
   logger.log(`Prepared transaction ID: ${txID}`);
-  const preparedCashTransfer = await paladin3.pollForPreparedTransaction(txID, 50000);
+  const preparedCashTransfer = await paladin3.pollForPreparedTransaction(
+    txID,
+    pollTimeout
+  ); // 2 minutes
   if (!preparedCashTransfer) {
     logger.error(`Failed to get prepared transaction for ID: ${txID}`);
     return false;
   }
-  
+
   logger.log("Cash transfer preparation successful!");
 
   const encodedCashTransfer = await encodeZetoTransfer(preparedCashTransfer);
@@ -255,7 +289,7 @@ async function main(): Promise<boolean> {
   logger.log("Creating atom...");
   logger.log(`Asset unlock call length: ${assetUnlockCall.length}`);
   logger.log(`Encoded cash transfer length: ${encodedCashTransfer.length}`);
-  
+
   const atom = await atomFactory.create(cashIssuer, [
     {
       contractAddress: notoAsset.address,
@@ -267,7 +301,7 @@ async function main(): Promise<boolean> {
     },
   ]);
   if (!checkDeploy(atom)) return false;
-  
+
   logger.log(`Atom created successfully at address: ${atom.address}`);
 
   // Approve asset unlock operation
@@ -280,7 +314,7 @@ async function main(): Promise<boolean> {
       delegate: atom.address,
       data: "0x",
     })
-    .waitForReceipt(10000);
+    .waitForReceipt(pollTimeout);
   if (!checkReceipt(receipt)) return false;
 
   // Approve cash transfer operation
@@ -311,22 +345,34 @@ async function main(): Promise<boolean> {
   // it can take some time for the balances to update, so loop until all balances are >0
   const startTime = Date.now();
   logger.log("Waiting for balances to settle after swap...");
-  while (true) {  
-    finalAssetBalanceInvestor1 = await notoAsset.using(paladin2).balanceOf(investor1, { account: investor1.lookup });
-    finalAssetBalanceInvestor2 = await notoAsset.using(paladin3).balanceOf(investor2, { account: investor2.lookup });
-    finalCashBalanceInvestor1 = await zetoCash.using(paladin2).balanceOf(investor1, { account: investor1.lookup });
-    finalCashBalanceInvestor2 = await zetoCash.using(paladin3).balanceOf(investor2, { account: investor2.lookup });
-    
-    logger.log(`Current balances - Asset: I1=${finalAssetBalanceInvestor1.totalBalance}, I2=${finalAssetBalanceInvestor2.totalBalance}, Cash: I1=${finalCashBalanceInvestor1.totalBalance}, I2=${finalCashBalanceInvestor2.totalBalance}`);
-    
-    if (finalAssetBalanceInvestor1.totalBalance !== "0" &&
-        finalAssetBalanceInvestor2.totalBalance !== "0" &&
-        finalCashBalanceInvestor1.totalBalance !== "0" &&
-        finalCashBalanceInvestor2.totalBalance !== "0") {
+  while (true) {
+    finalAssetBalanceInvestor1 = await notoAsset
+      .using(paladin2)
+      .balanceOf(investor1, { account: investor1.lookup });
+    finalAssetBalanceInvestor2 = await notoAsset
+      .using(paladin3)
+      .balanceOf(investor2, { account: investor2.lookup });
+    finalCashBalanceInvestor1 = await zetoCash
+      .using(paladin2)
+      .balanceOf(investor1, { account: investor1.lookup });
+    finalCashBalanceInvestor2 = await zetoCash
+      .using(paladin3)
+      .balanceOf(investor2, { account: investor2.lookup });
+
+    logger.log(
+      `Current balances - Asset: I1=${finalAssetBalanceInvestor1.totalBalance}, I2=${finalAssetBalanceInvestor2.totalBalance}, Cash: I1=${finalCashBalanceInvestor1.totalBalance}, I2=${finalCashBalanceInvestor2.totalBalance}`
+    );
+
+    if (
+      finalAssetBalanceInvestor1.totalBalance !== "0" &&
+      finalAssetBalanceInvestor2.totalBalance !== "0" &&
+      finalCashBalanceInvestor1.totalBalance !== "0" &&
+      finalCashBalanceInvestor2.totalBalance !== "0"
+    ) {
       logger.log("All balances are non-zero, proceeding...");
       break;
     }
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     // if 60 second passed from the beginning of the loop than fail the test
     if (Date.now() - startTime > 60000) {
       logger.error("Failed to get final balances after 60 seconds");
@@ -335,7 +381,7 @@ async function main(): Promise<boolean> {
   }
 
   // Save contract data to file for later use
-  const contractData : ContractData = {
+  const contractData: ContractData = {
     atomFactoryAddress: atomFactory.address,
     zetoCashAddress: zetoCash.address,
     notoAssetAddress: notoAsset.address,
@@ -349,49 +395,50 @@ async function main(): Promise<boolean> {
       lockId: lockId,
       lockedStateId: lockedStateId,
       assetUnlockCall: assetUnlockCall,
-      encodedCashTransfer: encodedCashTransfer
+      encodedCashTransfer: encodedCashTransfer,
     },
     finalBalances: {
       asset: {
         investor1: {
           totalBalance: finalAssetBalanceInvestor1?.totalBalance ?? "0",
           totalStates: finalAssetBalanceInvestor1?.totalStates ?? "0",
-          overflow: finalAssetBalanceInvestor1?.overflow ?? false
+          overflow: finalAssetBalanceInvestor1?.overflow ?? false,
         },
         investor2: {
           totalBalance: finalAssetBalanceInvestor2?.totalBalance ?? "0",
           totalStates: finalAssetBalanceInvestor2?.totalStates ?? "0",
-          overflow: finalAssetBalanceInvestor2?.overflow ?? false
-        }
+          overflow: finalAssetBalanceInvestor2?.overflow ?? false,
+        },
       },
       cash: {
         investor1: {
           totalBalance: finalCashBalanceInvestor1?.totalBalance ?? "0",
           totalStates: finalCashBalanceInvestor1?.totalStates ?? "0",
-          overflow: finalCashBalanceInvestor1?.overflow ?? false
+          overflow: finalCashBalanceInvestor1?.overflow ?? false,
         },
         investor2: {
           totalBalance: finalCashBalanceInvestor2?.totalBalance ?? "0",
           totalStates: finalCashBalanceInvestor2?.totalStates ?? "0",
-          overflow: finalCashBalanceInvestor2?.overflow ?? false
-        }
-      }
+          overflow: finalCashBalanceInvestor2?.overflow ?? false,
+        },
+      },
     },
     participants: {
       cashIssuer: cashIssuer.lookup,
       assetIssuer: assetIssuer.lookup,
       investor1: investor1.lookup,
-      investor2: investor2.lookup
+      investor2: investor2.lookup,
     },
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, "..", "data");
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const dataFile = path.join(dataDir, `contract-data-${timestamp}.json`);
   fs.writeFileSync(dataFile, JSON.stringify(contractData, null, 2));
   logger.log(`Contract data saved to ${dataFile}`);

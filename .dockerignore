@@ -24,7 +24,7 @@ perf/
 !perf/go.mod
 
 # Other folders not needed for the Docker build
-example/
+examples/
 
 # The operator has its own docker build (with its own .dockerignore), so we don't want to rebuild the whole
 # Paladin docker every time you're re-running the operator/test.

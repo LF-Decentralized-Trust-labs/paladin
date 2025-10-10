@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/kaleido-io/paladin/perf/internal/version"
+	"github.com/LF-Decentralized-Trust-labs/paladin/perf/internal/version"
 	"gopkg.in/yaml.v3"
 
 	"github.com/spf13/cobra"

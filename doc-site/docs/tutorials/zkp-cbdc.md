@@ -1,13 +1,13 @@
 # Cash Tokens based on Zeto
 
-The code for this tutorial can be found in [example/zeto](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/zeto).
+The code for this tutorial can be found in [examples/zeto](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/zeto).
 
-This shows how to leverage the [Zeto](../../architecture/zeto/) in order to build a cash payment solution, for instance wholesale CBDC or a payment rail with commercial bank money, with privacy, illustrating multiple aspects of Paladin's privacy capabilities.
+This shows how to leverage [Zeto](../../architecture/zeto/) tokens in order to build a cash payment solution, for instance wholesale CBDC or a payment rail with commercial bank money, with privacy, illustrating multiple aspects of Paladin's privacy capabilities.
 
 ## Running the example
 
 Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paladin environment, and
-then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/zeto/README.md)
+then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/zeto/README.md)
 to run the code.
 
 ## Scenario #1: cash solution with private minting
@@ -20,9 +20,11 @@ Below is a walkthrough of each step in the example, with an explanation of what 
 
 ```typescript
 const zetoFactory = new ZetoFactory(paladin3, 'zeto');
-const zetoCBDC = await zetoFactory.newZeto(cbdcIssuer, {
-  tokenName: 'Zeto_AnonNullifier',
-});
+const zetoCBDC1 = await zetoFactory
+  .newZeto(cbdcIssuer, {
+    tokenName: 'Zeto_AnonNullifier',
+  })
+  .waitForDeploy();
 ```
 
 This creates a new instance of the Zeto domain, using the [Zeto_AnonNullifier](https://github.com/hyperledger-labs/zeto/tree/main?tab=readme-ov-file#zeto_anonnullifier) contract. This results in a new cloned contract on the base ledger, with a new unique address. This Zeto token contract will be used to represent
@@ -34,20 +36,22 @@ deployer account of the contract.
 ### Issue cash
 
 ```typescript
-let receipt = await zetoCBDC.mint(cbdcIssuer, {
-  mints: [
-    {
-      to: bank1,
-      amount: 100000,
-      data: "0x",
-    },
-    {
-      to: bank2,
-      amount: 100000,
-      data: "0x",
-    },
-  ],
-});
+let receipt = await zetoCBDC1
+  .mint(cbdcIssuer, {
+    mints: [
+      {
+        to: bank1,
+        amount: 100000,
+        data: "0x",
+      },
+      {
+        to: bank2,
+        amount: 100000,
+        data: "0x",
+      },
+    ],
+  })
+  .waitForReceipt();
 ```
 
 The cash issuer mints cash to the commercial banks, `bank1` and `bank2`.
@@ -55,15 +59,18 @@ The cash issuer mints cash to the commercial banks, `bank1` and `bank2`.
 ### Bank1 transfers tokens to bank2 as payment
 
 ```typescript
-receipt = await zetoCBDC.using(paladin1).transfer(bank1, {
-  transfers: [
-    {
-      to: bank2,
-      amount: 1000,
-      data: "0x",
-    },
-  ],
-});
+receipt = await zetoCBDC1
+  .using(paladin1)
+  .transfer(bank1, {
+    transfers: [
+      {
+        to: bank2,
+        amount: 1000,
+        data: "0x",
+      },
+    ],
+  })
+  .waitForReceipt();
 ```
 
 Bank1 can call the `transfer` function to transfer zeto tokens to multiple parties, up to 10. Note that the identity `bank1` exists on the `paladin1` instance,
@@ -78,10 +85,11 @@ Below is a walkthrough of each step in the example, with an explanation of what 
 ### Create CBDC token
 
 ```typescript
-const zetoFactory = new ZetoFactory(paladin3, 'zeto');
-const zetoCBDC = await zetoFactory.newZeto(cbdcIssuer, {
-  tokenName: 'Zeto_AnonNullifier',
-});
+const zetoCBDC2 = await zetoFactory
+  .newZeto(cbdcIssuer, {
+    tokenName: 'Zeto_AnonNullifier',
+  })
+  .waitForDeploy();
 ```
 
 This creates a new instance of the Zeto domain, using the [Zeto_AnonNullifier](https://github.com/hyperledger-labs/zeto/tree/main?tab=readme-ov-file#zeto_anonnullifier) contract. This results in a new cloned contract on the base ledger, with a new unique address. This Zeto token contract will be used to represent
@@ -98,9 +106,11 @@ This deploys the ERC20 token which will be used by the authority to regulate the
 ### Configure the Zeto token contract to accept deposits and withdraws from the ERC20
 
 ```typescript
-const result2 = await zetoCBDC.setERC20(cbdcIssuer, {
-  _erc20: erc20Address as string,
-});
+const result2 = await zetoCBDC2
+  .setERC20(cbdcIssuer, {
+    erc20: erc20Address as string,
+  })
+  .waitForReceipt();
 ```
 
 When the `deposit` function is called on the Zeto contract, this ERC20 contract will be called to draw the requested funds from the depositor's account. Conversely, when the `withdraw` function is called, this ERC20 contract will be called to transfer back the ERC20 balance to the withdrawer's account.
@@ -116,9 +126,12 @@ Because the ERC20 implementation provides full transparency of the token operati
 ### Banks exchange ERC20 balances for Zeto tokens - deposit
 
 ```typescript
-const result4 = await zetoCBDC.using(paladin1).deposit(bank1, {
-  amount: 10000,
-});
+const result4 = await zetoCBDC2
+  .using(paladin1)
+  .deposit(bank1, {
+    amount: 10000,
+  })
+  .waitForReceipt();
 ```
 
 After having been minted ERC20 balances, a partcipant like `bank1` can call `deposit` on the Paladin Zeto domain to exchange for Zeto tokens. Behind the scenes, the ERC20 balance is transferred to the Zeto contract which will hold until `withdraw` is called later.
@@ -126,15 +139,18 @@ After having been minted ERC20 balances, a partcipant like `bank1` can call `dep
 ### Bank1 transfers tokens to bank2 as payment
 
 ```typescript
-receipt = await zetoCBDC.using(paladin1).transfer(bank1, {
-  transfers: [
-    {
-      to: bank2,
-      amount: 1000,
-      data: "0x",
-    },
-  ],
-});
+receipt = await zetoCBDC2
+  .using(paladin1)
+  .transfer(bank1, {
+    transfers: [
+      {
+        to: bank2,
+        amount: 1000,
+        data: "0x",
+      },
+    ],
+  })
+  .waitForReceipt();
 ```
 
 Bank1 can call the `transfer` function to transfer zeto tokens to multiple parties, up to 10. Note that the identity `bank1` exists on the `paladin1` instance,
@@ -143,9 +159,12 @@ therefore it must use that instance to send the transfer transction (`.using(pal
 ### Bank1 exchanges Zeto tokens for ERC20 balances - withdraw
 
 ```typescript
-const result5 = await zetoCBDC.using(paladin1).withdraw(bank1, {
-  amount: 1000,
-});
+const result5 = await zetoCBDC2
+  .using(paladin1)
+  .withdraw(bank1, {
+    amount: 1000,
+  })
+  .waitForReceipt();
 ```
 
 A participant like `bank1` who has unspent Zeto tokens can call `withdraw` on the Paladin Zeto domain to exchange them for ERC20 balances. Behind the scenes, the requested amount are "burnt" in the Zeto contract, and the corresponding ERC20 amount are released by the Zeto contract, by transferring to the requesting account.

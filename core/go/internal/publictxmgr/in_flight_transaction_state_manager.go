@@ -19,8 +19,8 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/publictxmgr/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr/metrics"
 )
 
 type inFlightTransactionState struct {

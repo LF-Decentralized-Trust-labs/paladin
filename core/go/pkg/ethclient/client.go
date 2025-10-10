@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -21,21 +21,22 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signpayloads"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -135,7 +136,7 @@ func (cr CallResult) JSON() (s string) {
 type KeyManager interface {
 	AddInMemorySigner(prefix string, signer signerapi.InMemorySigner) // should only be called on initialization routine
 	ResolveKey(ctx context.Context, identifier, algorithm, verifierType string) (keyHandle, verifier string, err error)
-	Sign(ctx context.Context, req *signerapi.SignRequest) (*signerapi.SignResponse, error)
+	Sign(ctx context.Context, req *prototk.SignWithKeyRequest) (*prototk.SignWithKeyResponse, error)
 	Close()
 }
 
@@ -364,7 +365,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	}
 	hash := sha3.NewLegacyKeccak256()
 	_, _ = hash.Write(sigPayload.Bytes())
-	signature, err := ec.keymgr.Sign(ctx, &signerapi.SignRequest{
+	signature, err := ec.keymgr.Sign(ctx, &prototk.SignWithKeyRequest{
 		Algorithm:   algorithms.ECDSA_SECP256K1,
 		PayloadType: signpayloads.OPAQUE_TO_RSV,
 		KeyHandle:   keyHandle,
@@ -380,8 +381,13 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 		case EIP1559:
 			rawTX, err = tx.FinalizeEIP1559WithSignature(sigPayload, sig)
 		case LEGACY_EIP155:
+			// sig will have a 0/1 V value as that is the contract with Paladin key manager but firefly-signer library specifies
+			// "starting point must be legacy 27/28" for EIP-155 so we need to convert
+			sig.V.SetInt64(sig.V.Int64() + 27)
 			rawTX, err = tx.FinalizeLegacyEIP155WithSignature(sigPayload, sig, ec.chainID)
 		case LEGACY_ORIGINAL:
+			// sig will have a 0/1 V value as that is the contract with Paladin key manager but legacy is 27/28 so we need to convert
+			sig.V.SetInt64(sig.V.Int64() + 27)
 			rawTX, err = tx.FinalizeLegacyOriginalWithSignature(sigPayload, sig)
 		}
 	}

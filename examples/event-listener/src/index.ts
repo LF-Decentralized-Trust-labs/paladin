@@ -1,3 +1,17 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import PaladinClient, {
   ITransactionReceipt,
   PaladinWebSocketClient,
@@ -7,23 +21,29 @@ import PaladinClient, {
 import { nanoid } from "nanoid";
 import { checkDeploy } from "paladin-example-common";
 import helloWorldJson from "./abis/HelloWorld.json";
-import * as fs from 'fs';
-import * as path from 'path';
-import { ContractData } from "./verify-deployed";
-import { nodeConnections } from "../../common/src/config";
+import * as fs from "fs";
+import * as path from "path";
+import { ContractData } from "./tests/data-persistence";
+import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
 
 async function main(): Promise<boolean> {
   // --- Initialization from Imported Config ---
   if (nodeConnections.length < 1) {
-    logger.error("The environment config must provide at least 1 node for this scenario.");
+    logger.error(
+      "The environment config must provide at least 1 node for this scenario."
+    );
     return false;
   }
-  
-  logger.log("Initializing Paladin client from the environment configuration...");
+
+  logger.log(
+    "Initializing Paladin client from the environment configuration..."
+  );
   const paladin = new PaladinClient(nodeConnections[0].clientOptions);
-  const [verifierNode1] = paladin.getVerifiers(`member@${nodeConnections[0].id}`);
+  const [verifierNode1] = paladin.getVerifiers(
+    `member@${nodeConnections[0].id}`
+  );
 
   // Create a privacy group for Node1 alone
   logger.log("Creating a privacy group for Node1...");
@@ -67,7 +87,7 @@ async function main(): Promise<boolean> {
     // Ignore error if listener doesn't exist
     logger.log("No existing listener to delete");
   }
-  
+
   await paladin.ptx.createReceiptListener({
     name: "example-event-listener",
     filters: {
@@ -191,14 +211,18 @@ async function main(): Promise<boolean> {
   logger.log("Waiting for event data to be captured...");
   const startTime = Date.now();
   const maxWaitTime = 60000; // Reduced to 30 seconds
-  
+
   while (!receivedEventData || !receivedReceiptId) {
     await new Promise((resolve) => setTimeout(resolve, 500)); // Reduced polling interval
-    
+
     // If maxWaitTime passed from the beginning of the loop then fail the test
     if (Date.now() - startTime > maxWaitTime) {
-      logger.error(`Failed to capture event data after ${maxWaitTime/1000} seconds`);
-      logger.error(`received: ${received}, receivedEventData: ${!!receivedEventData}, receivedReceiptId: ${!!receivedReceiptId}`);
+      logger.error(
+        `Failed to capture event data after ${maxWaitTime / 1000} seconds`
+      );
+      logger.error(
+        `received: ${received}, receivedEventData: ${!!receivedEventData}, receivedReceiptId: ${!!receivedReceiptId}`
+      );
       return false;
     }
   }
@@ -228,24 +252,25 @@ async function main(): Promise<boolean> {
       domain: "pente",
       sequenceAbove: lastSequence,
       domainReceipts: true,
-      incompleteStateReceiptBehavior: "block_contract"
+      incompleteStateReceiptBehavior: "block_contract",
     },
     websocketConfig: {
       url: "ws://127.0.0.1:31549",
-      subscriptions: ["example-event-listener"]
+      subscriptions: ["example-event-listener"],
     },
     participant: {
-      verifierNode1: verifierNode1.lookup
+      verifierNode1: verifierNode1.lookup,
     },
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 
-  const dataDir = path.join(__dirname, '..', 'data');
+  // Use command-line argument for data directory if provided, otherwise use default
+  const dataDir = process.argv[2] || path.join(__dirname, "..", "data");
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const dataFile = path.join(dataDir, `contract-data-${timestamp}.json`);
   fs.writeFileSync(dataFile, JSON.stringify(contractData, null, 2));
   logger.log(`Contract data saved to ${dataFile}`);

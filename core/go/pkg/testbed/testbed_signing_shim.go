@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -19,10 +19,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
 )
 
 type ethClientKeyMgrShim struct {
@@ -45,7 +46,7 @@ func (e *ethClientKeyMgrShim) ResolveKey(ctx context.Context, identifier string,
 	return resolvedKey.KeyHandle, resolvedKey.Verifier.Verifier, nil
 }
 
-func (e *ethClientKeyMgrShim) Sign(ctx context.Context, req *signerapi.SignRequest) (*signerapi.SignResponse, error) {
+func (e *ethClientKeyMgrShim) Sign(ctx context.Context, req *prototk.SignWithKeyRequest) (*prototk.SignWithKeyResponse, error) {
 	mapping := e.resolved[fmt.Sprintf("%s|%s", req.KeyHandle, req.Algorithm)]
 	if mapping == nil {
 		return nil, fmt.Errorf("combination not resolved in this shim: keyHandle=%s, algorithm=%s", req.KeyHandle, req.Algorithm)
@@ -54,7 +55,7 @@ func (e *ethClientKeyMgrShim) Sign(ctx context.Context, req *signerapi.SignReque
 	if err != nil {
 		return nil, err
 	}
-	return &signerapi.SignResponse{Payload: signedPayload}, nil
+	return &prototk.SignWithKeyResponse{Payload: signedPayload}, nil
 }
 
 func (tb *testbed) EthClientKeyManagerShim() ethclient.KeyManager {

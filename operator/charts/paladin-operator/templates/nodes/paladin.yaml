@@ -4,9 +4,17 @@
 {{- $besuPrefix := .Values.besu.nodeNamePrefix }}
 {{- $basePort := .Values.paladin.baseNodePort }}
 
-{{- range $i, $ := until (.Values.nodeCount | int) }}
+{{- $paladinCount := include "paladin-operator.paladinNodeCount" . | int }}
+{{- $besuCount := include "paladin-operator.besuNodeCount" . | int }}
+
+{{- range $i, $ := until $paladinCount }}
 {{- $name := printf "%s%d" $prefix (add $i 1) }}
-{{- $besuName := printf "%s%d" $besuPrefix (add $i 1) }}
+{{- $besuName := printf "%s%d" $besuPrefix 1 }}
+{{- if ne $besuCount 1 }}
+{{-   $besuIndex := mod $i $besuCount }}
+{{-   $besuIndex = add $besuIndex 1 }}
+{{-   $besuName = printf "%s%d" $besuPrefix $besuIndex }}
+{{- end }}
 apiVersion: core.paladin.io/v1alpha1
 kind: Paladin
 metadata:

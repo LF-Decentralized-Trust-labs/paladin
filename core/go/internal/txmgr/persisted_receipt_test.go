@@ -21,14 +21,14 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/mocks/componentsmocks"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -194,10 +194,10 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, receipt)
 	require.JSONEq(t, fmt.Sprintf(`{
-		"id":"%s",
-		"sequence":%d,
-		"failureMessage":"PD012214: Unable to decode revert data (no revert data available)"
-	}`, txID, receipt.Sequence), string(pldtypes.JSONString(receipt)))
+		 "id":"%s",
+		 "sequence":%d,
+		 "failureMessage":"PD012214: Unable to decode revert data (no revert data available)"
+	 }`, txID, receipt.Sequence), string(pldtypes.JSONString(receipt)))
 
 }
 
@@ -257,18 +257,18 @@ func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 
 	require.NotNil(t, receipt)
 	require.JSONEq(t, fmt.Sprintf(`{
-		"id":"%s",
-		"sequence":%d,
-		"domain": "domain1",
-		"blockNumber":12345, 
-		"logIndex":5,
-	 	"source":"0x3f9f796ff55589dd2358c458f185bbed357c0b6e",
-	  	"success":true, 
-	  	"transactionHash":"0xd0561b310b77e47bc16fb3c40d48b72255b1748efeecf7452373dfce8045af30", 
-		"transactionIndex":10,
-		"states": {"none": true},
-		"domainReceiptError": "not available"
-	}`, txID, receipt.Sequence), pldtypes.JSONString(receipt).Pretty())
+		 "id":"%s",
+		 "sequence":%d,
+		 "domain": "domain1",
+		 "blockNumber":12345, 
+		 "logIndex":5,
+		  "source":"0x3f9f796ff55589dd2358c458f185bbed357c0b6e",
+		   "success":true, 
+		   "transactionHash":"0xd0561b310b77e47bc16fb3c40d48b72255b1748efeecf7452373dfce8045af30", 
+		 "transactionIndex":10,
+		 "states": {"none": true},
+		 "domainReceiptError": "not available"
+	 }`, txID, receipt.Sequence), pldtypes.JSONString(receipt).Pretty())
 
 }
 

@@ -53,7 +53,7 @@ paladinNodes:
     # ======== Registries ========
     # Registry names this node interacts with. Must match labels on registry CRs.
     registries:
-      - evm-reg
+      - evm-registry
 
     # ======== Transports ========
     transports:
@@ -127,3 +127,12 @@ paladinNodes:
       registryAdminNode: bank  # The admin node that manages the registry
       registryAdminKey: registry.operator
       registry: evm-registry
+
+# Domains can be configured with a default signing identity
+domains:
+  noto:
+    fixedSigningIdentity: ""
+  pente:
+    fixedSigningIdentity: ""
+  zeto:
+    fixedSigningIdentity: ""

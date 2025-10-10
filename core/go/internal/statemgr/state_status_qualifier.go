@@ -19,7 +19,7 @@ package statemgr
 import (
 	"fmt"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"gorm.io/gorm"
 )
 

@@ -105,7 +105,9 @@ func NewTestTLSWSServer(testReq func(req *http.Request), publicKeyFile *os.File,
 		}()
 		go func() {
 			defer close(sendDone)
-			defer ws.Close()
+			defer func() {
+				_ = ws.Close()
+			}()
 			for data := range fromServer {
 				_ = ws.WriteMessage(websocket.TextMessage, []byte(data))
 			}
@@ -176,7 +178,9 @@ func NewTestWSServer(testReq func(req *http.Request)) (toServer, fromServer chan
 		}()
 		go func() {
 			defer close(sendDone)
-			defer ws.Close()
+			defer func() {
+				_ = ws.Close()
+			}()
 			for data := range fromServer {
 				_ = ws.WriteMessage(websocket.TextMessage, []byte(data))
 			}

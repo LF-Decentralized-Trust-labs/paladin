@@ -1,0 +1,96 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+syntax = "proto3";
+
+package io.kaleido.paladin.toolkit;
+
+message ConfigureSigningModuleRequest {
+    string name = 1; // The name
+    string config_json= 2; // The block of config supplied in the configuration for the signing module by the Paladin administrator (converted from YAML to JSON for transport)
+  }
+
+message ConfigureSigningModuleResponse {
+}
+
+message ResolveKeyRequest {
+  string name = 1; // a name assured to be unique at this path
+  uint64 index = 2; // a unique index managed by the key manager assured to be unique at this path. Used for key derivation (BIP32). Should not be used for direct mapping.
+  map<string, string> attributes = 3; // attributes passed to the signing module during key resolution
+  repeated ResolveKeyPathSegment path = 4; // hierarchical path to the key split into segments (optional)
+  repeated PublicKeyIdentifierType required_identifiers = 5; // required identifiers for the resolved key (optional)
+}
+
+message ResolveKeyResponse {
+  string key_handle = 1; // maps this internal key representation down to the key material
+  repeated PublicKeyIdentifier identifiers = 2; // resolved public key information
+}
+
+message SignWithKeyRequest {
+  string key_handle = 1; // the key handle as returned by a previous Resolve call (potentially a very long time ago)
+  string algorithm = 2; // identifier for the signing engine and algorithm to use in signing. Examples: "ecdsa:secp256k1" or "domain:zeto:circuit1"
+  string payload_type = 3; // describes the input and output payload combination to the signer. Example: "opaque:rsv" or "groth16:zeto"
+  bytes payload = 4; // the input payload to process according to the algorithm
+}
+
+message SignWithKeyResponse {
+  bytes payload = 1; // a set of bytes appropriate to the Paladin signing algorithm spec used
+}
+
+message ListKeysRequest {
+  int32 limit = 1; // the maximum number of records to return
+  string continue = 2; // the "next" string from a previous call, or empty
+}
+
+message ListKeysResponse {
+  repeated ListKeyEntry items = 1; // any length less than the limit will cause the caller to assume there might be more records
+  string next = 2; // non empty string to support pagination when the are potentially more records
+}
+
+message ResolveKeyPathSegment {
+  string name = 1; // the name of the path segment (folder)
+  uint64 index = 2; // a unique index managed by the key manager assured to be unique at this level in the path. Used for key derivation (BIP32). Should not be used for direct mapping.
+}
+
+message ListKeyEntry {
+  string name = 1; // the part of the key identifier representing this key
+  string key_handle = 2; // maps this internal key representation down to the key material
+  map<string, string> attributes = 3; // attributes passed to the signing module during key resolution
+  repeated ListKeyPathSegment path = 4; // hierarchical path to the key split into segments
+  repeated PublicKeyIdentifier identifiers = 5; // public key information
+}
+
+// The only discoverable item for a path segment is the name, but it is an object for future extensibility
+message ListKeyPathSegment {
+  string name = 1;
+}
+
+message PublicKeyIdentifierType {
+  string algorithm = 1; // the curve on which the key material has been generated (for predefined constants refer to the toolkit/go/pkg/algorithms package)
+  string verifier_type = 2; // the representation to which the public key material is encoded (for predefined constants refer to the toolkit/go/pkg/verifiers package)
+}
+
+message PublicKeyIdentifier {
+  string algorithm = 1; // the curve on which the key material has been generated (for predefined constants refer to the toolkit/go/pkg/algorithms package)
+  string verifier_type = 2; // the representation to which the public key material is encoded (for predefined constants refer to the toolkit/go/pkg/verifiers package)
+  string verifier = 3; // the public key encoded in the form of the Verifier type (for example, a 0x address)
+}
+
+// Signer lifecycle
+message CloseRequest {
+}
+
+message CloseResponse {
+}

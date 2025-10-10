@@ -24,15 +24,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/rpcclientmocks"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/wsclient"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/mocks/rpcclientmocks"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/wsclient"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -257,7 +257,11 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 							for !complete {
 								time.Sleep(100 * time.Microsecond)
 								if bl.newHeadsSub != nil {
-									bl.newHeadsSub.Notifications() <- rpcclientmocks.NewRPCSubscriptionNotification(t)
+									select {
+									case bl.newHeadsSub.Notifications() <- rpcclientmocks.NewRPCSubscriptionNotification(t):
+									case <-ctx.Done():
+										return
+									}
 								}
 							}
 						}()
@@ -274,7 +278,11 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 				}
 				b, err := json.Marshal(rpcRes)
 				require.NoError(t, err)
-				fromServer <- string(b)
+				select {
+				case fromServer <- string(b):
+				case <-ctx.Done():
+					return
+				}
 			case <-ctx.Done():
 				return
 			}

@@ -17,7 +17,7 @@
 package pldapi
 
 import (
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
 
 type EthTransactionResult string

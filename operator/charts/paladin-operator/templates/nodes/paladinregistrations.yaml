@@ -1,7 +1,7 @@
 {{- if (eq .Values.mode "devnet") }}
 
 {{- $prefix := .Values.paladin.nodeNamePrefix }}
-{{- $count := .Values.nodeCount | int }}
+{{- $count := include "paladin-operator.paladinNodeCount" . | int }}
 
 {{- $adminNode := printf "%s1" $prefix }}
 

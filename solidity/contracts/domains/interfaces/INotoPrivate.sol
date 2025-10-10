@@ -7,8 +7,29 @@ pragma solidity ^0.8.20;
  *      This interface is never expected to be implemented in a smart contract.
  */
 interface INotoPrivate {
+    struct UnlockRecipient {
+        string to;
+        uint256 amount;
+    }
+
+    struct UnlockPublicParams {
+        bytes32[] lockedInputs;
+        bytes32[] lockedOutputs;
+        bytes32[] outputs;
+        bytes signature;
+        bytes data;
+    }
+
     function mint(
         string calldata to,
+        uint256 amount,
+        bytes calldata data
+    ) external;
+
+    function burn(uint256 amount, bytes calldata data) external;
+
+    function burnFrom(
+        string calldata from,
         uint256 amount,
         bytes calldata data
     ) external;
@@ -19,13 +40,11 @@ interface INotoPrivate {
         bytes calldata data
     ) external;
 
-    function burn(uint256 amount, bytes calldata data) external;
-
-    function approveTransfer(
-        StateEncoded[] calldata inputs,
-        StateEncoded[] calldata outputs,
-        bytes calldata data,
-        address delegate
+    function transferFrom(
+        string calldata from,
+        string calldata to,
+        uint256 amount,
+        bytes calldata data
     ) external;
 
     function lock(uint256 amount, bytes calldata data) external;
@@ -51,24 +70,16 @@ interface INotoPrivate {
         bytes calldata data
     ) external;
 
-    struct StateEncoded {
-        bytes id;
-        string domain;
-        bytes32 schema;
-        address contractAddress;
-        bytes data;
-    }
+    function name() external view returns (string memory);
 
-    struct UnlockRecipient {
-        string to;
-        uint256 amount;
-    }
+    function symbol() external view returns (string memory);
 
-    struct UnlockPublicParams {
-        bytes32[] lockedInputs;
-        bytes32[] lockedOutputs;
-        bytes32[] outputs;
-        bytes signature;
-        bytes data;
-    }
+    function decimals() external view returns (uint8);
+
+    function balanceOf(
+        string memory account
+    )
+        external
+        view
+        returns (uint256 totalStates, uint256 totalBalance, bool overflow);
 }

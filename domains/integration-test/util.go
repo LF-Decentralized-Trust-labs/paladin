@@ -21,20 +21,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zeto"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/testbed"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/noto"
+	nototypes "github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/types"
+	zetotypes "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/solutils"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
 	"github.com/go-resty/resty/v2"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/pkg/testbed"
-	"github.com/kaleido-io/paladin/domains/noto/pkg/noto"
-	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
-	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -131,16 +131,18 @@ func deployContracts(ctx context.Context, t *testing.T, hdWalletSeed *testbed.UT
 	return deployed
 }
 
-func newNotoDomain(t *testing.T, config *nototypes.DomainConfig) (chan noto.Noto, *testbed.TestbedDomain) {
+func newNotoDomain(t *testing.T, registryAddress *pldtypes.EthAddress) (chan noto.Noto, *testbed.TestbedDomain) {
 	waitForDomain := make(chan noto.Noto, 1)
 	tbd := &testbed.TestbedDomain{
-		Config: mapConfig(t, config),
+		Config: mapConfig(t, nototypes.DomainConfig{
+			FactoryVersion: 1,
+		}),
 		Plugin: plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
 			domain := noto.New(callbacks)
 			waitForDomain <- domain
 			return domain
 		}),
-		RegistryAddress: pldtypes.MustEthAddress(config.FactoryAddress),
+		RegistryAddress: registryAddress,
 	}
 	return waitForDomain, tbd
 }

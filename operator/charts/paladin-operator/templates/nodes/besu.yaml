@@ -3,7 +3,9 @@
 {{- $basePort := .Values.besu.baseNodePort }}
 {{- $prefix := .Values.besu.nodeNamePrefix }}
 
-{{- range $i, $ := until (.Values.nodeCount | int) }}
+{{- $besuCount := include "paladin-operator.besuNodeCount" . | int }}
+
+{{- range $i, $ := until $besuCount }}
 {{- $name := printf "%s%d" $prefix (add $i 1) }}
 apiVersion: core.paladin.io/v1alpha1
 kind: Besu

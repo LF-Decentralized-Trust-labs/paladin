@@ -6,14 +6,14 @@ import (
 	"math/big"
 	"testing"
 
+	corepb "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/proto"
 	"github.com/iden3/go-iden3-crypto/babyjub"
-	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/constants"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/domain"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	pb "github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

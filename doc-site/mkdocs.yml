@@ -117,21 +117,23 @@ nav:
       - Ledger Layers: architecture/ledger_layers.md
       - Distributed Sequencer Protocol: architecture/distributed_sequencer.md
   - Getting Started:
-      - Installation:
-          - Default Installation: getting-started/installation.md
-          - Advanced Installation: getting-started/installation-advanced.md
-          - Manual Installation: getting-started/installation-manual.md
-      - User Interface: getting-started/user-interface.md
-      - Troubleshooting: getting-started/troubleshooting.md
+    - Installation: 
+      - Default Installation: getting-started/installation.md
+      - Advanced Installation: getting-started/installation-advanced.md
+      - Manual Installation: getting-started/installation-manual.md
+    - User Interface: getting-started/user-interface.md
+    - L1 and L2 Chains: getting-started/l1-and-l2-chains.md
+    - Troubleshooting: getting-started/troubleshooting.md
   - Tutorials:
-      - Introduction: tutorials/index.md
-      - Hello World: tutorials/hello-world.md
-      - Public Smart Contract: tutorials/public-storage.md
-      - Private Smart Contract: tutorials/private-storage.md
-      - Notarized Tokens: tutorials/notarized-tokens.md
-      - Wholesale CBDC: tutorials/zkp-cbdc.md
-      - Private Stablecoin with KYC: tutorials/private-stablecoin.md
-      - Bond Issuance: tutorials/bond-issuance.md
+    - Introduction: tutorials/index.md
+    - Hello World: tutorials/hello-world.md
+    - Public Smart Contract: tutorials/public-storage.md
+    - Private Smart Contract: tutorials/private-storage.md
+    - Notarized Tokens: tutorials/notarized-tokens.md
+    - Wholesale CBDC: tutorials/zkp-cbdc.md
+    - Private Stablecoin with KYC: tutorials/private-stablecoin.md
+    - Atomic Swap: tutorials/atomic-swap.md
+    - Bond Issuance: tutorials/bond-issuance.md
   - Reference:
       - APIs: reference/apis/*.md
       - Types: reference/types/*.md

@@ -15,20 +15,22 @@
 
 package io.kaleido.paladin.pente.domain.helpers;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import io.kaleido.paladin.testbed.Testbed;
-
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.kaleido.paladin.pente.domain.PenteConfiguration.GroupTupleJSON;
-import io.kaleido.paladin.toolkit.*;
-
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.kaleido.paladin.pente.domain.PenteConfiguration.GroupTupleJSON;
+import io.kaleido.paladin.testbed.Testbed;
+import io.kaleido.paladin.toolkit.JsonABI;
+import io.kaleido.paladin.toolkit.JsonHex;
+import io.kaleido.paladin.toolkit.JsonQuery;
 
 public class NotoHelper {
     final String domainName;
@@ -38,6 +40,10 @@ public class NotoHelper {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ConstructorParams(
+            @JsonProperty
+            String name,
+            @JsonProperty
+            String symbol,
             @JsonProperty
             String notary,
             @JsonProperty

@@ -19,23 +19,26 @@ import (
 	"context"
 	"sync"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/filters"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signer"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/cache"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
 )
 
 type keyManager struct {
@@ -52,6 +55,11 @@ type keyManager struct {
 	allocLock       sync.Mutex
 	allocLockHolder *keyResolver
 
+	// plugin signing modules
+	mux                  sync.Mutex
+	signingModulesByID   map[uuid.UUID]*signingModule
+	signingModulesByName map[string]*signingModule
+
 	p persistence.Persistence
 }
 
@@ -60,6 +68,8 @@ func NewKeyManager(bgCtx context.Context, conf *pldconf.KeyManagerConfig) compon
 		bgCtx:                   bgCtx,
 		conf:                    conf,
 		identifierCache:         cache.NewCache[string, *pldapi.KeyMappingWithPath](&conf.IdentifierCache, &pldconf.KeyManagerDefaults.IdentifierCache),
+		signingModulesByID:      make(map[uuid.UUID]*signingModule),
+		signingModulesByName:    make(map[string]*signingModule),
 		verifierByIdentityCache: cache.NewCache[string, *pldapi.KeyVerifier](&conf.VerifierCache, &pldconf.KeyManagerDefaults.VerifierCache),
 		verifierReverseCache:    cache.NewCache[string, *pldapi.KeyMappingAndVerifier](&conf.VerifierCache, &pldconf.KeyManagerDefaults.VerifierCache),
 		walletsByName:           make(map[string]*wallet),
@@ -75,7 +85,11 @@ func (km *keyManager) PreInit(pic components.PreInitComponents) (*components.Man
 
 func (km *keyManager) PostInit(c components.AllComponents) error {
 	km.p = c.Persistence()
+	return nil
+}
 
+func (km *keyManager) Start() error {
+	// Process wallets once all signing modules have been loaded
 	for _, walletConf := range km.conf.Wallets {
 		w, err := km.newWallet(km.bgCtx, walletConf)
 		if err != nil {
@@ -91,11 +105,59 @@ func (km *keyManager) PostInit(c components.AllComponents) error {
 	return nil
 }
 
-func (km *keyManager) Start() error {
-	return nil
+func (km *keyManager) Stop() {
 }
 
-func (km *keyManager) Stop() {
+func (km *keyManager) cleanupSigningModule(sm *signingModule) {
+	sm.close()
+	delete(km.signingModulesByID, sm.id)
+	delete(km.signingModulesByName, sm.name)
+}
+
+func (km *keyManager) ConfiguredSigningModules() map[string]*pldconf.PluginConfig {
+	pluginConf := make(map[string]*pldconf.PluginConfig)
+	for name, conf := range km.conf.SigningModules {
+		pluginConf[name] = &conf.Plugin
+	}
+	return pluginConf
+}
+
+func (km *keyManager) SigningModuleRegistered(name string, id uuid.UUID, toSigningModule components.KeyManagerToSigningModule) (fromSigningModule plugintk.SigningModuleCallbacks, err error) {
+	// Replaces any previously registered instance
+	existingSigningModule, _ := km.GetSigningModule(km.bgCtx, name)
+	for existingSigningModule != nil {
+		// Can't hold the lock in cleanup, hence the loop
+		km.cleanupSigningModule(existingSigningModule.(*signingModule))
+		existingSigningModule, _ = km.GetSigningModule(km.bgCtx, name)
+	}
+
+	km.mux.Lock()
+	defer km.mux.Unlock()
+
+	// Get the config for this signing module
+	conf := km.conf.SigningModules[name]
+	if conf == nil {
+		// Shouldn't be possible
+		return nil, i18n.NewError(km.bgCtx, msgs.MsgKeyManagerSigningModuleNotFound, name)
+	}
+
+	// Initialize
+	sm := km.newSigningModule(id, name, conf, toSigningModule).(*signingModule)
+	km.signingModulesByID[id] = sm
+	km.signingModulesByName[name] = sm
+	go sm.init()
+	return sm, nil
+}
+
+func (km *keyManager) GetSigningModule(ctx context.Context, name string) (signer.SigningModule, error) {
+	km.mux.Lock()
+	defer km.mux.Unlock()
+
+	sm := km.signingModulesByName[name]
+	if sm == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgKeyManagerSigningModuleNotFound, name)
+	}
+	return sm, nil
 }
 
 func (km *keyManager) Sign(ctx context.Context, mapping *pldapi.KeyMappingAndVerifier, payloadType string, payload []byte) ([]byte, error) {
@@ -151,7 +213,7 @@ func (km *keyManager) unlockAllocation(ctx context.Context, kr *keyResolver) {
 }
 
 func (km *keyManager) AddInMemorySigner(prefix string, signer signerapi.InMemorySigner) {
-	// Called during PostInit phase by domain manager
+	// Called during Start phase by domain manager
 	for _, w := range km.walletsByName {
 		w.signingModule.AddInMemorySigner(prefix, signer)
 	}

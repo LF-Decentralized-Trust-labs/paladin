@@ -18,8 +18,8 @@ package types
 import (
 	_ "embed"
 
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/solutils"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/solutils"
 )
 
 //go:embed abis/IZetoFungible.json
@@ -111,7 +111,7 @@ type FungibleBalanceOfParam struct {
 }
 
 type BalanceOfResult struct {
-	TotalBalance string `json:"totalBalance"`
-	TotalStates  string `json:"totalStates"`
-	Overflow     string `json:"overflow"`
+	TotalBalance *pldtypes.HexUint256 `json:"totalBalance"`
+	TotalStates  *pldtypes.HexUint256 `json:"totalStates"`
+	Overflow     bool                 `json:"overflow"`
 }

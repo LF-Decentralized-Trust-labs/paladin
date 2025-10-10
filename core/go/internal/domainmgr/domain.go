@@ -22,41 +22,43 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/plugins"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/query"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/retry"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/retry"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signpayloads"
+	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
 )
 
 type domain struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 
-	conf            *pldconf.DomainConfig
-	defaultGasLimit pldtypes.HexUint64
-	dm              *domainManager
-	name            string
-	api             components.DomainManagerToDomain
-	registryAddress *pldtypes.EthAddress
+	conf                 *pldconf.DomainConfig
+	defaultGasLimit      pldtypes.HexUint64
+	dm                   *domainManager
+	name                 string
+	api                  components.DomainManagerToDomain
+	registryAddress      *pldtypes.EthAddress
+	fixedSigningIdentity string
 
 	stateLock          sync.Mutex
 	initialized        atomic.Bool
@@ -85,14 +87,15 @@ var DefaultDefaultGasLimit pldtypes.HexUint64 = 4000000 // high gas limit by def
 
 func (dm *domainManager) newDomain(name string, conf *pldconf.DomainConfig, toDomain components.DomainManagerToDomain) *domain {
 	d := &domain{
-		dm:              dm,
-		conf:            conf,
-		defaultGasLimit: DefaultDefaultGasLimit,                     // can be set by config below
-		initRetry:       retry.NewRetryIndefinite(&conf.Init.Retry), // indefinite retry
-		name:            name,
-		api:             toDomain,
-		initDone:        make(chan struct{}),
-		registryAddress: pldtypes.MustEthAddress(conf.RegistryAddress), // check earlier in startup
+		dm:                   dm,
+		conf:                 conf,
+		defaultGasLimit:      DefaultDefaultGasLimit,                     // can be set by config below
+		initRetry:            retry.NewRetryIndefinite(&conf.Init.Retry), // indefinite retry
+		name:                 name,
+		api:                  toDomain,
+		initDone:             make(chan struct{}),
+		registryAddress:      pldtypes.MustEthAddress(conf.RegistryAddress), // check earlier in startup
+		fixedSigningIdentity: conf.FixedSigningIdentity,
 
 		schemasByID:        make(map[string]components.Schema),
 		schemasBySignature: make(map[string]components.Schema),
@@ -198,6 +201,7 @@ func (d *domain) init() {
 			RegistryContractAddress: d.RegistryAddress().String(),
 			ChainId:                 d.dm.ethClientFactory.ChainID(),
 			ConfigJson:              pldtypes.JSONString(d.conf.Config).String(),
+			FixedSigningIdentity:    d.fixedSigningIdentity,
 		})
 		if err != nil {
 			return true, err
@@ -289,6 +293,10 @@ func (d *domain) Configuration() *prototk.DomainConfig {
 	return d.config
 }
 
+func (d *domain) FixedSigningIdentity() string {
+	return d.fixedSigningIdentity
+}
+
 func toProtoStates(states []*pldapi.State) []*prototk.StoredState {
 	pbStates := make([]*prototk.StoredState, len(states))
 	for i, s := range states {
@@ -363,27 +371,27 @@ func (d *domain) EncodeData(ctx context.Context, encRequest *prototk.EncodeDataR
 		var entry *abi.Entry
 		err := json.Unmarshal([]byte(encRequest.Definition), &entry)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid))
 		}
 		abiData, err = entry.EncodeCallDataJSONCtx(ctx, []byte(encRequest.Body))
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail))
 		}
 	case prototk.EncodingType_TUPLE:
 		var param *abi.Parameter
 		err := json.Unmarshal([]byte(encRequest.Definition), &param)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid))
 		}
 		abiData, err = param.Components.EncodeABIDataJSONCtx(ctx, []byte(encRequest.Body))
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail))
 		}
 	case prototk.EncodingType_ETH_TRANSACTION, prototk.EncodingType_ETH_TRANSACTION_SIGNED:
 		var tx *ethsigner.Transaction
 		err := json.Unmarshal([]byte(encRequest.Body), &tx)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid))
 		}
 		// We only support EIP-155 and EIP-1559 as they include the ChainID in the payload
 		var sigPayload *ethsigner.TransactionSignaturePayload
@@ -395,10 +403,13 @@ func (d *domain) EncodeData(ctx context.Context, encRequest *prototk.EncodeDataR
 		case "eip155", "eip-155":
 			sigPayload = tx.SignaturePayloadLegacyEIP155(d.dm.ethClientFactory.ChainID())
 			finalizer = func(signaturePayload *ethsigner.TransactionSignaturePayload, sig *secp256k1.SignatureData) ([]byte, error) {
+				// sig will have a 0/1 V value as that is the contract with Paladin key manager but firefly-signer library specifies
+				// "starting point must be legacy 27/28" for EIP-155 so we need to convert
+				sig.V.SetInt64(sig.V.Int64() + 27)
 				return tx.FinalizeLegacyEIP155WithSignature(signaturePayload, sig, d.dm.ethClientFactory.ChainID())
 			}
 		default:
-			return nil, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.Definition)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.Definition))
 		}
 		if encRequest.EncodingType == prototk.EncodingType_ETH_TRANSACTION_SIGNED {
 			sig, err := d.inlineEthSign(ctx, sigPayload.Bytes(), encRequest.KeyIdentifier)
@@ -415,14 +426,14 @@ func (d *domain) EncodeData(ctx context.Context, encRequest *prototk.EncodeDataR
 		var tdv4 *eip712.TypedData
 		err := json.Unmarshal([]byte(encRequest.Body), &tdv4)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataInvalid))
 		}
 		abiData, err = eip712.EncodeTypedDataV4(ctx, tdv4)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataFail))
 		}
 	default:
-		return nil, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.EncodingType)
+		return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.EncodingType))
 	}
 	return &prototk.EncodeDataResponse{
 		Data: abiData,
@@ -467,33 +478,33 @@ func (d *domain) DecodeData(ctx context.Context, decRequest *prototk.DecodeDataR
 		var entry *abi.Entry
 		err := json.Unmarshal([]byte(decRequest.Definition), &entry)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid))
 		}
 		cv, err := entry.DecodeCallDataCtx(ctx, decRequest.Data)
 		if err == nil {
 			body, err = cv.JSON()
 		}
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail))
 		}
 	case prototk.EncodingType_TUPLE:
 		var param *abi.Parameter
 		err := json.Unmarshal([]byte(decRequest.Definition), &param)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid))
 		}
 		cv, err := param.Components.DecodeABIDataCtx(ctx, []byte(decRequest.Data), 0)
 		if err == nil {
 			body, err = cv.JSON()
 		}
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail))
 		}
 	case prototk.EncodingType_EVENT_DATA:
 		var entry *abi.Entry
 		err := json.Unmarshal([]byte(decRequest.Definition), &entry)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestEntryInvalid))
 		}
 		topics := make([]ethtypes.HexBytes0xPrefix, len(decRequest.Topics))
 		for i, topic := range decRequest.Topics {
@@ -504,7 +515,7 @@ func (d *domain) DecodeData(ctx context.Context, decRequest *prototk.DecodeDataR
 			body, err = cv.JSON()
 		}
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail))
 		}
 	case prototk.EncodingType_ETH_TRANSACTION:
 		// We support round tripping the same types as encode
@@ -514,7 +525,7 @@ func (d *domain) DecodeData(ctx context.Context, decRequest *prototk.DecodeDataR
 		case "", "eip1559", "eip-1559": // this is all we support currently
 			tx, err = ethsigner.DecodeEIP1559SignaturePayload(ctx, decRequest.Data, d.dm.ethClientFactory.ChainID())
 		default:
-			return nil, i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestEntryInvalid, decRequest.Definition)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestEntryInvalid, decRequest.Definition))
 		}
 		if err == nil {
 			body, err = json.Marshal(tx)
@@ -533,7 +544,7 @@ func (d *domain) DecodeData(ctx context.Context, decRequest *prototk.DecodeDataR
 		case "eip155", "eip-155":
 			from, tx, err = ethsigner.RecoverLegacyRawTransaction(ctx, decRequest.Data, d.dm.ethClientFactory.ChainID())
 		default:
-			err = i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestEntryInvalid, decRequest.Definition)
+			return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestEntryInvalid, decRequest.Definition))
 		}
 		if err == nil {
 			tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, from))
@@ -543,7 +554,7 @@ func (d *domain) DecodeData(ctx context.Context, decRequest *prototk.DecodeDataR
 			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIDecodingRequestFail)
 		}
 	default:
-		return nil, i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestInvalidType, decRequest.EncodingType)
+		return nil, plugins.NewPluginError(prototk.Header_INVALID_INPUT, i18n.NewError(ctx, msgs.MsgDomainABIDecodingRequestInvalidType, decRequest.EncodingType))
 	}
 	return &prototk.DecodeDataResponse{
 		Body: string(body),

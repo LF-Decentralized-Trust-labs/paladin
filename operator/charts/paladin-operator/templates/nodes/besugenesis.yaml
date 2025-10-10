@@ -15,7 +15,8 @@ spec:
   emptyBlockPeriod: 10s
   initialValidators:
   {{- $prefix := .Values.besu.nodeNamePrefix }}
-  {{- range $i, $ := until (.Values.nodeCount | int) }}
+  {{- $besuCount := include "paladin-operator.besuNodeCount" . | int }}
+  {{- range $i, $ := until $besuCount }}
   - {{ printf "%s%d" $prefix (add $i 1) }}
   {{- end }}
 

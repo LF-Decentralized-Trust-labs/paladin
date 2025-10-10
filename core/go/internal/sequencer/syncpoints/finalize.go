@@ -19,12 +19,12 @@ package syncpoints
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/common/go/pkg/log"
-	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
-	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
 )
 
 // a transaction finalization operation is an update to the transaction managers tables
@@ -67,29 +67,43 @@ func (s *syncPoints) writeFailureOperations(ctx context.Context, dbTX persistenc
 	//
 	// However, a syncpoint gets triggered for every finalize so that we can flush the Domain Context to the DB
 	// so that all states are stored, before we clear out the transaction from the in-memory Domain Context.
-	//
+	receiptsToDistribute := make([]*components.ReceiptInputWithOriginator, 0, len(finalizeOperations))
+	for _, op := range finalizeOperations {
+		if op.FailureMessage != "" {
+			receiptsToDistribute = append(receiptsToDistribute, &components.ReceiptInputWithOriginator{
+				Originator: op.Originator,
+				ReceiptInput: components.ReceiptInput{
+					ReceiptType:    components.RT_FailedWithMessage,
+					Domain:         op.Domain,
+					TransactionID:  op.TransactionID,
+					FailureMessage: op.FailureMessage,
+				},
+			})
+		}
+	}
+	return s.WriteOrDistributeReceipts(ctx, dbTX, receiptsToDistribute)
+
+}
+
+func (s *syncPoints) WriteOrDistributeReceipts(ctx context.Context, dbTX persistence.DBTX, receipts []*components.ReceiptInputWithOriginator) error {
+
 	// Receipts need to go back to their originator, so we either store the receive ourselves locally - or
 	// push it in a reliable message back to the sender.
 	localFailureReceipts := make([]*components.ReceiptInput, 0)
 	remoteSends := make([]*pldapi.ReliableMessage, 0)
-	for _, op := range finalizeOperations {
-		if op.FailureMessage != "" {
-			receipt := &components.ReceiptInput{
-				ReceiptType:    components.RT_FailedWithMessage,
-				Domain:         op.Domain,
-				TransactionID:  op.TransactionID,
-				FailureMessage: op.FailureMessage,
-			}
-			node, _ := pldtypes.PrivateIdentityLocator(op.Originator).Node(ctx, true)
-			log.L(ctx).Warnf("Failure receipt %s for node %s: %s", receipt.TransactionID, node, receipt.FailureMessage)
+	for _, r := range receipts {
+		if r.ReceiptType != components.RT_Success {
+			node, _ := pldtypes.PrivateIdentityLocator(r.Originator).Node(ctx, true)
+			log.L(ctx).Warnf("Failure receipt %s with sender %s (node='%s') and address %v: %s",
+				r.TransactionID, r.Originator, node, r.DomainContractAddress, r.FailureMessage)
 			if node != "" && node != s.transportMgr.LocalNodeName() {
 				remoteSends = append(remoteSends, &pldapi.ReliableMessage{
 					Node:        node,
 					MessageType: pldapi.RMTReceipt.Enum(),
-					Metadata:    pldtypes.JSONString(receipt),
+					Metadata:    pldtypes.JSONString(&r.ReceiptInput),
 				})
 			} else {
-				localFailureReceipts = append(localFailureReceipts, receipt)
+				localFailureReceipts = append(localFailureReceipts, &r.ReceiptInput)
 			}
 		}
 	}
