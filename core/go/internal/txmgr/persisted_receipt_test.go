@@ -194,10 +194,10 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, receipt)
 	require.JSONEq(t, fmt.Sprintf(`{
-		 "id":"%s",
-		 "sequence":%d,
-		 "failureMessage":"PD012214: Unable to decode revert data (no revert data available)"
-	 }`, txID, receipt.Sequence), string(pldtypes.JSONString(receipt)))
+		"id":"%s",
+		"sequence":%d,
+		"failureMessage":"PD012214: Unable to decode revert data (no revert data available)"
+	}`, txID, receipt.Sequence), string(pldtypes.JSONString(receipt)))
 
 }
 
@@ -257,18 +257,18 @@ func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 
 	require.NotNil(t, receipt)
 	require.JSONEq(t, fmt.Sprintf(`{
-		 "id":"%s",
-		 "sequence":%d,
-		 "domain": "domain1",
-		 "blockNumber":12345, 
-		 "logIndex":5,
-		  "source":"0x3f9f796ff55589dd2358c458f185bbed357c0b6e",
-		   "success":true, 
-		   "transactionHash":"0xd0561b310b77e47bc16fb3c40d48b72255b1748efeecf7452373dfce8045af30", 
-		 "transactionIndex":10,
-		 "states": {"none": true},
-		 "domainReceiptError": "not available"
-	 }`, txID, receipt.Sequence), pldtypes.JSONString(receipt).Pretty())
+		"id":"%s",
+		"sequence":%d,
+		"domain": "domain1",
+		"blockNumber":12345, 
+		"logIndex":5,
+	 	"source":"0x3f9f796ff55589dd2358c458f185bbed357c0b6e",
+	  	"success":true, 
+	  	"transactionHash":"0xd0561b310b77e47bc16fb3c40d48b72255b1748efeecf7452373dfce8045af30", 
+		"transactionIndex":10,
+		"states": {"none": true},
+		"domainReceiptError": "not available"
+	}`, txID, receipt.Sequence), pldtypes.JSONString(receipt).Pretty())
 
 }
 

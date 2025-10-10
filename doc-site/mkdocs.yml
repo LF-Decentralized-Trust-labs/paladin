@@ -122,13 +122,13 @@ nav:
           - State Machine: architecture/distributed_sequencer_state_machine.md
           - Protocol: architecture/distributed_sequencer_protocol.md
   - Getting Started:
-    - Installation: 
-      - Default Installation: getting-started/installation.md
-      - Advanced Installation: getting-started/installation-advanced.md
-      - Manual Installation: getting-started/installation-manual.md
-    - User Interface: getting-started/user-interface.md
-    - L1 and L2 Chains: getting-started/l1-and-l2-chains.md
-    - Troubleshooting: getting-started/troubleshooting.md
+      - Installation:
+          - Default Installation: getting-started/installation.md
+          - Advanced Installation: getting-started/installation-advanced.md
+          - Manual Installation: getting-started/installation-manual.md
+      - User Interface: getting-started/user-interface.md
+      - L1 and L2 Chains: getting-started/l1-and-l2-chains.md
+      - Troubleshooting: getting-started/troubleshooting.md
   - Tutorials:
       - Introduction: tutorials/index.md
       - Hello World: tutorials/hello-world.md

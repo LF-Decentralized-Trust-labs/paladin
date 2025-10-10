@@ -125,9 +125,6 @@ type pubTxManager struct {
 	// updates
 	updates   []*transactionUpdate
 	updateMux sync.Mutex
-
-	// metrics
-	metrics metrics.PublicTransactionManagerMetrics
 }
 
 type txActivityRecords struct {

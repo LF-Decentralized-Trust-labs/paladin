@@ -5,7 +5,6 @@ This guide outlines the process for developing Paladin examples and the requirem
 ## Overview
 
 All Paladin examples must follow a consistent pattern that includes:
-
 1. **Data Persistence**: Saving contract data to files for later verification
 2. **Verification Scripts**: Ensuring deployed contracts remain accessible and functional
 3. **Standard Commands**: Providing consistent npm scripts across all examples
@@ -55,5 +54,6 @@ Every example's `package.json` should include these scripts:
 - **`start`**: Run the example with ts-node
 - **`start:prod`**: Run the example with built JavaScript
 - **`verify`**: Run verification with ts-node
-- **`abi`**: Copy ABIs from the solidity directory (this is for the scenario the solidity was built locally)
+- **`abi`**: Copy ABIs from the solidity directory (this is for the scenario the solidity was built locally) 
 - **`copy-abi`**: Copy ABIs from examples/common to example directory
+ 

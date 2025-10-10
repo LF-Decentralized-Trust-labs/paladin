@@ -19,8 +19,8 @@ import PaladinClient, {
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import { checkDeploy, checkReceipt } from "paladin-example-common";
 import erc20Abi from "./zeto-abis/SampleERC20.json";
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'fs';
+import * as path from 'path';
 import { ContractData } from "./tests/data-persistence";
 import { nodeConnections } from "paladin-example-common";
 
@@ -29,23 +29,15 @@ const logger = console;
 async function main(): Promise<boolean> {
   // --- Initialization from Imported Config ---
   if (nodeConnections.length < 3) {
-    logger.error(
-      "The environment config must provide at least 3 nodes for this scenario."
-    );
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
     return false;
   }
-
-  logger.log(
-    "Initializing Paladin clients from the environment configuration..."
-  );
-  const clients = nodeConnections.map(
-    (node) => new PaladinClient(node.clientOptions)
-  );
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
   const [paladin1, paladin2, paladin3] = clients;
 
-  const [cbdcIssuer] = paladin1.getVerifiers(
-    `centralbank@${nodeConnections[2].id}`
-  );
+  const [cbdcIssuer] = paladin1.getVerifiers(`centralbank@${nodeConnections[2].id}`);
   const [bank1] = paladin2.getVerifiers(`bank1@${nodeConnections[0].id}`);
   const [bank2] = paladin3.getVerifiers(`bank2@${nodeConnections[1].id}`);
 
@@ -121,10 +113,10 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(10000);
   if (!checkReceipt(receipt)) return false;
-
+  
   // Add a small delay to ensure state is settled
   await new Promise((resolve) => setTimeout(resolve, 2000));
-
+  
   bank1Balance = await zetoCBDC1
     .using(paladin1)
     .balanceOf(bank1, { account: bank1.lookup });
@@ -167,13 +159,7 @@ async function main(): Promise<boolean> {
   logger.log(
     "- Bank1 approve ERC20 balance for the Zeto token contract as spender, to prepare for deposit..."
   );
-  await approveERC20(
-    paladin1,
-    bank1,
-    zetoCBDC2.address,
-    erc20Address!,
-    erc20ApproveAmount
-  );
+  await approveERC20(paladin1, bank1, zetoCBDC2.address, erc20Address!, erc20ApproveAmount);
 
   logger.log("- Bank1 deposit ERC20 balance to Zeto ...");
   const result4 = await zetoCBDC2
@@ -207,10 +193,10 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(10000);
   if (!checkReceipt(receipt)) return false;
-
+  
   // Add a small delay to ensure state is settled
   await new Promise((resolve) => setTimeout(resolve, 2000));
-
+  
   const bank1BalanceUseCase2 = await zetoCBDC2
     .using(paladin1)
     .balanceOf(bank1, { account: bank1.lookup });
@@ -246,7 +232,7 @@ async function main(): Promise<boolean> {
   logger.log("\nUse case #2 complete!");
 
   // Save contract data to file for later use
-  const contractData: ContractData = {
+  const contractData : ContractData= {
     zetoCBDC1Address: zetoCBDC1.address,
     zetoCBDC2Address: zetoCBDC2.address,
     erc20Address: erc20Address!,
@@ -258,14 +244,14 @@ async function main(): Promise<boolean> {
         bank1: {
           totalBalance: bank1Balance.totalBalance,
           totalStates: bank1Balance.totalStates,
-          overflow: bank1Balance.overflow,
+          overflow: bank1Balance.overflow
         },
         bank2: {
           totalBalance: bank2Balance.totalBalance,
           totalStates: bank2Balance.totalStates,
-          overflow: bank2Balance.overflow,
-        },
-      },
+          overflow: bank2Balance.overflow
+        }
+      }
     },
     useCase2: {
       erc20MintAmount: erc20MintAmount,
@@ -277,28 +263,28 @@ async function main(): Promise<boolean> {
         bank1: {
           totalBalance: finalBalanceBank1.totalBalance,
           totalStates: finalBalanceBank1.totalStates,
-          overflow: finalBalanceBank1.overflow,
+          overflow: finalBalanceBank1.overflow
         },
         bank2: {
           totalBalance: finalBalanceBank2.totalBalance,
           totalStates: finalBalanceBank2.totalStates,
-          overflow: finalBalanceBank2.overflow,
-        },
-      },
+          overflow: finalBalanceBank2.overflow
+        }
+      }
     },
     cbdcIssuer: cbdcIssuer.lookup,
     bank1: bank1.lookup,
     bank2: bank2.lookup,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toISOString()
   };
 
   // Use command-line argument for data directory if provided, otherwise use default
-  const dataDir = process.argv[2] || path.join(__dirname, "..", "data");
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dataFile = path.join(dataDir, `contract-data-${timestamp}.json`);
   fs.writeFileSync(dataFile, JSON.stringify(contractData, null, 2));
   logger.log(`Contract data saved to ${dataFile}`);

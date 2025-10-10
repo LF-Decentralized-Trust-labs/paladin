@@ -280,7 +280,6 @@ task copySolidity(type: Copy) {
 }
 
 task copyZetoSolidity(type: Copy) {
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     inputs.files(configurations.zetoArtifacts)
     inputs.files(configurations.poseidonArtifacts)
     inputs.files(configurations.contractCompile)
@@ -342,21 +341,22 @@ task loadImages(type: Exec) {
         args "OPERATOR_IMAGE_NAME=${operatorImageName}"
         args "OPERATOR_IMAGE_TAG=${operatorImageTag}"
         args "PALADIN_IMAGE_NAME=${paladinImageName}"
-        args "PALADIN_IMAGE_TAG=test"
+        args "PALADIN_IMAGE_TAG=${paladinImageTag}"
 }
 
 // Task to load images into the Kind cluster
-task promoteKindOperatorImage {
+task promoteKindImages {
     dependsOn startKindCluster
-    dependsOn 'buildOperatorImage'
-    dependsOn 'loadImages'
-}
 
-// Task to load images into the Kind cluster
-task promoteKindPaladinImage {
-    dependsOn startKindCluster
-    dependsOn 'buildPaladinImage'
-    dependsOn 'loadImages'
+    if (buildPaladin) {
+        dependsOn 'buildPaladinImage'
+    }
+    if (buildOperator) {
+        dependsOn 'buildOperatorImage'
+    }
+    if (loadImages) {
+        dependsOn 'loadImages'
+    }
 }
 
 task prepareCRDsChart(type: Exec) {
@@ -519,10 +519,16 @@ task build {
 
 // Task to update the Paladin image in the Kind cluster
 task updatePaladinImage(type: Exec) {
-    dependsOn promoteKindPaladinImage
+    doFirst {
+        buildOperator = false
+        buildPaladin = true
+    }
+    dependsOn promoteKindImages 
     executable 'kubectl'
     args "rollout" 
     args "restart" 
     args "sts"
     args "paladin-node1"
+    args "paladin-node2"
+    args "paladin-node3"
 }

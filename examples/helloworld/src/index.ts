@@ -16,8 +16,8 @@ import PaladinClient, {
   TransactionType,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import helloWorldJson from "./abis/HelloWorld.json";
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'fs';
+import * as path from 'path';
 import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
@@ -25,15 +25,11 @@ const logger = console;
 async function main(): Promise<boolean> {
   // --- Initialization from Imported Config ---
   if (nodeConnections.length < 1) {
-    logger.error(
-      "The environment config must provide at least 1 node for this scenario."
-    );
+    logger.error("The environment config must provide at least 1 node for this scenario.");
     return false;
   }
-
-  logger.log(
-    "Initializing Paladin client from the environment configuration..."
-  );
+  
+  logger.log("Initializing Paladin client from the environment configuration...");
   const paladin = new PaladinClient(nodeConnections[0].clientOptions);
   const [owner] = paladin.getVerifiers(`owner@${nodeConnections[0].id}`);
 
@@ -50,11 +46,7 @@ async function main(): Promise<boolean> {
   });
 
   // Wait for the deployment receipt
-  const deploymentReceipt = await paladin.pollForReceipt(
-    deploymentTxID,
-    10000,
-    true
-  );
+  const deploymentReceipt = await paladin.pollForReceipt(deploymentTxID, 10000, true);
   if (!deploymentReceipt?.contractAddress) {
     logger.error("STEP 1: Deployment failed!");
     return false;
@@ -82,16 +74,12 @@ async function main(): Promise<boolean> {
   }
 
   // Wait for the function call receipt
-  const functionReceipt = await paladin.pollForReceipt(
-    sayHelloTxID,
-    10000,
-    true
-  );
+  const functionReceipt = await paladin.pollForReceipt(sayHelloTxID, 10000, true);
   if (!functionReceipt?.transactionHash) {
     logger.error("STEP 2: Receipt retrieval failed!");
     return false;
   }
-
+  
   // Validate the transaction was successful
   if (!functionReceipt.success) {
     logger.error("STEP 2: Transaction failed!");
@@ -104,16 +92,14 @@ async function main(): Promise<boolean> {
   const events = await paladin.bidx.decodeTransactionEvents(
     functionReceipt.transactionHash,
     helloWorldJson.abi,
-    "pretty=true"
+    "pretty=true",
   );
 
   // Extract the event message and validate its content
   const message = events[0].data["message"];
   const expectedOutput = `Welcome to Paladin, ${name}`;
   if (message !== expectedOutput) {
-    logger.error(
-      `STEP 3: ERROR - Event data does not match the expected output! message: "${message}"`
-    );
+    logger.error(`STEP 3: ERROR - Event data does not match the expected output! message: "${message}"`);
     return false;
   }
   logger.log("STEP 3: Events verified successfully!");
@@ -123,16 +109,16 @@ async function main(): Promise<boolean> {
     contractAddress: deploymentReceipt.contractAddress,
     message: message,
     transactionHash: functionReceipt.transactionHash,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toISOString()
   };
 
   // Use command-line argument for data directory if provided, otherwise use default
-  const dataDir = process.argv[2] || path.join(__dirname, "..", "data");
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dataFile = path.join(dataDir, `contract-data-${timestamp}.json`);
   fs.writeFileSync(dataFile, JSON.stringify(contractData, null, 2));
   logger.log(`Contract data saved to ${dataFile}`);

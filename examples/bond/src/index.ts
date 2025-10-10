@@ -25,8 +25,8 @@ import atomFactoryJson from "./abis/AtomFactory.json";
 import bondTrackerPublicJson from "./abis/BondTrackerPublic.json";
 import { newBondSubscription } from "./helpers/bondsubscription";
 import { newBondTracker } from "./helpers/bondtracker";
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'fs';
+import * as path from 'path';
 import { ContractData } from "./tests/data-persistence";
 import { nodeConnections } from "paladin-example-common";
 
@@ -35,18 +35,12 @@ const logger = console;
 async function main(): Promise<boolean> {
   // --- Initialization from Imported Config ---
   if (nodeConnections.length < 3) {
-    logger.error(
-      "The environment config must provide at least 3 nodes for this scenario."
-    );
+    logger.error("The environment config must provide at least 3 nodes for this scenario.");
     return false;
   }
-
-  logger.log(
-    "Initializing Paladin clients from the environment configuration..."
-  );
-  const clients = nodeConnections.map(
-    (node) => new PaladinClient(node.clientOptions)
-  );
+  
+  logger.log("Initializing Paladin clients from the environment configuration...");
+  const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
   const [paladin1, paladin2, paladin3] = clients;
 
   const [cashIssuer, bondIssuer] = paladin1.getVerifiers(
@@ -54,9 +48,7 @@ async function main(): Promise<boolean> {
     `bondIssuer@${nodeConnections[0].id}`
   );
 
-  const [bondCustodian] = paladin2.getVerifiers(
-    `bondCustodian@${nodeConnections[1].id}`
-  );
+  const [bondCustodian] = paladin2.getVerifiers(`bondCustodian@${nodeConnections[1].id}`);
   const [investor] = paladin3.getVerifiers(`investor@${nodeConnections[2].id}`);
   // Create a Noto token to represent cash
   logger.log("Deploying Noto cash token...");
@@ -412,6 +404,7 @@ async function main(): Promise<boolean> {
   receipt = await paladin2.pollForReceipt(txID, 10000);
   if (!checkReceipt(receipt)) return false;
 
+
   // it can take some time for the balances to update, so loop until all balances are >0
   let finalCashBalanceInvestor: NotoBalanceOfResult | undefined;
   let finalBondBalanceInvestor: NotoBalanceOfResult | undefined;
@@ -419,32 +412,30 @@ async function main(): Promise<boolean> {
   let finalBondBalanceCustodian: NotoBalanceOfResult | undefined;
   const startTime = Date.now();
   while (true) {
-    // Get final balances after the bond distribution
-    finalCashBalanceInvestor = await notoCash
-      .using(paladin3)
-      .balanceOf(investor, { account: investor.lookup });
+  // Get final balances after the bond distribution
+  finalCashBalanceInvestor = await notoCash
+    .using(paladin3)
+    .balanceOf(investor, { account: investor.lookup });
 
-    finalBondBalanceInvestor = await notoBond
-      .using(paladin3)
-      .balanceOf(investor, { account: investor.lookup });
+  finalBondBalanceInvestor = await notoBond
+    .using(paladin3)
+    .balanceOf(investor, { account: investor.lookup });
 
-    finalCashBalanceCustodian = await notoCash
-      .using(paladin2)
-      .balanceOf(bondCustodian, { account: bondCustodian.lookup });
+  finalCashBalanceCustodian = await notoCash
+    .using(paladin2)
+    .balanceOf(bondCustodian, { account: bondCustodian.lookup });
 
     finalBondBalanceCustodian = await notoBond
-      .using(paladin2)
-      .balanceOf(bondCustodian, { account: bondCustodian.lookup });
+    .using(paladin2)
+    .balanceOf(bondCustodian, { account: bondCustodian.lookup });
 
-    if (
-      finalCashBalanceInvestor?.totalBalance !== "0" &&
+    if (finalCashBalanceInvestor?.totalBalance !== "0" &&
       finalBondBalanceInvestor?.totalBalance !== "0" &&
       finalCashBalanceCustodian?.totalBalance !== "0" &&
-      finalBondBalanceCustodian?.totalBalance !== "0"
-    ) {
+      finalBondBalanceCustodian?.totalBalance !== "0") {
       break;
     }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     if (Date.now() - startTime > 60000) {
       logger.error("Failed to get final balances after 60 seconds");
@@ -452,7 +443,7 @@ async function main(): Promise<boolean> {
     }
   }
 
-  // Save contract data to file for later use
+      // Save contract data to file for later use
   const contractData: ContractData = {
     notoCashAddress: notoCash.address,
     notoBondAddress: notoBond.address,
@@ -472,56 +463,56 @@ async function main(): Promise<boolean> {
       discountPrice: 1,
       minimumDenomination: 1,
       bondUnits: 100,
-      cashAmount: 100,
+      cashAmount: 100
     },
     lockDetails: {
       cashLockId: cashLockId,
       bondLockId: bondLockId,
       cashUnlockCall: cashUnlockCall,
-      assetUnlockCall: assetUnlockCall,
+      assetUnlockCall: assetUnlockCall
     },
     finalBalances: {
       cash: {
         investor: {
           totalBalance: finalCashBalanceInvestor.totalBalance,
           totalStates: finalCashBalanceInvestor.totalStates,
-          overflow: finalCashBalanceInvestor.overflow,
+          overflow: finalCashBalanceInvestor.overflow
         },
         custodian: {
           totalBalance: finalCashBalanceCustodian.totalBalance,
           totalStates: finalCashBalanceCustodian.totalStates,
-          overflow: finalCashBalanceCustodian.overflow,
-        },
+          overflow: finalCashBalanceCustodian.overflow
+        }
       },
       bond: {
         investor: {
           totalBalance: finalBondBalanceInvestor.totalBalance,
           totalStates: finalBondBalanceInvestor.totalStates,
-          overflow: finalBondBalanceInvestor.overflow,
+          overflow: finalBondBalanceInvestor.overflow
         },
         custodian: {
           totalBalance: finalBondBalanceCustodian.totalBalance,
           totalStates: finalBondBalanceCustodian.totalStates,
-          overflow: finalBondBalanceCustodian.overflow,
-        },
-      },
+          overflow: finalBondBalanceCustodian.overflow
+        }
+      }
     },
     participants: {
       cashIssuer: cashIssuer.lookup,
       bondIssuer: bondIssuer.lookup,
       bondCustodian: bondCustodian.lookup,
-      investor: investor.lookup,
+      investor: investor.lookup
     },
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toISOString()
   };
 
   // Use command-line argument for data directory if provided, otherwise use default
-  const dataDir = process.argv[2] || path.join(__dirname, "..", "data");
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dataFile = path.join(dataDir, `contract-data-${timestamp}.json`);
   fs.writeFileSync(dataFile, JSON.stringify(contractData, null, 2));
   logger.log(`Contract data saved to ${dataFile}`);

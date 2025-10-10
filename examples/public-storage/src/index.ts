@@ -16,8 +16,8 @@ import PaladinClient, {
   TransactionType,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import storageJson from "./abis/Storage.json";
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'fs';
+import * as path from 'path';
 import { nodeConnections } from "paladin-example-common";
 
 const logger = console;
@@ -25,15 +25,11 @@ const logger = console;
 async function main(): Promise<boolean> {
   // --- Initialization from Imported Config ---
   if (nodeConnections.length < 1) {
-    logger.error(
-      "The environment config must provide at least 1 node for this scenario."
-    );
+    logger.error("The environment config must provide at least 1 node for this scenario.");
     return false;
   }
-
-  logger.log(
-    "Initializing Paladin client from the environment configuration..."
-  );
+  
+  logger.log("Initializing Paladin client from the environment configuration...");
   const paladin = new PaladinClient(nodeConnections[0].clientOptions);
   const [owner] = paladin.getVerifiers(`owner@${nodeConnections[0].id}`);
 
@@ -53,13 +49,13 @@ async function main(): Promise<boolean> {
     logger.error("Deployment failed!");
     return false;
   }
-
+  
   // Validate deployment was successful
   if (!deploymentReceipt.success) {
     logger.error("Deployment transaction failed!");
     return false;
   }
-
+  
   logger.log("Step 1: Storage contract deployed successfully!");
 
   // Step 2: Store a value in the contract
@@ -80,14 +76,14 @@ async function main(): Promise<boolean> {
     logger.error("Failed to store value in the contract!");
     return false;
   }
-
+  
   // Validate store transaction was successful
   if (!storeReceipt.success) {
     logger.error("Store transaction failed!");
     return false;
   }
-
-  logger.log("Step 2: Value stored successfully!");
+  
+  logger.log("Step 2: Value stored successfully!" );
 
   // Step 3: Retrieve the stored value from the contract
   logger.log("Step 3: Retrieving the stored value...");
@@ -103,15 +99,11 @@ async function main(): Promise<boolean> {
   // Validate the retrieved value
   const retrievedValue = retrieveResult["value"];
   if (retrievedValue !== valueToStore.toString()) {
-    logger.error(
-      `Retrieved value "${retrievedValue}" does not match stored value "${valueToStore}"!`
-    );
+    logger.error(`Retrieved value "${retrievedValue}" does not match stored value "${valueToStore}"!`);
     return false;
   }
 
-  logger.log(
-    `Step 3: Value retrieved successfully! Retrieved value: "${retrievedValue}"`
-  );
+  logger.log(`Step 3: Value retrieved successfully! Retrieved value: "${retrievedValue}"`);
 
   // Save contract data to file for later use
   const contractData = {
@@ -119,16 +111,16 @@ async function main(): Promise<boolean> {
     storedValue: valueToStore,
     retrievedValue: retrievedValue,
     storeTransactionHash: storeReceipt.transactionHash,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toISOString()
   };
 
   // Use command-line argument for data directory if provided, otherwise use default
-  const dataDir = process.argv[2] || path.join(__dirname, "..", "data");
+  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dataFile = path.join(dataDir, `contract-data-${timestamp}.json`);
   fs.writeFileSync(dataFile, JSON.stringify(contractData, null, 2));
   logger.log(`Contract data saved to ${dataFile}`);
