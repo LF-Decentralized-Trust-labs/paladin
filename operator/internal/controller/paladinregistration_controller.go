@@ -79,8 +79,6 @@ var PaladinRegistrationCRMap = CRMap[corev1alpha1.PaladinRegistration, *corev1al
 func (r *PaladinRegistrationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	// TODO: Add an admission webhook to make the bytecode and ABI immutable
-
 	// Fetch the PaladinRegistration instance
 	var reg corev1alpha1.PaladinRegistration
 	if err := r.Get(ctx, req.NamespacedName, &reg); err != nil {

@@ -29,6 +29,9 @@ resources:
   kind: SmartContractDeployment
   path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
     namespaced: true
@@ -56,6 +59,9 @@ resources:
   kind: PaladinRegistry
   path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
     namespaced: true
@@ -74,6 +80,9 @@ resources:
   kind: PaladinRegistration
   path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
     namespaced: true
@@ -83,4 +92,7 @@ resources:
   kind: TransactionInvoke
   path: github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1
   version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 version: "3"

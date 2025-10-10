@@ -47,11 +47,18 @@ spec:
           - containerPort: {{ .Values.operator.service.port }}
             name: http
             protocol: TCP
+          {{- if .Values.webhook.enabled }}
+          - containerPort: 9443
+            name: webhook
+            protocol: TCP
+          {{- end }}
         env:
           - name: WATCH_NAMESPACE
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+          - name: ENABLE_WEBHOOKS
+            value: "{{ .Values.webhook.enabled }}"
           {{- range .Values.operator.env }}
           - name: {{ .name }}
             value: {{ .value | quote }}
@@ -67,8 +74,19 @@ spec:
           {{- toYaml . | nindent 10 }}
         {{- end }}
         volumeMounts:
-          {{- toYaml .Values.operator.volumeMounts | nindent 12 }}
+          {{- if .Values.webhook.enabled }}
+          - mountPath: /tmp/k8s-webhook-server/serving-certs
+            name: cert
+            readOnly: true
+          {{- end }}
+          {{- toYaml .Values.operator.volumeMounts | nindent 10 }}
       volumes:
+        {{- if .Values.webhook.enabled }}
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: webhook-server-cert
+        {{- end }}
         {{- toYaml .Values.operator.volumes | nindent 8 }}
       {{- with .Values.operator.nodeSelector }}
       nodeSelector:
