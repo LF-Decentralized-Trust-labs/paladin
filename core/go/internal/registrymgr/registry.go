@@ -308,6 +308,10 @@ func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX persistence.D
 			Error
 	}
 
+	if err != nil {
+		return err
+	}
+
 	if len(dbProps) > 0 {
 		err = dbTX.DB().
 			WithContext(ctx).

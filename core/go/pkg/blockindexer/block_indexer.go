@@ -570,11 +570,13 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 	for i, block := range batch.blocks {
 		newHighestBlock = int64(block.Number)
 		blocks = append(blocks, bi.blockInfoToIndexedBlock(block))
+		log.L(ctx).Debugf("Indexing %d transactions from block %d", len(batch.receipts[i]), block.Number)
 		for txIndex, r := range batch.receipts[i] {
 			result := pldapi.TXResult_FAILURE.Enum()
 			if r.Status.BigInt().Int64() == 1 {
 				result = pldapi.TXResult_SUCCESS.Enum()
 			}
+			log.L(ctx).Debugf("Indexed transaction: blockNumber=%d, txIndex=%d, hash=%s, result=%s", block.Number, txIndex, r.TransactionHash, result)
 			txn := IndexedTransactionNotify{
 				IndexedTransaction: pldapi.IndexedTransaction{
 					Hash:             pldtypes.NewBytes32FromSlice(r.TransactionHash),
@@ -591,7 +593,9 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 			notifyTransactions = append(notifyTransactions, &txn)
 			transactions = append(transactions, &txn.IndexedTransaction)
 			for _, l := range r.Logs {
-				events = append(events, bi.logToIndexedEvent(l))
+				event := bi.logToIndexedEvent(l)
+				log.L(ctx).Debugf("Indexed event %d/%d/%d: %s", event.BlockNumber, event.TransactionIndex, event.LogIndex, event.Signature)
+				events = append(events, event)
 			}
 		}
 	}

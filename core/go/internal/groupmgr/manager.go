@@ -29,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
@@ -187,7 +188,13 @@ func (gm *groupManager) insertGroup(ctx context.Context, dbTX persistence.DBTX, 
 		Configuration: pldtypes.JSONString(pgGenesis.Configuration.Map()),
 		GenesisTX:     genesisTx,
 	}
-	err := dbTX.DB().WithContext(ctx).Create(pg).Error
+	err := dbTX.DB().
+		WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "domain"}, {Name: "id"}},
+			DoNothing: true,
+		}).
+		Create(pg).Error
 	if err == nil {
 		pgms := make([]*persistedGroupMember, len(pgGenesis.Members))
 		for i, identity := range pgGenesis.Members {
@@ -199,6 +206,10 @@ func (gm *groupManager) insertGroup(ctx context.Context, dbTX persistence.DBTX, 
 			}
 		}
 		err = dbTX.DB().WithContext(ctx).
+			Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "domain"}, {Name: "group"}, {Name: "idx"}},
+				DoNothing: true,
+			}).
 			Create(pgms).
 			Error
 	}

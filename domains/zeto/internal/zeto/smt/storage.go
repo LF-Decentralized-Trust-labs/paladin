@@ -307,7 +307,7 @@ func (s *statesStorage) makeNewStateFromTreeNode(ctx context.Context, n *smtNode
 	}
 
 	data, _ := json.Marshal(newNode)
-	hash, err := newNode.Hash()
+	hash, err := newNode.Hash(s.smtName)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorHashSMTNode, err)
 	}

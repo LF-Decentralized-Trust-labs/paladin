@@ -15,14 +15,14 @@
 
 package io.kaleido.paladin.pente.evmstate;
 
+import java.util.Optional;
+
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import org.hyperledger.besu.datatypes.Hash;
 import org.hyperledger.besu.datatypes.Wei;
 import org.hyperledger.besu.evm.frame.BlockValues;
 import org.hyperledger.besu.evm.operation.BlockHashOperation;
-
-import java.util.Optional;
 
 public class VirtualBlockchain implements BlockValues, BlockHashOperation.BlockHashLookup {
 
@@ -58,7 +58,7 @@ public class VirtualBlockchain implements BlockValues, BlockHashOperation.BlockH
 
     @Override
     public long getTimestamp() {
-        return this.gasLimit;
+        return this.blockTimestamp;
     }
 
     @Override

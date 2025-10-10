@@ -253,8 +253,9 @@ type MerkleTreeNode struct {
 	RightChild pldtypes.Bytes32  `json:"rightChild"`
 }
 
-func (m *MerkleTreeNode) Hash() (string, error) {
+func (m *MerkleTreeNode) Hash(smtName string) (string, error) {
 	h := sha256.New()
+	h.Write([]byte(smtName)) // Include the SMT name in the hash to ensure global uniqueness
 	h.Write(m.RefKey.Bytes())
 	h.Write(m.Index.Bytes())
 	h.Write([]byte(m.Type))

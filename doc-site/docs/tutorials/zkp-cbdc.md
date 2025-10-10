@@ -152,6 +152,6 @@ A participant like `bank1` who has unspent Zeto tokens can call `withdraw` on th
 
 ## Next Steps
 
-Next, discover how **Notarized Tokens** and **Privacy Groups** seamlessly integrate to enable a robust bond issuance workflow that balances private collaboration with public transparency.
+Next, explore Zeto tokens further to understand how compliant **KYC** processes can be integrated with zero-knowledge proof-backed tokens.
 
-[Continue to the Bond Issuance Tutorial →](./bond-issuance.md)
+[Continue to the Private Stablecoin Tutorial →](./private-stablecoin.md)

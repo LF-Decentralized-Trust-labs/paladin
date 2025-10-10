@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -12,23 +12,22 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
-package publictxmgr
+package metrics
 
 import (
 	"context"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestMetrics(t *testing.T) {
-	// none of the functions are actually implemented, so it's purely for test coverage
-	btem := &publicTxEngineMetrics{}
-	ctx := context.Background()
-	btem.InitMetrics(ctx)
-	btem.RecordCompletedTransactionCountMetrics(ctx, "success")
-	btem.RecordOperationMetrics(ctx, "test", "success", 12)
-	btem.RecordStageChangeMetrics(ctx, "test", 12)
-	btem.RecordInFlightOrchestratorPoolMetrics(ctx, nil, 1)
-	btem.RecordInFlightTxQueueMetrics(ctx, nil, 1)
-	btem.RecordCompletedTransactionCountMetrics(ctx, "test")
+func TestInit(t *testing.T) {
+	mgr := NewMetricsManager(context.Background())
+	assert.NotNil(t, mgr)
+
+	err := mgr.Registry().Register(prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "test_counter",
+	}))
+	assert.NoError(t, err, "should register a counter successfully")
 }

@@ -110,6 +110,21 @@ public class PenteDomainTests {
             )
     ));
 
+    static final JsonABI timestampTestABI = new JsonABI(List.of(
+            JsonABI.newFunction(
+                    "deploy",
+                    JsonABI.newParameters(
+                            JsonABI.newTuple("group", "Group", JsonABI.newParameters(
+                                    JsonABI.newParameter("salt", "bytes32"),
+                                    JsonABI.newParameter("members", "string[]")
+                            )),
+                            JsonABI.newParameter("bytecode", "bytes"),
+                            JsonABI.newTuple("inputs", "", JsonABI.newParameters())
+                    ),
+                    JsonABI.newParameters()
+            )
+    ));
+
     Testbed.TransactionResult getTransactionInfo(LinkedHashMap<String, Object> res) {
         return new ObjectMapper().convertValue(res, Testbed.TransactionResult.class);
     }
@@ -417,6 +432,57 @@ public class PenteDomainTests {
                             simpleStorageABI,
                             "set"
                     ), true);
+        }
+    }
+
+    @Test
+    void testBlockTimestamp() throws Exception {
+        JsonHex.Address address = deployFactory();
+        JsonHex.Bytes32 groupSalt = JsonHex.randomBytes32();
+        try (Testbed testbed = new Testbed(testbedSetup, new Testbed.ConfigDomain(
+                "pente", address, new Testbed.ConfigPlugin("jar", "", PenteDomainFactory.class.getName()), new HashMap<>()
+        ))) {
+            PenteConfiguration.GroupTupleJSON groupInfo = new PenteConfiguration.GroupTupleJSON(
+                    groupSalt,
+                    new String[]{"member1", "member2"}
+            );
+
+            // Create the privacy group
+            String penteAddr = testbed.getRpcClient().request("testbed_deploy",
+                    "pente", "member1",
+                    new PenteConfiguration.PrivacyGroupConstructorParamsJSON(
+                            groupInfo,
+                            "shanghai",
+                            PenteConfiguration.ENDORSEMENT_TYPE__GROUP_SCOPED_IDENTITIES,
+                            true
+                    ));
+            assertFalse(penteAddr.isBlank());
+
+            // Deploy TimestampTest to the privacy group
+            String timestampTestBytecode = ResourceLoader.jsonResourceEntryText(
+                    this.getClass().getClassLoader(),
+                    "contracts/testcontracts/TimestampTest.sol/TimestampTest.json",
+                    "bytecode"
+            );
+            var mapper = new ObjectMapper();
+            var tx = getTransactionInfo(
+                    testbed.getRpcClient().request("testbed_invoke",
+                            new Testbed.TransactionInput(
+                                    "private",
+                                    "",
+                                    "deployer",
+                                    JsonHex.addressFrom(penteAddr),
+                                    new HashMap<>() {{
+                                        put("group", groupInfo);
+                                        put("bytecode", timestampTestBytecode);
+                                        put("inputs", new String[]{});
+                                    }},
+                                    timestampTestABI,
+                                    "deploy"
+                            ), true));
+            var domainReceipt = mapper.convertValue(tx.domainReceipt(), PenteEVMTransaction.JSONReceipt.class);
+            var timestampTestAddr = domainReceipt.receipt().contractAddress();
+            assertFalse(timestampTestAddr.toString().isBlank());
         }
     }
 }

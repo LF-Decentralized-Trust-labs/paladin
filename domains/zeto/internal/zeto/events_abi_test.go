@@ -24,7 +24,7 @@ import (
 
 func TestGetAllZetoEventAbis(t *testing.T) {
 	events := getAllZetoEventAbis()
-	assert.Equal(t, 6, len(events))
+	assert.Equal(t, 8, len(events))
 }
 
 func TestBuildEvents(t *testing.T) {

@@ -52,12 +52,12 @@ func (inputs *FungibleNullifierWitnessInputs) prepareInputsForNullifiers(ctx con
 		}
 		nullifiers[i] = nullifier
 	}
-	root, ok := new(big.Int).SetString(extras.Root, 16)
+	root, ok := new(big.Int).SetString(extras.SmtProof.Root, 16)
 	if !ok {
 		return nil, nil, nil, nil, nil, i18n.NewError(ctx, msgs.MsgErrorDecodeRootExtras)
 	}
 	var proofs [][]*big.Int
-	for _, proof := range extras.MerkleProofs {
+	for _, proof := range extras.SmtProof.MerkleProofs {
 		var mp []*big.Int
 		for _, node := range proof.Nodes {
 			n, ok := new(big.Int).SetString(node, 16)
@@ -68,8 +68,8 @@ func (inputs *FungibleNullifierWitnessInputs) prepareInputsForNullifiers(ctx con
 		}
 		proofs = append(proofs, mp)
 	}
-	enabled := make([]*big.Int, len(extras.Enabled))
-	for i, e := range extras.Enabled {
+	enabled := make([]*big.Int, len(extras.SmtProof.Enabled))
+	for i, e := range extras.SmtProof.Enabled {
 		if e {
 			enabled[i] = big.NewInt(1)
 		} else {

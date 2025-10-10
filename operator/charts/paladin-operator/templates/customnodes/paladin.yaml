@@ -23,6 +23,8 @@ spec:
         type: secret
         secret:
           name: {{ .baseLedgerEndpoint.endpoint.auth.secretName }}
+        secretRef: # this is deprecated, but kept for backward compatibility
+          name: {{ .baseLedgerEndpoint.endpoint.auth.secretName }}
       {{- end }}
     {{- else if eq .baseLedgerEndpoint.type "local" }}
     local:
@@ -73,6 +75,10 @@ spec:
   database:
     mode: {{ .database.mode }}
     migrationMode: {{ .database.migrationMode }}
+    {{- if .database.pvcTemplate  }}
+    pvcTemplate:
+{{ toYaml .database.pvcTemplate | nindent 6 }}
+    {{- end }}
 
   secretBackedSigners:
   {{- range .secretBackedSigners }}

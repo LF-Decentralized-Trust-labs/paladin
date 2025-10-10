@@ -20,7 +20,9 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/kaleido-io/paladin/core/internal/publictxmgr/metrics"
 	"github.com/kaleido-io/paladin/core/mocks/publictxmgrmocks"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,9 +30,10 @@ import (
 func newTestInFlightTransactionStateManager(t *testing.T) (InFlightTransactionStateManager, func()) {
 	_, balanceManager, ptm, _, done := newTestBalanceManager(t)
 
+	metrics := metrics.InitMetrics(context.Background(), prometheus.NewRegistry())
 	mockInMemoryState := NewTestInMemoryTxState(t)
 	mockActionTriggers := publictxmgrmocks.NewInFlightStageActionTriggers(t)
-	iftxs := NewInFlightTransactionStateManager(&publicTxEngineMetrics{}, balanceManager, mockActionTriggers, mockInMemoryState, ptm, ptm.submissionWriter, false)
+	iftxs := NewInFlightTransactionStateManager(metrics, balanceManager, mockActionTriggers, mockInMemoryState, ptm, ptm.submissionWriter, false)
 	return iftxs, done
 
 }

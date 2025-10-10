@@ -1,0 +1,120 @@
+apiVersion: core.paladin.io/v1alpha1
+kind: TransactionInvoke
+metadata:
+  labels:
+    app.kubernetes.io/name: operator-go
+    app.kubernetes.io/managed-by: kustomize
+  name: zeto-anon-nullifier-kyc
+spec:
+  node: node1
+  from: zeto.operator
+  txType: public
+  toTemplate: '{{ index .status.resolvedContractAddresses "zeto-factory" }}'
+  requiredContractDeployments:
+    - 'zeto-factory'
+    - 'zeto-impl-anon-nullifier-kyc'
+    - 'zeto-g16-deposit'
+    - 'zeto-g16-withdraw-nullifier'
+    - 'zeto-g16-withdraw-nullifier-batch'
+    - 'zeto-g16-anon-nullifier-kyc-transfer'
+    - 'zeto-g16-anon-nullifier-kyc-transfer-batch'
+    - 'zeto-g16-anon-nullifier-kyc-transfer-locked'
+    - 'zeto-g16-anon-nullifier-kyc-transfer-locked-batch'
+  function: registerImplementation
+  paramsJSONTemplate: |
+    {
+      "name": "Zeto_AnonNullifierKyc",
+      "implementation": {
+        "implementation":        "{{ index .status.resolvedContractAddresses "zeto-impl-anon-nullifier-kyc" }}",
+        "verifiers": {
+          "verifier":              "{{ index .status.resolvedContractAddresses "zeto-g16-anon-nullifier-kyc-transfer" }}",
+          "depositVerifier":       "{{ index .status.resolvedContractAddresses "zeto-g16-deposit" }}",
+          "withdrawVerifier":      "{{ index .status.resolvedContractAddresses "zeto-g16-withdraw-nullifier" }}",
+          "lockVerifier":          "{{ index .status.resolvedContractAddresses "zeto-g16-anon-nullifier-kyc-transfer-locked" }}",
+          "burnVerifier":          "0x0000000000000000000000000000000000000000",
+          "batchVerifier":         "{{ index .status.resolvedContractAddresses "zeto-g16-anon-nullifier-kyc-transfer-batch" }}",
+          "batchWithdrawVerifier": "{{ index .status.resolvedContractAddresses "zeto-g16-withdraw-nullifier-batch" }}",
+          "batchLockVerifier":     "{{ index .status.resolvedContractAddresses "zeto-g16-anon-nullifier-kyc-transfer-locked-batch" }}",
+          "batchBurnVerifier":     "0x0000000000000000000000000000000000000000"
+        }
+      }
+    }
+  abiJSON: |
+    [
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "implementation",
+                "type": "address"
+              },
+              {
+                "name": "verifiers",
+                "type": "tuple",
+                "components": [
+                  {
+                    "internalType": "address",
+                    "name": "verifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "depositVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "withdrawVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "lockVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "burnVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "batchVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "batchWithdrawVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "batchLockVerifier",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "batchBurnVerifier",
+                    "type": "address"
+                  }
+                ]
+              }
+            ],
+            "internalType": "struct ZetoTokenFactory.ImplementationInfo",
+            "name": "implementation",
+            "type": "tuple"
+          }
+        ],
+        "name": "registerImplementation",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }
+    ]

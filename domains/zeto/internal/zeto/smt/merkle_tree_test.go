@@ -23,9 +23,12 @@ import (
 )
 
 func TestPackageInit(t *testing.T) {
-	assert.Equal(t, SMT_HEIGHT_UTXO, len(Empty_Proof.Nodes))
-	assert.Equal(t, "0", Empty_Proof.Nodes[0])
-	assert.Equal(t, "0", Empty_Proof.Nodes[SMT_HEIGHT_UTXO-1])
+	assert.Equal(t, SMT_HEIGHT_UTXO, len(Empty_Proof_Utxos.Nodes))
+	assert.Equal(t, "0", Empty_Proof_Utxos.Nodes[0])
+	assert.Equal(t, "0", Empty_Proof_Utxos.Nodes[SMT_HEIGHT_UTXO-1])
+	assert.Equal(t, SMT_HEIGHT_KYC, len(Empty_Proof_kyc.Nodes))
+	assert.Equal(t, "0", Empty_Proof_kyc.Nodes[0])
+	assert.Equal(t, "0", Empty_Proof_kyc.Nodes[SMT_HEIGHT_KYC-1])
 }
 
 func TestMerkleTreeName(t *testing.T) {

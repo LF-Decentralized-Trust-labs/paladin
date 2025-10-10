@@ -112,13 +112,13 @@ func TestStorage(t *testing.T) {
 	stateQueryConext := pldtypes.ShortID()
 
 	storage := NewStatesStorage(&domain.MockDomainCallbacks{MockFindAvailableStates: returnCustomError}, "test", stateQueryConext, "root-schema", "node-schema")
-	smt, err := NewSmt(storage)
+	smt, err := NewSmt(storage, SMT_HEIGHT_UTXO)
 	assert.EqualError(t, err, "PD210065: Failed to find available states for the merkle tree. test error")
 	assert.NotNil(t, storage)
 	assert.Nil(t, smt)
 
 	storage = NewStatesStorage(&domain.MockDomainCallbacks{MockFindAvailableStates: returnEmptyStates}, "test", stateQueryConext, "root-schema", "node-schema")
-	smt, err = NewSmt(storage)
+	smt, err = NewSmt(storage, SMT_HEIGHT_UTXO)
 	assert.NoError(t, err)
 	assert.NotNil(t, storage)
 	assert.NotNil(t, smt)
@@ -132,13 +132,13 @@ func TestStorage(t *testing.T) {
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", idx.Hex())
 
 	storage = NewStatesStorage(&domain.MockDomainCallbacks{MockFindAvailableStates: returnBadData}, "test", stateQueryConext, "root-schema", "node-schema")
-	smt, err = NewSmt(storage)
+	smt, err = NewSmt(storage, SMT_HEIGHT_UTXO)
 	assert.EqualError(t, err, "PD210066: Failed to unmarshal root node index. invalid character 'b' looking for beginning of value")
 	assert.NotNil(t, storage)
 	assert.Nil(t, smt)
 
 	storage = NewStatesStorage(&domain.MockDomainCallbacks{MockFindAvailableStates: returnNode(0)}, "test", stateQueryConext, "root-schema", "node-schema")
-	smt, err = NewSmt(storage)
+	smt, err = NewSmt(storage, SMT_HEIGHT_UTXO)
 	assert.NoError(t, err)
 	assert.NotNil(t, storage)
 	assert.NotNil(t, smt)
@@ -167,7 +167,7 @@ func TestStorage(t *testing.T) {
 func TestUpsertRootNodeIndex(t *testing.T) {
 	stateQueryConext := pldtypes.ShortID()
 	storage := NewStatesStorage(&domain.MockDomainCallbacks{MockFindAvailableStates: returnEmptyStates}, "test", stateQueryConext, "root-schema", "node-schema")
-	_, _ = NewSmt(storage)
+	_, _ = NewSmt(storage, SMT_HEIGHT_UTXO)
 	assert.NotNil(t, storage)
 	tx, err := storage.BeginTx()
 	assert.NoError(t, err)

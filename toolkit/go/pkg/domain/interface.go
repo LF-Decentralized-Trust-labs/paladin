@@ -38,3 +38,9 @@ type DomainHandler[C any] interface {
 	Endorse(ctx context.Context, tx *ParsedTransaction[C], req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error)
 	Prepare(ctx context.Context, tx *ParsedTransaction[C], req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error)
 }
+
+type DomainCallHandler[C any] interface {
+	ValidateParams(ctx context.Context, config *C, params string) (interface{}, error)
+	InitCall(ctx context.Context, tx *ParsedTransaction[C], req *pb.InitCallRequest) (*pb.InitCallResponse, error)
+	ExecCall(ctx context.Context, tx *ParsedTransaction[C], req *pb.ExecCallRequest) (*pb.ExecCallResponse, error)
+}

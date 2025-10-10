@@ -134,7 +134,7 @@ func (a *AtomHelper) GetOperations(ctx context.Context) []map[string]any {
 			BuildTX().
 			Call()
 		require.NoError(a.t, err)
-		operations = append(operations, jsonOutput["0"].(map[string]any))
+		operations = append(operations, jsonOutput["operation"].(map[string]any))
 	}
 	return operations
 }

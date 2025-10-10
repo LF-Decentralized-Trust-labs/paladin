@@ -10,6 +10,10 @@ export interface IPrivacyGroupInput {
   transactionOptions?: IPrivacyGroupTXOptions;
 }
 
+export interface IPrivacyGroupResume {
+  id: string;
+}
+
 export interface IPrivacyGroupTXOptions extends PublicTxOptions {
   idempotencyKey?: string;
 }

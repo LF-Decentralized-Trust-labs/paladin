@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -16,38 +16,24 @@ package metrics
 
 import (
 	"context"
-	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/metric"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const componentName = "paladin"
-
-var metricsSubsystemName = "core"
-
 type metricsManager struct {
 	ctx             context.Context
-	timeMap         map[string]time.Time
-	metricManager   metric.MetricsManager
 	metricsRegistry *prometheus.Registry
 }
 
 func NewMetricsManager(ctx context.Context) Metrics {
 	registry := prometheus.NewRegistry()
 
-	//_ = ffresty.EnableClientMetrics(ctx, registry)
 	mm := &metricsManager{
 		ctx:             ctx,
-		timeMap:         make(map[string]time.Time),
 		metricsRegistry: registry,
 	}
 
 	return mm
-}
-
-func (mm *metricsManager) MetricManager() metric.MetricsManager {
-	return mm.metricManager
 }
 
 func (mm *metricsManager) Registry() *prometheus.Registry {
@@ -55,6 +41,5 @@ func (mm *metricsManager) Registry() *prometheus.Registry {
 }
 
 type Metrics interface {
-	MetricManager() metric.MetricsManager
 	Registry() *prometheus.Registry
 }

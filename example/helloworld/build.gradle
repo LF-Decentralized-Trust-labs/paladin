@@ -70,4 +70,5 @@ task e2e(type: Exec, dependsOn: [build]) {
 task clean(type: Delete) {
     delete 'node_modules'
     delete 'build'
+    delete 'src/abis'
 }

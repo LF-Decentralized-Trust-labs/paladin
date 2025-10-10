@@ -23,14 +23,18 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/core"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
@@ -42,14 +46,63 @@ type StateSchemas struct {
 	MerkleTreeNodeSchema *prototk.StateSchema
 }
 
-const modulus = "21888242871839275222246405745257275088548364400416034343698204186575808495617"
+type MerkleTreeType int
 
-func IsBatchCircuit(sizeOfEndorsableStates int) bool {
-	return sizeOfEndorsableStates > 2
+const (
+	StatesTree MerkleTreeType = iota
+	LockedStatesTree
+	KycStatesTree
+)
+
+type MerkleTreeSpec struct {
+	Name       string
+	Levels     int
+	Type       MerkleTreeType
+	Storage    smt.StatesStorage
+	Tree       core.SparseMerkleTree
+	EmptyProof *proto.MerkleProof
 }
 
+func NewMerkleTreeSpec(ctx context.Context, name string, treeType MerkleTreeType, callbacks plugintk.DomainCallbacks, merkleTreeRootSchemaId, merkleTreeNodeSchemaId string, stateQueryContext string) (*MerkleTreeSpec, error) {
+	var tree core.SparseMerkleTree
+	var levels int
+	switch treeType {
+	case StatesTree:
+		levels = smt.SMT_HEIGHT_UTXO
+	case LockedStatesTree:
+		levels = smt.SMT_HEIGHT_UTXO
+	case KycStatesTree:
+		levels = smt.SMT_HEIGHT_KYC
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgUnknownSmtType, treeType)
+	}
+	storage := smt.NewStatesStorage(callbacks, name, stateQueryContext, merkleTreeRootSchemaId, merkleTreeNodeSchemaId)
+	tree, err := smt.NewSmt(storage, levels)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorNewSmt, name, err)
+	}
+	emptyProof := &smt.Empty_Proof_Utxos
+	if treeType == KycStatesTree {
+		emptyProof = &smt.Empty_Proof_kyc
+	}
+	return &MerkleTreeSpec{
+		Name:       name,
+		Levels:     levels,
+		Type:       treeType,
+		Storage:    storage,
+		Tree:       tree,
+		EmptyProof: emptyProof,
+	}, nil
+}
+
+const modulus = "21888242871839275222246405745257275088548364400416034343698204186575808495617"
+
 func IsNullifiersToken(tokenName string) bool {
-	return tokenName == constants.TOKEN_ANON_NULLIFIER || tokenName == constants.TOKEN_NF_ANON_NULLIFIER
+	return tokenName == constants.TOKEN_ANON_NULLIFIER || tokenName == constants.TOKEN_NF_ANON_NULLIFIER || tokenName == constants.TOKEN_ANON_NULLIFIER_KYC
+}
+
+func IsKycToken(tokenName string) bool {
+	return tokenName == constants.TOKEN_ANON_NULLIFIER_KYC
 }
 
 func IsNonFungibleToken(tokenName string) bool {

@@ -81,6 +81,12 @@ paladinNodes:
     database:
       mode: sidecarPostgres
       migrationMode: auto
+      # pvcTemplate:         # Optional - Set a custom PVC for the DB
+      #   storageClassName: "my-storage"
+      #   accessModes:
+      #   - ReadWriteOnce
+      #   capacity:
+      #     storage: 10Gi
     secretBackedSigners:
       - name: signer-auto-wallet
         secret: central-bank.keys

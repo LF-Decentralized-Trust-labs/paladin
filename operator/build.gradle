@@ -219,7 +219,7 @@ task copySolidity(type: Copy) {
         include 'contracts/private/InvestorList.sol/InvestorList.json'
         include 'contracts/private/NotoTrackerERC20.sol/NotoTrackerERC20.json'
         include 'contracts/shared/BondTrackerPublic.sol/BondTrackerPublic.json'
-        include 'contracts/shared/Atom.sol/AtomFactory.json'
+        include 'contracts/shared/AtomFactory.sol/AtomFactory.json'
         include 'contracts/testcontracts/ERC20Simple.sol/ERC20Simple.json'
     }
     into 'test/e2e/abis'

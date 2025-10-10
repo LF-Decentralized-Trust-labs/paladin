@@ -189,3 +189,46 @@ Inputs:
 
 - **delegate** - set to the Ethereum account, which can be an externally owned account or a smart contract address, that is allowed to submit the transaction to use the locked proof to execute the Zeto token transfer
 - **call** - this is an abi encoded bytes from a call to the `transfer()` function of the target Zeto token smart contract. Refer to the [PvP test case](../../../domains/integration-test/pvp_test.go) for an example of how to construct the encode call bytes
+
+### balanceOf
+
+Returns the balance information for a specified account. This function provides a quick balance check but is limited to processing up to 1000 states and is not intended to replace the role of a proper indexer for comprehensive balance tracking.
+
+```json
+{
+  "type": "function",
+  "name": "balanceOf",
+  "inputs": [
+    {
+      "name": "account",
+      "type": "string"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "totalStates",
+      "type": "uint256"
+    },
+    {
+      "name": "totalBalance",
+      "type": "uint256"
+    },
+    {
+      "name": "overflow",
+      "type": "bool"
+    }
+  ]
+}
+```
+
+Inputs:
+
+- **account** - lookup string for the identity to query the balance for
+
+Outputs:
+
+- **totalStates** - number of unspent UTXO states found for the account
+- **totalBalance** - sum of all unspent UTXO values for the account
+- **overflow** - indicates if there are at least 1000 states available (true means the returned balance may be incomplete)
+
+**Note:** This function is limited to querying up to 1000 states and should not be used as a replacement for proper indexing infrastructure.

@@ -23,6 +23,7 @@ import (
 	"github.com/kaleido-io/paladin/common/go/pkg/i18n"
 	"github.com/kaleido-io/paladin/common/go/pkg/log"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/core/internal/publictxmgr/metrics"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldapi"
 	"github.com/kaleido-io/paladin/sdk/go/pkg/pldtypes"
@@ -32,7 +33,7 @@ type inFlightTransactionStateGeneration struct {
 	current             bool
 	testOnlyNoEventMode bool
 
-	PublicTxManagerMetricsManager
+	metrics.PublicTransactionManagerMetrics
 	InFlightStageActionTriggers
 	InMemoryTxStateManager
 
@@ -68,7 +69,7 @@ type inFlightTransactionStateGeneration struct {
 }
 
 func NewInFlightTransactionStateGeneration(
-	thm PublicTxManagerMetricsManager,
+	thm metrics.PublicTransactionManagerMetrics,
 	bm BalanceManager,
 	ifsat InFlightStageActionTriggers,
 	imtxs InMemoryTxStateManager,
@@ -76,16 +77,16 @@ func NewInFlightTransactionStateGeneration(
 	submissionWriter *submissionWriter,
 	noEventMode bool) InFlightTransactionStateGeneration {
 	return &inFlightTransactionStateGeneration{
-		current:                       true,
-		bufferedStageOutputs:          make([]*StageOutput, 0),
-		cancel:                        make(chan bool, 1),
-		testOnlyNoEventMode:           noEventMode,
-		txLevelStageStartTime:         time.Now(),
-		statusUpdater:                 statusUpdater,
-		submissionWriter:              submissionWriter,
-		PublicTxManagerMetricsManager: thm,
-		InFlightStageActionTriggers:   ifsat,
-		InMemoryTxStateManager:        imtxs,
+		current:                         true,
+		bufferedStageOutputs:            make([]*StageOutput, 0),
+		cancel:                          make(chan bool, 1),
+		testOnlyNoEventMode:             noEventMode,
+		txLevelStageStartTime:           time.Now(),
+		statusUpdater:                   statusUpdater,
+		submissionWriter:                submissionWriter,
+		PublicTransactionManagerMetrics: thm,
+		InFlightStageActionTriggers:     ifsat,
+		InMemoryTxStateManager:          imtxs,
 	}
 }
 
