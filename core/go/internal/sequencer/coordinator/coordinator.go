@@ -42,7 +42,7 @@ import (
 type SeqCoordinator interface {
 	// Asynchronously update the state machine by queueing an event to be processed. Most
 	// callers should use this interface.
-	QueueEvent(ctx context.Context, event common.Event) error
+	QueueEvent(ctx context.Context, event common.Event)
 
 	// Synchronously update the state machine by processing this event. Primarily used for testing the state machine.
 	ProcessEvent(ctx context.Context, event common.Event) error
@@ -161,13 +161,13 @@ func NewCoordinator(
 
 func (c *coordinator) eventLoop(ctx context.Context) error {
 	for {
-		log.L(ctx).Infof("[Sequencer] sender event loop waiting for next event")
+		log.L(ctx).Infof("sender event loop waiting for next event")
 		select {
 		case event := <-c.coordinatorEvents:
-			log.L(ctx).Infof("[Sequencer] coordinator pulled event from the queue: %s", event.TypeString())
+			log.L(ctx).Infof("coordinator pulled event from the queue: %s", event.TypeString())
 			c.ProcessEvent(ctx, event)
 		case <-c.stopEventLoop:
-			log.L(ctx).Infof("[Sequencer] coordinator event loop cancelled")
+			log.L(ctx).Infof("coordinator event loop cancelled")
 			return i18n.NewError(ctx, msgs.MsgContextCanceled)
 		}
 	}
@@ -181,7 +181,7 @@ func (c *coordinator) GetActiveCoordinatorNode(ctx context.Context) string {
 	if c.activeCoordinatorNode == "" {
 		activeCoordinator, err := c.selectNextActiveCoordinator(ctx)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error selecting next active coordinator: %v", err)
+			log.L(ctx).Errorf("error selecting next active coordinator: %v", err)
 			return ""
 		}
 		c.activeCoordinatorNode = activeCoordinator
@@ -197,21 +197,21 @@ func (c *coordinator) selectNextActiveCoordinator(ctx context.Context) (string, 
 	coordinator := ""
 	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_STATIC {
 		// E.g. Noto
-		log.L(ctx).Info("[Sequencer] selecting next active coordinator in static coordinator mode")
+		log.L(ctx).Info("selecting next active coordinator in static coordinator mode")
 		if c.domainAPI.ContractConfig().GetStaticCoordinator() == "" {
-			return "", fmt.Errorf("Static coordinator mode is configured but static coordinator node is not set")
+			return "", fmt.Errorf("static coordinator mode is configured but static coordinator node is not set")
 		}
-		log.L(ctx).Infof("[Sequencer] selected next active coordinator in static coordinator mode: %s", c.domainAPI.ContractConfig().GetStaticCoordinator())
+		log.L(ctx).Infof("selected next active coordinator in static coordinator mode: %s", c.domainAPI.ContractConfig().GetStaticCoordinator())
 		coordinator = c.domainAPI.ContractConfig().GetStaticCoordinator()
 	}
 	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_ENDORSER {
 		// E.g. Pente
 		// Make a fair choice about the next coordinator, but for now just choose the node this request arrived at
-		log.L(ctx).Infof("[Sequencer] selecting next active coordinator in endorser coordinator mode")
-		log.L(ctx).Infof("[Sequencer] selected next active coordinator in endorser coordinator mode: %s", c.nodeName)
+		log.L(ctx).Infof("selecting next active coordinator in endorser coordinator mode")
+		log.L(ctx).Infof("selected next active coordinator in endorser coordinator mode: %s", c.nodeName)
 		if len(c.senderNodePool) == 0 {
 			coordinator = c.nodeName
-			log.L(ctx).Warnf("[Sequencer] Coordinator %s selected based on hash modulus of the sender pool", coordinator)
+			log.L(ctx).Warnf("Coordinator %s selected based on hash modulus of the sender pool", coordinator)
 		} else {
 			// Round block number down to the nearest block range (e.g. block 1012, 1013, 1014 etc. all become 1000 for hashing)
 			effectiveBlockNumber := c.currentBlockHeight - (c.currentBlockHeight % c.coordinatorSelectionBlockRange)
@@ -220,13 +220,13 @@ func (c *coordinator) selectNextActiveCoordinator(ctx context.Context) (string, 
 			h := fnv.New32a()
 			h.Write([]byte(strconv.FormatUint(effectiveBlockNumber, 10)))
 			coordinator = c.senderNodePool[int(h.Sum32())%len(c.senderNodePool)]
-			log.L(ctx).Infof("[Sequencer] Coordinator %s selected based on hash modulus of the sender pool", coordinator)
+			log.L(ctx).Infof("Coordinator %s selected based on hash modulus of the sender pool", coordinator)
 		}
 	}
 	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_SENDER {
 		// E.g. Zeto
-		log.L(ctx).Infof("[Sequencer] selecting next active coordinator in sender coordinator mode")
-		log.L(ctx).Infof("[Sequencer] selected next active coordinator in sender coordinator mode: %s", c.nodeName)
+		log.L(ctx).Infof("selecting next active coordinator in sender coordinator mode")
+		log.L(ctx).Infof("selected next active coordinator in sender coordinator mode: %s", c.nodeName)
 		coordinator = c.nodeName
 	}
 
@@ -251,7 +251,7 @@ func (c *coordinator) UpdateSenderNodePool(ctx context.Context, sender string) {
 	} else {
 		senderNode = senderParts[0]
 	}
-	log.L(ctx).Infof("[Sequencer] updating sender node pool with node %s", senderNode)
+	log.L(ctx).Infof("updating sender node pool with node %s", senderNode)
 	if !slices.Contains(c.senderNodePool, senderNode) {
 		c.senderNodePool = append(c.senderNodePool, senderNode)
 		slices.Sort(c.senderNodePool)
@@ -293,7 +293,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 							To:            to,
 						})
 						if err != nil {
-							log.L(ctx).Errorf("[Sequencer] error selecting next transaction after transaction %s moved from %s to %s: %v", t.ID.String(), from.String(), to.String(), err)
+							log.L(ctx).Errorf("error selecting next transaction after transaction %s moved from %s to %s: %v", t.ID.String(), from.String(), to.String(), err)
 							//TODO figure out how to get this to the abend handler
 						}
 					}
@@ -309,15 +309,15 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 				c.engineIntegration.ResetTransactions(ctx, txn.ID)
 
 				if err != nil {
-					log.L(ctx).Errorf("[Sequencer] error forgetting transaction %s: %v", txn.ID.String(), err)
+					log.L(ctx).Errorf("error forgetting transaction %s: %v", txn.ID.String(), err)
 				}
-				log.L(ctx).Debugf("[Sequencer] transaction %s cleaned up", txn.ID.String())
+				log.L(ctx).Debugf("transaction %s cleaned up", txn.ID.String())
 			},
 			c.readyForDispatch,
 			c.metrics,
 		)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error creating transaction: %v", err)
+			log.L(ctx).Errorf("error creating transaction: %v", err)
 			return err
 		}
 
@@ -333,7 +333,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 		receivedEvent.TransactionID = txn.ID
 		err = c.transactionsByID[txn.ID].HandleEvent(ctx, receivedEvent)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error handling ReceivedEvent for transaction %s: %v", txn.ID.String(), err)
+			log.L(ctx).Errorf("error handling ReceivedEvent for transaction %s: %v", txn.ID.String(), err)
 			return err
 		}
 	}
@@ -344,7 +344,7 @@ func (c *coordinator) propagateEventToTransaction(ctx context.Context, event tra
 	if txn := c.transactionsByID[event.GetTransactionID()]; txn != nil {
 		return txn.HandleEvent(ctx, event)
 	} else {
-		log.L(ctx).Debugf("[Sequencer] ignoring event because transaction not known to this coordinator %s", event.GetTransactionID().String())
+		log.L(ctx).Debugf("ignoring event because transaction not known to this coordinator %s", event.GetTransactionID().String())
 	}
 	return nil
 }
@@ -353,7 +353,7 @@ func (c *coordinator) propagateEventToAllTransactions(ctx context.Context, event
 	for _, txn := range c.transactionsByID {
 		err := txn.HandleEvent(ctx, event)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error handling event %v for transaction %s: %v", event.Type(), txn.ID.String(), err)
+			log.L(ctx).Errorf("error handling event %v for transaction %s: %v", event.Type(), txn.ID.String(), err)
 			return err
 		}
 	}
@@ -363,17 +363,17 @@ func (c *coordinator) propagateEventToAllTransactions(ctx context.Context, event
 func (c *coordinator) getTransactionsInStates(ctx context.Context, states []transaction.State) []*transaction.Transaction {
 	//TODO this could be made more efficient by maintaining a separate index of transactions for each state but that is error prone so
 	// deferring until we have a comprehensive test suite to catch errors
-	log.L(ctx).Infof("[Sequencer] getting transactions in states: %+v", states)
+	log.L(ctx).Infof("getting transactions in states: %+v", states)
 	matchingStates := make(map[transaction.State]bool)
 	for _, state := range states {
 		matchingStates[state] = true
 	}
 
-	log.L(ctx).Infof("[Sequencer] found %d transactions in states: %+v", len(c.transactionsByID), states)
+	log.L(ctx).Infof("found %d transactions in states: %+v", len(c.transactionsByID), states)
 	matchingTxns := make([]*transaction.Transaction, 0, len(c.transactionsByID))
 	for _, txn := range c.transactionsByID {
 		if matchingStates[txn.GetState()] {
-			log.L(ctx).Infof("[Sequencer] found transaction %s in state %s", txn.ID.String(), txn.GetState())
+			log.L(ctx).Infof("found transaction %s in state %s", txn.ID.String(), txn.GetState())
 			matchingTxns = append(matchingTxns, txn)
 		}
 	}
@@ -402,10 +402,10 @@ func (c *coordinator) findTransactionBySignerNonce(ctx context.Context, signer *
 	// deferring until we have a comprehensive test suite to catch errors
 	for _, txn := range c.transactionsByID {
 		if txn != nil {
-			log.L(ctx).Infof("[Sequencer] Tracked TX ID %s", txn.ID.String())
+			log.L(ctx).Infof("Tracked TX ID %s", txn.ID.String())
 		}
 		if txn != nil && txn.GetSignerAddress() != nil {
-			log.L(ctx).Infof("[Sequencer] Tracked TX ID %s signer address '%s'", txn.ID.String(), txn.GetSignerAddress().String())
+			log.L(ctx).Infof("Tracked TX ID %s signer address '%s'", txn.ID.String(), txn.GetSignerAddress().String())
 		}
 		if txn.GetSignerAddress() != nil && *txn.GetSignerAddress() == *signer && txn.GetNonce() != nil && *(txn.GetNonce()) == nonce {
 			return txn
@@ -415,14 +415,14 @@ func (c *coordinator) findTransactionBySignerNonce(ctx context.Context, signer *
 }
 
 func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uuid.UUID, from *pldtypes.EthAddress, nonce uint64, hash pldtypes.Bytes32, revertReason pldtypes.HexBytes) (bool, error) {
-	log.L(ctx).Infof("[Sequencer] confirmDispatchedTransaction - we currently have %d transactions to handle", len(c.transactionsByID))
+	log.L(ctx).Infof("confirmDispatchedTransaction - we currently have %d transactions to handle", len(c.transactionsByID))
 	// First check whether it is one that we have been coordinating
 	if dispatchedTransaction := c.findTransactionBySignerNonce(ctx, from, nonce); dispatchedTransaction != nil {
 		if dispatchedTransaction.GetLatestSubmissionHash() == nil || *(dispatchedTransaction.GetLatestSubmissionHash()) != hash {
 			// Is this not the transaction that we are looking for?
 			// We have missed a submission?  Or is it possible that an earlier submission has managed to get confirmed?
 			// It is interesting so we log it but either way,  this must be the transaction that we are looking for because we can't re-use a nonce
-			log.L(ctx).Debugf("[Sequencer] transaction %s confirmed with a different hash than expected", dispatchedTransaction.ID.String())
+			log.L(ctx).Debugf("transaction %s confirmed with a different hash than expected", dispatchedTransaction.ID.String())
 		}
 		event := &transaction.ConfirmedEvent{
 			Hash:         hash,
@@ -432,7 +432,7 @@ func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uui
 		event.EventTime = time.Now()
 		err := dispatchedTransaction.HandleEvent(ctx, event)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
+			log.L(ctx).Errorf("error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
 			return false, err
 		}
 		return true, nil
@@ -445,12 +445,12 @@ func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uui
 				// Is this not the transaction that we are looking for?
 				// We have missed a submission?  Or is it possible that an earlier submission has managed to get confirmed?
 				// It is interesting so we log it but either way,  this must be the transaction that we are looking for because we can't re-use a nonce
-				log.L(ctx).Debugf("[Sequencer] transaction %s confirmed with a different hash than expected. Dispatch hash nil, confirmed hash %s", dispatchedTransaction.ID.String(), hash.String())
+				log.L(ctx).Debugf("transaction %s confirmed with a different hash than expected. Dispatch hash nil, confirmed hash %s", dispatchedTransaction.ID.String(), hash.String())
 			} else if *(dispatchedTransaction.GetLatestSubmissionHash()) != hash {
 				// Is this not the transaction that we are looking for?
 				// We have missed a submission?  Or is it possible that an earlier submission has managed to get confirmed?
 				// It is interesting so we log it but either way,  this must be the transaction that we are looking for because we can't re-use a nonce
-				log.L(ctx).Debugf("[Sequencer] transaction %s confirmed with a different hash than expected. Dispatch hash %s, confirmed hash %s", dispatchedTransaction.ID.String(), dispatchedTransaction.GetLatestSubmissionHash(), hash.String())
+				log.L(ctx).Debugf("transaction %s confirmed with a different hash than expected. Dispatch hash %s, confirmed hash %s", dispatchedTransaction.ID.String(), dispatchedTransaction.GetLatestSubmissionHash(), hash.String())
 			}
 			event := &transaction.ConfirmedEvent{
 				Hash:         hash,
@@ -459,13 +459,13 @@ func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uui
 			event.TransactionID = txId
 			err := dispatchedTransaction.HandleEvent(ctx, event)
 			if err != nil {
-				log.L(ctx).Errorf("[Sequencer] error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
+				log.L(ctx).Errorf("error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
 				return false, err
 			}
 			return true, nil
 		}
 	}
-	log.L(ctx).Infof("[Sequencer] confirmDispatchedTransaction - failed to find a transaction submitted by signer %s", from.String())
+	log.L(ctx).Infof("confirmDispatchedTransaction - failed to find a transaction submitted by signer %s", from.String())
 	return false, nil
 
 }
@@ -486,7 +486,7 @@ func ptrTo[T any](v T) *T {
 // have an active sequencer for the contract address since it may be the only sender that can honour dispatch
 // requests from another coordinator, but this node is no longer acting as the coordinator.
 func (c *coordinator) Stop() {
-	log.L(context.Background()).Infof("[Sequencer] stopping coordinator for contract %s", c.contractAddress.String())
+	log.L(context.Background()).Infof("stopping coordinator for contract %s", c.contractAddress.String())
 
 	// MRW TODO - The state machine doesn't really have a "please take over from me" path. Not a current priority
 	// but clean "please take over" path may be needed in the future

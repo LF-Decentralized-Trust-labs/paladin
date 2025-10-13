@@ -135,7 +135,7 @@ func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) 
 		for _, pubTx := range pubBindingTx {
 			for _, publicTx := range pubTx {
 				log.L(dm.bgCtx).Debugf("Checking public transactions for TX ID %s to find a match for the receipt we are processing %s", completion.TransactionID, publicTx.TransactionHash)
-				if publicTx.TransactionHash.Equals(&completion.ReceiptInput.OnChain.TransactionHash) {
+				if publicTx.TransactionHash.Equals(&completion.OnChain.TransactionHash) {
 					log.L(dm.bgCtx).Debugf("Found a match for the receipt we are processing %s", publicTx.TransactionHash)
 					err = dm.sequencerManager.HandleTransactionConfirmed(dm.bgCtx, completion, &publicTx.From, publicTx.Nonce.Uint64())
 					if err != nil {

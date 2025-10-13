@@ -55,7 +55,7 @@ func stopNode(t *testing.T, party testutils.Party) {
 }
 
 func TestTransactionSuccessAfterStartStopSingleNode(t *testing.T) {
-	// We want to test that we can start some nodes, send some transactions, restart the nodes and send some more transactions
+	// We want to test that we can start some nodes, send a transaction, restart the nodes and send some more transactions
 
 	ctx := context.Background()
 	domainRegistryAddress := deployDomainRegistry(t, "alice")
@@ -305,13 +305,14 @@ func TestTransactionSuccessIfOneNodeStoppedButNotARequiredVerifier(t *testing.T)
 		transactionReceiptCondition(t, ctx, bobTx1ID, bob.GetClient(), false),
 		transactionLatencyThreshold(t),
 		100*time.Millisecond,
-		"Transaction received a receipt that it shouldn't have",
+		"Transaction did not receive a receipt",
 	)
 }
 
 func TestTransactionSuccessIfOneRequiredVerifierStoppedDuringSubmission(t *testing.T) {
 	// Test that we can start 2 nodes, stop one of them, then submit a transaction where both nodes
-	// are required verifiers. After the node is restarted the transaction should proceed.
+	// are required verifiers. While one node is offline we shouldn't get a receipt. After the node
+	// is restarted the transaction should proceed to completion.
 	ctx := context.Background()
 	domainRegistryAddress := deployDomainRegistry(t, "alice")
 
@@ -394,7 +395,7 @@ func TestTransactionSuccessIfOneRequiredVerifierStoppedDuringSubmission(t *testi
 	require.NoError(t, err)
 	assert.NotEqual(t, uuid.UUID{}, bobTx1ID)
 
-	// Check that we don't receive a receipt in the usual time
+	// Check that we don't receive a receipt in the usual time while alice's node is offline
 	assert.Never(t,
 		transactionReceiptCondition(t, ctx, bobTx1ID, bob.GetClient(), false),
 		transactionLatencyThreshold(t),
@@ -407,13 +408,127 @@ func TestTransactionSuccessIfOneRequiredVerifierStoppedDuringSubmission(t *testi
 		stopNode(t, alice)
 	})
 
-	// Check that we did receive a receipt in the usual time
+	// Check that we did receive a receipt once alice's node was restarted
 	customThreshold := 15 * time.Second
 	assert.Eventually(t,
 		transactionReceiptCondition(t, ctx, bobTx1ID, bob.GetClient(), false),
 		transactionLatencyThresholdCustom(t, &customThreshold),
 		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+}
+
+func TestTransactionResumesIfBothRequiredVerifiersAreStoppedBeforeCompletion(t *testing.T) {
+	// Test that we can start 2 nodes, stop one of them, then submit a transaction where both nodes
+	// are required verifiers. While one node is offline we shouldn't get a receipt. We then stop
+	// the remaining node so there are no active nodes. On restarting both, one should resume coordination
+	// and the transaction should be successful.
+	ctx := context.Background()
+	domainRegistryAddress := deployDomainRegistry(t, "alice")
+
+	alice := testutils.NewPartyForTesting(t, "alice", domainRegistryAddress)
+	bob := testutils.NewPartyForTesting(t, "bob", domainRegistryAddress)
+
+	alice.AddPeer(bob.GetNodeConfig())
+	bob.AddPeer(alice.GetNodeConfig())
+
+	domainConfig := &domains.SimpleDomainConfig{
+		SubmitMode: domains.ENDORSER_SUBMISSION,
+	}
+
+	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+
+	constructorParameters := &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken1",
+		Symbol:          "FT1",
+		EndorsementMode: domains.SelfEndorsement,
+	}
+
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	// Start a private transaction on alice's node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
+	var aliceTxID uuid.UUID
+	idempotencyKey := uuid.New().String()
+	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+                    "from": "",
+                    "to": "` + bob.GetIdentityLocator() + `",
+                    "amount": "123000000000000000000"
+                }`),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, aliceTxID, alice.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+
+	// Stop alice's node before submitting a transaction request to bob's node.
+	stopNode(t, alice)
+
+	// Start a private transaction on bob's node, TO alice's identifier. This can't proceed while her node is stopped.
+	var bobTx1ID uuid.UUID
+	idempotencyKey = uuid.New().String()
+	err = bob.GetClient().CallRPC(ctx, &bobTx1ID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-bob-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           bob.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+	                "from": "` + bob.GetIdentityLocator() + `",
+	                "to": "` + alice.GetIdentityLocator() + `",
+	                "amount": "123000000000000000000"
+	            }`),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, bobTx1ID)
+
+	// Check that we don't receive a receipt in the usual time while alice's node is offline
+	assert.Never(t,
+		transactionReceiptCondition(t, ctx, bobTx1ID, bob.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
 		"Transaction received a receipt that it shouldn't have",
+	)
+
+	// Now stop bob's node as well.
+	stopNode(t, bob)
+
+	// Restart both nodes
+	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+	t.Cleanup(func() {
+		stopNode(t, alice)
+		stopNode(t, bob)
+	})
+
+	// Check that we did receive a receipt once the nodes restarted. Allow a little
+	// more time for coordination selection etc.
+	// customThreshold := 3 * time.Second
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, bobTx1ID, bob.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
 	)
 }
 

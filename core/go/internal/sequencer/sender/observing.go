@@ -41,7 +41,7 @@ func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatRec
 			if dispatchedTransaction.LatestSubmissionHash != nil {
 				//if the dispatched transaction has a hash, then we can update our view of the transaction
 				txnSubmittedEvent := &transaction.SubmittedEvent{}
-				txnSubmittedEvent.BaseEvent.TransactionID = dispatchedTransaction.ID
+				txnSubmittedEvent.TransactionID = dispatchedTransaction.ID
 				txnSubmittedEvent.SignerAddress = dispatchedTransaction.Signer
 				txnSubmittedEvent.LatestSubmissionHash = *dispatchedTransaction.LatestSubmissionHash
 				if dispatchedTransaction.Nonce != nil {

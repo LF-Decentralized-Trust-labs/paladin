@@ -26,7 +26,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	engineProto "github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto/engine"
-	pb "github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto/engine"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
@@ -84,7 +83,7 @@ func (tw *transportWriter) SendDelegationRequest(
 		if err != nil {
 			log.L(ctx).Errorf("[Sequencer] error marshalling transaction message: %s", err)
 		}
-		delegationRequest := &pb.DelegationRequest{
+		delegationRequest := &engineProto.DelegationRequest{
 			// DelegationId:       delegationId,
 			TransactionId: transaction.ID.String(),
 			// DelegateNodeId:     delegateNodeId,
@@ -124,7 +123,7 @@ func (tw *transportWriter) SendDelegationRequestAcknowledgment(
 
 ) error {
 
-	delegationRequestAcknowledgment := &pb.DelegationRequestAcknowledgment{
+	delegationRequestAcknowledgment := &engineProto.DelegationRequestAcknowledgment{
 		DelegationId:    delegationId,
 		TransactionId:   transactionID,
 		DelegateNodeId:  delegateNodeName,
@@ -348,12 +347,12 @@ func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.U
 
 	postAssemblyBytes, err := json.Marshal(postAssembly)
 	if err != nil {
-		log.L(ctx).Error("[Sequencer] error marshalling postAssembly", err)
+		return err
 	}
 
 	preAssemblyBytes, err := json.Marshal(preAssembly)
 	if err != nil {
-		log.L(ctx).Error("[Sequencer] error marshalling preAssembly", err)
+		return err
 	}
 
 	assembleResponse := &engineProto.AssembleResponse{
@@ -365,7 +364,7 @@ func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.U
 	}
 	assembleResponseBytes, err := proto.Marshal(assembleResponse)
 	if err != nil {
-		log.L(ctx).Error("[Sequencer] error marshalling assemble response", err)
+		return err
 	}
 
 	err = tw.send(ctx, &components.FireAndForgetMessageSend{
@@ -384,8 +383,8 @@ func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.U
 
 func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) error {
 	if contractAddress == nil {
-		err := fmt.Errorf("Attempt to send handover request without specifying contract address")
-		log.L(ctx).Error(err.Error())
+		err := fmt.Errorf("attempt to send handover request without specifying contract address")
+		return err
 	}
 	handoverRequest := &HandoverRequest{
 		ContractAddress: contractAddress,
@@ -409,8 +408,8 @@ func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordi
 
 func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID, senderNode string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
 	if contractAddress == nil {
-		err := fmt.Errorf("Attempt to send nonce assigned event request without specifying contract address")
-		log.L(ctx).Error(err.Error())
+		err := fmt.Errorf("attempt to send nonce assigned event request without specifying contract address")
+		return err
 	}
 	nonceAssigned := &engineProto.NonceAssigned{
 		Id:              uuid.New().String(),
@@ -437,8 +436,8 @@ func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID
 
 func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
 	if contractAddress == nil {
-		err := fmt.Errorf("Attempt to send TX submitted event without specifying contract address")
-		log.L(ctx).Error(err.Error())
+		err := fmt.Errorf("attempt to send TX submitted event without specifying contract address")
+		return err
 	}
 	txSubmitted := &engineProto.TransactionSubmitted{
 		Id:              uuid.New().String(),
@@ -472,8 +471,8 @@ func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uu
 
 func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
 	if contractAddress == nil {
-		err := fmt.Errorf("Attempt to send TX submitted event without specifying contract address")
-		log.L(ctx).Error(err.Error())
+		err := fmt.Errorf("attempt to send TX submitted event without specifying contract address")
+		return err
 	}
 	txConfirmed := &engineProto.TransactionConfirmed{
 		Id:              uuid.New().String(),

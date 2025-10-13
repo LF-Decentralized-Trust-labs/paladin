@@ -26,7 +26,7 @@ import (
 func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 	if txn.latestAssembleRequest == nil {
 		//This should never happen unless there is a bug in the state machine logic
-		log.L(ctx).Errorf("[Sequencer] no assemble request found")
+		log.L(ctx).Errorf("no assemble request found")
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "No assemble request found")
 	}
 
@@ -38,7 +38,7 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 	// but from a flow of data perspective and the state machine logic, it _could_ be converted to async
 	postAssembly, err := txn.engineIntegration.AssembleAndSign(ctx, txn.ID, txn.PreAssembly, txn.latestAssembleRequest.stateLocksJSON, txn.latestAssembleRequest.coordinatorsBlockHeight)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] failed to assemble and sign transaction: %s", err)
+		log.L(ctx).Errorf("failed to assemble and sign transaction: %s", err)
 		//This should never happen but if it does, the most likely cause of failure is an error in the local domain code or state machine logic so best thing to abend the sender state machine
 		return err
 	}
@@ -54,11 +54,11 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 			PostAssembly: postAssembly,
 		})
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error handling AssembleAndSignSuccessEvent: %s", err)
+			log.L(ctx).Errorf("error handling AssembleAndSignSuccessEvent: %s", err)
 			return err
 		}
 	case prototk.AssembleTransactionResponse_REVERT:
-		log.L(ctx).Debugf("[Sequencer] emitting AssembleRevertEvent: %s", txn.ID.String())
+		log.L(ctx).Debugf("emitting AssembleRevertEvent: %s", txn.ID.String())
 		err = txn.eventHandler(ctx, &AssembleRevertEvent{
 			BaseEvent: BaseEvent{
 				TransactionID: txn.ID,
@@ -67,11 +67,11 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 			PostAssembly: postAssembly,
 		})
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error handling AssembleRevertEvent: %s", err)
+			log.L(ctx).Errorf("error handling AssembleRevertEvent: %s", err)
 			return err
 		}
 	case prototk.AssembleTransactionResponse_PARK:
-		log.L(ctx).Debugf("[Sequencer] emitting AssembleParkEvent: %s", txn.ID.String())
+		log.L(ctx).Debugf("emitting AssembleParkEvent: %s", txn.ID.String())
 		err = txn.eventHandler(ctx, &AssembleParkEvent{
 			BaseEvent: BaseEvent{
 				TransactionID: txn.ID,
@@ -80,7 +80,7 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 			PostAssembly: postAssembly,
 		})
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error handling AssembleParkEvent: %s", err)
+			log.L(ctx).Errorf("error handling AssembleParkEvent: %s", err)
 			return err
 		}
 	}
@@ -88,18 +88,15 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 }
 
 func action_SendAssembleRevertResponse(ctx context.Context, txn *Transaction) error {
-	log.L(ctx).Debugf("[Sequencer] sending assemble revert response for transaction %s to %s", txn.ID.String(), txn.currentDelegate)
-	txn.transportWriter.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
-	return nil
+	log.L(ctx).Debugf("sending assemble revert response for transaction %s to %s", txn.ID.String(), txn.currentDelegate)
+	return txn.transportWriter.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
 }
 func action_SendAssembleParkResponse(ctx context.Context, txn *Transaction) error {
-	log.L(ctx).Debugf("[Sequencer] sending assemble park response for transaction %s to %s", txn.ID.String(), txn.currentDelegate)
-	txn.transportWriter.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
-	return nil
+	log.L(ctx).Debugf("sending assemble park response for transaction %s to %s", txn.ID.String(), txn.currentDelegate)
+	return txn.transportWriter.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
 }
 
 func action_SendAssembleSuccessResponse(ctx context.Context, txn *Transaction) error {
-	log.L(ctx).Debugf("[Sequencer] sending assemble success response for transaction %s to %s", txn.ID.String(), txn.currentDelegate)
-	txn.transportWriter.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
-	return nil
+	log.L(ctx).Debugf("sending assemble success response for transaction %s to %s", txn.ID.String(), txn.currentDelegate)
+	return txn.transportWriter.SendAssembleResponse(ctx, txn.ID, txn.latestFulfilledAssembleRequestID, txn.PostAssembly, txn.PreAssembly, txn.currentDelegate)
 }

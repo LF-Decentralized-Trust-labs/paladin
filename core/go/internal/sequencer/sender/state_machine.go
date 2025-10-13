@@ -187,11 +187,10 @@ func (s *sender) ProcessEvent(ctx context.Context, event common.Event) error {
 
 // Queue a state machine event for the sequencer loop to process. Should be called by most Paladin components to ensure memory integrity of
 // sequencer state machine and transactions.
-func (s *sender) QueueEvent(ctx context.Context, event common.Event) error {
+func (s *sender) QueueEvent(ctx context.Context, event common.Event) {
 	log.L(ctx).Infof("Pushing sender event onto event queue: %s", event.TypeString())
 	s.senderEvents <- event
 	log.L(ctx).Infof("Pushed sender event onto event queue: %s", event.TypeString())
-	return nil
 }
 
 func (s *sender) SetActiveCoordinator(ctx context.Context, coordinator string) error {

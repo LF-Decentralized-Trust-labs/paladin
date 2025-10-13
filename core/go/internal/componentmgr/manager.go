@@ -393,11 +393,6 @@ func (cm *componentManager) StartManagers() (err error) {
 	}
 
 	if err == nil {
-		err = cm.sequencerManager.Start()
-		err = cm.addIfStarted("distributed_sequencer_manager", cm.sequencerManager, err, msgs.MsgComponentDistributedSequencerStartError)
-	}
-
-	if err == nil {
 		err = cm.txManager.Start()
 		err = cm.addIfStarted("tx_manager", cm.txManager, err, msgs.MsgComponentTxManagerStartError)
 	}
@@ -421,6 +416,14 @@ func (cm *componentManager) CompleteStart() error {
 	// Wait for the domain plugins to all start
 	err := cm.pluginManager.WaitForInit(cm.bgCtx, prototk.PluginInfo_DOMAIN)
 	err = cm.wrapIfErr(err, msgs.MsgComponentWaitPluginStartError)
+
+	// We need the domains to have initialised before we can use them in the sequencer
+	if err == nil {
+		err = cm.sequencerManager.Start()
+		err = cm.addIfStarted("sequencer_manager", cm.sequencerManager, err, msgs.MsgComponentDistributedSequencerStartError)
+	}
+
+	cm.sequencerManager.Start()
 
 	// then start the block indexer
 	if err == nil {

@@ -87,7 +87,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 		domainAPI, err = sMgr.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
 		if err != nil {
 			// Treat as a valid case, let the caller decide if it is or not
-			log.L(ctx).Infof("[Sequencer] no sequencer found for contract %s, assuming contract deploy: %s", contractAddr, err)
+			log.L(ctx).Infof("no sequencer found for contract %s, assuming contract deploy: %s", contractAddr, err)
 			return nil, nil
 		}
 	}
@@ -130,7 +130,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 
 			domainAPI, err := sMgr.components.DomainManager().GetSmartContractByAddress(ctx, sMgr.components.Persistence().NOTX(), contractAddr)
 			if err != nil {
-				log.L(ctx).Errorf("[Sequencer] failed to get domain API for contract %s: %s", contractAddr.String(), err)
+				log.L(ctx).Errorf("failed to get domain API for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
 
@@ -142,7 +142,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 
 			senderNodePool, err := sMgr.getInitialSenderNodePool(ctx, tx, domainAPI)
 			if err != nil {
-				log.L(ctx).Errorf("[Sequencer] failed to get transaction sender node pool for contract %s: %s", contractAddr.String(), err)
+				log.L(ctx).Errorf("failed to get transaction sender node pool for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
 
@@ -162,7 +162,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 
 			sender, err := sender.NewSender(sMgr.ctx, sMgr.nodeName, transportWriter, common.RealClock(), sMgr.engineIntegration, 10, &contractAddr, 15000, 10, sMgr.metrics)
 			if err != nil {
-				log.L(ctx).Errorf("[Sequencer] failed to create sequencer sender for contract %s: %s", contractAddr.String(), err)
+				log.L(ctx).Errorf("failed to create sequencer sender for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
 
@@ -256,7 +256,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 					hasPrivateTransaction := preparedTransaction.PreparedPrivateTransaction != nil
 					switch {
 					case preparedTransaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && hasPublicTransaction && !hasPrivateTransaction:
-						log.L(ctx).Infof("Result of transaction %s is a public transaction (gas=%d)", preparedTransaction.ID, *preparedTransaction.PreparedPublicTransaction.PublicTxOptions.Gas)
+						log.L(ctx).Infof("Result of transaction %s is a public transaction (gas=%d)", preparedTransaction.ID, *preparedTransaction.PreparedPublicTransaction.Gas)
 						publicTransactionsToSend = append(publicTransactionsToSend, preparedTransaction)
 						sequence.PrivateTransactionDispatches = append(sequence.PrivateTransactionDispatches, &syncpoints.DispatchPersisted{
 							PrivateTransactionID: t.ID.String(),
@@ -425,7 +425,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				// Get the best candidate for an initial coordinator, and use as the delegate for any originated transactions
 				err := sender.SetActiveCoordinator(sMgr.ctx, coordinator.GetActiveCoordinatorNode(sMgr.ctx))
 				if err != nil {
-					log.L(ctx).Errorf("[Sequencer] failed to set active coordinator for contract %s: %s", contractAddr.String(), err)
+					log.L(ctx).Errorf("failed to set active coordinator for contract %s: %s", contractAddr.String(), err)
 				}
 			}
 
@@ -466,7 +466,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 
 // Must be called within the sequencer's write lock
 func (sMgr *sequencerManager) stopLowestPrioritySequencer(ctx context.Context) {
-	log.L(ctx).Debugf("[Sequencer] max concurrent sequencers reached, stopping lowest priority sequencer")
+	log.L(ctx).Debugf("max concurrent sequencers reached, stopping lowest priority sequencer")
 	if len(sMgr.sequencers) != 0 {
 		// If any sequencers are already closing we can wait for them to close instead of stopping a different one
 		for _, sequencer := range sMgr.sequencers {
@@ -477,7 +477,7 @@ func (sMgr *sequencerManager) stopLowestPrioritySequencer(ctx context.Context) {
 				// we don't wait for the closing ones to complete. The aim is to allow the node to remain stable while
 				// still being responsive to new contract activity so a closing sequencer is allowed to page out in its
 				// own time.
-				log.L(ctx).Debugf("[Sequencer] coordinator %s is closing, waiting for it to close", sequencer.contractAddress)
+				log.L(ctx).Debugf("coordinator %s is closing, waiting for it to close", sequencer.contractAddress)
 				return
 			} else if sequencer.coordinator.GetCurrentState() == coordinator.State_Idle ||
 				sequencer.coordinator.GetCurrentState() == coordinator.State_Observing {
@@ -522,19 +522,19 @@ func (sMgr *sequencerManager) updateActiveCoordinators(ctx context.Context) {
 	activeCoordinators := 0
 	// If any sequencers are already closing we can wait for them to close instead of stopping a different one
 	for _, sequencer := range sMgr.sequencers {
-		log.L(ctx).Debugf("[Sequencer] coordinator %s state %s", sequencer.contractAddress, sequencer.coordinator.GetCurrentState())
+		log.L(ctx).Debugf("coordinator %s state %s", sequencer.contractAddress, sequencer.coordinator.GetCurrentState())
 		if sequencer.coordinator.GetCurrentState() == coordinator.State_Active {
-			log.L(ctx).Debugf("[Sequencer] coordinator %s is active", sequencer.contractAddress)
+			log.L(ctx).Debugf("coordinator %s is active", sequencer.contractAddress)
 			activeCoordinators++
 		}
 	}
 
 	sMgr.metrics.SetActiveCoordinators(activeCoordinators)
 
-	log.L(ctx).Debugf("[Sequencer] %d coordinators currently active", activeCoordinators)
+	log.L(ctx).Debugf("%d coordinators currently active", activeCoordinators)
 
 	if activeCoordinators >= sMgr.targetActiveCoordinatorsLimit {
-		log.L(ctx).Debugf("[Sequencer] max concurrent coordinators reached, asking the lowest priority coordinator to hand over to another node")
+		log.L(ctx).Debugf("max concurrent coordinators reached, asking the lowest priority coordinator to hand over to another node")
 		// Order existing sequencers by LRU time
 		sequencers := make([]*sequencer, 0)
 		for _, sequencer := range sMgr.sequencers {

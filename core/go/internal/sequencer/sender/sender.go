@@ -34,7 +34,7 @@ import (
 type SeqSender interface {
 	// Asynchronously update the state machine by queueing an event to be processed. Most
 	// callers should use this interface.
-	QueueEvent(ctx context.Context, event common.Event) error
+	QueueEvent(ctx context.Context, event common.Event)
 
 	// Synchronously update the state machine by processing this event. Primarily used for testing the state machine.
 	ProcessEvent(ctx context.Context, event common.Event) error

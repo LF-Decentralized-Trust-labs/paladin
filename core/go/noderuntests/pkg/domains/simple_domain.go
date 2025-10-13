@@ -474,11 +474,11 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 			// We have 2 transfer(...) functions - one which takes just 3 params, the other takes a 4th for an origin TX ID for basic chained TX testing. Check
 			// the transfer TX input is for one of these 2 functions.
 			var txABI interface{}
-			json.Unmarshal([]byte(tx.FunctionAbiJson), &txABI)
+			_ = json.Unmarshal([]byte(tx.FunctionAbiJson), &txABI)
 			var simpleTokenABI interface{}
-			json.Unmarshal([]byte(simpleTokenTransferABI), &simpleTokenABI)
+			_ = json.Unmarshal([]byte(simpleTokenTransferABI), &simpleTokenABI)
 			var simpleTokenWithOriginTXABI interface{}
-			json.Unmarshal([]byte(simpleTokenTransferWithOriginTXABI), &simpleTokenWithOriginTXABI)
+			_ = json.Unmarshal([]byte(simpleTokenTransferWithOriginTXABI), &simpleTokenWithOriginTXABI)
 
 			assert.True(t, reflect.DeepEqual(txABI, simpleTokenABI) || reflect.DeepEqual(txABI, simpleTokenWithOriginTXABI))
 			assert.True(t,

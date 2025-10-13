@@ -103,12 +103,12 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 		}
 
 		// Add it to the right list
-		if nodeName == sd.StateDistributionSet.LocalNode {
+		if nodeName == sd.LocalNode {
 			log.L(ctx).Debugf("new state %s will be written locally for recipient %s hasNullifier=%t", fullState.ID, recipient, matchedNullifier != nil)
-			sd.StateDistributionSet.Local = append(sd.StateDistributionSet.Local, distribution)
+			sd.Local = append(sd.Local, distribution)
 		} else {
 			log.L(ctx).Debugf("new state %s will be written distributed to recipient %s hasNullifier=%t", fullState.ID, recipient, matchedNullifier != nil)
-			sd.StateDistributionSet.Remote = append(sd.StateDistributionSet.Remote, distribution)
+			sd.Remote = append(sd.Remote, distribution)
 		}
 	}
 
@@ -136,7 +136,7 @@ func (sd *stateDistributionBuilder) Build(ctx context.Context, txn *components.P
 
 	// This code depends on the fact we ensure this gets fully qualified as the transaction comes into the system,
 	// on the sending node. So as the transaction flows around everyone knows who the originating node is.
-	sd.StateDistributionSet.SenderNode, err = pldtypes.PrivateIdentityLocator(tx.PreAssembly.TransactionSpecification.From).Node(ctx, false)
+	sd.SenderNode, err = pldtypes.PrivateIdentityLocator(tx.PreAssembly.TransactionSpecification.From).Node(ctx, false)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrFromNotResolvedDistroTime)
 	}

@@ -155,7 +155,7 @@ func NewInstanceForTesting(t *testing.T, domainRegistryAddress *pldtypes.EthAddr
 	}
 
 	i.conf.BlockIndexer.FromBlock = json.RawMessage(`"latest"`)
-	i.conf.DomainManagerConfig.Domains = make(map[string]*pldconf.DomainConfig, 1)
+	i.conf.Domains = make(map[string]*pldconf.DomainConfig, 1)
 	if domainConfig == nil {
 		domainConfig = &domains.SimpleDomainConfig{
 			SubmitMode: domains.ENDORSER_SUBMISSION,
@@ -164,7 +164,7 @@ func NewInstanceForTesting(t *testing.T, domainRegistryAddress *pldtypes.EthAddr
 
 	switch domainConfig := domainConfig.(type) {
 	case *domains.SimpleDomainConfig:
-		i.conf.DomainManagerConfig.Domains["domain1"] = &pldconf.DomainConfig{
+		i.conf.Domains["domain1"] = &pldconf.DomainConfig{
 			AllowSigning: true,
 			Plugin: pldconf.PluginConfig{
 				Type:    string(pldtypes.LibraryTypeCShared),
@@ -179,7 +179,7 @@ func NewInstanceForTesting(t *testing.T, domainRegistryAddress *pldtypes.EthAddr
 		for i, peerNode := range peerNodes {
 			endorsementSet[i+1] = peerNode.(*nodeConfiguration).name
 		}
-		i.conf.DomainManagerConfig.Domains["simpleStorageDomain"] = &pldconf.DomainConfig{
+		i.conf.Domains["simpleStorageDomain"] = &pldconf.DomainConfig{
 			AllowSigning: true,
 			Plugin: pldconf.PluginConfig{
 				Type:    string(pldtypes.LibraryTypeCShared),
@@ -304,9 +304,9 @@ func initPostgres(t *testing.T, ctx context.Context, nodeName string) (dns strin
 
 	// First create the database - using the super user
 	adminDB, err := sql.Open("postgres", dbDSN("postgres"))
+	require.NoError(t, err)
 	// Check if the database already exists
 	res, err := adminDB.Query(fmt.Sprintf(`SELECT 1 FROM pg_database WHERE datname = '%s';`, componentTestdbName))
-
 	require.NoError(t, err)
 
 	if res != nil && res.Next() {
@@ -329,6 +329,7 @@ func initPostgres(t *testing.T, ctx context.Context, nodeName string) (dns strin
 
 	if err == nil {
 		err = adminDB.Close()
+		require.NoError(t, err)
 	}
 
 	// If we created the database to run the tests, delete it at the end
@@ -407,7 +408,7 @@ func testConfig(t *testing.T, enableWS bool, configPath string) (pldconf.Paladin
 
 	conf.Log.Level = confutil.P("info")
 
-	conf.TransportManagerConfig.ReliableMessageWriter.BatchMaxSize = confutil.P(1)
+	conf.ReliableMessageWriter.BatchMaxSize = confutil.P(1)
 
 	// Postgres config typically passes in a fixed seed so re-runs against the same DB
 	// use consistent signing keys. Sqlite in-memory config typically relies on a random
@@ -459,7 +460,7 @@ func buildTestCertificate(t *testing.T, subject pkix.Name, ca *x509.Certificate,
 	// Create an X509 certificate pair
 	privatekey, _ := rsa.GenerateKey(rand.Reader, 1024 /* smallish key to make the test faster */)
 	publickey := &privatekey.PublicKey
-	var privateKeyBytes []byte = x509.MarshalPKCS1PrivateKey(privatekey)
+	var privateKeyBytes = x509.MarshalPKCS1PrivateKey(privatekey)
 	privateKeyBlock := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privateKeyBytes}
 	privateKeyPEM := &strings.Builder{}
 	err := pem.Encode(privateKeyPEM, privateKeyBlock)

@@ -256,11 +256,10 @@ func (c *coordinator) ProcessEvent(ctx context.Context, event common.Event) erro
 
 // Queue a state machine event for the sequencer loop to process. Should be called by most Paladin components to ensure memory integrity of
 // sequencer state machine and transactions.
-func (c *coordinator) QueueEvent(ctx context.Context, event common.Event) error {
+func (c *coordinator) QueueEvent(ctx context.Context, event common.Event) {
 	log.L(ctx).Infof("[Sequencer] coordinator pushing event onto event queue: %s", event.TypeString())
 	c.coordinatorEvents <- event
 	log.L(ctx).Infof("[Sequencer] coordinator pushed event onto event queue: %s", event.TypeString())
-	return nil
 }
 
 // Function evaluateEvent evaluates whether the event is relevant given the current state of the coordinator

@@ -68,8 +68,9 @@ type SequencerManager interface {
 	ManagerLifecycle
 	TransportClient
 
-	// Synchronous functions to submit a new private transaction
+	// Synchronous functions to submit a new private transaction or resume an in-progress one
 	HandleNewTx(ctx context.Context, dbTX persistence.DBTX, tx *ValidatedTransaction) error
+	HandleTxResume(ctx context.Context, tx *ValidatedTransaction) error
 
 	// Synchronous function to call an existing deployed smart contract
 	CallPrivateSmartContract(ctx context.Context, call *ResolvedTransaction) (*abi.ComponentValue, error)

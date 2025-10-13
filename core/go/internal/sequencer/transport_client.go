@@ -27,7 +27,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator"
 	coordTransaction "github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 	senderTransaction "github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	engineProto "github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto/engine"
@@ -141,7 +140,7 @@ func (sMgr *sequencerManager) handleAssembleRequest(ctx context.Context, message
 		return
 	}
 
-	assembleRequestEvent := &transaction.AssembleRequestReceivedEvent{}
+	assembleRequestEvent := &senderTransaction.AssembleRequestReceivedEvent{}
 	assembleRequestEvent.TransactionID = uuid.MustParse(assembleRequest.TransactionId)
 	assembleRequestEvent.RequestID = uuid.MustParse(assembleRequest.AssembleRequestId)
 	assembleRequestEvent.Coordinator = seq.GetCoordinator().GetActiveCoordinatorNode(ctx)
@@ -245,7 +244,7 @@ func (sMgr *sequencerManager) handleAssembleError(ctx context.Context, message *
 		return
 	}
 
-	assembleErrorEvent := &transaction.AssembleErrorEvent{}
+	assembleErrorEvent := &senderTransaction.AssembleErrorEvent{}
 	assembleErrorEvent.TransactionID = uuid.MustParse(assembleError.TransactionId)
 	assembleErrorEvent.EventTime = time.Now()
 
@@ -343,7 +342,7 @@ func (sMgr *sequencerManager) handlePreDispatchRequest(ctx context.Context, mess
 
 	postAssemblyHash := pldtypes.NewBytes32FromSlice(preDispatchRequest.PostAssembleHash)
 
-	preDispatchRequestReceivedEvent := &transaction.PreDispatchRequestReceivedEvent{
+	preDispatchRequestReceivedEvent := &senderTransaction.PreDispatchRequestReceivedEvent{
 		RequestID:        uuid.MustParse(preDispatchRequest.Id),
 		Coordinator:      message.FromNode,
 		PostAssemblyHash: &postAssemblyHash,
@@ -476,7 +475,7 @@ func (sMgr *sequencerManager) handleDelegationRequestAcknowledgment(ctx context.
 	}
 
 	// MRW TODO - is any action required here?
-	log.L(ctx).Infof("[Sequencer] handleDelegationRequestAcknowledgment received for transaction ID %s", delegationRequestAcknowledgment.TransactionId)
+	log.L(ctx).Infof("handleDelegationRequestAcknowledgment received for transaction ID %s", delegationRequestAcknowledgment.TransactionId)
 }
 
 func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, message *components.ReceivedMessage) {
@@ -495,14 +494,14 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 
 	psc, err := sMgr.components.DomainManager().GetSmartContractByAddress(ctx, sMgr.components.Persistence().NOTX(), *contractAddress)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to get domain for endorsement request: %s", err)
+		log.L(ctx).Errorf("handleEndorsementRequest failed to get domain for endorsement request: %s", err)
 		return
 	}
 
 	transactionSpecification := &prototk.TransactionSpecification{}
 	err = proto.Unmarshal(endorsementRequest.TransactionSpecification.Value, transactionSpecification)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to unmarshal transaction specification for endorsement request: %s", err)
+		log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal transaction specification for endorsement request: %s", err)
 		return
 	}
 	log.L(ctx).Debugf("Unmarshalled transaction specification: %+v", transactionSpecification)
@@ -524,7 +523,7 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 		nextSignature := &prototk.AttestationResult{}
 		err = proto.Unmarshal(s.Value, nextSignature)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to unmarshal signature %s for endorsement request: %s", s.String(), err)
+			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal signature %s for endorsement request: %s", s.String(), err)
 			return
 		}
 		transactionSignatures[i] = nextSignature
@@ -535,7 +534,7 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 		nextState := &prototk.EndorsableState{}
 		err = proto.Unmarshal(s.Value, nextState)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to unmarshal input state %s for endorsement request: %s", s.String(), err)
+			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal input state %s for endorsement request: %s", s.String(), err)
 			return
 		}
 		transactionInputStates[i] = nextState
@@ -546,7 +545,7 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 		nextState := &prototk.EndorsableState{}
 		err = proto.Unmarshal(s.Value, nextState)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to unmarshal read state %s for endorsement request: %s", s.String(), err)
+			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal read state %s for endorsement request: %s", s.String(), err)
 			return
 		}
 		transactionReadStates[i] = nextState
@@ -557,19 +556,19 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 		nextState := &prototk.EndorsableState{}
 		err = proto.Unmarshal(s.Value, nextState)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to unmarshal output state %s for endorsement request: %s", s.String(), err)
+			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal output state %s for endorsement request: %s", s.String(), err)
 			return
 		}
 		transactionOutputStates[i] = nextState
 	}
 
 	transactionInfoStates := make([]*prototk.EndorsableState, len(endorsementRequest.InfoStates))
-	log.L(ctx).Debugf("[Sequencer] number of transaction info states: %+v", len(endorsementRequest.InfoStates))
+	log.L(ctx).Debugf("number of transaction info states: %+v", len(endorsementRequest.InfoStates))
 	for i, s := range endorsementRequest.InfoStates {
 		nextState := &prototk.EndorsableState{}
 		err = proto.Unmarshal(s.Value, nextState)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to unmarshal info state %s for endorsement request: %s", s.String(), err)
+			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal info state %s for endorsement request: %s", s.String(), err)
 			return
 		}
 		transactionInfoStates[i] = nextState
@@ -578,20 +577,20 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 	transactionEndorsement := &prototk.AttestationRequest{}
 	err = proto.Unmarshal(endorsementRequest.AttestationRequest.Value, transactionEndorsement)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to unmarshal endorsement request: %s", err)
+		log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal endorsement request: %s", err)
 		return
 	}
 
 	unqualifiedLookup, err := pldtypes.PrivateIdentityLocator(endorsementRequest.Party).Identity(ctx)
 	if err != nil {
-		errorMessage := fmt.Sprintf("[Sequencer] failed to parse lookup key for party %s : %s", endorsementRequest.Party, err)
+		errorMessage := fmt.Sprintf("failed to parse lookup key for party %s : %s", endorsementRequest.Party, err)
 		log.L(ctx).Error(errorMessage)
 		return
 	}
 
 	resolvedSigner, err := sMgr.components.KeyManager().ResolveKeyNewDatabaseTX(ctx, unqualifiedLookup, transactionEndorsement.Algorithm, transactionEndorsement.VerifierType)
 	if err != nil {
-		errorMessage := fmt.Sprintf("[Sequencer] failed to resolve key for party %s", endorsementRequest.Party)
+		errorMessage := fmt.Sprintf("failed to resolve key for party %s", endorsementRequest.Party)
 		log.L(ctx).Error(errorMessage)
 		return
 	}
@@ -606,9 +605,9 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 	privateEndorsementRequest.InfoStates = transactionInfoStates
 
 	// Log private endorsement info states length
-	log.L(ctx).Debugf("[Sequencer] private endorsement info states length: %+v", len(privateEndorsementRequest.InfoStates))
+	log.L(ctx).Debugf("private endorsement info states length: %+v", len(privateEndorsementRequest.InfoStates))
 	for _, state := range privateEndorsementRequest.InfoStates {
-		log.L(ctx).Debugf("[Sequencer] private endorsement info state: %+v", state)
+		log.L(ctx).Debugf("private endorsement info state: %+v", state)
 	}
 
 	privateEndorsementRequest.Endorsement = transactionEndorsement
@@ -690,7 +689,11 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 	}
 
 	sMgr.metrics.IncEndorsedTransactions()
-	seq.GetTransportWriter().SendEndorsementResponse(ctx, endorsementRequest.TransactionId, endorsementRequest.IdempotencyKey, contractAddress.String(), attResult, endorsementResult, revertReason, transactionEndorsement.Name, endorsementRequest.Party, message.FromNode)
+	err = seq.GetTransportWriter().SendEndorsementResponse(ctx, endorsementRequest.TransactionId, endorsementRequest.IdempotencyKey, contractAddress.String(), attResult, endorsementResult, revertReason, transactionEndorsement.Name, endorsementRequest.Party, message.FromNode)
+	if err != nil {
+		log.L(ctx).Errorf("handleEndorsementRequest failed to send endorsement response: %s", err)
+		return
+	}
 }
 
 func (sMgr *sequencerManager) handleEndorsementResponse(ctx context.Context, message *components.ReceivedMessage) {
@@ -709,17 +712,17 @@ func (sMgr *sequencerManager) handleEndorsementResponse(ctx context.Context, mes
 	endorsement := &prototk.AttestationResult{}
 	err = proto.Unmarshal(endorsementResponse.Endorsement.Value, endorsement)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] handleEndorsementResponse failed to unmarshal endorsement: %s", err)
+		log.L(ctx).Errorf("handleEndorsementResponse failed to unmarshal endorsement: %s", err)
 		return
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] handleEndorsementRequest failed to obtain sequencer to pass endorsement event %v:", err)
+		log.L(ctx).Errorf("handleEndorsementRequest failed to obtain sequencer to pass endorsement event %v:", err)
 		return
 	}
 	if seq == nil {
-		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -747,11 +750,11 @@ func (sMgr *sequencerManager) handleNonceAssigned(ctx context.Context, message *
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] handleNonceAssignedEvent failed to obtain sequencer to pass nonce assigned event %v:", err)
+		log.L(ctx).Errorf("handleNonceAssignedEvent failed to obtain sequencer to pass nonce assigned event %v:", err)
 		return
 	}
 	if seq == nil {
-		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -778,11 +781,11 @@ func (sMgr *sequencerManager) handleTransactionSubmitted(ctx context.Context, me
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] handleTransactionSubmitted failed to obtain sequencer to pass transaction submitted event %v:", err)
+		log.L(ctx).Errorf("handleTransactionSubmitted failed to obtain sequencer to pass transaction submitted event %v:", err)
 		return
 	}
 	if seq == nil {
-		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -809,11 +812,11 @@ func (sMgr *sequencerManager) handleTransactionConfirmed(ctx context.Context, me
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] handleTransactionSubmitted failed to obtain sequencer to pass transaction submitted event %v:", err)
+		log.L(ctx).Errorf("handleTransactionSubmitted failed to obtain sequencer to pass transaction submitted event %v:", err)
 		return
 	}
 	if seq == nil {
-		log.L(ctx).Errorf("[Sequencer] no sequencer found for contract %s", contractAddress.String())
+		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 

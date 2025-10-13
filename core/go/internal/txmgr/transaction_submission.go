@@ -532,8 +532,6 @@ func (tm *txManager) processNewTransactions(ctx context.Context, dbTX persistenc
 		}
 	}
 
-	// TODO: Integrate with private TX manager persistence when available, as it will follow the
-	// same pattern as public transactions above
 	for _, txi := range txis {
 		if txi.Transaction.Type.V() == pldapi.TransactionTypePrivate {
 			if err := tm.sequencerMgr.HandleNewTx(ctx, dbTX, txi); err != nil {

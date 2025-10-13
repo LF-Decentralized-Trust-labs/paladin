@@ -64,6 +64,12 @@ packages:
       dir: "{{.InterfaceDir}}"
       pkgname: "{{.SrcPackageName}}"
       structname: "Mock{{.InterfaceName}}"
+  github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator:
+    config:
+      all: true
+      dir: "{{.InterfaceDir}}"
+      pkgname: "{{.SrcPackageName}}"
+      structname: "Mock{{.InterfaceName}}"
   github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport:
     config:
       all: true

@@ -316,20 +316,9 @@ func (_c *MockSeqCoordinator_ProcessEvent_Call) RunAndReturn(run func(ctx contex
 }
 
 // QueueEvent provides a mock function for the type MockSeqCoordinator
-func (_mock *MockSeqCoordinator) QueueEvent(ctx context.Context, event common.Event) error {
-	ret := _mock.Called(ctx, event)
-
-	if len(ret) == 0 {
-		panic("no return value specified for QueueEvent")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, common.Event) error); ok {
-		r0 = returnFunc(ctx, event)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
+func (_mock *MockSeqCoordinator) QueueEvent(ctx context.Context, event common.Event) {
+	_mock.Called(ctx, event)
+	return
 }
 
 // MockSeqCoordinator_QueueEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueueEvent'
@@ -362,13 +351,13 @@ func (_c *MockSeqCoordinator_QueueEvent_Call) Run(run func(ctx context.Context, 
 	return _c
 }
 
-func (_c *MockSeqCoordinator_QueueEvent_Call) Return(err error) *MockSeqCoordinator_QueueEvent_Call {
-	_c.Call.Return(err)
+func (_c *MockSeqCoordinator_QueueEvent_Call) Return() *MockSeqCoordinator_QueueEvent_Call {
+	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockSeqCoordinator_QueueEvent_Call) RunAndReturn(run func(ctx context.Context, event common.Event) error) *MockSeqCoordinator_QueueEvent_Call {
-	_c.Call.Return(run)
+func (_c *MockSeqCoordinator_QueueEvent_Call) RunAndReturn(run func(ctx context.Context, event common.Event)) *MockSeqCoordinator_QueueEvent_Call {
+	_c.Run(run)
 	return _c
 }
 
