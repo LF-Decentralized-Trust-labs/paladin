@@ -76,7 +76,7 @@ func (r *SentMessageRecorder) SendDelegationRequestAcknowledgment(ctx context.Co
 	return nil
 }
 
-func (r *SentMessageRecorder) SendEndorsementRequest(ctx context.Context, transactionId uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error {
+func (r *SentMessageRecorder) SendEndorsementRequest(ctx context.Context, transactionId uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, readStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error {
 	return nil
 }
 

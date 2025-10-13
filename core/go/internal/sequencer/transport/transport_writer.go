@@ -17,7 +17,6 @@ package transport
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -37,7 +36,7 @@ import (
 type TransportWriter interface {
 	SendDelegationRequest(ctx context.Context, coordinatorLocator string, transactions []*components.PrivateTransaction, blockHeight uint64) error
 	SendDelegationRequestAcknowledgment(ctx context.Context, delegatingNodeName string, delegationId string, delegateNodeName string, transactionID string) error
-	SendEndorsementRequest(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error
+	SendEndorsementRequest(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, readStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error
 	SendEndorsementResponse(ctx context.Context, transactionId, idempotencyKey, contractAddress string, attResult *prototk.AttestationResult, endorsementResult *components.EndorsementResult, revertReason, endorsementName, party, node string) error
 	SendAssembleRequest(ctx context.Context, assemblingNode string, txID uuid.UUID, idempotencyId uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error
 	SendAssembleResponse(ctx context.Context, txID uuid.UUID, assembleRequestId uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string) error
@@ -74,14 +73,12 @@ func (tw *transportWriter) SendDelegationRequest(
 	transactions []*components.PrivateTransaction,
 	blockHeight uint64,
 ) error {
-	log.L(ctx).Infof("[Sequencer] SendDelegationRequest coordinator locator: %s", coordinatorLocator)
-	log.L(ctx).Infof("[Sequencer] SendDelegationRequest - we currently have %d transactions to handle", len(transactions))
 	for _, transaction := range transactions {
 
 		transactionBytes, err := json.Marshal(transaction)
 
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error marshalling transaction message: %s", err)
+			log.L(ctx).Errorf("error marshalling transaction message: %s", err)
 		}
 		delegationRequest := &engineProto.DelegationRequest{
 			// DelegationId:       delegationId,
@@ -92,7 +89,7 @@ func (tw *transportWriter) SendDelegationRequest(
 		}
 		delegationRequestBytes, err := proto.Marshal(delegationRequest)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error marshalling delegationRequest  message: %s", err)
+			log.L(ctx).Errorf("error marshalling delegationRequest  message: %s", err)
 		}
 
 		parts := strings.Split(coordinatorLocator, "@")
@@ -108,7 +105,7 @@ func (tw *transportWriter) SendDelegationRequest(
 			Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 			Node:        node,
 		}); err != nil {
-			log.L(ctx).Errorf("[Sequencer] error sending delegationRequest message: %s", err)
+			log.L(ctx).Errorf("error sending delegationRequest message: %s", err)
 		}
 	}
 	return nil
@@ -131,7 +128,7 @@ func (tw *transportWriter) SendDelegationRequestAcknowledgment(
 	}
 	delegationRequestAcknowledgmentBytes, err := proto.Marshal(delegationRequestAcknowledgment)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error marshalling delegationRequestAcknowledgment  message: %s", err)
+		log.L(ctx).Errorf("error marshalling delegationRequestAcknowledgment  message: %s", err)
 		return err
 	}
 
@@ -146,49 +143,37 @@ func (tw *transportWriter) SendDelegationRequestAcknowledgment(
 	return nil
 }
 
-func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState {
-	endorsableList := make([]*prototk.EndorsableState, len(states))
-	for i, input := range states {
-		endorsableList[i] = &prototk.EndorsableState{
-			Id:            input.ID.String(),
-			SchemaId:      input.Schema.String(),
-			StateDataJson: string(input.Data),
-		}
-	}
-	return endorsableList
-}
-
 // TODO do we have duplication here?  contractAddress and transactionID are in the transactionSpecification
-func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error {
+func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, readStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error {
 	attRequestAny, err := anypb.New(attRequest)
 	if err != nil {
-		log.L(ctx).Error("[Sequencer] error marshalling attestation request", err)
+		log.L(ctx).Error("error marshalling attestation request", err)
 		return err
 	}
 
 	transactionSpecificationAny, err := anypb.New(transactionSpecification)
 	if err != nil {
-		log.L(ctx).Error("[Sequencer] error marshalling transaction specification", err)
+		log.L(ctx).Error("error marshalling transaction specification", err)
 		return err
 	}
 
-	log.L(ctx).Infof("[Sequencer] sending endorsement request with %d verifiers", len(verifiers))
+	log.L(ctx).Debug("sending endorsement request with %d verifiers", len(verifiers))
 	verifiersAny := make([]*anypb.Any, len(verifiers))
 	for i, verifier := range verifiers {
-		log.L(ctx).Debugf("[Sequencer] marshalling endorsement requestverifier %s", verifier.String())
+		log.L(ctx).Debugf("marshalling endorsement requestverifier %s", verifier.String())
 		verifierAny, err := anypb.New(verifier)
 		if err != nil {
-			log.L(ctx).Error("[Sequencer] error marshalling verifier", err)
+			log.L(ctx).Error("error marshalling verifier", err)
 			return err
 		}
 		verifiersAny[i] = verifierAny
 	}
 	signaturesAny := make([]*anypb.Any, len(signatures))
 	for i, signature := range signatures {
-		log.L(ctx).Debugf("[Sequencer] marshalling endorsement signature %s", signature.String())
+		log.L(ctx).Debugf("marshalling endorsement signature %s", signature.String())
 		signatureAny, err := anypb.New(signature)
 		if err != nil {
-			log.L(ctx).Error("[Sequencer] error marshalling signature", err)
+			log.L(ctx).Error("error marshalling signature", err)
 			return err
 		}
 		signaturesAny[i] = signatureAny
@@ -196,39 +181,49 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, txID uuid
 
 	inputStatesAny := make([]*anypb.Any, len(inputStates))
 	for i, inputState := range inputStates {
-		log.L(ctx).Debugf("[Sequencer] marshalling endorsement inputState %s", inputState.String())
+		log.L(ctx).Debugf("marshalling endorsement inputState %s", inputState.String())
 		inputStateAny, err := anypb.New(inputState)
 		if err != nil {
-			log.L(ctx).Error("[Sequencer] error marshalling input state", err)
-			//TODO return nil, err
+			log.L(ctx).Error("error marshalling input state", err)
+			return err
 		}
 		inputStatesAny[i] = inputStateAny
+	}
+
+	readStatesAny := make([]*anypb.Any, len(readStates))
+	for i, readState := range readStates {
+		readStateAny, err := anypb.New(readState)
+		if err != nil {
+			log.L(ctx).Error("Error marshalling read state", err)
+			return err
+		}
+		readStatesAny[i] = readStateAny
 	}
 
 	outputStatesAny := make([]*anypb.Any, len(outputStates))
 	for i, outputState := range outputStates {
 		outputStateAny, err := anypb.New(outputState)
 		if err != nil {
-			log.L(ctx).Error("[Sequencer] error marshalling output state", err)
+			log.L(ctx).Error("error marshalling output state", err)
 			return err
 		}
 		outputStatesAny[i] = outputStateAny
 	}
 
 	infoStatesAny := make([]*anypb.Any, len(infoStates))
-	log.L(ctx).Debugf("[Sequencer] sending endorse request with %+v info states", len(infoStates))
+	log.L(ctx).Debugf("sending endorse request with %+v info states", len(infoStates))
 	for i, infoState := range infoStates {
 		infoStateAny, err := anypb.New(infoState)
 		if err != nil {
-			log.L(ctx).Error("[Sequencer] error marshalling output state", err)
+			log.L(ctx).Error("error marshalling output state", err)
 			return err
 		}
 		infoStatesAny[i] = infoStateAny
 	}
 
-	log.L(ctx).Debugf("[Sequencer] tw contract address %s, tx spec contract address %s", tw.contractAddress.HexString(), transactionSpecification.ContractInfo.ContractAddress)
+	log.L(ctx).Debugf("tw contract address %s, tx spec contract address %s", tw.contractAddress.HexString(), transactionSpecification.ContractInfo.ContractAddress)
 
-	log.L(ctx).Debugf("[Sequencer] sending endorse request with TX ID %+v", transactionSpecification.TransactionId)
+	log.L(ctx).Debugf("sending endorse request with TX ID %+v", transactionSpecification.TransactionId)
 	endorsementRequest := &engineProto.EndorsementRequest{
 		IdempotencyKey:           idempotencyKey.String(),
 		ContractAddress:          transactionSpecification.ContractInfo.ContractAddress,
@@ -245,7 +240,7 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, txID uuid
 
 	endorsementRequestBytes, err := proto.Marshal(endorsementRequest)
 	if err != nil {
-		log.L(ctx).Error("[Sequencer] error marshalling endorsement request", err)
+		log.L(ctx).Error("error marshalling endorsement request", err)
 		return err
 	}
 
@@ -274,7 +269,7 @@ func (tw *transportWriter) SendEndorsementResponse(ctx context.Context, transact
 
 	attResultAny, err := anypb.New(attResult)
 	if err != nil {
-		log.L(ctx).Error("[Sequencer] error marshalling transaction specification", err)
+		log.L(ctx).Error("error marshalling transaction specification", err)
 		return err
 	}
 	endorsementResponse.Endorsement = attResultAny
@@ -286,7 +281,7 @@ func (tw *transportWriter) SendEndorsementResponse(ctx context.Context, transact
 
 	endorsementResponseBytes, err := proto.Marshal(endorsementResponse)
 	if err != nil {
-		log.L(ctx).Error("[Sequencer] error marshalling endorsement response", err)
+		log.L(ctx).Error("error marshalling endorsement response", err)
 	}
 
 	payload := &components.FireAndForgetMessageSend{
@@ -304,11 +299,11 @@ func (tw *transportWriter) SendEndorsementResponse(ctx context.Context, transact
 // MRW TODO - why are there no state locks passed in to here?
 func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNode string, txID uuid.UUID, idempotencyId uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error {
 
-	log.L(ctx).Infof("[Sequencer] transport writer attempting to send assemble request to assembling node %s", assemblingNode)
+	log.L(ctx).Debugf("transport writer attempting to send assemble request to assembling node %s", assemblingNode)
 
 	preAssemblyBytes, err := json.Marshal(preAssembly)
 	if err != nil {
-		log.L(ctx).Error("[Sequencer] error marshalling preassembly", err)
+		log.L(ctx).Error("error marshalling preassembly", err)
 		return err
 	}
 
@@ -320,14 +315,10 @@ func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNo
 		StateLocks:        stateLocksJSON,
 		BlockHeight:       blockHeight,
 	}
-	log.L(ctx).Infof("[Sequencer] assemble request: TX ID %s", assembleRequest.TransactionId)
-	log.L(ctx).Infof("[Sequencer] assemble request: Idempotency ID %s", assembleRequest.AssembleRequestId)
-	log.L(ctx).Infof("[Sequencer] assemble request: Contract Address %s", assembleRequest.ContractAddress)
-	log.L(ctx).Infof("[Sequencer] assemble request: preassembly byte hex %s", hex.EncodeToString(assembleRequest.PreAssembly))
 
 	assembleRequestBytes, err := proto.Marshal(assembleRequest)
 	if err != nil {
-		log.L(ctx).Error("[Sequencer] error marshalling assemble request", err)
+		log.L(ctx).Error("error marshalling assemble request", err)
 		return err
 	}
 
@@ -375,7 +366,7 @@ func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.U
 	})
 	if err != nil {
 		// Log the error but continue sending to the other recipients
-		log.L(ctx).Errorf("[Sequencer] error sending assemble response to %s: %s", recipient, err)
+		log.L(ctx).Errorf("error sending assemble response to %s: %s", recipient, err)
 	}
 
 	return err
@@ -391,7 +382,7 @@ func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordi
 	}
 	handoverRequestBytes, err := json.Marshal(handoverRequest)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error marshalling handover request message: %s", err)
+		log.L(ctx).Errorf("error marshalling handover request message: %s", err)
 	}
 
 	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
@@ -400,7 +391,7 @@ func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordi
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Node:        activeCoordinator,
 	}); err != nil {
-		log.L(ctx).Errorf("[Sequencer] error sending handover request message: %s", err)
+		log.L(ctx).Errorf("error sending handover request message: %s", err)
 	}
 
 	return err
@@ -419,7 +410,7 @@ func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID
 	}
 	nonceAssignedBytes, err := proto.Marshal(nonceAssigned)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error marshalling nonce assigned event: %s", err)
+		log.L(ctx).Errorf("error marshalling nonce assigned event: %s", err)
 	}
 
 	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
@@ -428,7 +419,7 @@ func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Node:        senderNode,
 	}); err != nil {
-		log.L(ctx).Errorf("[Sequencer] error sending nonce assigned event: %s", err)
+		log.L(ctx).Errorf("error sending nonce assigned event: %s", err)
 	}
 
 	return err
@@ -447,7 +438,7 @@ func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uu
 	}
 	txSubmittedBytes, err := proto.Marshal(txSubmitted)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error marshalling TX submitted event: %s", err)
+		log.L(ctx).Errorf("error marshalling TX submitted event: %s", err)
 	}
 
 	// Split transactionSender into node and domain
@@ -463,7 +454,7 @@ func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uu
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Node:        node,
 	}); err != nil {
-		log.L(ctx).Errorf("[Sequencer] error sending transaction submitted event: %s", err)
+		log.L(ctx).Errorf("error sending transaction submitted event: %s", err)
 	}
 
 	return err
@@ -483,7 +474,7 @@ func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uu
 	}
 	txConfirmedBytes, err := proto.Marshal(txConfirmed)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error marshalling TX confirmed event: %s", err)
+		log.L(ctx).Errorf("error marshalling TX confirmed event: %s", err)
 	}
 
 	// Split transactionSender into node and domain
@@ -499,7 +490,7 @@ func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uu
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Node:        node,
 	}); err != nil {
-		log.L(ctx).Errorf("[Sequencer] error sending transaction confirmed event: %s", err)
+		log.L(ctx).Errorf("error sending transaction confirmed event: %s", err)
 	}
 
 	return err
@@ -509,19 +500,18 @@ func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string,
 
 	coordinatorSnapshotBytes, err := json.Marshal(coordinatorSnapshot)
 	if err != nil {
-		log.L(ctx).Error("[Sequencer] error marshalling heartbeat", err)
+		log.L(ctx).Error("error marshalling heartbeat", err)
 	}
-	log.L(ctx).Debugf("[Sequencer] sending heartbeat to %s", targetNode)
 
 	heartbeatRequest := &engineProto.CoordinatorHeartbeatNotification{
 		From:                tw.transportManager.LocalNodeName(),
 		ContractAddress:     contractAddress.HexString(),
 		CoordinatorSnapshot: coordinatorSnapshotBytes,
 	}
-	log.L(ctx).Debugf("[Sequencer] sending heartbeat: From 	%s, Contract Address %s", tw.transportManager.LocalNodeName(), contractAddress.HexString())
+	log.L(ctx).Debugf("sending heartbeat: From 	%s, Contract Address %s", tw.transportManager.LocalNodeName(), contractAddress.HexString())
 	heartbeatRequestBytes, err := proto.Marshal(heartbeatRequest)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error marshalling heartbeat request  message: %s", err)
+		log.L(ctx).Errorf("error marshalling heartbeat request  message: %s", err)
 	}
 
 	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
@@ -530,15 +520,13 @@ func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Node:        targetNode,
 	}); err != nil {
-		log.L(ctx).Errorf("[Sequencer] error sending heartbeat request  message: %s", err)
+		log.L(ctx).Errorf("error sending heartbeat request  message: %s", err)
 	}
 
 	return err
 }
 
 func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
-	log.L(ctx).Info("SendPreDispatchRequest")
-
 	// MRW TODO - should dispatch confirmations also take the hash?
 	dispatchConfirmationRequest := &engineProto.TransactionDispatched{
 		Id:               idempotencyKey.String(),
@@ -549,7 +537,7 @@ func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, transacti
 
 	dispatchConfirmationRequestBytes, err := proto.Marshal(dispatchConfirmationRequest)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error marshalling dispatch confirmation request  message: %s", err)
+		log.L(ctx).Errorf("error marshalling dispatch confirmation request  message: %s", err)
 	}
 
 	// Split transactionSender into node and domain
@@ -565,14 +553,12 @@ func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, transacti
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Node:        node,
 	}); err != nil {
-		log.L(ctx).Errorf("[Sequencer] error sending dispatch confirmation request  message: %s", err)
+		log.L(ctx).Errorf("error sending dispatch confirmation request  message: %s", err)
 	}
 	return err
 }
 
 func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
-	log.L(ctx).Info("SendPreDispatchResponse")
-
 	dispatchResponseEvent := &engineProto.TransactionDispatched{
 		Id:              idempotencyKey.String(),
 		TransactionId:   transactionSpecification.TransactionId,
@@ -582,7 +568,7 @@ func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transact
 
 	dispatchResponseEventBytes, err := proto.Marshal(dispatchResponseEvent)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error marshalling dispatch confirmation request  message: %s", err)
+		log.L(ctx).Errorf("error marshalling dispatch confirmation request  message: %s", err)
 	}
 
 	// Split transactionSender into node and domain
@@ -598,14 +584,12 @@ func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transact
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Node:        node,
 	}); err != nil {
-		log.L(ctx).Errorf("[Sequencer] error sending dispatched event: %s", err)
+		log.L(ctx).Errorf("error sending dispatched event: %s", err)
 	}
 	return err
 }
 
 func (tw *transportWriter) SendDispatched(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
-	log.L(ctx).Infof("SendDispatched")
-
 	dispatchedEvent := &engineProto.TransactionDispatched{
 		Id:              idempotencyKey.String(),
 		TransactionId:   transactionSpecification.TransactionId,
@@ -615,7 +599,7 @@ func (tw *transportWriter) SendDispatched(ctx context.Context, transactionSender
 
 	dispatchedEventBytes, err := proto.Marshal(dispatchedEvent)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error marshalling dispatch confirmation request  message: %s", err)
+		log.L(ctx).Errorf("error marshalling dispatch confirmation request  message: %s", err)
 	}
 
 	// Split transactionSender into node and domain
@@ -631,21 +615,21 @@ func (tw *transportWriter) SendDispatched(ctx context.Context, transactionSender
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Node:        node,
 	}); err != nil {
-		log.L(ctx).Errorf("[Sequencer] error sending dispatched event: %s", err)
+		log.L(ctx).Errorf("error sending dispatched event: %s", err)
 	}
 	return err
 }
 
 func (tw *transportWriter) send(ctx context.Context, payload *components.FireAndForgetMessageSend) error {
 	if payload.Node == "" {
-		log.L(ctx).Error("[Sequencer] attempt to send sequencer event without specifying destination node name")
+		log.L(ctx).Error("attempt to send sequencer event without specifying destination node name")
 		// MRW TODO - should return this error, just logging it for now
 	}
 
 	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Debugf("%+v sent to %s", payload.MessageType, payload.Node)
 	if payload.Node == "" || payload.Node == tw.transportManager.LocalNodeName() {
 		// "Localhost" loopback
-		log.L(ctx).Debugf("[Sequencer] sending %s to loopback interface", payload.MessageType)
+		log.L(ctx).Debugf("sending %s to loopback interface", payload.MessageType)
 
 		// Run the loopback transport in a goroutine to avoid blocking the main thread. This is important for the
 		// channel-based event queue to ensure the queue consumer is not blocked when we happen to be sending
@@ -653,12 +637,12 @@ func (tw *transportWriter) send(ctx context.Context, payload *components.FireAnd
 		go func() {
 			err := tw.loopbackTransport.Send(ctx, payload)
 			if err != nil {
-				log.L(ctx).Errorf("[Sequencer] error sending %s to loopback interface: %s", payload.MessageType, err)
+				log.L(ctx).Errorf("error sending %s to loopback interface: %s", payload.MessageType, err)
 			}
 		}()
 		return nil
 	}
-	log.L(ctx).Debugf("[Sequencer] sending %s to node: %s", payload.MessageType, payload.Node)
+	log.L(ctx).Debugf("sending %s to node: %s", payload.MessageType, payload.Node)
 	err := tw.transportManager.Send(ctx, payload)
 	return err
 }

@@ -508,16 +508,16 @@ func (_c *MockTransportWriter_SendDispatched_Call) RunAndReturn(run func(ctx con
 }
 
 // SendEndorsementRequest provides a mock function for the type MockTransportWriter
-func (_mock *MockTransportWriter) SendEndorsementRequest(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error {
-	ret := _mock.Called(ctx, txID, idempotencyKey, party, attRequest, transactionSpecification, verifiers, signatures, inputStates, outputStates, infoStates)
+func (_mock *MockTransportWriter) SendEndorsementRequest(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, readStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error {
+	ret := _mock.Called(ctx, txID, idempotencyKey, party, attRequest, transactionSpecification, verifiers, signatures, inputStates, readStates, outputStates, infoStates)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendEndorsementRequest")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, uuid.UUID, string, *prototk.AttestationRequest, *prototk.TransactionSpecification, []*prototk.ResolvedVerifier, []*prototk.AttestationResult, []*prototk.EndorsableState, []*prototk.EndorsableState, []*prototk.EndorsableState) error); ok {
-		r0 = returnFunc(ctx, txID, idempotencyKey, party, attRequest, transactionSpecification, verifiers, signatures, inputStates, outputStates, infoStates)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, uuid.UUID, string, *prototk.AttestationRequest, *prototk.TransactionSpecification, []*prototk.ResolvedVerifier, []*prototk.AttestationResult, []*prototk.EndorsableState, []*prototk.EndorsableState, []*prototk.EndorsableState, []*prototk.EndorsableState) error); ok {
+		r0 = returnFunc(ctx, txID, idempotencyKey, party, attRequest, transactionSpecification, verifiers, signatures, inputStates, readStates, outputStates, infoStates)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -539,13 +539,14 @@ type MockTransportWriter_SendEndorsementRequest_Call struct {
 //   - verifiers []*prototk.ResolvedVerifier
 //   - signatures []*prototk.AttestationResult
 //   - inputStates []*prototk.EndorsableState
+//   - readStates []*prototk.EndorsableState
 //   - outputStates []*prototk.EndorsableState
 //   - infoStates []*prototk.EndorsableState
-func (_e *MockTransportWriter_Expecter) SendEndorsementRequest(ctx interface{}, txID interface{}, idempotencyKey interface{}, party interface{}, attRequest interface{}, transactionSpecification interface{}, verifiers interface{}, signatures interface{}, inputStates interface{}, outputStates interface{}, infoStates interface{}) *MockTransportWriter_SendEndorsementRequest_Call {
-	return &MockTransportWriter_SendEndorsementRequest_Call{Call: _e.mock.On("SendEndorsementRequest", ctx, txID, idempotencyKey, party, attRequest, transactionSpecification, verifiers, signatures, inputStates, outputStates, infoStates)}
+func (_e *MockTransportWriter_Expecter) SendEndorsementRequest(ctx interface{}, txID interface{}, idempotencyKey interface{}, party interface{}, attRequest interface{}, transactionSpecification interface{}, verifiers interface{}, signatures interface{}, inputStates interface{}, readStates interface{}, outputStates interface{}, infoStates interface{}) *MockTransportWriter_SendEndorsementRequest_Call {
+	return &MockTransportWriter_SendEndorsementRequest_Call{Call: _e.mock.On("SendEndorsementRequest", ctx, txID, idempotencyKey, party, attRequest, transactionSpecification, verifiers, signatures, inputStates, readStates, outputStates, infoStates)}
 }
 
-func (_c *MockTransportWriter_SendEndorsementRequest_Call) Run(run func(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState)) *MockTransportWriter_SendEndorsementRequest_Call {
+func (_c *MockTransportWriter_SendEndorsementRequest_Call) Run(run func(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, readStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState)) *MockTransportWriter_SendEndorsementRequest_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -591,6 +592,10 @@ func (_c *MockTransportWriter_SendEndorsementRequest_Call) Run(run func(ctx cont
 		if args[10] != nil {
 			arg10 = args[10].([]*prototk.EndorsableState)
 		}
+		var arg11 []*prototk.EndorsableState
+		if args[11] != nil {
+			arg11 = args[11].([]*prototk.EndorsableState)
+		}
 		run(
 			arg0,
 			arg1,
@@ -603,6 +608,7 @@ func (_c *MockTransportWriter_SendEndorsementRequest_Call) Run(run func(ctx cont
 			arg8,
 			arg9,
 			arg10,
+			arg11,
 		)
 	})
 	return _c
@@ -613,7 +619,7 @@ func (_c *MockTransportWriter_SendEndorsementRequest_Call) Return(err error) *Mo
 	return _c
 }
 
-func (_c *MockTransportWriter_SendEndorsementRequest_Call) RunAndReturn(run func(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error) *MockTransportWriter_SendEndorsementRequest_Call {
+func (_c *MockTransportWriter_SendEndorsementRequest_Call) RunAndReturn(run func(ctx context.Context, txID uuid.UUID, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, readStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, infoStates []*prototk.EndorsableState) error) *MockTransportWriter_SendEndorsementRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }

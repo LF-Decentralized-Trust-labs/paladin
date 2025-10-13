@@ -124,6 +124,7 @@ func (r *SentMessageRecorder) SendEndorsementRequest(
 	verifiers []*prototk.ResolvedVerifier,
 	signatures []*prototk.AttestationResult,
 	inputStates []*prototk.EndorsableState,
+	readStates []*prototk.EndorsableState,
 	outputStates []*prototk.EndorsableState,
 	infoStates []*prototk.EndorsableState,
 ) error {
