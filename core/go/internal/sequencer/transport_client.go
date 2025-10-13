@@ -595,6 +595,9 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 		return
 	}
 
+	// TODO - if we are endorsing but not the node the transaction was submitted to we could choose this point to populate our "transactions"
+	// DB with the inputs since the endorse gives us 99% of the original transaction inputs.
+
 	privateEndorsementRequest := &components.PrivateTransactionEndorseRequest{}
 	privateEndorsementRequest.TransactionSpecification = transactionSpecification
 	privateEndorsementRequest.Verifiers = transactionVerifiers
