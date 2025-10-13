@@ -24,6 +24,7 @@ type SequencerConfig struct {
 	AssembleTimeout      *string           `json:"assembleTimeout"`
 	RequestTimeout       *string           `json:"requestTimeout"`
 	BlockHeightTolerance *uint64           `json:"blockHeightTolerance"`
+	BlockRange           *uint64           `json:"blockRange"`
 	ClosingGracePeriod   *int              `json:"closingGracePeriod"`
 	Writer               FlushWriterConfig `json:"writer"`
 }
@@ -32,6 +33,7 @@ type SequencerMinimumConfig struct {
 	AssembleTimeout      time.Duration
 	RequestTimeout       time.Duration
 	BlockHeightTolerance uint64
+	BlockRange           uint64
 	ClosingGracePeriod   int
 }
 
@@ -39,6 +41,7 @@ var SequencerDefaults = &SequencerConfig{
 	AssembleTimeout:      confutil.P("60s"),
 	RequestTimeout:       confutil.P("10s"),
 	BlockHeightTolerance: confutil.P(uint64(10)),
+	BlockRange:           confutil.P(uint64(100)),
 	ClosingGracePeriod:   confutil.P(4),
 }
 
@@ -46,5 +49,6 @@ var SequencerMinimum = &SequencerMinimumConfig{
 	AssembleTimeout:      1 * time.Second,
 	RequestTimeout:       1 * time.Second,
 	BlockHeightTolerance: 1,
+	BlockRange:           10,
 	ClosingGracePeriod:   1,
 }

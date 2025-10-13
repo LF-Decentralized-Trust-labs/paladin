@@ -69,19 +69,18 @@ type coordinator struct {
 	heartbeatIntervalsSinceStateChange         int
 	transactionsByID                           map[uuid.UUID]*transaction.Transaction
 	currentBlockHeight                         uint64
-	coordinatorSelectionBlockRange             uint64
 	activeCoordinatorsFlushPointsBySignerNonce map[string]*common.FlushPoint
 	grapher                                    transaction.Grapher
 
 	/* Config */
-	blockRangeSize       int64
-	contractAddress      *pldtypes.EthAddress
-	blockHeightTolerance uint64
-	closingGracePeriod   int // expressed as a multiple of heartbeat intervals
-	requestTimeout       common.Duration
-	assembleTimeout      common.Duration
-	senderNodePool       []string // The (possibly changing) list of sender nodes
-	nodeName             string
+	contractAddress                *pldtypes.EthAddress
+	blockHeightTolerance           uint64
+	closingGracePeriod             int // expressed as a multiple of heartbeat intervals
+	requestTimeout                 common.Duration
+	assembleTimeout                common.Duration
+	senderNodePool                 []string // The (possibly changing) list of sender nodes
+	nodeName                       string
+	coordinatorSelectionBlockRange uint64
 
 	/* Dependencies */
 	domainAPI          components.DomainSmartContract
@@ -114,7 +113,7 @@ func NewCoordinator(
 	syncPoints syncpoints.SyncPoints,
 	requestTimeout,
 	assembleTimeout common.Duration,
-	blockRangeSize int64,
+	blockRangeSize uint64,
 	contractAddress *pldtypes.EthAddress,
 	blockHeightTolerance uint64,
 	closingGracePeriod int,
@@ -129,7 +128,6 @@ func NewCoordinator(
 		transactionsByID:                   make(map[uuid.UUID]*transaction.Transaction),
 		domainAPI:                          domainAPI,
 		transportWriter:                    transportWriter,
-		blockRangeSize:                     blockRangeSize,
 		contractAddress:                    contractAddress,
 		blockHeightTolerance:               blockHeightTolerance,
 		closingGracePeriod:                 closingGracePeriod,
@@ -146,7 +144,7 @@ func NewCoordinator(
 		metrics:                            metrics,
 		coordinatorEvents:                  make(chan common.Event, 1),
 		stopEventLoop:                      make(chan struct{}),
-		coordinatorSelectionBlockRange:     100, // MRW TODO - make configurable
+		coordinatorSelectionBlockRange:     blockRangeSize,
 	}
 	c.senderNodePool = make([]string, 0)
 	c.InitializeStateMachine(State_Idle)

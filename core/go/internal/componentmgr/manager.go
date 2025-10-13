@@ -417,17 +417,15 @@ func (cm *componentManager) CompleteStart() error {
 	err := cm.pluginManager.WaitForInit(cm.bgCtx, prototk.PluginInfo_DOMAIN)
 	err = cm.wrapIfErr(err, msgs.MsgComponentWaitPluginStartError)
 
+	// then start the block indexer
+	if err == nil {
+		err = cm.startBlockIndexer()
+	}
+
 	// We need the domains to have initialised before we can use them in the sequencer
 	if err == nil {
 		err = cm.sequencerManager.Start()
 		err = cm.addIfStarted("sequencer_manager", cm.sequencerManager, err, msgs.MsgComponentDistributedSequencerStartError)
-	}
-
-	cm.sequencerManager.Start()
-
-	// then start the block indexer
-	if err == nil {
-		err = cm.startBlockIndexer()
 	}
 
 	// start the RPC server last

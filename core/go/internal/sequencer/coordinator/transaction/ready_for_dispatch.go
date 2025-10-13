@@ -65,7 +65,23 @@ func (t *Transaction) hasDependenciesNotReady(ctx context.Context) bool {
 	return false
 }
 
+func (t *Transaction) traceDispatch(ctx context.Context) {
+	// Log transaction signatures
+	for _, signature := range t.PostAssembly.Signatures {
+		log.L(ctx).Tracef("Transaction %s has signature %+v", t.ID.String(), signature)
+	}
+
+	// Log transaction endorsements
+	for _, endorsement := range t.PostAssembly.Endorsements {
+		log.L(ctx).Tracef("Transaction %s has endorsement %+v", t.ID.String(), endorsement)
+	}
+}
+
 func (t *Transaction) notifyDependentsOfReadinessAndQueueForDispatch(ctx context.Context) error {
+
+	if log.IsTraceEnabled() {
+		t.traceDispatch(ctx)
+	}
 
 	// Ask the distributed sequencer manager to add this TX to the queue for collection
 	t.onReadyForDispatch(ctx, t)

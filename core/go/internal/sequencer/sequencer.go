@@ -95,6 +95,16 @@ func (sMgr *sequencerManager) Start() error {
 
 	// Repaat getting pending transactions until none are returned. Run in a goroutine to avoid blocking the main thread
 	go func() {
+		for {
+			// On startup we can't assemble any transactions without having a confirmed block height so
+			// wait until the indexer is ready
+			_, err := sMgr.components.BlockIndexer().GetConfirmedBlockHeight(sMgr.ctx)
+			if err == nil {
+				break
+			}
+			fmt.Println("Waiting for block indexer to be ready")
+			time.Sleep(1 * time.Second)
+		}
 		resumedTransactions := 0
 
 		// Limit ourselves to resuming up to 1000 transactions on startup.
