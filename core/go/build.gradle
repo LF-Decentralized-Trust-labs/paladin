@@ -155,8 +155,17 @@ task protoc(type: ProtoCompile, dependsOn: [
     }
 }
 
-task makeMocks(type: Exec, dependsOn: [":installMockery", protoc]) {
+task makeMocksComponents(type: Exec, dependsOn: [":installMockery", protoc]) {
    executable "mockery"
+}
+
+// Make mocks for components first, then for sequencer. Mockery doesn't
+// support strict ordering in package lists and gets stuck in a chicken-and-egg loop
+// of trying to generate component mocks after sequencer mocks even though the
+// latter pre-reqs the former.
+task makeMocks(type: Exec, dependsOn: [makeMocksComponents]) {
+   executable "mockery"
+   args '--config=.mockery.sequencer.yml'
 }
 
 

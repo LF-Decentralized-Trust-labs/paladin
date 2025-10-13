@@ -119,10 +119,10 @@ func NewCoordinator(
 	blockHeightTolerance uint64,
 	closingGracePeriod int,
 	nodeName string,
+	metrics metrics.DistributedSequencerMetrics,
 	readyForDispatch func(context.Context, *transaction.Transaction),
 	coordinatorStarted func(contractAddress *pldtypes.EthAddress, coordinatorNode string),
 	coordinatorIdle func(contractAddress *pldtypes.EthAddress),
-	metrics metrics.DistributedSequencerMetrics,
 ) (*coordinator, error) {
 	c := &coordinator{
 		heartbeatIntervalsSinceStateChange: 0,
@@ -281,9 +281,10 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 			c.assembleTimeout,
 			c.closingGracePeriod,
 			c.grapher,
+			c.metrics,
+			c.readyForDispatch,
 			func(ctx context.Context, t *transaction.Transaction, to, from transaction.State) {
-				//callback function to notify us when the transaction changes state
-				log.L(ctx).Debugf("[Sequencer] transaction %s moved from %s to %s", t.ID.String(), from.String(), to.String())
+				// TX state changed, check if we need to be selecting the next transaction for this sequencer
 				//TODO the following logic should be moved to the state machine so that all the rules are in one place
 				if c.stateMachine.currentState == State_Active {
 					if from == transaction.State_Assembling {
@@ -300,7 +301,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 				}
 			},
 			func(ctx context.Context) {
-				//callback function to notify us when the transaction is cleaned up
+				// TX cleaned up after confirmation & sufficient heartbeats
 				delete(c.transactionsByID, txn.ID)
 				c.metrics.DecCoordinatingTransactions()
 				err := c.grapher.Forget(txn.ID)
@@ -313,8 +314,6 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 				}
 				log.L(ctx).Debugf("transaction %s cleaned up", txn.ID.String())
 			},
-			c.readyForDispatch,
-			c.metrics,
 		)
 		if err != nil {
 			log.L(ctx).Errorf("error creating transaction: %v", err)

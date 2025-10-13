@@ -238,11 +238,11 @@ func newTransactionForUnitTesting(t *testing.T, grapher Grapher) (*Transaction, 
 		mocks.clock.Duration(5000),
 		5,
 		grapher,
+		nil,
+		func(context.Context, *Transaction) {}, // onReadyForDispatch function, not used in tests
 		func(ctx context.Context, txn *Transaction, from, to State) {
 		},
-		func(context.Context) {},               // onCleanup function, not used in tests
-		func(context.Context, *Transaction) {}, // onReadyForDispatch function, not used in tests
-		nil,
+		func(context.Context) {}, // onCleanup function, not used in tests
 	)
 	require.NoError(t, err)
 

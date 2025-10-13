@@ -108,10 +108,10 @@ func NewTransaction(
 	assembleTimeout common.Duration,
 	finalizingGracePeriod int,
 	grapher Grapher,
+	metrics metrics.DistributedSequencerMetrics,
+	onReadyForDispatch func(context.Context, *Transaction),
 	onStateTransition OnStateTransition,
 	onCleanup func(context.Context),
-	onReadyForDispatch func(context.Context, *Transaction),
-	metrics metrics.DistributedSequencerMetrics,
 ) (*Transaction, error) {
 	senderIdentity, senderNode, err := pldtypes.PrivateIdentityLocator(sender).Validate(ctx, "", false)
 	if err != nil {

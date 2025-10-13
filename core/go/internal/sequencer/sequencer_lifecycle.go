@@ -180,6 +180,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				confutil.Uint64Min(sMgr.config.BlockHeightTolerance, pldconf.SequencerMinimum.BlockHeightTolerance, *pldconf.SequencerDefaults.BlockHeightTolerance),
 				confutil.IntMin(sMgr.config.ClosingGracePeriod, pldconf.SequencerMinimum.ClosingGracePeriod, *pldconf.SequencerDefaults.ClosingGracePeriod),
 				sMgr.nodeName,
+				sMgr.metrics,
 				func(ctx context.Context, t *coordTransaction.Transaction) {
 					// MRW TODO - move to sequencer module?
 					log.L(ctx).Debugf("Transaction %s ready for dispatch", t.ID.String())
@@ -402,10 +403,9 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 					}
 				},
 				func(contractAddress *pldtypes.EthAddress) {
-					// A new coordinator became idle, update metrics
+					// A new coordinator became idle, perform any lifecycle tidy up
 					sMgr.updateActiveCoordinators(sMgr.ctx)
 				},
-				sMgr.metrics,
 			)
 			if err != nil {
 				log.L(ctx).Errorf("[Sequencer] failed to create sequencer coordinator for contract %s: %s", contractAddr.String(), err)
@@ -508,7 +508,6 @@ func (sMgr *sequencerManager) stopLowestPrioritySequencer(ctx context.Context) {
 }
 
 func (sMgr *sequencerManager) updateActiveCoordinators(ctx context.Context) {
-	// log.L(ctx).Debugf("[Sequencer] checking number of concurrent coordinators")
 	log.L(log.WithComponent(ctx, common.SUBCOMP_MISC)).Debugf("checking number of concurrent coordinators")
 
 	readlock := true

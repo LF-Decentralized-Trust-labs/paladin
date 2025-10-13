@@ -380,10 +380,10 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 		b.fakeClock.Duration(b.assembleTimeout),
 		5,
 		b.grapher,
-		nil,
-		func(context.Context) {},               // onCleanup function, not used in tests
-		func(context.Context, *Transaction) {}, // onReadyForDispatch function, not used in tests
 		metrics,
+		func(context.Context, *Transaction) {}, // onReadyForDispatch function, not used in tests
+		nil,
+		func(context.Context) {}, // onCleanup function, not used in tests
 	)
 	if err != nil {
 		panic(fmt.Sprintf("Error from NewTransaction: %v", err))
