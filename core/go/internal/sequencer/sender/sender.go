@@ -19,14 +19,12 @@ import (
 	"context"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/google/uuid"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
@@ -103,16 +101,18 @@ func NewSender(
 	return s, nil
 }
 
-func (s *sender) eventLoop(ctx context.Context) error {
+func (s *sender) eventLoop(ctx context.Context) {
 	for {
-		log.L(ctx).Infof("[Sequencer] sender event loop waiting for next event")
+		log.L(ctx).Infof("sender event loop waiting for next event")
 		select {
 		case event := <-s.senderEvents:
-			log.L(ctx).Infof("[Sequencer] sender pulled event from the queue: %s", event.TypeString())
-			s.ProcessEvent(ctx, event)
+			log.L(ctx).Infof("sender pulled event from the queue: %s", event.TypeString())
+			err := s.ProcessEvent(ctx, event)
+			if err != nil {
+				log.L(ctx).Errorf("error processing event: %v", err)
+			}
 		case <-s.stopEventLoop:
-			log.L(ctx).Infof("[Sequencer] sender event loop cancelled")
-			return i18n.NewError(ctx, msgs.MsgContextCanceled)
+			log.L(ctx).Infof("sender event loop cancelled")
 		}
 	}
 }
@@ -121,7 +121,7 @@ func (s *sender) propagateEventToTransaction(ctx context.Context, event transact
 	if txn := s.transactionsByID[event.GetTransactionID()]; txn != nil {
 		return txn.HandleEvent(ctx, event)
 	} else {
-		log.L(ctx).Debugf("[Sequencer] ignoring event because transaction not known to this sender %s", event.GetTransactionID().String())
+		log.L(ctx).Debugf("ignoring event because transaction not known to this sender %s", event.GetTransactionID().String())
 	}
 	return nil
 }
@@ -129,7 +129,7 @@ func (s *sender) propagateEventToTransaction(ctx context.Context, event transact
 func (s *sender) createTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
 	newTxn, err := transaction.NewTransaction(ctx, txn, s.transportWriter, s.ProcessEvent, s.engineIntegration, s.metrics)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error creating transaction: %v", err)
+		log.L(ctx).Errorf("error creating transaction: %v", err)
 		return err
 	}
 	s.transactionsByID[txn.ID] = newTxn
@@ -138,7 +138,7 @@ func (s *sender) createTransaction(ctx context.Context, txn *components.PrivateT
 	createdEvent.TransactionID = txn.ID
 	err = newTxn.HandleEvent(ctx, createdEvent)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error handling CreatedEvent for transaction %s: %v", txn.ID.String(), err)
+		log.L(ctx).Errorf("error handling CreatedEvent for transaction %s: %v", txn.ID.String(), err)
 		return err
 	}
 	return nil

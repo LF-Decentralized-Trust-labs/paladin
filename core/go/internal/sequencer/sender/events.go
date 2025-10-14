@@ -30,11 +30,11 @@ type HeartbeatIntervalEvent struct {
 	common.BaseEvent
 }
 
-func (_ *HeartbeatIntervalEvent) Type() EventType {
+func (*HeartbeatIntervalEvent) Type() EventType {
 	return Event_HeartbeatInterval
 }
 
-func (_ *HeartbeatIntervalEvent) TypeString() string {
+func (*HeartbeatIntervalEvent) TypeString() string {
 	return "Event_HeartbeatInterval"
 }
 
@@ -43,11 +43,11 @@ type HeartbeatReceivedEvent struct {
 	transport.CoordinatorHeartbeatNotification
 }
 
-func (_ *HeartbeatReceivedEvent) Type() EventType {
+func (*HeartbeatReceivedEvent) Type() EventType {
 	return Event_HeartbeatReceived
 }
 
-func (_ *HeartbeatReceivedEvent) TypeString() string {
+func (*HeartbeatReceivedEvent) TypeString() string {
 	return "Event_HeartbeatReceived"
 }
 
@@ -56,11 +56,11 @@ type TransactionCreatedEvent struct {
 	Transaction *components.PrivateTransaction
 }
 
-func (_ *TransactionCreatedEvent) Type() EventType {
+func (*TransactionCreatedEvent) Type() EventType {
 	return Event_TransactionCreated
 }
 
-func (_ *TransactionCreatedEvent) TypeString() string {
+func (*TransactionCreatedEvent) TypeString() string {
 	return "Event_TransactionCreated"
 }
 
@@ -72,10 +72,10 @@ type TransactionConfirmedEvent struct {
 	RevertReason pldtypes.HexBytes
 }
 
-func (_ *TransactionConfirmedEvent) Type() EventType {
+func (*TransactionConfirmedEvent) Type() EventType {
 	return Event_TransactionConfirmed
 }
 
-func (_ *TransactionConfirmedEvent) TypeString() string {
+func (*TransactionConfirmedEvent) TypeString() string {
 	return "Event_TransactionConfirmed"
 }

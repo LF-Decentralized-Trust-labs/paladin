@@ -60,8 +60,7 @@ func sendDelegationRequest(ctx context.Context, s *sender, includeAlreadyDelegat
 	}
 
 	// Don't send delegation request before internal TX state machine has been updated
-	s.transportWriter.SendDelegationRequest(ctx, s.activeCoordinatorNode, privateTransactions, s.currentBlockHeight)
-	return nil
+	return s.transportWriter.SendDelegationRequest(ctx, s.activeCoordinatorNode, privateTransactions, s.currentBlockHeight)
 }
 
 func action_SendDroppedTXDelegationRequest(ctx context.Context, s *sender) error {

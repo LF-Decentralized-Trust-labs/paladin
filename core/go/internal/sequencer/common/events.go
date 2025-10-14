@@ -44,10 +44,10 @@ type HeartbeatIntervalEvent struct {
 	BaseEvent
 }
 
-func (_ *HeartbeatIntervalEvent) Type() EventType {
+func (*HeartbeatIntervalEvent) Type() EventType {
 	return Event_HeartbeatInterval
 }
 
-func (_ *HeartbeatIntervalEvent) TypeString() string {
+func (*HeartbeatIntervalEvent) TypeString() string {
 	return "Event_HeartbeatInterval"
 }

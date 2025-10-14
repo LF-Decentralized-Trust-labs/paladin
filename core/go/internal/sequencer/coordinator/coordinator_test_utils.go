@@ -31,17 +31,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func privateTransactionMatcher(txID ...uuid.UUID) func(*components.PrivateTransaction) bool {
-	return func(tx *components.PrivateTransaction) bool {
-		for _, id := range txID {
-			if tx.ID == id {
-				return true
-			}
-		}
-		return false
-	}
-}
-
 type SentMessageRecorder struct {
 	transaction.SentMessageRecorder
 	hasSentHandoverRequest bool

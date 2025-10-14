@@ -52,11 +52,11 @@ type ConfirmedSuccessEvent struct {
 	BaseEvent
 }
 
-func (_ *ConfirmedSuccessEvent) Type() EventType {
+func (*ConfirmedSuccessEvent) Type() EventType {
 	return Event_ConfirmedSuccess
 }
 
-func (_ *ConfirmedSuccessEvent) TypeString() string {
+func (*ConfirmedSuccessEvent) TypeString() string {
 	return "Event_ConfirmedSuccess"
 }
 
@@ -65,11 +65,11 @@ type ConfirmedRevertedEvent struct {
 	RevertReason pldtypes.HexBytes
 }
 
-func (_ *ConfirmedRevertedEvent) Type() EventType {
+func (*ConfirmedRevertedEvent) Type() EventType {
 	return Event_ConfirmedReverted
 }
 
-func (_ *ConfirmedRevertedEvent) TypeString() string {
+func (*ConfirmedRevertedEvent) TypeString() string {
 	return "Event_ConfirmedReverted"
 }
 
@@ -78,11 +78,11 @@ type CreatedEvent struct {
 	PrivateTransaction *components.PrivateTransaction
 }
 
-func (_ *CreatedEvent) Type() EventType {
+func (*CreatedEvent) Type() EventType {
 	return Event_Created
 }
 
-func (_ *CreatedEvent) TypeString() string {
+func (*CreatedEvent) TypeString() string {
 	return "Event_Created"
 }
 
@@ -91,11 +91,11 @@ type DelegatedEvent struct {
 	Coordinator string
 }
 
-func (_ *DelegatedEvent) Type() EventType {
+func (*DelegatedEvent) Type() EventType {
 	return Event_Delegated
 }
 
-func (_ *DelegatedEvent) TypeString() string {
+func (*DelegatedEvent) TypeString() string {
 	return "Event_Delegated"
 }
 func (event *DelegatedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
@@ -112,11 +112,11 @@ type AssembleRequestReceivedEvent struct {
 	PreAssembly             []byte
 }
 
-func (_ *AssembleRequestReceivedEvent) Type() EventType {
+func (*AssembleRequestReceivedEvent) Type() EventType {
 	return Event_AssembleRequestReceived
 }
 
-func (_ *AssembleRequestReceivedEvent) TypeString() string {
+func (*AssembleRequestReceivedEvent) TypeString() string {
 	return "Event_AssembleRequestReceived"
 }
 func (event *AssembleRequestReceivedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
@@ -138,11 +138,11 @@ type AssembleAndSignSuccessEvent struct {
 	RequestID    uuid.UUID
 }
 
-func (_ *AssembleAndSignSuccessEvent) Type() EventType {
+func (*AssembleAndSignSuccessEvent) Type() EventType {
 	return Event_AssembleAndSignSuccess
 }
 
-func (_ *AssembleAndSignSuccessEvent) TypeString() string {
+func (*AssembleAndSignSuccessEvent) TypeString() string {
 	return "Event_AssembleAndSignSuccess"
 }
 func (event *AssembleAndSignSuccessEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
@@ -157,11 +157,11 @@ type AssembleRevertEvent struct {
 	RequestID    uuid.UUID
 }
 
-func (_ *AssembleRevertEvent) Type() EventType {
+func (*AssembleRevertEvent) Type() EventType {
 	return Event_AssembleRevert
 }
 
-func (_ *AssembleRevertEvent) TypeString() string {
+func (*AssembleRevertEvent) TypeString() string {
 	return "Event_AssembleRevert"
 }
 func (event *AssembleRevertEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
@@ -176,11 +176,11 @@ type AssembleParkEvent struct {
 	RequestID    uuid.UUID
 }
 
-func (_ *AssembleParkEvent) Type() EventType {
+func (*AssembleParkEvent) Type() EventType {
 	return Event_AssemblePark
 }
 
-func (_ *AssembleParkEvent) TypeString() string {
+func (*AssembleParkEvent) TypeString() string {
 	return "Event_AssemblePark"
 }
 func (event *AssembleParkEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
@@ -193,11 +193,11 @@ type AssembleErrorEvent struct {
 	BaseEvent
 }
 
-func (_ *AssembleErrorEvent) Type() EventType {
+func (*AssembleErrorEvent) Type() EventType {
 	return Event_AssembleError
 }
 
-func (_ *AssembleErrorEvent) TypeString() string {
+func (*AssembleErrorEvent) TypeString() string {
 	return "Event_AssembleError"
 }
 
@@ -208,11 +208,11 @@ type PreDispatchRequestReceivedEvent struct {
 	PostAssemblyHash *pldtypes.Bytes32
 }
 
-func (_ *PreDispatchRequestReceivedEvent) Type() EventType {
+func (*PreDispatchRequestReceivedEvent) Type() EventType {
 	return Event_PreDispatchRequestReceived
 }
 
-func (_ *PreDispatchRequestReceivedEvent) TypeString() string {
+func (*PreDispatchRequestReceivedEvent) TypeString() string {
 	return "Event_PreDispatchRequestReceived"
 }
 
@@ -221,11 +221,11 @@ type CoordinatorChangedEvent struct {
 	Coordinator string
 }
 
-func (_ *CoordinatorChangedEvent) Type() EventType {
+func (*CoordinatorChangedEvent) Type() EventType {
 	return Event_CoordinatorChanged
 }
 
-func (_ *CoordinatorChangedEvent) TypeString() string {
+func (*CoordinatorChangedEvent) TypeString() string {
 	return "Event_CoordinatorChanged"
 }
 func (event *CoordinatorChangedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
@@ -238,11 +238,11 @@ type DispatchedEvent struct {
 	SignerAddress pldtypes.EthAddress
 }
 
-func (_ *DispatchedEvent) Type() EventType {
+func (*DispatchedEvent) Type() EventType {
 	return Event_Dispatched
 }
 
-func (_ *DispatchedEvent) TypeString() string {
+func (*DispatchedEvent) TypeString() string {
 	return "Event_Dispatched"
 }
 func (event *DispatchedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
@@ -256,11 +256,11 @@ type NonceAssignedEvent struct {
 	Nonce         uint64
 }
 
-func (_ *NonceAssignedEvent) Type() EventType {
+func (*NonceAssignedEvent) Type() EventType {
 	return Event_NonceAssigned
 }
 
-func (_ *NonceAssignedEvent) TypeString() string {
+func (*NonceAssignedEvent) TypeString() string {
 	return "Event_NonceAssigned"
 }
 func (event *NonceAssignedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
@@ -276,11 +276,11 @@ type SubmittedEvent struct {
 	LatestSubmissionHash pldtypes.Bytes32
 }
 
-func (_ *SubmittedEvent) Type() EventType {
+func (*SubmittedEvent) Type() EventType {
 	return Event_Submitted
 }
 
-func (_ *SubmittedEvent) TypeString() string {
+func (*SubmittedEvent) TypeString() string {
 	return "Event_Submitted"
 }
 func (event *SubmittedEvent) ApplyToTransaction(_ context.Context, txn *Transaction) error {
@@ -294,10 +294,10 @@ type ResumedEvent struct {
 	BaseEvent
 }
 
-func (_ *ResumedEvent) Type() EventType {
+func (*ResumedEvent) Type() EventType {
 	return Event_Resumed
 }
 
-func (_ *ResumedEvent) TypeString() string {
+func (*ResumedEvent) TypeString() string {
 	return "Event_Resumed"
 }

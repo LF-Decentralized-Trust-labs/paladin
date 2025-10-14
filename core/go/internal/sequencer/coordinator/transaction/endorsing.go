@@ -170,15 +170,14 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 	return nil
 }
 
-func (t *Transaction) resetEndorsementRequests(ctx context.Context) error {
+func (t *Transaction) resetEndorsementRequests(ctx context.Context) {
 	if t.pendingEndorsementRequests == nil {
-		return nil
+		return
 	}
 
 	log.L(ctx).Trace("resetting endorsement requests")
 	t.cancelEndorsementRequestTimeoutSchedule()
 	t.pendingEndorsementRequests = make(map[string]map[string]*common.IdempotentRequest)
-	return nil
 }
 
 func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey uuid.UUID, party string, attRequest *prototk.AttestationRequest) error {

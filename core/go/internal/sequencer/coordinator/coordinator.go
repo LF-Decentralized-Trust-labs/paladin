@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
@@ -34,7 +33,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
@@ -157,22 +155,28 @@ func NewCoordinator(
 
 }
 
-func (c *coordinator) eventLoop(ctx context.Context) error {
+func (c *coordinator) eventLoop(ctx context.Context) {
 	for {
 		log.L(ctx).Infof("sender event loop waiting for next event")
 		select {
 		case event := <-c.coordinatorEvents:
 			log.L(ctx).Infof("coordinator pulled event from the queue: %s", event.TypeString())
-			c.ProcessEvent(ctx, event)
+			err := c.ProcessEvent(ctx, event)
+			if err != nil {
+				log.L(ctx).Errorf("error processing event: %v", err)
+			}
 		case <-c.stopEventLoop:
 			log.L(ctx).Infof("coordinator event loop cancelled")
-			return i18n.NewError(ctx, msgs.MsgContextCanceled)
+			return
 		}
 	}
 }
 
 func (c *coordinator) sendHandoverRequest(ctx context.Context) {
-	c.transportWriter.SendHandoverRequest(ctx, c.activeCoordinatorNode, c.contractAddress)
+	err := c.transportWriter.SendHandoverRequest(ctx, c.activeCoordinatorNode, c.contractAddress)
+	if err != nil {
+		log.L(ctx).Errorf("error sending handover request: %v", err)
+	}
 }
 
 func (c *coordinator) GetActiveCoordinatorNode(ctx context.Context) string {

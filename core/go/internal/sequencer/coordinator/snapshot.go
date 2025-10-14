@@ -30,18 +30,22 @@ func action_SendHeartbeat(ctx context.Context, c *coordinator) error {
 
 func (c *coordinator) sendHeartbeat(ctx context.Context, contractAddress *pldtypes.EthAddress) error {
 	snapshot := c.getSnapshot(ctx)
-	log.L(ctx).Debugf("[Sequencer] sending heartbeats for sequencer %s", contractAddress.String())
+	log.L(ctx).Debugf("sending heartbeats for sequencer %s", contractAddress.String())
+	var err error
 	for _, node := range c.senderNodePool {
 		if node != c.nodeName {
-			log.L(ctx).Debugf("[Sequencer] sending heartbeat to %s", node)
-			c.transportWriter.SendHeartbeat(ctx, node, contractAddress, snapshot)
+			log.L(ctx).Debugf("sending heartbeat to %s", node)
+			err = c.transportWriter.SendHeartbeat(ctx, node, contractAddress, snapshot)
+			if err != nil {
+				log.L(ctx).Errorf("error sending heartbeat to %s: %v", node, err)
+			}
 		}
 	}
-	return nil
+	return err
 }
 
 func (c *coordinator) getSnapshot(ctx context.Context) *common.CoordinatorSnapshot {
-	log.L(ctx).Infof("[Sequencer] creating snapshot for sequencer %s", c.contractAddress.String())
+	log.L(ctx).Infof("creating snapshot for sequencer %s", c.contractAddress.String())
 	// This function is called from the sequencer loop so is safe to read internal state
 	pooledTransactions := make([]*common.Transaction, 0, len(c.transactionsByID))
 	dispatchedTransactions := make([]*common.DispatchedTransaction, 0, len(c.transactionsByID))
@@ -53,7 +57,7 @@ func (c *coordinator) getSnapshot(ctx context.Context) *common.CoordinatorSnapsh
 	// 2. Dispatched transactions - these are transactions that are past the point of no return, the precise status (ready for collection, dispatched, nonce assigned, submitted to a blockchain node) is dependant on parallel processing from this point onward
 	// 3. Confirmed transactions - these are transactions that have been confirmed by the network
 	for _, txn := range c.transactionsByID {
-		log.L(ctx).Infof("[Sequencer] next transaction to assess current status of %s. Current state: %s", txn.ID.String(), txn.GetCurrentState().String())
+		log.L(ctx).Infof("next transaction to assess current status of %s. Current state: %s", txn.ID.String(), txn.GetCurrentState().String())
 		switch txn.GetCurrentState() {
 		// pooled transactions are those that have been delegated but not yet dispatched, this includes the various states from being delegated up to being ready for dispatch
 		case transaction.State_Reverted:
@@ -94,7 +98,7 @@ func (c *coordinator) getSnapshot(ctx context.Context) *common.CoordinatorSnapsh
 			dispatchedTransactions = append(dispatchedTransactions, dispatchedTransaction)
 
 		case transaction.State_Confirmed:
-			log.L(ctx).Infof("[Sequencer] heartbeat snapshot building, transaction ID %s is in State_Confirmed, sending to heartbeat receipients", txn.ID.String())
+			log.L(ctx).Infof("heartbeat snapshot building, transaction ID %s is in State_Confirmed, sending to heartbeat receipients", txn.ID.String())
 			confirmedTransaction := &common.ConfirmedTransaction{}
 			confirmedTransaction.ID = txn.ID
 

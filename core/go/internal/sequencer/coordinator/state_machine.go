@@ -423,7 +423,7 @@ func action_Idle(ctx context.Context, c *coordinator) error {
 	return nil
 }
 
-func (c *coordinator) heartbeatLoop(ctx context.Context) error {
+func (c *coordinator) heartbeatLoop(ctx context.Context) {
 	if c.heartbeatCtx == nil {
 		c.heartbeatCtx, c.heartbeatCancel = context.WithCancel(ctx)
 
@@ -433,17 +433,19 @@ func (c *coordinator) heartbeatLoop(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				c.sendHeartbeat(c.heartbeatCtx, c.contractAddress)
+				err := c.sendHeartbeat(c.heartbeatCtx, c.contractAddress)
+				if err != nil {
+					log.L(ctx).Errorf("error sending heartbeat: %v", err)
+				}
 			case <-c.heartbeatCtx.Done():
 			case <-ctx.Done():
-				log.L(ctx).Infof("[SeqState] Ending heartbeat loop for %s", c.contractAddress.String())
+				log.L(ctx).Infof("Ending heartbeat loop for %s", c.contractAddress.String())
 				c.heartbeatCtx = nil
 				c.heartbeatCancel = nil
-				return nil
+				return
 			}
 		}
 	}
-	return nil
 }
 
 func (s State) String() string {

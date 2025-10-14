@@ -90,12 +90,7 @@ type TransactionPool interface {
 type transactionSelector struct {
 	transactionPool         TransactionPool
 	numSenders              int
-	fastQueue               chan (*senderLocator)
-	slowQueue               chan (*senderLocator)
 	currentAssemblingSender *senderLocator
-	fastQueueMode           bool
-	unseenQueueEntries      int // count of how many times we still need to read from the fast queue before we are back to the start
-	timesRoundQueue         int // count of how many times we have read all the fast queue entries since we last read from the slow queue
 }
 
 func NewTransactionSelector(ctx context.Context, transactionPool TransactionPool) TransactionSelector {
@@ -107,7 +102,6 @@ func NewTransactionSelector(ctx context.Context, transactionPool TransactionPool
 		transactionPool:         transactionPool,
 		numSenders:              0,
 		currentAssemblingSender: nil,
-		fastQueueMode:           true,
 	}
 
 	for node := range senderPoolMap {
@@ -115,19 +109,6 @@ func NewTransactionSelector(ctx context.Context, transactionPool TransactionPool
 	}
 
 	log.L(ctx).Infof("sender pool size for transaction selector: %d", selector.numSenders)
-
-	selector.fastQueue = make(chan *senderLocator, selector.numSenders)
-	selector.slowQueue = make(chan *senderLocator, selector.numSenders)
-
-	// for node := range senderPoolMap {
-	// 	for _, sender := range senderPoolMap[node] {
-	// 		// MRW TODO - is this to emulate 2x the fast queue senders?
-	// 		selector.fastQueue <- &senderLocator{node: node, identity: sender}
-	// 		selector.slowQueue <- &senderLocator{node: node, identity: sender}
-	// 		selector.numSenders++
-	// 	}
-	// }
-	selector.unseenQueueEntries = selector.numSenders
 	return selector
 }
 

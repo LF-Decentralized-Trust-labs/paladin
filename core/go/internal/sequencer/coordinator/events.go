@@ -30,7 +30,7 @@ type Event interface {
 
 type CoordinatorStateEventActivated struct{}
 
-func (_ *CoordinatorStateEventActivated) Type() EventType {
+func (*CoordinatorStateEventActivated) Type() EventType {
 	return Event_Activated
 }
 
@@ -41,21 +41,21 @@ type TransactionsDelegatedEvent struct {
 	SendersBlockHeight uint64
 }
 
-func (_ *TransactionsDelegatedEvent) Type() EventType {
+func (*TransactionsDelegatedEvent) Type() EventType {
 	return Event_TransactionsDelegated
 }
 
-func (_ *TransactionsDelegatedEvent) TypeString() string {
+func (*TransactionsDelegatedEvent) TypeString() string {
 	return "Event_TransactionsDelegated"
 }
 
 type CoordinatorFlushedEvent struct{}
 
-func (_ *CoordinatorFlushedEvent) Type() EventType {
+func (*CoordinatorFlushedEvent) Type() EventType {
 	return Event_Flushed
 }
 
-func (_ *CoordinatorFlushedEvent) TypeString() string {
+func (*CoordinatorFlushedEvent) TypeString() string {
 	return "Event_Flushed"
 }
 
@@ -68,11 +68,11 @@ type TransactionConfirmedEvent struct {
 	RevertReason pldtypes.HexBytes
 }
 
-func (_ *TransactionConfirmedEvent) Type() EventType {
+func (*TransactionConfirmedEvent) Type() EventType {
 	return Event_TransactionConfirmed
 }
 
-func (_ *TransactionConfirmedEvent) TypeString() string {
+func (*TransactionConfirmedEvent) TypeString() string {
 	return "Event_TransactionConfirmed"
 }
 
@@ -81,11 +81,11 @@ type TransactionDispatchConfirmedEvent struct {
 	TransactionID uuid.UUID
 }
 
-func (_ *TransactionDispatchConfirmedEvent) Type() EventType {
+func (*TransactionDispatchConfirmedEvent) Type() EventType {
 	return Event_TransactionDispatchConfirmed
 }
 
-func (_ *TransactionDispatchConfirmedEvent) TypeString() string {
+func (*TransactionDispatchConfirmedEvent) TypeString() string {
 	return "Event_TransactionDispatchConfirmed"
 }
 func (t *TransactionDispatchConfirmedEvent) GetTransactionID() uuid.UUID {
@@ -97,11 +97,11 @@ type HeartbeatReceivedEvent struct {
 	transport.CoordinatorHeartbeatNotification
 }
 
-func (_ *HeartbeatReceivedEvent) Type() EventType {
+func (*HeartbeatReceivedEvent) Type() EventType {
 	return Event_HeartbeatReceived
 }
 
-func (_ *HeartbeatReceivedEvent) TypeString() string {
+func (*HeartbeatReceivedEvent) TypeString() string {
 	return "Event_HeartbeatReceived"
 }
 
@@ -110,11 +110,11 @@ type HandoverRequestEvent struct {
 	Requester string
 }
 
-func (_ *HandoverRequestEvent) Type() EventType {
+func (*HandoverRequestEvent) Type() EventType {
 	return Event_HandoverRequestReceived
 }
 
-func (_ *HandoverRequestEvent) TypeString() string {
+func (*HandoverRequestEvent) TypeString() string {
 	return "Event_HandoverRequestReceived"
 }
 
@@ -123,11 +123,11 @@ type NewBlockEvent struct {
 	BlockHeight uint64
 }
 
-func (_ *NewBlockEvent) Type() EventType {
+func (*NewBlockEvent) Type() EventType {
 	return Event_NewBlock
 }
 
-func (_ *NewBlockEvent) TypeString() string {
+func (*NewBlockEvent) TypeString() string {
 	return "Event_NewBlock"
 }
 
@@ -135,11 +135,11 @@ type HandoverReceivedEvent struct {
 	common.BaseEvent
 }
 
-func (_ *HandoverReceivedEvent) Type() EventType {
+func (*HandoverReceivedEvent) Type() EventType {
 	return Event_HandoverReceived
 }
 
-func (_ *HandoverReceivedEvent) TypeString() string {
+func (*HandoverReceivedEvent) TypeString() string {
 	return "Event_HandoverReceived"
 }
 
@@ -149,10 +149,10 @@ type TransactionStateTransitionEvent struct {
 	To            transaction.State
 }
 
-func (_ *TransactionStateTransitionEvent) Type() EventType {
+func (*TransactionStateTransitionEvent) Type() EventType {
 	return Event_TransactionStateTransition
 }
 
-func (_ *TransactionStateTransitionEvent) TypeString() string {
+func (*TransactionStateTransitionEvent) TypeString() string {
 	return "Event_TransactionStateTransition"
 }

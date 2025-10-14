@@ -72,7 +72,6 @@ type SenderBuilderForTesting struct {
 	nodeName         *string
 	committeeMembers []string
 	contractAddress  *pldtypes.EthAddress
-	eventHandler     func(ctx context.Context, event common.Event) error
 	transactions     []*transaction.Transaction
 	metrics          metrics.DistributedSequencerMetrics
 }
@@ -81,7 +80,6 @@ type SenderDependencyMocks struct {
 	SentMessageRecorder *SentMessageRecorder
 	Clock               *common.FakeClockForTesting
 	EngineIntegration   *common.FakeEngineIntegrationForTesting
-	emittedEvents       []common.Event
 }
 
 func NewSenderBuilderForTesting(state State) *SenderBuilderForTesting {

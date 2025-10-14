@@ -54,7 +54,6 @@ type sequencerManager struct {
 	nodeName                      string
 	sequencersLock                sync.RWMutex
 	syncPoints                    syncpoints.SyncPoints
-	subscribersLock               sync.Mutex
 	metrics                       metrics.DistributedSequencerMetrics
 	sequencers                    map[string]*sequencer
 	blockHeight                   int64
@@ -667,8 +666,13 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 			sequencer.GetCoordinator().QueueEvent(ctx, confirmedEvent)
 
 			// Forward the event to the sending node
+			// MRW TODO - I don't think we need to do this as nodes should index public chain reverts themselves
 			transportWriter := sequencer.GetTransportWriter()
-			transportWriter.SendTransactionConfirmed(ctx, confirmedTxn.TransactionID, mtx.SenderNode(), &contractAddress, nonce, confirmedTxn.RevertData)
+			err = transportWriter.SendTransactionConfirmed(ctx, confirmedTxn.TransactionID, mtx.SenderNode(), &contractAddress, nonce, confirmedTxn.RevertData)
+			if err != nil {
+				// Log but continue for the other receipts
+				log.L(sMgr.ctx).Errorf("failed to send transaction confirmed event to sending node %s: %v", mtx.SenderNode(), err)
+			}
 		} else {
 			// For a deploy we won't have tracked the transaction through the state machine, but we can load it ready for upcoming transactions and start
 			// of with ourselves as the active coordinator
@@ -733,9 +737,13 @@ func (sMgr *sequencerManager) HandleTransactionFailed(ctx context.Context, dbTX 
 
 			sequencer.GetCoordinator().QueueEvent(ctx, failedEvent)
 
-			// Forward the event to the sending node
+			// Forward the event to the sending node. // MRW TODO - I don't think we need to do this as nodes should index public chain reverts themselves
 			transportWriter := sequencer.GetTransportWriter()
-			transportWriter.SendTransactionConfirmed(ctx, tx.TransactionID, mtx.SenderNode(), contractAddress, tx.Nonce, tx.RevertReason)
+			err = transportWriter.SendTransactionConfirmed(ctx, tx.TransactionID, mtx.SenderNode(), contractAddress, tx.Nonce, tx.RevertReason)
+			if err != nil {
+				// Log but continue for the other receipts
+				log.L(sMgr.ctx).Errorf("failed to send transaction confirmed event to sending node %s: %v", mtx.SenderNode(), err)
+			}
 
 		}
 		sMgr.metrics.IncRevertedTransactions()

@@ -44,11 +44,11 @@ type ReceivedEvent struct {
 	BaseCoordinatorEvent
 }
 
-func (_ *ReceivedEvent) Type() EventType {
+func (*ReceivedEvent) Type() EventType {
 	return Event_Received
 }
 
-func (_ *ReceivedEvent) TypeString() string {
+func (*ReceivedEvent) TypeString() string {
 	return "Event_Received"
 }
 
@@ -57,11 +57,11 @@ type SelectedEvent struct {
 	BaseCoordinatorEvent
 }
 
-func (_ *SelectedEvent) Type() EventType {
+func (*SelectedEvent) Type() EventType {
 	return Event_Selected
 }
 
-func (_ *SelectedEvent) TypeString() string {
+func (*SelectedEvent) TypeString() string {
 	return "Event_Selected"
 }
 
@@ -70,11 +70,11 @@ type AssembleRequestSentEvent struct {
 	BaseCoordinatorEvent
 }
 
-func (_ *AssembleRequestSentEvent) Type() EventType {
+func (*AssembleRequestSentEvent) Type() EventType {
 	return Event_AssembleRequestSent
 }
 
-func (_ *AssembleRequestSentEvent) TypeString() string {
+func (*AssembleRequestSentEvent) TypeString() string {
 	return "Event_AssembleRequestSent"
 }
 
@@ -86,11 +86,11 @@ type AssembleSuccessEvent struct {
 	RequestID    uuid.UUID
 }
 
-func (_ *AssembleSuccessEvent) Type() EventType {
+func (*AssembleSuccessEvent) Type() EventType {
 	return Event_Assemble_Success
 }
 
-func (_ *AssembleSuccessEvent) TypeString() string {
+func (*AssembleSuccessEvent) TypeString() string {
 	return "Event_Assemble_Success"
 }
 
@@ -101,11 +101,11 @@ type AssembleRevertResponseEvent struct {
 	RequestID    uuid.UUID
 }
 
-func (_ *AssembleRevertResponseEvent) Type() EventType {
+func (*AssembleRevertResponseEvent) Type() EventType {
 	return Event_Assemble_Revert_Response
 }
 
-func (_ *AssembleRevertResponseEvent) TypeString() string {
+func (*AssembleRevertResponseEvent) TypeString() string {
 	return "Event_Assemble_Revert_Response"
 }
 
@@ -116,11 +116,11 @@ type EndorsedEvent struct {
 	RequestID   uuid.UUID
 }
 
-func (_ *EndorsedEvent) Type() EventType {
+func (*EndorsedEvent) Type() EventType {
 	return Event_Endorsed
 }
 
-func (_ *EndorsedEvent) TypeString() string {
+func (*EndorsedEvent) TypeString() string {
 	return "Event_Endorsed"
 }
 
@@ -133,11 +133,11 @@ type EndorsedRejectedEvent struct {
 	RequestID              uuid.UUID
 }
 
-func (_ *EndorsedRejectedEvent) Type() EventType {
+func (*EndorsedRejectedEvent) Type() EventType {
 	return Event_EndorsedRejected
 }
 
-func (_ *EndorsedRejectedEvent) TypeString() string {
+func (*EndorsedRejectedEvent) TypeString() string {
 	return "Event_EndorsedRejected"
 }
 
@@ -147,11 +147,11 @@ type DispatchRequestApprovedEvent struct {
 	RequestID uuid.UUID
 }
 
-func (_ *DispatchRequestApprovedEvent) Type() EventType {
+func (*DispatchRequestApprovedEvent) Type() EventType {
 	return Event_DispatchRequestApproved
 }
 
-func (_ *DispatchRequestApprovedEvent) TypeString() string {
+func (*DispatchRequestApprovedEvent) TypeString() string {
 	return "Event_DispatchRequestApproved"
 }
 
@@ -160,11 +160,11 @@ type DispatchRequestRejectedEvent struct {
 	BaseCoordinatorEvent
 }
 
-func (_ *DispatchRequestRejectedEvent) Type() EventType {
+func (*DispatchRequestRejectedEvent) Type() EventType {
 	return Event_DispatchRequestRejected
 }
 
-func (_ *DispatchRequestRejectedEvent) TypeString() string {
+func (*DispatchRequestRejectedEvent) TypeString() string {
 	return "Event_DispatchRequestRejected"
 }
 
@@ -175,11 +175,11 @@ type CollectedEvent struct {
 	SignerAddress pldtypes.EthAddress
 }
 
-func (_ *CollectedEvent) Type() EventType {
+func (*CollectedEvent) Type() EventType {
 	return Event_Collected
 }
 
-func (_ *CollectedEvent) TypeString() string {
+func (*CollectedEvent) TypeString() string {
 	return "Event_Collected"
 }
 
@@ -189,11 +189,11 @@ type NonceAllocatedEvent struct {
 	Nonce uint64
 }
 
-func (_ *NonceAllocatedEvent) Type() EventType {
+func (*NonceAllocatedEvent) Type() EventType {
 	return Event_NonceAllocated
 }
 
-func (_ *NonceAllocatedEvent) TypeString() string {
+func (*NonceAllocatedEvent) TypeString() string {
 	return "Event_NonceAllocated"
 }
 
@@ -203,11 +203,11 @@ type SubmittedEvent struct {
 	SubmissionHash pldtypes.Bytes32
 }
 
-func (_ *SubmittedEvent) Type() EventType {
+func (*SubmittedEvent) Type() EventType {
 	return Event_Submitted
 }
 
-func (_ *SubmittedEvent) TypeString() string {
+func (*SubmittedEvent) TypeString() string {
 	return "Event_Submitted"
 }
 
@@ -219,11 +219,11 @@ type ConfirmedEvent struct {
 	RevertReason pldtypes.HexBytes
 }
 
-func (_ *ConfirmedEvent) Type() EventType {
+func (*ConfirmedEvent) Type() EventType {
 	return Event_Confirmed
 }
 
-func (_ *ConfirmedEvent) TypeString() string {
+func (*ConfirmedEvent) TypeString() string {
 	return "Event_Confirmed"
 }
 
@@ -232,11 +232,11 @@ type DependencyAssembledEvent struct {
 	DependencyID uuid.UUID
 }
 
-func (_ *DependencyAssembledEvent) Type() EventType {
+func (*DependencyAssembledEvent) Type() EventType {
 	return Event_DependencyAssembled
 }
 
-func (_ *DependencyAssembledEvent) TypeString() string {
+func (*DependencyAssembledEvent) TypeString() string {
 	return "Event_DependencyAssembled"
 }
 
@@ -245,11 +245,11 @@ type DependencyRevertedEvent struct {
 	DependencyID uuid.UUID
 }
 
-func (_ *DependencyRevertedEvent) Type() EventType {
+func (*DependencyRevertedEvent) Type() EventType {
 	return Event_DependencyReverted
 }
 
-func (_ *DependencyRevertedEvent) TypeString() string {
+func (*DependencyRevertedEvent) TypeString() string {
 	return "Event_DependencyReverted"
 }
 
@@ -258,11 +258,11 @@ type DependencyReadyEvent struct {
 	DependencyID uuid.UUID
 }
 
-func (_ *DependencyReadyEvent) Type() EventType {
+func (*DependencyReadyEvent) Type() EventType {
 	return Event_DependencyReady
 }
 
-func (_ *DependencyReadyEvent) TypeString() string {
+func (*DependencyReadyEvent) TypeString() string {
 	return "Event_DependencyReady"
 }
 
@@ -270,11 +270,11 @@ type RequestTimeoutIntervalEvent struct {
 	BaseCoordinatorEvent
 }
 
-func (_ *RequestTimeoutIntervalEvent) Type() EventType {
+func (*RequestTimeoutIntervalEvent) Type() EventType {
 	return Event_RequestTimeoutInterval
 }
 
-func (_ *RequestTimeoutIntervalEvent) TypeString() string {
+func (*RequestTimeoutIntervalEvent) TypeString() string {
 	return "Event_RequestTimeoutInterval"
 }
 
@@ -285,11 +285,11 @@ type StateTransitionEvent struct {
 	ToState   State
 }
 
-func (_ *StateTransitionEvent) Type() EventType {
+func (*StateTransitionEvent) Type() EventType {
 	return Event_StateTransition
 }
 
-func (_ *StateTransitionEvent) TypeString() string {
+func (*StateTransitionEvent) TypeString() string {
 	return "Event_StateTransition"
 }
 
@@ -298,10 +298,10 @@ type HeartbeatIntervalEvent struct {
 	BaseCoordinatorEvent
 }
 
-func (_ *HeartbeatIntervalEvent) Type() EventType {
+func (*HeartbeatIntervalEvent) Type() EventType {
 	return Event_HeartbeatInterval
 }
 
-func (_ *HeartbeatIntervalEvent) TypeString() string {
+func (*HeartbeatIntervalEvent) TypeString() string {
 	return "Event_HeartbeatInterval"
 }

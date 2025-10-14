@@ -24,8 +24,7 @@ import (
 func action_SendPreDispatchResponse(ctx context.Context, txn *Transaction) error {
 	// MRW TODO - sending a dispatch response should be based on some sanity check that we are OK for the coordinator
 	// to proceed to dispatch. Not sure if that belongs here, or somewhere else, but at the moment we always reply OK/proceed.
-	txn.transportWriter.SendPreDispatchResponse(ctx, txn.currentDelegate, txn.latestPreDispatchRequestID, txn.PreAssembly.TransactionSpecification)
-	return nil
+	return txn.transportWriter.SendPreDispatchResponse(ctx, txn.currentDelegate, txn.latestPreDispatchRequestID, txn.PreAssembly.TransactionSpecification)
 }
 
 // Validate that the assemble request matches the current delegate

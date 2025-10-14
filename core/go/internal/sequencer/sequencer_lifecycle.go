@@ -73,18 +73,14 @@ type sequencer struct {
 	// Sequencer attributes
 	contractAddress string
 	lastTXTime      time.Time
-
-	// Channels for passing events into the originator and coordinator event loops respectively
-	senderEvents      chan common.Event
-	coordinatorEvents chan common.Event
-	closeEventHandler context.CancelFunc
 }
 
 // Return the sequencer for the requested contract address, instantiating it first if this is its first use
 func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistence.DBTX, contractAddr pldtypes.EthAddress, domainAPI components.DomainSmartContract, tx *components.PrivateTransaction) (Sequencer, error) {
 	var err error
 	if domainAPI == nil {
-		domainAPI, err = sMgr.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
+		// Does a domain exist at this address?
+		_, err = sMgr.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
 		if err != nil {
 			// Treat as a valid case, let the caller decide if it is or not
 			log.L(ctx).Infof("no sequencer found for contract %s, assuming contract deploy: %s", contractAddr, err)
@@ -248,7 +244,10 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			}
 
 			// Get the best candidate for an initial coordinator, and use as the delegate for any originated transactions
-			sMgr.sequencers[contractAddr.String()].GetSender().SetActiveCoordinator(sMgr.ctx, sMgr.sequencers[contractAddr.String()].GetCoordinator().GetActiveCoordinatorNode(sMgr.ctx))
+			err := sMgr.sequencers[contractAddr.String()].GetSender().SetActiveCoordinator(sMgr.ctx, sMgr.sequencers[contractAddr.String()].GetCoordinator().GetActiveCoordinatorNode(sMgr.ctx))
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -427,9 +426,13 @@ func (sMgr *sequencerManager) dispatch(ctx context.Context, t *coordTransaction.
 	// We also need to trigger ourselves for any private TX we chained
 	for _, dispatch := range dispatchBatch.PrivateDispatches {
 		// Create a new DB transaction and handle the new transaction
-		sMgr.components.Persistence().Transaction(ctx, func(ctx context.Context, dbTx persistence.DBTX) error {
+		err = sMgr.components.Persistence().Transaction(ctx, func(ctx context.Context, dbTx persistence.DBTX) error {
 			return sMgr.HandleNewTx(ctx, dbTx, dispatch.NewTransaction)
 		})
+		if err != nil {
+			log.L(ctx).Errorf("error handling new transaction: %v", err)
+			return
+		}
 	}
 	log.L(ctx).Debugf("Chained %d private transactions", len(dispatchBatch.PrivateDispatches))
 }
