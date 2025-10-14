@@ -303,7 +303,11 @@ func (gm *groupManager) CreateGroup(ctx context.Context, dbTX persistence.DBTX, 
 		tx.PublicTxOptions = spec.TransactionOptions.PublicTxOptions
 	}
 	if tx.From == "" {
-		tx.From = fmt.Sprintf("domains.%s.pgroupinit.%s", spec.Domain, id)
+		if identity := domain.FixedSigningIdentity(); identity != "" {
+			tx.From = identity
+		} else {
+			tx.From = fmt.Sprintf("domains.%s.pgroupinit.%s", spec.Domain, id)
+		}
 	}
 
 	// Insert the transaction

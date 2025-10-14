@@ -18,7 +18,7 @@ import PaladinClient, {
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContractData } from "./tests/data-persistence";
-import { nodeConnections, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
+import { nodeConnections, getCachePath, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import assert from "assert";
 
 const logger = console;
@@ -52,7 +52,7 @@ async function main(): Promise<boolean> {
       notary: verifierNode1,
       notaryMode: "basic",
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!cashToken) {
     logger.error("Failed to deploy the Noto cash token!");
     return false;
@@ -242,7 +242,7 @@ async function main(): Promise<boolean> {
   };
 
   // Use command-line argument for data directory if provided, otherwise use default
-  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
+  const dataDir = getCachePath();
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }

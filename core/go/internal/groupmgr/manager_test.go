@@ -107,6 +107,7 @@ func newTestGroupManager(t *testing.T, realDB bool, conf *pldconf.GroupManagerCo
 	logrus.SetLevel(logrus.TraceLevel)
 
 	mc := newMockComponents(t, realDB)
+	mc.domain.On("FixedSigningIdentity").Return("").Maybe()
 	for _, fn := range extraSetup {
 		fn(mc, conf)
 	}

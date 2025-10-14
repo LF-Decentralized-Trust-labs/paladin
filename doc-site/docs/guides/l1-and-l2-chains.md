@@ -11,7 +11,7 @@ A public chain will have a long chain history. Paladin indexes the base ledger i
 chain this could take many days to index. Paladin only requires block history from the point at which Paladin tranasctions and contracts were deployed. To reduce the time to index the chain, use the `fromBlock` configuration
 option under the `blockIndexer` configuration section. For example:
 
-```
+```yaml
 blockIndexer:
     fromBlock: 9024200
 ```
@@ -34,7 +34,7 @@ Public chains can experience chain reorganizations, especially during periods of
 
 To set the required confirmations for a public chain, add the following to your configuration:
 
-```***
+```yaml
 blockIndexer:
   fromBlock: 9024200
   requiredConfirmations: 12
@@ -58,7 +58,7 @@ in order for them to be mined into blocks. Paladin provides several options for 
 
 You can configure fixed gas prices at the node level that will be used for all transactions unless overridden at the transaction level:
 
-```
+```yaml
 publicTxManager:
   gasPrice:
     fixedGasPrice:
@@ -80,11 +80,11 @@ Note: setting the fixed gas price values too high could result in paying more ga
 
 Paladin can automatically retrieve optimal gas prices using the `eth_feeHistory` RPC method, which provides historical fee data from the network. This approach adapts to network conditions and can be more cost-effective than fixed pricing.
 
-```
+```yaml
 publicTxManager:
   gasPrice:
     ethFeeHistory:
-      tipPercentile: 85
+      priorityFeePercentile: 85
       historyBlockCount: 20
       baseFeeBufferFactor: 1
       cache:
@@ -102,7 +102,7 @@ Configuration options:
 
 Paladin can retrieve gas prices from external gas oracle APIs, which can provide more accurate or specialized gas price data than the standard `eth_feeHistory` method. This is particularly useful for chains with limited RPC capabilities or when using specialized gas price services.
 
-```
+```yaml
 publicTxManager:
   gasPrice:
     gasOracleAPI:
@@ -139,7 +139,7 @@ The gas oracle API must:
 
 Gas oracle APIs can also be custom JSON/RPC methods provided by your base ledger node. This is useful when your node supports specialized gas price calculation methods that aren't part of the standard Ethereum JSON/RPC specification.
 
-```
+```yaml
 publicTxManager:
   gasPrice:
     gasOracleAPI:
@@ -169,7 +169,7 @@ Example API responses that work with the template above:
 **Hexadecimal format:**
 ```json
 {
-  "data": {
+  "result": {
     "maxFeePerGas": "0x2FAF080",
     "maxPriorityFeePerGas": "0x3B9ACA0"
   }
@@ -179,7 +179,7 @@ Example API responses that work with the template above:
 **Decimal format:**
 ```json
 {
-  "data": {
+  "result": {
     "maxFeePerGas": "50000000",
     "maxPriorityFeePerGas": "62500000"
   }
@@ -213,7 +213,7 @@ Transaction-level fixed gas pricing bypasses all automatic gas pricing logic and
 
 When a transaction is rejected for being underpriced, Paladin can automatically increase the gas price by a configurable percentage and resubmit the transaction. This mechanism applies to node-level fixed pricing, gas oracle API pricing, and dynamic pricing, but not to transaction-level fixed pricing.
 
-```
+```yaml
 publicTxManager:
   gasPrice:
     increasePercentage: 10
@@ -227,7 +227,7 @@ publicTxManager:
 
 To protect against excessive gas spending, you can configure maximum caps for both `maxFeePerGas` and `maxPriorityFeePerGas`. These caps apply universally to all gas pricing methods:
 
-```
+```yaml
 publicTxManager:
   gasPrice:
     maxFeePerGasCap: 0x5d21dba00  # 25 Gwei cap
@@ -264,7 +264,7 @@ The gas price cache stores the most recent gas price data and automatically refr
 
 Both `ethFeeHistory` and `gasOracleAPI` pricing methods support caching:
 
-```
+```yaml
 publicTxManager:
   gasPrice:
     ethFeeHistory:

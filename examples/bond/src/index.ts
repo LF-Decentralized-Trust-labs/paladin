@@ -22,6 +22,7 @@ import PaladinClient, {
 import {
   checkDeploy,
   checkReceipt,
+  getCachePath,
   DEFAULT_POLL_TIMEOUT,
   LONG_POLL_TIMEOUT,
   POLL_INTERVAL,
@@ -151,7 +152,7 @@ async function main(): Promise<boolean> {
         },
       },
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(notoBond)) return false;
 
   // Deploy the atom factory on the base ledger
@@ -514,7 +515,7 @@ async function main(): Promise<boolean> {
   };
 
   // Use command-line argument for data directory if provided, otherwise use default
-  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
+  const dataDir = getCachePath();
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }

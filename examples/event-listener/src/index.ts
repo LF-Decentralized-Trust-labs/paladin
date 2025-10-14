@@ -19,7 +19,7 @@ import PaladinClient, {
   TransactionType,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import { nanoid } from "nanoid";
-import { checkDeploy, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
+import { checkDeploy, getCachePath, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import helloWorldJson from "./abis/HelloWorld.json";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -48,7 +48,7 @@ async function main(): Promise<boolean> {
       evmVersion: "shanghai",
       externalCallsEnabled: true,
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(memberPrivacyGroup)) return false;
 
   // Deploy a smart contract within the privacy group
@@ -59,7 +59,7 @@ async function main(): Promise<boolean> {
     from: verifierNode1.lookup,
   });
   const receipt = await deploy.waitForReceipt(DEFAULT_POLL_TIMEOUT);
-  const contractAddress = await deploy.waitForDeploy();
+  const contractAddress = await deploy.waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!receipt || !contractAddress) {
     logger.error("Failed to deploy the contract. No address returned.");
     return false;
@@ -254,7 +254,7 @@ async function main(): Promise<boolean> {
   };
 
   // Use command-line argument for data directory if provided, otherwise use default
-  const dataDir = process.argv[2] || path.join(__dirname, '..', 'data');
+  const dataDir = getCachePath();
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }

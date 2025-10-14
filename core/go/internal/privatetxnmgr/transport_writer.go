@@ -116,7 +116,7 @@ func (tw *transportWriter) SendDelegationRequestAcknowledgment(
 }
 
 // TODO do we have duplication here?  contractAddress and transactionID are in the transactionSpecification
-func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, idempotencyKey string, party string, targetNode string, contractAddress string, transactionID string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*components.FullState, outputStates []*components.FullState, infoStates []*components.FullState) error {
+func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, idempotencyKey string, party string, targetNode string, contractAddress string, transactionID string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*components.FullState, readStates []*components.FullState, outputStates []*components.FullState, infoStates []*components.FullState) error {
 	attRequestAny, err := anypb.New(attRequest)
 	if err != nil {
 		log.L(ctx).Error("Error marshalling attestation request", err)
@@ -158,6 +158,17 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, idempoten
 		inputStatesAny[i] = inputStateAny
 	}
 
+	readStatesAny := make([]*anypb.Any, len(readStates))
+	endorseableReadStates := toEndorsableList(readStates)
+	for i, readState := range endorseableReadStates {
+		readStateAny, err := anypb.New(readState)
+		if err != nil {
+			log.L(ctx).Error("Error marshalling read state", err)
+			return err
+		}
+		readStatesAny[i] = readStateAny
+	}
+
 	outputStatesAny := make([]*anypb.Any, len(outputStates))
 	endorseableOutputStates := toEndorsableList(outputStates)
 	for i, outputState := range endorseableOutputStates {
@@ -190,6 +201,7 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, idempoten
 		Verifiers:                verifiersAny,
 		Signatures:               signaturesAny,
 		InputStates:              inputStatesAny,
+		ReadStates:               readStatesAny,
 		OutputStates:             outputStatesAny,
 		InfoStates:               infoStatesAny,
 	}

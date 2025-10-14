@@ -5,6 +5,11 @@
 # This workflow (phase 2) creates the final release after RC testing has been completed.
 name: Release
 
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  
 on:
   push:
     tags:
@@ -176,13 +181,47 @@ jobs:
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }} 
 
+  # ================================ Prepare release ================================
+  # Override SDK version in examples and create a release branch
+  prepare-release:
+    needs: [setup, release-solidity-contracts, release-typescript-sdk]
+    runs-on: ubuntu-latest
+    outputs:
+      new_sha: ${{ steps.commit.outputs.NEW_SHA }}
+
+    steps:
+    - name: Checkout repository code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: override examples sdk version
+      uses: ./.github/actions/override-sdk-version
+      with:
+        sdk_version: ${{ needs.setup.outputs.tag }}
+
+    - name: Commit changes
+      id: commit
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add examples/
+        git commit -m "chore: Update SDK version in examples to ${{ needs.setup.outputs.tag }}"
+        git push origin HEAD:release-${{ needs.setup.outputs.tag }}
+        echo "NEW_SHA=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
   # ================================ CREATE FINAL RELEASE ================================
   # Bundle all built artifacts and create the final GitHub release
   # This step only runs after all artifacts have been successfully built and published
   create-final-release:
-    needs: [setup, release-solidity-contracts, release-typescript-sdk]
+    needs: [setup, prepare-release]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - name: Download Helm artifacts
         uses: actions/download-artifact@v4
         with:
@@ -198,11 +237,11 @@ jobs:
       - name: List downloaded artifacts
         run: |
           ls -R
-
       - name: Create final release with all artifacts
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.setup.outputs.tag }}
+          target_commitish: ${{ needs.prepare-release.outputs.new_sha }}
           body: "Release ${{ needs.setup.outputs.tag }}"
           generate_release_notes: true
           make_latest: '${{ fromJSON(needs.setup.outputs.latest) }}'

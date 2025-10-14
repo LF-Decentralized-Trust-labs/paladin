@@ -5,14 +5,14 @@ go 1.24.0
 toolchain go1.24.3
 
 require (
+	github.com/LF-Decentralized-Trust-labs/paladin/common/go v0.0.0-00010101000000-000000000000
+	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
 	github.com/aidarkhanov/nanoid v1.0.8
 	github.com/go-resty/resty/v2 v2.14.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/hyperledger/firefly-signer v1.1.21
 	github.com/jarcoal/httpmock v1.2.0
-	github.com/LF-Decentralized-Trust-labs/paladin/common/go v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/crypto v0.36.0

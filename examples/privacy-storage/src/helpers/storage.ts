@@ -17,6 +17,7 @@ import PaladinClient, {
   PentePrivacyGroup,
   PentePrivateContract,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
+import { DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import storage from "../abis/Storage.json";
 
 export const newPrivateStorage = async (
@@ -27,7 +28,7 @@ export const newPrivateStorage = async (
     abi: storage.abi,
     bytecode: storage.bytecode,
     from: from.lookup,
-  }).waitForDeploy();
+  }).waitForDeploy(DEFAULT_POLL_TIMEOUT);
   return address ? new PrivateStorage(pente, address) : undefined;
 };
 

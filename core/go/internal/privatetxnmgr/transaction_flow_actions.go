@@ -597,6 +597,7 @@ func (tf *transactionFlow) requestEndorsement(ctx context.Context, idempotencyKe
 			tf.transaction.PreAssembly.Verifiers,
 			tf.transaction.PostAssembly.Signatures,
 			tf.transaction.PostAssembly.InputStates,
+			tf.transaction.PostAssembly.ReadStates,
 			tf.transaction.PostAssembly.OutputStates,
 			tf.transaction.PostAssembly.InfoStates,
 		)

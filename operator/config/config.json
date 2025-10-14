@@ -6,13 +6,13 @@
         }
     },
     "besu": {
-        "image": "hyperledger/besu:24.10.0",
+        "image": "hyperledger/besu:25.8.0",
         "labels": {
             "app": "besu"
         }
     },
     "postgres": {
-        "image": "postgres:latest"
+        "image": "postgres:17.6"
     }
 }
   
