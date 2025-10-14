@@ -125,7 +125,7 @@ func (t *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []
 // it is safe to call this function multiple times and on a frequent basis (e.g. every heartbeat interval while in the endorsement gathering state) as it will not send duplicate requests unless they have timedout
 func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 
-	log.L(ctx).Infof("sendEndorsementRequests: number of verifiers %d", len(t.PreAssembly.Verifiers))
+	log.L(ctx).Debugf("sendEndorsementRequests: number of verifiers %d", len(t.PreAssembly.Verifiers))
 
 	if t.pendingEndorsementRequests == nil {
 		//we are starting a new round of endorsement requests so set an interval to remind us to resend any requests that have not been fulfilled on a periodic basis
@@ -158,6 +158,7 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 			})
 			pendingRequestsForAttRequest[endorsementRequirement.party] = pendingRequest
 		}
+
 		err := pendingRequest.Nudge(ctx)
 		if err != nil {
 			log.L(ctx).Errorf("failed to nudge endorsement request for party %s: %s", endorsementRequirement.party, err)
@@ -166,6 +167,17 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 
 	}
 
+	return nil
+}
+
+func (t *Transaction) resetEndorsementRequests(ctx context.Context) error {
+	if t.pendingEndorsementRequests == nil {
+		return nil
+	}
+
+	log.L(ctx).Trace("resetting endorsement requests")
+	t.cancelEndorsementRequestTimeoutSchedule()
+	t.pendingEndorsementRequests = make(map[string]map[string]*common.IdempotentRequest)
 	return nil
 }
 

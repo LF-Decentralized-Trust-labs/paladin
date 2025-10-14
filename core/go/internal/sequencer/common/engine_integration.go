@@ -190,6 +190,9 @@ func (e *engineIntegration) AssembleAndSign(ctx context.Context, transactionID u
 		return nil, err
 	}
 
+	// Reset to an empty list in case we've already assembled before
+	preAssembly.Verifiers = make([]*prototk.ResolvedVerifier, 0)
+
 	for _, v := range preAssembly.RequiredVerifiers {
 		log.L(ctx).Debugf("assembleForRemoteCoordinator: resolving required verifier %s", v.Lookup)
 		verifier, err := e.components.IdentityResolver().ResolveVerifier(

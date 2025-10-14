@@ -268,6 +268,39 @@ func (_c *MockDistributedSequencerMetrics_IncEndorsedTransactions_Call) RunAndRe
 	return _c
 }
 
+// IncRevertedTransactions provides a mock function for the type MockDistributedSequencerMetrics
+func (_mock *MockDistributedSequencerMetrics) IncRevertedTransactions() {
+	_mock.Called()
+	return
+}
+
+// MockDistributedSequencerMetrics_IncRevertedTransactions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IncRevertedTransactions'
+type MockDistributedSequencerMetrics_IncRevertedTransactions_Call struct {
+	*mock.Call
+}
+
+// IncRevertedTransactions is a helper method to define mock.On call
+func (_e *MockDistributedSequencerMetrics_Expecter) IncRevertedTransactions() *MockDistributedSequencerMetrics_IncRevertedTransactions_Call {
+	return &MockDistributedSequencerMetrics_IncRevertedTransactions_Call{Call: _e.mock.On("IncRevertedTransactions")}
+}
+
+func (_c *MockDistributedSequencerMetrics_IncRevertedTransactions_Call) Run(run func()) *MockDistributedSequencerMetrics_IncRevertedTransactions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockDistributedSequencerMetrics_IncRevertedTransactions_Call) Return() *MockDistributedSequencerMetrics_IncRevertedTransactions_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockDistributedSequencerMetrics_IncRevertedTransactions_Call) RunAndReturn(run func()) *MockDistributedSequencerMetrics_IncRevertedTransactions_Call {
+	_c.Run(run)
+	return _c
+}
+
 // ObserveSequencerTXStateChange provides a mock function for the type MockDistributedSequencerMetrics
 func (_mock *MockDistributedSequencerMetrics) ObserveSequencerTXStateChange(state string, duration time.Duration) {
 	_mock.Called(state, duration)

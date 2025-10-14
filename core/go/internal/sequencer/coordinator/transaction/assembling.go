@@ -282,6 +282,7 @@ func action_NotifyDependentsOfRevert(ctx context.Context, txn *Transaction) erro
 }
 
 func action_IncrementAssembleErrors(ctx context.Context, txn *Transaction) error {
+	txn.resetEndorsementRequests(ctx)
 	return txn.incrementAssembleErrors(ctx)
 }
 

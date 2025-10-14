@@ -28,6 +28,7 @@ type DistributedSequencerMetrics interface {
 	IncEndorsedTransactions()
 	IncDispatchedTransactions()
 	IncConfirmedTransactions()
+	IncRevertedTransactions()
 	ObserveSequencerTXStateChange(state string, duration time.Duration)
 	SetActiveCoordinators(numberOfActiveCoordinators int)
 	SetActiveSequencers(numberOfActiveSequencers int)
@@ -43,6 +44,7 @@ type distributedSequencerMetrics struct {
 	endorsedTransactions     prometheus.Counter
 	dispatchedTransactions   prometheus.Counter
 	confirmedTransactions    prometheus.Counter
+	revertedTransactions     prometheus.Counter
 	sequencerStage           *prometheus.HistogramVec
 	activeCoordinators       prometheus.Gauge
 	activeSequencers         prometheus.Gauge
@@ -62,6 +64,8 @@ func InitMetrics(ctx context.Context, registry *prometheus.Registry) *distribute
 		Help: "Distributed sequencer dispatched transactions", Subsystem: METRICS_SUBSYSTEM})
 	metrics.confirmedTransactions = prometheus.NewCounter(prometheus.CounterOpts{Name: "confirmed_txns_total",
 		Help: "Distributed sequencer confirmed transactions", Subsystem: METRICS_SUBSYSTEM})
+	metrics.revertedTransactions = prometheus.NewCounter(prometheus.CounterOpts{Name: "reverted_txns_total",
+		Help: "Distributed sequencer reverted transactions", Subsystem: METRICS_SUBSYSTEM})
 	metrics.sequencerStage = prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "sequencer_stage",
 		Help: "Distributed sequencer stage", Subsystem: METRICS_SUBSYSTEM, Buckets: []float64{5, 10, 20, 40, 80, 200, 400, 800, 1600}}, []string{"stage"})
 	metrics.activeCoordinators = prometheus.NewGauge(prometheus.GaugeOpts{Name: "active_coordinators",
@@ -100,6 +104,10 @@ func (dtm *distributedSequencerMetrics) IncDispatchedTransactions() {
 
 func (dtm *distributedSequencerMetrics) IncConfirmedTransactions() {
 	dtm.confirmedTransactions.Inc()
+}
+
+func (dtm *distributedSequencerMetrics) IncRevertedTransactions() {
+	dtm.revertedTransactions.Inc()
 }
 
 func (dtm *distributedSequencerMetrics) ObserveSequencerTXStateChange(state string, duration time.Duration) {

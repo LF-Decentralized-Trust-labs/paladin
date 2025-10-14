@@ -324,7 +324,7 @@ abstract class CoordinationTest extends Exec {
         workingDir '.'
         executable 'go'
         args 'test'
-        args './noderuntests/coordinationtest', './pkg/testbed'
+        args './noderuntests/coordinationtest'
         args '-cover'
         args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..." // toolkit handled seperately
         args '-covermode=atomic'

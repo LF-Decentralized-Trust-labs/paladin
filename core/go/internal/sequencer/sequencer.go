@@ -102,8 +102,13 @@ func (sMgr *sequencerManager) Start() error {
 			if err == nil {
 				break
 			}
-			fmt.Println("Waiting for block indexer to be ready")
-			time.Sleep(1 * time.Second)
+
+			ctx, cancel := context.WithTimeout(sMgr.ctx, 1*time.Second)
+			defer cancel()
+
+			// Wait for the block indexer to be ready
+			<-ctx.Done()
+			log.L(sMgr.ctx).Errorf("Timeout waiting for block indexer to be ready")
 		}
 		resumedTransactions := 0
 
@@ -348,7 +353,7 @@ func (sMgr *sequencerManager) HandleNewTx(ctx context.Context, dbTX persistence.
 	if txi.Function == nil || txi.Function.Definition == nil {
 		return i18n.NewError(ctx, msgs.MsgPrivateTxMgrFunctionNotProvided)
 	}
-	log.L(sMgr.ctx).Infof("handling non-deploy transaction %s from signer %s", tx.ID, tx.From)
+	log.L(sMgr.ctx).Infof("handling transaction %s from signer %s", tx.ID, tx.From)
 	return sMgr.handleTx(ctx, dbTX, &components.PrivateTransaction{
 		ID:      *tx.ID,
 		Domain:  tx.Domain,
@@ -676,10 +681,65 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 	return nil
 }
 
-func (sMgr *sequencerManager) HandleTransactionFailed(ctx context.Context, dbTX persistence.DBTX, confirms []*components.PublicTxMatch) error {
-	log.L(sMgr.ctx).Infof("handling transaction failed for %d transactions", len(confirms))
-	// MRW TODO - populate failure receipts and distribute to sequencer
-	privateFailureReceipts := make([]*components.ReceiptInputWithOriginator, len(confirms))
+func (sMgr *sequencerManager) HandleTransactionFailed(ctx context.Context, dbTX persistence.DBTX, failures []*components.PublicTxMatch) error {
+	log.L(sMgr.ctx).Infof("handling transaction failed for %d transactions", len(failures))
+	privateFailureReceipts := make([]*components.ReceiptInputWithOriginator, len(failures))
+
+	for i, tx := range failures {
+		// We calculate the failure message - all errors handled mapped internally here
+		privateFailureReceipts[i] = &components.ReceiptInputWithOriginator{
+			Originator:            tx.TransactionSender,
+			DomainContractAddress: tx.TransactionContractAddress,
+			ReceiptInput: components.ReceiptInput{
+				ReceiptType:   components.RT_FailedOnChainWithRevertData,
+				TransactionID: tx.TransactionID,
+				OnChain: pldtypes.OnChainLocation{
+					Type:             pldtypes.OnChainTransaction,
+					TransactionHash:  tx.Hash,
+					BlockNumber:      tx.BlockNumber,
+					TransactionIndex: tx.BlockNumber,
+				},
+				RevertData: tx.RevertReason,
+			},
+		}
+		contractAddress := tx.To
+
+		sequencer, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
+		if err != nil {
+			log.L(sMgr.ctx).Errorf("failed to obtain sequencer to pass transaction confirmed event to %v:", err)
+			return err
+		}
+
+		if sequencer != nil {
+			mtx := sequencer.GetCoordinator().GetTransactionByID(ctx, tx.TransactionID)
+			if mtx == nil {
+				return fmt.Errorf("coordinator not tracking transaction ID %s", tx.TransactionID)
+			}
+
+			log.L(sMgr.ctx).Infof("handing TX reverted event to coordinator")
+
+			if tx.From == nil {
+				return fmt.Errorf("nil From address for confirmed transaction %s", tx.TransactionID)
+			}
+
+			failedEvent := &coordinator.TransactionConfirmedEvent{
+				TxID:         tx.TransactionID,
+				From:         tx.From, // The base ledger signing address
+				Hash:         tx.Hash,
+				RevertReason: tx.RevertReason,
+				Nonce:        tx.Nonce,
+			}
+			failedEvent.EventTime = time.Now()
+
+			sequencer.GetCoordinator().QueueEvent(ctx, failedEvent)
+
+			// Forward the event to the sending node
+			transportWriter := sequencer.GetTransportWriter()
+			transportWriter.SendTransactionConfirmed(ctx, tx.TransactionID, mtx.SenderNode(), contractAddress, tx.Nonce, tx.RevertReason)
+
+		}
+		sMgr.metrics.IncRevertedTransactions()
+	}
 
 	// Distribute the receipts to the correct location - either local if we were the submitter, or remote.
 	return sMgr.WriteOrDistributeReceiptsPostSubmit(ctx, dbTX, privateFailureReceipts)
@@ -783,19 +843,13 @@ func (sMgr *sequencerManager) CallPrivateSmartContract(ctx context.Context, call
 
 func (sMgr *sequencerManager) WriteOrDistributeReceiptsPostSubmit(ctx context.Context, dbTX persistence.DBTX, receipts []*components.ReceiptInputWithOriginator) error {
 
-	// MRW TODO - handle failure of a transaction wrt its chained transactions
-	// There may be some cases (a small number?) where we decide we can continue with the next transaction.
-	// for _, r := range receipts {
-	// 	if r.ReceiptType != components.RT_Success && r.DomainContractAddress != "" {
-	// 		seq := p.getSequencerIfActive(ctx, r.DomainContractAddress)
-	// 		if seq != nil {
-	// 			log.L(ctx).Errorf("Due to transaction error the sequencer for smart contract %s in domain %s is STOPPING", seq.contractAddress, r.Domain)
-	// 			seq.Stop()
-	// 		}
-	// 	}
-	// }
+	// There may be some public reverts that are unrecoverable. This function is potentially where we enforce that. For now, no public revert
+	// is considered irrecoverable for private transactions so we don't persist a private TX failure receipt here, we assume that with enough
+	// successful re-assembles we will end up with a successful private TX receipt. An assemle revert will still finalise the private TX with
+	// a revert receipt.
+	// sMgr.syncPoints.WriteOrDistributeReceipts(ctx, dbTX, receipts)
 
-	return sMgr.syncPoints.WriteOrDistributeReceipts(ctx, dbTX, receipts)
+	return nil
 }
 
 // MRW TODO - move to sequencer module?

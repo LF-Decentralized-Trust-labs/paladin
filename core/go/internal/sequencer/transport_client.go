@@ -712,13 +712,6 @@ func (sMgr *sequencerManager) handleEndorsementResponse(ctx context.Context, mes
 		return
 	}
 
-	endorsement := &prototk.AttestationResult{}
-	err = proto.Unmarshal(endorsementResponse.Endorsement.Value, endorsement)
-	if err != nil {
-		log.L(ctx).Errorf("handleEndorsementResponse failed to unmarshal endorsement: %s", err)
-		return
-	}
-
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
 		log.L(ctx).Errorf("handleEndorsementRequest failed to obtain sequencer to pass endorsement event %v:", err)
@@ -729,12 +722,31 @@ func (sMgr *sequencerManager) handleEndorsementResponse(ctx context.Context, mes
 		return
 	}
 
+	// Endorsement reverted
+	if endorsementResponse.GetRevertReason() != "" {
+		endorsementRejectedEvent := &coordTransaction.EndorsedRejectedEvent{}
+		endorsementRejectedEvent.TransactionID = uuid.MustParse(endorsementResponse.TransactionId)
+		endorsementRejectedEvent.RequestID = uuid.MustParse(endorsementResponse.IdempotencyKey)
+		endorsementRejectedEvent.EventTime = time.Now()
+		endorsementRejectedEvent.RevertReason = endorsementResponse.GetRevertReason()
+		endorsementRejectedEvent.AttestationRequestName = endorsementResponse.AttestationRequestName
+		seq.GetCoordinator().QueueEvent(ctx, endorsementRejectedEvent)
+		return
+	}
+
+	// Endorsement succeeded
+	endorsement := &prototk.AttestationResult{}
+	err = proto.Unmarshal(endorsementResponse.Endorsement.Value, endorsement)
+	if err != nil {
+		log.L(ctx).Errorf("handleEndorsementResponse failed to unmarshal endorsement: %s", err)
+		return
+	}
+
 	endorsementResponseEvent := &coordTransaction.EndorsedEvent{}
 	endorsementResponseEvent.TransactionID = uuid.MustParse(endorsementResponse.TransactionId)
 	endorsementResponseEvent.RequestID = uuid.MustParse(endorsementResponse.IdempotencyKey)
 	endorsementResponseEvent.Endorsement = endorsement
 	endorsementResponseEvent.EventTime = time.Now()
-
 	seq.GetCoordinator().QueueEvent(ctx, endorsementResponseEvent)
 }
 

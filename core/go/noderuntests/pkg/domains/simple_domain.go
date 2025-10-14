@@ -52,6 +52,9 @@ var simpleDomainBuild []byte // comes from Hardhat build
 //go:embed abis/SimpleToken.json
 var simpleTokenBuild []byte // comes from Hardhat build
 
+// The simple domain can be used to test reverts but only once, then they need discarding for the next revert test
+var revertedOnce = make(map[string]bool)
+
 const (
 	SimpleDomainInsufficientFundsError = "SDE0001"
 )
@@ -801,6 +804,24 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 
 				_, fromAddr, toAddr := extractTransferVerifiers(req.Transaction, txInputs, req.ResolvedVerifiers)
 				amount := txInputs.Amount.BigInt()
+				salt := pldtypes.RandBytes(32)
+
+				// Basic special case for revert testing:
+				// If the amount is set to 1001 we will revert in the domain at assembly time
+				// If the amount is set to 1002 we will use a fixed, known salt and revert the domain at endorsement time (see EndorseTransaction)
+				// If the amount is set to 1003 we will use a fixed, known salt and the baseledger contract will check for the known input UTXO and revert
+				if amount.Cmp(big.NewInt(1001)) == 0 {
+					revertMessage := "simple domain revert - special transfer amount 1001 intentionally rejected"
+					return &prototk.AssembleTransactionResponse{
+						AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
+						RevertReason:   &revertMessage,
+					}, nil
+				}
+				if amount.Cmp(big.NewInt(1003)) == 0 && !revertedOnce[req.Transaction.TransactionId] {
+					// Don't revert, but set the UTXO to a special value that will cause endorsement to revert on the base ledger
+					salt = pldtypes.MustParseHexBytes("0x1212121212121212121212121212121212121212121212121212121212121212")
+					revertedOnce[req.Transaction.TransactionId] = true
+				}
 				toKeep := new(big.Int)
 				coinsToSpend := []*simpleTokenParser{}
 				stateRefsToSpend := []*prototk.StateRef{}
@@ -827,7 +848,7 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 				if fromAddr != nil && toKeep.Sign() > 0 {
 					// Generate a state to keep for ourselves
 					coin := simpleTokenParser{
-						Salt:   pldtypes.RandBytes(32),
+						Salt:   salt,
 						Owner:  *fromAddr,
 						Amount: (*ethtypes.HexInteger)(toKeep),
 					}
@@ -846,7 +867,7 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 				if toAddr != nil && amount.Sign() > 0 {
 					// Generate the coin to transfer
 					coin := simpleTokenParser{
-						Salt:   pldtypes.RandBytes(32),
+						Salt:   salt,
 						Owner:  *toAddr,
 						Amount: (*ethtypes.HexInteger)(amount),
 					}
@@ -985,6 +1006,20 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 					assert.Equal(t, simpleTokenSchemaID, output.SchemaId)
 					if err := json.Unmarshal([]byte(output.StateDataJson), &outCoins[i]); err != nil {
 						return nil, fmt.Errorf("invalid output[%d] (%s): %s", i, output.Id, err)
+					}
+				}
+
+				// Special case - amount 1002 causes us to revert at endorsement time. We do this only once since
+				// endorsement needs to be successful eventually. This contract is effectively throw-away once it's
+				// been used to test revert in this way but all tests deploy a new instance each time.
+				if outCoins[0].Amount.BigInt().Cmp(big.NewInt(1002)) == 0 {
+					if !revertedOnce[req.Transaction.TransactionId] {
+						revertMessage := "simple domain revert - special transfer amount 1002 intentionally rejected"
+						revertedOnce[req.Transaction.TransactionId] = true
+						return &prototk.EndorseTransactionResponse{
+							EndorsementResult: prototk.EndorseTransactionResponse_REVERT,
+							RevertReason:      &revertMessage,
+						}, nil
 					}
 				}
 

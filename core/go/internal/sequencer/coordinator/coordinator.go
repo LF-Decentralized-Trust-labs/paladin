@@ -285,7 +285,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 				// TX state changed, check if we need to be selecting the next transaction for this sequencer
 				//TODO the following logic should be moved to the state machine so that all the rules are in one place
 				if c.stateMachine.currentState == State_Active {
-					if from == transaction.State_Assembling {
+					if from == transaction.State_Assembling || to == transaction.State_Pooled {
 						err := c.selectNextTransaction(ctx, &TransactionStateTransitionEvent{
 							TransactionID: t.ID,
 							From:          from,

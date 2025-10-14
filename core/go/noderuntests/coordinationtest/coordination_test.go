@@ -875,3 +875,193 @@ func TestTransactionSuccessChainedTransactionPrivacyGroupEndorsementThenPrivacyG
 		"Transaction did not receive a receipt",
 	)
 }
+
+func TestTransactionRevertDuringAssembly(t *testing.T) {
+	// Test that we can start 2 nodes, then submit a transaction while one of them is stopped.
+	// The  node that is stopped is not a required verifier so the transaction should succeed
+	// without restarting that node.
+	ctx := context.Background()
+	domainRegistryAddress := deployDomainRegistry(t, "alice")
+
+	alice := testutils.NewPartyForTesting(t, "alice", domainRegistryAddress)
+	bob := testutils.NewPartyForTesting(t, "bob", domainRegistryAddress)
+
+	alice.AddPeer(bob.GetNodeConfig())
+	bob.AddPeer(alice.GetNodeConfig())
+
+	domainConfig := &domains.SimpleDomainConfig{
+		SubmitMode: domains.ENDORSER_SUBMISSION,
+	}
+
+	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+	t.Cleanup(func() {
+		stopNode(t, alice)
+		stopNode(t, bob)
+	})
+
+	constructorParameters := &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken1",
+		Symbol:          "FT1",
+		EndorsementMode: domains.SelfEndorsement,
+	}
+
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	// Start a private transaction on alice's node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
+	var aliceTxID uuid.UUID
+	idempotencyKey := uuid.New().String()
+	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+                    "from": "",
+                    "to": "` + bob.GetIdentityLocator() + `",
+                    "amount": "1001"
+                }`), // Special value 1001 in the simple domain causes revert at assembly time
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+	assert.Eventually(t,
+		transactionRevertedCondition(t, ctx, aliceTxID, alice.GetClient()),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive expected revert receipt",
+	)
+}
+
+func TestTransactionRevertDuringEndorsement(t *testing.T) {
+	// Test that we can start 2 nodes, then submit a transaction while one of them is stopped.
+	// The  node that is stopped is not a required verifier so the transaction should succeed
+	// without restarting that node.
+	ctx := context.Background()
+	domainRegistryAddress := deployDomainRegistry(t, "alice")
+
+	alice := testutils.NewPartyForTesting(t, "alice", domainRegistryAddress)
+	bob := testutils.NewPartyForTesting(t, "bob", domainRegistryAddress)
+
+	alice.AddPeer(bob.GetNodeConfig())
+	bob.AddPeer(alice.GetNodeConfig())
+
+	domainConfig := &domains.SimpleDomainConfig{
+		SubmitMode: domains.ENDORSER_SUBMISSION,
+	}
+
+	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+	t.Cleanup(func() {
+		stopNode(t, alice)
+		stopNode(t, bob)
+	})
+
+	constructorParameters := &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken1",
+		Symbol:          "FT1",
+		EndorsementMode: domains.SelfEndorsement,
+	}
+
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	// Start a private transaction on alice's node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
+	var aliceTxID uuid.UUID
+	idempotencyKey := uuid.New().String()
+	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+                    "from": "",
+                    "to": "` + bob.GetIdentityLocator() + `",
+                    "amount": "1002"
+                }`), // Special value 1002 in the simple domain causes revert at endorsement time
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+	assert.Eventually(t,
+		transactionReceiptCondition(t, ctx, aliceTxID, alice.GetClient(), false),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt",
+	)
+}
+
+func TestTransactionRevertOnBaseLedger(t *testing.T) {
+	// Test that we can start 2 nodes, then submit a transaction while one of them is stopped.
+	// The  node that is stopped is not a required verifier so the transaction should succeed
+	// without restarting that node.
+	ctx := context.Background()
+	domainRegistryAddress := deployDomainRegistry(t, "alice")
+
+	alice := testutils.NewPartyForTesting(t, "alice", domainRegistryAddress)
+	bob := testutils.NewPartyForTesting(t, "bob", domainRegistryAddress)
+
+	alice.AddPeer(bob.GetNodeConfig())
+	bob.AddPeer(alice.GetNodeConfig())
+
+	domainConfig := &domains.SimpleDomainConfig{
+		SubmitMode: domains.ENDORSER_SUBMISSION,
+	}
+
+	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+	t.Cleanup(func() {
+		stopNode(t, alice)
+		stopNode(t, bob)
+	})
+
+	constructorParameters := &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken1",
+		Symbol:          "FT1",
+		EndorsementMode: domains.SelfEndorsement,
+	}
+
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	// Start a private transaction on alice's node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
+	var aliceTxID uuid.UUID
+	idempotencyKey := uuid.New().String()
+	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+                    "from": "",
+                    "to": "` + bob.GetIdentityLocator() + `",
+                    "amount": "1003"
+                }`), // Special value 1003 in the simple domain causes revert once on the base ledger, then subsequently be successful
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+	customDuration := 5 * time.Second
+	assert.Eventually(t,
+		transactionReceiptConditionExpectedPublicTXCount(t, ctx, aliceTxID, alice.GetClient(), 2),
+		transactionLatencyThresholdCustom(t, &customDuration),
+		100*time.Millisecond,
+		"Transaction did not receive expected receipt or have the expected number of public transactions",
+	)
+}
