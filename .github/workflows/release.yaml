@@ -134,12 +134,13 @@ jobs:
   # Build and prepare all final release artifacts (images, charts, contracts, SDK)
   # These are the same artifacts that were tested in the RC phase
 
-  # Build and publish final release images
+  # Retag RC images with final release tags (much faster than rebuilding)
   release-images:
     needs: setup
-    uses: ./.github/workflows/release-images.yaml
+    uses: ./.github/workflows/retag-images.yaml
     with:
-      tag: ${{ needs.setup.outputs.tag }}
+      source_tag: ${{ needs.setup.outputs.rc_tag }}
+      target_tag: ${{ needs.setup.outputs.tag }}
       latest: '${{ fromJSON(needs.setup.outputs.latest) }}'
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
