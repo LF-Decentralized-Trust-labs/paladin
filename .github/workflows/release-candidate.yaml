@@ -19,7 +19,7 @@ on:
       tag:
         required: true
         type: string
-        description: 'Release candidate tag (e.g., v0.1.0-rc.1)'
+        description: 'Release candidate tag (e.g., v1.2.3-rc.1)'
 
 jobs:
   # ================================ SETUP ================================
@@ -76,10 +76,18 @@ jobs:
           REF: ${{ steps.set-vars.outputs.tag }}
         run: |
           if [[ -z "$REF_TAG_PRERELEASE" ]]; then
-            echo "This workflow can only be triggered from an RC tag (e.g., v1.2.3-rc1)."
+            echo "This workflow can only be triggered from an RC tag (e.g. v1.2.3-rc.1)."
             echo "Current ref: $REF"
             exit 1
           fi
+          
+          # Validate that prerelease follows rc.X format
+          if [[ ! "$REF_TAG_PRERELEASE" =~ ^rc\.[0-9]+$ ]]; then
+            echo "RC tag must follow the format vX.Y.Z-rc.W (e.g. v1.2.3-rc.1)."
+            echo "Current prerelease suffix: $REF_TAG_PRERELEASE"
+            exit 1
+          fi
+          
           echo "Valid RC tag: $REF_TAG_VERSION"
       
 
@@ -171,7 +179,7 @@ jobs:
         git config --local user.name "GitHub Action"
         git add examples/
         git commit -m "chore: Update SDK version in examples to ${{ needs.setup.outputs.tag }}"
-        git push origin HEAD:release-${{ needs.setup.outputs.tag }}
+        git push origin HEAD:refs/heads/release-${{ needs.setup.outputs.tag }}
         echo "NEW_SHA=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
 

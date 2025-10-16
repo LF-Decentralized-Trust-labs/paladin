@@ -99,14 +99,38 @@ Once the RC has been tested and validated, the final release can be created:
     Packages contract ABIs and deployment artifacts for distribution.
   - **GitHub Release:** Creates a final release with all artifacts
 
-### Releasing Options: 
-* **Release Candidate:** Trigger the [RC workflow](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/release-candidate.yaml) via the GitHub Actions interface, specifying the RC version.
-* **Release:** Trigger the [release workflow](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/release.yaml) via the GitHub Actions interface, specifying the final version and selecting the "latest" option if needed.
+## How to Create a Release
+
+### Quick Start: Release Process
+Follow these steps to create a new Paladin release:
+
+#### Step 1: Create a Release Candidate
+1. Go to **[Actions → Release Candidate](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/release-candidate.yaml)**
+2. Click **"Run workflow"**
+3. Enter the RC tag (e.g., `v1.2.3-rc.1`)
+4. Click **"Run workflow"**
+5. Wait for the workflow to complete and test the RC thoroughly
+
+#### Step 2: Create the Final Release
+1. Go to **[Actions → Release](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/release.yaml)**
+2. Click **"Run workflow"**
+3. Fill in the required fields:
+   - **tag**: Final release version (e.g., `v1.2.3`)
+   - **rc_tag**: The RC tag you tested (e.g., `v1.2.3-rc.1`)
+   - **latest**: Check if this should be marked as the latest release
+4. Click **"Run workflow"**
+
+### Example Release Flow
+```
+1. Create RC:     v1.2.3-rc.1  → Test thoroughly
+2. Final Release: v1.2.3       → Built from v1.2.3-rc.1
+```
 
 ### Important Release Process Notes:
-- **RC Required:** Final releases can only be created if a corresponding RC exists
+- **RC Required:** Final releases must be built from a tested RC tag
 - **Testing:** Always test RCs thoroughly before promoting to final release
 - **Version Consistency:** The RC version must match the final version (e.g., `v1.0.0-rc.1` → `v1.0.0`)
+- **Format:** RC tags must follow `vX.Y.Z-rc.W` format (e.g., `v1.2.3-rc.1`)
 
 ## Manual Docker Image Release
 
