@@ -29,13 +29,12 @@ type DistributerConfig struct {
 	ReceivedObjectWriter  FlushWriterConfig `json:"receivedStateWriter"`
 }
 
-var DistributerWriterConfigDefaults = FlushWriterConfig{
-	WorkerCount:  confutil.P(10),
-	BatchTimeout: confutil.P("25ms"),
-	BatchMaxSize: confutil.P(100),
-}
-
-var PrivateTxManagerDefaults = &PrivateTxManagerConfig{
+var PrivateTxManagerDefaults = PrivateTxManagerConfig{
+	Writer: FlushWriterConfig{
+		WorkerCount:  confutil.P(10),
+		BatchTimeout: confutil.P("25ms"),
+		BatchMaxSize: confutil.P(100),
+	},
 	Sequencer: PrivateTxManagerSequencerConfig{
 		MaxConcurrentProcess:                confutil.P(500),
 		MaxInflightTransactions:             confutil.P(500),

@@ -24,8 +24,8 @@ type StateStoreConfig struct {
 	SchemaCache CacheConfig `json:"schemaCache"`
 }
 
-var StateWriterConfigDefaults = FlushWriterConfig{
-	WorkerCount:  confutil.P(10),
-	BatchTimeout: confutil.P("25ms"),
-	BatchMaxSize: confutil.P(100),
+var StateStoreConfigDefaults = StateStoreConfig{
+	SchemaCache: CacheConfig{
+		Capacity: confutil.P(1000),
+	},
 }

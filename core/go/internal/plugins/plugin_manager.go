@@ -77,14 +77,14 @@ type pluginManager struct {
 func NewPluginManager(bgCtx context.Context,
 	grpcTarget string, // default is a UDS path, can use tcp:127.0.0.1:12345 strings too (or tcp4:/tcp6:)
 	loaderID uuid.UUID,
-	conf *pldconf.PluginManagerConfig) components.PluginManager {
+	conf *pldconf.PluginManagerInlineConfig) components.PluginManager {
 
 	pc := &pluginManager{
 		bgCtx: log.WithComponent(bgCtx, log.Component("pluginmanager")),
 
 		grpcTarget:      grpcTarget,
 		loaderID:        loaderID,
-		shutdownTimeout: confutil.DurationMin(conf.GRPC.ShutdownTimeout, 0, *pldconf.DefaultGRPCConfig.ShutdownTimeout),
+		shutdownTimeout: confutil.DurationMin(conf.GRPC.ShutdownTimeout, 0, *pldconf.PluginManagerInlineConfigDefaults.GRPC.ShutdownTimeout),
 
 		domainPlugins:        make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
 		transportPlugins:     make(map[uuid.UUID]*plugin[prototk.TransportMessage]),

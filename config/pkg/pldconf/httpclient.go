@@ -43,7 +43,7 @@ type HTTPClientConfig struct {
 	ConnectionTimeout *string                `json:"connectionTimeout,omitempty"`
 }
 
-var DefaultHTTPConfig = &HTTPClientConfig{
+var DefaultHTTPConfig = HTTPClientConfig{
 	ConnectionTimeout: confutil.P("30s"),
 	RequestTimeout:    confutil.P("30s"),
 	Retry: HTTPRetryConfig{

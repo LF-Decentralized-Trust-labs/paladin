@@ -27,7 +27,7 @@ type PublicTxManagerConfig struct {
 	GasLimit       GasLimitConfig                    `json:"gasLimit"`
 }
 
-var PublicTxManagerDefaults = &PublicTxManagerConfig{
+var PublicTxManagerDefaults = PublicTxManagerConfig{
 	Manager: PublicTxManagerManagerConfig{
 		MaxInFlightOrchestrators: confutil.P(50),
 		Interval:                 confutil.P("5s"),
@@ -87,7 +87,8 @@ var PublicTxManagerDefaults = &PublicTxManagerConfig{
 			},
 		},
 		GasOracleAPI: &GasOracleAPIConfig{
-			Method: confutil.P("GET"), // Default to GET method
+			HTTPClientConfig: DefaultHTTPConfig,
+			Method:           confutil.P("GET"), // Default to GET method
 			Cache: GasPriceCacheConfig{
 				Enabled:     confutil.P(true),  // Default to enabled
 				RefreshTime: confutil.P("30s"), // Default to 30 seconds refresh time

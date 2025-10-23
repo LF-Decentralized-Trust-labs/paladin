@@ -139,8 +139,8 @@ func newBlockIndexer(ctx context.Context, conf *pldconf.BlockIndexerConfig, pers
 		txWaiters:                  inflight.NewInflightManager[pldtypes.Bytes32, *pldapi.IndexedTransaction](pldtypes.ParseBytes32),
 		eventStreams:               make(map[uuid.UUID]*eventStream),
 		eventStreamsHeadSet:        make(map[uuid.UUID]*eventStream),
-		esBlockDispatchQueueLength: confutil.IntMin(conf.EventStreams.BlockDispatchQueueLength, 0, *pldconf.EventStreamDefaults.BlockDispatchQueueLength),
-		esCatchUpQueryPageSize:     confutil.IntMin(conf.EventStreams.CatchUpQueryPageSize, 0, *pldconf.EventStreamDefaults.CatchUpQueryPageSize),
+		esBlockDispatchQueueLength: confutil.IntMin(conf.EventStreams.BlockDispatchQueueLength, 0, *pldconf.BlockIndexerDefaults.EventStreams.BlockDispatchQueueLength),
+		esCatchUpQueryPageSize:     confutil.IntMin(conf.EventStreams.CatchUpQueryPageSize, 0, *pldconf.BlockIndexerDefaults.EventStreams.CatchUpQueryPageSize),
 		dispatcherTap:              make(chan struct{}, 1),
 		ignoredTransactionTypes:    confutil.Int64Slice(conf.IgnoredTransactionTypes, pldconf.BlockIndexerDefaults.IgnoredTransactionTypes),
 	}

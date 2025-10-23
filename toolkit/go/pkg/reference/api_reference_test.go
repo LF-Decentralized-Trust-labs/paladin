@@ -30,9 +30,9 @@ import (
 	"golang.org/x/text/language"
 )
 
-func TestCheckGeneratedMarkdownPages(t *testing.T) {
-	ctx := i18n.WithLang(context.Background(), language.Spanish)
-	markdownMap, err := GenerateObjectsReferenceMarkdown(ctx)
+func TestCheckAPIGeneratedMarkdownPages(t *testing.T) {
+	ctx := i18n.WithLang(context.Background(), language.AmericanEnglish)
+	markdownMap, err := GenerateAPIObjectsReferenceMarkdown(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, markdownMap)
 
@@ -45,7 +45,7 @@ func TestCheckGeneratedMarkdownPages(t *testing.T) {
 
 func TestGenerateMarkdownDescriptionMissing(t *testing.T) {
 	type thingy struct{}
-	d := newDocGenerator()
+	d := newAPIDocGenerator()
 	_, err := d.generateMarkdownPages(context.Background(), []interface{}{thingy{}}, []interface{}{}, []pldclient.RPCModule{}, "")
 	assert.Regexp(t, "PD020900.*thingy_description.md", err)
 }

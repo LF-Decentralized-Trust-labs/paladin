@@ -172,7 +172,7 @@ func NewOrchestrator(
 		persistenceRetryTimeout: confutil.DurationMin(conf.Orchestrator.PersistenceRetryTime, veryShortMinimum, *pldconf.PublicTxManagerDefaults.Orchestrator.PersistenceRetryTime),
 
 		// submission retry
-		transactionSubmissionRetry: retry.NewRetryLimited(&conf.Orchestrator.SubmissionRetry),
+		transactionSubmissionRetry: retry.NewRetryLimited(&conf.Orchestrator.SubmissionRetry, &pldconf.PublicTxManagerDefaults.Orchestrator.SubmissionRetry),
 		staleTimeout:               confutil.DurationMin(conf.Orchestrator.StaleTimeout, 0, *pldconf.PublicTxManagerDefaults.Orchestrator.StaleTimeout),
 		hasZeroGasPrice:            ptm.gasPriceClient.HasZeroGasPrice(ctx),
 		InFlightTxsStale:           make(chan bool, 1),

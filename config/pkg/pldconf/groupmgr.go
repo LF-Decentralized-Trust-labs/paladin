@@ -26,7 +26,7 @@ type MessageListeners struct {
 	ReadPageSize *int        `json:"readPageSize"`
 }
 
-var GroupManagerDefaults = &GroupManagerConfig{
+var GroupManagerDefaults = GroupManagerConfig{
 	Cache: CacheConfig{
 		Capacity: confutil.P(50),
 	},

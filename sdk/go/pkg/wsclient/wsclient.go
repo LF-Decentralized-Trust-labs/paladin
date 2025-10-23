@@ -92,10 +92,7 @@ func New(ctx context.Context, config *pldconf.WSClientConfig, beforeConnect WSPr
 			TLSClientConfig:  tlsConfig,
 			HandshakeTimeout: confutil.DurationMin(config.ConnectionTimeout, 0, *pldconf.DefaultWSConfig.ConnectionTimeout),
 		},
-		retry: *retry.NewRetryIndefinite(&pldconf.RetryConfig{
-			InitialDelay: config.ConnectRetry.InitialDelay,
-			MaxDelay:     config.ConnectRetry.MaxDelay,
-		}),
+		retry:                *retry.NewRetryIndefinite(&config.ConnectRetry),
 		initialRetryAttempts: confutil.IntMin(config.InitialConnectAttempts, 0, *pldconf.DefaultWSConfig.InitialConnectAttempts),
 		headers:              make(http.Header),
 		send:                 make(chan []byte),

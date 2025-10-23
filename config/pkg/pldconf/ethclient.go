@@ -25,6 +25,8 @@ type EthClientConfig struct {
 	EstimateGasFactor *float64         `json:"gasEstimateFactor"`
 }
 
-var EthClientDefaults = &EthClientConfig{
+var EthClientDefaults = EthClientConfig{
 	EstimateGasFactor: confutil.P(2.0),
+	HTTP:              DefaultHTTPConfig,
+	WS:                DefaultWSConfig,
 }

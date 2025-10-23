@@ -76,8 +76,8 @@ func NewRPCServer(ctx context.Context, conf *pldconf.RPCServerConfig) (_ *rpcSer
 	// Add the WebSocket server
 	if !conf.WS.Disabled {
 		s.wsUpgrader = &websocket.Upgrader{
-			ReadBufferSize:  int(confutil.ByteSize(conf.WS.ReadBufferSize, 0, *pldconf.WSDefaults.ReadBufferSize)),
-			WriteBufferSize: int(confutil.ByteSize(conf.WS.WriteBufferSize, 0, *pldconf.WSDefaults.WriteBufferSize)),
+			ReadBufferSize:  int(confutil.ByteSize(conf.WS.ReadBufferSize, 0, *pldconf.RPCServerConfigDefaults.WS.ReadBufferSize)),
+			WriteBufferSize: int(confutil.ByteSize(conf.WS.WriteBufferSize, 0, *pldconf.RPCServerConfigDefaults.WS.WriteBufferSize)),
 		}
 		log.L(ctx).Infof("WebSocket server readBufferSize=%d writeBufferSize=%d", s.wsUpgrader.ReadBufferSize, s.wsUpgrader.WriteBufferSize)
 		if s.wsServer, err = httpserver.NewServer(ctx, "JSON/RPC (WebSocket)", &conf.WS.HTTPServerConfig, http.HandlerFunc(s.wsHandler)); err != nil {

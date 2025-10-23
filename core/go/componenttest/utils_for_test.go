@@ -204,7 +204,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtype
 	i.ctx = log.WithLogField(context.Background(), "node-name", binding.name)
 
 	i.conf.BlockIndexer.FromBlock = json.RawMessage(`"latest"`)
-	i.conf.DomainManagerConfig.Domains = make(map[string]*pldconf.DomainConfig, 1)
+	i.conf.DomainManagerInlineConfig.Domains = make(map[string]*pldconf.DomainConfig, 1)
 	if domainConfig == nil {
 		domainConfig = &domains.SimpleDomainConfig{
 			SubmitMode: domains.ENDORSER_SUBMISSION,
@@ -212,7 +212,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtype
 	}
 	switch domainConfig := domainConfig.(type) {
 	case *domains.SimpleDomainConfig:
-		i.conf.DomainManagerConfig.Domains["domain1"] = &pldconf.DomainConfig{
+		i.conf.DomainManagerInlineConfig.Domains["domain1"] = &pldconf.DomainConfig{
 			AllowSigning: true,
 			Plugin: pldconf.PluginConfig{
 				Type:    string(pldtypes.LibraryTypeCShared),
@@ -227,7 +227,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *pldtype
 		for i, peerNode := range peerNodes {
 			endorsementSet[i+1] = peerNode.name
 		}
-		i.conf.DomainManagerConfig.Domains["simpleStorageDomain"] = &pldconf.DomainConfig{
+		i.conf.DomainManagerInlineConfig.Domains["simpleStorageDomain"] = &pldconf.DomainConfig{
 			AllowSigning: true,
 			Plugin: pldconf.PluginConfig{
 				Type:    string(pldtypes.LibraryTypeCShared),
@@ -419,7 +419,7 @@ func testConfig(t *testing.T, enableWS bool, seed string) (pldconf.PaladinConfig
 
 	conf.Log.Level = confutil.P("info")
 
-	conf.TransportManagerConfig.ReliableMessageWriter.BatchMaxSize = confutil.P(1)
+	conf.TransportManagerInlineConfig.ReliableMessageWriter.BatchMaxSize = confutil.P(1)
 
 	// Use the provided seed for consistent test accounts
 	// This seed will generate the same accounts every time for testing

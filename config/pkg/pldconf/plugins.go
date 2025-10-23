@@ -18,7 +18,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 )
 
-type PluginManagerConfig struct {
+type PluginManagerInlineConfig struct {
 	GRPC GRPCConfig `json:"grpc"`
 }
 
@@ -26,12 +26,14 @@ type GRPCConfig struct {
 	ShutdownTimeout *string `json:"shutdownTimeout"`
 }
 
-var DefaultGRPCConfig = &GRPCConfig{
-	ShutdownTimeout: confutil.P("10s"),
-}
-
 type PluginConfig struct {
 	Type    string  `json:"type"`
 	Library string  `json:"library"`
 	Class   *string `json:"class,omitempty"`
+}
+
+var PluginManagerInlineConfigDefaults = PluginManagerInlineConfig{
+	GRPC: GRPCConfig{
+		ShutdownTimeout: confutil.P("10s"),
+	},
 }

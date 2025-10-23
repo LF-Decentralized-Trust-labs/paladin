@@ -20,12 +20,12 @@ import (
 )
 
 // Intended to be embedded at root level of paladin config
-type DomainManagerConfig struct {
-	Domains       map[string]*DomainConfig   `json:"domains"`
-	DomainManager DomainManagerManagerConfig `json:"domainManager"`
+type DomainManagerInlineConfig struct {
+	Domains       map[string]*DomainConfig `json:"domains" configdefaults:"DomainsConfigDefaults"`
+	DomainManager DomainManagerConfig      `json:"domainManager"`
 }
 
-type DomainManagerManagerConfig struct {
+type DomainManagerConfig struct {
 	ContractCache CacheConfig `json:"contractCache"`
 }
 
@@ -39,10 +39,20 @@ type DomainConfig struct {
 	FixedSigningIdentity string           `json:"fixedSigningIdentity"`
 }
 
-var ContractCacheDefaults = &CacheConfig{
-	Capacity: confutil.P(1000),
-}
-
 type DomainInitConfig struct {
 	Retry RetryConfig `json:"retry"`
+}
+
+var DomainConfigDefaults = DomainConfig{
+	Init: DomainInitConfig{
+		Retry: GenericRetryDefaults.RetryConfig,
+	},
+}
+
+var DomainManagerInlineConfigDefaults = DomainManagerInlineConfig{
+	DomainManager: DomainManagerConfig{
+		ContractCache: CacheConfig{
+			Capacity: confutil.P(1000),
+		},
+	},
 }

@@ -38,7 +38,7 @@ type EventStreamConfig struct {
 	FromBlock    json.RawMessage `json:"fromBlock,omitempty"`
 }
 
-var EventStreamDefaults = &EventStreamConfig{
+var EventStreamsDefaults = &EventStreamConfig{
 	BatchSize:    confutil.P(50),
 	BatchTimeout: confutil.P("75ms"),
 	FromBlock:    json.RawMessage(`0`),

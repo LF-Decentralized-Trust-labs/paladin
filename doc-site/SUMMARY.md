@@ -7,8 +7,8 @@
     * getting-started/*
 * Tutorials
     * tutorials/*
-* Guides
-    * guides/*
+* Administration
+    * administration/*
 * References
     * references/*
 * Contributing

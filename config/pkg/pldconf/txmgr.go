@@ -39,7 +39,7 @@ type ReceiptListeners struct {
 	StateGapCheckInterval *string     `json:"stateGapCheckInterval"`
 }
 
-var TxManagerDefaults = &TxManagerConfig{
+var TxManagerDefaults = TxManagerConfig{
 	ABI: ABIConfig{
 		Cache: CacheConfig{
 			Capacity: confutil.P(100),

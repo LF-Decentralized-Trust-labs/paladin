@@ -92,7 +92,7 @@ func TestGetNodeTransportsDefaultsRealDB(t *testing.T) {
 }
 
 func TestGetNodeTransportsCustomSettingsRealDB(t *testing.T) {
-	ctx, rm, tp, _, done := newTestRegistry(t, true, func(mc *mockComponents, conf *pldconf.RegistryManagerConfig, regConf *prototk.RegistryConfig) {
+	ctx, rm, tp, _, done := newTestRegistry(t, true, func(mc *mockComponents, conf *pldconf.RegistryManagerInlineConfig, regConf *prototk.RegistryConfig) {
 		conf.Registries["test1"].Transports = pldconf.RegistryTransportsConfig{
 			RequiredPrefix:    "network1.",
 			HierarchySplitter: ".",
@@ -147,7 +147,7 @@ func TestGetNodeTransportsErr(t *testing.T) {
 }
 
 func TestBadTransportLookupPropertyRegexp(t *testing.T) {
-	_, rm, mc, done := newTestRegistryManager(t, false, &pldconf.RegistryManagerConfig{
+	_, rm, mc, done := newTestRegistryManager(t, false, &pldconf.RegistryManagerInlineConfig{
 		Registries: map[string]*pldconf.RegistryConfig{
 			"test1": {
 				Transports: pldconf.RegistryTransportsConfig{

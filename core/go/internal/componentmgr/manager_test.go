@@ -57,7 +57,7 @@ func TestInitOK(t *testing.T) {
 	// We build a config that allows us to get through init successfully, as should be possible
 	// (anything that can't do this should have a separate Start() phase).
 	testConfig := &pldconf.PaladinConfig{
-		TransportManagerConfig: pldconf.TransportManagerConfig{
+		TransportManagerInlineConfig: pldconf.TransportManagerInlineConfig{
 			NodeName: "node1",
 		},
 		DB: pldconf.DBConfig{
@@ -75,7 +75,7 @@ func TestInitOK(t *testing.T) {
 				URL: "http://localhost:8545", // we won't actually connect this test, just check the config
 			},
 		},
-		KeyManagerConfig: pldconf.KeyManagerConfig{
+		KeyManagerInlineConfig: pldconf.KeyManagerInlineConfig{
 			Wallets: []*pldconf.WalletConfig{
 				{
 					Name: "wallet1",

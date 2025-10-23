@@ -62,8 +62,8 @@ func newTestPlugin(registryFuncs *plugintk.RegistryAPIFunctions) *testPlugin {
 	}
 }
 
-func newTestRegistry(t *testing.T, realDB bool, extraSetup ...func(mc *mockComponents, conf *pldconf.RegistryManagerConfig, regConf *prototk.RegistryConfig)) (context.Context, *registryManager, *testPlugin, *mockComponents, func()) {
-	conf := &pldconf.RegistryManagerConfig{
+func newTestRegistry(t *testing.T, realDB bool, extraSetup ...func(mc *mockComponents, conf *pldconf.RegistryManagerInlineConfig, regConf *prototk.RegistryConfig)) (context.Context, *registryManager, *testPlugin, *mockComponents, func()) {
+	conf := &pldconf.RegistryManagerInlineConfig{
 		Registries: map[string]*pldconf.RegistryConfig{
 			"test1": {
 				Config: map[string]any{"some": "conf"},
@@ -552,7 +552,7 @@ func TestGetEntryPropertiesQueryFail(t *testing.T) {
 func TestRegistryWithEventStreams(t *testing.T) {
 	es := &blockindexer.EventStream{ID: uuid.New()}
 
-	_, _, tp, _, done := newTestRegistry(t, false, func(mc *mockComponents, conf *pldconf.RegistryManagerConfig, regConf *prototk.RegistryConfig) {
+	_, _, tp, _, done := newTestRegistry(t, false, func(mc *mockComponents, conf *pldconf.RegistryManagerInlineConfig, regConf *prototk.RegistryConfig) {
 		a := abi.ABI{
 			{
 				Type: abi.Event,
@@ -635,7 +635,7 @@ func TestConfigureEventStreamBadEventABITypes(t *testing.T) {
 
 func TestHandleEventBatchOk(t *testing.T) {
 
-	ctx, _, tp, _, done := newTestRegistry(t, false, func(mc *mockComponents, conf *pldconf.RegistryManagerConfig, regConf *prototk.RegistryConfig) {
+	ctx, _, tp, _, done := newTestRegistry(t, false, func(mc *mockComponents, conf *pldconf.RegistryManagerInlineConfig, regConf *prototk.RegistryConfig) {
 		mc.db.ExpectBegin()
 		mc.db.ExpectExec("INSERT.*reg_entries").WillReturnResult(driver.ResultNoRows)
 		mc.db.ExpectCommit()
@@ -684,7 +684,7 @@ func TestHandleEventBatchOk(t *testing.T) {
 
 func TestHandleEventBatchError(t *testing.T) {
 
-	ctx, _, tp, _, done := newTestRegistry(t, false, func(mc *mockComponents, conf *pldconf.RegistryManagerConfig, regConf *prototk.RegistryConfig) {
+	ctx, _, tp, _, done := newTestRegistry(t, false, func(mc *mockComponents, conf *pldconf.RegistryManagerInlineConfig, regConf *prototk.RegistryConfig) {
 		mc.db.ExpectBegin()
 	})
 	defer done()

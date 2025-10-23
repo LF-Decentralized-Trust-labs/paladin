@@ -40,12 +40,7 @@ type EventStreamsConfig struct {
 	CatchUpQueryPageSize     *int `json:"catchupQueryPageSize"`
 }
 
-var EventStreamDefaults = &EventStreamsConfig{
-	BlockDispatchQueueLength: confutil.P(100),
-	CatchUpQueryPageSize:     confutil.P(100),
-}
-
-var BlockIndexerDefaults = &BlockIndexerConfig{
+var BlockIndexerDefaults = BlockIndexerConfig{
 	FromBlock:               json.RawMessage(`0`),
 	CommitBatchSize:         confutil.P(50),
 	CommitBatchTimeout:      confutil.P("100ms"),
@@ -54,4 +49,8 @@ var BlockIndexerDefaults = &BlockIndexerConfig{
 	BlockPollingInterval:    confutil.P("10s"),
 	IgnoredTransactionTypes: []int64{0x7e},
 	InsertDBBatchSize:       confutil.P(5000),
+	EventStreams: EventStreamsConfig{
+		BlockDispatchQueueLength: confutil.P(100),
+		CatchUpQueryPageSize:     confutil.P(100),
+	},
 }

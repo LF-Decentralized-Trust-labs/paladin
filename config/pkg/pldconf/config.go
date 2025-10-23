@@ -16,24 +16,58 @@
 package pldconf
 
 type PaladinConfig struct {
-	DomainManagerConfig    `json:",inline"`
-	PluginManagerConfig    `json:",inline"`
-	TransportManagerConfig `json:",inline"`
-	RegistryManagerConfig  `json:",inline"`
-	KeyManagerConfig       `json:",inline"`
-	Startup                StartupConfig          `json:"startup"`
-	Log                    LogConfig              `json:"log"`
-	Blockchain             EthClientConfig        `json:"blockchain"`
-	DB                     DBConfig               `json:"db"`
-	RPCServer              RPCServerConfig        `json:"rpcServer"`
-	MetricsServer          MetricsServerConfig    `json:"metricsServer"`
-	DebugServer            DebugServerConfig      `json:"debugServer"`
-	StateStore             StateStoreConfig       `json:"statestore"`
-	BlockIndexer           BlockIndexerConfig     `json:"blockIndexer"`
-	TempDir                *string                `json:"tempDir"`
-	TxManager              TxManagerConfig        `json:"txManager"`
-	PrivateTxManager       PrivateTxManagerConfig `json:"privateTxManager"`
-	PublicTxManager        PublicTxManagerConfig  `json:"publicTxManager"`
-	IdentityResolver       IdentityResolverConfig `json:"identityResolver"`
-	GroupManager           GroupManagerConfig     `json:"groupManager"`
+	DomainManagerInlineConfig    `json:",inline"`
+	PluginManagerInlineConfig    `json:",inline"`
+	TransportManagerInlineConfig `json:",inline"`
+	RegistryManagerInlineConfig  `json:",inline"`
+	KeyManagerInlineConfig       `json:",inline"`
+	Startup                      StartupConfig          `json:"startup"`
+	Log                          LogConfig              `json:"log"`
+	Blockchain                   EthClientConfig        `json:"blockchain"`
+	DB                           DBConfig               `json:"db"`
+	RPCServer                    RPCServerConfig        `json:"rpcServer"`
+	MetricsServer                MetricsServerConfig    `json:"metricsServer"`
+	DebugServer                  DebugServerConfig      `json:"debugServer"`
+	StateStore                   StateStoreConfig       `json:"statestore"`
+	BlockIndexer                 BlockIndexerConfig     `json:"blockIndexer"`
+	TempDir                      *string                `json:"tempDir"`
+	TxManager                    TxManagerConfig        `json:"txManager"`
+	PrivateTxManager             PrivateTxManagerConfig `json:"privateTxManager"`
+	PublicTxManager              PublicTxManagerConfig  `json:"publicTxManager"`
+	IdentityResolver             IdentityResolverConfig `json:"identityResolver"`
+	GroupManager                 GroupManagerConfig     `json:"groupManager"`
+}
+
+// PaladinConfigDefaults provides default values for all configuration options
+var PaladinConfigDefaults = &PaladinConfig{
+	DomainManagerInlineConfig:    DomainManagerInlineConfigDefaults,
+	PluginManagerInlineConfig:    PluginManagerInlineConfigDefaults,
+	TransportManagerInlineConfig: TransportManagerDefaults,
+	RegistryManagerInlineConfig:  RegistryManagerInlineConfigDefaults,
+	KeyManagerInlineConfig:       KeyManagerDefaults,
+	Startup:                      StartupConfigDefaults,
+	Log:                          LogDefaults,
+	Blockchain:                   EthClientDefaults,
+	RPCServer:                    RPCServerConfigDefaults,
+	MetricsServer:                MetricsServerDefaults,
+	DebugServer:                  DebugServerDefaults,
+	StateStore:                   StateStoreConfigDefaults,
+	BlockIndexer:                 BlockIndexerDefaults,
+	TxManager:                    TxManagerDefaults,
+	PrivateTxManager:             PrivateTxManagerDefaults,
+	PublicTxManager:              PublicTxManagerDefaults,
+	IdentityResolver:             IdentityResolverDefaults,
+	GroupManager:                 GroupManagerDefaults,
+}
+
+// Default values of array items or map values cannot be included in the PaladinConfigDefaults variable
+// since the default value or an array or map is for it to be empty.
+// This map provides a workaround for this by including struct instances containing default values, where
+// the map keys can be used with the 'configdefaults:' tag.
+var PaladinConfigMapStructDefaults = map[string]any{
+	"DomainsConfigDefaults":       DomainConfigDefaults,
+	"SigningModuleConfigDefaults": SigningModuleConfigDefaults,
+	"RegistryConfigDefaults":      RegistryConfigDefaults,
+	"TransportConfigDefaults":     TransportConfigDefaults,
+	"WalletConfigDefaults":        WalletDefaults,
 }
