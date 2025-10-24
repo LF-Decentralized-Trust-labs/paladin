@@ -62,6 +62,8 @@ type DBPubTxnSubmission struct {
 	Created         pldtypes.Timestamp `gorm:"column:created;autoCreateTime:false"` // we set this as we track the record in memory too
 	TransactionHash pldtypes.Bytes32   `gorm:"column:tx_hash;primaryKey"`
 	GasPricing      pldtypes.RawJSON   `gorm:"column:gas_pricing"` // no filtering allowed on this field as it's complex JSON gasPrice/maxFeePerGas/maxPriorityFeePerGas calculation
+	PrivateTXID     uuid.UUID          `gorm:"-"`                  // just used when a sequencer needs loading
+	ContractAddress string             `gorm:"-"`                  // just used when a sequencer needs loading
 }
 
 func (DBPubTxnSubmission) TableName() string {

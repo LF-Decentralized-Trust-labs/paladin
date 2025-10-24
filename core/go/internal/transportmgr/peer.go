@@ -393,6 +393,10 @@ func (p *peer) processReliableMsgPage(dbTX persistence.DBTX, page []*pldapi.Reli
 			msg, errorAck, err = p.tm.buildPrivacyGroupMessageMsg(p.ctx, dbTX, rm)
 		case pldapi.RMTReceipt:
 			msg, errorAck, err = p.tm.buildReceiptDistributionMsg(p.ctx, dbTX, rm)
+		case pldapi.RMTPublicTransaction:
+			msg, errorAck, err = p.tm.buildPublicTransactionMsg(p.ctx, dbTX, rm)
+		case pldapi.RMTPublicTransactionSubmission:
+			msg, errorAck, err = p.tm.buildPublicTransactionSubmissionMsg(p.ctx, dbTX, rm)
 		default:
 			errorAck = i18n.NewError(p.ctx, msgs.MsgTransportUnsupportedReliableMsg, rm.MessageType)
 		}

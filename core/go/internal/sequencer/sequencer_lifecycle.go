@@ -83,7 +83,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 		_, err = sMgr.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
 		if err != nil {
 			// Treat as a valid case, let the caller decide if it is or not
-			log.L(ctx).Infof("no sequencer found for contract %s, assuming contract deploy: %s", contractAddr, err)
+			log.L(ctx).Debugf("no sequencer found for contract %s, assuming contract deploy: %s", contractAddr, err)
 			return nil, nil
 		}
 	}
@@ -145,10 +145,13 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			// Create a new domain context for the sequencer. This will be re-used for the lifetime of the sequencer
 			dCtx := sMgr.components.StateManager().NewDomainContext(sMgr.ctx, domainAPI.Domain(), contractAddr)
 
+			// Create a 2nd domain context for assembling remote transactions
+			delegateDomainContext := sMgr.components.StateManager().NewDomainContext(sMgr.ctx, domainAPI.Domain(), contractAddr)
+
 			// Create a transport writer for the sequencer to communicate with sequencers on other peers
 			transportWriter := transport.NewTransportWriter(&contractAddr, sMgr.nodeName, sMgr.components.TransportManager(), sMgr.HandlePaladinMsg)
 
-			sMgr.engineIntegration = common.NewEngineIntegration(sMgr.ctx, sMgr.components, sMgr.nodeName, domainAPI, dCtx, sMgr, sMgr)
+			sMgr.engineIntegration = common.NewEngineIntegration(sMgr.ctx, sMgr.components, sMgr.nodeName, domainAPI, dCtx, delegateDomainContext, sMgr)
 
 			sequencer := &sequencer{
 				ctx:             sMgr.ctx,
@@ -182,7 +185,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 					sMgr.dispatch(ctx, t, dCtx, transportWriter)
 				},
 				func(contractAddress *pldtypes.EthAddress, coordinatorNode string) {
-					// A new coordinator started, it might be us or it might be another node.
+					// A new coordinator became active, it might be us or it might be another node.
 					// Update metrics and check if we need to stop one to stay within the configured max active coordinators
 					sMgr.updateActiveCoordinators(sMgr.ctx)
 
@@ -203,26 +206,16 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				return nil, err
 			}
 
-			// Start by populating the pool of originators with the endorsers of this transaction. At this point
-			// we don't have anything else to use to determine who our candidate coordinators are.
-			if tx != nil && tx.PreAssembly != nil && tx.PreAssembly.RequiredVerifiers != nil {
-				for _, verifiers := range tx.PreAssembly.RequiredVerifiers {
-					if strings.Contains(verifiers.Lookup, "@") {
-						parts := strings.Split(verifiers.Lookup, "@")
-						coordinator.UpdateSenderNodePool(ctx, parts[1])
-					}
-				}
-
-				// Get the best candidate for an initial coordinator, and use as the delegate for any originated transactions
-				err := sender.SetActiveCoordinator(sMgr.ctx, coordinator.GetActiveCoordinatorNode(sMgr.ctx))
-				if err != nil {
-					log.L(ctx).Errorf("failed to set active coordinator for contract %s: %s", contractAddr.String(), err)
-				}
-			}
-
 			sequencer.sender = sender
 			sequencer.coordinator = coordinator
 			sMgr.sequencers[contractAddr.String()] = sequencer
+
+			// Start by populating the pool of originators with the endorsers of this transaction. At this point
+			// we don't have anything else to use to determine who our candidate coordinators are.
+			sMgr.setInitialCoordinator(ctx, tx, sequencer)
+			if err != nil {
+				return nil, err
+			}
 
 			if tx != nil {
 				sMgr.sequencers[contractAddr.String()].lastTXTime = time.Now()
@@ -231,20 +224,11 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("created  | %s", contractAddr.String())
 		}
 	} else {
-		// MRW TODO - move to a common function
 		// We already have a sequencer initialized but we might not have an initial coordinator selected
 		// Start by populating the pool of originators with the endorsers of this transaction. At this point
 		// we don't have anything else to use to determine who our candidate coordinators are.
-		if tx != nil && tx.PreAssembly != nil && tx.PreAssembly.RequiredVerifiers != nil {
-			for _, verifiers := range tx.PreAssembly.RequiredVerifiers {
-				if strings.Contains(verifiers.Lookup, "@") {
-					parts := strings.Split(verifiers.Lookup, "@")
-					sMgr.sequencers[contractAddr.String()].GetCoordinator().UpdateSenderNodePool(ctx, parts[1])
-				}
-			}
-
-			// Get the best candidate for an initial coordinator, and use as the delegate for any originated transactions
-			err := sMgr.sequencers[contractAddr.String()].GetSender().SetActiveCoordinator(sMgr.ctx, sMgr.sequencers[contractAddr.String()].GetCoordinator().GetActiveCoordinatorNode(sMgr.ctx))
+		if sMgr.sequencers[contractAddr.String()].GetSender().GetCurrentCoordinator() == "" {
+			err := sMgr.setInitialCoordinator(ctx, tx, sMgr.sequencers[contractAddr.String()])
 			if err != nil {
 				return nil, err
 			}
@@ -256,6 +240,25 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 	}
 
 	return sMgr.sequencers[contractAddr.String()], nil
+}
+
+func (sMgr *sequencerManager) setInitialCoordinator(ctx context.Context, tx *components.PrivateTransaction, sequencer *sequencer) error {
+
+	if tx != nil && tx.PreAssembly != nil && tx.PreAssembly.RequiredVerifiers != nil {
+		for _, verifiers := range tx.PreAssembly.RequiredVerifiers {
+			if strings.Contains(verifiers.Lookup, "@") {
+				parts := strings.Split(verifiers.Lookup, "@")
+				sequencer.GetCoordinator().UpdateSenderNodePool(ctx, parts[1])
+			}
+		}
+
+		// Get the best candidate for an initial coordinator, and use as the delegate for any originated transactions
+		err := sequencer.GetSender().SetActiveCoordinator(sMgr.ctx, sequencer.GetCoordinator().GetActiveCoordinatorNode(sMgr.ctx))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (sMgr *sequencerManager) dispatch(ctx context.Context, t *coordTransaction.Transaction, dCtx components.DomainContext, transportWriter transport.TransportWriter) {
@@ -388,7 +391,7 @@ func (sMgr *sequencerManager) dispatch(ctx context.Context, t *coordTransaction.
 			}
 			publicTXs[i].Data = pldtypes.HexBytes(data)
 
-			log.L(ctx).Infof("Validating public transaction %s", pt.ID.String())
+			log.L(ctx).Tracef("Validating public transaction %s", pt.ID.String())
 			err = publicTransactionEngine.ValidateTransaction(ctx, sMgr.components.Persistence().NOTX(), publicTXs[i])
 			if err != nil {
 				log.L(ctx).Errorf("Failed to encode call data for public transaction %s: %s", pt.ID, err)

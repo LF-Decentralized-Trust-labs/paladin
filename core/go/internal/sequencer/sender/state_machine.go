@@ -152,15 +152,14 @@ func (s *sender) InitializeStateMachine(initialState State) {
 
 // Process a state machine event immediately. Should only be called on the sequencer loop, or in tests to avoid timing conditions
 func (s *sender) ProcessEvent(ctx context.Context, event common.Event) error {
-	log.L(ctx).Infof("Distributed sender handling new event (contract address %s, node name %s)", s.contractAddress, s.nodeName)
+	log.L(ctx).Debugf("Distributed sender handling new event %s (contract address %s, node name %s)", event.TypeString(), s.contractAddress, s.nodeName)
 
 	if transactionEvent, ok := event.(transaction.Event); ok {
-		log.L(ctx).Infof("Propagating transaction event to transaction: %s", transactionEvent.TypeString())
+		log.L(ctx).Debugf("Propagating transaction event %s to transaction: %s", transactionEvent.TypeString(), transactionEvent.GetTransactionID().String())
 		return s.propagateEventToTransaction(ctx, transactionEvent)
 	}
 
 	//determine whether this event is valid for the current state
-	log.L(ctx).Infof("Evaluating event: %s", event.TypeString())
 	eventHandler, err := s.evaluateEvent(ctx, event)
 	if err != nil || eventHandler == nil {
 		return err
@@ -169,7 +168,6 @@ func (s *sender) ProcessEvent(ctx context.Context, event common.Event) error {
 	//If we get here, the state machine has defined a rule for handling this event
 	//Apply the event to the coordinator to update the internal state
 	// so that the guards and actions defined in the state machine can reference the new internal state of the coordinator
-	log.L(ctx).Infof("Applying event: %s", event.TypeString())
 	err = s.applyEvent(ctx, event)
 	if err != nil {
 		return err
@@ -188,9 +186,9 @@ func (s *sender) ProcessEvent(ctx context.Context, event common.Event) error {
 // Queue a state machine event for the sequencer loop to process. Should be called by most Paladin components to ensure memory integrity of
 // sequencer state machine and transactions.
 func (s *sender) QueueEvent(ctx context.Context, event common.Event) {
-	log.L(ctx).Infof("Pushing sender event onto event queue: %s", event.TypeString())
+	log.L(ctx).Tracef("Pushing sender event onto event queue: %s", event.TypeString())
 	s.senderEvents <- event
-	log.L(ctx).Infof("Pushed sender event onto event queue: %s", event.TypeString())
+	log.L(ctx).Tracef("Pushed sender event onto event queue: %s", event.TypeString())
 }
 
 func (s *sender) SetActiveCoordinator(ctx context.Context, coordinator string) error {
@@ -198,8 +196,12 @@ func (s *sender) SetActiveCoordinator(ctx context.Context, coordinator string) e
 		return i18n.NewError(ctx, msgs.MsgDistSeqInternalError, "Cannot set active coordinator to an empty string")
 	}
 	s.activeCoordinatorNode = coordinator
-	log.L(ctx).Debugf("[Sequencer] initial active coordinator set to %s", s.activeCoordinatorNode)
+	log.L(ctx).Debugf("initial active coordinator set to %s", s.activeCoordinatorNode)
 	return nil
+}
+
+func (s *sender) GetCurrentCoordinator() string {
+	return s.activeCoordinatorNode
 }
 
 func (s *sender) GetTxStatus(ctx context.Context, txID uuid.UUID) (status components.PrivateTxStatus, err error) {
@@ -232,21 +234,19 @@ func (s *sender) evaluateEvent(ctx context.Context, event common.Event) (*EventH
 			valid, err := eventHandler.Validator(ctx, s, event)
 			if err != nil {
 				//This is an unexpected error.  If the event is invalid, the validator should return false and not an error
-				log.L(ctx).Errorf("[Sequencer] error validating event %s: %v", event.TypeString(), err)
+				log.L(ctx).Errorf("error validating event %s: %v", event.TypeString(), err)
 				return nil, err
 			}
 			if !valid {
-				//This is perfectly normal sometimes an event happens and is no longer relevant to the coordinator so we just ignore it and move on
-				log.L(ctx).Debugf("[Sequencer] sender event %s is not valid for current state %s", event.TypeString(), sm.currentState.String())
+				// This is perfectly normal sometimes an event happens and is no longer relevant to the transaction so we just ignore it and move on.
+				// We log a warning in case it's not a late-delivered message but something that needs looking in to
+				log.L(ctx).Warnf("sender event %s is not valid for current state %s", event.TypeString(), sm.currentState.String())
 				return nil, nil
 			}
 		}
 		return &eventHandler, nil
-	} else {
-		// no event handler defined for this event while in this state
-		log.L(ctx).Debugf("[Sequencer] no sender event handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
-		return nil, nil
 	}
+	return nil, nil
 }
 
 // Function applyEvent updates the internal state of the coordinator with information from the event
@@ -263,11 +263,11 @@ func (s *sender) applyEvent(ctx context.Context, event common.Event) error {
 	case *TransactionConfirmedEvent:
 		err = s.confirmTransaction(ctx, event.From, event.Nonce, event.Hash, event.RevertReason)
 	default:
-		log.L(ctx).Debugf("[Sequencer] no action defined for event %T", event)
+		log.L(ctx).Debugf("no action defined for event %T", event)
 
 	}
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error applying event %v: %v", event.Type(), err)
+		log.L(ctx).Errorf("error applying event %v: %v", event.Type(), err)
 	}
 	return err
 }
@@ -278,7 +278,7 @@ func (s *sender) performActions(ctx context.Context, eventHandler EventHandler) 
 			err := rule.Action(ctx, s)
 			if err != nil {
 				//any recoverable errors should have been handled by the action function
-				log.L(ctx).Errorf("[Sequencer] error applying action: %v", err)
+				log.L(ctx).Errorf("error applying action: %v", err)
 				return err
 			}
 		}
@@ -300,7 +300,7 @@ func (s *sender) evaluateTransitions(ctx context.Context, event common.Event, ev
 				err := rule.On(ctx, s)
 				if err != nil {
 					//any recoverable errors should have been handled by the action function
-					log.L(ctx).Errorf("[Sequencer] error transitioning sender to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("error transitioning sender to state %v: %v", sm.currentState, err)
 					return err
 				}
 			}
@@ -310,11 +310,11 @@ func (s *sender) evaluateTransitions(ctx context.Context, event common.Event, ev
 				err := newStateDefinition.OnTransitionTo(ctx, s)
 				if err != nil {
 					// any recoverable errors should have been handled by the OnTransitionTo function
-					log.L(ctx).Errorf("[Sequencer] error transitioning sender to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("error transitioning sender to state %v: %v", sm.currentState, err)
 					return err
 				}
 			} else {
-				log.L(ctx).Debugf("[Sequencer] no OnTransitionTo function defined for state %v", sm.currentState)
+				log.L(ctx).Debugf("no OnTransitionTo function defined for state %v", sm.currentState)
 			}
 
 			break

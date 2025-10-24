@@ -157,7 +157,6 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, txID uuid
 		return err
 	}
 
-	log.L(ctx).Debug("sending endorsement request with %d verifiers", len(verifiers))
 	verifiersAny := make([]*anypb.Any, len(verifiers))
 	for i, verifier := range verifiers {
 		log.L(ctx).Debugf("marshalling endorsement requestverifier %s", verifier.String())

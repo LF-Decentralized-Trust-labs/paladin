@@ -38,6 +38,7 @@ type SeqSender interface {
 	ProcessEvent(ctx context.Context, event common.Event) error
 
 	SetActiveCoordinator(ctx context.Context, coordinator string) error
+	GetCurrentCoordinator() string
 	GetTxStatus(ctx context.Context, txID uuid.UUID) (status components.PrivateTxStatus, err error)
 	Stop()
 }
@@ -93,7 +94,7 @@ func NewSender(
 		engineIntegration:           engineIntegration,
 		heartbeatThresholdMs:        clock.Duration(heartbeatPeriodMs * heartbeatThresholdIntervals),
 		metrics:                     metrics,
-		senderEvents:                make(chan common.Event, 1),
+		senderEvents:                make(chan common.Event, 50), // TODO >1 only required for sqlite coarse-grained locks. Should this be DB-dependent?
 		stopEventLoop:               make(chan struct{}),
 	}
 	s.InitializeStateMachine(State_Idle)

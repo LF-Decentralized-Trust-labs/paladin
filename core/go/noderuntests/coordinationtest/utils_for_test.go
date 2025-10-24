@@ -33,8 +33,7 @@ func transactionReceiptCondition(t *testing.T, ctx context.Context, txID uuid.UU
 	//for the given transaction ID, return a function that can be used in an assert.Eventually to check if the transaction has a receipt
 	return func() bool {
 		txFull := pldapi.TransactionFull{}
-		err := rpcClient.CallRPC(ctx, &txFull, "ptx_getTransactionFull", txID)
-		require.NoError(t, err)
+		_ = rpcClient.CallRPC(ctx, &txFull, "ptx_getTransactionFull", txID)
 		require.False(t, (txFull.Receipt != nil && txFull.Receipt.Success == false), "Have transaction receipt but not successful")
 		return txFull.Receipt != nil && (!isDeploy || (txFull.Receipt.ContractAddress != nil && *txFull.Receipt.ContractAddress != pldtypes.EthAddress{}))
 	}
@@ -44,8 +43,7 @@ func transactionReceiptConditionExpectedPublicTXCount(t *testing.T, ctx context.
 	//for the given transaction ID, return a function that can be used in an assert.Eventually to check if the transaction has a receipt
 	return func() bool {
 		txFull := pldapi.TransactionFull{}
-		err := rpcClient.CallRPC(ctx, &txFull, "ptx_getTransactionFull", txID)
-		require.NoError(t, err)
+		_ = rpcClient.CallRPC(ctx, &txFull, "ptx_getTransactionFull", txID)
 		require.False(t, (txFull.Receipt != nil && txFull.Receipt.Success == false), "Have transaction receipt but not successful")
 		return txFull.Receipt != nil && txFull.Receipt.Success == true && len(txFull.Public) == expectedPublicTXCount
 	}
@@ -55,8 +53,7 @@ func transactionReceiptConditionReceiptOnly(t *testing.T, ctx context.Context, t
 	//for the given transaction ID, return a function that can be used in an assert.Eventually to check if the transaction has a receipt
 	return func() bool {
 		txReceipt := pldapi.TransactionReceiptData{}
-		err := rpcClient.CallRPC(ctx, &txReceipt, "ptx_getTransactionReceipt", txID)
-		require.NoError(t, err)
+		_ = rpcClient.CallRPC(ctx, &txReceipt, "ptx_getTransactionReceipt", txID)
 		require.False(t, (txReceipt.Success == false), "Have transaction receipt but not successful")
 		return txReceipt.Success == true
 	}

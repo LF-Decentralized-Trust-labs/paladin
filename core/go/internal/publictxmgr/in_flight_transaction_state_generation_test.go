@@ -26,7 +26,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/publictxmgrmocks"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -78,11 +77,11 @@ func TestStateVersionTransactionFromRetrieveGasPriceToTracking(t *testing.T) {
 	defer mockActionTriggers.AssertExpectations(t)
 	// retrieve gas price errored
 	mockActionTriggers.On("TriggerRetrieveGasPrice", mock.Anything).Return(fmt.Errorf("gasPriceError")).Once()
-	version.StartNewStageContext(ctx, InFlightTxStageRetrieveGasPrice, BaseTxSubStatusReceived, uuid.New())
+	version.StartNewStageContext(ctx, InFlightTxStageRetrieveGasPrice, BaseTxSubStatusReceived)
 	assert.Regexp(t, "gasPriceError", version.GetStageTriggerError(ctx))
 	// retrieve gas price success
 	mockActionTriggers.On("TriggerRetrieveGasPrice", mock.Anything).Return(nil).Once()
-	version.StartNewStageContext(ctx, InFlightTxStageRetrieveGasPrice, BaseTxSubStatusReceived, uuid.New())
+	version.StartNewStageContext(ctx, InFlightTxStageRetrieveGasPrice, BaseTxSubStatusReceived)
 	assert.Nil(t, version.GetStageTriggerError(ctx))
 
 	var nilBytes []byte
@@ -90,12 +89,12 @@ func TestStateVersionTransactionFromRetrieveGasPriceToTracking(t *testing.T) {
 	// scenario A: no signer configured, do submission
 	mockActionTriggers.On("TriggerSubmitTx", mock.Anything, nilBytes, nilHash, mock.Anything, mock.Anything).Return(nil).Once()
 
-	version.StartNewStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived, uuid.New())
+	version.StartNewStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived)
 	assert.Nil(t, version.GetStageTriggerError(ctx))
 
 	// scenario B: signer configured sign the data
 	mockActionTriggers.On("TriggerSignTx", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-	version.StartNewStageContext(ctx, InFlightTxStageSigning, BaseTxSubStatusReceived, uuid.New())
+	version.StartNewStageContext(ctx, InFlightTxStageSigning, BaseTxSubStatusReceived)
 	assert.Nil(t, version.GetStageTriggerError(ctx))
 	// persist the signed data as transient output
 	testSignedData := []byte("test signed data")
@@ -106,11 +105,11 @@ func TestStateVersionTransactionFromRetrieveGasPriceToTracking(t *testing.T) {
 	})
 	// do the submission
 	mockActionTriggers.On("TriggerSubmitTx", mock.Anything, testSignedData, testHash, mock.Anything, mock.Anything).Return(nil)
-	version.StartNewStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived, uuid.New())
+	version.StartNewStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived)
 	assert.Nil(t, version.GetStageTriggerError(ctx))
 
 	// start tracking  no actions need to be triggered
-	version.StartNewStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusTracking, uuid.New())
+	version.StartNewStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusTracking)
 	assert.Nil(t, version.GetStageTriggerError(ctx))
 
 	// test clear running stage context
@@ -310,7 +309,7 @@ func TestStateManagerTxPersistenceManagementUpdateErrors(t *testing.T) {
 	assert.Regexp(t, "PD011918", err)
 
 	// set a running context
-	version.StartNewStageContext(ctx, InFlightTxStageQueued, BaseTxSubStatusTracking, uuid.New())
+	version.StartNewStageContext(ctx, InFlightTxStageQueued, BaseTxSubStatusTracking)
 
 	// cannot persist when running context hasn't set persistence output
 	_, _, err = version.PersistTxState(ctx)

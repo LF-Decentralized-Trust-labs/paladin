@@ -48,7 +48,9 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 		},
 	}
 
-	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	for range 7 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// trigger retrieve gas price
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
@@ -64,7 +66,6 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
-
 	retrievedGasPrice := &pldapi.PublicTxGasPricing{
 		GasPrice: pldtypes.Int64ToInt256(10),
 	}
@@ -76,6 +77,7 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
+
 	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, retrievedGasPrice.GasPrice, rsc.StageOutputsToBePersisted.TxUpdates.GasPricing.GasPrice)
@@ -111,6 +113,7 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	assert.False(t, rsc.StageErrored)
 	it.persistenceRetryTimeout = 0
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+
 	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now(), fmt.Errorf("persist gas price error"))
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
@@ -123,6 +126,7 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
 	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now(), nil)
 	assert.NotNil(t, rsc.StageOutput.GasPriceOutput.Err)
+
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
@@ -193,7 +197,9 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrements(t *testing.T) {
 	}
 	mTS.statusUpdater = mSU
 
-	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	for range 2 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// trigger retrieve gas price
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
@@ -250,7 +256,10 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsReachedCap(t *tes
 		},
 	}
 	mTS.statusUpdater = mSU
-	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+
+	for range 2 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// trigger retrieve gas price
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
@@ -307,7 +316,10 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsRetrievedHigherPr
 		},
 	}
 	mTS.statusUpdater = mSU
-	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+
+	for range 2 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// trigger retrieve gas price
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
@@ -363,7 +375,9 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559HigherExis
 		},
 	}
 	mTS.statusUpdater = mSU
-	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	for range 2 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// trigger retrieve gas price
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
@@ -426,7 +440,9 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559MismatchFo
 		},
 	}
 	mTS.statusUpdater = mSU
-	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	for range 2 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// trigger retrieve gas price
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
@@ -484,7 +500,9 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559ReachedCap
 		},
 	}
 	mTS.statusUpdater = mSU
-	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	for range 3 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// trigger retrieve gas price
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
@@ -576,7 +594,9 @@ func TestProduceLatestInFlightStageContextRetrieveGasPanic(t *testing.T) {
 		},
 	}
 	mTS.statusUpdater = mSU
-	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	for range 2 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// trigger retrieve gas price
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))

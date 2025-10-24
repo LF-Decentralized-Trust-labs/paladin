@@ -246,11 +246,11 @@ func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) err
 	return nil
 }
 
-func (t *Transaction) writeLockAndDistributeStates(ctx context.Context) error {
-	return t.engineIntegration.WriteLockAndDistributeStatesForTransaction(ctx, t.PrivateTransaction)
+func (t *Transaction) writeLockStates(ctx context.Context) error {
+	return t.engineIntegration.WriteLockStatesForTransaction(ctx, t.PrivateTransaction)
 }
 
-func (t *Transaction) incrementAssembleErrors(ctx context.Context) error {
+func (t *Transaction) incrementAssembleErrors() error {
 	t.errorCount++
 	return nil
 }
@@ -281,9 +281,15 @@ func action_NotifyDependentsOfRevert(ctx context.Context, txn *Transaction) erro
 	return txn.notifyDependentsOfRevert(ctx)
 }
 
+func action_NotifyOfConfirmation(ctx context.Context, txn *Transaction) error {
+	log.L(ctx).Infof("action_NotifyOfConfirmation - notifying dependents of confirmation for transaction %s", txn.ID.String())
+	txn.engineIntegration.ResetTransactions(ctx, txn.ID)
+	return nil
+}
+
 func action_IncrementAssembleErrors(ctx context.Context, txn *Transaction) error {
 	txn.resetEndorsementRequests(ctx)
-	return txn.incrementAssembleErrors(ctx)
+	return txn.incrementAssembleErrors()
 }
 
 func guard_AssembleTimeoutExceeded(ctx context.Context, txn *Transaction) bool {

@@ -45,7 +45,7 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 
 	switch postAssembly.AssemblyResult {
 	case prototk.AssembleTransactionResponse_OK:
-		log.L(ctx).Debugf("[Sequencer] emitting AssembleAndSignSuccessEvent: %s", txn.ID.String())
+		log.L(ctx).Debugf("emitting AssembleAndSignSuccessEvent: %s", txn.ID.String())
 		err = txn.eventHandler(ctx, &AssembleAndSignSuccessEvent{
 			BaseEvent: BaseEvent{
 				TransactionID: txn.ID,

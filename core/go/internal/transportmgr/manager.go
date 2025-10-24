@@ -59,6 +59,7 @@ type transportManager struct {
 	identityResolver components.IdentityResolver
 	groupManager     components.GroupManager
 	persistence      persistence.Persistence
+	publicTxManager  components.PublicTxManager
 
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
@@ -139,6 +140,7 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 	tm.persistence = c.Persistence()
 	tm.reliableMsgWriter = flushwriter.NewWriter(tm.bgCtx, tm.handleReliableMsgBatch, tm.persistence,
 		&tm.conf.ReliableMessageWriter, &pldconf.TransportManagerDefaults.ReliableMessageWriter)
+	tm.publicTxManager = c.PublicTxManager()
 	return nil
 }
 

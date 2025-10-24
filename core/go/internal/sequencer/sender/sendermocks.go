@@ -200,6 +200,50 @@ func (_m *MockSeqSender) EXPECT() *MockSeqSender_Expecter {
 	return &MockSeqSender_Expecter{mock: &_m.Mock}
 }
 
+// GetCurrentCoordinator provides a mock function for the type MockSeqSender
+func (_mock *MockSeqSender) GetCurrentCoordinator() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCurrentCoordinator")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockSeqSender_GetCurrentCoordinator_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCurrentCoordinator'
+type MockSeqSender_GetCurrentCoordinator_Call struct {
+	*mock.Call
+}
+
+// GetCurrentCoordinator is a helper method to define mock.On call
+func (_e *MockSeqSender_Expecter) GetCurrentCoordinator() *MockSeqSender_GetCurrentCoordinator_Call {
+	return &MockSeqSender_GetCurrentCoordinator_Call{Call: _e.mock.On("GetCurrentCoordinator")}
+}
+
+func (_c *MockSeqSender_GetCurrentCoordinator_Call) Run(run func()) *MockSeqSender_GetCurrentCoordinator_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockSeqSender_GetCurrentCoordinator_Call) Return(s string) *MockSeqSender_GetCurrentCoordinator_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockSeqSender_GetCurrentCoordinator_Call) RunAndReturn(run func() string) *MockSeqSender_GetCurrentCoordinator_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetTxStatus provides a mock function for the type MockSeqSender
 func (_mock *MockSeqSender) GetTxStatus(ctx context.Context, txID uuid.UUID) (components.PrivateTxStatus, error) {
 	ret := _mock.Called(ctx, txID)

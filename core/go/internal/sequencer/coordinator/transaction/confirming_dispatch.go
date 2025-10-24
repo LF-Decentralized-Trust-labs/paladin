@@ -31,21 +31,16 @@ func (t *Transaction) applyDispatchConfirmation(_ context.Context, requestID uui
 
 func (t *Transaction) sendPreDispatchRequest(ctx context.Context) error {
 
-	log.L(ctx).Debugf("[Sequencer] Sending dispatch confirmation request for transaction %s", t.ID)
-	log.L(ctx).Debugf("[Sequencer] Do we have endorsements or signatures?")
-	log.L(ctx).Debugf("[Sequencer] %d endorsements", len(t.PostAssembly.Endorsements))
-	log.L(ctx).Debugf("[Sequencer] %d signatures", len(t.PostAssembly.Signatures))
-
 	if t.pendingPreDispatchRequest == nil {
 		hash, err := t.Hash(ctx)
 		if err != nil {
-			log.L(ctx).Debugf("[Sequencer] Error hashing transaction for dispatch confirmation request: %s", err)
+			log.L(ctx).Debugf("Error hashing transaction for dispatch confirmation request: %s", err)
 			return err
 		}
-		log.L(ctx).Debugf("[Sequencer] Creating idempotent request for dispatch confirmation request")
+		log.L(ctx).Debugf("Creating idempotent request for dispatch confirmation request")
 		t.pendingPreDispatchRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
 
-			log.L(ctx).Debugf("[Sequencer] Calling SendDispatchConfirmationRequest")
+			log.L(ctx).Debugf("Calling SendDispatchConfirmationRequest")
 			return t.transportWriter.SendPreDispatchRequest(
 				ctx,
 				t.sender,
@@ -61,7 +56,7 @@ func (t *Transaction) sendPreDispatchRequest(ctx context.Context) error {
 				},
 			})
 			if err != nil {
-				log.L(ctx).Errorf("[Sequencer] error handling RequestTimeoutIntervalEvent: %s", err)
+				log.L(ctx).Errorf("error handling RequestTimeoutIntervalEvent: %s", err)
 				return
 			}
 		})

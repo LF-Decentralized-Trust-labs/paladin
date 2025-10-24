@@ -45,7 +45,7 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	}
 
 	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
-	for i := 0; i < 2; i++ {
+	for range 7 {
 		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
 	}
 

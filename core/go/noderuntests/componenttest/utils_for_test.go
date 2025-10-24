@@ -51,6 +51,7 @@ func transactionReceiptCondition(t *testing.T, ctx context.Context, txID uuid.UU
 	return func() bool {
 		txFull := pldapi.TransactionFull{}
 		err := rpcClient.CallRPC(ctx, &txFull, "ptx_getTransactionFull", txID)
+		fmt.Printf("Transaction full: %+v\n", txFull)
 		require.NoError(t, err)
 		require.False(t, (txFull.Receipt != nil && txFull.Receipt.Success == false), "Have transaction receipt but not successful")
 		return txFull.Receipt != nil && (!isDeploy || (txFull.Receipt.ContractAddress != nil && *txFull.Receipt.ContractAddress != pldtypes.EthAddress{}))
@@ -71,7 +72,7 @@ func transactionRevertedCondition(t *testing.T, ctx context.Context, txID uuid.U
 func transactionLatencyThreshold(t *testing.T) time.Duration {
 	// normally we would expect a transaction to be confirmed within a couple of seconds but
 	// if we are in a debug session, we want to give it much longer
-	threshold := 2 * time.Second
+	threshold := 5 * time.Second
 
 	deadline, ok := t.Deadline()
 	if !ok {

@@ -31,7 +31,9 @@ func TestProduceLatestInFlightStageContextTriggerStageError(t *testing.T) {
 	defer done()
 	it, _ := newInflightTransaction(o, 1)
 
-	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	for range 2 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	tOut := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
@@ -57,9 +59,13 @@ func TestProduceLatestInFlightStageContextTriggerStageError(t *testing.T) {
 }
 
 func TestProduceLatestInFlightStageContextStatusChange(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, ifts := newInflightTransaction(o, 1)
+
+	for range 3 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// trigger status change
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
@@ -132,7 +138,9 @@ func TestProduceLatestInFlightStageContextStatusUpdatePanic(t *testing.T) {
 	defer done()
 	it, _ := newInflightTransaction(o, 1)
 
-	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	for range 2 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// trigger status change
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))

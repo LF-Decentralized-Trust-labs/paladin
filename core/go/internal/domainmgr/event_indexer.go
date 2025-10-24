@@ -137,7 +137,7 @@ func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) 
 				log.L(dm.bgCtx).Debugf("Checking public transactions for TX ID %s to find a match for the receipt we are processing %s", completion.TransactionID, publicTx.TransactionHash)
 				if publicTx.TransactionHash.Equals(&completion.OnChain.TransactionHash) {
 					log.L(dm.bgCtx).Debugf("Found a match for the receipt we are processing %s", publicTx.TransactionHash)
-					err = dm.sequencerManager.HandleTransactionConfirmed(dm.bgCtx, completion, &publicTx.From, publicTx.Nonce.Uint64())
+					err = dm.sequencerManager.HandleTransactionConfirmed(dm.bgCtx, completion, &publicTx.From, publicTx.Nonce)
 					if err != nil {
 						log.L(dm.bgCtx).Errorf("Error handling transaction confirmed event: %s", err)
 					}
@@ -147,7 +147,7 @@ func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) 
 
 		// We also provide a direct waiter that's used by the testbed
 		inflight := dm.privateTxWaiter.GetInflight(completion.TransactionID)
-		log.L(dm.bgCtx).Infof("Notifying of completion for private deployment TransactionID %s (waiter=%t)", completion.TransactionID, inflight != nil)
+		log.L(dm.bgCtx).Debugf("Notifying of completion for private deployment TransactionID %s (waiter=%t)", completion.TransactionID, inflight != nil)
 		if inflight != nil {
 			inflight.Complete(&completion.ReceiptInput)
 		}
@@ -378,6 +378,7 @@ func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX persisten
 
 	// Then any finalizations of those states
 	if len(stateSpends) > 0 || len(stateReads) > 0 || len(stateConfirms) > 0 || len(stateInfoRecords) > 0 {
+		log.L(ctx).Infof("Writing state finalizations for %d spends, %d reads, %d confirms, %d info records", len(stateSpends), len(stateReads), len(stateConfirms), len(stateInfoRecords))
 		if err := d.dm.stateStore.WriteStateFinalizations(ctx, dbTX, stateSpends, stateReads, stateConfirms, stateInfoRecords); err != nil {
 			return nil, err
 		}

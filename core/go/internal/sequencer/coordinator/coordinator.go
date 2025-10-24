@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
@@ -33,6 +34,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
@@ -140,7 +142,7 @@ func NewCoordinator(
 		coordinatorIdle:                    coordinatorIdle,
 		nodeName:                           nodeName,
 		metrics:                            metrics,
-		coordinatorEvents:                  make(chan common.Event, 1),
+		coordinatorEvents:                  make(chan common.Event, 50), // TODO >1 only required for sqlite coarse-grained locks. Should this be DB-dependent?
 		stopEventLoop:                      make(chan struct{}),
 		coordinatorSelectionBlockRange:     blockRangeSize,
 	}
@@ -181,6 +183,7 @@ func (c *coordinator) sendHandoverRequest(ctx context.Context) {
 
 func (c *coordinator) GetActiveCoordinatorNode(ctx context.Context) string {
 	if c.activeCoordinatorNode == "" {
+		// If we don't yet have an active coordinator, select one based on the appropriate algorithm for the contract type
 		activeCoordinator, err := c.selectNextActiveCoordinator(ctx)
 		if err != nil {
 			log.L(ctx).Errorf("error selecting next active coordinator: %v", err)
@@ -192,6 +195,7 @@ func (c *coordinator) GetActiveCoordinatorNode(ctx context.Context) string {
 }
 
 func (c *coordinator) SetActiveCoordinatorNode(ctx context.Context, coordinatorNode string) {
+	log.L(ctx).Debugf("set active coordinator for contract %s: %s", c.contractAddress.String(), coordinatorNode)
 	c.activeCoordinatorNode = coordinatorNode
 }
 
@@ -199,21 +203,25 @@ func (c *coordinator) selectNextActiveCoordinator(ctx context.Context) (string, 
 	coordinator := ""
 	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_STATIC {
 		// E.g. Noto
-		log.L(ctx).Info("selecting next active coordinator in static coordinator mode")
 		if c.domainAPI.ContractConfig().GetStaticCoordinator() == "" {
 			return "", fmt.Errorf("static coordinator mode is configured but static coordinator node is not set")
 		}
-		log.L(ctx).Infof("selected next active coordinator in static coordinator mode: %s", c.domainAPI.ContractConfig().GetStaticCoordinator())
-		coordinator = c.domainAPI.ContractConfig().GetStaticCoordinator()
+		log.L(ctx).Debugf("coordinator %s selected as next active coordinator in static coordinator mode", c.domainAPI.ContractConfig().GetStaticCoordinator())
+		// If the static coordinator returns a fully qualified identity extract just the node name
+		if strings.Contains(c.domainAPI.ContractConfig().GetStaticCoordinator(), "@") {
+			parts := strings.Split(c.domainAPI.ContractConfig().GetStaticCoordinator(), "@")
+			coordinator = parts[1]
+		} else {
+			coordinator = c.domainAPI.ContractConfig().GetStaticCoordinator()
+		}
 	}
 	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_ENDORSER {
 		// E.g. Pente
 		// Make a fair choice about the next coordinator, but for now just choose the node this request arrived at
-		log.L(ctx).Infof("selecting next active coordinator in endorser coordinator mode")
-		log.L(ctx).Infof("selected next active coordinator in endorser coordinator mode: %s", c.nodeName)
 		if len(c.senderNodePool) == 0 {
 			coordinator = c.nodeName
-			log.L(ctx).Warnf("Coordinator %s selected based on hash modulus of the sender pool", coordinator)
+			coordinator = "alice"
+			log.L(ctx).Warnf("coordinator %s selected based on empty sender pool (local node)", coordinator)
 		} else {
 			// Round block number down to the nearest block range (e.g. block 1012, 1013, 1014 etc. all become 1000 for hashing)
 			effectiveBlockNumber := c.currentBlockHeight - (c.currentBlockHeight % c.coordinatorSelectionBlockRange)
@@ -222,38 +230,30 @@ func (c *coordinator) selectNextActiveCoordinator(ctx context.Context) (string, 
 			h := fnv.New32a()
 			h.Write([]byte(strconv.FormatUint(effectiveBlockNumber, 10)))
 			coordinator = c.senderNodePool[int(h.Sum32())%len(c.senderNodePool)]
-			log.L(ctx).Infof("Coordinator %s selected based on hash modulus of the sender pool", coordinator)
+			coordinator = "alice"
+			log.L(ctx).Debugf("coordinator %s selected based on hash modulus of the sender pool", coordinator)
 		}
 	}
 	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_SENDER {
 		// E.g. Zeto
-		log.L(ctx).Infof("selecting next active coordinator in sender coordinator mode")
-		log.L(ctx).Infof("selected next active coordinator in sender coordinator mode: %s", c.nodeName)
+		log.L(ctx).Debugf("coordinator %s selected as next active coordinator in sender coordinator mode", c.nodeName)
 		coordinator = c.nodeName
 	}
 
-	// MRW TODO - remove this below
-	// Strip everything after the @ to get the node node
-	coordinatorNode := strings.Split(coordinator, "@")
-	if len(coordinatorNode) > 1 {
-		return coordinatorNode[1], nil
+	log.L(ctx).Debugf("selected active coordinator for contract %s: %s", c.contractAddress.String(), coordinator)
+
+	if strings.Contains(coordinator, "@") || coordinator == "" {
+		return "", i18n.NewError(ctx, msgs.MsgDistSeqInternalError, "coordinator node is invalid")
 	}
 
-	if coordinatorNode[0] == "" {
-		return "", fmt.Errorf("coordinator node not found")
-	}
-	return coordinatorNode[0], nil
+	return coordinator, nil
 }
 
-func (c *coordinator) UpdateSenderNodePool(ctx context.Context, sender string) {
-	senderParts := strings.Split(sender, "@")
-	var senderNode string
-	if len(senderParts) > 1 {
-		senderNode = senderParts[1]
-	} else {
-		senderNode = senderParts[0]
+func (c *coordinator) UpdateSenderNodePool(ctx context.Context, senderNode string) {
+	if strings.Contains(senderNode, "@") {
+		log.L(ctx).Errorf("sender ID provided, sender node expected: %s", senderNode)
 	}
-	log.L(ctx).Infof("updating sender node pool with node %s", senderNode)
+	log.L(ctx).Debugf("updating sender node pool with node %s", senderNode)
 	if !slices.Contains(c.senderNodePool, senderNode) {
 		c.senderNodePool = append(c.senderNodePool, senderNode)
 		slices.Sort(c.senderNodePool)
@@ -308,9 +308,6 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender str
 				c.metrics.DecCoordinatingTransactions()
 				err := c.grapher.Forget(txn.ID)
 
-				// Remove this transaction from our domain context on success
-				c.engineIntegration.ResetTransactions(ctx, txn.ID)
-
 				if err != nil {
 					log.L(ctx).Errorf("error forgetting transaction %s: %v", txn.ID.String(), err)
 				}
@@ -364,17 +361,17 @@ func (c *coordinator) propagateEventToAllTransactions(ctx context.Context, event
 func (c *coordinator) getTransactionsInStates(ctx context.Context, states []transaction.State) []*transaction.Transaction {
 	//TODO this could be made more efficient by maintaining a separate index of transactions for each state but that is error prone so
 	// deferring until we have a comprehensive test suite to catch errors
-	log.L(ctx).Infof("getting transactions in states: %+v", states)
+	log.L(ctx).Debugf("getting transactions in states: %+v", states)
 	matchingStates := make(map[transaction.State]bool)
 	for _, state := range states {
 		matchingStates[state] = true
 	}
 
-	log.L(ctx).Infof("found %d transactions in states: %+v", len(c.transactionsByID), states)
+	log.L(ctx).Debugf("looking across %d transactions for those in states: %+v", len(c.transactionsByID), states)
 	matchingTxns := make([]*transaction.Transaction, 0, len(c.transactionsByID))
 	for _, txn := range c.transactionsByID {
 		if matchingStates[txn.GetState()] {
-			log.L(ctx).Infof("found transaction %s in state %s", txn.ID.String(), txn.GetState())
+			log.L(ctx).Debugf("found transaction %s in state %s", txn.ID.String(), txn.GetState())
 			matchingTxns = append(matchingTxns, txn)
 		}
 	}
@@ -403,10 +400,10 @@ func (c *coordinator) findTransactionBySignerNonce(ctx context.Context, signer *
 	// deferring until we have a comprehensive test suite to catch errors
 	for _, txn := range c.transactionsByID {
 		if txn != nil {
-			log.L(ctx).Infof("Tracked TX ID %s", txn.ID.String())
+			log.L(ctx).Tracef("Tracked TX ID %s", txn.ID.String())
 		}
 		if txn != nil && txn.GetSignerAddress() != nil {
-			log.L(ctx).Infof("Tracked TX ID %s signer address '%s'", txn.ID.String(), txn.GetSignerAddress().String())
+			log.L(ctx).Tracef("Tracked TX ID %s signer address '%s'", txn.ID.String(), txn.GetSignerAddress().String())
 		}
 		if txn.GetSignerAddress() != nil && *txn.GetSignerAddress() == *signer && txn.GetNonce() != nil && *(txn.GetNonce()) == nonce {
 			return txn
@@ -416,7 +413,7 @@ func (c *coordinator) findTransactionBySignerNonce(ctx context.Context, signer *
 }
 
 func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uuid.UUID, from *pldtypes.EthAddress, nonce uint64, hash pldtypes.Bytes32, revertReason pldtypes.HexBytes) (bool, error) {
-	log.L(ctx).Infof("confirmDispatchedTransaction - we currently have %d transactions to handle", len(c.transactionsByID))
+	log.L(ctx).Debugf("we currently have %d transactions to handle, confirming that dispatched TX %s is in our list", len(c.transactionsByID), txId.String())
 	// First check whether it is one that we have been coordinating
 	if dispatchedTransaction := c.findTransactionBySignerNonce(ctx, from, nonce); dispatchedTransaction != nil {
 		if dispatchedTransaction.GetLatestSubmissionHash() == nil || *(dispatchedTransaction.GetLatestSubmissionHash()) != hash {
@@ -458,6 +455,8 @@ func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uui
 				RevertReason: revertReason,
 			}
 			event.TransactionID = txId
+
+			log.L(ctx).Debugf("Confirming dispatched TX %s", txId.String())
 			err := dispatchedTransaction.HandleEvent(ctx, event)
 			if err != nil {
 				log.L(ctx).Errorf("error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
@@ -466,12 +465,12 @@ func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uui
 			return true, nil
 		}
 	}
-	log.L(ctx).Infof("confirmDispatchedTransaction - failed to find a transaction submitted by signer %s", from.String())
+	log.L(ctx).Infof("failed to find a transaction submitted by signer %s", from.String())
 	return false, nil
 
 }
 
-func (c *coordinator) confirmMonitoredTransaction(ctx context.Context, from *pldtypes.EthAddress, nonce uint64) {
+func (c *coordinator) confirmMonitoredTransaction(_ context.Context, from *pldtypes.EthAddress, nonce uint64) {
 	if flushPoint := c.activeCoordinatorsFlushPointsBySignerNonce[fmt.Sprintf("%s:%d", from.String(), nonce)]; flushPoint != nil {
 		//We do not remove the flushPoint from the list because there is a chance that the coordinator hasn't seen this confirmation themselves and
 		// when they send us the next heartbeat, it will contain this FlushPoint so it would get added back into the list and we would not see the confirmation again

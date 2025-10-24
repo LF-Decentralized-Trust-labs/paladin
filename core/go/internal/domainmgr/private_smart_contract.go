@@ -237,12 +237,12 @@ func (dc *domainContract) AssembleTransaction(dCtx components.DomainContext, rea
 		// We hydrate the states on our side of the Manager<->Plugin divide at this point,
 		// which provides back to the engine the full sequence locking information of the
 		// states (inputs, and read)
-		log.L(dCtx.Ctx()).Info("Loading post-assembly input states from context")
+		log.L(dCtx.Ctx()).Debugf("Loading post-assembly input states from context")
 		postAssembly.InputStates, err = dc.loadStatesFromContext(dCtx, readTX, res.AssembledTransaction.InputStates)
 		if err != nil {
 			return err
 		}
-		log.L(dCtx.Ctx()).Info("Loading post-assembly read states from context")
+		log.L(dCtx.Ctx()).Debugf("Loading post-assembly read states from context")
 		postAssembly.ReadStates, err = dc.loadStatesFromContext(dCtx, readTX, res.AssembledTransaction.ReadStates)
 		if err != nil {
 			return err
@@ -258,8 +258,8 @@ func (dc *domainContract) AssembleTransaction(dCtx components.DomainContext, rea
 		// Note the states at this point are just potential states - depending on the analysis
 		// of the result, and the locking on the input states, the engine might decide to
 		// abandon this attempt and just re-assemble later.
-		log.L(dCtx.Ctx()).Infof("Number of potential output states: %+v", len(res.AssembledTransaction.OutputStates))
-		log.L(dCtx.Ctx()).Infof("Number of potential info states: %+v", len(res.AssembledTransaction.InfoStates))
+		log.L(dCtx.Ctx()).Debugf("Number of potential output states: %+v", len(res.AssembledTransaction.OutputStates))
+		log.L(dCtx.Ctx()).Debugf("Number of potential info states: %+v", len(res.AssembledTransaction.InfoStates))
 		postAssembly.OutputStatesPotential = res.AssembledTransaction.OutputStates
 		postAssembly.InfoStatesPotential = res.AssembledTransaction.InfoStates
 		postAssembly.DomainData = res.AssembledTransaction.DomainData
@@ -335,7 +335,7 @@ func (dc *domainContract) upsertPotentialStates(dCtx components.DomainContext, r
 	contractAddr := tx.PreAssembly.TransactionSpecification.ContractInfo.ContractAddress
 	writtenStates = make([]*components.FullState, len(newStatesToWrite))
 	if len(newStatesToWrite) > 0 {
-		log.L(dCtx.Ctx()).Infof("Writing states to domain context for transaction=%s domain=%s contract-address=%s", tx.ID, dc.d.name, contractAddr)
+		log.L(dCtx.Ctx()).Infof("Writing %d states to domain context for transaction=%s domain=%s contract-address=%s", len(newStatesToWrite), tx.ID, dc.d.name, contractAddr)
 		newStates, err := dCtx.UpsertStates(readTX, newStatesToWrite...)
 		if err != nil {
 			return nil, err

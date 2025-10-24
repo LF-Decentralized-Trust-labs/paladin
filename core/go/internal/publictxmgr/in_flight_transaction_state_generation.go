@@ -27,7 +27,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/google/uuid"
 )
 
 type inFlightTransactionStateGeneration struct {
@@ -145,7 +144,7 @@ func (v *inFlightTransactionStateGeneration) GetStageTriggerError(ctx context.Co
 	return v.stageTriggerError
 }
 
-func (v *inFlightTransactionStateGeneration) StartNewStageContext(ctx context.Context, stage InFlightTxStage, substatus BaseTxSubStatus, txIdUUID uuid.UUID) {
+func (v *inFlightTransactionStateGeneration) StartNewStageContext(ctx context.Context, stage InFlightTxStage, substatus BaseTxSubStatus) {
 	nowTime := time.Now() // pin the now time
 	rsc := NewRunningStageContext(ctx, stage, substatus, v.InMemoryTxStateManager)
 	if rsc.Stage != v.stage {
@@ -182,7 +181,7 @@ func (v *inFlightTransactionStateGeneration) StartNewStageContext(ctx context.Co
 		if rsc.InMemoryTx.GetTo() != nil {
 			toAddress = rsc.InMemoryTx.GetTo().String()
 		}
-		v.stageTriggerError = v.TriggerSubmitTx(ctx, signedMessage, calculatedTxHash, toAddress, txIdUUID)
+		v.stageTriggerError = v.TriggerSubmitTx(ctx, signedMessage, calculatedTxHash, toAddress)
 	case InFlightTxStageStatusUpdate:
 		log.L(ctx).Tracef("Transaction with ID %s, triggering status update", rsc.InMemoryTx.GetSignerNonce())
 		v.stageTriggerError = v.TriggerStatusUpdate(ctx)

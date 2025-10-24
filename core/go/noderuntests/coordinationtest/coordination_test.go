@@ -54,6 +54,101 @@ func stopNode(t *testing.T, party testutils.Party) {
 	party.Stop(t)
 }
 
+func TestTransactionSuccessPrivacyGroupEndorsement(t *testing.T) {
+	// Test a regular privacy group endorsement transaction
+	ctx := context.Background()
+	domainRegistryAddress := deployDomainRegistry(t, "alice")
+
+	alice := testutils.NewPartyForTesting(t, "alice", domainRegistryAddress)
+	bob := testutils.NewPartyForTesting(t, "bob", domainRegistryAddress)
+
+	alice.AddPeer(bob.GetNodeConfig())
+	bob.AddPeer(alice.GetNodeConfig())
+
+	domainConfig := &domains.SimpleDomainConfig{
+		SubmitMode: domains.ONE_TIME_USE_KEYS,
+	}
+
+	startNode(t, alice, domainConfig)
+	startNode(t, bob, domainConfig)
+	t.Cleanup(func() {
+		stopNode(t, alice)
+		stopNode(t, bob)
+	})
+
+	constructorParameters := &domains.ConstructorParameters{
+		From:            alice.GetIdentity(),
+		Name:            "FakeToken1",
+		Symbol:          "FT1",
+		EndorsementMode: domains.PrivacyGroupEndorsement,
+		EndorsementSet:  []string{alice.GetIdentityLocator(), bob.GetIdentityLocator()},
+	}
+
+	contractAddress := alice.DeploySimpleDomainInstanceContract(t, constructorParameters, transactionReceiptCondition, transactionLatencyThreshold)
+
+	// Start a private transaction on alice's node
+	// this is a mint to bob so bob should later be able to do a transfer without any mint taking place on bob's node
+	var aliceTxID uuid.UUID
+	idempotencyKey := uuid.New().String()
+	err := alice.GetClient().CallRPC(ctx, &aliceTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleTokenTransferABI(),
+		TransactionBase: pldapi.TransactionBase{
+			To:             contractAddress,
+			Domain:         "domain1",
+			IdempotencyKey: "tx1-alice-" + idempotencyKey,
+			Type:           pldapi.TransactionTypePrivate.Enum(),
+			From:           alice.GetIdentity(),
+			Data: pldtypes.RawJSON(`{
+                    "from": "",
+                    "to": "` + bob.GetIdentityLocator() + `",
+                    "amount": "123000000000000000000"
+                }`),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.UUID{}, aliceTxID)
+	assert.Eventually(t,
+		transactionReceiptConditionExpectedPublicTXCount(t, ctx, aliceTxID, alice.GetClient(), 1),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt with 1 public TX",
+	)
+	// Check bob has the public TX info as well
+	assert.Eventually(t,
+		transactionReceiptConditionExpectedPublicTXCount(t, ctx, aliceTxID, bob.GetClient(), 1),
+		transactionLatencyThreshold(t),
+		100*time.Millisecond,
+		"Transaction did not receive a receipt with 1 public TX",
+	)
+
+	// Check Alice and Bob both have the same view of the world
+	aliceTxFull := pldapi.TransactionFull{}
+	err = alice.GetClient().CallRPC(ctx, &aliceTxFull, "ptx_getTransactionFull", aliceTxID)
+	require.NoError(t, err)
+	require.NotNil(t, aliceTxFull)
+
+	bobTxFull := pldapi.TransactionFull{}
+	err = bob.GetClient().CallRPC(ctx, &bobTxFull, "ptx_getTransactionFull", aliceTxID)
+	require.NoError(t, err)
+	require.NotNil(t, bobTxFull)
+
+	assert.Equal(t, aliceTxFull.ABIReference, bobTxFull.ABIReference)
+	assert.Equal(t, aliceTxFull.Domain, bobTxFull.Domain)
+	assert.Equal(t, aliceTxFull.Function, bobTxFull.Function)
+	assert.Equal(t, aliceTxFull.From, bobTxFull.From)
+	assert.Equal(t, aliceTxFull.To, bobTxFull.To)
+	assert.Equal(t, aliceTxFull.Gas, bobTxFull.Gas)
+	assert.Equal(t, aliceTxFull.GasPrice, bobTxFull.GasPrice)
+	assert.Equal(t, aliceTxFull.Data, bobTxFull.Data)
+	assert.Equal(t, aliceTxFull.Public[0].TransactionHash, bobTxFull.Public[0].TransactionHash)
+	assert.Equal(t, aliceTxFull.Public[0].From, bobTxFull.Public[0].From)
+	assert.Equal(t, aliceTxFull.Public[0].To, bobTxFull.Public[0].To)
+	assert.Equal(t, aliceTxFull.Public[0].Value, bobTxFull.Public[0].Value)
+	assert.Equal(t, aliceTxFull.Public[0].Gas, bobTxFull.Public[0].Gas)
+	assert.Equal(t, aliceTxFull.Public[0].GasPrice, bobTxFull.Public[0].GasPrice)
+}
+
 func TestTransactionSuccessAfterStartStopSingleNode(t *testing.T) {
 	// We want to test that we can start some nodes, send a transaction, restart the nodes and send some more transactions
 
@@ -780,9 +875,13 @@ func TestTransactionSuccessChainedTransactionPrivacyGroupEndorsementThenSelfEndo
 		"Transaction did not receive a receipt",
 	)
 
-	// Bob's node has the receipt, but not necesarily the original transaction
+	txFull := pldapi.TransactionFull{}
+	err = alice.GetClient().CallRPC(ctx, &txFull, "ptx_getTransactionFull", aliceTxID)
+	require.NoError(t, err)
+
+	// Bob's node has the receipt
 	assert.Eventually(t,
-		transactionReceiptConditionReceiptOnly(t, ctx, aliceTxID, bob.GetClient(), false),
+		transactionReceiptCondition(t, ctx, aliceTxID, bob.GetClient(), false),
 		transactionLatencyThreshold(t),
 		100*time.Millisecond,
 		"Transaction did not receive a receipt",
@@ -867,9 +966,9 @@ func TestTransactionSuccessChainedTransactionPrivacyGroupEndorsementThenPrivacyG
 		"Transaction did not receive a receipt",
 	)
 
-	// Bob's node has the receipt, but not necesarily the original transaction
+	// Bob's node has the receipt
 	assert.Eventually(t,
-		transactionReceiptConditionReceiptOnly(t, ctx, aliceTxID, bob.GetClient(), false),
+		transactionReceiptCondition(t, ctx, aliceTxID, bob.GetClient(), false),
 		transactionLatencyThreshold(t),
 		100*time.Millisecond,
 		"Transaction did not receive a receipt",

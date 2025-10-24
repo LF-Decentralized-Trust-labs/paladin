@@ -204,6 +204,9 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	})
 	defer done()
 
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.sequencerManager.On("HandlePublicTXsWritten", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
 	// Mock a gas price
 	chainID, _ := rand.Int(rand.Reader, big.NewInt(100000000000000))
 	m.ethClient.On("GasPrice", mock.Anything).Return(pldtypes.MustParseHexUint256("1000000000000000"), nil)
@@ -470,7 +473,7 @@ func TestAddActivityWrap(t *testing.T) {
 
 func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 	ctx := context.Background()
-	_, ptm, _, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+	_, ptm, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		mocks.db.MatchExpectationsInOrder(false)
 		mocks.db.ExpectBegin()
 		mocks.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{}))
@@ -478,6 +481,8 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 		mocks.db.ExpectCommit()
 	})
 	defer done()
+
+	m.sequencerManager.On("HandlePublicTXsWritten", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// create transaction succeeded
 	tx, err := ptm.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
@@ -504,6 +509,9 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 		conf.GasPrice.FixedGasPrice = nil
 	})
 	defer done()
+
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.sequencerManager.On("HandlePublicTXsWritten", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	keyMapping, err := m.keyManager.ResolveKeyNewDatabaseTX(ctx, "signer1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
@@ -594,6 +602,9 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 	})
 	defer done()
 
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.sequencerManager.On("HandlePublicTXsWritten", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
 	keyMapping, err := m.keyManager.ResolveKeyNewDatabaseTX(ctx, "signer1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
 	resolvedKey := pldtypes.MustEthAddress(keyMapping.Verifier.Verifier)
@@ -620,7 +631,6 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 
 	confirmations := make(chan *blockindexer.IndexedTransactionNotify, 1)
 	srtx := m.ethClient.On("SendRawTransaction", mock.Anything, mock.Anything)
-	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	srtx.Run(func(args mock.Arguments) {
 		signedMessage := args[1].(pldtypes.HexBytes)
 

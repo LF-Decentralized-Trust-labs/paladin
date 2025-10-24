@@ -35,7 +35,7 @@ func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatRec
 			txn := s.transactionsByID[dispatchedTransaction.ID]
 			if txn == nil {
 				//unexpected situation to be in.  We trust our memory of transactions over the coordinator's, so we ignore this transaction
-				log.L(ctx).Warnf("[Sequencer] received heartbeat from %s with dispatched transaction %s but no transaction found in memory", s.activeCoordinatorNode, dispatchedTransaction.ID)
+				log.L(ctx).Warnf("received heartbeat from %s with dispatched transaction %s but no transaction found in memory", s.activeCoordinatorNode, dispatchedTransaction.ID)
 				continue
 			}
 			if dispatchedTransaction.LatestSubmissionHash != nil {
@@ -50,7 +50,7 @@ func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatRec
 
 				err := txn.HandleEvent(ctx, txnSubmittedEvent)
 				if err != nil {
-					msg := fmt.Sprintf("[Sequencer] error handling transaction submitted event for transaction %s: %v", txn.ID, err)
+					msg := fmt.Sprintf("error handling transaction submitted event for transaction %s: %v", txn.ID, err)
 					log.L(ctx).Error(msg)
 					return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 				}
@@ -65,7 +65,7 @@ func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatRec
 				})
 
 				if err != nil {
-					msg := fmt.Sprintf("[Sequencer] error handling nonce assigned event for transaction %s: %v", txn.ID, err)
+					msg := fmt.Sprintf("error handling nonce assigned event for transaction %s: %v", txn.ID, err)
 					log.L(ctx).Error(msg)
 					return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 				}

@@ -207,7 +207,7 @@ func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.
 	})
 
 	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
-	for i := 0; i < 2; i++ {
+	for range 3 {
 		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
 	}
 
@@ -297,7 +297,7 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	})
 
 	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
-	for i := 0; i < 2; i++ {
+	for range 5 {
 		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
 	}
 
@@ -421,7 +421,7 @@ func TestProduceLatestInFlightStageContextSubmitRePrepare(t *testing.T) {
 	})
 
 	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
 	}
 
@@ -454,7 +454,7 @@ func TestProduceLatestInFlightStageContextSubmitRePrepare(t *testing.T) {
 }
 
 func TestProduceLatestInFlightStageContextResubmission(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -463,6 +463,9 @@ func TestProduceLatestInFlightStageContextResubmission(t *testing.T) {
 			return nil
 		},
 	}
+
+	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+
 	// the transaction already has details of a last submission
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
 		GasPricing: &pldapi.PublicTxGasPricing{
@@ -513,6 +516,8 @@ func TestTriggerSubmitTx(t *testing.T) {
 		TransactionHash: confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))),
 	})
 
+	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+
 	// trigger signing
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))
 	called := make(chan struct{})
@@ -523,10 +528,7 @@ func TestTriggerSubmitTx(t *testing.T) {
 		close(called)
 	}).Once()
 
-	// successful event notification to distributed sequencer
-	m.sequencerManager.On("HandlePublicTXSubmission", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-	err := it.TriggerSubmitTx(ctx, nil, confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))), it.stateManager.GetTo().String(), uuid.New())
+	err := it.TriggerSubmitTx(ctx, nil, confutil.P(pldtypes.Bytes32Keccak([]byte("0x000001"))), it.stateManager.GetTo().String())
 	require.NoError(t, err)
 	<-called
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)

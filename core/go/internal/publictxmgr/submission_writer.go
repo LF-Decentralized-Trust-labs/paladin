@@ -19,8 +19,10 @@ import (
 	"context"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/flushwriter"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr/metrics"
+	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 
@@ -31,12 +33,14 @@ type noResult struct{}
 
 type submissionWriter struct {
 	flushwriter.Writer[*DBPubTxnSubmission, *noResult]
-	metrics metrics.PublicTransactionManagerMetrics
+	metrics          metrics.PublicTransactionManagerMetrics
+	sequencerManager components.SequencerManager
 }
 
-func newSubmissionWriter(bgCtx context.Context, p persistence.Persistence, conf *pldconf.PublicTxManagerConfig, metrics metrics.PublicTransactionManagerMetrics) *submissionWriter {
+func newSubmissionWriter(bgCtx context.Context, p persistence.Persistence, conf *pldconf.PublicTxManagerConfig, metrics metrics.PublicTransactionManagerMetrics, sequencerManager components.SequencerManager) *submissionWriter {
 	sw := &submissionWriter{}
 	sw.metrics = metrics
+	sw.sequencerManager = sequencerManager
 	sw.Writer = flushwriter.NewWriter(bgCtx, sw.runBatch, p, &conf.Manager.SubmissionWriter, &pldconf.PublicTxManagerDefaults.Manager.SubmissionWriter)
 	return sw
 }
@@ -53,6 +57,21 @@ func (sw *submissionWriter) runBatch(ctx context.Context, tx persistence.DBTX, v
 	if err != nil {
 		return nil, err
 	}
+
+	// The sequencer needs to distribute the public submission to all relevant nodes. We submit a reliable message
+	// under the same DBTX as the local persist.
+	for _, value := range values {
+		err = sw.sequencerManager.HandlePublicTXSubmission(ctx,
+			tx,
+			(*pldtypes.Bytes32)(&value.TransactionHash),
+			value.ContractAddress,
+			value.GasPricing.StringValue(),
+			value.PrivateTXID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	sw.metrics.IncDBSubmittedTransactionsByN(uint64(len(values)))
 	// We don't actually provide any result, so just build an array of nil results
 	return make([]flushwriter.Result[*noResult], len(values)), err

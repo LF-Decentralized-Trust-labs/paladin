@@ -275,7 +275,7 @@ func TestHandleEventBatch(t *testing.T) {
 		})).Return(nil)
 
 		matchTXNonce := pldtypes.MustParseHexUint64("1")
-		mc.sequencerManager.On("HandleTransactionConfirmed", mock.Anything, mock.Anything, mock.Anything, matchTXNonce.Uint64()).Return(nil)
+		mc.sequencerManager.On("HandleTransactionConfirmed", mock.Anything, mock.Anything, mock.Anything, &matchTXNonce).Return(nil)
 
 		var queryJson *query.QueryJSON = nil
 		matchTxHash := pldtypes.MustParseBytes32(eventTx2Hash)

@@ -29,7 +29,7 @@ import (
 func sendDelegationRequest(ctx context.Context, s *sender, includeAlreadyDelegated bool) error {
 	transactions, err := s.transactionsOrderedByCreatedTime(ctx)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] failed to get transactions ordered by created time: %v", err)
+		log.L(ctx).Errorf("failed to get transactions ordered by created time: %v", err)
 		return err
 	}
 
@@ -53,7 +53,7 @@ func sendDelegationRequest(ctx context.Context, s *sender, includeAlreadyDelegat
 			Coordinator: s.activeCoordinatorNode,
 		})
 		if err != nil {
-			msg := fmt.Sprintf("[Sequencer] error handling delegated event for transaction %s: %v", txn.ID, err)
+			msg := fmt.Sprintf("error handling delegated event for transaction %s: %v", txn.ID, err)
 			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
@@ -85,7 +85,7 @@ func guard_HasDroppedTransactions(ctx context.Context, s *sender) bool {
 			}
 		}
 		if dropped {
-			log.L(ctx).Debugf("[Sequencer] transaction %s is in Delegated state but not found in latest coordinator snapshot, assuming dropped", txn.ID)
+			log.L(ctx).Debugf("transaction %s is in Delegated state but not found in latest coordinator snapshot, assuming dropped", txn.ID)
 			return true
 		}
 	}

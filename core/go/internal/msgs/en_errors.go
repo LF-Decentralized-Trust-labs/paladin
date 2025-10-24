@@ -492,5 +492,5 @@ var (
 	MsgPGroupsReceivedGenesisInvalid        = pde("PD012523", "Received genesis state is invalid")
 
 	// Distributed sequencer PD0126XX
-	MsgDistSeqInternalError = pde("PD012601", "Distributed sequencer internal error")
+	MsgDistSeqInternalError = pde("PD012601", "Distributed sequencer internal error: %s")
 )

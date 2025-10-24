@@ -26,7 +26,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -40,7 +39,7 @@ func calculateTransactionHash(rawTxnData []byte) *pldtypes.Bytes32 {
 	return &hashBytes
 }
 
-func (it *inFlightTransactionStageController) submitTX(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32, signerNonce string, contractAddress string, lastSubmitTime *pldtypes.Timestamp, cancelled func(context.Context) bool, txnID uuid.UUID) (*pldtypes.Bytes32, *pldtypes.Timestamp, ethclient.ErrorReason, SubmissionOutcome, error) {
+func (it *inFlightTransactionStageController) submitTX(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32, signerNonce string, contractAddress string, lastSubmitTime *pldtypes.Timestamp, cancelled func(context.Context) bool) (*pldtypes.Bytes32, *pldtypes.Timestamp, ethclient.ErrorReason, SubmissionOutcome, error) {
 	var txHash *pldtypes.Bytes32
 	sendStart := time.Now()
 	if calculatedTxHash == nil {
@@ -58,12 +57,6 @@ func (it *inFlightTransactionStageController) submitTX(ctx context.Context, sign
 			return false, nil
 		}
 		txHash, submissionError = it.ethClient.SendRawTransaction(ctx, pldtypes.HexBytes(signedMessage))
-		if contractAddress != "" {
-			err := it.sequencerManager.HandlePublicTXSubmission(ctx, txHash, contractAddress, txnID)
-			if err != nil {
-				log.L(ctx).Errorf("HandlePublicTXSubmission failed: %s", err)
-			}
-		}
 		if submissionError == nil {
 			submissionOutcome = SubmissionOutcomeFailedRequiresRetry
 			it.thMetrics.RecordOperationMetrics(ctx, string(InFlightTxOperationTransactionSend), string(GenericStatusSuccess), time.Since(sendStart).Seconds())

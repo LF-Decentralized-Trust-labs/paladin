@@ -220,13 +220,10 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 
 // Process a state machine event immediately. Should only be called on the sequencer loop, or in tests to avoid timing conditions
 func (c *coordinator) ProcessEvent(ctx context.Context, event common.Event) error {
-	log.L(ctx).Infof("[Sequencer] coordinator handling new event (contract address %s, active coordinator %s, committee %+v)", c.contractAddress, c.activeCoordinatorNode, c.senderNodePool)
-	for node, party := range c.senderNodePool {
-		log.L(ctx).Infof("[Sequencer] coordinator handling new event: party %d = %s", node, party)
-	}
+	log.L(ctx).Debugf("coordinator handling new event %s (contract address %s, active coordinator %s, current sender pool %+v)", event.TypeString(), c.contractAddress, c.activeCoordinatorNode, c.senderNodePool)
 
 	if transactionEvent, ok := event.(transaction.Event); ok {
-		log.L(ctx).Infof("[Sequencer] coordinator propogating event to transactions: %s", transactionEvent.TypeString())
+		log.L(ctx).Debugf("coordinator propogating event %s to transactions: %s", event.TypeString(), transactionEvent.TypeString())
 		return c.propagateEventToTransaction(ctx, transactionEvent)
 	}
 
@@ -251,15 +248,17 @@ func (c *coordinator) ProcessEvent(ctx context.Context, event common.Event) erro
 
 	//Determine whether this event triggers a state transition
 	err = c.evaluateTransitions(ctx, event, *eventHandler)
+	log.L(ctx).Debugf("coordinator handled new event %s (contract address %s)", event.TypeString(), c.contractAddress)
+
 	return err
 }
 
 // Queue a state machine event for the sequencer loop to process. Should be called by most Paladin components to ensure memory integrity of
 // sequencer state machine and transactions.
 func (c *coordinator) QueueEvent(ctx context.Context, event common.Event) {
-	log.L(ctx).Infof("[Sequencer] coordinator pushing event onto event queue: %s", event.TypeString())
+	log.L(ctx).Tracef("coordinator pushing event onto event queue: %s", event.TypeString())
 	c.coordinatorEvents <- event
-	log.L(ctx).Infof("[Sequencer] coordinator pushed event onto event queue: %s", event.TypeString())
+	log.L(ctx).Tracef("coordinator pushed event onto event queue: %s", event.TypeString())
 }
 
 // Function evaluateEvent evaluates whether the event is relevant given the current state of the coordinator
@@ -275,21 +274,20 @@ func (c *coordinator) evaluateEvent(ctx context.Context, event common.Event) (*E
 			valid, err := eventHandler.Validator(ctx, c, event)
 			if err != nil {
 				//This is an unexpected error.  If the event is invalid, the validator should return false and not an error
-				log.L(ctx).Errorf("[Sequencer] error validating event %s: %v", event.TypeString(), err)
+				log.L(ctx).Errorf("error validating event %s: %v", event.TypeString(), err)
 				return nil, err
 			}
 			if !valid {
-				//This is perfectly normal sometimes an event happens and is no longer relevant to the coordinator so we just ignore it and move on
-				log.L(ctx).Debugf("[Sequencer] coordinator event %s is not valid for current state %s: %t", event.TypeString(), sm.currentState.String(), valid)
+				// This is perfectly normal sometimes an event happens and is no longer relevant to the transaction so we just ignore it and move on.
+				// We log a warning in case it's not a late-delivered message but something that needs looking in to
+				log.L(ctx).Warnf("coordinator event %s is not valid for current state %s: %t", event.TypeString(), sm.currentState.String(), valid)
 				return nil, nil
 			}
 		}
 		return &eventHandler, nil
-	} else {
-		// no event handler defined for this event while in this state
-		log.L(ctx).Debugf("[Sequencer] no coordinatorevent handler defined for Event %s in State %s", event.TypeString(), sm.currentState.String())
-		return nil, nil
 	}
+
+	return nil, nil
 }
 
 // Function applyEvent updates the internal state of the coordinator with information from the event
@@ -311,7 +309,7 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 		// MRW TODO ^^
 		isDispatchedTransaction, err := c.confirmDispatchedTransaction(ctx, event.TxID, event.From, event.Nonce, event.Hash, event.RevertReason)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error confirming transaction From: %s , Nonce: %d, Hash: %v: %v", event.From, event.Nonce, event.Hash, err)
+			log.L(ctx).Errorf("error confirming transaction From: %s , Nonce: %d, Hash: %v: %v", event.From, event.Nonce, event.Hash, err)
 			return err
 		}
 		if !isDispatchedTransaction {
@@ -339,7 +337,7 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 		err = c.propagateEventToAllTransactions(ctx, event)
 	}
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error applying event %v: %v", event.Type(), err)
+		log.L(ctx).Errorf("error applying event %v: %v", event.Type(), err)
 	}
 	return err
 }
@@ -350,7 +348,7 @@ func (c *coordinator) performActions(ctx context.Context, eventHandler EventHand
 			err := rule.Action(ctx, c)
 			if err != nil {
 				//any recoverable errors should have been handled by the action function
-				log.L(ctx).Errorf("[Sequencer] error applying action: %v", err)
+				log.L(ctx).Errorf("error applying action: %v", err)
 				return err
 			}
 		}
@@ -371,7 +369,7 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 				err := rule.On(ctx, c)
 				if err != nil {
 					//any recoverable errors should have been handled by the action function
-					log.L(ctx).Errorf("[Sequencer] error transitioning coordinator to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("error transitioning coordinator to state %v: %v", sm.currentState, err)
 					return err
 				}
 			}
@@ -381,7 +379,7 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 				err := newStateDefinition.OnTransitionTo(ctx, c)
 				if err != nil {
 					// any recoverable errors should have been handled by the OnTransitionTo function
-					log.L(ctx).Errorf("[Sequencer] error transitioning coordinator to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("error transitioning coordinator to state %v: %v", sm.currentState, err)
 					return err
 				}
 			}
