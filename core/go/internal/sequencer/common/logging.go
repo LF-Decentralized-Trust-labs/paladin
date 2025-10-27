@@ -20,10 +20,9 @@ import (
 )
 
 const (
-	SUBCOMP_STATE     log.Component = "State"
-	SUBCOMP_LIFECYCLE log.Component = "Life "
-	SUBCOMP_MSGTX     log.Component = "MsgTx"
-	SUBCOMP_MSGRX     log.Component = "MsgRx"
-	SUBCOMP_COORD     log.Component = "Coord"
-	SUBCOMP_MISC      log.Component = "Misc"
+	SUBCOMP_STATE     log.Component = "state"
+	SUBCOMP_LIFECYCLE log.Component = "life"
+	SUBCOMP_MSGTX     log.Component = "msgtx"
+	SUBCOMP_MSGRX     log.Component = "msgrx"
+	SUBCOMP_COORD     log.Component = "coord"
 )

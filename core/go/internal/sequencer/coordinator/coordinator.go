@@ -158,10 +158,10 @@ func NewCoordinator(
 
 func (c *coordinator) eventLoop(ctx context.Context) {
 	for {
-		log.L(ctx).Infof("coordinator event loop waiting for next event")
+		log.L(ctx).Tracef("coordinator event loop waiting for next event")
 		select {
 		case event := <-c.coordinatorEvents:
-			log.L(ctx).Infof("coordinator pulled event from the queue: %s", event.TypeString())
+			log.L(ctx).Tracef("coordinator pulled event from the queue: %s", event.TypeString())
 			err := c.ProcessEvent(ctx, event)
 			if err != nil {
 				log.L(ctx).Errorf("error processing event: %v", err)
@@ -407,31 +407,8 @@ func (c *coordinator) findTransactionBySignerNonce(ctx context.Context, signer *
 	return nil
 }
 
-func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uuid.UUID, from *pldtypes.EthAddress, nonce uint64, hash pldtypes.Bytes32, revertReason pldtypes.HexBytes) (bool, error) {
+func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uuid.UUID, from *pldtypes.EthAddress, hash pldtypes.Bytes32, revertReason pldtypes.HexBytes) (bool, error) {
 	log.L(ctx).Debugf("we currently have %d transactions to handle, confirming that dispatched TX %s is in our list", len(c.transactionsByID), txId.String())
-	// First check whether it is one that we have been coordinating
-	if dispatchedTransaction := c.findTransactionBySignerNonce(ctx, from, nonce); dispatchedTransaction != nil {
-		if dispatchedTransaction.GetLatestSubmissionHash() == nil || *(dispatchedTransaction.GetLatestSubmissionHash()) != hash {
-			// Is this not the transaction that we are looking for?
-			// We have missed a submission?  Or is it possible that an earlier submission has managed to get confirmed?
-			// It is interesting so we log it but either way,  this must be the transaction that we are looking for because we can't re-use a nonce
-			log.L(ctx).Debugf("transaction %s confirmed with a different hash than expected", dispatchedTransaction.ID.String())
-		}
-		event := &transaction.ConfirmedEvent{
-			Hash:         hash,
-			RevertReason: revertReason,
-		}
-		event.TransactionID = dispatchedTransaction.ID
-		event.EventTime = time.Now()
-		err := dispatchedTransaction.HandleEvent(ctx, event)
-		if err != nil {
-			log.L(ctx).Errorf("error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
-			return false, err
-		}
-		return true, nil
-	}
-
-	// MRW TODO - fallback while deciding whether we can confirm transactions by ID rather than signer
 	for _, dispatchedTransaction := range c.transactionsByID {
 		if dispatchedTransaction.ID == txId {
 			if dispatchedTransaction.GetLatestSubmissionHash() == nil {
@@ -450,6 +427,7 @@ func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uui
 				RevertReason: revertReason,
 			}
 			event.TransactionID = txId
+			event.EventTime = time.Now()
 
 			log.L(ctx).Debugf("Confirming dispatched TX %s", txId.String())
 			err := dispatchedTransaction.HandleEvent(ctx, event)

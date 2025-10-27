@@ -65,7 +65,7 @@ type sequencerManager struct {
 
 // Init implements Engine.
 func (sMgr *sequencerManager) PreInit(c components.PreInitComponents) (*components.ManagerInitResult, error) {
-	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_MISC)).Infof("PreInit distributed sequencer manager")
+	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_LIFECYCLE)).Infof("PreInit distributed sequencer manager")
 	sMgr.metrics = metrics.InitMetrics(sMgr.ctx, c.MetricsManager().Registry())
 
 	return &components.ManagerInitResult{
@@ -80,7 +80,7 @@ func (sMgr *sequencerManager) PreInit(c components.PreInitComponents) (*componen
 }
 
 func (sMgr *sequencerManager) PostInit(c components.AllComponents) error {
-	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_MISC)).Infof("PostInit distributed sequencer manager")
+	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_LIFECYCLE)).Infof("PostInit distributed sequencer manager")
 	sMgr.components = c
 	sMgr.nodeName = sMgr.components.TransportManager().LocalNodeName()
 	sMgr.syncPoints = syncpoints.NewSyncPoints(sMgr.ctx, &sMgr.config.Writer, c.Persistence(), c.TxManager(), c.PublicTxManager(), c.TransportManager())
@@ -88,7 +88,7 @@ func (sMgr *sequencerManager) PostInit(c components.AllComponents) error {
 }
 
 func (sMgr *sequencerManager) Start() error {
-	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_MISC)).Infof("Starting distributed sequencer manager")
+	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_LIFECYCLE)).Infof("Starting distributed sequencer manager")
 	sMgr.syncPoints.Start()
 
 	// We may have in-flight transactions that never completed. Load any we have pending and and resume them
@@ -140,7 +140,7 @@ func (sMgr *sequencerManager) Start() error {
 }
 
 func (sMgr *sequencerManager) Stop() {
-	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_MISC)).Infof("Stopping distributed sequencer manager")
+	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_LIFECYCLE)).Infof("Stopping distributed sequencer manager")
 	sMgr.cancelCtx()
 }
 
@@ -159,7 +159,7 @@ func NewDistributedSequencerManager(ctx context.Context, config *pldconf.Sequenc
 }
 
 func (sMgr *sequencerManager) OnNewBlockHeight(ctx context.Context, blockHeight int64) {
-	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_MISC)).Tracef("new block height %d", blockHeight)
+	log.L(ctx).Tracef("new block height %d", blockHeight)
 	sMgr.blockHeight = blockHeight
 }
 
@@ -661,7 +661,7 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 	log.L(sMgr.ctx).Tracef("HandleTransactionConfirmed %s %s %+v", confirmedTxn.TransactionID.String(), from.String(), nonce)
 
 	// A transaction can be confirmed after the coordinating node has restarted. The coordinator doesn't persist the private TX, it relies
-	// on the originating node to delegate the private TX to it. handleDeleationRequest first checks if a public TX for that request has been confirmed
+	// on the originating node to delegate the private TX to it. HandleTransactionConfirmed first checks if a public TX for that request has been confirmed
 	// on chain, so in in this context we will assume we have the private TX in memory from which we can determine the originating node for confirmation events.
 
 	var contractAddress pldtypes.EthAddress
@@ -885,6 +885,10 @@ func (sMgr *sequencerManager) WriteOrDistributeReceiptsPostSubmit(ctx context.Co
 	// sMgr.syncPoints.WriteOrDistributeReceipts(ctx, dbTX, receipts)
 
 	return nil
+}
+
+func (sMgr *sequencerManager) BuildStateDistributions(ctx context.Context, tx *components.PrivateTransaction) (*components.StateDistributionSet, error) {
+	return common.NewStateDistributionBuilder(sMgr.components, tx).Build(ctx)
 }
 
 func mapPreparedTransaction(tx *components.PrivateTransaction) *components.PreparedTransactionWithRefs {

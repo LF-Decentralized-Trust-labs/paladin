@@ -34,13 +34,10 @@ func (t *Transaction) sendPreDispatchRequest(ctx context.Context) error {
 	if t.pendingPreDispatchRequest == nil {
 		hash, err := t.Hash(ctx)
 		if err != nil {
-			log.L(ctx).Debugf("Error hashing transaction for dispatch confirmation request: %s", err)
+			log.L(ctx).Debugf("error hashing transaction for dispatch confirmation request: %s", err)
 			return err
 		}
-		log.L(ctx).Debugf("Creating idempotent request for dispatch confirmation request")
 		t.pendingPreDispatchRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
-
-			log.L(ctx).Debugf("Calling SendDispatchConfirmationRequest")
 			return t.transportWriter.SendPreDispatchRequest(
 				ctx,
 				t.originatorNode,

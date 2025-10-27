@@ -220,8 +220,6 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, txID uuid
 		infoStatesAny[i] = infoStateAny
 	}
 
-	log.L(ctx).Debugf("tw contract address %s, tx spec contract address %s", tw.contractAddress.HexString(), transactionSpecification.ContractInfo.ContractAddress)
-
 	log.L(ctx).Debugf("sending endorse request with TX ID %+v", transactionSpecification.TransactionId)
 	endorsementRequest := &engineProto.EndorsementRequest{
 		IdempotencyKey:           idempotencyKey.String(),
@@ -297,7 +295,7 @@ func (tw *transportWriter) SendEndorsementResponse(ctx context.Context, transact
 
 func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNode string, txID uuid.UUID, idempotencyId uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error {
 
-	log.L(ctx).Debugf("transport writer attempting to send assemble request to assembling node %s", assemblingNode)
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send assemble request to assembling node %s", assemblingNode)
 
 	preAssemblyBytes, err := json.Marshal(preAssembly)
 	if err != nil {
@@ -333,6 +331,8 @@ func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNo
 }
 
 func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.UUID, assembleRequestId uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string) error {
+
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send assemble response to node %s", recipient)
 
 	postAssemblyBytes, err := json.Marshal(postAssembly)
 	if err != nil {
@@ -371,6 +371,9 @@ func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.U
 }
 
 func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) error {
+
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send handover request to node %s", activeCoordinator)
+
 	if contractAddress == nil {
 		err := fmt.Errorf("attempt to send handover request without specifying contract address")
 		return err
@@ -396,6 +399,9 @@ func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordi
 }
 
 func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
+
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send nonce assigned message to node %s", originatorNode)
+
 	if contractAddress == nil {
 		err := fmt.Errorf("attempt to send nonce assigned event request without specifying contract address")
 		return err
@@ -424,6 +430,9 @@ func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID
 }
 
 func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
+
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send transaction submitted message to node %s", originatorNode)
+
 	if contractAddress == nil {
 		err := fmt.Errorf("attempt to send TX submitted event without specifying contract address")
 		return err
@@ -452,6 +461,9 @@ func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uu
 }
 
 func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
+
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send transaction confirmed message to node %s", originatorNode)
+
 	if contractAddress == nil {
 		err := fmt.Errorf("attempt to send TX submitted event without specifying contract address")
 		return err
@@ -482,6 +494,8 @@ func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uu
 
 func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot) error {
 
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send haertbeat to node %s", targetNode)
+
 	coordinatorSnapshotBytes, err := json.Marshal(coordinatorSnapshot)
 	if err != nil {
 		log.L(ctx).Error("error marshalling heartbeat", err)
@@ -511,6 +525,9 @@ func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string,
 }
 
 func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, originatorNode string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
+
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send pre-dispatch request to node %s", originatorNode)
+
 	// MRW TODO - should dispatch confirmations also take the hash?
 	dispatchConfirmationRequest := &engineProto.TransactionDispatched{
 		Id:               idempotencyKey.String(),
@@ -536,6 +553,9 @@ func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, originato
 }
 
 func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send pre-dispatch response to node %s", transactionOriginator)
+
 	dispatchResponseEvent := &engineProto.TransactionDispatched{
 		Id:              idempotencyKey.String(),
 		TransactionId:   transactionSpecification.TransactionId,
@@ -567,6 +587,9 @@ func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transact
 }
 
 func (tw *transportWriter) SendDispatched(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+
+	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send dispatched message to node %s", transactionOriginator)
+
 	dispatchedEvent := &engineProto.TransactionDispatched{
 		Id:              idempotencyKey.String(),
 		TransactionId:   transactionSpecification.TransactionId,
@@ -599,8 +622,8 @@ func (tw *transportWriter) SendDispatched(ctx context.Context, transactionOrigin
 
 func (tw *transportWriter) send(ctx context.Context, payload *components.FireAndForgetMessageSend) error {
 	if payload.Node == "" {
-		log.L(ctx).Error("attempt to send message without specifying destination node name")
-		// MRW TODO - should return this error, just logging it for now
+		err := fmt.Errorf("attempt to send message without specifying destination node name")
+		return err
 	}
 
 	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Debugf("%+v sent to %s", payload.MessageType, payload.Node)

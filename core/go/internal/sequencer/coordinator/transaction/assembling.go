@@ -97,7 +97,7 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 			},
 		})
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error handling RequestTimeoutIntervalEvent: %s", err)
+			log.L(ctx).Errorf("error handling RequestTimeoutIntervalEvent: %s", err)
 			return
 		}
 	})
@@ -106,7 +106,7 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 
 func (t *Transaction) nudgeAssembleRequest(ctx context.Context) error {
 	if t.pendingAssembleRequest == nil {
-		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "[Sequencer] nudgeAssembleRequest called with no pending request")
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "nudgeAssembleRequest called with no pending request")
 	}
 	return t.pendingAssembleRequest.Nudge(ctx)
 }
@@ -116,7 +116,7 @@ func (t *Transaction) assembleTimeoutExceeded(ctx context.Context) bool {
 		//strange situation to be in if we get to the point of this being nil, should immediately leave the state where we ever ask this question
 		// however we go here, the answer to the question is "false" because there is no pending request to timeout but log this as it is a strange situation
 		// and might be an indicator of another issue
-		log.L(ctx).Infof("[Sequencer] assembleTimeoutExceeded called on transaction %s with no pending assemble request", t.ID)
+		log.L(ctx).Infof("assembleTimeoutExceeded called on transaction %s with no pending assemble request", t.ID)
 		return false
 	}
 	return t.clock.HasExpired(t.pendingAssembleRequest.FirstRequestTime(), t.assembleTimeout)
@@ -146,7 +146,7 @@ func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
 			DependencyID: t.ID,
 		})
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error notifying next transaction %s of assembly of transaction %s: %s", t.nextTransaction.ID, t.ID, err)
+			log.L(ctx).Errorf("error notifying next transaction %s of assembly of transaction %s: %s", t.nextTransaction.ID, t.ID, err)
 			return err
 		}
 	}
@@ -154,7 +154,7 @@ func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
 	for _, dependentId := range t.dependencies.PrereqOf {
 		dependent := t.grapher.TransactionByID(ctx, dependentId)
 		if dependent == nil {
-			msg := fmt.Sprintf("[Sequencer] notifyDependentsOfReadiness: Dependent transaction %s not found in memory", dependentId)
+			msg := fmt.Sprintf("notifyDependentsOfReadiness: Dependent transaction %s not found in memory", dependentId)
 			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
@@ -165,7 +165,7 @@ func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
 			DependencyID: t.ID,
 		})
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error notifying dependent transaction %s of assembly of transaction %s: %s", dependent.ID, t.ID, err)
+			log.L(ctx).Errorf("error notifying dependent transaction %s of assembly of transaction %s: %s", dependent.ID, t.ID, err)
 			return err
 		}
 	}
@@ -191,13 +191,13 @@ func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 				DependencyID: t.ID,
 			})
 			if err != nil {
-				log.L(ctx).Errorf("[Sequencer] error notifying dependent transaction %s of revert of transaction %s: %s", dependentID, t.ID, err)
+				log.L(ctx).Errorf("error notifying dependent transaction %s of revert of transaction %s: %s", dependentID, t.ID, err)
 				return err
 			}
 		} else {
 			//TODO can we Assume that the dependent is no longer in memory and doesn't need to know about this event?  Point to (write) the architecture doc that explains why this is safe
 
-			msg := fmt.Sprintf("[Sequencer] notifyDependentsOfRevert: Dependent transaction %s not found in memory", dependentID)
+			msg := fmt.Sprintf("notifyDependentsOfRevert: Dependent transaction %s not found in memory", dependentID)
 			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}

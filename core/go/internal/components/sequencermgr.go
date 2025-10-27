@@ -86,7 +86,9 @@ type SequencerManager interface {
 	GetTxStatus(ctx context.Context, domainAddress string, txID uuid.UUID) (status PrivateTxStatus, err error)
 	WriteOrDistributeReceiptsPostSubmit(ctx context.Context, dbTX persistence.DBTX, receipts []*ReceiptInputWithOriginator) error
 
-	// BuildStateDistributions(ctx context.Context, tx *PrivateTransaction) (*StateDistributionSet, error)
 	BuildNullifier(ctx context.Context, kr KeyResolver, s *StateDistributionWithData) (*NullifierUpsert, error)
 	BuildNullifiers(ctx context.Context, distributions []*StateDistributionWithData) (nullifiers []*NullifierUpsert, err error)
+
+	// Only used for test bed
+	BuildStateDistributions(ctx context.Context, tx *PrivateTransaction) (*StateDistributionSet, error)
 }

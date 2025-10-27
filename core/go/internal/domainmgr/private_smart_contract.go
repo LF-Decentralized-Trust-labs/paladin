@@ -675,7 +675,7 @@ func (dc *domainContract) loadStatesFromContext(dCtx components.DomainContext, r
 	}
 	statesByID := make(map[string]*pldapi.State)
 	for schemaID, stateIDs := range rawIDsBySchema {
-		log.L(dCtx.Ctx()).Infof("Finding available states for state IDs %+v", stateIDs)
+		log.L(dCtx.Ctx()).Debugf("Finding available states for state IDs %+v", stateIDs)
 		_, statesForSchema, err := dCtx.FindAvailableStates(readTX, schemaID, &query.QueryJSON{
 			Statements: query.Statements{
 				Ops: query.Ops{
@@ -706,7 +706,7 @@ func (dc *domainContract) loadStatesFromContext(dCtx components.DomainContext, r
 			Data:   s.Data,
 		}
 	}
-	log.L(dCtx.Ctx()).Infof("Found available states %+v", states)
+	log.L(dCtx.Ctx()).Debugf("Found available states %+v", states)
 	return states, nil
 
 }

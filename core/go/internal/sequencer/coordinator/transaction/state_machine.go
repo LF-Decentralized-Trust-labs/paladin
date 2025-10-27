@@ -311,7 +311,7 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 
 func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error {
 
-	log.L(ctx).Infof("[Sequencer] transaction state machine handling new event (TX ID %s, TX originator %s, TX address %+v)", t.ID.String(), t.originator, t.Address.HexString())
+	log.L(ctx).Infof("transaction state machine handling new event (TX ID %s, TX originator %s, TX address %+v)", t.ID.String(), t.originator, t.Address.HexString())
 	//determine whether this event is valid for the current state
 	eventHandler, err := t.evaluateEvent(ctx, event)
 	if err != nil || eventHandler == nil {
@@ -401,7 +401,7 @@ func (t *Transaction) applyEvent(ctx context.Context, event common.Event) error 
 		t.heartbeatIntervalsSinceStateChange++
 	default:
 		//other events may trigger actions and/or state transitions but not require any internal state to be updated
-		log.L(ctx).Debugf("no internal state to apply for event type %T", event)
+		log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Tracef("no internal state to apply for event type %T", event)
 	}
 	return err
 }

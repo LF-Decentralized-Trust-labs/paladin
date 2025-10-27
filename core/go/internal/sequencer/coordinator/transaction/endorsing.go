@@ -84,7 +84,6 @@ func (t *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []
 		return unfulfilledEndorsementRequirements
 	}
 	for _, attRequest := range t.PostAssembly.AttestationPlan {
-		log.L(ctx).Debugf("unfulfilled endorsement plan - payload length = %d", len(attRequest.Payload))
 		if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
 			for _, party := range attRequest.Parties {
 				log.L(ctx).Debugf("party %s must endorse this request. Checking for endorsement", party)

@@ -91,7 +91,7 @@ func (t *Transaction) notifyDependentsOfReadinessAndQueueForDispatch(ctx context
 	for _, dependentId := range t.dependencies.PrereqOf {
 		dependent := t.grapher.TransactionByID(ctx, dependentId)
 		if dependent == nil {
-			msg := fmt.Sprintf("[Sequencer] notifyDependentsOfReadiness: Dependent transaction %s not found in memory", dependentId)
+			msg := fmt.Sprintf("notifyDependentsOfReadiness: Dependent transaction %s not found in memory", dependentId)
 			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
@@ -102,7 +102,7 @@ func (t *Transaction) notifyDependentsOfReadinessAndQueueForDispatch(ctx context
 			DependencyID: t.ID,
 		})
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] error notifying dependent transaction %s of readiness of transaction %s: %s", dependent.ID, t.ID, err)
+			log.L(ctx).Errorf("error notifying dependent transaction %s of readiness of transaction %s: %s", dependent.ID, t.ID, err)
 			return err
 		}
 	}

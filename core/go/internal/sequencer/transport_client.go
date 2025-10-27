@@ -106,6 +106,7 @@ func (sMgr *sequencerManager) parseContractAddressString(ctx context.Context, co
 }
 
 func (sMgr *sequencerManager) handleAssembleRequest(ctx context.Context, message *components.ReceivedMessage) {
+
 	assembleRequest := &engineProto.AssembleRequest{}
 	err := proto.Unmarshal(message.Payload, assembleRequest)
 	if err != nil {
@@ -119,7 +120,7 @@ func (sMgr *sequencerManager) handleAssembleRequest(ctx context.Context, message
 		sMgr.logPaladinMessageJsonUnmarshalError(ctx, "TransactionPreAssembly", message, err)
 		return
 	}
-	log.L(ctx).Infof("We've been asked to handle an assemble request. How many required verifiers are there? %d How many actual verifiers are there? %d", len(preAssembly.RequiredVerifiers), len(preAssembly.Verifiers))
+	log.L(ctx).Infof("handling assemble request with %d required verifiers, %d verifiers", len(preAssembly.RequiredVerifiers), len(preAssembly.Verifiers))
 
 	contractAddress := sMgr.parseContractAddressString(ctx, assembleRequest.ContractAddress, message)
 	if contractAddress == nil {
@@ -240,7 +241,7 @@ func (sMgr *sequencerManager) handleAssembleError(ctx context.Context, message *
 	assembleErrorEvent.EventTime = time.Now()
 
 	errorString := assembleError.ErrorMessage
-	log.L(ctx).Infof("assemble error for TX %s: %s", assembleError.TransactionId, errorString)
+	log.L(ctx).Debugf("assemble error for TX %s: %s", assembleError.TransactionId, errorString)
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
@@ -297,7 +298,7 @@ func (sMgr *sequencerManager) handleCoordinatorHeartbeatNotification(ctx context
 	}
 
 	for _, transaction := range coordinatorSnapshot.ConfirmedTransactions {
-		log.L(ctx).Infof("received a heartbeat containing a confirmed transaction: %s", transaction.ID.String())
+		log.L(ctx).Debugf("received a heartbeat containing a confirmed transaction: %s", transaction.ID.String())
 		heartbeatIntervalEvent := &coordTransaction.HeartbeatIntervalEvent{}
 		heartbeatIntervalEvent.TransactionID = transaction.ID
 		heartbeatIntervalEvent.EventTime = time.Now()

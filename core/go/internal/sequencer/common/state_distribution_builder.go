@@ -128,7 +128,7 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 // This function is called by the coordinator to validate the new states produced in the postAssembly.
 // It knows who the local node is, and who the originator is.
 // It is aware of nullifiers and distribution lists, and produces a set of instructions for who needs what.
-func (sd *stateDistributionBuilder) Build(ctx context.Context, txn *components.PrivateTransaction) (sds *components.StateDistributionSet, err error) {
+func (sd *stateDistributionBuilder) Build(ctx context.Context) (sds *components.StateDistributionSet, err error) {
 
 	log.L(ctx).Debug("privateTxManager:ProcessTransactionStatesForDistribution")
 

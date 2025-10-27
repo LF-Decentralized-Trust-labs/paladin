@@ -49,7 +49,6 @@ func (c *coordinator) selectNextTransaction(ctx context.Context, event *Transact
 /* Functions of the TransactionPool interface required by the transactionSelector */
 func (c *coordinator) GetPooledTransactionsByOriginatorNodeAndIdentity(ctx context.Context) map[string]map[string]*transaction.Transaction {
 	pooledTransactions := c.getTransactionsInStates(ctx, []transaction.State{transaction.State_Pooled})
-	log.L(ctx).Debugf("pooled transactions: %d", len(pooledTransactions))
 	transactionsByOriginatorNodeAndIdentity := make(map[string]map[string]*transaction.Transaction)
 	for _, txn := range pooledTransactions {
 		log.L(ctx).Debugf("found pooled transaction %s from %s", txn.ID.String(), txn.OriginatorNode())

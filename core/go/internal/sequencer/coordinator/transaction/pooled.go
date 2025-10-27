@@ -85,7 +85,7 @@ func (t *Transaction) hasUnknownDependencies(ctx context.Context) bool {
 // TODO rename this function because it is not clear that its main purpose is to attach this transaction to the dependency as a dependent
 func (t *Transaction) initializeDependencies(ctx context.Context) error {
 	if t.PreAssembly == nil {
-		msg := fmt.Sprintf("[Sequencer] cannot calculate dependencies for transaction %s without a PreAssembly", t.ID)
+		msg := fmt.Sprintf("cannot calculate dependencies for transaction %s without a PreAssembly", t.ID)
 		log.L(ctx).Error(msg)
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
@@ -99,7 +99,7 @@ func (t *Transaction) initializeDependencies(ctx context.Context) error {
 				// in either case, the guards will stop this transaction from being assembled but will appear in the heartbeat messages so that the originator can take appropriate action (remove the dependency if it is confirmed, resend the dependency delegation request if it is an inflight transaction)
 
 				//This should be relatively rare so worth logging as an info
-				log.L(ctx).Infof("[Sequencer] dependency %s not found in memory for transaction %s", dependencyID, t.ID)
+				log.L(ctx).Infof("dependency %s not found in memory for transaction %s", dependencyID, t.ID)
 				continue
 			}
 
