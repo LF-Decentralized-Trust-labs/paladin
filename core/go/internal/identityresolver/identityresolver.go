@@ -184,7 +184,7 @@ func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup str
 			Payload:     resolveVerifierRequestBytes,
 		}, errChan)
 		go func() {
-			// If sending fails, for example after the transport's short-retry when a node is down,
+			// If sending fails, for example when a node is down
 			// fail the request in the same manor we would if the remote node had returned an error response
 			select {
 			case <-ctx.Done():
