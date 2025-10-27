@@ -64,6 +64,8 @@ type grpcTransport struct {
 	conf                Config
 	connLock            sync.RWMutex
 	outboundConnections map[string]*outboundConn
+
+	gracefulShutdownTimeout time.Duration
 }
 
 func NewPlugin(ctx context.Context) plugintk.PluginBase {
@@ -145,6 +147,9 @@ func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.Con
 		},
 		baseTLSConfig: baseTLSConfig,
 	}
+
+	t.gracefulShutdownTimeout = confutil.DurationMin(t.conf.GracefulShutdownTimeout, 0, *ConfigDefaults.GracefulShutdownTimeout)
+
 	t.grpcServer = grpc.NewServer(grpc.Creds(t.peerVerifier))
 	proto.RegisterPaladinGRPCTransportServer(t.grpcServer, t)
 
@@ -343,7 +348,7 @@ func (t *grpcTransport) StopTransport(ctx context.Context, req *prototk.StopTran
 	}()
 	select {
 	case <-gracefullyStopped:
-	case <-time.After(500 * time.Millisecond): // TODO does this need to be configurable?
+	case <-time.After(t.gracefulShutdownTimeout):
 		t.grpcServer.Stop()
 	}
 

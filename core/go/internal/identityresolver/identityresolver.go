@@ -191,6 +191,7 @@ func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup str
 				return
 			case x, ok := <-errChan:
 				if !ok {
+					// No err was received from the transport, so all good
 					return
 				}
 				err = x
