@@ -220,7 +220,7 @@ func (c *coordinator) InitializeStateMachine(initialState State) {
 
 // Process a state machine event immediately. Should only be called on the sequencer loop, or in tests to avoid timing conditions
 func (c *coordinator) ProcessEvent(ctx context.Context, event common.Event) error {
-	log.L(ctx).Debugf("coordinator handling new event %s (contract address %s, active coordinator %s, current sender pool %+v)", event.TypeString(), c.contractAddress, c.activeCoordinatorNode, c.senderNodePool)
+	log.L(ctx).Debugf("coordinator handling new event %s (contract address %s, active coordinator %s, current originator pool %+v)", event.TypeString(), c.contractAddress, c.activeCoordinatorNode, c.originatorNodePool)
 
 	if transactionEvent, ok := event.(transaction.Event); ok {
 		log.L(ctx).Debugf("coordinator propogating event %s to transactions: %s", event.TypeString(), transactionEvent.TypeString())
@@ -298,7 +298,7 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 	// First apply the event to the update the internal fine grained state of the coordinator if there is any handler registered for the current state
 	switch event := event.(type) {
 	case *TransactionsDelegatedEvent:
-		err = c.addToDelegatedTransactions(ctx, event.Sender, event.Transactions)
+		err = c.addToDelegatedTransactions(ctx, event.Originator, event.Transactions)
 	case *TransactionConfirmedEvent:
 		//This may be a confirmation of a transaction that we have have been coordinating or it may be one that another coordinator has been coordinating
 		//if the latter, then we may or may not know about it depending on whether we have seen a heartbeat from that coordinator since last time

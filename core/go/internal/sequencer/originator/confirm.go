@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package sender
+package originator
 
 import (
 	"context"
@@ -22,21 +22,21 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
 
-func (s *sender) confirmTransaction(
+func (o *originator) confirmTransaction(
 	ctx context.Context,
 	From *pldtypes.EthAddress,
 	nonce uint64,
 	hash pldtypes.Bytes32,
 	revertReason pldtypes.HexBytes,
 ) error {
-	transactionID, ok := s.submittedTransactionsByHash[hash]
+	transactionID, ok := o.submittedTransactionsByHash[hash]
 	if !ok {
 
-		//assumed to be a transaction from another sender
+		//assumed to be a transaction from another originator
 		//TODO: should we keep track of this just in case we become the active coordinator soon and don't get a clean handover?
 		//
 		// TODO think about where the following comment should go.  THere is a lot of rationale documented here that is relevant to other parts of the code
@@ -50,21 +50,21 @@ func (s *sender) confirmTransaction(
 		// In the meantime, it would be safe albeit possibly inefficient to delegate all unconfirmed transactions
 		// to new coordinator on switchover.  Double intent protection in the base contract will ensure that we don't process the same transaction twice
 
-		log.L(ctx).Debugf("[Sequencer] transaction %s not found in submitted transactions", hash)
+		log.L(ctx).Debugf("transaction %s not found in submitted transactions", hash)
 		return nil
 	}
 	if transactionID == nil {
 		//This should never happen and if it does, we can no longer trust any of the data structures we have in memory
 		// for this sequencer instance so return an error to trigger an abend of the sequencer instance
-		msg := fmt.Sprintf("[Sequencer] transaction %s found in submitted transactions but nil transaction ID", hash)
+		msg := fmt.Sprintf("transaction %s found in submitted transactions but nil transaction ID", hash)
 		log.L(ctx).Error(msg)
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
-	txn, ok := s.transactionsByID[*transactionID]
+	txn, ok := o.transactionsByID[*transactionID]
 	if txn == nil || !ok {
 		//This should never happen and if it does, we can no longer trust any of the data structures we have in memory
 		// for this sequencer instance so return an error to trigger an abend of the sequencer instance
-		msg := fmt.Sprintf("[Sequencer] transaction %s found in submitted transactions but nil transaction", hash)
+		msg := fmt.Sprintf("transaction %s found in submitted transactions but nil transaction", hash)
 		log.L(ctx).Error(msg)
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
@@ -75,7 +75,7 @@ func (s *sender) confirmTransaction(
 			},
 		})
 		if err != nil {
-			msg := fmt.Sprintf("[Sequencer] error handling confirmed success event for transaction %s: %v", txn.ID, err)
+			msg := fmt.Sprintf("error handling confirmed success event for transaction %s: %v", txn.ID, err)
 			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
@@ -87,18 +87,18 @@ func (s *sender) confirmTransaction(
 			RevertReason: revertReason,
 		})
 		if err != nil {
-			msg := fmt.Sprintf("[Sequencer] error handling confirmed revert event for transaction %s: %v", txn.ID, err)
+			msg := fmt.Sprintf("error handling confirmed revert event for transaction %s: %v", txn.ID, err)
 			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
 	}
 
-	delete(s.submittedTransactionsByHash, hash)
+	delete(o.submittedTransactionsByHash, hash)
 	return nil
 
 }
-func guard_HasUnconfirmedTransactions(ctx context.Context, s *sender) bool {
+func guard_HasUnconfirmedTransactions(ctx context.Context, o *originator) bool {
 	return len(
-		s.getTransactionsNotInStates(ctx, []transaction.State{transaction.State_Confirmed}),
+		o.getTransactionsNotInStates(ctx, []transaction.State{transaction.State_Confirmed}),
 	) > 0
 }

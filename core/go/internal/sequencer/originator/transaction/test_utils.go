@@ -43,7 +43,7 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 	return &SentMessageRecorder{}
 }
 
-func (r *SentMessageRecorder) SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+func (r *SentMessageRecorder) SendPreDispatchResponse(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
 	r.hasSentConfirmationResponse = true
 	return nil
 }
@@ -68,7 +68,7 @@ func (r *SentMessageRecorder) SendAssembleRequest(ctx context.Context, assemblin
 	return nil
 }
 
-func (r *SentMessageRecorder) SendDelegationRequest(ctx context.Context, coordinatorLocator string, transactions []*components.PrivateTransaction, sendersBlockHeight uint64) error {
+func (r *SentMessageRecorder) SendDelegationRequest(ctx context.Context, coordinatorLocator string, transactions []*components.PrivateTransaction, originatorsBlockHeight uint64) error {
 	return nil
 }
 
@@ -84,23 +84,23 @@ func (r *SentMessageRecorder) SendEndorsementResponse(ctx context.Context, trans
 	return nil
 }
 
-func (r *SentMessageRecorder) SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
+func (r *SentMessageRecorder) SendPreDispatchRequest(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
 	return nil
 }
 
-func (r *SentMessageRecorder) SendDispatched(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+func (r *SentMessageRecorder) SendDispatched(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
 	return nil
 }
 
-func (r *SentMessageRecorder) SendNonceAssigned(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
+func (r *SentMessageRecorder) SendNonceAssigned(ctx context.Context, txID uuid.UUID, transactionOriginator string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
 	return nil
 }
 
-func (r *SentMessageRecorder) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
+func (r *SentMessageRecorder) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionOriginator string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
 	return nil
 }
 
-func (r *SentMessageRecorder) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
+func (r *SentMessageRecorder) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionOriginator string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
 	return nil
 }
 

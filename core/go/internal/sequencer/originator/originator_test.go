@@ -13,14 +13,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package sender
+package originator
 
 import (
 	"context"
 	"testing"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/testutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
@@ -30,19 +30,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func NewSenderForUnitTest(t *testing.T, ctx context.Context, senderIdentityPool []string) (*sender, *senderDependencyMocks) {
+func NewOriginatorForUnitTest(t *testing.T, ctx context.Context, originatorIdentityPool []string) (*originator, *originatorDependencyMocks) {
 
-	if senderIdentityPool == nil {
-		senderIdentityPool = []string{"member1@node1"}
+	if originatorIdentityPool == nil {
+		originatorIdentityPool = []string{"member1@node1"}
 	}
-	mocks := &senderDependencyMocks{
+	mocks := &originatorDependencyMocks{
 		transportWriter:   transport.NewMockTransportWriter(t),
 		clock:             &common.FakeClockForTesting{},
 		engineIntegration: common.NewMockEngineIntegration(t),
 		emit:              func(event common.Event) {},
 	}
 
-	sender, err := NewSender(
+	originator, err := NewOriginator(
 		ctx,
 		"member1@node1",
 		mocks.transportWriter,
@@ -52,33 +52,33 @@ func NewSenderForUnitTest(t *testing.T, ctx context.Context, senderIdentityPool 
 		pldtypes.RandAddress(),
 		5,
 		5,
-		nil, // MRW TODO - mock metrics
+		nil,
 	)
 	require.NoError(t, err)
 
-	return sender, mocks
+	return originator, mocks
 }
 
-type senderDependencyMocks struct {
+type originatorDependencyMocks struct {
 	transportWriter   *transport.MockTransportWriter
 	clock             *common.FakeClockForTesting
 	engineIntegration *common.MockEngineIntegration
 	emit              common.EmitEvent
 }
 
-func TestSender_SingleTransactionLifecycle(t *testing.T) {
-	// Test the progression of a single transaction through the sender's lifecycle
-	// Simulating coordinator node by inspecting the sender output messages and by sending events that would normally be triggered
-	//  by coordinator node sending messages to the transaction sender.
-	// At each stage, we inspect the state of the transaction by querying the sender's status API
+func TestOriginator_SingleTransactionLifecycle(t *testing.T) {
+	// Test the progression of a single transaction through the originator's lifecycle
+	// Simulating coordinator node by inspecting the originator output messages and by sending events that would normally be triggered
+	//  by coordinator node sending messages to the transaction originator.
+	// At each stage, we inspect the state of the transaction by querying the seoriginatornder's status API
 
 	ctx := context.Background()
-	senderLocator := "sender@senderNode"
+	originatorLocator := "sender@senderNode"
 	coordinatorLocator := "coordinator@coordinatorNode"
-	builder := NewSenderBuilderForTesting(State_Idle).CommitteeMembers(senderLocator, coordinatorLocator)
+	builder := NewOriginatorBuilderForTesting(State_Idle).CommitteeMembers(originatorLocator, coordinatorLocator)
 	s, mocks := builder.Build(ctx)
 
-	//ensure the sender is in observing mode by emulating a heartbeat from an active coordinator
+	//ensure the originator is in observing mode by emulating a heartbeat from an active coordinator
 	heartbeatEvent := &HeartbeatReceivedEvent{}
 	heartbeatEvent.From = coordinatorLocator
 	contractAddress := builder.GetContractAddress()
@@ -88,8 +88,8 @@ func TestSender_SingleTransactionLifecycle(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, s.GetCurrentState() == State_Observing)
 
-	// Start by creating a transaction with the sender
-	transactionBuilder := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender(senderLocator).NumberOfRequiredEndorsers(1)
+	// Start by creating a transaction with the originator
+	transactionBuilder := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Originator(originatorLocator).NumberOfRequiredEndorsers(1)
 	txn := transactionBuilder.BuildSparse()
 	err = s.ProcessEvent(ctx, &TransactionCreatedEvent{
 		Transaction: txn,
@@ -167,17 +167,17 @@ func TestSender_SingleTransactionLifecycle(t *testing.T) {
 
 }
 
-func TestSender_DelegateDroppedTransactions(t *testing.T) {
+func TestOriginator_DelegateDroppedTransactions(t *testing.T) {
 	//delegate a transaction then receive a heartbeat that does not contain that transaction, and check that
 	// it continues to get re-delegated until it is in included in a heartbeat
 
 	ctx := context.Background()
-	senderLocator := "sender@senderNode"
+	originatorLocator := "sender@senderNode"
 	coordinatorLocator := "coordinator@coordinatorNode"
-	builder := NewSenderBuilderForTesting(State_Idle).CommitteeMembers(senderLocator, coordinatorLocator)
+	builder := NewOriginatorBuilderForTesting(State_Idle).CommitteeMembers(originatorLocator, coordinatorLocator)
 	s, mocks := builder.Build(ctx)
 
-	//ensure the sender is in observing mode by emulating a heartbeat from an active coordinator
+	//ensure the originator is in observing mode by emulating a heartbeat from an active coordinator
 	heartbeatEvent := &HeartbeatReceivedEvent{}
 	heartbeatEvent.From = coordinatorLocator
 	contractAddress := builder.GetContractAddress()
@@ -187,7 +187,7 @@ func TestSender_DelegateDroppedTransactions(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, s.GetCurrentState() == State_Observing)
 
-	transactionBuilder1 := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender(senderLocator).NumberOfRequiredEndorsers(1)
+	transactionBuilder1 := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Originator(originatorLocator).NumberOfRequiredEndorsers(1)
 	txn1 := transactionBuilder1.BuildSparse()
 	err = s.ProcessEvent(ctx, &TransactionCreatedEvent{
 		Transaction: txn1,
@@ -201,7 +201,7 @@ func TestSender_DelegateDroppedTransactions(t *testing.T) {
 	transactionBuilder2 := testutil.
 		NewPrivateTransactionBuilderForTesting().
 		Address(builder.GetContractAddress()).
-		Sender(senderLocator).
+		Originator(originatorLocator).
 		NumberOfRequiredEndorsers(1)
 	txn2 := transactionBuilder2.BuildSparse()
 	err = s.ProcessEvent(ctx, &TransactionCreatedEvent{
@@ -218,8 +218,8 @@ func TestSender_DelegateDroppedTransactions(t *testing.T) {
 	heartbeatEvent.ContractAddress = &contractAddress
 	heartbeatEvent.PooledTransactions = []*common.Transaction{
 		{
-			ID:     txn1.ID,
-			Sender: senderLocator,
+			ID:         txn1.ID,
+			Originator: originatorLocator,
 		},
 	}
 

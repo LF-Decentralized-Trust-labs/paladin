@@ -37,7 +37,7 @@ type assembleRequestFromCoordinator struct {
 	preAssembly             []byte
 }
 
-// Transaction tracks the state of a transaction that is being sent by the local node in Sender state.
+// Transaction tracks the state of a transaction that is being sent by the local node in originator state.
 type Transaction struct {
 	stateMachine *StateMachine
 	*components.PrivateTransaction
@@ -86,7 +86,7 @@ func (t *Transaction) Hash(ctx context.Context) (*pldtypes.Bytes32, error) {
 
 	log.L(ctx).Debugf("[Sequencer] hashing transaction %s with %d signatures and %d endorsements", t.ID.String(), len(t.PostAssembly.Signatures), len(t.PostAssembly.Endorsements))
 
-	// MRW TODO MUST DO - it's not clear is a sender transaction hash if valid without any signatures or endorsements.
+	// MRW TODO MUST DO - it's not clear is a originator transaction hash if valid without any signatures or endorsements.
 	// After assemble a Pente TX can have just the assembler's endorsement (not everyone else's), so comparing hashes with > 1 endorsements will fail
 	// if len(t.PostAssembly.Signatures) == 0 {
 	// 	return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "[Sequencer] cannot hash transaction without at least one Signature")
@@ -111,7 +111,7 @@ func (t *Transaction) GetEndorsementStatus(ctx context.Context) []components.Pri
 				// MRW TODO - endorsement request time
 				endorsementRequestState := &components.PrivateTxEndorsementStatus{Party: party, EndorsementReceived: false}
 				for _, endorsement := range t.PostAssembly.Endorsements {
-					log.L(ctx).Debugf("[Sequencer] existing endorsement from party %s", endorsement.Verifier.Lookup)
+					log.L(ctx).Debugf("existing endorsement from party %s", endorsement.Verifier.Lookup)
 					found = endorsement.Name == attRequest.Name &&
 						party == endorsement.Verifier.Lookup &&
 						attRequest.VerifierType == endorsement.Verifier.VerifierType

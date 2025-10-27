@@ -33,8 +33,8 @@ func TestGetSnapshot_OK(t *testing.T) {
 
 func TestGetSnapshot_IncludesPooledTransaction(t *testing.T) {
 	ctx := context.Background()
-	sender := "sender@senderNode"
-	c, _ := NewCoordinatorForUnitTest(t, ctx, []string{sender})
+	originator := "sender@senderNode"
+	c, _ := NewCoordinatorForUnitTest(t, ctx, []string{originator})
 
 	for _, state := range []transaction.State{
 		transaction.State_Pooled,
@@ -56,8 +56,8 @@ func TestGetSnapshot_IncludesPooledTransaction(t *testing.T) {
 
 func TestGetSnapshot_IncludesDispatchedTransaction(t *testing.T) {
 	ctx := context.Background()
-	sender := "sender@senderNode"
-	c, _ := NewCoordinatorForUnitTest(t, ctx, []string{sender})
+	originator := "sender@senderNode"
+	c, _ := NewCoordinatorForUnitTest(t, ctx, []string{originator})
 
 	for _, state := range []transaction.State{
 		transaction.State_Ready_For_Dispatch,

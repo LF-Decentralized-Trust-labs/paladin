@@ -1172,7 +1172,7 @@ func TestNotaryDelegated(t *testing.T) {
 }
 func TestNotaryDelegatedPrepare(t *testing.T) {
 	//Similar to the TestNotaryDelegated test except in this case, the transaction is not submitted to the base ledger by the notary.
-	//instead, the assembled and prepared transaction is returned to the sender node to submit to the base ledger whenever it is deemed appropriate
+	//instead, the assembled and prepared transaction is returned to the originator node to submit to the base ledger whenever it is deemed appropriate
 	// NOTE the use of ptx_prepareTransaction instead of ptx_sendTransaction on the transfer
 
 	ctx := context.Background()
@@ -1305,7 +1305,7 @@ func TestNotaryDelegatedPrepare(t *testing.T) {
 		},
 		transactionLatencyThreshold(t),
 		100*time.Millisecond,
-		"Prepared transaction not available on sender node",
+		"Prepared transaction not available on originator node",
 	)
 
 }

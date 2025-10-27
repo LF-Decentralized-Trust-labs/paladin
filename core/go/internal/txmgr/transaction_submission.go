@@ -305,14 +305,13 @@ func (tm *txManager) CallTransaction(ctx context.Context, dbTX persistence.DBTX,
 	}
 
 	// Do the call
-	// MRW TODO - how does calling a private smart contract interact with the distributed sequencer?
 	cv, err := tm.sequencerMgr.CallPrivateSmartContract(ctx, &txi.ResolvedTransaction)
 	if err != nil {
 		return err
 	}
 
 	// Serialize the result
-	b, err := serializer.SerializeJSONCtx(ctx, cv) // MRW TODO - passing nil temporarily
+	b, err := serializer.SerializeJSONCtx(ctx, cv)
 	if err == nil {
 		err = json.Unmarshal(b, result)
 	}
@@ -349,7 +348,7 @@ func (tm *txManager) callTransactionPublic(ctx context.Context, result any, call
 	return err
 }
 
-func (tm *txManager) PrepareChainedPrivateTransaction(ctx context.Context, dbTX persistence.DBTX, origSender string, origTxID uuid.UUID, origDomain string, origDomainAddress *pldtypes.EthAddress, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (chained *components.ChainedPrivateTransaction, err error) {
+func (tm *txManager) PrepareChainedPrivateTransaction(ctx context.Context, dbTX persistence.DBTX, originalSender string, originalTxID uuid.UUID, originalDomain string, originalDomainAddress *pldtypes.EthAddress, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (chained *components.ChainedPrivateTransaction, err error) {
 	tx.Type = pldapi.TransactionTypePrivate.Enum()
 	if tx.IdempotencyKey == "" {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrPrivateChainedTXIdemKey)
@@ -357,13 +356,13 @@ func (tm *txManager) PrepareChainedPrivateTransaction(ctx context.Context, dbTX 
 	newTX, err := tm.resolveNewTransaction(ctx, dbTX, tx, submitMode)
 	if err == nil {
 		chained = &components.ChainedPrivateTransaction{
-			OriginalSenderLocator: origSender,
-			OriginalTransaction:   origTxID,
-			OriginalDomain:        origDomain,
+			OriginalSenderLocator: originalSender,
+			OriginalTransaction:   originalTxID,
+			OriginalDomain:        originalDomain,
 			NewTransaction:        newTX,
 		}
-		if origDomainAddress != nil {
-			chained.OriginalContractAddress = origDomainAddress.String()
+		if originalDomainAddress != nil {
+			chained.OriginalContractAddress = originalDomainAddress.String()
 		}
 	}
 	return chained, err

@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
@@ -28,14 +28,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSenderTransaction_InitializeOK(t *testing.T) {
+func TestOriginatorTransaction_InitializeOK(t *testing.T) {
 
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Initial).Build()
 	assert.NotNil(t, txn)
 	assert.Equal(t, transaction.State_Initial, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Initial_ToPending_OnCreated(t *testing.T) {
+func TestOriginatorTransaction_Initial_ToPending_OnCreated(t *testing.T) {
 	ctx := context.Background()
 
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Initial).Build()
@@ -50,7 +50,7 @@ func TestSenderTransaction_Initial_ToPending_OnCreated(t *testing.T) {
 	assert.Equal(t, transaction.State_Pending, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Pending_ToDelegated_OnDelegated(t *testing.T) {
+func TestOriginatorTransaction_Pending_ToDelegated_OnDelegated(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Pending)
 	txn := builder.Build()
@@ -65,7 +65,7 @@ func TestSenderTransaction_Pending_ToDelegated_OnDelegated(t *testing.T) {
 	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Delegated_ToAssembling_OnAssembleRequestReceived_OK(t *testing.T) {
+func TestOriginatorTransaction_Delegated_ToAssembling_OnAssembleRequestReceived_OK(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Delegated)
 	txn, mocks := builder.BuildWithMocks()
@@ -91,7 +91,7 @@ func TestSenderTransaction_Delegated_ToAssembling_OnAssembleRequestReceived_OK(t
 	assert.Equal(t, transaction.State_Assembling, currentState, "current state is %s", currentState.String())
 }
 
-func TestSenderTransaction_Delegated_ToAssembling_OnAssembleRequestReceived_REVERT(t *testing.T) {
+func TestOriginatorTransaction_Delegated_ToAssembling_OnAssembleRequestReceived_REVERT(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Delegated)
 	txn, mocks := builder.BuildWithMocks()
@@ -116,7 +116,7 @@ func TestSenderTransaction_Delegated_ToAssembling_OnAssembleRequestReceived_REVE
 	assert.Equal(t, transaction.State_Assembling, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Delegated_ToAssembling_OnAssembleRequestReceived_PARK(t *testing.T) {
+func TestOriginatorTransaction_Delegated_ToAssembling_OnAssembleRequestReceived_PARK(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Delegated)
 	txn, mocks := builder.BuildWithMocks()
@@ -141,7 +141,7 @@ func TestSenderTransaction_Delegated_ToAssembling_OnAssembleRequestReceived_PARK
 	assert.Equal(t, transaction.State_Assembling, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Assembling_ToEndorsement_Gathering_OnAssembleAndSignSuccess(t *testing.T) {
+func TestOriginatorTransaction_Assembling_ToEndorsement_Gathering_OnAssembleAndSignSuccess(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Assembling)
 	txn, mocks := builder.BuildWithMocks()
@@ -161,7 +161,7 @@ func TestSenderTransaction_Assembling_ToEndorsement_Gathering_OnAssembleAndSignS
 	assert.Equal(t, transaction.State_Endorsement_Gathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Assembling_ToReverted_OnAssembleRevert(t *testing.T) {
+func TestOriginatorTransaction_Assembling_ToReverted_OnAssembleRevert(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Assembling)
 	txn, mocks := builder.BuildWithMocks()
@@ -181,7 +181,7 @@ func TestSenderTransaction_Assembling_ToReverted_OnAssembleRevert(t *testing.T) 
 	assert.Equal(t, transaction.State_Reverted, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Assembling_ToParked_OnAssemblePark(t *testing.T) {
+func TestOriginatorTransaction_Assembling_ToParked_OnAssemblePark(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Assembling)
 	txn, mocks := builder.BuildWithMocks()
@@ -200,7 +200,7 @@ func TestSenderTransaction_Assembling_ToParked_OnAssemblePark(t *testing.T) {
 	assert.Equal(t, transaction.State_Parked, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Delegated_ToReverted_OnAssembleRequestReceived_AfterAssembleCompletesRevert(t *testing.T) {
+func TestOriginatorTransaction_Delegated_ToReverted_OnAssembleRequestReceived_AfterAssembleCompletesRevert(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Delegated)
 	txn, mocks := builder.BuildWithMocks()
@@ -226,7 +226,7 @@ func TestSenderTransaction_Delegated_ToReverted_OnAssembleRequestReceived_AfterA
 	//TODO assert that transaction was finalized as Reverted in the database
 }
 
-func TestSenderTransaction_Delegated_ToParked_OnAssembleRequestReceived_AfterAssembleCompletesPark(t *testing.T) {
+func TestOriginatorTransaction_Delegated_ToParked_OnAssembleRequestReceived_AfterAssembleCompletesPark(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Delegated)
 	txn, mocks := builder.BuildWithMocks()
@@ -252,7 +252,7 @@ func TestSenderTransaction_Delegated_ToParked_OnAssembleRequestReceived_AfterAss
 	//TODO assert that transaction was finalized as Parked in the database
 }
 
-func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
+func TestOriginatorTransaction_Endorsement_Gathering_NoTransition_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering)
 	txn, mocks := builder.BuildWithMocks()
@@ -272,7 +272,7 @@ func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnAssembleRequest_
 	assert.Equal(t, transaction.State_Endorsement_Gathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Reverted_DoResendAssembleResponse_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
+func TestOriginatorTransaction_Reverted_DoResendAssembleResponse_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Reverted)
 	txn, mocks := builder.BuildWithMocks()
@@ -292,7 +292,7 @@ func TestSenderTransaction_Reverted_DoResendAssembleResponse_OnAssembleRequest_I
 	assert.Equal(t, transaction.State_Reverted, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Reverted_Ignore_OnAssembleRequest_IfNotMatchesPreviousRequest(t *testing.T) {
+func TestOriginatorTransaction_Reverted_Ignore_OnAssembleRequest_IfNotMatchesPreviousRequest(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Reverted)
 	txn, mocks := builder.BuildWithMocks()
@@ -310,7 +310,7 @@ func TestSenderTransaction_Reverted_Ignore_OnAssembleRequest_IfNotMatchesPreviou
 	assert.Equal(t, transaction.State_Reverted, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Parked_DoResendAssembleResponse_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
+func TestOriginatorTransaction_Parked_DoResendAssembleResponse_OnAssembleRequest_IfMatchesPreviousRequest(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Parked)
 	txn, mocks := builder.BuildWithMocks()
@@ -331,7 +331,7 @@ func TestSenderTransaction_Parked_DoResendAssembleResponse_OnAssembleRequest_IfM
 
 }
 
-func TestSenderTransaction_Parked_Ignore_OnAssembleRequest_IfNotMatchesPreviousRequest(t *testing.T) {
+func TestOriginatorTransaction_Parked_Ignore_OnAssembleRequest_IfNotMatchesPreviousRequest(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Parked)
 	txn, mocks := builder.BuildWithMocks()
@@ -350,7 +350,7 @@ func TestSenderTransaction_Parked_Ignore_OnAssembleRequest_IfNotMatchesPreviousR
 
 }
 
-func TestSenderTransaction_Endorsement_Gathering_ToAssembling_OnAssembleRequest_IfNotMatchesPreviousRequest(t *testing.T) {
+func TestOriginatorTransaction_Endorsement_Gathering_ToAssembling_OnAssembleRequest_IfNotMatchesPreviousRequest(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering)
 	txn, mocks := builder.BuildWithMocks()
@@ -376,7 +376,7 @@ func TestSenderTransaction_Endorsement_Gathering_ToAssembling_OnAssembleRequest_
 
 }
 
-func TestSenderTransaction_Endorsement_Gathering_ToPrepared_OnDispatchConfirmationRequestReceivedIfMatches(t *testing.T) {
+func TestOriginatorTransaction_Endorsement_Gathering_ToPrepared_OnDispatchConfirmationRequestReceivedIfMatches(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering)
 	txn, mocks := builder.BuildWithMocks()
@@ -397,7 +397,7 @@ func TestSenderTransaction_Endorsement_Gathering_ToPrepared_OnDispatchConfirmati
 	assert.Equal(t, transaction.State_Prepared, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongCoordinator(t *testing.T) {
+func TestOriginatorTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongCoordinator(t *testing.T) {
 
 	ctx := context.Background()
 
@@ -420,7 +420,7 @@ func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirma
 	assert.Equal(t, transaction.State_Endorsement_Gathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
+func TestOriginatorTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
 
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering)
@@ -441,7 +441,7 @@ func TestSenderTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirma
 	assert.Equal(t, transaction.State_Endorsement_Gathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Endorsement_Gathering_ToDelegated_OnCoordinatorChanged(t *testing.T) {
+func TestOriginatorTransaction_Endorsement_Gathering_ToDelegated_OnCoordinatorChanged(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Endorsement_Gathering).Build()
 
@@ -457,7 +457,7 @@ func TestSenderTransaction_Endorsement_Gathering_ToDelegated_OnCoordinatorChange
 
 }
 
-func TestSenderTransaction_Prepared_ToDispatched_OnDispatched(t *testing.T) {
+func TestOriginatorTransaction_Prepared_ToDispatched_OnDispatched(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Prepared).Build()
 
@@ -474,7 +474,7 @@ func TestSenderTransaction_Prepared_ToDispatched_OnDispatched(t *testing.T) {
 	assert.Equal(t, transaction.State_Dispatched, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Prepared_NoTransition_Do_Resend_OnDispatchConfirmationRequestReceivedIfMatches(t *testing.T) {
+func TestOriginatorTransaction_Prepared_NoTransition_Do_Resend_OnDispatchConfirmationRequestReceivedIfMatches(t *testing.T) {
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Prepared)
 	txn, mocks := builder.BuildWithMocks()
@@ -495,7 +495,7 @@ func TestSenderTransaction_Prepared_NoTransition_Do_Resend_OnDispatchConfirmatio
 	assert.Equal(t, transaction.State_Prepared, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Prepared_Ignore_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongCoordinator(t *testing.T) {
+func TestOriginatorTransaction_Prepared_Ignore_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongCoordinator(t *testing.T) {
 
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Prepared)
@@ -517,7 +517,7 @@ func TestSenderTransaction_Prepared_Ignore_OnDispatchConfirmationRequestReceived
 	assert.Equal(t, transaction.State_Prepared, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Prepared_Ignore_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
+func TestOriginatorTransaction_Prepared_Ignore_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
 
 	ctx := context.Background()
 	builder := transaction.NewTransactionBuilderForTesting(t, transaction.State_Prepared)
@@ -538,7 +538,7 @@ func TestSenderTransaction_Prepared_Ignore_OnDispatchConfirmationRequestReceived
 	assert.Equal(t, transaction.State_Prepared, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Prepared_ToDelegated_OnCoordinatorChanged(t *testing.T) {
+func TestOriginatorTransaction_Prepared_ToDelegated_OnCoordinatorChanged(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Prepared).Build()
 
@@ -554,7 +554,7 @@ func TestSenderTransaction_Prepared_ToDelegated_OnCoordinatorChanged(t *testing.
 
 }
 
-func TestSenderTransaction_Dispatched_ToConfirmed_OnConfirmedSuccess(t *testing.T) {
+func TestOriginatorTransaction_Dispatched_ToConfirmed_OnConfirmedSuccess(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Dispatched).Build()
 
@@ -568,7 +568,7 @@ func TestSenderTransaction_Dispatched_ToConfirmed_OnConfirmedSuccess(t *testing.
 	assert.Equal(t, transaction.State_Confirmed, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Dispatched_ToSequenced_OnNonceAssigned(t *testing.T) {
+func TestOriginatorTransaction_Dispatched_ToSequenced_OnNonceAssigned(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Dispatched).Build()
 
@@ -584,7 +584,7 @@ func TestSenderTransaction_Dispatched_ToSequenced_OnNonceAssigned(t *testing.T) 
 	assert.Equal(t, transaction.State_Sequenced, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Dispatched_ToSubmitted_OnSubmitted(t *testing.T) {
+func TestOriginatorTransaction_Dispatched_ToSubmitted_OnSubmitted(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Dispatched).Build()
 
@@ -601,7 +601,7 @@ func TestSenderTransaction_Dispatched_ToSubmitted_OnSubmitted(t *testing.T) {
 	assert.Equal(t, transaction.State_Submitted, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Dispatched_ToDelegated_OnConfirmedReverted(t *testing.T) {
+func TestOriginatorTransaction_Dispatched_ToDelegated_OnConfirmedReverted(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Dispatched).Build()
 
@@ -615,7 +615,7 @@ func TestSenderTransaction_Dispatched_ToDelegated_OnConfirmedReverted(t *testing
 	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Dispatched_ToDelegated_OnCoordinatorChanged(t *testing.T) {
+func TestOriginatorTransaction_Dispatched_ToDelegated_OnCoordinatorChanged(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Dispatched).Build()
 
@@ -631,7 +631,7 @@ func TestSenderTransaction_Dispatched_ToDelegated_OnCoordinatorChanged(t *testin
 
 }
 
-func TestSenderTransaction_Sequenced_ToConfirmed_OnConfirmedSuccess(t *testing.T) {
+func TestOriginatorTransaction_Sequenced_ToConfirmed_OnConfirmedSuccess(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Sequenced).Build()
 
@@ -645,7 +645,7 @@ func TestSenderTransaction_Sequenced_ToConfirmed_OnConfirmedSuccess(t *testing.T
 	assert.Equal(t, transaction.State_Confirmed, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Sequenced_ToSubmitted_OnSubmitted(t *testing.T) {
+func TestOriginatorTransaction_Sequenced_ToSubmitted_OnSubmitted(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Sequenced).Build()
 
@@ -662,7 +662,7 @@ func TestSenderTransaction_Sequenced_ToSubmitted_OnSubmitted(t *testing.T) {
 	assert.Equal(t, transaction.State_Submitted, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Sequenced_ToDelegated_OnConfirmedReverted(t *testing.T) {
+func TestOriginatorTransaction_Sequenced_ToDelegated_OnConfirmedReverted(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Sequenced).Build()
 
@@ -676,7 +676,7 @@ func TestSenderTransaction_Sequenced_ToDelegated_OnConfirmedReverted(t *testing.
 	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Sequenced_ToDelegated_OnCoordinatorChanged(t *testing.T) {
+func TestOriginatorTransaction_Sequenced_ToDelegated_OnCoordinatorChanged(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Sequenced).Build()
 
@@ -692,7 +692,7 @@ func TestSenderTransaction_Sequenced_ToDelegated_OnCoordinatorChanged(t *testing
 
 }
 
-func TestSenderTransaction_Submitted_ToConfirmed_OnConfirmedSuccess(t *testing.T) {
+func TestOriginatorTransaction_Submitted_ToConfirmed_OnConfirmedSuccess(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
@@ -706,7 +706,7 @@ func TestSenderTransaction_Submitted_ToConfirmed_OnConfirmedSuccess(t *testing.T
 	assert.Equal(t, transaction.State_Confirmed, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Submitted_ToDelegated_OnConfirmedReverted(t *testing.T) {
+func TestOriginatorTransaction_Submitted_ToDelegated_OnConfirmedReverted(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
@@ -720,7 +720,7 @@ func TestSenderTransaction_Submitted_ToDelegated_OnConfirmedReverted(t *testing.
 	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 }
 
-func TestSenderTransaction_Submitted_ToDelegated_OnCoordinatorChanged(t *testing.T) {
+func TestOriginatorTransaction_Submitted_ToDelegated_OnCoordinatorChanged(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Submitted).Build()
 
@@ -735,7 +735,7 @@ func TestSenderTransaction_Submitted_ToDelegated_OnCoordinatorChanged(t *testing
 	assert.Equal(t, transaction.State_Delegated, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
 
 }
-func TestSenderTransaction_Parked_ToPending_OnResumed(t *testing.T) {
+func TestOriginatorTransaction_Parked_ToPending_OnResumed(t *testing.T) {
 	ctx := context.Background()
 	txn := transaction.NewTransactionBuilderForTesting(t, transaction.State_Parked).Build()
 

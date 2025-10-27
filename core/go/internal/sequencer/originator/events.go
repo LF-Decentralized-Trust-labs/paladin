@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package sender
+package originator
 
 import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"

@@ -51,7 +51,7 @@ type SeqCoordinator interface {
 	GetActiveCoordinatorNode(ctx context.Context) string
 	SetActiveCoordinatorNode(ctx context.Context, coordinatorNode string)
 	GetCurrentState() State
-	UpdateSenderNodePool(ctx context.Context, senderNode string)
+	UpdateOriginatorNodePool(ctx context.Context, originatorNode string)
 
 	// Transactions being sequencer (here or elsewhere)
 	GetTransactionsReadyToDispatch(ctx context.Context) ([]*components.PrivateTransaction, error)
@@ -78,7 +78,7 @@ type coordinator struct {
 	closingGracePeriod             int // expressed as a multiple of heartbeat intervals
 	requestTimeout                 common.Duration
 	assembleTimeout                common.Duration
-	senderNodePool                 []string // The (possibly changing) list of sender nodes
+	originatorNodePool             []string // The (possibly changing) list of originator nodes
 	nodeName                       string
 	coordinatorSelectionBlockRange uint64
 
@@ -107,7 +107,6 @@ func NewCoordinator(
 	ctx context.Context,
 	domainAPI components.DomainSmartContract,
 	transportWriter transport.TransportWriter,
-	senderNodePool []string,
 	clock common.Clock,
 	engineIntegration common.EngineIntegration,
 	syncPoints syncpoints.SyncPoints,
@@ -146,7 +145,7 @@ func NewCoordinator(
 		stopEventLoop:                      make(chan struct{}),
 		coordinatorSelectionBlockRange:     blockRangeSize,
 	}
-	c.senderNodePool = make([]string, 0)
+	c.originatorNodePool = make([]string, 0)
 	c.InitializeStateMachine(State_Idle)
 	c.transactionSelector = NewTransactionSelector(ctx, c)
 
@@ -159,7 +158,7 @@ func NewCoordinator(
 
 func (c *coordinator) eventLoop(ctx context.Context) {
 	for {
-		log.L(ctx).Infof("sender event loop waiting for next event")
+		log.L(ctx).Infof("coordinator event loop waiting for next event")
 		select {
 		case event := <-c.coordinatorEvents:
 			log.L(ctx).Infof("coordinator pulled event from the queue: %s", event.TypeString())
@@ -214,14 +213,12 @@ func (c *coordinator) selectNextActiveCoordinator(ctx context.Context) (string, 
 		} else {
 			coordinator = c.domainAPI.ContractConfig().GetStaticCoordinator()
 		}
-	}
-	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_ENDORSER {
+	} else if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_ENDORSER {
 		// E.g. Pente
 		// Make a fair choice about the next coordinator, but for now just choose the node this request arrived at
-		if len(c.senderNodePool) == 0 {
+		if len(c.originatorNodePool) == 0 {
 			coordinator = c.nodeName
-			coordinator = "alice"
-			log.L(ctx).Warnf("coordinator %s selected based on empty sender pool (local node)", coordinator)
+			log.L(ctx).Warnf("coordinator %s selected based on empty originator pool (local node)", coordinator)
 		} else {
 			// Round block number down to the nearest block range (e.g. block 1012, 1013, 1014 etc. all become 1000 for hashing)
 			effectiveBlockNumber := c.currentBlockHeight - (c.currentBlockHeight % c.coordinatorSelectionBlockRange)
@@ -229,14 +226,12 @@ func (c *coordinator) selectNextActiveCoordinator(ctx context.Context) (string, 
 			// Take a numeric hash of the identities using the current block range
 			h := fnv.New32a()
 			h.Write([]byte(strconv.FormatUint(effectiveBlockNumber, 10)))
-			coordinator = c.senderNodePool[int(h.Sum32())%len(c.senderNodePool)]
-			coordinator = "alice"
-			log.L(ctx).Debugf("coordinator %s selected based on hash modulus of the sender pool", coordinator)
+			coordinator = c.originatorNodePool[int(h.Sum32())%len(c.originatorNodePool)]
+			log.L(ctx).Debugf("coordinator %s selected based on hash modulus of the originator pool", coordinator)
 		}
-	}
-	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_SENDER {
+	} else if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_SENDER {
 		// E.g. Zeto
-		log.L(ctx).Debugf("coordinator %s selected as next active coordinator in sender coordinator mode", c.nodeName)
+		log.L(ctx).Debugf("coordinator %s selected as next active coordinator in originator coordinator mode", c.nodeName)
 		coordinator = c.nodeName
 	}
 
@@ -249,30 +244,30 @@ func (c *coordinator) selectNextActiveCoordinator(ctx context.Context) (string, 
 	return coordinator, nil
 }
 
-func (c *coordinator) UpdateSenderNodePool(ctx context.Context, senderNode string) {
-	if strings.Contains(senderNode, "@") {
-		log.L(ctx).Errorf("sender ID provided, sender node expected: %s", senderNode)
+func (c *coordinator) UpdateOriginatorNodePool(ctx context.Context, originatorNode string) {
+	if strings.Contains(originatorNode, "@") {
+		log.L(ctx).Errorf("originator ID provided, originator node expected: %s", originatorNode)
 	}
-	log.L(ctx).Debugf("updating sender node pool with node %s", senderNode)
-	if !slices.Contains(c.senderNodePool, senderNode) {
-		c.senderNodePool = append(c.senderNodePool, senderNode)
-		slices.Sort(c.senderNodePool)
+	log.L(ctx).Debugf("updating originator node pool with node %s", originatorNode)
+	if !slices.Contains(c.originatorNodePool, originatorNode) {
+		c.originatorNodePool = append(c.originatorNodePool, originatorNode)
+		slices.Sort(c.originatorNodePool)
 	}
 }
 
-// TODO consider renaming to setDelegatedTransactionsForSender to make it clear that we expect senders to include all inflight transactions in every delegation request and therefore this is
-// a replace, not an add.  Need to finalize the decision about whether we expect the sender to include all inflight delegated transactions in every delegation request. Currently the code assumes we do so need to make the spec clear on that point and
+// TODO consider renaming to setDelegatedTransactionsForOriginator to make it clear that we expect originators to include all inflight transactions in every delegation request and therefore this is
+// a replace, not an add.  Need to finalize the decision about whether we expect the originator to include all inflight delegated transactions in every delegation request. Currently the code assumes we do so need to make the spec clear on that point and
 // record a decision record to explain why.  Every  time we come back to this point, we will be tempted to reverse that decision so we need to make sure we have a record of the known consequences.
-// sender must be a fully qualified identity locator otherwise an error will be returned
-func (c *coordinator) addToDelegatedTransactions(ctx context.Context, sender string, transactions []*components.PrivateTransaction) error {
+// originator must be a fully qualified identity locator otherwise an error will be returned
+func (c *coordinator) addToDelegatedTransactions(ctx context.Context, originator string, transactions []*components.PrivateTransaction) error {
 
-	//TODO should remove any transactions from the same sender that we already have but are not in this list
+	//TODO should remove any transactions from the same originator that we already have but are not in this list
 
 	var previousTransaction *transaction.Transaction
 	for _, txn := range transactions {
 		newTransaction, err := transaction.NewTransaction(
 			ctx,
-			sender,
+			originator,
 			txn,
 			c.transportWriter,
 			c.clock,
@@ -483,7 +478,7 @@ func ptrTo[T any](v T) *T {
 }
 
 // A coordinator may be required to stop if this node has reached its capacity. The node may still need to
-// have an active sequencer for the contract address since it may be the only sender that can honour dispatch
+// have an active sequencer for the contract address since it may be the only originator that can honour dispatch
 // requests from another coordinator, but this node is no longer acting as the coordinator.
 func (c *coordinator) Stop() {
 	log.L(context.Background()).Infof("stopping coordinator for contract %s", c.contractAddress.String())

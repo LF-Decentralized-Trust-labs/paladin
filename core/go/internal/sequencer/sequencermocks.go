@@ -6,7 +6,7 @@ package sequencer
 
 import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -84,48 +84,48 @@ func (_c *MockSequencer_GetCoordinator_Call) RunAndReturn(run func() coordinator
 	return _c
 }
 
-// GetSender provides a mock function for the type MockSequencer
-func (_mock *MockSequencer) GetSender() sender.SeqSender {
+// GetOriginator provides a mock function for the type MockSequencer
+func (_mock *MockSequencer) GetOriginator() originator.SeqOriginator {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetSender")
+		panic("no return value specified for GetOriginator")
 	}
 
-	var r0 sender.SeqSender
-	if returnFunc, ok := ret.Get(0).(func() sender.SeqSender); ok {
+	var r0 originator.SeqOriginator
+	if returnFunc, ok := ret.Get(0).(func() originator.SeqOriginator); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(sender.SeqSender)
+			r0 = ret.Get(0).(originator.SeqOriginator)
 		}
 	}
 	return r0
 }
 
-// MockSequencer_GetSender_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSender'
-type MockSequencer_GetSender_Call struct {
+// MockSequencer_GetOriginator_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOriginator'
+type MockSequencer_GetOriginator_Call struct {
 	*mock.Call
 }
 
-// GetSender is a helper method to define mock.On call
-func (_e *MockSequencer_Expecter) GetSender() *MockSequencer_GetSender_Call {
-	return &MockSequencer_GetSender_Call{Call: _e.mock.On("GetSender")}
+// GetOriginator is a helper method to define mock.On call
+func (_e *MockSequencer_Expecter) GetOriginator() *MockSequencer_GetOriginator_Call {
+	return &MockSequencer_GetOriginator_Call{Call: _e.mock.On("GetOriginator")}
 }
 
-func (_c *MockSequencer_GetSender_Call) Run(run func()) *MockSequencer_GetSender_Call {
+func (_c *MockSequencer_GetOriginator_Call) Run(run func()) *MockSequencer_GetOriginator_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockSequencer_GetSender_Call) Return(seqSender sender.SeqSender) *MockSequencer_GetSender_Call {
-	_c.Call.Return(seqSender)
+func (_c *MockSequencer_GetOriginator_Call) Return(seqOriginator originator.SeqOriginator) *MockSequencer_GetOriginator_Call {
+	_c.Call.Return(seqOriginator)
 	return _c
 }
 
-func (_c *MockSequencer_GetSender_Call) RunAndReturn(run func() sender.SeqSender) *MockSequencer_GetSender_Call {
+func (_c *MockSequencer_GetOriginator_Call) RunAndReturn(run func() originator.SeqOriginator) *MockSequencer_GetOriginator_Call {
 	_c.Call.Return(run)
 	return _c
 }

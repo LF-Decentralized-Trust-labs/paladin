@@ -37,16 +37,16 @@ func TestCoordinator_InitializeOK(t *testing.T) {
 
 func TestCoordinator_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 	ctx := context.Background()
-	sender := "sender@senderNode"
+	originator := "sender@senderNode"
 
 	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Idle)
-	builder.SenderIdentityPool(sender)
+	builder.OriginatorIdentityPool(originator)
 	c, _ := builder.Build(ctx)
 
 	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState())
 
 	err := c.ProcessEvent(ctx, &coordinator.TransactionsDelegatedEvent{
-		Sender:       sender,
+		Originator:   originator,
 		Transactions: testutil.NewPrivateTransactionBuilderListForTesting(1).Address(builder.GetContractAddress()).BuildSparse(),
 	})
 	assert.NoError(t, err)
@@ -68,16 +68,16 @@ func TestCoordinator_Idle_ToObserving_OnHeartbeatReceived(t *testing.T) {
 
 func TestCoordinator_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 	ctx := context.Background()
-	sender := "sender@senderNode"
+	originator := "sender@senderNode"
 
 	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Observing).
-		SenderIdentityPool(sender).
+		OriginatorIdentityPool(originator).
 		ActiveCoordinatorBlockHeight(200).
 		CurrentBlockHeight(194) // default tolerance is 5 so this is behind
 	c, _ := builder.Build(ctx)
 
 	err := c.ProcessEvent(ctx, &coordinator.TransactionsDelegatedEvent{
-		Sender:       sender,
+		Originator:   originator,
 		Transactions: testutil.NewPrivateTransactionBuilderListForTesting(1).Address(builder.GetContractAddress()).BuildSparse(),
 	})
 	assert.NoError(t, err)
@@ -87,16 +87,16 @@ func TestCoordinator_Observing_ToStandby_OnDelegated_IfBehind(t *testing.T) {
 
 func TestCoordinator_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
-	sender := "sender@senderNode"
+	originator := "sender@senderNode"
 
 	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Observing).
-		SenderIdentityPool(sender).
+		OriginatorIdentityPool(originator).
 		ActiveCoordinatorBlockHeight(200).
 		CurrentBlockHeight(195) // default tolerance is 5 so this is not behind
 	c, mocks := builder.Build(ctx)
 
 	err := c.ProcessEvent(ctx, &coordinator.TransactionsDelegatedEvent{
-		Sender:       sender,
+		Originator:   originator,
 		Transactions: testutil.NewPrivateTransactionBuilderListForTesting(1).Address(builder.GetContractAddress()).BuildSparse(),
 	})
 	assert.NoError(t, err)
@@ -108,9 +108,9 @@ func TestCoordinator_Observing_ToElect_OnDelegated_IfNotBehind(t *testing.T) {
 
 func TestCoordinator_Standby_ToElect_OnNewBlock_IfNotBehind(t *testing.T) {
 	ctx := context.Background()
-	sender := "sender@senderNode"
+	originator := "sender@senderNode"
 	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Standby).
-		SenderIdentityPool(sender).
+		OriginatorIdentityPool(originator).
 		ActiveCoordinatorBlockHeight(200).
 		CurrentBlockHeight(194)
 	c, _ := builder.Build(ctx)

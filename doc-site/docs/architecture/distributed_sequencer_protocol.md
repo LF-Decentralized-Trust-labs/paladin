@@ -25,9 +25,9 @@ block-beta
   space
   block:components
     columns 4
-    sender1["Sender"]
+    originator1["Originator"]
     coordinator1["Coordinator"]
-    sender2["Sender"]
+    originator2["Originator"]
     coordinator2["Coordinator"]
   end
 
@@ -35,9 +35,9 @@ contract --> node1
 contract --> node2
 node1 --> sequencer1
 node2 --> sequencer2
-sequencer1 --> sender1
+sequencer1 --> originator1
 sequencer1 --> coordinator1
-sequencer2 --> sender2
+sequencer2 --> originator2
 sequencer2 --> coordinator2
 style contract fill:#ffffff,stroke:#888888
 style contracts fill:#f5f5f5,stroke:#f5f5f5
@@ -48,8 +48,8 @@ style node1 fill:#eef0ff,stroke:#7e9dff
 style node2 fill:#fffdee,stroke:#ffca58
 style sequencer1 fill:#eef0ff,stroke:#7e9dff
 style sequencer2 fill:#fffdee,stroke:#ffca58
-style sender1 fill:#eef0ff,stroke:#7e9dff
-style sender2 fill:#fffdee,stroke:#ffca58
+style originator1 fill:#eef0ff,stroke:#7e9dff
+style originator2 fill:#fffdee,stroke:#ffca58
 style coordinator1 fill:#eef0ff,stroke:#7e9dff,stroke-dasharray: 5 5
 style coordinator2 fill:#fffdee,stroke:#ffca58,stroke-dasharray: 5 5
 
@@ -58,11 +58,11 @@ style coordinator2 fill:#fffdee,stroke:#ffca58,stroke-dasharray: 5 5
 Paladin domains use one of the following coordination models:
 
 1. Always local
-    - Always acts as coordinator for its own transactions relating to the contract, for example when participating in a Zeto token contract.
+   - Always acts as coordinator for its own transactions relating to the contract, for example when participating in a Zeto token contract.
 2. Always remote
-    - Never acts as a coordinator for the private contract, for example when particpating in a Noto token but never acting as the notary for the token
+   - Never acts as a coordinator for the private contract, for example when particpating in a Noto token but never acting as the notary for the token
 3. Leader elected
-    - May act as a coordinator based on the distributed coordination algorithm, for example when participating in a Pente private contract
+   - May act as a coordinator based on the distributed coordination algorithm, for example when participating in a Pente private contract
 
 The following diagram shows 3 different domain contracts that 2 nodes are participating in. For the 3 domain contracts the nodes play different coordination roles:
 
@@ -98,13 +98,13 @@ block-beta
             space
             block:seq1componentlist
               block:seq1components
-                c1node1sender["Sender"]
+                c1node1originator["Originator"]
                 c1node1coordinator["Coordinator"]
               end
             end
             block:seq2componentlist
               block:seq2components
-                c1node2sender["Sender"]
+                c1node2originator["Originator"]
                 c1node2coordinator["Coordinator"]
               end
             end
@@ -132,7 +132,7 @@ block-beta
             end
             block:seq4componentlist
               block:seq4components
-                c2node2sender["Sender"]
+                c2node2originator["Originator"]
               end
             end
           end
@@ -154,13 +154,13 @@ block-beta
             space
             block:seq5componentlist
               block:seq5components
-                c3node1sender["Sender"]
+                c3node1originator["Originator"]
                 c3node1coordinator["Coordinator"]
               end
             end
             block:seq6componentlist
               block:seq6components
-                c3node2sender["Sender"]
+                c3node2originator["Originator"]
                 c3node2coordinator["Coordinator"]
               end
             end
@@ -179,15 +179,15 @@ block-beta
   c2node2 --> c2node2sequencer
   c3node1 --> c3node1sequencer
   c3node2 --> c3node2sequencer
-  c1node1sequencer --> c1node1sender
-  c1node2sequencer --> c1node2sender
+  c1node1sequencer --> c1node1originator
+  c1node2sequencer --> c1node2originator
   c1node1sequencer --> c1node1coordinator
   c1node2sequencer --> c1node2coordinator
   c2node1sequencer --> c2node1coordinator
-  c2node2sequencer --> c2node2sender
-  c3node1sequencer --> c3node1sender
+  c2node2sequencer --> c2node2originator
+  c3node1sequencer --> c3node1originator
   c3node1sequencer --> c3node1coordinator
-  c3node2sequencer --> c3node2sender
+  c3node2sequencer --> c3node2originator
   c3node2sequencer --> c3node2coordinator
   style domainContract1 fill:#ffffff,stroke:#999999
   style domainContract2 fill:#ffffff,stroke:#999999
@@ -209,11 +209,11 @@ block-beta
   style c2node1coordinator fill:#e8eeff,stroke:#a7bcff
   style c3node1coordinator fill:#e8eeff,stroke:#a7bcff
   style c3node2coordinator fill:#ffffff,stroke:#777777,stroke-dasharray: 5 5
-  style c1node1sender fill:#e8eeff,stroke:#a7bcff
-  style c1node2sender fill:#fffdee,stroke:#ffca58
-  style c2node2sender fill:#fffdee,stroke:#ffca58
-  style c3node1sender fill:#e8eeff,stroke:#a7bcff
-  style c3node2sender fill:#fffdee,stroke:#ffca58
+  style c1node1originator fill:#e8eeff,stroke:#a7bcff
+  style c1node2originator fill:#fffdee,stroke:#ffca58
+  style c2node2originator fill:#fffdee,stroke:#ffca58
+  style c3node1originator fill:#e8eeff,stroke:#a7bcff
+  style c3node2originator fill:#fffdee,stroke:#ffca58
   style seq1components fill:#f5f5f5,stroke:#f5f5f5
   style seq2components fill:#f5f5f5,stroke:#f5f5f5
   style seq3components fill:#f5f5f5,stroke:#f5f5f5
@@ -277,7 +277,7 @@ block-beta
           space
           block:comp1
             columns 2
-            sender1["Sender"]
+            originator1["Originator"]
             coordinator1["Always coordinator"]
           end
         end
@@ -287,7 +287,7 @@ block-beta
           space
           block:comp2
           columns 2
-            sender2["Sender"]
+            originator2["Originator"]
             coordinator2["Never coordinator"]
           end
         end
@@ -297,7 +297,7 @@ block-beta
           space
           block:comp3
           columns 2
-            sender3["Sender"]
+            originator3["Originator"]
             coordinator3["Sometimes coordinator"]
           end
         end
@@ -309,10 +309,10 @@ block-beta
   domainContract1 --> sequencer1
   domainContract2 --> sequencer2
   domainContract3 --> sequencer3
-  sequencer1 --> sender1
+  sequencer1 --> originator1
   sequencer1 --> coordinator1
-  sequencer2 --> sender2
-  sequencer3 --> sender3
+  sequencer2 --> originator2
+  sequencer3 --> originator3
   sequencer3 --> coordinator3
   style coordinator2 fill:#eeeeee,stroke:#bbbbbb
   style coordinator3 fill:#eeeeee,stroke:#bbbbbb,stroke-dasharray: 5 5
@@ -323,9 +323,9 @@ block-beta
   style sequencer1 fill:#fffdee,stroke:#ffca58
   style sequencer2 fill:#fffdee,stroke:#ffca58
   style sequencer3 fill:#fffdee,stroke:#ffca58
-  style sender1 fill:#fffdee,stroke:#ffca58
-  style sender2 fill:#fffdee,stroke:#ffca58
-  style sender3 fill:#fffdee,stroke:#ffca58
+  style originator1 fill:#fffdee,stroke:#ffca58
+  style originator2 fill:#fffdee,stroke:#ffca58
+  style originator3 fill:#fffdee,stroke:#ffca58
   style coordinator1 fill:#fffdee,stroke:#ffca58
   style domainContract1 fill:#fffdee,stroke:#ffca58
   style domainContract2 fill:#fffdee,stroke:#ffca58
@@ -367,16 +367,16 @@ Full rules for the the algorithm:
 - Composition of committee i.e. the set of nodes who are candidates for coordinator is universally agreed (similar to BFT algorithms).
 - Liveness of the coordinator node can be detected via heartbeat messages.
 - Coordinators will keep going until they are told otherwise (e.g. by a handover request from another coordinator) or there is a sufficient lul in activity that it naturally flushes
-    - if that means the coordinator goes on forever, then so be it
-    - senders keep delegating to the current active coordinator and only choose a new one if that coordinator stops sending heartbeats.
-    - senders remember which coordinators have been detected as unresponsive recently and go through the list in order
-    - this means that if sender A fails over (or swaps out / in) while sender B is still online, then sender A may delegate to a different coordinator and trigger a handover. So be it.
-- The sender node for each transaction is responsible for ensuring that the transaction always has one coordinator actively coordinating it by detecting and responding to situations where the transaction is not being coordinated
+  - if that means the coordinator goes on forever, then so be it
+  - originators keep delegating to the current active coordinator and only choose a new one if that coordinator stops sending heartbeats.
+  - originators remember which coordinators have been detected as unresponsive recently and go through the list in order
+  - this means that if originator A fails over (or swaps out / in) while originator B is still online, then originator A may delegate to a different coordinator and trigger a handover. So be it.
+- The originator node for each transaction is responsible for ensuring that the transaction always has one coordinator actively coordinating it by detecting and responding to situations where the transaction is not being coordinated
 - Situations can arise where different nodes chose different coordinators because of different awareness of block height and/or different awareness of availability. The algorithm is less efficient when this happens but continues to function and can return to full efficiency as soon as the situation is resolved.
 - There is no need for election `term`s in this algorithm.
 - When coordinator responsibility is switched to another node, each inflight transaction is either re-assigned to the new coordinator or flushed through to confirmation on the base ledger
-    - If the sender deems the transaction to be no longer valid, it is responsible for finalizing it as reverted.
-    - If the sender deems the transaction not ready to be submitted, it is responsible for parking it until it is ready.
-    - If a transaction is successfully assembled and endorsed but subsequently reverted on the base ledger contract, the coordinator is is responsible for retrying at a frequency that does not cause excessive load on the system.
-- The sender node continues to monitor and control the delegation of its transaction until it has received receipt of the transactions' confirmations on the base ledger. This provides an "at least once" quality of service for every transaction at the distributed sequencer layer. As described earlier the blockchain enforces "at most once" semantics, so there is no possibility of duplicate transactions.
-- The handshake between the sender node and the coordinator node(s) attempts to minimize the likelihood of the same transaction intent resulting in 2 valid base ledger transactions but cannot eliminate that possibility completely so there is protection against duplicate intent fulfillment in the base ledger contract
+  - If the originator deems the transaction to be no longer valid, it is responsible for finalizing it as reverted.
+  - If the originator deems the transaction not ready to be submitted, it is responsible for parking it until it is ready.
+  - If a transaction is successfully assembled and endorsed but subsequently reverted on the base ledger contract, the coordinator is is responsible for retrying at a frequency that does not cause excessive load on the system.
+- The originator node continues to monitor and control the delegation of its transaction until it has received receipt of the transactions' confirmations on the base ledger. This provides an "at least once" quality of service for every transaction at the distributed sequencer layer. As described earlier the blockchain enforces "at most once" semantics, so there is no possibility of duplicate transactions.
+- The handshake between the originator node and the coordinator node(s) attempts to minimize the likelihood of the same transaction intent resulting in 2 valid base ledger transactions but cannot eliminate that possibility completely so there is protection against duplicate intent fulfillment in the base ledger contract

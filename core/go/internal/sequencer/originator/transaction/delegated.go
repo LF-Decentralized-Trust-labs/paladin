@@ -35,7 +35,7 @@ func validator_AssembleRequestMatches(ctx context.Context, txn *Transaction, eve
 		return false, nil
 	}
 
-	log.L(ctx).Debugf("sender transaction validating assemble request - event coordinator %s, TX current delegate = %s", assembleRequestEvent.Coordinator, txn.currentDelegate)
+	log.L(ctx).Debugf("originator transaction validating assemble request - event coordinator %s, TX current delegate = %s", assembleRequestEvent.Coordinator, txn.currentDelegate)
 	return assembleRequestEvent.Coordinator == txn.currentDelegate, nil
 
 }

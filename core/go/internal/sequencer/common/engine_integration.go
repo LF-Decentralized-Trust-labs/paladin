@@ -218,11 +218,11 @@ func (e *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 	// whether a lost/late signature would trigger a re-assembly of the transaction ( and any transaction that come after it in the sequencer) or whether we could safely ask the assembly
 	// to post hoc sign an assembly
 
-	// The transaction input data that is the senders intent to perform the transaction for this ID,
+	// The transaction input data that is the sender's intent to perform the transaction for this ID,
 	// MUST be retrieved from the local database. We cannot process it from the data that is received
 	// over the wire from another node (otherwise that node could "tell us" to do something that no
 	// application locally instructed us to do).
-	// TODO is this still necessary? We are not receiving the PreAssembly from the coordinator. We only get it from the sender's state machine which was initialized from reading the DB
+	// TODO is this still necessary? We are not receiving the PreAssembly from the coordinator. We only get it from the originator's state machine which was initialized from reading the DB
 	// there may be some weird cases where we get a assemble request and we have somehow swapped out the memory record of the preassembly since delegating but that is an edge case and not what we should optimize for
 
 	localTx, err := e.resolveLocalTransaction(ctx, transactionID)

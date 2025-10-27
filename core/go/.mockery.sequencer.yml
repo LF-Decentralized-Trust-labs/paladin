@@ -22,7 +22,7 @@ packages:
       dir: "{{.InterfaceDir}}"
       pkgname: "{{.SrcPackageName}}"
       structname: "Mock{{.InterfaceName}}"
-  github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender:
+  github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator:
     config:
       all: true
       dir: "{{.InterfaceDir}}"

@@ -32,12 +32,12 @@ import (
 func (t *Transaction) revertTransaction(ctx context.Context, revertReason string) error {
 	var tryFinalize func()
 	tryFinalize = func() {
-		t.syncPoints.QueueTransactionFinalize(ctx, t.Domain, pldtypes.EthAddress{}, t.sender, t.ID, revertReason,
+		t.syncPoints.QueueTransactionFinalize(ctx, t.Domain, pldtypes.EthAddress{}, t.originator, t.ID, revertReason,
 			func(ctx context.Context) {
-				log.L(ctx).Debugf("[Sequencer] finalized deployment transaction: %s", t.ID)
+				log.L(ctx).Debugf("finalized deployment transaction: %s", t.ID)
 			},
 			func(ctx context.Context, err error) {
-				log.L(ctx).Errorf("[Sequencer] error finalizing deployment: %s", err)
+				log.L(ctx).Errorf("error finalizing deployment: %s", err)
 				tryFinalize()
 			})
 	}
@@ -59,7 +59,7 @@ func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *compo
 	for _, state := range postAssembly.OutputStates {
 		err := t.grapher.AddMinter(ctx, state.ID, t)
 		if err != nil {
-			msg := fmt.Sprintf("Error adding minter for state %s: %s while applying postAssembly", state.ID, err)
+			msg := fmt.Sprintf("error adding minter for state %s: %s while applying postAssembly", state.ID, err)
 			log.L(ctx).Error(msg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 		}
@@ -70,7 +70,7 @@ func (t *Transaction) applyPostAssembly(ctx context.Context, postAssembly *compo
 func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 	//assemble requests have a short and long timeout
 	// the short timeout is for toleration of unreliable networks whereby the action is to retry the request with the same idempotency key
-	// the long timeout is to prevent an unavailable transaction sender/assemble from holding up the entire contract / privacy group given that the assemble step is single threaded
+	// the long timeout is to prevent an unavailable transaction originator/assemble from holding up the entire contract / privacy group given that the assemble step is single threaded
 	// the action for the long timeout is to return the transaction to the mempool and let another transaction be selected
 
 	//When we first send the request, we start a ticker to emit a requestTimeout event for each tick
@@ -79,16 +79,16 @@ func (t *Transaction) sendAssembleRequest(ctx context.Context) error {
 	t.pendingAssembleRequest = common.NewIdempotentRequest(ctx, t.clock, t.requestTimeout, func(ctx context.Context, idempotencyKey uuid.UUID) error {
 		stateLocks, err := t.engineIntegration.GetStateLocks(ctx)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] sendAssembleRequest failed to get engine state locks: %s", err)
+			log.L(ctx).Errorf("failed to get engine state locks: %s", err)
 			return err
 		}
 		blockHeight, err := t.engineIntegration.GetBlockHeight(ctx)
 		if err != nil {
-			log.L(ctx).Errorf("[Sequencer] sendAssembleRequest failed to get engine block height: %s", err)
+			log.L(ctx).Errorf("failed to get engine block height: %s", err)
 			return err
 		}
 
-		return t.transportWriter.SendAssembleRequest(ctx, t.senderNode, t.ID, idempotencyKey, t.PreAssembly, stateLocks, blockHeight)
+		return t.transportWriter.SendAssembleRequest(ctx, t.originatorNode, t.ID, idempotencyKey, t.PreAssembly, stateLocks, blockHeight)
 	})
 	t.cancelAssembleTimeoutSchedule = t.clock.ScheduleInterval(ctx, t.requestTimeout, func() {
 		err := t.eventHandler(ctx, &RequestTimeoutIntervalEvent{
@@ -174,7 +174,7 @@ func (t *Transaction) notifyDependentsOfAssembled(ctx context.Context) error {
 
 func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 	//this function is called when the transaction enters the reverted state on a revert response from assemble
-	// NOTE: at this point, we have not been assembled and therefore are not the minter of any state the only transactions that could possibly be dependent on us are those in the pool from the same sender
+	// NOTE: at this point, we have not been assembled and therefore are not the minter of any state the only transactions that could possibly be dependent on us are those in the pool from the same originator
 
 	dependents := t.dependencies.PrereqOf
 	if t.PreAssembly.Dependencies != nil {
@@ -208,11 +208,11 @@ func (t *Transaction) notifyDependentsOfRevert(ctx context.Context) error {
 
 func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) error {
 	//Dependencies can arise because  we have been assembled to spend states that were produced by other transactions
-	// or because there are other transactions from the same sender that have not been dispatched yet or because the user has declared explicit dependencies
+	// or because there are other transactions from the same originator that have not been dispatched yet or because the user has declared explicit dependencies
 	// this function calculates the dependencies relating to states and sets up the reverse association
 	// it is assumed that the other dependencies have already been set up when the transaction was first received by the coordinator TODO correct this comment line with more accurate description of when we expect the static dependencies to have been calculated.  Or make it more vague.
 	if t.PostAssembly == nil {
-		msg := fmt.Sprintf("[Sequencer] cannot calculate dependencies for transaction %s without a PostAssembly", t.ID)
+		msg := fmt.Sprintf("cannot calculate dependencies for transaction %s without a PostAssembly", t.ID)
 		log.L(ctx).Error(msg)
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
@@ -225,12 +225,12 @@ func (t *Transaction) calculatePostAssembleDependencies(ctx context.Context) err
 	for _, state := range append(t.PostAssembly.InputStates, t.PostAssembly.ReadStates...) {
 		dependency, err := t.grapher.LookupMinter(ctx, state.ID)
 		if err != nil {
-			errMsg := fmt.Sprintf("Error looking up dependency for state %s: %s", state.ID, err)
+			errMsg := fmt.Sprintf("error looking up dependency for state %s: %s", state.ID, err)
 			log.L(ctx).Error(errMsg)
 			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, errMsg)
 		}
 		if dependency == nil {
-			log.L(ctx).Infof("[Sequencer] no minter found for state %s", state.ID)
+			log.L(ctx).Infof("no minter found for state %s", state.ID)
 			//assume the state was produced by a confirmed transaction
 			//TODO should we validate this by checking the domain context? If not, explain why this is safe in the architecture doc
 			continue

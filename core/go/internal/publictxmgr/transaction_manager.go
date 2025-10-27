@@ -338,7 +338,7 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 	if err == nil {
 		publicTxBindings := make([]*DBPublicTxnBinding, 0, len(transactions))
 		for i, txi := range transactions {
-			transactionsToDistribute[i].Bindings = make([]*pldapi.PublicTxBinding, 0, len(txi.Bindings))
+			transactionsToDistribute[i].Bindings = make([]*pldapi.PublicTxBinding, 0)
 			pubTxnID := persistedTransactions[i].PublicTxnID
 			log.L(ctx).Debugf("WriteNewTransactions public txn binding ID: %+v", pubTxnID)
 			for _, bnd := range txi.Bindings {
@@ -350,11 +350,16 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 					PublicTxnID:     pubTxnID,
 				})
 
-				binding := &pldapi.PublicTxBinding{
-					Transaction:     bnd.TransactionID,
-					TransactionType: bnd.TransactionType,
+				if bnd.TransactionType == pldapi.TransactionTypePrivate.Enum() {
+					// We only distribute public transactions where they were the result of a private Paladin TX
+					binding := &pldapi.PublicTxBinding{
+						Transaction:     bnd.TransactionID,
+						TransactionType: bnd.TransactionType,
+					}
+					transactionsToDistribute[i].Bindings = append(transactionsToDistribute[i].Bindings, binding)
+				} else {
+					log.L(ctx).Debugf("Public transaction %s is not the result of a private Paladin TX, skipping distribution", bnd.TransactionID)
 				}
-				transactionsToDistribute[i].Bindings = append(transactionsToDistribute[i].Bindings, binding)
 			}
 		}
 		if len(publicTxBindings) > 0 {
@@ -377,7 +382,7 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 	}
 
 	// Hand off to the sequencer
-	ptm.sequencerManager.HandlePublicTXsWritten(ctx, dbTX, transactionsToDistribute)
+	err = ptm.sequencerManager.HandlePublicTXsWritten(ctx, dbTX, transactionsToDistribute)
 	if err != nil {
 		return nil, err
 	}

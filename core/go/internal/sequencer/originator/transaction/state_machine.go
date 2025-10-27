@@ -30,9 +30,9 @@ const (
 	State_Pending              // Intent for the transaction has been created in the database and has been assigned a unique ID but is not currently known to be being processed by a coordinator
 	//TODO currently Pending doesn't really make sense as a state because it is an instantaneous state.  It is the state of the transaction when it is first created and then immediately transitions to Delegated.
 	// States only really make sense when the transaction is waiting for something to happen.  We could remove this state and just have the transaction start in the Delegated state
-	// However, there may be a need for the sender to only delegate a subset of the transactions ( e.g. maybe there is an absolute ordering requirement and the only way to achieve that is by holding back until the dependency is confirmed)
-	// It is also slightly complicated by the fact that the delegation request is sent by an action of the sender state machine because it sends the delegation request for multiple transactions at once.
-	// Need a decision point on whether that is done by a) transaction emitting and event that triggers the sender to send the delegation request or b) the transaction state machine action makes a syncronous call to the sender to include that transaction in a new delegation request.
+	// However, there may be a need for the originator to only delegate a subset of the transactions ( e.g. maybe there is an absolute ordering requirement and the only way to achieve that is by holding back until the dependency is confirmed)
+	// It is also slightly complicated by the fact that the delegation request is sent by an action of the originator state machine because it sends the delegation request for multiple transactions at once.
+	// Need a decision point on whether that is done by a) transaction emitting and event that triggers the originator to send the delegation request or b) the transaction state machine action makes a syncronous call to the originator to include that transaction in a new delegation request.
 	// NOTE: initially there was a thought that we needed a pending state in case there is no current active coordinator so we can't go straight to delegated.  However, the current model is that we don't actually wait for any response from the coordinator.  We simply send the delegation request and assume that it is delegated at that point.
 	// We only resend the request if we don't see the heartbeat.
 	// Might need to rethink this and allow for some ack and shorter retry interval to tolerate less reliable networks,
@@ -47,14 +47,14 @@ const (
 	State_Submitted             // the transaction has been submitted to the blockchain
 	State_Confirmed             // the public transaction has been confirmed by the blockchain as successful
 	State_Reverted              // upon attempting to assemble the transaction, the domain code has determined that the intent is not valid and the transaction is finalized as reverted
-	State_Parked                // upon attempting to assemble the transaction, the domain code has determined that the transaction is not ready to be assembled and it is parked for later processing.  All remaining transactions for the current sender can continue - unless they have an explicit dependency on this transaction
+	State_Parked                // upon attempting to assemble the transaction, the domain code has determined that the transaction is not ready to be assembled and it is parked for later processing.  All remaining transactions for the current originator can continue - unless they have an explicit dependency on this transaction
 
 )
 
 type EventType = common.EventType
 
 const (
-	Event_Created                    EventType = iota // Transaction initially received by the sender or has been loaded from the database after a restart / swap-in
+	Event_Created                    EventType = iota // Transaction initially received by the originator or has been loaded from the database after a restart / swap-in
 	Event_ConfirmedSuccess                            // confirmation received from the blockchain of base ledge transaction successful completion
 	Event_ConfirmedReverted                           // confirmation received from the blockchain of base ledge transaction failure
 	Event_Delegated                                   // transaction has been delegated to a coordinator
@@ -462,7 +462,7 @@ func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*E
 			if !valid {
 				// This is perfectly normal sometimes an event happens and is no longer relevant to the transaction so we just ignore it and move on.
 				// We log a warning in case it's not a late-delivered message but something that needs looking in to
-				log.L(ctx).Warnf("sender transaction event %s is not valid for current state %s", event.TypeString(), sm.currentState.String())
+				log.L(ctx).Warnf("originator transaction event %s is not valid for current state %s", event.TypeString(), sm.currentState.String())
 				return nil, nil
 			}
 		}
@@ -507,7 +507,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 		if rule.If == nil || rule.If(ctx, t) { //if there is no guard defined, or the guard returns true
 			// (Odd spacing is intentional to align logs more clearly)
 			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("sdr-tx   | %s   | %s | %T | %s -> %s", t.Address.String()[0:8], t.ID.String()[0:8], event, sm.currentState.String(), rule.To.String())
-			t.metrics.ObserveSequencerTXStateChange("Sender_"+rule.To.String(), time.Duration(event.GetEventTime().Sub(sm.lastStateChange).Milliseconds()))
+			t.metrics.ObserveSequencerTXStateChange("Originator_"+rule.To.String(), time.Duration(event.GetEventTime().Sub(sm.lastStateChange).Milliseconds()))
 			sm.latestEvent = event.TypeString()
 			sm.lastStateChange = time.Now()
 			sm.currentState = rule.To
@@ -517,7 +517,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 				err := rule.On(ctx, t)
 				if err != nil {
 					//any recoverable errors should have been handled by the action function
-					log.L(ctx).Errorf("error transitioning sender transaction to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("error transitioning originator transaction to state %v: %v", sm.currentState, err)
 					return err
 				}
 			}
@@ -527,7 +527,7 @@ func (t *Transaction) evaluateTransitions(ctx context.Context, event common.Even
 				err := newStateDefinition.OnTransitionTo(ctx, t)
 				if err != nil {
 					// any recoverable errors should have been handled by the OnTransitionTo function
-					log.L(ctx).Errorf("error transitioning sender transaction to state %v: %v", sm.currentState, err)
+					log.L(ctx).Errorf("error transitioning originator transaction to state %v: %v", sm.currentState, err)
 					return err
 				}
 			}

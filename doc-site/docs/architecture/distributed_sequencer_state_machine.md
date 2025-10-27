@@ -1,14 +1,12 @@
 # Sequencer and transaction state machines
 
-The distributed sequencer is designed as a set of state machines, each of which manages the state of the sequencer components (sender and coordinator) and of sequencer transactions (at the sender and at the coordinator).
-
-
+The distributed sequencer is designed as a set of state machines, each of which manages the state of the sequencer components (originator and coordinator) and of sequencer transactions (at the originator and at the coordinator).
 
 For the transaction state machines metrics show how long transactions spend in each state.
 
-#### Senders transaction state
+#### Originator transaction's state
 
-The states that a transaction goes through, from the perspective of the transaction sender are:
+The states that a transaction goes through, from the perspective of the transaction originator are:
 
 - Initial: Initial state before anything is calculated
 - Pending: Intent for the transaction has been created in the database and has been assigned a unique ID but is not currently known to be being processed by a coordinator
@@ -22,11 +20,11 @@ The states that a transaction goes through, from the perspective of the transact
 - Submitted: the transaction has been submitted to the blockchain
 - Confirmed: the public transaction has been confirmed by the blockchain as successful
 - Reverted: upon attempting to assemble the transaction, the domain code has determined that the intent is not valid and the transaction is finalized as reverted
-- Parked: upon attempting to assemble the transaction, the domain code has determined that the transaction is not ready to be assembled and it is parked for later processing. All remaining transactions for the current sender can continue - unless they have an explicit dependency on this transaction
+- Parked: upon attempting to assemble the transaction, the domain code has determined that the transaction is not ready to be assembled and it is parked for later processing. All remaining transactions for the current originator can continue - unless they have an explicit dependency on this transaction
 
 Events that can cause a transition between states and/or trigger an action when the transaction is in a given state are:
 
-- Created: Transaction initially received by the sender or has been loaded from the database after a restart / swap-in
+- Created: Transaction initially received by the originator or has been loaded from the database after a restart / swap-in
 - ConfirmedSuccess: Confirmation received from the blockchain of base ledge transaction successful completion
 - ConfirmedReverted: Confirmation received from the blockchain of base ledge transaction failure
 - Delegated: Transaction has been delegated to a coordinator
@@ -73,20 +71,20 @@ stateDiagram-v2
     Parked --> Pending : Resumed
 ```
 
-#### Senders state
+#### Originator's state
 
-The states that a sender goes through:
+The states that a originator goes through:
 
-- Idle: Not acting as a sender and not aware of any active coordinators
-- Observing: Not acting as a sender but aware of a node (which may be the same node) acting as a coordinator
+- Idle: Not acting as a originator and not aware of any active coordinators
+- Observing: Not acting as a originator but aware of a node (which may be the same node) acting as a coordinator
 - Sending: Has some transactions that have been sent to a coordinator but not yet confirmed TODO should this be named State_Monitoring or State_Delegated or even State_Sent. Sending sounds like it is in the process of sending the request message.
 
-Events that can cause a transition between states and/or trigger an action when the sender is in a given state are:
+Events that can cause a transition between states and/or trigger an action when the originator is in a given state are:
 
 - HeartbeatInterval: The heartbeat interval has passed since the last time a heartbeat was received or the last time this event was received
 - HeartbeatReceived: A heartbeat message was received from the current active coordinator
 - TransactionCreated: A new transaction has been created and is ready to be sent to the coordinator
-- TransactionConfirmed: A transaction, that was send by this sender, has been confirmed on the base ledger
+- TransactionConfirmed: A transaction, that was send by this originator, has been confirmed on the base ledger
 - NewBlock: A new block has been mined on the base ledger
 - Base_Ledger_Transaction_Reverted: a transaction has moved from the dispatched to pending state because it was reverted on the base ledger
 
@@ -107,7 +105,7 @@ The states that a transaction goes through, from the perspective of the transact
 - Pooled: Waiting in the pool to be assembled - TODO should rename to "Selectable" or "Selectable_Pooled". Related to potential rename of `State_PreAssembly_Blocked`
 - PreAssembly_Blocked: Has not been assembled yet and cannot be assembled because a dependency never got assembled successfully - i.e. it was either Parked or Reverted is also blocked
 - Assembling: An assemble request has been sent but we are waiting for the response
-- Reverted: The transaction has been reverted by the assembler/sender
+- Reverted: The transaction has been reverted by the assembler/originator
 - Endorsement_Gathering: Assembled and waiting for endorsement
 - Blocked: Is fully endorsed but cannot proceed due to dependencies not being ready for dispatch
 - Confirming_Dispatch: Endorsed and waiting for dispatch confirmation
@@ -122,15 +120,15 @@ Events that can cause a transition between states and/or trigger an action when 
 - Received: Transaction initially received by the coordinator. Might seem redundant explicitly modeling this as an event rather than putting this logic into the constructor, but it is useful to make the initial state transition rules explicit in the state machine definitions
 - Selected: Selected from the pool as the next transaction to be assembled
 - AssembleRequestSent: Assemble request sent to the assembler
-- Assemble_Success: Assemble response received from the sender
-- Assemble_Revert_Response: Assemble response received from the sender with a revert reason
+- Assemble_Success: Assemble response received from the originator
+- Assemble_Revert_Response: Assemble response received from the originator with a revert reason
 - Endorsed: Endorsement received from one endorser
 - EndorsedRejected: Endorsement received from one endorser with a revert reason
 - DependencyReady: Another transaction, for which this transaction has a dependency on, has become ready for dispatch
 - DependencyAssembled: Another transaction, for which this transaction has a dependency on, has been assembled
 - DependencyReverted: Another transaction, for which this transaction has a dependency on, has been reverted
-- DispatchConfirmed: Dispatch confirmation received from the sender
-- DispatchConfirmationRejected: Dispatch confirmation response received from the sender with a rejection
+- DispatchConfirmed: Dispatch confirmation received from the originator
+- DispatchConfirmationRejected: Dispatch confirmation response received from the originator with a rejection
 - Collected: Collected by the dispatcher thread
 - NonceAllocated: Nonce allocated by the dispatcher thread
 - Submitted: Submission made to the blockchain. Each time this event is received, the submission hash is updated

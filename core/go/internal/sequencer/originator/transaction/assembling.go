@@ -39,7 +39,7 @@ func action_AssembleAndSign(ctx context.Context, txn *Transaction) error {
 	postAssembly, err := txn.engineIntegration.AssembleAndSign(ctx, txn.ID, txn.PreAssembly, txn.latestAssembleRequest.stateLocksJSON, txn.latestAssembleRequest.coordinatorsBlockHeight)
 	if err != nil {
 		log.L(ctx).Errorf("failed to assemble and sign transaction: %s", err)
-		//This should never happen but if it does, the most likely cause of failure is an error in the local domain code or state machine logic so best thing to abend the sender state machine
+		//This should never happen but if it does, the most likely cause of failure is an error in the local domain code or state machine logic so best thing to abend the originator state machine
 		return err
 	}
 

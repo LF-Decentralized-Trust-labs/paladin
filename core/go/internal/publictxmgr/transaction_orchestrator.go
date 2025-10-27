@@ -345,8 +345,6 @@ func (oc *orchestrator) allocateNonces(ctx context.Context, txns []*DBPublicTxn)
 		nonce := newNonces[i]
 		tx.Nonce = &nonce
 	}
-	// MRW TODO - Need to emit nonce allocated events to the sequencer
-
 	oc.lastNonceAlloc = time.Now()
 	oc.nextNonce = &newNextNonce
 

@@ -60,8 +60,8 @@ func TestPrivateTransactionBuilder_FullyEndorsed(t *testing.T) {
 	assert.Len(t, tx.PostAssembly.Endorsements, 3)
 }
 
-func TestPrivateTransactionBuilderList_SameSenderAndAddress(t *testing.T) {
-	builders := NewPrivateTransactionBuilderListForTesting(3).Sender("alice@node1")
+func TestPrivateTransactionBuilderList_SameOriginatorAndAddress(t *testing.T) {
+	builders := NewPrivateTransactionBuilderListForTesting(3).Originator("alice@node1")
 
 	txns := builders.BuildSparse()
 	require.NotNil(t, txns)

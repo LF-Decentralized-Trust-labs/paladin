@@ -440,25 +440,25 @@ func (_c *MockSeqCoordinator_Stop_Call) RunAndReturn(run func()) *MockSeqCoordin
 	return _c
 }
 
-// UpdateSenderNodePool provides a mock function for the type MockSeqCoordinator
-func (_mock *MockSeqCoordinator) UpdateSenderNodePool(ctx context.Context, senderNode string) {
-	_mock.Called(ctx, senderNode)
+// UpdateOriginatorNodePool provides a mock function for the type MockSeqCoordinator
+func (_mock *MockSeqCoordinator) UpdateOriginatorNodePool(ctx context.Context, originatorNode string) {
+	_mock.Called(ctx, originatorNode)
 	return
 }
 
-// MockSeqCoordinator_UpdateSenderNodePool_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateSenderNodePool'
-type MockSeqCoordinator_UpdateSenderNodePool_Call struct {
+// MockSeqCoordinator_UpdateOriginatorNodePool_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateOriginatorNodePool'
+type MockSeqCoordinator_UpdateOriginatorNodePool_Call struct {
 	*mock.Call
 }
 
-// UpdateSenderNodePool is a helper method to define mock.On call
+// UpdateOriginatorNodePool is a helper method to define mock.On call
 //   - ctx context.Context
-//   - senderNode string
-func (_e *MockSeqCoordinator_Expecter) UpdateSenderNodePool(ctx interface{}, senderNode interface{}) *MockSeqCoordinator_UpdateSenderNodePool_Call {
-	return &MockSeqCoordinator_UpdateSenderNodePool_Call{Call: _e.mock.On("UpdateSenderNodePool", ctx, senderNode)}
+//   - originatorNode string
+func (_e *MockSeqCoordinator_Expecter) UpdateOriginatorNodePool(ctx interface{}, originatorNode interface{}) *MockSeqCoordinator_UpdateOriginatorNodePool_Call {
+	return &MockSeqCoordinator_UpdateOriginatorNodePool_Call{Call: _e.mock.On("UpdateOriginatorNodePool", ctx, originatorNode)}
 }
 
-func (_c *MockSeqCoordinator_UpdateSenderNodePool_Call) Run(run func(ctx context.Context, senderNode string)) *MockSeqCoordinator_UpdateSenderNodePool_Call {
+func (_c *MockSeqCoordinator_UpdateOriginatorNodePool_Call) Run(run func(ctx context.Context, originatorNode string)) *MockSeqCoordinator_UpdateOriginatorNodePool_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -476,12 +476,12 @@ func (_c *MockSeqCoordinator_UpdateSenderNodePool_Call) Run(run func(ctx context
 	return _c
 }
 
-func (_c *MockSeqCoordinator_UpdateSenderNodePool_Call) Return() *MockSeqCoordinator_UpdateSenderNodePool_Call {
+func (_c *MockSeqCoordinator_UpdateOriginatorNodePool_Call) Return() *MockSeqCoordinator_UpdateOriginatorNodePool_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockSeqCoordinator_UpdateSenderNodePool_Call) RunAndReturn(run func(ctx context.Context, senderNode string)) *MockSeqCoordinator_UpdateSenderNodePool_Call {
+func (_c *MockSeqCoordinator_UpdateOriginatorNodePool_Call) RunAndReturn(run func(ctx context.Context, originatorNode string)) *MockSeqCoordinator_UpdateOriginatorNodePool_Call {
 	_c.Run(run)
 	return _c
 }
@@ -767,12 +767,12 @@ func (_m *MockTransactionPool) EXPECT() *MockTransactionPool_Expecter {
 	return &MockTransactionPool_Expecter{mock: &_m.Mock}
 }
 
-// GetCurrentSenderPool provides a mock function for the type MockTransactionPool
-func (_mock *MockTransactionPool) GetCurrentSenderPool(ctx context.Context) []string {
+// GetCurrentOriginatorPool provides a mock function for the type MockTransactionPool
+func (_mock *MockTransactionPool) GetCurrentOriginatorPool(ctx context.Context) []string {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetCurrentSenderPool")
+		panic("no return value specified for GetCurrentOriginatorPool")
 	}
 
 	var r0 []string
@@ -786,18 +786,18 @@ func (_mock *MockTransactionPool) GetCurrentSenderPool(ctx context.Context) []st
 	return r0
 }
 
-// MockTransactionPool_GetCurrentSenderPool_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCurrentSenderPool'
-type MockTransactionPool_GetCurrentSenderPool_Call struct {
+// MockTransactionPool_GetCurrentOriginatorPool_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCurrentOriginatorPool'
+type MockTransactionPool_GetCurrentOriginatorPool_Call struct {
 	*mock.Call
 }
 
-// GetCurrentSenderPool is a helper method to define mock.On call
+// GetCurrentOriginatorPool is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockTransactionPool_Expecter) GetCurrentSenderPool(ctx interface{}) *MockTransactionPool_GetCurrentSenderPool_Call {
-	return &MockTransactionPool_GetCurrentSenderPool_Call{Call: _e.mock.On("GetCurrentSenderPool", ctx)}
+func (_e *MockTransactionPool_Expecter) GetCurrentOriginatorPool(ctx interface{}) *MockTransactionPool_GetCurrentOriginatorPool_Call {
+	return &MockTransactionPool_GetCurrentOriginatorPool_Call{Call: _e.mock.On("GetCurrentOriginatorPool", ctx)}
 }
 
-func (_c *MockTransactionPool_GetCurrentSenderPool_Call) Run(run func(ctx context.Context)) *MockTransactionPool_GetCurrentSenderPool_Call {
+func (_c *MockTransactionPool_GetCurrentOriginatorPool_Call) Run(run func(ctx context.Context)) *MockTransactionPool_GetCurrentOriginatorPool_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -810,22 +810,22 @@ func (_c *MockTransactionPool_GetCurrentSenderPool_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockTransactionPool_GetCurrentSenderPool_Call) Return(strings []string) *MockTransactionPool_GetCurrentSenderPool_Call {
+func (_c *MockTransactionPool_GetCurrentOriginatorPool_Call) Return(strings []string) *MockTransactionPool_GetCurrentOriginatorPool_Call {
 	_c.Call.Return(strings)
 	return _c
 }
 
-func (_c *MockTransactionPool_GetCurrentSenderPool_Call) RunAndReturn(run func(ctx context.Context) []string) *MockTransactionPool_GetCurrentSenderPool_Call {
+func (_c *MockTransactionPool_GetCurrentOriginatorPool_Call) RunAndReturn(run func(ctx context.Context) []string) *MockTransactionPool_GetCurrentOriginatorPool_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetPooledTransactionsBySenderNodeAndIdentity provides a mock function for the type MockTransactionPool
-func (_mock *MockTransactionPool) GetPooledTransactionsBySenderNodeAndIdentity(ctx context.Context) map[string]map[string]*transaction.Transaction {
+// GetPooledTransactionsByOriginatorNodeAndIdentity provides a mock function for the type MockTransactionPool
+func (_mock *MockTransactionPool) GetPooledTransactionsByOriginatorNodeAndIdentity(ctx context.Context) map[string]map[string]*transaction.Transaction {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetPooledTransactionsBySenderNodeAndIdentity")
+		panic("no return value specified for GetPooledTransactionsByOriginatorNodeAndIdentity")
 	}
 
 	var r0 map[string]map[string]*transaction.Transaction
@@ -839,18 +839,18 @@ func (_mock *MockTransactionPool) GetPooledTransactionsBySenderNodeAndIdentity(c
 	return r0
 }
 
-// MockTransactionPool_GetPooledTransactionsBySenderNodeAndIdentity_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPooledTransactionsBySenderNodeAndIdentity'
-type MockTransactionPool_GetPooledTransactionsBySenderNodeAndIdentity_Call struct {
+// MockTransactionPool_GetPooledTransactionsByOriginatorNodeAndIdentity_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPooledTransactionsByOriginatorNodeAndIdentity'
+type MockTransactionPool_GetPooledTransactionsByOriginatorNodeAndIdentity_Call struct {
 	*mock.Call
 }
 
-// GetPooledTransactionsBySenderNodeAndIdentity is a helper method to define mock.On call
+// GetPooledTransactionsByOriginatorNodeAndIdentity is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockTransactionPool_Expecter) GetPooledTransactionsBySenderNodeAndIdentity(ctx interface{}) *MockTransactionPool_GetPooledTransactionsBySenderNodeAndIdentity_Call {
-	return &MockTransactionPool_GetPooledTransactionsBySenderNodeAndIdentity_Call{Call: _e.mock.On("GetPooledTransactionsBySenderNodeAndIdentity", ctx)}
+func (_e *MockTransactionPool_Expecter) GetPooledTransactionsByOriginatorNodeAndIdentity(ctx interface{}) *MockTransactionPool_GetPooledTransactionsByOriginatorNodeAndIdentity_Call {
+	return &MockTransactionPool_GetPooledTransactionsByOriginatorNodeAndIdentity_Call{Call: _e.mock.On("GetPooledTransactionsByOriginatorNodeAndIdentity", ctx)}
 }
 
-func (_c *MockTransactionPool_GetPooledTransactionsBySenderNodeAndIdentity_Call) Run(run func(ctx context.Context)) *MockTransactionPool_GetPooledTransactionsBySenderNodeAndIdentity_Call {
+func (_c *MockTransactionPool_GetPooledTransactionsByOriginatorNodeAndIdentity_Call) Run(run func(ctx context.Context)) *MockTransactionPool_GetPooledTransactionsByOriginatorNodeAndIdentity_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -863,12 +863,12 @@ func (_c *MockTransactionPool_GetPooledTransactionsBySenderNodeAndIdentity_Call)
 	return _c
 }
 
-func (_c *MockTransactionPool_GetPooledTransactionsBySenderNodeAndIdentity_Call) Return(stringToStringToTransaction map[string]map[string]*transaction.Transaction) *MockTransactionPool_GetPooledTransactionsBySenderNodeAndIdentity_Call {
+func (_c *MockTransactionPool_GetPooledTransactionsByOriginatorNodeAndIdentity_Call) Return(stringToStringToTransaction map[string]map[string]*transaction.Transaction) *MockTransactionPool_GetPooledTransactionsByOriginatorNodeAndIdentity_Call {
 	_c.Call.Return(stringToStringToTransaction)
 	return _c
 }
 
-func (_c *MockTransactionPool_GetPooledTransactionsBySenderNodeAndIdentity_Call) RunAndReturn(run func(ctx context.Context) map[string]map[string]*transaction.Transaction) *MockTransactionPool_GetPooledTransactionsBySenderNodeAndIdentity_Call {
+func (_c *MockTransactionPool_GetPooledTransactionsByOriginatorNodeAndIdentity_Call) RunAndReturn(run func(ctx context.Context) map[string]map[string]*transaction.Transaction) *MockTransactionPool_GetPooledTransactionsByOriginatorNodeAndIdentity_Call {
 	_c.Call.Return(run)
 	return _c
 }

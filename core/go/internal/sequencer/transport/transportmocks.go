@@ -439,8 +439,8 @@ func (_c *MockTransportWriter_SendDelegationRequestAcknowledgment_Call) RunAndRe
 }
 
 // SendDispatched provides a mock function for the type MockTransportWriter
-func (_mock *MockTransportWriter) SendDispatched(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
-	ret := _mock.Called(ctx, transactionSender, idempotencyKey, transactionSpecification)
+func (_mock *MockTransportWriter) SendDispatched(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+	ret := _mock.Called(ctx, transactionOriginator, idempotencyKey, transactionSpecification)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendDispatched")
@@ -448,7 +448,7 @@ func (_mock *MockTransportWriter) SendDispatched(ctx context.Context, transactio
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uuid.UUID, *prototk.TransactionSpecification) error); ok {
-		r0 = returnFunc(ctx, transactionSender, idempotencyKey, transactionSpecification)
+		r0 = returnFunc(ctx, transactionOriginator, idempotencyKey, transactionSpecification)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -462,14 +462,14 @@ type MockTransportWriter_SendDispatched_Call struct {
 
 // SendDispatched is a helper method to define mock.On call
 //   - ctx context.Context
-//   - transactionSender string
+//   - transactionOriginator string
 //   - idempotencyKey uuid.UUID
 //   - transactionSpecification *prototk.TransactionSpecification
-func (_e *MockTransportWriter_Expecter) SendDispatched(ctx interface{}, transactionSender interface{}, idempotencyKey interface{}, transactionSpecification interface{}) *MockTransportWriter_SendDispatched_Call {
-	return &MockTransportWriter_SendDispatched_Call{Call: _e.mock.On("SendDispatched", ctx, transactionSender, idempotencyKey, transactionSpecification)}
+func (_e *MockTransportWriter_Expecter) SendDispatched(ctx interface{}, transactionOriginator interface{}, idempotencyKey interface{}, transactionSpecification interface{}) *MockTransportWriter_SendDispatched_Call {
+	return &MockTransportWriter_SendDispatched_Call{Call: _e.mock.On("SendDispatched", ctx, transactionOriginator, idempotencyKey, transactionSpecification)}
 }
 
-func (_c *MockTransportWriter_SendDispatched_Call) Run(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification)) *MockTransportWriter_SendDispatched_Call {
+func (_c *MockTransportWriter_SendDispatched_Call) Run(run func(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification)) *MockTransportWriter_SendDispatched_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -502,7 +502,7 @@ func (_c *MockTransportWriter_SendDispatched_Call) Return(err error) *MockTransp
 	return _c
 }
 
-func (_c *MockTransportWriter_SendDispatched_Call) RunAndReturn(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error) *MockTransportWriter_SendDispatched_Call {
+func (_c *MockTransportWriter_SendDispatched_Call) RunAndReturn(run func(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error) *MockTransportWriter_SendDispatched_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -862,8 +862,8 @@ func (_c *MockTransportWriter_SendHeartbeat_Call) RunAndReturn(run func(ctx cont
 }
 
 // SendNonceAssigned provides a mock function for the type MockTransportWriter
-func (_mock *MockTransportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
-	ret := _mock.Called(ctx, txID, transactionSender, contractAddress, nonce)
+func (_mock *MockTransportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
+	ret := _mock.Called(ctx, txID, originatorNode, contractAddress, nonce)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendNonceAssigned")
@@ -871,7 +871,7 @@ func (_mock *MockTransportWriter) SendNonceAssigned(ctx context.Context, txID uu
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string, *pldtypes.EthAddress, uint64) error); ok {
-		r0 = returnFunc(ctx, txID, transactionSender, contractAddress, nonce)
+		r0 = returnFunc(ctx, txID, originatorNode, contractAddress, nonce)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -886,14 +886,14 @@ type MockTransportWriter_SendNonceAssigned_Call struct {
 // SendNonceAssigned is a helper method to define mock.On call
 //   - ctx context.Context
 //   - txID uuid.UUID
-//   - transactionSender string
+//   - originatorNode string
 //   - contractAddress *pldtypes.EthAddress
 //   - nonce uint64
-func (_e *MockTransportWriter_Expecter) SendNonceAssigned(ctx interface{}, txID interface{}, transactionSender interface{}, contractAddress interface{}, nonce interface{}) *MockTransportWriter_SendNonceAssigned_Call {
-	return &MockTransportWriter_SendNonceAssigned_Call{Call: _e.mock.On("SendNonceAssigned", ctx, txID, transactionSender, contractAddress, nonce)}
+func (_e *MockTransportWriter_Expecter) SendNonceAssigned(ctx interface{}, txID interface{}, originatorNode interface{}, contractAddress interface{}, nonce interface{}) *MockTransportWriter_SendNonceAssigned_Call {
+	return &MockTransportWriter_SendNonceAssigned_Call{Call: _e.mock.On("SendNonceAssigned", ctx, txID, originatorNode, contractAddress, nonce)}
 }
 
-func (_c *MockTransportWriter_SendNonceAssigned_Call) Run(run func(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64)) *MockTransportWriter_SendNonceAssigned_Call {
+func (_c *MockTransportWriter_SendNonceAssigned_Call) Run(run func(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64)) *MockTransportWriter_SendNonceAssigned_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -931,14 +931,14 @@ func (_c *MockTransportWriter_SendNonceAssigned_Call) Return(err error) *MockTra
 	return _c
 }
 
-func (_c *MockTransportWriter_SendNonceAssigned_Call) RunAndReturn(run func(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64) error) *MockTransportWriter_SendNonceAssigned_Call {
+func (_c *MockTransportWriter_SendNonceAssigned_Call) RunAndReturn(run func(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64) error) *MockTransportWriter_SendNonceAssigned_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // SendPreDispatchRequest provides a mock function for the type MockTransportWriter
-func (_mock *MockTransportWriter) SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
-	ret := _mock.Called(ctx, transactionSender, idempotencyKey, transactionSpecification, hash)
+func (_mock *MockTransportWriter) SendPreDispatchRequest(ctx context.Context, originatorNode string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
+	ret := _mock.Called(ctx, originatorNode, idempotencyKey, transactionSpecification, hash)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendPreDispatchRequest")
@@ -946,7 +946,7 @@ func (_mock *MockTransportWriter) SendPreDispatchRequest(ctx context.Context, tr
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uuid.UUID, *prototk.TransactionSpecification, *pldtypes.Bytes32) error); ok {
-		r0 = returnFunc(ctx, transactionSender, idempotencyKey, transactionSpecification, hash)
+		r0 = returnFunc(ctx, originatorNode, idempotencyKey, transactionSpecification, hash)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -960,15 +960,15 @@ type MockTransportWriter_SendPreDispatchRequest_Call struct {
 
 // SendPreDispatchRequest is a helper method to define mock.On call
 //   - ctx context.Context
-//   - transactionSender string
+//   - originatorNode string
 //   - idempotencyKey uuid.UUID
 //   - transactionSpecification *prototk.TransactionSpecification
 //   - hash *pldtypes.Bytes32
-func (_e *MockTransportWriter_Expecter) SendPreDispatchRequest(ctx interface{}, transactionSender interface{}, idempotencyKey interface{}, transactionSpecification interface{}, hash interface{}) *MockTransportWriter_SendPreDispatchRequest_Call {
-	return &MockTransportWriter_SendPreDispatchRequest_Call{Call: _e.mock.On("SendPreDispatchRequest", ctx, transactionSender, idempotencyKey, transactionSpecification, hash)}
+func (_e *MockTransportWriter_Expecter) SendPreDispatchRequest(ctx interface{}, originatorNode interface{}, idempotencyKey interface{}, transactionSpecification interface{}, hash interface{}) *MockTransportWriter_SendPreDispatchRequest_Call {
+	return &MockTransportWriter_SendPreDispatchRequest_Call{Call: _e.mock.On("SendPreDispatchRequest", ctx, originatorNode, idempotencyKey, transactionSpecification, hash)}
 }
 
-func (_c *MockTransportWriter_SendPreDispatchRequest_Call) Run(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32)) *MockTransportWriter_SendPreDispatchRequest_Call {
+func (_c *MockTransportWriter_SendPreDispatchRequest_Call) Run(run func(ctx context.Context, originatorNode string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32)) *MockTransportWriter_SendPreDispatchRequest_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1006,14 +1006,14 @@ func (_c *MockTransportWriter_SendPreDispatchRequest_Call) Return(err error) *Mo
 	return _c
 }
 
-func (_c *MockTransportWriter_SendPreDispatchRequest_Call) RunAndReturn(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error) *MockTransportWriter_SendPreDispatchRequest_Call {
+func (_c *MockTransportWriter_SendPreDispatchRequest_Call) RunAndReturn(run func(ctx context.Context, originatorNode string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error) *MockTransportWriter_SendPreDispatchRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // SendPreDispatchResponse provides a mock function for the type MockTransportWriter
-func (_mock *MockTransportWriter) SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
-	ret := _mock.Called(ctx, transactionSender, idempotencyKey, transactionSpecification)
+func (_mock *MockTransportWriter) SendPreDispatchResponse(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+	ret := _mock.Called(ctx, transactionOriginator, idempotencyKey, transactionSpecification)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendPreDispatchResponse")
@@ -1021,7 +1021,7 @@ func (_mock *MockTransportWriter) SendPreDispatchResponse(ctx context.Context, t
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uuid.UUID, *prototk.TransactionSpecification) error); ok {
-		r0 = returnFunc(ctx, transactionSender, idempotencyKey, transactionSpecification)
+		r0 = returnFunc(ctx, transactionOriginator, idempotencyKey, transactionSpecification)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1035,14 +1035,14 @@ type MockTransportWriter_SendPreDispatchResponse_Call struct {
 
 // SendPreDispatchResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - transactionSender string
+//   - transactionOriginator string
 //   - idempotencyKey uuid.UUID
 //   - transactionSpecification *prototk.TransactionSpecification
-func (_e *MockTransportWriter_Expecter) SendPreDispatchResponse(ctx interface{}, transactionSender interface{}, idempotencyKey interface{}, transactionSpecification interface{}) *MockTransportWriter_SendPreDispatchResponse_Call {
-	return &MockTransportWriter_SendPreDispatchResponse_Call{Call: _e.mock.On("SendPreDispatchResponse", ctx, transactionSender, idempotencyKey, transactionSpecification)}
+func (_e *MockTransportWriter_Expecter) SendPreDispatchResponse(ctx interface{}, transactionOriginator interface{}, idempotencyKey interface{}, transactionSpecification interface{}) *MockTransportWriter_SendPreDispatchResponse_Call {
+	return &MockTransportWriter_SendPreDispatchResponse_Call{Call: _e.mock.On("SendPreDispatchResponse", ctx, transactionOriginator, idempotencyKey, transactionSpecification)}
 }
 
-func (_c *MockTransportWriter_SendPreDispatchResponse_Call) Run(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification)) *MockTransportWriter_SendPreDispatchResponse_Call {
+func (_c *MockTransportWriter_SendPreDispatchResponse_Call) Run(run func(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification)) *MockTransportWriter_SendPreDispatchResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1075,14 +1075,14 @@ func (_c *MockTransportWriter_SendPreDispatchResponse_Call) Return(err error) *M
 	return _c
 }
 
-func (_c *MockTransportWriter_SendPreDispatchResponse_Call) RunAndReturn(run func(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error) *MockTransportWriter_SendPreDispatchResponse_Call {
+func (_c *MockTransportWriter_SendPreDispatchResponse_Call) RunAndReturn(run func(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error) *MockTransportWriter_SendPreDispatchResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // SendTransactionConfirmed provides a mock function for the type MockTransportWriter
-func (_mock *MockTransportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
-	ret := _mock.Called(ctx, txID, transactionSender, contractAddress, nonce, revertReason)
+func (_mock *MockTransportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
+	ret := _mock.Called(ctx, txID, originatorNode, contractAddress, nonce, revertReason)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendTransactionConfirmed")
@@ -1090,7 +1090,7 @@ func (_mock *MockTransportWriter) SendTransactionConfirmed(ctx context.Context, 
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string, *pldtypes.EthAddress, uint64, pldtypes.HexBytes) error); ok {
-		r0 = returnFunc(ctx, txID, transactionSender, contractAddress, nonce, revertReason)
+		r0 = returnFunc(ctx, txID, originatorNode, contractAddress, nonce, revertReason)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1105,15 +1105,15 @@ type MockTransportWriter_SendTransactionConfirmed_Call struct {
 // SendTransactionConfirmed is a helper method to define mock.On call
 //   - ctx context.Context
 //   - txID uuid.UUID
-//   - transactionSender string
+//   - originatorNode string
 //   - contractAddress *pldtypes.EthAddress
 //   - nonce uint64
 //   - revertReason pldtypes.HexBytes
-func (_e *MockTransportWriter_Expecter) SendTransactionConfirmed(ctx interface{}, txID interface{}, transactionSender interface{}, contractAddress interface{}, nonce interface{}, revertReason interface{}) *MockTransportWriter_SendTransactionConfirmed_Call {
-	return &MockTransportWriter_SendTransactionConfirmed_Call{Call: _e.mock.On("SendTransactionConfirmed", ctx, txID, transactionSender, contractAddress, nonce, revertReason)}
+func (_e *MockTransportWriter_Expecter) SendTransactionConfirmed(ctx interface{}, txID interface{}, originatorNode interface{}, contractAddress interface{}, nonce interface{}, revertReason interface{}) *MockTransportWriter_SendTransactionConfirmed_Call {
+	return &MockTransportWriter_SendTransactionConfirmed_Call{Call: _e.mock.On("SendTransactionConfirmed", ctx, txID, originatorNode, contractAddress, nonce, revertReason)}
 }
 
-func (_c *MockTransportWriter_SendTransactionConfirmed_Call) Run(run func(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes)) *MockTransportWriter_SendTransactionConfirmed_Call {
+func (_c *MockTransportWriter_SendTransactionConfirmed_Call) Run(run func(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes)) *MockTransportWriter_SendTransactionConfirmed_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1156,14 +1156,14 @@ func (_c *MockTransportWriter_SendTransactionConfirmed_Call) Return(err error) *
 	return _c
 }
 
-func (_c *MockTransportWriter_SendTransactionConfirmed_Call) RunAndReturn(run func(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error) *MockTransportWriter_SendTransactionConfirmed_Call {
+func (_c *MockTransportWriter_SendTransactionConfirmed_Call) RunAndReturn(run func(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error) *MockTransportWriter_SendTransactionConfirmed_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // SendTransactionSubmitted provides a mock function for the type MockTransportWriter
-func (_mock *MockTransportWriter) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
-	ret := _mock.Called(ctx, txID, transactionSender, contractAddress, txHash)
+func (_mock *MockTransportWriter) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
+	ret := _mock.Called(ctx, txID, originatorNode, contractAddress, txHash)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendTransactionSubmitted")
@@ -1171,7 +1171,7 @@ func (_mock *MockTransportWriter) SendTransactionSubmitted(ctx context.Context, 
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string, *pldtypes.EthAddress, *pldtypes.Bytes32) error); ok {
-		r0 = returnFunc(ctx, txID, transactionSender, contractAddress, txHash)
+		r0 = returnFunc(ctx, txID, originatorNode, contractAddress, txHash)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1186,14 +1186,14 @@ type MockTransportWriter_SendTransactionSubmitted_Call struct {
 // SendTransactionSubmitted is a helper method to define mock.On call
 //   - ctx context.Context
 //   - txID uuid.UUID
-//   - transactionSender string
+//   - originatorNode string
 //   - contractAddress *pldtypes.EthAddress
 //   - txHash *pldtypes.Bytes32
-func (_e *MockTransportWriter_Expecter) SendTransactionSubmitted(ctx interface{}, txID interface{}, transactionSender interface{}, contractAddress interface{}, txHash interface{}) *MockTransportWriter_SendTransactionSubmitted_Call {
-	return &MockTransportWriter_SendTransactionSubmitted_Call{Call: _e.mock.On("SendTransactionSubmitted", ctx, txID, transactionSender, contractAddress, txHash)}
+func (_e *MockTransportWriter_Expecter) SendTransactionSubmitted(ctx interface{}, txID interface{}, originatorNode interface{}, contractAddress interface{}, txHash interface{}) *MockTransportWriter_SendTransactionSubmitted_Call {
+	return &MockTransportWriter_SendTransactionSubmitted_Call{Call: _e.mock.On("SendTransactionSubmitted", ctx, txID, originatorNode, contractAddress, txHash)}
 }
 
-func (_c *MockTransportWriter_SendTransactionSubmitted_Call) Run(run func(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32)) *MockTransportWriter_SendTransactionSubmitted_Call {
+func (_c *MockTransportWriter_SendTransactionSubmitted_Call) Run(run func(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32)) *MockTransportWriter_SendTransactionSubmitted_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1231,7 +1231,7 @@ func (_c *MockTransportWriter_SendTransactionSubmitted_Call) Return(err error) *
 	return _c
 }
 
-func (_c *MockTransportWriter_SendTransactionSubmitted_Call) RunAndReturn(run func(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error) *MockTransportWriter_SendTransactionSubmitted_Call {
+func (_c *MockTransportWriter_SendTransactionSubmitted_Call) RunAndReturn(run func(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error) *MockTransportWriter_SendTransactionSubmitted_Call {
 	_c.Call.Return(run)
 	return _c
 }

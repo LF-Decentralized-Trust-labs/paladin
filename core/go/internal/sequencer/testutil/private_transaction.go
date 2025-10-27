@@ -41,9 +41,9 @@ type identityForTesting struct {
 
 type PrivateTransactionBuilderForTesting struct {
 	id                     uuid.UUID
-	senderName             string
-	senderNode             string
-	sender                 *identityForTesting
+	originatorName         string
+	originatorNode         string
+	originator             *identityForTesting
 	domain                 string
 	address                pldtypes.EthAddress
 	signerAddress          *pldtypes.EthAddress
@@ -57,7 +57,7 @@ type PrivateTransactionBuilderForTesting struct {
 	predefinedDependencies []uuid.UUID
 }
 
-// useful for creating multiple transactions in a test, from the same sender
+// useful for creating multiple transactions in a test, from the same originator
 type PrivateTransactionBuilderListForTesting []*PrivateTransactionBuilderForTesting
 
 func NewPrivateTransactionBuilderListForTesting(num int) PrivateTransactionBuilderListForTesting {
@@ -93,24 +93,24 @@ func (b PrivateTransactionBuilderListForTesting) Address(address pldtypes.EthAdd
 	return b
 }
 
-// initialize sender identity locator e.g. name@node
-func (b PrivateTransactionBuilderListForTesting) Sender(sender string) PrivateTransactionBuilderListForTesting {
+// initialize originator identity locator e.g. name@node
+func (b PrivateTransactionBuilderListForTesting) Originator(originator string) PrivateTransactionBuilderListForTesting {
 	for _, builder := range b {
-		builder.Sender(sender)
+		builder.Originator(originator)
 	}
 	return b
 }
 
-func (b PrivateTransactionBuilderListForTesting) SenderName(senderName string) PrivateTransactionBuilderListForTesting {
+func (b PrivateTransactionBuilderListForTesting) OriginatorName(originatorName string) PrivateTransactionBuilderListForTesting {
 	for _, builder := range b {
-		builder.SenderName(senderName)
+		builder.OriginatorName(originatorName)
 	}
 	return b
 }
 
-func (b PrivateTransactionBuilderListForTesting) SenderNode(senderNode string) PrivateTransactionBuilderListForTesting {
+func (b PrivateTransactionBuilderListForTesting) OriginatorNode(originatorNode string) PrivateTransactionBuilderListForTesting {
 	for _, builder := range b {
-		builder.SenderNode(senderNode)
+		builder.OriginatorNode(originatorNode)
 	}
 	return b
 }
@@ -123,8 +123,8 @@ func NewPrivateTransactionBuilderForTesting() *PrivateTransactionBuilderForTesti
 		id:                   uuid.New(),
 		domain:               "defaultDomain",
 		address:              *pldtypes.RandAddress(),
-		senderName:           "sender",
-		senderNode:           "senderNode",
+		originatorName:       "sender",
+		originatorNode:       "senderNode",
 		signerAddress:        nil,
 		numberOfEndorsers:    3,
 		numberOfEndorsements: 0,
@@ -139,25 +139,25 @@ func (b *PrivateTransactionBuilderForTesting) Address(address pldtypes.EthAddres
 	return b
 }
 
-func (b *PrivateTransactionBuilderForTesting) Sender(sender string) *PrivateTransactionBuilderForTesting {
+func (b *PrivateTransactionBuilderForTesting) Originator(originator string) *PrivateTransactionBuilderForTesting {
 
-	name, node, err := pldtypes.PrivateIdentityLocator(sender).Validate(context.Background(), "", false)
+	name, node, err := pldtypes.PrivateIdentityLocator(originator).Validate(context.Background(), "", false)
 	if err != nil {
 		//this is only used for testing so panic is fine
 		panic(err)
 	}
-	b.senderName = name
-	b.senderName = node
+	b.originatorName = name
+	b.originatorNode = node
 	return b
 }
 
-func (b *PrivateTransactionBuilderForTesting) SenderName(senderName string) *PrivateTransactionBuilderForTesting {
-	b.senderName = senderName
+func (b *PrivateTransactionBuilderForTesting) OriginatorName(originatorName string) *PrivateTransactionBuilderForTesting {
+	b.originatorName = originatorName
 	return b
 }
 
-func (b *PrivateTransactionBuilderForTesting) SenderNode(senderNode string) *PrivateTransactionBuilderForTesting {
-	b.senderNode = senderNode
+func (b *PrivateTransactionBuilderForTesting) OriginatorNode(originatorNode string) *PrivateTransactionBuilderForTesting {
+	b.originatorNode = originatorNode
 	return b
 }
 
@@ -213,13 +213,13 @@ func (b *PrivateTransactionBuilderForTesting) GetNumberOfEndorsers() int {
 	return b.numberOfEndorsers
 }
 
-func (b *PrivateTransactionBuilderForTesting) initializeSender() {
+func (b *PrivateTransactionBuilderForTesting) initializeOriginator() {
 
-	b.sender = &identityForTesting{
-		identityLocator: fmt.Sprintf("%s@%s", b.senderName, b.senderNode),
-		identity:        b.senderName,
+	b.originator = &identityForTesting{
+		identityLocator: fmt.Sprintf("%s@%s", b.originatorName, b.originatorNode),
+		identity:        b.originatorName,
 		verifier:        pldtypes.RandAddress().String(),
-		keyHandle:       b.senderName + "_KeyHandle",
+		keyHandle:       b.originatorName + "_KeyHandle",
 	}
 }
 
@@ -242,7 +242,7 @@ func (b *PrivateTransactionBuilderForTesting) initializeEndorsers() {
 // To create a partial transaction (e.g. with no PostAssembly) use the BuildPreAssembly etc methods
 func (b *PrivateTransactionBuilderForTesting) Build() *components.PrivateTransaction {
 
-	b.initializeSender()
+	b.initializeOriginator()
 	b.initializeEndorsers()
 	return &components.PrivateTransaction{
 		ID:           b.id,
@@ -256,7 +256,7 @@ func (b *PrivateTransactionBuilderForTesting) Build() *components.PrivateTransac
 
 // Function BuildSparse creates a new private transaction with only the PreAssembly populated
 func (b *PrivateTransactionBuilderForTesting) BuildSparse() *components.PrivateTransaction {
-	b.initializeSender()
+	b.initializeOriginator()
 	b.initializeEndorsers()
 	return &components.PrivateTransaction{
 		ID:          b.id,
@@ -274,13 +274,13 @@ func (b *PrivateTransactionBuilderForTesting) BuildPreAssembly() *components.Tra
 	}
 
 	preAssembly.RequiredVerifiers[0] = &prototk.ResolveVerifierRequest{
-		Lookup:       b.sender.identityLocator,
+		Lookup:       b.originator.identityLocator,
 		Algorithm:    algorithms.ECDSA_SECP256K1,
 		VerifierType: verifiers.ETH_ADDRESS,
 	}
 
 	preAssembly.Verifiers[0] = &prototk.ResolvedVerifier{
-		Lookup:       b.sender.identityLocator,
+		Lookup:       b.originator.identityLocator,
 		Algorithm:    algorithms.ECDSA_SECP256K1,
 		VerifierType: verifiers.ETH_ADDRESS,
 		Verifier:     pldtypes.RandAddress().String(),
@@ -349,7 +349,7 @@ func (b *PrivateTransactionBuilderForTesting) BuildPostAssembly() *components.Tr
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
 	}
 
-	//it is normal to have one AttestationRequest for the sender to sign the pre-assembly
+	//it is normal to have one AttestationRequest for the originator to sign the pre-assembly
 	postAssembly.AttestationPlan = make([]*prototk.AttestationRequest, b.numberOfEndorsers+1)
 	postAssembly.AttestationPlan[0] = &prototk.AttestationRequest{
 		Name:            "sign",
@@ -358,7 +358,7 @@ func (b *PrivateTransactionBuilderForTesting) BuildPostAssembly() *components.Tr
 		VerifierType:    verifiers.ETH_ADDRESS,
 		PayloadType:     signpayloads.OPAQUE_TO_RSV,
 		Parties: []string{
-			b.sender.identityLocator,
+			b.originator.identityLocator,
 		},
 	}
 
@@ -368,8 +368,8 @@ func (b *PrivateTransactionBuilderForTesting) BuildPostAssembly() *components.Tr
 			AttestationType: prototk.AttestationType_SIGN,
 			Payload:         pldtypes.RandBytes(32),
 			Verifier: &prototk.ResolvedVerifier{
-				Lookup:       b.sender.identityLocator,
-				Verifier:     b.sender.verifier,
+				Lookup:       b.originator.identityLocator,
+				Verifier:     b.originator.verifier,
 				Algorithm:    algorithms.ECDSA_SECP256K1,
 				VerifierType: verifiers.ETH_ADDRESS,
 			},

@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package sender
+package originator
 
 import (
 	"context"
@@ -23,11 +23,11 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator/transaction"
 )
 
-func sendDelegationRequest(ctx context.Context, s *sender, includeAlreadyDelegated bool) error {
-	transactions, err := s.transactionsOrderedByCreatedTime(ctx)
+func sendDelegationRequest(ctx context.Context, o *originator, includeAlreadyDelegated bool) error {
+	transactions, err := o.transactionsOrderedByCreatedTime(ctx)
 	if err != nil {
 		log.L(ctx).Errorf("failed to get transactions ordered by created time: %v", err)
 		return err
@@ -50,7 +50,7 @@ func sendDelegationRequest(ctx context.Context, s *sender, includeAlreadyDelegat
 			BaseEvent: transaction.BaseEvent{
 				TransactionID: txn.ID,
 			},
-			Coordinator: s.activeCoordinatorNode,
+			Coordinator: o.activeCoordinatorNode,
 		})
 		if err != nil {
 			msg := fmt.Sprintf("error handling delegated event for transaction %s: %v", txn.ID, err)
@@ -60,25 +60,25 @@ func sendDelegationRequest(ctx context.Context, s *sender, includeAlreadyDelegat
 	}
 
 	// Don't send delegation request before internal TX state machine has been updated
-	return s.transportWriter.SendDelegationRequest(ctx, s.activeCoordinatorNode, privateTransactions, s.currentBlockHeight)
+	return o.transportWriter.SendDelegationRequest(ctx, o.activeCoordinatorNode, privateTransactions, o.currentBlockHeight)
 }
 
-func action_SendDroppedTXDelegationRequest(ctx context.Context, s *sender) error {
-	return sendDelegationRequest(ctx, s, true)
+func action_SendDroppedTXDelegationRequest(ctx context.Context, o *originator) error {
+	return sendDelegationRequest(ctx, o, true)
 }
 
-func action_SendDelegationRequest(ctx context.Context, s *sender) error {
-	return sendDelegationRequest(ctx, s, false)
+func action_SendDelegationRequest(ctx context.Context, o *originator) error {
+	return sendDelegationRequest(ctx, o, false)
 }
 
-func guard_HasDroppedTransactions(ctx context.Context, s *sender) bool {
+func guard_HasDroppedTransactions(ctx context.Context, o *originator) bool {
 	//are there any transactions that the current active coordinator seems to have dropped ( as per its latest heartbeat)
-	//NOTE: "dropped" is not a state in the transaction state machine, but rather a state in the sender's view of the world.
+	//NOTE: "dropped" is not a state in the transaction state machine, but rather a state in the originator's view of the world.
 	// Reason for this is that it is not really a state of the transaction, it is a property of the heartbeat event and as such,
 	// is reconciled as part of handling that event so immediately, the transaction is in Delegated state again
-	for _, txn := range s.getTransactionsInStates(ctx, []transaction.State{transaction.State_Delegated}) {
+	for _, txn := range o.getTransactionsInStates(ctx, []transaction.State{transaction.State_Delegated}) {
 		dropped := true
-		for _, dispatchedTransaction := range s.latestCoordinatorSnapshot.PooledTransactions {
+		for _, dispatchedTransaction := range o.latestCoordinatorSnapshot.PooledTransactions {
 			if dispatchedTransaction.ID == txn.ID {
 				dropped = false
 				break

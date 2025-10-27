@@ -41,13 +41,13 @@ type TransportWriter interface {
 	SendAssembleRequest(ctx context.Context, assemblingNode string, txID uuid.UUID, idempotencyId uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error
 	SendAssembleResponse(ctx context.Context, txID uuid.UUID, assembleRequestId uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string) error
 	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) error
-	SendNonceAssigned(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64) error
-	SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error
-	SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error
+	SendNonceAssigned(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64) error
+	SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error
+	SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error
 	SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot) error
-	SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error
-	SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
-	SendDispatched(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
+	SendPreDispatchRequest(ctx context.Context, originatorNode string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error
+	SendPreDispatchResponse(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
+	SendDispatched(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
 }
 
 func NewTransportWriter(contractAddress *pldtypes.EthAddress, nodeID string, transportManager components.TransportManager, loopbackHandler func(ctx context.Context, message *components.ReceivedMessage)) TransportWriter {
@@ -295,7 +295,6 @@ func (tw *transportWriter) SendEndorsementResponse(ctx context.Context, transact
 	return err
 }
 
-// MRW TODO - why are there no state locks passed in to here?
 func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNode string, txID uuid.UUID, idempotencyId uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error {
 
 	log.L(ctx).Debugf("transport writer attempting to send assemble request to assembling node %s", assemblingNode)
@@ -396,7 +395,7 @@ func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordi
 	return err
 }
 
-func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID, senderNode string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
+func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
 	if contractAddress == nil {
 		err := fmt.Errorf("attempt to send nonce assigned event request without specifying contract address")
 		return err
@@ -416,7 +415,7 @@ func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID
 		MessageType: MessageType_NonceAssigned,
 		Payload:     nonceAssignedBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
-		Node:        senderNode,
+		Node:        originatorNode,
 	}); err != nil {
 		log.L(ctx).Errorf("error sending nonce assigned event: %s", err)
 	}
@@ -424,7 +423,7 @@ func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID
 	return err
 }
 
-func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
+func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
 	if contractAddress == nil {
 		err := fmt.Errorf("attempt to send TX submitted event without specifying contract address")
 		return err
@@ -440,18 +439,11 @@ func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uu
 		log.L(ctx).Errorf("error marshalling TX submitted event: %s", err)
 	}
 
-	// Split transactionSender into node and domain
-	parts := strings.Split(transactionSender, "@")
-	node := parts[0]
-	if len(parts) > 1 {
-		node = parts[1]
-	}
-
 	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: MessageType_TransactionSubmitted,
 		Payload:     txSubmittedBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
-		Node:        node,
+		Node:        originatorNode,
 	}); err != nil {
 		log.L(ctx).Errorf("error sending transaction submitted event: %s", err)
 	}
@@ -459,7 +451,7 @@ func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uu
 	return err
 }
 
-func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
+func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
 	if contractAddress == nil {
 		err := fmt.Errorf("attempt to send TX submitted event without specifying contract address")
 		return err
@@ -476,18 +468,11 @@ func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uu
 		log.L(ctx).Errorf("error marshalling TX confirmed event: %s", err)
 	}
 
-	// Split transactionSender into node and domain
-	parts := strings.Split(transactionSender, "@")
-	node := parts[0]
-	if len(parts) > 1 {
-		node = parts[1]
-	}
-
 	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: MessageType_TransactionConfirmed,
 		Payload:     txConfirmedBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
-		Node:        node,
+		Node:        originatorNode,
 	}); err != nil {
 		log.L(ctx).Errorf("error sending transaction confirmed event: %s", err)
 	}
@@ -525,7 +510,7 @@ func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string,
 	return err
 }
 
-func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
+func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, originatorNode string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
 	// MRW TODO - should dispatch confirmations also take the hash?
 	dispatchConfirmationRequest := &engineProto.TransactionDispatched{
 		Id:               idempotencyKey.String(),
@@ -539,30 +524,23 @@ func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, transacti
 		log.L(ctx).Errorf("error marshalling dispatch confirmation request  message: %s", err)
 	}
 
-	// Split transactionSender into node and domain
-	parts := strings.Split(transactionSender, "@")
-	node := parts[0]
-	if len(parts) > 1 {
-		node = parts[1]
-	}
-
 	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: MessageType_PreDispatchRequest,
 		Payload:     dispatchConfirmationRequestBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
-		Node:        node,
+		Node:        originatorNode,
 	}); err != nil {
-		log.L(ctx).Errorf("error sending dispatch confirmation request  message: %s", err)
+		log.L(ctx).Errorf("error sending pre-dispatch request  message: %s", err)
 	}
 	return err
 }
 
-func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
 	dispatchResponseEvent := &engineProto.TransactionDispatched{
 		Id:              idempotencyKey.String(),
 		TransactionId:   transactionSpecification.TransactionId,
 		ContractAddress: tw.contractAddress.HexString(),
-		Signer:          transactionSender,
+		Signer:          transactionOriginator,
 	}
 
 	dispatchResponseEventBytes, err := proto.Marshal(dispatchResponseEvent)
@@ -570,8 +548,8 @@ func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transact
 		log.L(ctx).Errorf("error marshalling dispatch confirmation request  message: %s", err)
 	}
 
-	// Split transactionSender into node and domain
-	parts := strings.Split(transactionSender, "@")
+	// Split transactionOriginator into node and domain
+	parts := strings.Split(transactionOriginator, "@")
 	node := parts[0]
 	if len(parts) > 1 {
 		node = parts[1]
@@ -588,12 +566,12 @@ func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transact
 	return err
 }
 
-func (tw *transportWriter) SendDispatched(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+func (tw *transportWriter) SendDispatched(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
 	dispatchedEvent := &engineProto.TransactionDispatched{
 		Id:              idempotencyKey.String(),
 		TransactionId:   transactionSpecification.TransactionId,
 		ContractAddress: tw.contractAddress.HexString(),
-		Signer:          transactionSender,
+		Signer:          transactionOriginator,
 	}
 
 	dispatchedEventBytes, err := proto.Marshal(dispatchedEvent)
@@ -601,8 +579,8 @@ func (tw *transportWriter) SendDispatched(ctx context.Context, transactionSender
 		log.L(ctx).Errorf("error marshalling dispatch confirmation request  message: %s", err)
 	}
 
-	// Split transactionSender into node and domain
-	parts := strings.Split(transactionSender, "@")
+	// Split transactionOriginator into node and domain
+	parts := strings.Split(transactionOriginator, "@")
 	node := parts[0]
 	if len(parts) > 1 {
 		node = parts[1]
@@ -621,7 +599,7 @@ func (tw *transportWriter) SendDispatched(ctx context.Context, transactionSender
 
 func (tw *transportWriter) send(ctx context.Context, payload *components.FireAndForgetMessageSend) error {
 	if payload.Node == "" {
-		log.L(ctx).Error("attempt to send sequencer event without specifying destination node name")
+		log.L(ctx).Error("attempt to send message without specifying destination node name")
 		// MRW TODO - should return this error, just logging it for now
 	}
 

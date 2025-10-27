@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package sender
+package originator
 
 import (
 	"context"
@@ -22,20 +22,20 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator/transaction"
 )
 
-func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatReceivedEvent) error {
-	s.timeOfMostRecentHeartbeat = s.clock.Now()
-	s.activeCoordinatorNode = event.From
-	s.latestCoordinatorSnapshot = &event.CoordinatorSnapshot
+func (o *originator) applyHeartbeatReceived(ctx context.Context, event *HeartbeatReceivedEvent) error {
+	o.timeOfMostRecentHeartbeat = o.clock.Now()
+	o.activeCoordinatorNode = event.From
+	o.latestCoordinatorSnapshot = &event.CoordinatorSnapshot
 	for _, dispatchedTransaction := range event.DispatchedTransactions {
-		//if any of the dispatched transactions were sent by this sender, ensure that we have an up to date view of its state
-		if dispatchedTransaction.Sender == s.nodeName {
-			txn := s.transactionsByID[dispatchedTransaction.ID]
+		//if any of the dispatched transactions were sent by this originator, ensure that we have an up to date view of its state
+		if dispatchedTransaction.Originator == o.nodeName {
+			txn := o.transactionsByID[dispatchedTransaction.ID]
 			if txn == nil {
 				//unexpected situation to be in.  We trust our memory of transactions over the coordinator's, so we ignore this transaction
-				log.L(ctx).Warnf("received heartbeat from %s with dispatched transaction %s but no transaction found in memory", s.activeCoordinatorNode, dispatchedTransaction.ID)
+				log.L(ctx).Warnf("received heartbeat from %s with dispatched transaction %s but no transaction found in memory", o.activeCoordinatorNode, dispatchedTransaction.ID)
 				continue
 			}
 			if dispatchedTransaction.LatestSubmissionHash != nil {
@@ -54,7 +54,7 @@ func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatRec
 					log.L(ctx).Error(msg)
 					return i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 				}
-				s.submittedTransactionsByHash[*dispatchedTransaction.LatestSubmissionHash] = &dispatchedTransaction.ID
+				o.submittedTransactionsByHash[*dispatchedTransaction.LatestSubmissionHash] = &dispatchedTransaction.ID
 			} else if dispatchedTransaction.Nonce != nil {
 				//if the dispatched transaction has a nonce but no hash, then it is sequenced
 				err := txn.HandleEvent(ctx, &transaction.NonceAssignedEvent{
@@ -80,12 +80,12 @@ func (s *sender) applyHeartbeatReceived(ctx context.Context, event *HeartbeatRec
 	return nil
 }
 
-func guard_HeartbeatThresholdExceeded(ctx context.Context, s *sender) bool {
-	if s.timeOfMostRecentHeartbeat == nil {
+func guard_HeartbeatThresholdExceeded(ctx context.Context, o *originator) bool {
+	if o.timeOfMostRecentHeartbeat == nil {
 		//we have never seen a heartbeat so that was a really long time ago, certainly longer than any threshold
 		return true
 	}
-	if s.clock.HasExpired(s.timeOfMostRecentHeartbeat, s.heartbeatThresholdMs) {
+	if o.clock.HasExpired(o.timeOfMostRecentHeartbeat, o.heartbeatThresholdMs) {
 		return true
 	}
 	return false

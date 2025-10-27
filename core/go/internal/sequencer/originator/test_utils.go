@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package sender
+package originator
 
 import (
 	"context"
@@ -21,7 +21,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	uuid "github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
@@ -42,7 +42,7 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 	return &SentMessageRecorder{}
 }
 
-func (r *SentMessageRecorder) SendDelegationRequest(ctx context.Context, coordinator string, transactions []*components.PrivateTransaction, sendersBlockHeight uint64) error {
+func (r *SentMessageRecorder) SendDelegationRequest(ctx context.Context, coordinator string, transactions []*components.PrivateTransaction, originatorsBlockHeight uint64) error {
 	r.delegatedTransactions = transactions
 	r.hasSentDelegationRequest = true
 	return nil
@@ -67,7 +67,7 @@ func (r *SentMessageRecorder) Reset(ctx context.Context) {
 	r.delegatedTransactions = nil
 }
 
-type SenderBuilderForTesting struct {
+type OriginatorBuilderForTesting struct {
 	state            State
 	nodeName         *string
 	committeeMembers []string
@@ -76,48 +76,48 @@ type SenderBuilderForTesting struct {
 	metrics          metrics.DistributedSequencerMetrics
 }
 
-type SenderDependencyMocks struct {
+type OriginatorDependencyMocks struct {
 	SentMessageRecorder *SentMessageRecorder
 	Clock               *common.FakeClockForTesting
 	EngineIntegration   *common.FakeEngineIntegrationForTesting
 }
 
-func NewSenderBuilderForTesting(state State) *SenderBuilderForTesting {
-	return &SenderBuilderForTesting{
+func NewOriginatorBuilderForTesting(state State) *OriginatorBuilderForTesting {
+	return &OriginatorBuilderForTesting{
 		state:   state,
 		metrics: metrics.InitMetrics(context.Background(), prometheus.NewRegistry()),
 	}
 }
 
-func (b *SenderBuilderForTesting) ContractAddress(contractAddress *pldtypes.EthAddress) *SenderBuilderForTesting {
+func (b *OriginatorBuilderForTesting) ContractAddress(contractAddress *pldtypes.EthAddress) *OriginatorBuilderForTesting {
 	b.contractAddress = contractAddress
 	return b
 }
 
-func (b *SenderBuilderForTesting) NodeName(nodeName string) *SenderBuilderForTesting {
+func (b *OriginatorBuilderForTesting) NodeName(nodeName string) *OriginatorBuilderForTesting {
 	b.nodeName = &nodeName
 	return b
 }
 
-func (b *SenderBuilderForTesting) CommitteeMembers(committeeMembers ...string) *SenderBuilderForTesting {
+func (b *OriginatorBuilderForTesting) CommitteeMembers(committeeMembers ...string) *OriginatorBuilderForTesting {
 	b.committeeMembers = committeeMembers
 	return b
 }
 
-func (b *SenderBuilderForTesting) Transactions(transactions ...*transaction.Transaction) *SenderBuilderForTesting {
+func (b *OriginatorBuilderForTesting) Transactions(transactions ...*transaction.Transaction) *OriginatorBuilderForTesting {
 	b.transactions = transactions
 	return b
 }
 
-func (b *SenderBuilderForTesting) GetContractAddress() pldtypes.EthAddress {
+func (b *OriginatorBuilderForTesting) GetContractAddress() pldtypes.EthAddress {
 	return *b.contractAddress
 }
 
-func (b *SenderBuilderForTesting) GetCoordinatorHeartbeatThresholdMs() int {
+func (b *OriginatorBuilderForTesting) GetCoordinatorHeartbeatThresholdMs() int {
 	return TestDefault_HeartbeatThreshold * TestDefault_HeartbeatIntervalMs
 }
 
-func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDependencyMocks) {
+func (b *OriginatorBuilderForTesting) Build(ctx context.Context) (*originator, *OriginatorDependencyMocks) {
 
 	if b.nodeName == nil {
 		b.nodeName = ptrTo("member1@node1")
@@ -130,16 +130,16 @@ func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDe
 	if b.contractAddress == nil {
 		b.contractAddress = pldtypes.RandAddress()
 	}
-	mocks := &SenderDependencyMocks{
+	mocks := &OriginatorDependencyMocks{
 		SentMessageRecorder: NewSentMessageRecorder(),
 		Clock:               &common.FakeClockForTesting{},
 		EngineIntegration:   &common.FakeEngineIntegrationForTesting{},
 	}
 
-	var sender *sender
+	var originator *originator
 
 	var err error
-	sender, err = NewSender(
+	originator, err = NewOriginator(
 		ctx,
 		*b.nodeName,
 		mocks.SentMessageRecorder,
@@ -153,11 +153,11 @@ func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDe
 	)
 
 	for _, tx := range b.transactions {
-		sender.transactionsByID[tx.ID] = tx
-		sender.transactionsOrdered = append(sender.transactionsOrdered, &tx.ID)
+		originator.transactionsByID[tx.ID] = tx
+		originator.transactionsOrdered = append(originator.transactionsOrdered, &tx.ID)
 		switch tx.GetCurrentState() {
 		case transaction.State_Submitted:
-			sender.submittedTransactionsByHash[*tx.GetLatestSubmissionHash()] = &tx.ID
+			originator.submittedTransactionsByHash[*tx.GetLatestSubmissionHash()] = &tx.ID
 		}
 	}
 
@@ -165,10 +165,15 @@ func (b *SenderBuilderForTesting) Build(ctx context.Context) (*sender, *SenderDe
 		panic(err)
 	}
 
-	sender.stateMachine.currentState = b.state
+	originator.stateMachine.currentState = b.state
 	switch b.state {
 	// Any state specific setup can be done here
 	}
 
-	return sender, mocks
+	err = originator.SetActiveCoordinator(ctx, "coordinator")
+	if err != nil {
+		return nil, nil
+	}
+
+	return originator, mocks
 }

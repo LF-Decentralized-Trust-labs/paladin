@@ -140,7 +140,7 @@ func (r *SentMessageRecorder) SendEndorsementRequest(
 
 func (r *SentMessageRecorder) SendPreDispatchRequest(
 	ctx context.Context,
-	transactionSender string,
+	transactionOriginator string,
 	idempotencyKey uuid.UUID,
 	transactionSpecification *prototk.TransactionSpecification,
 	hash *pldtypes.Bytes32,
@@ -155,7 +155,7 @@ func (r *SentMessageRecorder) SendAssembleResponse(ctx context.Context, txID uui
 	return nil
 }
 
-func (r *SentMessageRecorder) SendPreDispatchResponse(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+func (r *SentMessageRecorder) SendPreDispatchResponse(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
 	return nil
 }
 
@@ -163,15 +163,15 @@ func (r *SentMessageRecorder) SendHandoverRequest(ctx context.Context, activeCoo
 	return nil
 }
 
-func (r *SentMessageRecorder) SendNonceAssigned(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
+func (r *SentMessageRecorder) SendNonceAssigned(ctx context.Context, txID uuid.UUID, transactionOriginator string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
 	return nil
 }
 
-func (r *SentMessageRecorder) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
+func (r *SentMessageRecorder) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, transactionOriginator string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
 	return nil
 }
 
-func (r *SentMessageRecorder) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionSender string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
+func (r *SentMessageRecorder) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionOriginator string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
 	return nil
 }
 
@@ -187,7 +187,7 @@ func (r *SentMessageRecorder) SendHeartbeat(ctx context.Context, targetNode stri
 	return nil
 }
 
-func (r *SentMessageRecorder) SendDispatched(ctx context.Context, transactionSender string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
+func (r *SentMessageRecorder) SendDispatched(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
 	return nil
 }
 
@@ -204,7 +204,7 @@ func NewSentMessageRecorder() *SentMessageRecorder {
 
 type TransactionBuilderForTesting struct {
 	privateTransactionBuilder          *testutil.PrivateTransactionBuilderForTesting
-	sender                             *identityForTesting
+	originator                         *identityForTesting
 	dispatchConfirmed                  bool
 	signerAddress                      *pldtypes.EthAddress
 	latestSubmissionHash               *pldtypes.Bytes32
@@ -224,14 +224,14 @@ type TransactionBuilderForTesting struct {
 // Function NewTransactionBuilderForTesting creates a TransactionBuilderForTesting with random values for all fields
 // use the builder methods to set specific values for fields before calling Build to create a new Transaction
 func NewTransactionBuilderForTesting(t *testing.T, state State) *TransactionBuilderForTesting {
-	senderName := "sender"
-	senderNode := "senderNode"
+	originatorName := "sender"
+	originatorNode := "senderNode"
 	builder := &TransactionBuilderForTesting{
-		sender: &identityForTesting{
-			identityLocator: fmt.Sprintf("%s@%s", senderName, senderNode),
-			identity:        senderName,
+		originator: &identityForTesting{
+			identityLocator: fmt.Sprintf("%s@%s", originatorName, originatorNode),
+			identity:        originatorName,
 			verifier:        pldtypes.RandAddress().String(),
-			keyHandle:       senderName + "_KeyHandle",
+			keyHandle:       originatorName + "_KeyHandle",
 		},
 		dispatchConfirmed:         false,
 		signerAddress:             nil,
@@ -310,8 +310,8 @@ func (b *TransactionBuilderForTesting) Grapher(grapher Grapher) *TransactionBuil
 	return b
 }
 
-func (b *TransactionBuilderForTesting) Sender(sender *identityForTesting) *TransactionBuilderForTesting {
-	b.sender = sender
+func (b *TransactionBuilderForTesting) Originator(originator *identityForTesting) *TransactionBuilderForTesting {
+	b.originator = originator
 	return b
 }
 
@@ -320,8 +320,8 @@ func (b *TransactionBuilderForTesting) HeartbeatIntervalsSinceStateChange(heartb
 	return b
 }
 
-func (b *TransactionBuilderForTesting) GetSender() *identityForTesting {
-	return b.sender
+func (b *TransactionBuilderForTesting) GetOriginator() *identityForTesting {
+	return b.originator
 }
 
 func (b *TransactionBuilderForTesting) GetAssembleTimeout() int {
@@ -368,7 +368,7 @@ func (b *TransactionBuilderForTesting) Build() *Transaction {
 
 	txn, err := NewTransaction(
 		ctx,
-		b.sender.identityLocator,
+		b.originator.identityLocator,
 		privateTransaction,
 		b.sentMessageRecorder,
 		b.fakeClock,

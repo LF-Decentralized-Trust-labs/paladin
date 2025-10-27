@@ -29,7 +29,6 @@ import (
 type endorsementRequirement struct {
 	attRequest *prototk.AttestationRequest
 	party      string
-	endorsed   bool
 }
 
 func (t *Transaction) applyEndorsement(ctx context.Context, endorsement *prototk.AttestationResult, requestID uuid.UUID) error {

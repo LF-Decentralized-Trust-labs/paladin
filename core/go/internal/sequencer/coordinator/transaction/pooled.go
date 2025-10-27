@@ -25,14 +25,14 @@ import (
 )
 
 func (t *Transaction) SetPreviousTransaction(ctx context.Context, previousTransaction *Transaction) {
-	//TODO consider moving this to the PreAssembly part of PrivateTransaction and specifying a responsibility of the sender to set this.
-	// this is probably part of the decision on whether we expect the sender to include all current inflight transactions in every delegation request.
+	//TODO consider moving this to the PreAssembly part of PrivateTransaction and specifying a responsibility of the originator to set this.
+	// this is probably part of the decision on whether we expect the originator to include all current inflight transactions in every delegation request.
 	t.previousTransaction = previousTransaction
 }
 
 func (t *Transaction) SetNextTransaction(ctx context.Context, nextTransaction *Transaction) {
-	//TODO consider moving this to the PreAssembly part of PrivateTransaction and specifying a responsibility of the sender to set this.
-	// this is probably part of the decision on whether we expect the sender to include all current inflight transactions in every delegation request.
+	//TODO consider moving this to the PreAssembly part of PrivateTransaction and specifying a responsibility of the originator to set this.
+	// this is probably part of the decision on whether we expect the originator to include all current inflight transactions in every delegation request.
 	t.nextTransaction = nextTransaction
 }
 
@@ -96,7 +96,7 @@ func (t *Transaction) initializeDependencies(ctx context.Context) error {
 
 			if nil == dependencyTxn {
 				//either the dependency has been confirmed and no longer in memory or there was a overtake on the network and we have not received the delegation request for the dependency yet
-				// in either case, the guards will stop this transaction from being assembled but will appear in the heartbeat messages so that the sender can take appropriate action (remove the dependency if it is confirmed, resend the dependency delegation request if it is an inflight transaction)
+				// in either case, the guards will stop this transaction from being assembled but will appear in the heartbeat messages so that the originator can take appropriate action (remove the dependency if it is confirmed, resend the dependency delegation request if it is an inflight transaction)
 
 				//This should be relatively rare so worth logging as an info
 				log.L(ctx).Infof("[Sequencer] dependency %s not found in memory for transaction %s", dependencyID, t.ID)

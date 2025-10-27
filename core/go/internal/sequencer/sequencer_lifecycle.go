@@ -31,7 +31,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator"
 	coordTransaction "github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
@@ -45,7 +45,7 @@ import (
 // the coordinator, the originator, or the transport writer
 type Sequencer interface {
 	GetCoordinator() coordinator.SeqCoordinator
-	GetSender() sender.SeqSender
+	GetOriginator() originator.SeqOriginator
 	GetTransportWriter() transport.TransportWriter
 }
 
@@ -53,8 +53,8 @@ func (seq *sequencer) GetCoordinator() coordinator.SeqCoordinator {
 	return seq.coordinator
 }
 
-func (seq *sequencer) GetSender() sender.SeqSender {
-	return seq.sender
+func (seq *sequencer) GetOriginator() originator.SeqOriginator {
+	return seq.originator
 }
 
 func (seq *sequencer) GetTransportWriter() transport.TransportWriter {
@@ -66,7 +66,7 @@ type sequencer struct {
 	ctx context.Context
 
 	// The 3 main components of the sequencer
-	sender          sender.SeqSender
+	originator      originator.SeqOriginator
 	transportWriter transport.TransportWriter
 	coordinator     coordinator.SeqCoordinator
 
@@ -104,12 +104,11 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 
 		//double check in case another goroutine has created the sequencer while we were waiting for the write lock
 		if sMgr.sequencers[contractAddr.String()] == nil {
-			// log.L(ctx).Debugf("Creating sequencer for contract address %s", contractAddr.String())
 
 			log.L(log.WithComponent(ctx, common.SUBCOMP_MISC)).Debugf("creating sequencer for contract address %s", contractAddr.String())
 
 			// Are we handing this off to the sequencer now?
-			// Locally we store mappings of contract address to sender/coordinator pair
+			// Locally we store mappings of contract address to originator/coordinator pair
 
 			// Do we have space for another sequencer?
 			if sMgr.targetActiveSequencersLimit > 0 && len(sMgr.sequencers) > sMgr.targetActiveSequencersLimit {
@@ -119,8 +118,6 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			sMgr.metrics.SetActiveSequencers(len(sMgr.sequencers))
 
 			if tx == nil {
-				//err := i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "No TX provided to create distributed sequencer")
-				//return nil, err
 				log.L(ctx).Debugf("No TX provided to create sequencer")
 			}
 
@@ -133,12 +130,6 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			if domainAPI == nil {
 				err := i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "No domain provided to create sequencer")
 				log.L(ctx).Error(err)
-				return nil, err
-			}
-
-			senderNodePool, err := sMgr.getInitialSenderNodePool(ctx, tx, domainAPI)
-			if err != nil {
-				log.L(ctx).Errorf("failed to get transaction sender node pool for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
 
@@ -159,16 +150,15 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				transportWriter: transportWriter,
 			}
 
-			sender, err := sender.NewSender(sMgr.ctx, sMgr.nodeName, transportWriter, common.RealClock(), sMgr.engineIntegration, 10, &contractAddr, 15000, 10, sMgr.metrics)
+			originator, err := originator.NewOriginator(sMgr.ctx, sMgr.nodeName, transportWriter, common.RealClock(), sMgr.engineIntegration, 10, &contractAddr, 15000, 10, sMgr.metrics)
 			if err != nil {
-				log.L(ctx).Errorf("failed to create sequencer sender for contract %s: %s", contractAddr.String(), err)
+				log.L(ctx).Errorf("failed to create sequencer originator for contract %s: %s", contractAddr.String(), err)
 				return nil, err
 			}
 
 			coordinator, err := coordinator.NewCoordinator(sMgr.ctx,
 				domainAPI,
 				transportWriter,
-				senderNodePool,
 				common.RealClock(),
 				sMgr.engineIntegration,
 				sMgr.syncPoints,
@@ -189,8 +179,8 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 					// Update metrics and check if we need to stop one to stay within the configured max active coordinators
 					sMgr.updateActiveCoordinators(sMgr.ctx)
 
-					// The sender needs to know where to delegate transactions to
-					err := sender.SetActiveCoordinator(sMgr.ctx, coordinatorNode)
+					// The originator needs to know where to delegate transactions to
+					err := originator.SetActiveCoordinator(sMgr.ctx, coordinatorNode)
 					if err != nil {
 						log.L(ctx).Errorf("failed to set active coordinator for contract %s: %s", contractAddr.String(), err)
 						return
@@ -206,13 +196,13 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				return nil, err
 			}
 
-			sequencer.sender = sender
+			sequencer.originator = originator
 			sequencer.coordinator = coordinator
 			sMgr.sequencers[contractAddr.String()] = sequencer
 
 			// Start by populating the pool of originators with the endorsers of this transaction. At this point
 			// we don't have anything else to use to determine who our candidate coordinators are.
-			sMgr.setInitialCoordinator(ctx, tx, sequencer)
+			err = sMgr.setInitialCoordinator(ctx, tx, sequencer)
 			if err != nil {
 				return nil, err
 			}
@@ -227,7 +217,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 		// We already have a sequencer initialized but we might not have an initial coordinator selected
 		// Start by populating the pool of originators with the endorsers of this transaction. At this point
 		// we don't have anything else to use to determine who our candidate coordinators are.
-		if sMgr.sequencers[contractAddr.String()].GetSender().GetCurrentCoordinator() == "" {
+		if sMgr.sequencers[contractAddr.String()].GetOriginator().GetCurrentCoordinator() == "" {
 			err := sMgr.setInitialCoordinator(ctx, tx, sMgr.sequencers[contractAddr.String()])
 			if err != nil {
 				return nil, err
@@ -248,12 +238,12 @@ func (sMgr *sequencerManager) setInitialCoordinator(ctx context.Context, tx *com
 		for _, verifiers := range tx.PreAssembly.RequiredVerifiers {
 			if strings.Contains(verifiers.Lookup, "@") {
 				parts := strings.Split(verifiers.Lookup, "@")
-				sequencer.GetCoordinator().UpdateSenderNodePool(ctx, parts[1])
+				sequencer.GetCoordinator().UpdateOriginatorNodePool(ctx, parts[1])
 			}
 		}
 
 		// Get the best candidate for an initial coordinator, and use as the delegate for any originated transactions
-		err := sequencer.GetSender().SetActiveCoordinator(sMgr.ctx, sequencer.GetCoordinator().GetActiveCoordinatorNode(sMgr.ctx))
+		err := sequencer.GetOriginator().SetActiveCoordinator(sMgr.ctx, sequencer.GetCoordinator().GetActiveCoordinatorNode(sMgr.ctx))
 		if err != nil {
 			return err
 		}
@@ -420,7 +410,7 @@ func (sMgr *sequencerManager) dispatch(ctx context.Context, t *coordTransaction.
 		return
 	}
 
-	err = transportWriter.SendDispatched(ctx, t.Sender(), uuid.New(), t.PreAssembly.TransactionSpecification)
+	err = transportWriter.SendDispatched(ctx, t.Originator(), uuid.New(), t.PreAssembly.TransactionSpecification)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to send dispatched event for transaction %s: %s", t.ID, err)
 		return
@@ -460,7 +450,7 @@ func (sMgr *sequencerManager) stopLowestPrioritySequencer(ctx context.Context) {
 				// This sequencer is already idle or observing so we can page it out immediately
 
 				log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencer.contractAddress)
-				sequencer.sender.Stop()
+				sequencer.originator.Stop()
 				delete(sMgr.sequencers, sequencer.contractAddress)
 				return
 			}
@@ -477,7 +467,7 @@ func (sMgr *sequencerManager) stopLowestPrioritySequencer(ctx context.Context) {
 
 		// Stop the lowest priority sequencer by emitting an event and waiting for it to move to closed
 		sequencers[0].coordinator.Stop()
-		sequencers[0].sender.Stop()
+		sequencers[0].originator.Stop()
 		log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("unloading | %s", sequencers[0].contractAddress)
 		delete(sMgr.sequencers, sequencers[0].contractAddress)
 	}

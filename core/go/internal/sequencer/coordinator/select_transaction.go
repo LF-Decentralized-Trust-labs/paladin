@@ -47,24 +47,24 @@ func (c *coordinator) selectNextTransaction(ctx context.Context, event *Transact
 }
 
 /* Functions of the TransactionPool interface required by the transactionSelector */
-func (c *coordinator) GetPooledTransactionsBySenderNodeAndIdentity(ctx context.Context) map[string]map[string]*transaction.Transaction {
+func (c *coordinator) GetPooledTransactionsByOriginatorNodeAndIdentity(ctx context.Context) map[string]map[string]*transaction.Transaction {
 	pooledTransactions := c.getTransactionsInStates(ctx, []transaction.State{transaction.State_Pooled})
 	log.L(ctx).Debugf("pooled transactions: %d", len(pooledTransactions))
-	transactionsBySenderNodeAndIdentity := make(map[string]map[string]*transaction.Transaction)
+	transactionsByOriginatorNodeAndIdentity := make(map[string]map[string]*transaction.Transaction)
 	for _, txn := range pooledTransactions {
-		log.L(ctx).Debugf("found pooled transaction %s from %s", txn.ID.String(), txn.SenderNode())
-		if _, ok := transactionsBySenderNodeAndIdentity[txn.SenderNode()]; !ok {
-			transactionsBySenderNodeAndIdentity[txn.SenderNode()] = make(map[string]*transaction.Transaction)
+		log.L(ctx).Debugf("found pooled transaction %s from %s", txn.ID.String(), txn.OriginatorNode())
+		if _, ok := transactionsByOriginatorNodeAndIdentity[txn.OriginatorNode()]; !ok {
+			transactionsByOriginatorNodeAndIdentity[txn.OriginatorNode()] = make(map[string]*transaction.Transaction)
 		}
-		log.L(ctx).Debugf("candidate txn from sender node '%s', sender ID '%s': TXID %s", txn.SenderNode(), txn.SenderIdentity(), txn.ID.String())
-		transactionsBySenderNodeAndIdentity[txn.SenderNode()][txn.SenderIdentity()] = txn
+		log.L(ctx).Debugf("candidate txn from originator node '%s', originator ID '%s': TXID %s", txn.OriginatorNode(), txn.OriginatorIdentity(), txn.ID.String())
+		transactionsByOriginatorNodeAndIdentity[txn.OriginatorNode()][txn.OriginatorIdentity()] = txn
 	}
-	return transactionsBySenderNodeAndIdentity
+	return transactionsByOriginatorNodeAndIdentity
 }
 
-func (c *coordinator) GetCurrentSenderPool(ctx context.Context) []string {
-	log.L(ctx).Debugf("%d sender pool identities for contract %s", len(c.senderNodePool), c.contractAddress.HexString())
-	return c.senderNodePool
+func (c *coordinator) GetCurrentOriginatorPool(ctx context.Context) []string {
+	log.L(ctx).Debugf("%d originator pool identities for contract %s", len(c.originatorNodePool), c.contractAddress.HexString())
+	return c.originatorNodePool
 }
 
 func (c *coordinator) GetTransactionByID(_ context.Context, txnID uuid.UUID) *transaction.Transaction {
@@ -79,41 +79,41 @@ type TransactionSelector interface {
 
 // define the interface that the transaction selector algorithm uses to query the state of the transaction pool
 type TransactionPool interface {
-	//return a list of all transactions in that are in the State_Pooled state, keyed by the sender node and identifier
-	GetPooledTransactionsBySenderNodeAndIdentity(ctx context.Context) map[string]map[string]*transaction.Transaction
+	// return a list of all transactions in that are in the State_Pooled state, keyed by the originator node and identifier
+	GetPooledTransactionsByOriginatorNodeAndIdentity(ctx context.Context) map[string]map[string]*transaction.Transaction
 
 	GetTransactionByID(ctx context.Context, txnID uuid.UUID) *transaction.Transaction
 
-	//return a list of all members of the committee organized by their node identity
-	GetCurrentSenderPool(ctx context.Context) []string
+	// return a list of all members of the originators organized by their node identity
+	GetCurrentOriginatorPool(ctx context.Context) []string
 }
 
 type transactionSelector struct {
-	transactionPool         TransactionPool
-	currentAssemblingSender *senderLocator
+	transactionPool             TransactionPool
+	currentAssemblingOriginator *originatorLocator
 }
 
 func NewTransactionSelector(ctx context.Context, transactionPool TransactionPool) TransactionSelector {
 
 	selector := &transactionSelector{
-		transactionPool:         transactionPool,
-		currentAssemblingSender: nil,
+		transactionPool:             transactionPool,
+		currentAssemblingOriginator: nil,
 	}
 
 	return selector
 }
 
-type senderLocator struct {
+type originatorLocator struct {
 	node     string
 	identity string
 }
 
-// Determine if there is still an active sender, so we know if it's safe to select a new transaction to start processing
+// Determine if there is still an active originator, so we know if it's safe to select a new transaction to start processing
 func (ts *transactionSelector) currentTransactionStillInProgress(ctx context.Context, event *TransactionStateTransitionEvent) (bool, error) {
 
 	log.L(ctx).Debugf("checking event before transaction selection: %+v", event)
 
-	// validate the the event relates to a transaction for the current sender otherwise return an error
+	// validate the the event relates to a transaction for the current originator otherwise return an error
 	txnID := event.TransactionID
 
 	pooledTransaction := ts.transactionPool.GetTransactionByID(ctx, txnID)
@@ -127,12 +127,12 @@ func (ts *transactionSelector) currentTransactionStillInProgress(ctx context.Con
 		return false, i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
 	}
 
-	if ts.currentAssemblingSender != nil {
-		// The state machine event is for a different sender to the one who's currently assmebling. This could be a delayed event and
-		// in the mean time we've started processing a TX from another sender. Disregard the event and wait for the current in-progress
+	if ts.currentAssemblingOriginator != nil {
+		// The state machine event is for a different originator to the one who's currently assmebling. This could be a delayed event and
+		// in the mean time we've started processing a TX from another originator. Disregard the event and wait for the current in-progress
 		// TX to move to a point where we can select the next TX.
-		if pooledTransaction.SenderNode() != ts.currentAssemblingSender.node || pooledTransaction.SenderIdentity() != ts.currentAssemblingSender.identity {
-			log.L(ctx).Warnf("current assembling sender is %s, no TX selection changes to take for TX %s from %s", ts.currentAssemblingSender, txnID.String(), pooledTransaction.SenderNode())
+		if pooledTransaction.OriginatorNode() != ts.currentAssemblingOriginator.node || pooledTransaction.OriginatorIdentity() != ts.currentAssemblingOriginator.identity {
+			log.L(ctx).Warnf("current assembling originator is %s, no TX selection changes to take for TX %s from %s", ts.currentAssemblingOriginator, txnID.String(), pooledTransaction.OriginatorNode())
 			return true, nil
 		}
 	}
@@ -142,15 +142,15 @@ func (ts *transactionSelector) currentTransactionStillInProgress(ctx context.Con
 		switch event.To {
 		case transaction.State_Endorsement_Gathering:
 			log.L(ctx).Tracef("transaction %s moved to endorsement gathering state, no longer assembling. Can start next TX", txnID.String())
-			ts.currentAssemblingSender = nil
+			ts.currentAssemblingOriginator = nil
 		case transaction.State_Pooled:
 			// assuming the only reason for re-pooling is a timeout
 			// might need to add a RePoolReason to the transaction object if we find other reasons for this transition
 			log.L(ctx).Tracef("transaction %s moved to pooled state, no longer assembling. Can start next TX", txnID.String())
-			ts.currentAssemblingSender = nil
+			ts.currentAssemblingOriginator = nil
 		case transaction.State_Reverted:
 			log.L(ctx).Tracef("transaction %s moved to reverted state, no longer assembling. Can start next TX", txnID.String())
-			ts.currentAssemblingSender = nil
+			ts.currentAssemblingOriginator = nil
 		default:
 			msg := fmt.Sprintf("unexpected transition of transaction %s from assembling state to %s", txnID.String(), event.To.String())
 			log.L(ctx).Error(msg)
@@ -161,11 +161,11 @@ func (ts *transactionSelector) currentTransactionStillInProgress(ctx context.Con
 		case transaction.State_Pooled:
 			// A TX moved back into the pool, presumably after endorsement failed.
 			log.L(ctx).Tracef("transaction %s moved to pooled state, no longer endorsing. Can start next TX", txnID.String())
-			ts.currentAssemblingSender = nil
+			ts.currentAssemblingOriginator = nil
 		}
 	}
 
-	return ts.currentAssemblingSender != nil, nil
+	return ts.currentAssemblingOriginator != nil, nil
 }
 
 // We select a new transaction to process in the following cases:
@@ -189,13 +189,13 @@ func (ts *transactionSelector) SelectNextTransaction(ctx context.Context, event 
 
 	// Initial distributed sequencer implementation just pulls transactions in FIFO order. This needs implementing to be fairer, potentially based
 	// on the initial fast-queue/slow-queue in the PoC distributed sequencer.
-	selectableTransactionsMap := ts.transactionPool.GetPooledTransactionsBySenderNodeAndIdentity(ctx)
+	selectableTransactionsMap := ts.transactionPool.GetPooledTransactionsByOriginatorNodeAndIdentity(ctx)
 
-	for _, senderNodes := range selectableTransactionsMap {
-		for _, pooledTx := range senderNodes {
+	for _, originatorNodes := range selectableTransactionsMap {
+		for _, pooledTx := range originatorNodes {
 			if pooledTx != nil {
 				log.L(ctx).Infof("returning next pooled TX %s", pooledTx.ID.String())
-				ts.currentAssemblingSender = &senderLocator{node: pooledTx.SenderNode(), identity: pooledTx.SenderIdentity()}
+				ts.currentAssemblingOriginator = &originatorLocator{node: pooledTx.OriginatorNode(), identity: pooledTx.OriginatorIdentity()}
 				return pooledTx, nil
 			}
 		}

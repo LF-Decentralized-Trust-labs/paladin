@@ -28,7 +28,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator"
 	coordinatorTx "github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
@@ -59,7 +59,7 @@ type sequencerManager struct {
 	sequencers                    map[string]*sequencer
 	blockHeight                   int64
 	engineIntegration             common.EngineIntegration
-	targetActiveCoordinatorsLimit int // Max number of contracts this node aims to concurrently act as coordinator for. It could still efficiently respond to dispatch requests from other coordinators because the sender will remain in memory.
+	targetActiveCoordinatorsLimit int // Max number of contracts this node aims to concurrently act as coordinator for. It could still efficiently respond to dispatch requests from other coordinators because the originator will remain in memory.
 	targetActiveSequencersLimit   int // Max number of sequencers this node aims to retain in memory concurrently. Hitting this limit will cause an attempt to remove the lowest priority sequencer from memory, and hence require it to be recreated from persisted state if it is needed in the future
 }
 
@@ -177,8 +177,6 @@ func (sMgr *sequencerManager) handleDeployTx(ctx context.Context, tx *components
 		return i18n.WrapError(ctx, err, msgs.MsgDomainNotFound, tx.Domain)
 	}
 
-	// MRW TODO - should we retrieve the privacy group members here in order to use them to
-	// decide on the next active coordinator?
 	err = domain.InitDeploy(ctx, tx)
 	if err != nil {
 		return i18n.WrapError(ctx, err, msgs.MsgDeployInitFailed)
@@ -275,7 +273,7 @@ func (sMgr *sequencerManager) evaluateDeployment(ctx context.Context, domain com
 		publicTXs[0].To = &tx.InvokeTransaction.To
 
 	} else if tx.DeployTransaction != nil {
-		// MRW TODO
+		// TODO
 		return sMgr.revertDeploy(ctx, tx, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "deployTransaction not implemented"))
 	} else {
 		return sMgr.revertDeploy(ctx, tx, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "neither InvokeTransaction nor DeployTransaction set"))
@@ -435,29 +433,21 @@ func (sMgr *sequencerManager) handleTx(ctx context.Context, dbTX persistence.DBT
 		return err
 	}
 
-	txCreatedEvent := &sender.TransactionCreatedEvent{
+	txCreatedEvent := &originator.TransactionCreatedEvent{
 		Transaction: tx,
 	}
 
 	if !resume {
 		dbTX.AddPostCommit(func(ctx context.Context) {
-			sequencer.GetSender().QueueEvent(ctx, txCreatedEvent)
+			sequencer.GetOriginator().QueueEvent(ctx, txCreatedEvent)
 			sMgr.metrics.IncAcceptedTransactions()
 		})
 	} else {
 		// We're resuming an existing transaction, no need for a post-commit, just handle the TX
-		sequencer.GetSender().QueueEvent(ctx, txCreatedEvent)
+		sequencer.GetOriginator().QueueEvent(ctx, txCreatedEvent)
 	}
 
 	return nil
-}
-
-// The sender pool is the set of candidate identities who might submit new transactions for this domain. It is used to approximately-fairly
-// choose new transactions to process. For some domains it is static (e.g. Pente privacy groups). For others it can evolve over time (e.g. Noto)
-func (sMgr *sequencerManager) getInitialSenderNodePool(ctx context.Context, tx *components.PrivateTransaction, domainAPI components.DomainSmartContract) ([]string, error) {
-	// Sequencer TODO - we could pre-populate this for pente and zeto, for Noto we can potentially create an initial set but it will change over time
-	// First release of the distributed sequencer builds up from an empty list as transaction activity occurs
-	return make([]string, 0), nil
 }
 
 func (sMgr *sequencerManager) GetBlockHeight() int64 {
@@ -479,7 +469,7 @@ func (sMgr *sequencerManager) GetTxStatus(ctx context.Context, domainAddress str
 			Status: "unknown",
 		}, err
 	}
-	return sequencer.GetSender().GetTxStatus(ctx, txID)
+	return sequencer.GetOriginator().GetTxStatus(ctx, txID)
 }
 
 func (sMgr *sequencerManager) HandleTransactionCollected(ctx context.Context, signerAddress string, contractAddress string, txID uuid.UUID) error {
@@ -535,10 +525,10 @@ func (sMgr *sequencerManager) HandleNonceAssigned(ctx context.Context, nonce uin
 			return fmt.Errorf("transaction %s not found in coordinator, cannot handle nonce assignment event", txID)
 		}
 
-		// Forward the event to the sender
-		senderNode := coordTx.SenderNode()
+		// Forward the event to the originator
+		originatorNode := coordTx.OriginatorNode()
 		transportWriter := sequencer.GetTransportWriter()
-		err := transportWriter.SendNonceAssigned(ctx, txID, senderNode, pldtypes.MustEthAddress(contractAddress), nonce)
+		err := transportWriter.SendNonceAssigned(ctx, txID, originatorNode, pldtypes.MustEthAddress(contractAddress), nonce)
 		if err != nil {
 			return err
 		}
@@ -573,11 +563,11 @@ func (sMgr *sequencerManager) HandlePublicTXSubmission(ctx context.Context, dbTX
 			sequencerTX := sequencer.GetCoordinator().GetTransactionByID(ctx, txID)
 
 			if sequencerTX != nil {
-				senderNode := sequencerTX.SenderNode()
+				originatorNode := sequencerTX.OriginatorNode()
 
-				// Forward the event to the sender
+				// Forward the event to the originator
 				transportWriter := sequencer.GetTransportWriter()
-				err = transportWriter.SendTransactionSubmitted(ctx, txID, senderNode, pldtypes.MustEthAddress(contractAddress), txHash)
+				err = transportWriter.SendTransactionSubmitted(ctx, txID, originatorNode, pldtypes.MustEthAddress(contractAddress), txHash)
 				if err != nil {
 					return err
 				}
@@ -671,7 +661,7 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 	log.L(sMgr.ctx).Tracef("HandleTransactionConfirmed %s %s %+v", confirmedTxn.TransactionID.String(), from.String(), nonce)
 
 	// A transaction can be confirmed after the coordinating node has restarted. The coordinator doesn't persist the private TX, it relies
-	// on the sending node to delegate the private TX to it. handleDeleationRequest first checks if a public TX for that request has been confirmed
+	// on the originating node to delegate the private TX to it. handleDeleationRequest first checks if a public TX for that request has been confirmed
 	// on chain, so in in this context we will assume we have the private TX in memory from which we can determine the originating node for confirmation events.
 
 	var contractAddress pldtypes.EthAddress
@@ -715,9 +705,9 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 
 			sequencer.GetCoordinator().QueueEvent(ctx, confirmedEvent)
 
-			// Forward the event to the sending node. This is only to update the sender's state machine, not for DB confirmation
+			// Forward the event to the originating node. This is only to update the originator's state machine, not for DB confirmation
 			transportWriter := sequencer.GetTransportWriter()
-			err = transportWriter.SendTransactionConfirmed(ctx, confirmedTxn.TransactionID, mtx.SenderNode(), &contractAddress, nonce.Uint64(), confirmedTxn.RevertData)
+			err = transportWriter.SendTransactionConfirmed(ctx, confirmedTxn.TransactionID, mtx.OriginatorNode(), &contractAddress, nonce.Uint64(), confirmedTxn.RevertData)
 			if err != nil {
 				return err
 			}
@@ -778,12 +768,12 @@ func (sMgr *sequencerManager) HandleTransactionFailed(ctx context.Context, dbTX 
 
 			sequencer.GetCoordinator().QueueEvent(ctx, failedEvent)
 
-			// Forward the event to the sending node
+			// Forward the event to the originating node
 			transportWriter := sequencer.GetTransportWriter()
-			err = transportWriter.SendTransactionConfirmed(ctx, tx.TransactionID, mtx.SenderNode(), contractAddress, tx.Nonce, tx.RevertReason)
+			err = transportWriter.SendTransactionConfirmed(ctx, tx.TransactionID, mtx.OriginatorNode(), contractAddress, tx.Nonce, tx.RevertReason)
 			if err != nil {
 				// Log but continue for the other receipts
-				log.L(sMgr.ctx).Errorf("failed to send transaction confirmed event to sending node %s: %v", mtx.SenderNode(), err)
+				log.L(sMgr.ctx).Errorf("failed to send transaction confirmed event to originating node %s: %v", mtx.OriginatorNode(), err)
 			}
 
 		}
@@ -897,7 +887,6 @@ func (sMgr *sequencerManager) WriteOrDistributeReceiptsPostSubmit(ctx context.Co
 	return nil
 }
 
-// MRW TODO - move to sequencer module?
 func mapPreparedTransaction(tx *components.PrivateTransaction) *components.PreparedTransactionWithRefs {
 	pt := &components.PreparedTransactionWithRefs{
 		PreparedTransactionBase: &pldapi.PreparedTransactionBase{

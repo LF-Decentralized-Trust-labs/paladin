@@ -495,12 +495,6 @@ func (dc *domainContract) EndorseTransaction(dCtx components.DomainContext, read
 		Payload:      res.Payload,
 		RevertReason: res.RevertReason,
 	}
-	// MRW TODO - remove, used for debugging
-	string, err := json.Marshal(endRes)
-	if err != nil {
-		log.L(dCtx.Ctx()).Errorf("Error marshalling endorsement result: %s", err)
-	}
-	log.L(dCtx.Ctx()).Infof("Endorse transaction returning endorsement result with payload length %d: %+v", len(res.Payload), string)
 	return endRes, nil
 }
 

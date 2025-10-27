@@ -73,7 +73,7 @@ func (r *SentMessageRecorder) HasSentHeartbeat() bool {
 
 type CoordinatorBuilderForTesting struct {
 	state                                    State
-	senderIdentityPool                       []string
+	originatorIdentityPool                   []string
 	domainAPI                                components.DomainSmartContract
 	contractAddress                          *pldtypes.EthAddress
 	currentBlockHeight                       *uint64
@@ -107,8 +107,8 @@ func NewCoordinatorBuilderForTesting(t *testing.T, state State) *CoordinatorBuil
 	}
 }
 
-func (b *CoordinatorBuilderForTesting) SenderIdentityPool(senderIdentityPool ...string) *CoordinatorBuilderForTesting {
-	b.senderIdentityPool = senderIdentityPool
+func (b *CoordinatorBuilderForTesting) OriginatorIdentityPool(originatorIdentityPool ...string) *CoordinatorBuilderForTesting {
+	b.originatorIdentityPool = originatorIdentityPool
 	return b
 }
 
@@ -154,10 +154,6 @@ func (b *CoordinatorBuilderForTesting) GetFlushPointHash() pldtypes.Bytes32 {
 }
 
 func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator, *CoordinatorDependencyMocks) {
-
-	if b.senderIdentityPool == nil {
-		b.senderIdentityPool = []string{"member1@node1"}
-	}
 	if b.contractAddress == nil {
 		b.contractAddress = pldtypes.RandAddress()
 	}
@@ -176,7 +172,6 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		ctx,
 		b.domainAPI,
 		mocks.SentMessageRecorder,
-		b.senderIdentityPool,
 		mocks.Clock,
 		mocks.EngineIntegration,
 		mocks.SyncPoints,

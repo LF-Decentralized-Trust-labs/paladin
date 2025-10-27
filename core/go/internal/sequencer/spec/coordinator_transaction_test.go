@@ -56,7 +56,7 @@ func TestCoordinatorTransaction_Initial_ToPreAssemblyBlocked_OnReceived_IfDepend
 
 	builder2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Initial).
 		Grapher(grapher).
-		Sender(builder1.GetSender()).
+		Originator(builder1.GetOriginator()).
 		PredefinedDependencies(txn1.ID)
 	txn2 := builder2.Build()
 
@@ -233,7 +233,7 @@ func TestCoordinatorTransaction_Pooled_ToPreAssemblyBlocked_OnDependencyReverted
 
 	builder2 := transaction.NewTransactionBuilderForTesting(t, transaction.State_Pooled).
 		Grapher(grapher).
-		Sender(builder1.GetSender()).
+		Originator(builder1.GetOriginator()).
 		PredefinedDependencies(txn1.ID)
 	txn2 := builder2.Build()
 

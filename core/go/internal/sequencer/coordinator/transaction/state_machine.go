@@ -31,10 +31,10 @@ const (
 	State_Pooled                               // waiting in the pool to be assembled - TODO should rename to "Selectable" or "Selectable_Pooled".  Related to potential rename of `State_PreAssembly_Blocked`
 	State_PreAssembly_Blocked                  // has not been assembled yet and cannot be assembled because a dependency never got assembled successfully - i.e. it was either Parked or Reverted is also blocked
 	State_Assembling                           // an assemble request has been sent but we are waiting for the response
-	State_Reverted                             // the transaction has been reverted by the assembler/sender
+	State_Reverted                             // the transaction has been reverted by the assembler/originator
 	State_Endorsement_Gathering                // assembled and waiting for endorsement
 	State_Blocked                              // is fully endorsed but cannot proceed due to dependencies not being ready for dispatch
-	State_Confirming_Dispatchable              // endorsed and waiting for confirmation that were are OK to dispatch. The sender can still request not to proceed at this point.
+	State_Confirming_Dispatchable              // endorsed and waiting for confirmation that were are OK to dispatch. The originator can still request not to proceed at this point.
 	State_Ready_For_Dispatch                   // dispatch confirmation received and waiting to be collected by the dispatcher thread.Going into this state is the point of no return
 	State_Dispatched                           // collected by the dispatcher thread but not yet submitted
 	State_Submitted                            // at least one submission has been made to the blockchain
@@ -48,15 +48,15 @@ const (
 	Event_Received                 EventType = iota + common.Event_HeartbeatInterval + 1 // Transaction initially received by the coordinator.  Might seem redundant explicitly modeling this as an event rather than putting this logic into the constructor, but it is useful to make the initial state transition rules explicit in the state machine definitions
 	Event_Selected                                                                       // selected from the pool as the next transaction to be assembled
 	Event_AssembleRequestSent                                                            // assemble request sent to the assembler
-	Event_Assemble_Success                                                               // assemble response received from the sender
-	Event_Assemble_Revert_Response                                                       // assemble response received from the sender with a revert reason
+	Event_Assemble_Success                                                               // assemble response received from the originator
+	Event_Assemble_Revert_Response                                                       // assemble response received from the originator with a revert reason
 	Event_Endorsed                                                                       // endorsement received from one endorser
 	Event_EndorsedRejected                                                               // endorsement received from one endorser with a revert reason
 	Event_DependencyReady                                                                // another transaction, for which this transaction has a dependency on, has become ready for dispatch
 	Event_DependencyAssembled                                                            // another transaction, for which this transaction has a dependency on, has been assembled
 	Event_DependencyReverted                                                             // another transaction, for which this transaction has a dependency on, has been reverted
-	Event_DispatchRequestApproved                                                        // dispatch confirmation received from the sender
-	Event_DispatchRequestRejected                                                        // dispatch confirmation response received from the sender with a rejection
+	Event_DispatchRequestApproved                                                        // dispatch confirmation received from the originator
+	Event_DispatchRequestRejected                                                        // dispatch confirmation response received from the originator with a rejection
 	Event_Collected                                                                      // collected by the dispatcher thread
 	Event_NonceAllocated                                                                 // nonce allocated by the dispatcher thread
 	Event_Submitted                                                                      // submission made to the blockchain.  Each time this event is received, the submission hash is updated
@@ -311,7 +311,7 @@ func (t *Transaction) InitializeStateMachine(initialState State) {
 
 func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error {
 
-	log.L(ctx).Infof("[Sequencer] transaction state machine handling new event (TX ID %s, TX sender %s, TX address %+v)", t.ID.String(), t.sender, t.Address.HexString())
+	log.L(ctx).Infof("[Sequencer] transaction state machine handling new event (TX ID %s, TX originator %s, TX address %+v)", t.ID.String(), t.originator, t.Address.HexString())
 	//determine whether this event is valid for the current state
 	eventHandler, err := t.evaluateEvent(ctx, event)
 	if err != nil || eventHandler == nil {

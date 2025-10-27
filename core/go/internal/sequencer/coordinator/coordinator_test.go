@@ -37,11 +37,8 @@ func TestTransactionStateTransition(t *testing.T) {
 
 }
 
-func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentityPool []string) (*coordinator, *coordinatorDependencyMocks) {
+func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, originatorIdentityPool []string) (*coordinator, *coordinatorDependencyMocks) {
 
-	if senderIdentityPool == nil {
-		senderIdentityPool = []string{"member1@node1"}
-	}
 	metrics := metrics.InitMetrics(context.Background(), prometheus.NewRegistry())
 	mocks := &coordinatorDependencyMocks{
 		transportWriter:   transport.NewMockTransportWriter(t),
@@ -52,7 +49,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, senderIdentity
 	}
 	mockDomainAPI := componentsmocks.NewDomainSmartContract(t)
 
-	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.transportWriter, senderIdentityPool, mocks.clock, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1",
+	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.transportWriter, mocks.clock, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1",
 		metrics,
 		func(context.Context, *transaction.Transaction) {
 			// Not used
@@ -78,20 +75,20 @@ type coordinatorDependencyMocks struct {
 
 func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	// Test the progression of a single transaction through the coordinator's lifecycle
-	// Simulating sender node, endorser node and the public transaction manager (submitter)
+	// Simulating originator node, endorser node and the public transaction manager (submitter)
 	// by inspecting the coordinator output messages and by sending events that would normally be triggered by those components sending messages to the coordinator.
 	// At each stage, we inspect the state of the coordinator by checking the snapshot it produces on heartbeat messages
 
 	ctx := context.Background()
-	sender := "sender@senderNode"
+	originator := "sender@senderNode"
 	builder := NewCoordinatorBuilderForTesting(t, State_Idle)
 	c, mocks := builder.Build(ctx)
 
-	// Start by simulating the sender and delegate a transaction to the coordinator
-	transactionBuilder := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Sender(sender).NumberOfRequiredEndorsers(1)
+	// Start by simulating the originator and delegate a transaction to the coordinator
+	transactionBuilder := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Originator(originator).NumberOfRequiredEndorsers(1)
 	txn := transactionBuilder.BuildSparse()
 	err := c.ProcessEvent(ctx, &TransactionsDelegatedEvent{
-		Sender:       sender,
+		Originator:   originator,
 		Transactions: []*components.PrivateTransaction{txn},
 	})
 	assert.NoError(t, err)
@@ -102,7 +99,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	require.Equal(t, 1, len(snapshot.PooledTransactions))
 	assert.Equal(t, txn.ID.String(), snapshot.PooledTransactions[0].ID.String(), "Snapshot should contain the dispatched transaction with ID %s", txn.ID.String())
 
-	// Assert that a request has been sent to the sender and respond with an assembled transaction
+	// Assert that a request has been sent to the originator and respond with an assembled transaction
 	require.True(t, mocks.SentMessageRecorder.HasSentAssembleRequest())
 	err = c.ProcessEvent(ctx, &transaction.AssembleSuccessEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{

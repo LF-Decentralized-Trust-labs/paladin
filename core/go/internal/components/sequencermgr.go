@@ -53,10 +53,10 @@ type StateDistribution struct {
 }
 
 type StateDistributionSet struct {
-	LocalNode  string
-	SenderNode string
-	Remote     []*StateDistributionWithData
-	Local      []*StateDistributionWithData
+	LocalNode      string
+	OriginatorNode string
+	Remote         []*StateDistributionWithData
+	Local          []*StateDistributionWithData
 }
 
 // A StateDistributionWithData is an intent to send private data for a given state to a remote party

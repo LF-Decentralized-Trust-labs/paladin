@@ -26,13 +26,14 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/syncpoints"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/persistencemocks"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/gogo/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -51,7 +52,7 @@ type sequencerLifecycleTestMocks struct {
 	keyManager       *componentsmocks.KeyManager
 	domainAPI        *componentsmocks.DomainSmartContract
 	transportWriter  *transport.MockTransportWriter
-	sender           *sender.MockSeqSender
+	originator       *originator.MockSeqOriginator
 	coordinator      *coordinator.MockSeqCoordinator
 	syncPoints       *syncpoints.MockSyncPoints
 	metrics          *metrics.MockDistributedSequencerMetrics
@@ -70,7 +71,7 @@ func newSequencerLifecycleTestMocks(t *testing.T) *sequencerLifecycleTestMocks {
 		keyManager:       componentsmocks.NewKeyManager(t),
 		domainAPI:        componentsmocks.NewDomainSmartContract(t),
 		transportWriter:  transport.NewMockTransportWriter(t),
-		sender:           sender.NewMockSeqSender(t),
+		originator:       originator.NewMockSeqOriginator(t),
 		coordinator:      coordinator.NewMockSeqCoordinator(t),
 		syncPoints:       syncpoints.NewMockSyncPoints(t),
 		metrics:          metrics.NewMockDistributedSequencerMetrics(t),
@@ -135,7 +136,7 @@ func newSequencerForTesting(contractAddr *pldtypes.EthAddress, mocks *sequencerL
 	return &sequencer{
 		ctx:             context.Background(),
 		contractAddress: contractAddr.String(),
-		sender:          mocks.sender,
+		originator:      mocks.originator,
 		coordinator:     mocks.coordinator,
 		transportWriter: mocks.transportWriter,
 		lastTXTime:      time.Now(),
@@ -152,13 +153,13 @@ func TestSequencer_GetCoordinator(t *testing.T) {
 	assert.Equal(t, mocks.coordinator, coordinator)
 }
 
-func TestSequencer_GetSender(t *testing.T) {
+func TestSequencer_GetOriginator(t *testing.T) {
 	contractAddr := pldtypes.RandAddress()
 	mocks := newSequencerLifecycleTestMocks(t)
 	seq := newSequencerForTesting(contractAddr, mocks)
 
-	sender := seq.GetSender()
-	assert.Equal(t, mocks.sender, sender)
+	originator := seq.GetOriginator()
+	assert.Equal(t, mocks.originator, originator)
 }
 
 func TestSequencer_GetTransportWriter(t *testing.T) {
@@ -180,19 +181,19 @@ func TestSequencerManager_LoadSequencer_NewSequencer(t *testing.T) {
 	mocks.setupDefaultExpectations(ctx, contractAddr)
 	mockDomainSmartContract := componentsmocks.NewDomainSmartContract(t)
 	mockDomain := componentsmocks.NewDomain(t)
-	mockDomainSmartContract.EXPECT().Domain().Return(mockDomain).Once()
-	mockDomainSmartContract.EXPECT().ContractConfig().Return(&prototk.ContractConfig{}).Maybe()
+	mockDomainSmartContract.EXPECT().Domain().Return(mockDomain).Twice()
+	mockDomainSmartContract.EXPECT().ContractConfig().Return(&prototk.ContractConfig{StaticCoordinator: proto.String("test-coordinator")}).Maybe()
 	mocks.domainManager.EXPECT().GetSmartContractByAddress(ctx, mock.Anything, *contractAddr).Return(mockDomainSmartContract, nil)
-	mocks.stateManager.EXPECT().NewDomainContext(ctx, mockDomain, *contractAddr).Return(componentsmocks.NewDomainContext(t)).Once()
+	mocks.stateManager.EXPECT().NewDomainContext(ctx, mockDomain, *contractAddr).Return(componentsmocks.NewDomainContext(t)).Twice()
 
 	// Setup transport writer creation
 	mocks.transportWriter.EXPECT().SendDispatched(ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
-	// Setup sender creation expectations
-	mocks.sender.EXPECT().SetActiveCoordinator(ctx, mock.Anything).Maybe()
+	// Setup originator creation expectations
+	mocks.originator.EXPECT().SetActiveCoordinator(ctx, mock.Anything).Maybe()
 
 	// Setup coordinator creation expectations
-	mocks.coordinator.EXPECT().UpdateSenderNodePool(ctx, mock.Anything).Maybe()
+	mocks.coordinator.EXPECT().UpdateOriginatorNodePool(ctx, mock.Anything).Maybe()
 	mocks.coordinator.EXPECT().GetActiveCoordinatorNode(ctx).Return("test-coordinator").Maybe()
 
 	mocks.metrics.EXPECT().SetActiveSequencers(0).Once()
@@ -214,7 +215,7 @@ func TestSequencerManager_LoadSequencer_NewSequencer(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.NotNil(t, result.GetCoordinator())
-	assert.NotNil(t, result.GetSender())
+	assert.NotNil(t, result.GetOriginator())
 	assert.NotNil(t, result.GetTransportWriter())
 
 	// Verify sequencer was stored
@@ -239,9 +240,7 @@ func TestSequencerManager_LoadSequencer_ExistingSequencer(t *testing.T) {
 	mocks.domainManager.EXPECT().GetSmartContractByAddress(ctx, mock.Anything, *contractAddr).Return(nil, nil).Once()
 
 	// Setup coordinator expectations for existing sequencer
-	mocks.coordinator.EXPECT().UpdateSenderNodePool(ctx, "node1").Once()
-	mocks.coordinator.EXPECT().GetActiveCoordinatorNode(ctx).Return("test-coordinator").Once()
-	mocks.sender.EXPECT().SetActiveCoordinator(ctx, "test-coordinator").Return(nil).Once()
+	mocks.originator.EXPECT().GetCurrentCoordinator().Return("test-coordinator").Once()
 
 	// Create a mock private transaction
 	tx := &components.PrivateTransaction{
@@ -373,7 +372,7 @@ func TestSequencerManager_stopLowestPrioritySequencer_IdleSequencer(t *testing.T
 	// Create an idle sequencer
 	seq := newSequencerForTesting(contractAddr, mocks)
 	mocks.coordinator.EXPECT().GetCurrentState().Return(coordinator.State_Idle)
-	mocks.sender.EXPECT().Stop().Once()
+	mocks.originator.EXPECT().Stop().Once()
 
 	sm.sequencersLock.Lock()
 	sm.sequencers[contractAddr.String()] = seq
@@ -407,7 +406,7 @@ func TestSequencerManager_stopLowestPrioritySequencer_LowestPriority(t *testing.
 	mocks1.coordinator.EXPECT().GetCurrentState().Return(coordinator.State_Active)
 	mocks2.coordinator.EXPECT().GetCurrentState().Return(coordinator.State_Active)
 	mocks1.coordinator.EXPECT().Stop().Once()
-	mocks1.sender.EXPECT().Stop().Once()
+	mocks1.originator.EXPECT().Stop().Once()
 
 	sm.sequencersLock.Lock()
 	sm.sequencers[contractAddr1.String()] = seq1

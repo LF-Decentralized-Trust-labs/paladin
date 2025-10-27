@@ -50,17 +50,17 @@ type stateDistributionBuilder struct {
 func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Context, fullState *components.FullState, instruction *prototk.NewState) error {
 	tx := sd.tx
 
-	// We enforce that the sender gets a distribution
-	senderLocator := tx.PreAssembly.TransactionSpecification.From
-	senderIncludedByDomain := false
+	// We enforce that the originator gets a distribution
+	originatorLocator := tx.PreAssembly.TransactionSpecification.From
+	originatorIncludedByDomain := false
 	for _, recipient := range instruction.DistributionList {
-		if recipient == senderLocator {
-			senderIncludedByDomain = true
+		if recipient == originatorLocator {
+			originatorIncludedByDomain = true
 			break
 		}
 	}
-	if !senderIncludedByDomain {
-		instruction.DistributionList = append(instruction.DistributionList, senderLocator)
+	if !originatorIncludedByDomain {
+		instruction.DistributionList = append(instruction.DistributionList, originatorLocator)
 	}
 
 	remainingNullifiers := instruction.NullifierSpecs
@@ -126,7 +126,7 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 }
 
 // This function is called by the coordinator to validate the new states produced in the postAssembly.
-// It knows who the local node is, and who the sender is.
+// It knows who the local node is, and who the originator is.
 // It is aware of nullifiers and distribution lists, and produces a set of instructions for who needs what.
 func (sd *stateDistributionBuilder) Build(ctx context.Context, txn *components.PrivateTransaction) (sds *components.StateDistributionSet, err error) {
 
@@ -135,8 +135,8 @@ func (sd *stateDistributionBuilder) Build(ctx context.Context, txn *components.P
 	tx := sd.tx
 
 	// This code depends on the fact we ensure this gets fully qualified as the transaction comes into the system,
-	// on the sending node. So as the transaction flows around everyone knows who the originating node is.
-	sd.SenderNode, err = pldtypes.PrivateIdentityLocator(tx.PreAssembly.TransactionSpecification.From).Node(ctx, false)
+	// on the originating node. So as the transaction flows around everyone knows who the originating node is.
+	sd.OriginatorNode, err = pldtypes.PrivateIdentityLocator(tx.PreAssembly.TransactionSpecification.From).Node(ctx, false)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrFromNotResolvedDistroTime)
 	}

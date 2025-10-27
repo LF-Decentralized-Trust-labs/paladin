@@ -26,8 +26,8 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator"
 	coordTransaction "github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator/transaction"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender"
-	senderTransaction "github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/sender/transaction"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator"
+	originatorTransaction "github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator/transaction"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 	engineProto "github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto/engine"
@@ -136,7 +136,7 @@ func (sMgr *sequencerManager) handleAssembleRequest(ctx context.Context, message
 		return
 	}
 
-	assembleRequestEvent := &senderTransaction.AssembleRequestReceivedEvent{}
+	assembleRequestEvent := &originatorTransaction.AssembleRequestReceivedEvent{}
 	assembleRequestEvent.TransactionID = uuid.MustParse(assembleRequest.TransactionId)
 	assembleRequestEvent.RequestID = uuid.MustParse(assembleRequest.AssembleRequestId)
 	assembleRequestEvent.Coordinator = seq.GetCoordinator().GetActiveCoordinatorNode(ctx)
@@ -145,7 +145,7 @@ func (sMgr *sequencerManager) handleAssembleRequest(ctx context.Context, message
 	assembleRequestEvent.PreAssembly = assembleRequest.PreAssembly
 	assembleRequestEvent.EventTime = time.Now()
 
-	seq.GetSender().QueueEvent(ctx, assembleRequestEvent)
+	seq.GetOriginator().QueueEvent(ctx, assembleRequestEvent)
 }
 
 func (sMgr *sequencerManager) handleAssembleResponse(ctx context.Context, message *components.ReceivedMessage) {
@@ -235,7 +235,7 @@ func (sMgr *sequencerManager) handleAssembleError(ctx context.Context, message *
 		return
 	}
 
-	assembleErrorEvent := &senderTransaction.AssembleErrorEvent{}
+	assembleErrorEvent := &originatorTransaction.AssembleErrorEvent{}
 	assembleErrorEvent.TransactionID = uuid.MustParse(assembleError.TransactionId)
 	assembleErrorEvent.EventTime = time.Now()
 
@@ -280,7 +280,7 @@ func (sMgr *sequencerManager) handleCoordinatorHeartbeatNotification(ctx context
 		return
 	}
 
-	heartbeatEvent := &sender.HeartbeatReceivedEvent{}
+	heartbeatEvent := &originator.HeartbeatReceivedEvent{}
 	heartbeatEvent.From = from
 	heartbeatEvent.ContractAddress = contractAddress
 	heartbeatEvent.CoordinatorSnapshot = *coordinatorSnapshot
@@ -304,7 +304,7 @@ func (sMgr *sequencerManager) handleCoordinatorHeartbeatNotification(ctx context
 		seq.GetCoordinator().QueueEvent(ctx, heartbeatIntervalEvent)
 	}
 
-	seq.GetSender().QueueEvent(ctx, heartbeatEvent)
+	seq.GetOriginator().QueueEvent(ctx, heartbeatEvent)
 }
 
 func (sMgr *sequencerManager) handlePreDispatchRequest(ctx context.Context, message *components.ReceivedMessage) {
@@ -333,7 +333,7 @@ func (sMgr *sequencerManager) handlePreDispatchRequest(ctx context.Context, mess
 
 	postAssemblyHash := pldtypes.NewBytes32FromSlice(preDispatchRequest.PostAssembleHash)
 
-	preDispatchRequestReceivedEvent := &senderTransaction.PreDispatchRequestReceivedEvent{
+	preDispatchRequestReceivedEvent := &originatorTransaction.PreDispatchRequestReceivedEvent{
 		RequestID:        uuid.MustParse(preDispatchRequest.Id),
 		Coordinator:      message.FromNode,
 		PostAssemblyHash: &postAssemblyHash,
@@ -345,7 +345,7 @@ func (sMgr *sequencerManager) handlePreDispatchRequest(ctx context.Context, mess
 	// For now we just proceed and send an approval response. It's possible that the check belongs in the state machine
 	// validator function for PreDispatchRequestReceivedEvent?
 
-	seq.GetSender().QueueEvent(ctx, preDispatchRequestReceivedEvent)
+	seq.GetOriginator().QueueEvent(ctx, preDispatchRequestReceivedEvent)
 }
 
 func (sMgr *sequencerManager) handlePreDispatchResponse(ctx context.Context, message *components.ReceivedMessage) {
@@ -406,11 +406,11 @@ func (sMgr *sequencerManager) handleDispatchedEvent(ctx context.Context, message
 		return
 	}
 
-	dispatchConfirmedEvent := &senderTransaction.DispatchedEvent{}
+	dispatchConfirmedEvent := &originatorTransaction.DispatchedEvent{}
 	dispatchConfirmedEvent.TransactionID = uuid.MustParse(dispatchedEvent.TransactionId[2:34])
 	dispatchConfirmedEvent.EventTime = time.Now()
 
-	seq.GetSender().QueueEvent(ctx, dispatchConfirmedEvent)
+	seq.GetOriginator().QueueEvent(ctx, dispatchConfirmedEvent)
 }
 
 func (sMgr *sequencerManager) handleDelegationRequest(ctx context.Context, message *components.ReceivedMessage) {
@@ -433,11 +433,9 @@ func (sMgr *sequencerManager) handleDelegationRequest(ctx context.Context, messa
 		return
 	}
 
-	// MRW TODO - do we need to check if this coordinator has successfully confirmed this transaction on chain already?
-
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
 	if err != nil {
-		log.L(ctx).Errorf("handleDelegationRequest failed to obtain sequencer to pass endorsement event %v:", err)
+		log.L(ctx).Errorf("failed to obtain sequencer to pass endorsement event %v:", err)
 		return
 	}
 	if seq == nil {
@@ -446,13 +444,13 @@ func (sMgr *sequencerManager) handleDelegationRequest(ctx context.Context, messa
 	}
 
 	transactionDelegatedEvent := &coordinator.TransactionsDelegatedEvent{}
-	transactionDelegatedEvent.Sender = privateTransaction.PreAssembly.TransactionSpecification.From
+	transactionDelegatedEvent.Originator = privateTransaction.PreAssembly.TransactionSpecification.From
 	transactionDelegatedEvent.Transactions = append(transactionDelegatedEvent.Transactions, privateTransaction)
-	transactionDelegatedEvent.SendersBlockHeight = uint64(sMgr.blockHeight) // MRW TODO - which is the senders block height here?
+	transactionDelegatedEvent.OriginatorsBlockHeight = uint64(delegationRequest.BlockHeight)
 	transactionDelegatedEvent.EventTime = time.Now()
 
-	// Anyone who delegates a transaction to us is a candidate sender and should be sent heartbeats for TX confirmation processing
-	seq.GetCoordinator().UpdateSenderNodePool(ctx, message.FromNode)
+	// Anyone who delegates a transaction to us is a candidate originator and should be sent heartbeats for TX confirmation processing
+	seq.GetCoordinator().UpdateOriginatorNodePool(ctx, message.FromNode)
 
 	seq.GetCoordinator().QueueEvent(ctx, transactionDelegatedEvent)
 }
@@ -500,20 +498,24 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 	theUUID := pldtypes.MustParseBytes32(transactionSpecification.TransactionId).UUIDFirst16()
 	txID := theUUID
 	if err != nil {
-		log.L(ctx).Errorf("handleEndorsementRequest failed to parse transaction ID %s: %s", transactionSpecification.TransactionId, err)
+		log.L(ctx).Errorf("failed to parse transaction ID %s: %s", transactionSpecification.TransactionId, err)
 		return
 	}
 	tx, err := sMgr.components.TxManager().GetTransactionByID(ctx, txID)
 	if err != nil {
-		log.L(ctx).Errorf("handleEndorsementRequest failed to get transaction %s from the 'transactions' DB: %s", transactionSpecification.TransactionId, err)
+		log.L(ctx).Errorf("failed to get transaction %s from the 'transactions' DB: %s", transactionSpecification.TransactionId, err)
 		return
 	}
 	if tx == nil {
 		var functionABI abi.Entry // MRW TODO - parse function sig into ABI entry?
 		err = json.Unmarshal([]byte(transactionSpecification.FunctionAbiJson), &functionABI)
+		if err != nil {
+			log.L(ctx).Errorf("failed to unmarshall function abi: %s", err)
+			return
+		}
 		functionSig, err := functionABI.Signature()
 		if err != nil {
-			log.L(ctx).Errorf("handleEndorsementRequest failed to get signature for function ABI: %s", err)
+			log.L(ctx).Errorf("failed to get signature for function ABI: %s", err)
 			return
 		}
 
@@ -529,7 +531,7 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 				Data:     pldtypes.RawJSON(transactionSpecification.FunctionParamsJson),
 			},
 		})
-		log.L(ctx).Infof("handleEndorsementRequest transaction %s not found in the 'transactions' DB, inserting it", transactionSpecification.TransactionId)
+		log.L(ctx).Infof("transaction %s not found in the 'transactions' DB, inserting it", transactionSpecification.TransactionId)
 		err = sMgr.components.Persistence().Transaction(ctx, func(ctx context.Context, dbTx persistence.DBTX) error {
 			validatedTransaction := &components.ValidatedTransaction{
 				ResolvedTransaction: components.ResolvedTransaction{
@@ -553,7 +555,7 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 			return err
 		})
 		if err != nil {
-			log.L(ctx).Errorf("handleEndorsementRequest failed to insert transaction %s into the 'transactions' DB: %s", transactionSpecification.TransactionId, err)
+			log.L(ctx).Errorf("failed to insert transaction %s into the 'transactions' DB: %s", transactionSpecification.TransactionId, err)
 			return
 		}
 	}
@@ -566,7 +568,7 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 		nextVerifier := &prototk.ResolvedVerifier{}
 		err = proto.Unmarshal(v.Value, nextVerifier)
 		if err != nil {
-			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal verifier %s for endorsement request: %s", v.String(), err)
+			log.L(ctx).Errorf("failed to unmarshal verifier %s for endorsement request: %s", v.String(), err)
 			return
 		}
 		transactionVerifiers[i] = nextVerifier
@@ -577,7 +579,7 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 		nextSignature := &prototk.AttestationResult{}
 		err = proto.Unmarshal(s.Value, nextSignature)
 		if err != nil {
-			log.L(ctx).Errorf("handleEndorsementRequest failed to unmarshal signature %s for endorsement request: %s", s.String(), err)
+			log.L(ctx).Errorf("failed to unmarshal signature %s for endorsement request: %s", s.String(), err)
 			return
 		}
 		transactionSignatures[i] = nextSignature
@@ -812,12 +814,12 @@ func (sMgr *sequencerManager) handleNonceAssigned(ctx context.Context, message *
 		return
 	}
 
-	nonceAssignedEvent := &senderTransaction.NonceAssignedEvent{}
+	nonceAssignedEvent := &originatorTransaction.NonceAssignedEvent{}
 	nonceAssignedEvent.TransactionID = uuid.MustParse(nonceAssigned.TransactionId)
 	nonceAssignedEvent.Nonce = uint64(nonceAssigned.Nonce)
 	nonceAssignedEvent.EventTime = time.Now()
 
-	seq.GetSender().QueueEvent(ctx, nonceAssignedEvent)
+	seq.GetOriginator().QueueEvent(ctx, nonceAssignedEvent)
 }
 
 func (sMgr *sequencerManager) handleTransactionSubmitted(ctx context.Context, message *components.ReceivedMessage) {
@@ -843,12 +845,12 @@ func (sMgr *sequencerManager) handleTransactionSubmitted(ctx context.Context, me
 		return
 	}
 
-	transactionSubmittedEvent := &senderTransaction.SubmittedEvent{}
+	transactionSubmittedEvent := &originatorTransaction.SubmittedEvent{}
 	transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionSubmitted.TransactionId)
 	transactionSubmittedEvent.LatestSubmissionHash = pldtypes.Bytes32(transactionSubmitted.Hash)
 	transactionSubmittedEvent.EventTime = time.Now()
 
-	seq.GetSender().QueueEvent(ctx, transactionSubmittedEvent)
+	seq.GetOriginator().QueueEvent(ctx, transactionSubmittedEvent)
 }
 
 func (sMgr *sequencerManager) handleTransactionConfirmed(ctx context.Context, message *components.ReceivedMessage) {
@@ -875,15 +877,15 @@ func (sMgr *sequencerManager) handleTransactionConfirmed(ctx context.Context, me
 	}
 
 	if transactionConfirmed.RevertReason != nil {
-		transactionSubmittedEvent := &senderTransaction.ConfirmedRevertedEvent{}
+		transactionSubmittedEvent := &originatorTransaction.ConfirmedRevertedEvent{}
 		transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionConfirmed.TransactionId)
 		transactionSubmittedEvent.RevertReason = transactionConfirmed.RevertReason
 		transactionSubmittedEvent.EventTime = time.Now()
-		seq.GetSender().QueueEvent(ctx, transactionSubmittedEvent)
+		seq.GetOriginator().QueueEvent(ctx, transactionSubmittedEvent)
 	} else {
-		transactionSubmittedEvent := &senderTransaction.ConfirmedSuccessEvent{}
+		transactionSubmittedEvent := &originatorTransaction.ConfirmedSuccessEvent{}
 		transactionSubmittedEvent.TransactionID = uuid.MustParse(transactionConfirmed.TransactionId)
 		transactionSubmittedEvent.EventTime = time.Now()
-		seq.GetSender().QueueEvent(ctx, transactionSubmittedEvent)
+		seq.GetOriginator().QueueEvent(ctx, transactionSubmittedEvent)
 	}
 }

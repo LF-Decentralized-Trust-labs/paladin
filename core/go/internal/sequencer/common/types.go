@@ -44,7 +44,6 @@ type CoordinatorSnapshot struct {
 
 type CoordinatorState string
 
-// MRW TODO - not sure I've understood the reason for these states + those in state_machine.go
 const (
 	CoordinatorState_Idle      CoordinatorState = "Idle"
 	CoordinatorState_Observing CoordinatorState = "Observing"
@@ -58,8 +57,8 @@ const (
 
 type Transaction struct {
 	//components.PrivateTransaction
-	ID     uuid.UUID
-	Sender string
+	ID         uuid.UUID
+	Originator string
 }
 
 func (t *Transaction) GetID() string {

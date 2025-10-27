@@ -43,7 +43,7 @@ func (t *Transaction) sendPreDispatchRequest(ctx context.Context) error {
 			log.L(ctx).Debugf("Calling SendDispatchConfirmationRequest")
 			return t.transportWriter.SendPreDispatchRequest(
 				ctx,
-				t.sender,
+				t.originatorNode,
 				idempotencyKey,
 				t.PreAssembly.TransactionSpecification,
 				hash,
@@ -64,7 +64,7 @@ func (t *Transaction) sendPreDispatchRequest(ctx context.Context) error {
 
 	sendErr := t.pendingPreDispatchRequest.Nudge(ctx)
 
-	// MRW TODO - we are the ones doing the dispatching, so after we've informed the sender we can just update our own state?
+	// MRW TODO - we are the ones doing the dispatching, so after we've informed the originator we can just update our own state?
 	// t.HandleEvent(ctx, &DispatchConfirmedEvent{
 	// 	BaseCoordinatorEvent: BaseCoordinatorEvent{
 	// 		TransactionID: t.ID,

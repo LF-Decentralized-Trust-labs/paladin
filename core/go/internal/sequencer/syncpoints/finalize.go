@@ -88,7 +88,7 @@ func (s *syncPoints) writeFailureOperations(ctx context.Context, dbTX persistenc
 func (s *syncPoints) WriteOrDistributeReceipts(ctx context.Context, dbTX persistence.DBTX, receipts []*components.ReceiptInputWithOriginator) error {
 
 	// Receipts need to go back to their originator, so we either store the receive ourselves locally - or
-	// push it in a reliable message back to the sender.
+	// push it in a reliable message back to the originator.
 	localFailureReceipts := make([]*components.ReceiptInput, 0)
 	remoteSends := make([]*pldapi.ReliableMessage, 0)
 	for _, r := range receipts {

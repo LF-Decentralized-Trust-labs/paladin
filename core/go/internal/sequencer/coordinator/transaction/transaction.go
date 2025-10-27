@@ -48,9 +48,9 @@ const (
 // Transaction represents a transaction that is being coordinated by a contract sequencer agent in Coordinator state.
 type Transaction struct {
 	*components.PrivateTransaction
-	sender               string // The fully qualified identity of the sender e.g. "member1@node1"
-	senderNode           string // The node the sender is running on e.g. "node1"
-	senderIdentity       string // The member ID e.g. "member1"
+	originator           string // The fully qualified identity of the originator e.g. "member1@node1"
+	originatorNode       string // The node the originator is running on e.g. "node1"
+	originatorIdentity   string // The member ID e.g. "member1"
 	signerAddress        *pldtypes.EthAddress
 	latestSubmissionHash *pldtypes.Bytes32
 	nonce                *uint64
@@ -97,7 +97,7 @@ type OnStateTransition func(ctx context.Context, t *Transaction, to, from State)
 
 func NewTransaction(
 	ctx context.Context,
-	sender string,
+	originator string,
 	pt *components.PrivateTransaction,
 	transportWriter transport.TransportWriter,
 	clock common.Clock,
@@ -113,15 +113,15 @@ func NewTransaction(
 	onStateTransition OnStateTransition,
 	onCleanup func(context.Context),
 ) (*Transaction, error) {
-	senderIdentity, senderNode, err := pldtypes.PrivateIdentityLocator(sender).Validate(ctx, "", false)
+	originatorIdentity, originatorNode, err := pldtypes.PrivateIdentityLocator(originator).Validate(ctx, "", false)
 	if err != nil {
-		log.L(ctx).Errorf("[Sequencer] error validating sender %s: %s", sender, err)
+		log.L(ctx).Errorf("error validating originator %s: %s", originator, err)
 		return nil, err
 	}
 	txn := &Transaction{
-		sender:                sender,
-		senderIdentity:        senderIdentity,
-		senderNode:            senderNode,
+		originator:            originator,
+		originatorIdentity:    originatorIdentity,
+		originatorNode:        originatorNode,
 		PrivateTransaction:    pt,
 		transportWriter:       transportWriter,
 		clock:                 clock,
@@ -143,7 +143,11 @@ func NewTransaction(
 	return txn, nil
 }
 
-func (t *Transaction) cleanup(_ context.Context) error {
+func (t *Transaction) cleanup(ctx context.Context) error {
+	// Call any cleanup function passed in by the sequencer
+	t.onCleanup(ctx)
+
+	// Then clean ourselves up
 	return t.grapher.Forget(t.ID)
 }
 
@@ -205,16 +209,16 @@ func (t *Transaction) SignatureAttestationName() (string, error) {
 	return "", nil
 }
 
-func (t *Transaction) Sender() string {
-	return t.sender
+func (t *Transaction) Originator() string {
+	return t.originator
 }
 
-func (t *Transaction) SenderNode() string {
-	return t.senderNode
+func (t *Transaction) OriginatorNode() string {
+	return t.originatorNode
 }
 
-func (t *Transaction) SenderIdentity() string {
-	return t.senderIdentity
+func (t *Transaction) OriginatorIdentity() string {
+	return t.originatorIdentity
 }
 
 func (d *Transaction) OutputStateIDs(_ context.Context) []string {
