@@ -171,7 +171,7 @@ func (pr *pluginRun[M]) serve() error {
 		if err != nil {
 			// Should check if the err is io.EOF but `errors.Is(err, io.EOF)` returns false even where the
 			// err description is "error reading from server: EOF" so for now just exit on any error. If the
-			// error sn't as a result of Paladin shutting down the server will be relaunched by the plugin loader.
+			// error isn't as a result of Paladin shutting down the server will be relaunched by the plugin loader.
 			if strings.Contains(err.Error(), "EOF") {
 				log.L(pr.ctx).Warnf("recv failed, err %s. Assuming the server shut down the gRPC connection so closing plugin", err)
 				pr.closePlugin()
