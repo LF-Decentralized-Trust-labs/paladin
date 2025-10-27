@@ -87,7 +87,6 @@ func (t *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []
 		log.L(ctx).Debugf("unfulfilled endorsement plan - payload length = %d", len(attRequest.Payload))
 		if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
 			for _, party := range attRequest.Parties {
-				// MRW TODO - tidy up these logs
 				log.L(ctx).Debugf("party %s must endorse this request. Checking for endorsement", party)
 				found := false
 				for _, endorsement := range t.PostAssembly.Endorsements {
@@ -97,7 +96,7 @@ func (t *Transaction) unfulfilledEndorsementRequirements(ctx context.Context) []
 						attRequest.VerifierType == endorsement.Verifier.VerifierType
 
 					if found {
-						log.L(ctx).Infof("endorsement found: request[name=%s,party=%s,verifierType=%s] endorsement[name=%s,party=%s,verifierType=%s] verifier=%s",
+						log.L(ctx).Debugf("endorsement found: request[name=%s,party=%s,verifierType=%s] endorsement[name=%s,party=%s,verifierType=%s] verifier=%s",
 							attRequest.Name, party, attRequest.VerifierType,
 							endorsement.Name, endorsement.Verifier.Lookup, endorsement.Verifier.VerifierType,
 							endorsement.Verifier.Verifier,

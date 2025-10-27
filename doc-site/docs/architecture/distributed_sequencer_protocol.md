@@ -58,11 +58,11 @@ style coordinator2 fill:#fffdee,stroke:#ffca58,stroke-dasharray: 5 5
 Paladin domains use one of the following coordination models:
 
 1. Always local
-   - Always acts as coordinator for its own transactions relating to the contract, for example when participating in a Zeto token contract.
+    - Always acts as coordinator for its own transactions relating to the contract, for example when participating in a Zeto token contract.
 2. Always remote
-   - Never acts as a coordinator for the private contract, for example when particpating in a Noto token but never acting as the notary for the token
+    - Never acts as a coordinator for the private contract, for example when particpating in a Noto token but never acting as the notary for the token
 3. Leader elected
-   - May act as a coordinator based on the distributed coordination algorithm, for example when participating in a Pente private contract
+    - May act as a coordinator based on the distributed coordination algorithm, for example when participating in a Pente private contract
 
 The following diagram shows 3 different domain contracts that 2 nodes are participating in. For the 3 domain contracts the nodes play different coordination roles:
 
@@ -355,11 +355,11 @@ The desired properties of that algorithm are
 The 3 basic premises of the algorithm are:
 
 1. Once a coordinator has been elected, it is possible for it to continue indefinitely as the coordinator
-   - This is an intentional design choice, intended to provide optimal throughput for a contract
+    - This is an intentional design choice, intended to provide optimal throughput for a contract
 2. If an elected coordinator fails, another coordinator will take over the role
-   - This ensures high availability of the private contract
+    - This ensures high availability of the private contract
 3. The choice of coordinator is deterministic based on block number and liveness of the existing coordinator
-   - The deterministic choice of coordinator only needs to take place if the existing coordinator becomes unavailable
+    - The deterministic choice of coordinator only needs to take place if the existing coordinator becomes unavailable
 
 Full rules for the the algorithm:
 
@@ -367,16 +367,16 @@ Full rules for the the algorithm:
 - Composition of committee i.e. the set of nodes who are candidates for coordinator is universally agreed (similar to BFT algorithms).
 - Liveness of the coordinator node can be detected via heartbeat messages.
 - Coordinators will keep going until they are told otherwise (e.g. by a handover request from another coordinator) or there is a sufficient lul in activity that it naturally flushes
-  - if that means the coordinator goes on forever, then so be it
-  - originators keep delegating to the current active coordinator and only choose a new one if that coordinator stops sending heartbeats.
-  - originators remember which coordinators have been detected as unresponsive recently and go through the list in order
-  - this means that if originator A fails over (or swaps out / in) while originator B is still online, then originator A may delegate to a different coordinator and trigger a handover. So be it.
+    - if that means the coordinator goes on forever, then so be it
+    - originators keep delegating to the current active coordinator and only choose a new one if that coordinator stops sending heartbeats.
+    - originators remember which coordinators have been detected as unresponsive recently and go through the list in order
+    - this means that if originator A fails over (or swaps out / in) while originator B is still online, then originator A may delegate to a different coordinator and trigger a handover. So be it.
 - The originator node for each transaction is responsible for ensuring that the transaction always has one coordinator actively coordinating it by detecting and responding to situations where the transaction is not being coordinated
 - Situations can arise where different nodes chose different coordinators because of different awareness of block height and/or different awareness of availability. The algorithm is less efficient when this happens but continues to function and can return to full efficiency as soon as the situation is resolved.
 - There is no need for election `term`s in this algorithm.
 - When coordinator responsibility is switched to another node, each inflight transaction is either re-assigned to the new coordinator or flushed through to confirmation on the base ledger
-  - If the originator deems the transaction to be no longer valid, it is responsible for finalizing it as reverted.
-  - If the originator deems the transaction not ready to be submitted, it is responsible for parking it until it is ready.
-  - If a transaction is successfully assembled and endorsed but subsequently reverted on the base ledger contract, the coordinator is is responsible for retrying at a frequency that does not cause excessive load on the system.
+    - If the originator deems the transaction to be no longer valid, it is responsible for finalizing it as reverted.
+    - If the originator deems the transaction not ready to be submitted, it is responsible for parking it until it is ready.
+    - If a transaction is successfully assembled and endorsed but subsequently reverted on the base ledger contract, the coordinator is is responsible for retrying at a frequency that does not cause excessive load on the system.
 - The originator node continues to monitor and control the delegation of its transaction until it has received receipt of the transactions' confirmations on the base ledger. This provides an "at least once" quality of service for every transaction at the distributed sequencer layer. As described earlier the blockchain enforces "at most once" semantics, so there is no possibility of duplicate transactions.
 - The handshake between the originator node and the coordinator node(s) attempts to minimize the likelihood of the same transaction intent resulting in 2 valid base ledger transactions but cannot eliminate that possibility completely so there is protection against duplicate intent fulfillment in the base ledger contract
