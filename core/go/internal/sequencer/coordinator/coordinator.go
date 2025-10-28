@@ -137,6 +137,7 @@ type coordinator struct {
 
 func NewCoordinator(
 	ctx context.Context,
+	contractAddress *pldtypes.EthAddress,
 	domainAPI components.DomainSmartContract,
 	transportWriter transport.TransportWriter,
 	clock common.Clock,
@@ -145,7 +146,6 @@ func NewCoordinator(
 	requestTimeout,
 	assembleTimeout common.Duration,
 	blockRangeSize uint64,
-	contractAddress *pldtypes.EthAddress,
 	blockHeightTolerance uint64,
 	closingGracePeriod int,
 	maxInflightTransactions int,

@@ -172,6 +172,7 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 
 	coordinator, err := NewCoordinator(
 		ctx,
+		b.contractAddress, // Contract address,
 		b.domainAPI,
 		mocks.SentMessageRecorder,
 		mocks.Clock,
@@ -180,7 +181,6 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		mocks.Clock.Duration(1000), // Request timeout
 		mocks.Clock.Duration(5000), // Assemble timeout
 		100,                        // Block range size
-		b.contractAddress,          // Contract address,
 		5,                          // Block height tolerance
 		5,                          // Closing grace period (measured in number of heartbeat intervals)
 		b.maxInflightTransactions,  // Max inflight transactions

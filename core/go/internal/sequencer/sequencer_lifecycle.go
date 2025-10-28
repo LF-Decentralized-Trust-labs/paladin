@@ -157,6 +157,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			}
 
 			coordinator, err := coordinator.NewCoordinator(sMgr.ctx,
+				&contractAddr,
 				domainAPI,
 				transportWriter,
 				common.RealClock(),
@@ -165,7 +166,6 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				confutil.DurationMin(sMgr.config.RequestTimeout, pldconf.SequencerMinimum.RequestTimeout, *pldconf.SequencerDefaults.RequestTimeout),
 				confutil.DurationMin(sMgr.config.AssembleTimeout, pldconf.SequencerMinimum.AssembleTimeout, *pldconf.SequencerDefaults.AssembleTimeout),
 				confutil.Uint64Min(sMgr.config.BlockRange, pldconf.SequencerMinimum.BlockRange, *pldconf.SequencerDefaults.BlockRange),
-				&contractAddr,
 				confutil.Uint64Min(sMgr.config.BlockHeightTolerance, pldconf.SequencerMinimum.BlockHeightTolerance, *pldconf.SequencerDefaults.BlockHeightTolerance),
 				confutil.IntMin(sMgr.config.ClosingGracePeriod, pldconf.SequencerMinimum.ClosingGracePeriod, *pldconf.SequencerDefaults.ClosingGracePeriod),
 				confutil.IntMin(sMgr.config.MaxInflightTransactions, pldconf.SequencerMinimum.MaxInflightTransactions, *pldconf.SequencerDefaults.MaxInflightTransactions),
@@ -253,6 +253,9 @@ func (sMgr *sequencerManager) setInitialCoordinator(ctx context.Context, tx *com
 	return nil
 }
 
+// Once we get here the sequencer has decided we have not gone too far ahead of the currently confirmed transactions, and are OK to
+// dispatch a new transaction. There might be several transactions still in flight to the base ledger and maxDispatchAhead can be used
+// to control how "optimistic" we are about submitting newly assembled and endorsed transactions.
 func (sMgr *sequencerManager) dispatch(ctx context.Context, t *coordTransaction.Transaction, dCtx components.DomainContext, transportWriter transport.TransportWriter) {
 	domainAPI, err := sMgr.components.DomainManager().GetSmartContractByAddress(ctx, sMgr.components.Persistence().NOTX(), t.Address)
 	if err != nil {
@@ -334,7 +337,7 @@ func (sMgr *sequencerManager) dispatch(ctx context.Context, t *coordTransaction.
 	}
 
 	for _, sd := range sds.Remote {
-		log.L(ctx).Infof("Adding remote state distribution %+v", sd.StateDistribution)
+		log.L(ctx).Debugf("Adding remote state distribution %+v", sd.StateDistribution)
 		stateDistributions = append(stateDistributions, &sd.StateDistribution)
 	}
 	localStateDistributions = append(localStateDistributions, sds.Local...)

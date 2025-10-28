@@ -21,42 +21,54 @@ import (
 )
 
 type SequencerConfig struct {
-	AssembleTimeout         *string           `json:"assembleTimeout"`
-	RequestTimeout          *string           `json:"requestTimeout"`
-	BlockHeightTolerance    *uint64           `json:"blockHeightTolerance"`
-	BlockRange              *uint64           `json:"blockRange"`
-	ClosingGracePeriod      *int              `json:"closingGracePeriod"`
-	MaxInflightTransactions *int              `json:"maxInflightTransactions"`
-	MaxDispatchAhead        *int              `json:"maxDispatchAhead"`
-	Writer                  FlushWriterConfig `json:"writer"`
+	AssembleTimeout               *string           `json:"assembleTimeout"`
+	RequestTimeout                *string           `json:"requestTimeout"`
+	BlockHeightTolerance          *uint64           `json:"blockHeightTolerance"`
+	BlockRange                    *uint64           `json:"blockRange"`
+	ClosingGracePeriod            *int              `json:"closingGracePeriod"`
+	MaxInflightTransactions       *int              `json:"maxInflightTransactions"`
+	MaxDispatchAhead              *int              `json:"maxDispatchAhead"`
+	TargetActiveCoordinators      *int              `json:"targetActiveCoordinators"`
+	TargetActiveSequencers        *int              `json:"targetActiveSequencers"`
+	TransactionResumePollInterval *string           `json:"transactionResumePollInterval"`
+	Writer                        FlushWriterConfig `json:"writer"`
 }
 
 type SequencerMinimumConfig struct {
-	AssembleTimeout         time.Duration
-	RequestTimeout          time.Duration
-	BlockHeightTolerance    uint64
-	BlockRange              uint64
-	ClosingGracePeriod      int
-	MaxInflightTransactions int
-	MaxDispatchAhead        int
+	AssembleTimeout               time.Duration
+	RequestTimeout                time.Duration
+	BlockHeightTolerance          uint64
+	BlockRange                    uint64
+	ClosingGracePeriod            int
+	MaxInflightTransactions       int
+	MaxDispatchAhead              int
+	TargetActiveCoordinators      int
+	TargetActiveSequencers        int
+	TransactionResumePollInterval time.Duration
 }
 
 var SequencerDefaults = &SequencerConfig{
-	AssembleTimeout:         confutil.P("60s"),
-	RequestTimeout:          confutil.P("10s"),
-	BlockHeightTolerance:    confutil.P(uint64(10)),
-	BlockRange:              confutil.P(uint64(100)),
-	ClosingGracePeriod:      confutil.P(4),
-	MaxInflightTransactions: confutil.P(500),
-	MaxDispatchAhead:        confutil.P(10),
+	AssembleTimeout:               confutil.P("60s"),
+	RequestTimeout:                confutil.P("10s"),
+	BlockHeightTolerance:          confutil.P(uint64(10)),
+	BlockRange:                    confutil.P(uint64(100)),
+	ClosingGracePeriod:            confutil.P(4),
+	MaxInflightTransactions:       confutil.P(500),
+	MaxDispatchAhead:              confutil.P(10),
+	TargetActiveCoordinators:      confutil.P(50),
+	TargetActiveSequencers:        confutil.P(50),
+	TransactionResumePollInterval: confutil.P("5m"),
 }
 
 var SequencerMinimum = &SequencerMinimumConfig{
-	AssembleTimeout:         1 * time.Second,
-	RequestTimeout:          1 * time.Second,
-	BlockHeightTolerance:    1,
-	BlockRange:              10,
-	ClosingGracePeriod:      1,
-	MaxInflightTransactions: 1,
-	MaxDispatchAhead:        1,
+	AssembleTimeout:               1 * time.Second,
+	RequestTimeout:                1 * time.Second,
+	BlockHeightTolerance:          1,
+	BlockRange:                    10,
+	ClosingGracePeriod:            1,
+	MaxInflightTransactions:       1,
+	MaxDispatchAhead:              1,
+	TargetActiveCoordinators:      10,
+	TargetActiveSequencers:        10,
+	TransactionResumePollInterval: 10 * time.Second,
 }

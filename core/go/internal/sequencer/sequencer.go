@@ -39,6 +39,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
@@ -89,52 +90,10 @@ func (sMgr *sequencerManager) PostInit(c components.AllComponents) error {
 
 func (sMgr *sequencerManager) Start() error {
 	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_LIFECYCLE)).Infof("Starting distributed sequencer manager")
+
 	sMgr.syncPoints.Start()
 
-	// We may have in-flight transactions that never completed. Load any we have pending and and resume them
-
-	// Repeat getting pending transactions until none are returned. Run in a goroutine to avoid blocking the main thread
-	go func() {
-		for {
-			// On startup we can't assemble any transactions without having a confirmed block height so
-			// wait until the indexer is ready
-			_, err := sMgr.components.BlockIndexer().GetConfirmedBlockHeight(sMgr.ctx)
-			if err == nil {
-				break
-			}
-
-			ctx, cancel := context.WithTimeout(sMgr.ctx, 1*time.Second)
-			defer cancel()
-
-			// Wait for the block indexer to be ready
-			<-ctx.Done()
-			if sMgr.ctx.Err() != nil {
-				return
-			}
-		}
-
-		resumedTransactions := 0
-		// MRW TODO - we ought to repeat this process or have an idle sequencer manager loop to periodically checks for incomplete DB transactions to process
-		pendingTx, err := sMgr.components.TxManager().QueryTransactionsResolved(sMgr.ctx, query.NewQueryBuilder().Limit(1000).Query(), sMgr.components.Persistence().NOTX(), true)
-		if err != nil {
-			log.L(sMgr.ctx).Errorf("Error querying pending transactions to resume incomplete ones: %s", err)
-		}
-		if len(pendingTx) == 0 {
-			log.L(sMgr.ctx).Infof("No pending transactions to resume")
-			return
-		}
-		resumedTransactions += len(pendingTx)
-		log.L(sMgr.ctx).Infof("Resuming %d transactions", resumedTransactions)
-		for _, tx := range pendingTx {
-			log.L(sMgr.ctx).Debugf("Resuming pending transaction %s", tx.Transaction.ID)
-			err = sMgr.HandleTxResume(sMgr.ctx, &components.ValidatedTransaction{
-				ResolvedTransaction: *tx,
-			})
-			if err != nil {
-				log.L(sMgr.ctx).Errorf("Error resuming pending transaction %s: %s", tx.Transaction.ID, err)
-			}
-		}
-	}()
+	sMgr.pollForIncompleteTransactions(sMgr.ctx, confutil.DurationMin(sMgr.config.TransactionResumePollInterval, *&pldconf.SequencerMinimum.TransactionResumePollInterval, *pldconf.SequencerDefaults.TransactionResumePollInterval))
 
 	return nil
 }
@@ -152,10 +111,74 @@ func NewDistributedSequencerManager(ctx context.Context, config *pldconf.Sequenc
 		cancelCtx:                     dsmCtxCancel,
 		config:                        config,
 		sequencers:                    make(map[string]*sequencer),
-		targetActiveCoordinatorsLimit: 10, // MRW TODO configurable
-		targetActiveSequencersLimit:   10, // MRW TODO configurable
+		targetActiveCoordinatorsLimit: confutil.IntMin(config.TargetActiveCoordinators, pldconf.SequencerMinimum.TargetActiveCoordinators, *pldconf.SequencerDefaults.TargetActiveCoordinators),
+		targetActiveSequencersLimit:   confutil.IntMin(config.TargetActiveSequencers, pldconf.SequencerMinimum.TargetActiveSequencers, *pldconf.SequencerDefaults.TargetActiveSequencers),
 	}
 	return sMgr
+}
+
+// We may have in-flight transactions that never completed. Load any we have pending and and resume them
+func (sMgr *sequencerManager) pollForIncompleteTransactions(ctx context.Context, rePollInterval time.Duration) {
+	// Repeat getting pending transactions until none are returned. Run in a goroutine to avoid blocking the main thread
+	go func() {
+	waitForIndexerReady:
+		for {
+			// On startup we can't assemble any transactions without having a confirmed block height so
+			// wait until the indexer is ready
+			_, err := sMgr.components.BlockIndexer().GetConfirmedBlockHeight(ctx)
+			if err == nil {
+				break
+			}
+
+			timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+			defer cancel()
+
+			// Wait for the block indexer to be ready
+			select {
+			case <-timeoutCtx.Done():
+				log.L(ctx).Debugf("timeout - check again if indexer is ready")
+				break waitForIndexerReady
+			case <-ctx.Done():
+				log.L(ctx).Errorf("context cancelled - ending DB poll")
+				return
+			}
+		}
+
+		for {
+			resumedTransactions := 0
+			pendingTx, err := sMgr.components.TxManager().QueryTransactionsResolved(sMgr.ctx, query.NewQueryBuilder().Limit(1000).Query(), sMgr.components.Persistence().NOTX(), true)
+			if err != nil {
+				log.L(sMgr.ctx).Errorf("Error querying pending transactions to resume incomplete ones: %s", err)
+			}
+			if len(pendingTx) == 0 {
+				log.L(sMgr.ctx).Infof("No pending transactions to resume")
+				return
+			}
+			resumedTransactions += len(pendingTx)
+			log.L(sMgr.ctx).Infof("Resuming %d transactions", resumedTransactions)
+			for _, tx := range pendingTx {
+				log.L(sMgr.ctx).Debugf("Resuming pending transaction %s", tx.Transaction.ID)
+				err = sMgr.HandleTxResume(sMgr.ctx, &components.ValidatedTransaction{
+					ResolvedTransaction: *tx,
+				})
+				if err != nil {
+					log.L(sMgr.ctx).Errorf("Error resuming pending transaction %s: %s", tx.Transaction.ID, err)
+				}
+			}
+
+			// Repeat DB poll every 5 minutes to check for incomplete transactions to resume
+			timeoutCtx, cancel := context.WithTimeout(sMgr.ctx, rePollInterval)
+			defer cancel()
+
+			select {
+			case <-timeoutCtx.Done():
+				log.L(sMgr.ctx).Debugf("timeout - checking for pending DB transactions")
+			case <-ctx.Done():
+				log.L(sMgr.ctx).Errorf("context cancelled - ending DB poll")
+				return
+			}
+		}
+	}()
 }
 
 func (sMgr *sequencerManager) OnNewBlockHeight(ctx context.Context, blockHeight int64) {

@@ -703,7 +703,7 @@ func TestTransactionSuccessChainedTransaction(t *testing.T) {
 		"Transaction did not receive a receipt",
 	)
 
-	// Bob's node has the receipt, but not necesarily the original transaction
+	// Bob's node has the receipt
 	assert.Eventually(t,
 		transactionReceiptConditionReceiptOnly(t, ctx, aliceTxID, bob.GetClient(), false),
 		transactionLatencyThreshold(t),
