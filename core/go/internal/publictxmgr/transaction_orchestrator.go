@@ -428,7 +428,6 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 		}
 
 		for _, tx := range additional {
-			log.L(ctx).Infof("Retrieving binding for public TX ID %d", tx.PublicTxnID)
 			var txId string
 			err := oc.p.DB().
 				Table("public_txn_bindings").
@@ -437,10 +436,9 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 				Find(&txId).
 				Error
 			if err != nil {
-				log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %d: %s", tx.PublicTxnID, err)
+				log.L(ctx).Warnf("Orchestrator poll and process: error while retrieving binding for %d: %s", tx.PublicTxnID, err)
 				continue
 			}
-			log.L(ctx).Infof("Retrieved binding for public TX ID %d: %s", tx.PublicTxnID, txId)
 			if tx.Binding == nil {
 				tx.Binding = &DBPublicTxnBinding{}
 			}
@@ -466,7 +464,6 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 						if err != nil {
 							log.L(ctx).Warnf("Orchestrator poll and process: error while handing TX collected to sequencer for %d: %s", tx.PublicTxnID, err)
 						}
-						log.L(ctx).Infof("Retrieved binding for public TX ID %d: %s", tx.PublicTxnID, txId)
 					}
 				}
 			}
@@ -485,16 +482,6 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 		}
 
 		for _, tx := range additional {
-			log.L(ctx).Infof("Handling nonce assignment for public TX ID %d", tx.PublicTxnID)
-			log.L(ctx).Infof("Handling nonce assignment for signing address %s", oc.signingAddress.String())
-			log.L(ctx).Infof("Handling nonce assignment for to address %s", tx.To)
-			log.L(ctx).Infof("Handling nonce assignment for binding %v", tx.Binding)
-
-			log.L(ctx).Infof("Retrieving binding for public TX ID %d", tx.PublicTxnID)
-			if tx.Binding != nil {
-				log.L(ctx).Infof("Binding for public TX ID isn't null, it's %s, we can skip the extra DB lookup here FYI", tx.Binding.Transaction.String())
-			}
-
 			var txId string
 			err := oc.p.DB().
 				Table("public_txn_bindings").
@@ -506,7 +493,6 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 				log.L(ctx).Warnf("Error retrieving binding for public TX ID %d: %s", tx.PublicTxnID, err)
 				return
 			}
-			log.L(ctx).Infof("Retrieved binding for public TX ID %d: %s", tx.PublicTxnID, txId)
 
 			if txId != "" {
 				// Convert txId to UUID

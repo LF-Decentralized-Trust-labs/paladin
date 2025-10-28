@@ -73,6 +73,7 @@ func (r *SentMessageRecorder) HasSentHeartbeat() bool {
 
 type CoordinatorBuilderForTesting struct {
 	state                                    State
+	maxInflightTransactions                  int
 	originatorIdentityPool                   []string
 	domainAPI                                components.DomainSmartContract
 	contractAddress                          *pldtypes.EthAddress
@@ -101,9 +102,10 @@ func NewCoordinatorBuilderForTesting(t *testing.T, state State) *CoordinatorBuil
 
 	domainAPI := componentsmocks.NewDomainSmartContract(t)
 	return &CoordinatorBuilderForTesting{
-		state:     state,
-		domainAPI: domainAPI,
-		metrics:   metrics.InitMetrics(context.Background(), prometheus.NewRegistry()),
+		state:                   state,
+		domainAPI:               domainAPI,
+		metrics:                 metrics.InitMetrics(context.Background(), prometheus.NewRegistry()),
+		maxInflightTransactions: 500,
 	}
 }
 
@@ -181,6 +183,7 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		b.contractAddress,          // Contract address,
 		5,                          // Block height tolerance
 		5,                          // Closing grace period (measured in number of heartbeat intervals)
+		b.maxInflightTransactions,  // Max inflight transactions
 		"node1",
 		b.metrics,
 		func(context.Context, *transaction.Transaction) {},                    // onReadyForDispatch function, not used in tests
@@ -247,4 +250,9 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 	}
 
 	return coordinator, mocks
+}
+
+func (b *CoordinatorBuilderForTesting) SetMaxInflightTransactions(maxInflightTransactions int) *CoordinatorBuilderForTesting {
+	b.maxInflightTransactions = maxInflightTransactions
+	return b
 }

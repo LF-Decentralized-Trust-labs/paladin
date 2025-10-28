@@ -126,7 +126,6 @@ func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persisten
 func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) {
 	for _, completion := range txCompletions {
 		// The sequencer manager needs to know about these to update its in-memory state
-
 		pubBindingTx, err := dm.publicTxManager.QueryPublicTxForTransactions(dm.bgCtx, dm.persistence.NOTX(), []uuid.UUID{completion.TransactionID}, nil)
 		if err != nil {
 			log.L(dm.bgCtx).Errorf("Error getting public transaction by ID: %s", err)

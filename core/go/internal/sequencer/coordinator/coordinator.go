@@ -81,6 +81,7 @@ type coordinator struct {
 	originatorNodePool             []string // The (possibly changing) list of originator nodes
 	nodeName                       string
 	coordinatorSelectionBlockRange uint64
+	maxInflightTransactions        int
 
 	/* Dependencies */
 	domainAPI          components.DomainSmartContract
@@ -116,6 +117,7 @@ func NewCoordinator(
 	contractAddress *pldtypes.EthAddress,
 	blockHeightTolerance uint64,
 	closingGracePeriod int,
+	maxInflightTransactions int,
 	nodeName string,
 	metrics metrics.DistributedSequencerMetrics,
 	readyForDispatch func(context.Context, *transaction.Transaction),
@@ -130,6 +132,7 @@ func NewCoordinator(
 		contractAddress:                    contractAddress,
 		blockHeightTolerance:               blockHeightTolerance,
 		closingGracePeriod:                 closingGracePeriod,
+		maxInflightTransactions:            maxInflightTransactions,
 		grapher:                            transaction.NewGrapher(ctx),
 		clock:                              clock,
 		requestTimeout:                     requestTimeout,
@@ -260,11 +263,13 @@ func (c *coordinator) UpdateOriginatorNodePool(ctx context.Context, originatorNo
 // record a decision record to explain why.  Every  time we come back to this point, we will be tempted to reverse that decision so we need to make sure we have a record of the known consequences.
 // originator must be a fully qualified identity locator otherwise an error will be returned
 func (c *coordinator) addToDelegatedTransactions(ctx context.Context, originator string, transactions []*components.PrivateTransaction) error {
-
-	//TODO should remove any transactions from the same originator that we already have but are not in this list
-
 	var previousTransaction *transaction.Transaction
 	for _, txn := range transactions {
+
+		if len(c.transactionsByID) >= c.maxInflightTransactions {
+			return i18n.NewError(ctx, msgs.MsgSequencerMaxInflightTransactions, c.maxInflightTransactions)
+		}
+
 		newTransaction, err := transaction.NewTransaction(
 			ctx,
 			originator,

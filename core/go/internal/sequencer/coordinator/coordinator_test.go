@@ -49,7 +49,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, originatorIden
 	}
 	mockDomainAPI := componentsmocks.NewDomainSmartContract(t)
 
-	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.transportWriter, mocks.clock, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, "node1",
+	coordinator, err := NewCoordinator(ctx, mockDomainAPI, mocks.transportWriter, mocks.clock, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, pldtypes.RandAddress(), 5, 5, 500, "node1",
 		metrics,
 		func(context.Context, *transaction.Transaction) {
 			// Not used
@@ -242,5 +242,24 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 
 }
 
-func TestCoordinator_HandoverFlush(t *testing.T) {
+func TestCoordinator_MaxInflightTransactions(t *testing.T) {
+	ctx := context.Background()
+	originator := "sender@senderNode"
+	builder := NewCoordinatorBuilderForTesting(t, State_Idle)
+	builder.SetMaxInflightTransactions(5)
+	c, _ := builder.Build(ctx)
+
+	// Start by simulating the originator and delegate a transaction to the coordinator
+	for i := range 100 {
+		transactionBuilder := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Originator(originator).NumberOfRequiredEndorsers(1)
+		txn := transactionBuilder.BuildSparse()
+		err := c.addToDelegatedTransactions(ctx, originator, []*components.PrivateTransaction{txn})
+
+		if i < 5 {
+			require.NoError(t, err)
+		} else {
+			require.Error(t, err)
+			require.ErrorContains(t, err, "PD012642")
+		}
+	}
 }

@@ -637,7 +637,7 @@ func (sMgr *sequencerManager) HandlePublicTXsWritten(ctx context.Context, dbTX p
 					if strings.Contains(endorsement.Verifier.Lookup, "@") {
 						node := strings.Split(endorsement.Verifier.Lookup, "@")[1]
 						if node != sMgr.nodeName {
-							log.L(sMgr.ctx).Infof("Endorser %s is not the sequencer node, send this info to them", node)
+							log.L(sMgr.ctx).Debugf("Endorser %s is not the sequencer node, send this info to them", node)
 							// Send reliable message to the node under the current DBTX
 							err = sMgr.components.TransportManager().SendReliable(ctx, dbTX, &pldapi.ReliableMessage{
 								MessageType: pldapi.RMTPublicTransaction.Enum(),
@@ -694,14 +694,20 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 			if from == nil {
 				return fmt.Errorf("nil From address for confirmed transaction %s", confirmedTxn.TransactionID)
 			}
+
 			confirmedEvent := &coordinator.TransactionConfirmedEvent{
 				TxID:         confirmedTxn.TransactionID,
 				From:         from, // The base ledger signing address
 				Hash:         confirmedTxn.OnChain.TransactionHash,
 				RevertReason: confirmedTxn.RevertData,
-				Nonce:        nonce.Uint64(),
 			}
 			confirmedEvent.EventTime = time.Now()
+
+			if nonce != nil {
+				// TODO on the coordinator node we have the nonce, but public TX distribution to other nodes currently happens pre-nonce allocation
+				// Should we distribute public transactions post nonce allocation?
+				confirmedEvent.Nonce = nonce.Uint64()
+			}
 
 			sequencer.GetCoordinator().QueueEvent(ctx, confirmedEvent)
 
