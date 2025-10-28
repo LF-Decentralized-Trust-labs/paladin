@@ -39,6 +39,31 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 )
 
+// The coordinator event loop is the only thread-safe way to access state about transactions externally.
+// These structures allow an external caller (e.g. another component - but currently just another part of
+// the distributed sequencer) to request data from the sequencer which it will respond to in between other
+// updates to its state machine(s). This is not necessarily the optimal way to introspect the sequencer's
+// state in a thread-safe way, but the initial implementation focuses on thread safety over optimal performance.
+type QueryRequest struct {
+	Type     Query
+	Response chan any
+}
+type Query string
+
+const (
+	QueryTypeDispatchedTransactions Query = "dispatched_transactions"
+)
+
+func (tt Query) Enum() pldtypes.Enum[Query] {
+	return pldtypes.Enum[Query](tt)
+}
+
+func (tt Query) Options() []string {
+	return []string{
+		string(QueryTypeDispatchedTransactions),
+	}
+}
+
 type SeqCoordinator interface {
 	// Asynchronously update the state machine by queueing an event to be processed. Most
 	// callers should use this interface.
@@ -82,6 +107,7 @@ type coordinator struct {
 	nodeName                       string
 	coordinatorSelectionBlockRange uint64
 	maxInflightTransactions        int
+	maxDispatchAhead               int
 
 	/* Dependencies */
 	domainAPI          components.DomainSmartContract
@@ -101,7 +127,12 @@ type coordinator struct {
 
 	/* Event loop */
 	coordinatorEvents chan common.Event
+	externalQueries   chan QueryRequest
 	stopEventLoop     chan struct{}
+
+	/* Dispatch loop */
+	dispatchQueue    chan *transaction.Transaction
+	stopDispatchLoop chan struct{}
 }
 
 func NewCoordinator(
@@ -118,6 +149,7 @@ func NewCoordinator(
 	blockHeightTolerance uint64,
 	closingGracePeriod int,
 	maxInflightTransactions int,
+	maxDispatchAhead int,
 	nodeName string,
 	metrics metrics.DistributedSequencerMetrics,
 	readyForDispatch func(context.Context, *transaction.Transaction),
@@ -133,6 +165,7 @@ func NewCoordinator(
 		blockHeightTolerance:               blockHeightTolerance,
 		closingGracePeriod:                 closingGracePeriod,
 		maxInflightTransactions:            maxInflightTransactions,
+		maxDispatchAhead:                   maxDispatchAhead,
 		grapher:                            transaction.NewGrapher(ctx),
 		clock:                              clock,
 		requestTimeout:                     requestTimeout,
@@ -145,8 +178,11 @@ func NewCoordinator(
 		nodeName:                           nodeName,
 		metrics:                            metrics,
 		coordinatorEvents:                  make(chan common.Event, 50), // TODO >1 only required for sqlite coarse-grained locks. Should this be DB-dependent?
+		externalQueries:                    make(chan QueryRequest, 10),
 		stopEventLoop:                      make(chan struct{}),
 		coordinatorSelectionBlockRange:     blockRangeSize,
+		dispatchQueue:                      make(chan *transaction.Transaction, maxInflightTransactions),
+		stopDispatchLoop:                   make(chan struct{}),
 	}
 	c.originatorNodePool = make([]string, 0)
 	c.InitializeStateMachine(State_Idle)
@@ -155,22 +191,82 @@ func NewCoordinator(
 	// Start event processing loop
 	go c.eventLoop(ctx)
 
+	// Start dispatch queue loop
+	go c.dispatchLoop(ctx)
+
 	return c, nil
 
 }
 
 func (c *coordinator) eventLoop(ctx context.Context) {
 	for {
-		log.L(ctx).Tracef("coordinator event loop waiting for next event")
+		log.L(ctx).Debugf("coordinator event loop waiting for next event")
 		select {
+		case query := <-c.externalQueries:
+			log.L(ctx).Debugf("coordinator handling external query %s", query.Type)
+			if query.Type == QueryTypeDispatchedTransactions {
+				dispatchingTransactionCount := len(c.getTransactionsInStates(ctx, []transaction.State{transaction.State_Dispatched, transaction.State_Submitted}))
+				log.L(ctx).Tracef("coordinator responding to %s: %d dispatched transactions", query.Type, dispatchingTransactionCount)
+				query.Response <- dispatchingTransactionCount
+			} else {
+				log.L(ctx).Errorf("%s", i18n.NewError(ctx, msgs.MsgSequencerInternalError, "external query type unknown").Error())
+			}
 		case event := <-c.coordinatorEvents:
-			log.L(ctx).Tracef("coordinator pulled event from the queue: %s", event.TypeString())
+			log.L(ctx).Debugf("coordinator pulled event from the queue: %s", event.TypeString())
 			err := c.ProcessEvent(ctx, event)
 			if err != nil {
 				log.L(ctx).Errorf("error processing event: %v", err)
 			}
 		case <-c.stopEventLoop:
 			log.L(ctx).Infof("coordinator event loop cancelled")
+			return
+		}
+	}
+}
+
+func (c *coordinator) dispatchLoop(ctx context.Context) {
+	for {
+		log.L(ctx).Debugf("coordinator dispatch loop waiting for next TX to dispatch, max dispatch ahead: %d", c.maxDispatchAhead)
+		select {
+		case tx := <-c.dispatchQueue:
+			log.L(ctx).Debugf("coordinator pulled transaction %s from the dispatch queue", tx.ID.String())
+			// Got the next TX, but can't dispatch too far ahead in case an earlier TX reverts on-chain
+			coordinatorQuery := QueryRequest{
+				Type:     QueryTypeDispatchedTransactions,
+				Response: make(chan any),
+			}
+
+			log.L(ctx).Debugf("coordinator asking for number of transactions currently in dispatch")
+		waitForDispatch:
+			for true {
+				queryStart := time.Now() // While this mechanism is proving out, capture query times
+				c.externalQueries <- coordinatorQuery
+				select {
+				case response := <-coordinatorQuery.Response:
+					queryDuration := time.Since(queryStart)
+					log.L(ctx).Debugf("coordinator query response %d us", queryDuration.Microseconds())
+					inFlight := response.(int)
+					if inFlight < c.maxDispatchAhead {
+						log.L(ctx).Debugf("inFlight TX count %d < maxDispatchAhead %d - OK to dispatch", inFlight, c.maxDispatchAhead)
+						break waitForDispatch
+					}
+				case <-ctx.Done():
+					log.L(ctx).Infof("coordinator dispatch loop cancelled during query")
+					return
+				}
+
+				// There are too many transactions making their way to the base ledger. If we're hitting this frequently
+				// then the node has probably been configured to optimise for base-ledger safety rather than optimal
+				// throughput
+				time.Sleep(100 * time.Millisecond)
+			}
+			log.L(ctx).Debugf("coordinator submitting transaction %s for dispatch", tx.ID.String())
+			c.readyForDispatch(ctx, tx)
+		case <-c.stopDispatchLoop:
+			log.L(ctx).Infof("coordinator dispatch loop stopped")
+			return
+		case <-ctx.Done():
+			log.L(ctx).Infof("coordinator dispatch loop cancelled")
 			return
 		}
 	}
@@ -284,7 +380,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, originator
 			c.closingGracePeriod,
 			c.grapher,
 			c.metrics,
-			c.readyForDispatch,
+			c.queueForDispatch,
 			func(ctx context.Context, t *transaction.Transaction, to, from transaction.State) {
 				// TX state changed, check if we need to be selecting the next transaction for this sequencer
 				//TODO the following logic should be moved to the state machine so that all the rules are in one place
@@ -336,6 +432,10 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, originator
 		}
 	}
 	return nil
+}
+
+func (c *coordinator) queueForDispatch(ctx context.Context, txn *transaction.Transaction) {
+	c.dispatchQueue <- txn
 }
 
 func (c *coordinator) propagateEventToTransaction(ctx context.Context, event transaction.Event) error {
@@ -494,6 +594,7 @@ func (c *coordinator) Stop() {
 	// MRW TODO - The state machine doesn't really have a "please take over from me" path. Not a current priority
 	// but clean "please take over" path may be needed in the future
 	c.stopEventLoop <- struct{}{}
+	c.stopDispatchLoop <- struct{}{}
 }
 
 //TODO the following getter methods are not safe to call on anything other than the sequencer goroutine because they are reading data structures that are being modified by the state machine.

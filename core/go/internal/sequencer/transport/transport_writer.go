@@ -43,7 +43,7 @@ type TransportWriter interface {
 	SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) error
 	SendNonceAssigned(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64) error
 	SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error
-	SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error
+	SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce *pldtypes.HexUint64, revertReason pldtypes.HexBytes) error
 	SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot) error
 	SendPreDispatchRequest(ctx context.Context, originatorNode string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error
 	SendPreDispatchResponse(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error
@@ -460,7 +460,7 @@ func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uu
 	return err
 }
 
-func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
+func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce *pldtypes.HexUint64, revertReason pldtypes.HexBytes) error {
 
 	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send transaction confirmed message to node %s", originatorNode)
 
@@ -468,12 +468,15 @@ func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uu
 		err := fmt.Errorf("attempt to send TX submitted event without specifying contract address")
 		return err
 	}
+
 	txConfirmed := &engineProto.TransactionConfirmed{
 		Id:              uuid.New().String(),
 		TransactionId:   txID.String(),
 		ContractAddress: contractAddress.HexString(),
-		Nonce:           int64(nonce),
 		RevertReason:    revertReason,
+	}
+	if nonce != nil {
+		txConfirmed.Nonce = int64(*nonce)
 	}
 	txConfirmedBytes, err := proto.Marshal(txConfirmed)
 	if err != nil {

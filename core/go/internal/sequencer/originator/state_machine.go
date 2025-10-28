@@ -155,7 +155,7 @@ func (o *originator) ProcessEvent(ctx context.Context, event common.Event) error
 	log.L(ctx).Debugf("Distributed originator handling new event %s (contract address %s, node name %s)", event.TypeString(), o.contractAddress, o.nodeName)
 
 	if transactionEvent, ok := event.(transaction.Event); ok {
-		log.L(ctx).Debugf("Propagating transaction event %s to transaction: %s", transactionEvent.TypeString(), transactionEvent.GetTransactionID().String())
+		log.L(ctx).Debugf("Originator propagating transaction event %s to transaction: %s", transactionEvent.TypeString(), transactionEvent.GetTransactionID().String())
 		return o.propagateEventToTransaction(ctx, transactionEvent)
 	}
 

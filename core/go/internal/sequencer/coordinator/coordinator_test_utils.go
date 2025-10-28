@@ -184,6 +184,7 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		5,                          // Block height tolerance
 		5,                          // Closing grace period (measured in number of heartbeat intervals)
 		b.maxInflightTransactions,  // Max inflight transactions
+		10,                         // Max dispatch ahead
 		"node1",
 		b.metrics,
 		func(context.Context, *transaction.Transaction) {},                    // onReadyForDispatch function, not used in tests

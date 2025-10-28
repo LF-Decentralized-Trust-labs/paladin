@@ -169,6 +169,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				confutil.Uint64Min(sMgr.config.BlockHeightTolerance, pldconf.SequencerMinimum.BlockHeightTolerance, *pldconf.SequencerDefaults.BlockHeightTolerance),
 				confutil.IntMin(sMgr.config.ClosingGracePeriod, pldconf.SequencerMinimum.ClosingGracePeriod, *pldconf.SequencerDefaults.ClosingGracePeriod),
 				confutil.IntMin(sMgr.config.MaxInflightTransactions, pldconf.SequencerMinimum.MaxInflightTransactions, *pldconf.SequencerDefaults.MaxInflightTransactions),
+				confutil.IntMin(sMgr.config.MaxDispatchAhead, pldconf.SequencerMinimum.MaxDispatchAhead, *pldconf.SequencerDefaults.MaxDispatchAhead),
 				sMgr.nodeName,
 				sMgr.metrics,
 				func(ctx context.Context, t *coordTransaction.Transaction) {

@@ -100,7 +100,7 @@ func (r *SentMessageRecorder) SendTransactionSubmitted(ctx context.Context, txID
 	return nil
 }
 
-func (r *SentMessageRecorder) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionOriginator string, contractAddress *pldtypes.EthAddress, nonce uint64, revertReason pldtypes.HexBytes) error {
+func (r *SentMessageRecorder) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, transactionOriginator string, contractAddress *pldtypes.EthAddress, nonce *pldtypes.HexUint64, revertReason pldtypes.HexBytes) error {
 	return nil
 }
 

@@ -27,6 +27,7 @@ type SequencerConfig struct {
 	BlockRange              *uint64           `json:"blockRange"`
 	ClosingGracePeriod      *int              `json:"closingGracePeriod"`
 	MaxInflightTransactions *int              `json:"maxInflightTransactions"`
+	MaxDispatchAhead        *int              `json:"maxDispatchAhead"`
 	Writer                  FlushWriterConfig `json:"writer"`
 }
 
@@ -37,6 +38,7 @@ type SequencerMinimumConfig struct {
 	BlockRange              uint64
 	ClosingGracePeriod      int
 	MaxInflightTransactions int
+	MaxDispatchAhead        int
 }
 
 var SequencerDefaults = &SequencerConfig{
@@ -46,6 +48,7 @@ var SequencerDefaults = &SequencerConfig{
 	BlockRange:              confutil.P(uint64(100)),
 	ClosingGracePeriod:      confutil.P(4),
 	MaxInflightTransactions: confutil.P(500),
+	MaxDispatchAhead:        confutil.P(10),
 }
 
 var SequencerMinimum = &SequencerMinimumConfig{
@@ -55,4 +58,5 @@ var SequencerMinimum = &SequencerMinimumConfig{
 	BlockRange:              10,
 	ClosingGracePeriod:      1,
 	MaxInflightTransactions: 1,
+	MaxDispatchAhead:        1,
 }

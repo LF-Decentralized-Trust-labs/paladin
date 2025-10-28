@@ -578,32 +578,40 @@ func (sMgr *sequencerManager) HandlePublicTXSubmission(ctx context.Context, dbTX
 					return fmt.Errorf("transaction %s not found in coordinator", txID)
 				}
 
-				publicTXSubmission := &pldapi.PublicTxToDistribute{
-					TransactionHash: txHash,
-					GasPricing:      []byte(gasPricing),
-					Bindings: []*pldapi.PublicTxBinding{
-						{
-							Transaction: txID,
+				if tx.PostAssembly != nil {
+					// This is currently a best-effort attempt to distribute public TX submissions to all parties who should know about it.
+					// TODO - this should accommodate distribution after restarts which means we need a way to determine which parties for any
+					// domain should receive public TX information
+					publicTXSubmission := &pldapi.PublicTxToDistribute{
+						TransactionHash: txHash,
+						GasPricing:      []byte(gasPricing),
+						Bindings: []*pldapi.PublicTxBinding{
+							{
+								Transaction: txID,
+							},
 						},
-					},
-				}
+					}
 
-				// Get all endorsers
-				for _, endorsement := range tx.PostAssembly.Endorsements {
-					if strings.Contains(endorsement.Verifier.Lookup, "@") {
-						node := strings.Split(endorsement.Verifier.Lookup, "@")[1]
-						if node != sMgr.nodeName {
-							// Send reliable message to the node under the current DBTX
-							err = sMgr.components.TransportManager().SendReliable(ctx, dbTX, &pldapi.ReliableMessage{
-								MessageType: pldapi.RMTPublicTransactionSubmission.Enum(),
-								Metadata:    pldtypes.JSONString(publicTXSubmission),
-								Node:        node,
-							})
-							if err != nil {
-								return err
+					// Get all endorsers
+					for _, endorsement := range tx.PostAssembly.Endorsements {
+						if strings.Contains(endorsement.Verifier.Lookup, "@") {
+							node := strings.Split(endorsement.Verifier.Lookup, "@")[1]
+							if node != sMgr.nodeName {
+								// Send reliable message to the node under the current DBTX
+								err = sMgr.components.TransportManager().SendReliable(ctx, dbTX, &pldapi.ReliableMessage{
+									MessageType: pldapi.RMTPublicTransactionSubmission.Enum(),
+									Metadata:    pldtypes.JSONString(publicTXSubmission),
+									Node:        node,
+								})
+								if err != nil {
+									return err
+								}
 							}
 						}
 					}
+				} else {
+					// Log as a warning for now as we need a better way to distribute public TX info among nodes.
+					log.L(sMgr.ctx).Warnf("Transaction %s has no post assembly, cannot distribute public TX submission", txID)
 				}
 			}
 		}
@@ -713,7 +721,7 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 
 			// Forward the event to the originating node. This is only to update the originator's state machine, not for DB confirmation
 			transportWriter := sequencer.GetTransportWriter()
-			err = transportWriter.SendTransactionConfirmed(ctx, confirmedTxn.TransactionID, mtx.OriginatorNode(), &contractAddress, nonce.Uint64(), confirmedTxn.RevertData)
+			err = transportWriter.SendTransactionConfirmed(ctx, confirmedTxn.TransactionID, mtx.OriginatorNode(), &contractAddress, nonce, confirmedTxn.RevertData)
 			if err != nil {
 				return err
 			}
@@ -776,7 +784,8 @@ func (sMgr *sequencerManager) HandleTransactionFailed(ctx context.Context, dbTX 
 
 			// Forward the event to the originating node
 			transportWriter := sequencer.GetTransportWriter()
-			err = transportWriter.SendTransactionConfirmed(ctx, tx.TransactionID, mtx.OriginatorNode(), contractAddress, tx.Nonce, tx.RevertReason)
+			nonce := pldtypes.HexUint64(tx.Nonce)
+			err = transportWriter.SendTransactionConfirmed(ctx, tx.TransactionID, mtx.OriginatorNode(), contractAddress, &nonce, tx.RevertReason)
 			if err != nil {
 				// Log but continue for the other receipts
 				log.L(sMgr.ctx).Errorf("failed to send transaction confirmed event to originating node %s: %v", mtx.OriginatorNode(), err)

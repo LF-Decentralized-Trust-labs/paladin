@@ -374,6 +374,17 @@ func init() {
 						},
 					},
 				},
+				// After submission there's a race for us or the coordinator to find out that the base ledger transaction
+				// reverted. We need to accomodate the coordinator getting there first and sending a new assemble request
+				// before we receive the revert and moved back to delegated.
+				Event_AssembleRequestReceived: {
+					Validator: validator_AssembleRequestMatches,
+					Transitions: []Transition{
+						{
+							To: State_Assembling,
+						},
+					},
+				},
 			},
 		},
 

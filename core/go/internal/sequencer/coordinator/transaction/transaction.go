@@ -73,14 +73,13 @@ type Transaction struct {
 	previousTransaction       *Transaction
 	nextTransaction           *Transaction
 	onReadyForDispatch        func(context.Context, *Transaction)
-	// dependencies                                     []uuid.UUID //TODO figure out naming of these fields and their relationship with the PrivateTransaction fields
-	// dependents                                       []uuid.UUID
 
 	//Configuration
 	requestTimeout        common.Duration
 	assembleTimeout       common.Duration
 	errorCount            int
 	finalizingGracePeriod int // number of heartbeat intervals that the transaction will remain in one of the terminal states ( Reverted or Confirmed) before it is removed from memory and no longer reported in heartbeats
+
 	// Dependencies
 	clock              common.Clock
 	transportWriter    transport.TransportWriter
