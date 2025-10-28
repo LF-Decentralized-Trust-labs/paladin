@@ -193,7 +193,7 @@ func (o *originator) QueueEvent(ctx context.Context, event common.Event) {
 
 func (o *originator) SetActiveCoordinator(ctx context.Context, coordinator string) error {
 	if coordinator == "" {
-		return i18n.NewError(ctx, msgs.MsgDistSeqInternalError, "Cannot set active coordinator to an empty string")
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "Cannot set active coordinator to an empty string")
 	}
 	o.activeCoordinatorNode = coordinator
 	log.L(ctx).Debugf("initial active coordinator set to %s", o.activeCoordinatorNode)

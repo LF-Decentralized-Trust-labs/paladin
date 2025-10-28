@@ -159,7 +159,7 @@ func (t *Transaction) sendEndorsementRequests(ctx context.Context) error {
 		err := pendingRequest.Nudge(ctx)
 		if err != nil {
 			log.L(ctx).Errorf("failed to nudge endorsement request for party %s: %s", endorsementRequirement.party, err)
-			t.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerEndorsementRequestError), endorsementRequirement.party, err.Error())
+			t.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgSequencerEndorsementRequestError), endorsementRequirement.party, err.Error())
 		}
 
 	}
@@ -194,7 +194,7 @@ func (t *Transaction) requestEndorsement(ctx context.Context, idempotencyKey uui
 	)
 	if err != nil {
 		log.L(ctx).Errorf("failed to send endorsement request to party %s: %s", party, err)
-		t.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerEndorsementRequestError), party, err.Error())
+		t.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgSequencerEndorsementRequestError), party, err.Error())
 	}
 	return err
 }

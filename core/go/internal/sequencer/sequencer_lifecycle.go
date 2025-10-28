@@ -128,7 +128,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			}
 
 			if domainAPI == nil {
-				err := i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "No domain provided to create sequencer")
+				err := i18n.NewError(ctx, msgs.MsgSequencerInternalError, "No domain provided to create sequencer")
 				log.L(ctx).Error(err)
 				return nil, err
 			}
@@ -320,7 +320,7 @@ func (sMgr *sequencerManager) dispatch(ctx context.Context, t *coordTransaction.
 		// The prepared transaction needs to end up on the node that is able to submit it.
 		preparedTxnDistributions = append(preparedTxnDistributions, preparedTransactionWithRefs)
 	default:
-		err = i18n.NewError(ctx, msgs.MsgPrivateTxMgrInvalidPrepareOutcome, preparedTransaction.ID, preparedTransaction.Intent, hasPublicTransaction, hasPrivateTransaction)
+		err = i18n.NewError(ctx, msgs.MsgSequencerInvalidPrepareOutcome, preparedTransaction.ID, preparedTransaction.Intent, hasPublicTransaction, hasPrivateTransaction)
 		log.L(ctx).Errorf("error preparing transaction %s: %s", preparedTransaction.ID, err)
 		return
 	}
@@ -348,7 +348,7 @@ func (sMgr *sequencerManager) dispatch(ctx context.Context, t *coordTransaction.
 		for i, pt := range publicTransactionsToSend {
 			unqualifiedSigner, err := pldtypes.PrivateIdentityLocator(pt.Signer).Identity(ctx)
 			if err != nil {
-				err = i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerInternalError, err)
+				err = i18n.WrapError(ctx, err, msgs.MsgSequencerInternalError, err)
 				log.L(ctx).Error(err)
 				return
 			}

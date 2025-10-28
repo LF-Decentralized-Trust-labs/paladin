@@ -169,7 +169,7 @@ func (sMgr *sequencerManager) OnNewBlockHeight(ctx context.Context, blockHeight 
 func (sMgr *sequencerManager) handleDeployTx(ctx context.Context, tx *components.PrivateContractDeploy) error {
 	log.L(ctx).Debugf("handling new private contract deploy transaction: %v", tx)
 	if tx.Domain == "" {
-		return i18n.NewError(ctx, msgs.MsgDomainNotProvided)
+		return i18n.NewError(ctx, msgs.MsgSequencerDomainNotProvided)
 	}
 
 	domain, err := sMgr.components.DomainManager().GetDomainByName(ctx, tx.Domain)
@@ -179,7 +179,7 @@ func (sMgr *sequencerManager) handleDeployTx(ctx context.Context, tx *components
 
 	err = domain.InitDeploy(ctx, tx)
 	if err != nil {
-		return i18n.WrapError(ctx, err, msgs.MsgDeployInitFailed)
+		return i18n.WrapError(ctx, err, msgs.MsgSequencerDeployInitFailed)
 	}
 
 	// this is a transaction that will confirm just like invoke transactions
@@ -203,7 +203,7 @@ func (sMgr *sequencerManager) deploymentLoop(ctx context.Context, domain compone
 		// Potentially needs to move to an event-driven model like on invocation.
 		verifier, resolveErr := sMgr.components.IdentityResolver().ResolveVerifier(ctx, v.Lookup, v.Algorithm, v.VerifierType)
 		if resolveErr != nil {
-			err = i18n.WrapError(ctx, resolveErr, msgs.MsgKeyResolutionFailed, v.Lookup, v.Algorithm, v.VerifierType)
+			err = i18n.WrapError(ctx, resolveErr, msgs.MsgSequencerKeyResolutionFailed, v.Lookup, v.Algorithm, v.VerifierType)
 			break
 		}
 		tx.Verifiers[i] = &prototk.ResolvedVerifier{
@@ -243,7 +243,7 @@ func (sMgr *sequencerManager) evaluateDeployment(ctx context.Context, domain com
 		return err
 	}
 	if node != sMgr.nodeName {
-		return i18n.NewError(ctx, msgs.MsgPrivateTxManagerNonLocalSigningAddr, tx.Signer)
+		return i18n.NewError(ctx, msgs.MsgSequencerNonLocalSigningAddr, tx.Signer)
 	}
 
 	keyMgr := sMgr.components.KeyManager()
@@ -267,22 +267,22 @@ func (sMgr *sequencerManager) evaluateDeployment(ctx context.Context, domain com
 
 		data, err := tx.InvokeTransaction.FunctionABI.EncodeCallDataCtx(ctx, tx.InvokeTransaction.Inputs)
 		if err != nil {
-			return sMgr.revertDeploy(ctx, tx, i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrEncodeCallDataFailed))
+			return sMgr.revertDeploy(ctx, tx, i18n.WrapError(ctx, err, msgs.MsgSequencerEncodeCallDataFailed))
 		}
 		publicTXs[0].Data = pldtypes.HexBytes(data)
 		publicTXs[0].To = &tx.InvokeTransaction.To
 
 	} else if tx.DeployTransaction != nil {
 		// TODO
-		return sMgr.revertDeploy(ctx, tx, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "deployTransaction not implemented"))
+		return sMgr.revertDeploy(ctx, tx, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "deployTransaction not implemented"))
 	} else {
-		return sMgr.revertDeploy(ctx, tx, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "neither InvokeTransaction nor DeployTransaction set"))
+		return sMgr.revertDeploy(ctx, tx, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "neither InvokeTransaction nor DeployTransaction set"))
 	}
 
 	for _, pubTx := range publicTXs {
 		err := publicTransactionEngine.ValidateTransaction(ctx, sMgr.components.Persistence().NOTX(), pubTx)
 		if err != nil {
-			return sMgr.revertDeploy(ctx, tx, i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerInternalError, "PrepareSubmissionBatch failed"))
+			return sMgr.revertDeploy(ctx, tx, i18n.WrapError(ctx, err, msgs.MsgSequencerInternalError, "PrepareSubmissionBatch failed"))
 		}
 	}
 
@@ -312,7 +312,7 @@ func (sMgr *sequencerManager) evaluateDeployment(ctx context.Context, domain com
 }
 
 func (sMgr *sequencerManager) revertDeploy(ctx context.Context, tx *components.PrivateContractDeploy, err error) error {
-	deployError := i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerDeployError)
+	deployError := i18n.WrapError(ctx, err, msgs.MsgSequencerDeployError)
 
 	var tryFinalize func()
 	tryFinalize = func() {
@@ -335,7 +335,7 @@ func (sMgr *sequencerManager) HandleNewTx(ctx context.Context, dbTX persistence.
 	tx := txi.Transaction
 	if tx.To == nil {
 		if txi.Transaction.SubmitMode.V() != pldapi.SubmitModeAuto {
-			return i18n.NewError(ctx, msgs.MsgPrivateTxMgrPrepareNotSupportedDeploy)
+			return i18n.NewError(ctx, msgs.MsgSequencerPrepareNotSupportedDeploy)
 		}
 		log.L(sMgr.ctx).Infof("handling deploy transaction %s from signer %s", tx.ID, tx.From)
 		return sMgr.handleDeployTx(ctx, &components.PrivateContractDeploy{
@@ -350,7 +350,7 @@ func (sMgr *sequencerManager) HandleNewTx(ctx context.Context, dbTX persistence.
 		intent = prototk.TransactionSpecification_PREPARE_TRANSACTION
 	}
 	if txi.Function == nil || txi.Function.Definition == nil {
-		return i18n.NewError(ctx, msgs.MsgPrivateTxMgrFunctionNotProvided)
+		return i18n.NewError(ctx, msgs.MsgSequencerFunctionNotProvided)
 	}
 	log.L(sMgr.ctx).Infof("handling transaction %s from signer %s", tx.ID, tx.From)
 	return sMgr.handleTx(ctx, dbTX, &components.PrivateTransaction{
@@ -367,7 +367,7 @@ func (sMgr *sequencerManager) HandleTxResume(ctx context.Context, txi *component
 	tx := txi.Transaction
 	if tx.To == nil {
 		if txi.Transaction.SubmitMode.V() != pldapi.SubmitModeAuto {
-			return i18n.NewError(ctx, msgs.MsgPrivateTxMgrPrepareNotSupportedDeploy)
+			return i18n.NewError(ctx, msgs.MsgSequencerPrepareNotSupportedDeploy)
 		}
 		log.L(sMgr.ctx).Infof("resuming deploy transaction %s from signer %s", txi.Transaction.ID, txi.Transaction.From)
 		return sMgr.handleDeployTx(ctx, &components.PrivateContractDeploy{
@@ -382,7 +382,7 @@ func (sMgr *sequencerManager) HandleTxResume(ctx context.Context, txi *component
 		intent = prototk.TransactionSpecification_PREPARE_TRANSACTION
 	}
 	if txi.Function == nil || txi.Function.Definition == nil {
-		return i18n.NewError(ctx, msgs.MsgPrivateTxMgrFunctionNotProvided)
+		return i18n.NewError(ctx, msgs.MsgSequencerFunctionNotProvided)
 	}
 	log.L(sMgr.ctx).Infof("resuming transaction %s from signer %s", tx.ID, tx.From)
 	return sMgr.handleTx(ctx, sMgr.components.Persistence().NOTX(), &components.PrivateTransaction{
@@ -405,7 +405,7 @@ func (sMgr *sequencerManager) handleTx(ctx context.Context, dbTX persistence.DBT
 	contractAddr := *localTx.Transaction.To
 	emptyAddress := pldtypes.EthAddress{}
 	if contractAddr == emptyAddress {
-		return i18n.NewError(ctx, msgs.MsgContractAddressNotProvided)
+		return i18n.NewError(ctx, msgs.MsgSequencerContractAddressNotProvided)
 	}
 
 	domainAPI, err := sMgr.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
@@ -415,7 +415,7 @@ func (sMgr *sequencerManager) handleTx(ctx context.Context, dbTX persistence.DBT
 
 	domainName := domainAPI.Domain().Name()
 	if localTx.Transaction.Domain != "" && domainName != localTx.Transaction.Domain {
-		return i18n.NewError(ctx, msgs.MsgPrivateTxMgrDomainMismatch, localTx.Transaction.Domain, domainName, domainAPI.Address())
+		return i18n.NewError(ctx, msgs.MsgSequencerDomainMismatch, localTx.Transaction.Domain, domainName, domainAPI.Address())
 	}
 	localTx.Transaction.Domain = domainName
 
@@ -425,7 +425,7 @@ func (sMgr *sequencerManager) handleTx(ctx context.Context, dbTX persistence.DBT
 	}
 
 	if tx.PreAssembly == nil {
-		return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "PreAssembly is nil")
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "PreAssembly is nil")
 	}
 
 	sequencer, err := sMgr.LoadSequencer(ctx, dbTX, contractAddr, domainAPI, tx)
@@ -842,7 +842,7 @@ func (sMgr *sequencerManager) CallPrivateSmartContract(ctx context.Context, call
 
 	domainName := psc.Domain().Name()
 	if callTx.Domain != "" && domainName != callTx.Domain {
-		return nil, i18n.NewError(ctx, msgs.MsgPrivateTxMgrDomainMismatch, callTx.Domain, domainName, psc.Address())
+		return nil, i18n.NewError(ctx, msgs.MsgSequencerDomainMismatch, callTx.Domain, domainName, psc.Address())
 	}
 	callTx.Domain = domainName
 

@@ -116,7 +116,7 @@ func (e *engineIntegration) WriteLockStatesForTransaction(ctx context.Context, t
 			// which is most likely a programming error in the domain or the domain manager or the sequencer
 			errorMessage := fmt.Sprintf("Failed to write potential states: %s", err)
 			log.L(ctx).Error(errorMessage)
-			return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, errorMessage)
+			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, errorMessage)
 		} else {
 			log.L(ctx).Debugf("Potential states written %s", e.domainContext.Info().ID)
 		}
@@ -129,7 +129,7 @@ func (e *engineIntegration) WriteLockStatesForTransaction(ctx context.Context, t
 		if err != nil {
 			errorMessage := fmt.Sprintf("Failed to lock states: %s", err)
 			log.L(ctx).Error(errorMessage)
-			return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, errorMessage)
+			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, errorMessage)
 
 		} else {
 			log.L(ctx).Tracef("Input states locked %s: %s", e.domainContext.Info().ID, txn.PostAssembly.InputStates[0].ID)
@@ -206,7 +206,7 @@ func (e *engineIntegration) AssembleAndSign(ctx context.Context, transactionID u
 func (e *engineIntegration) resolveLocalTransaction(ctx context.Context, transactionID uuid.UUID) (*components.ResolvedTransaction, error) {
 	locallyResolvedTx, err := e.components.TxManager().GetResolvedTransactionByID(ctx, transactionID)
 	if err == nil && locallyResolvedTx == nil {
-		err = i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrAssembleTxnNotFound, transactionID)
+		err = i18n.WrapError(ctx, err, msgs.MsgSequencerAssembleTxnNotFound, transactionID)
 	}
 	return locallyResolvedTx, err
 }
@@ -231,7 +231,7 @@ func (e *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 			log.L(ctx).Errorf("transaction %s for invalid domain/address domain=%s (expected=%s) to=%s (expected=%s)",
 				transactionID, localTx.Transaction.Domain, e.domainSmartContract.Domain().Name(), localTx.Transaction.To, e.domainSmartContract.Address())
 		}
-		err := i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrAssembleRequestInvalid, transactionID)
+		err := i18n.WrapError(ctx, err, msgs.MsgSequencerAssembleRequestInvalid, transactionID)
 		return nil, err
 	}
 	transaction := &components.PrivateTransaction{
@@ -252,7 +252,7 @@ func (e *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 	}
 	if transaction.PostAssembly == nil {
 		// This is most likely a programming error in the domain
-		err := i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "AssembleTransaction returned nil PostAssembly")
+		err := i18n.NewError(ctx, msgs.MsgSequencerInternalError, "AssembleTransaction returned nil PostAssembly")
 		return nil, err
 	}
 
@@ -264,12 +264,12 @@ func (e *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 		case prototk.AttestationType_GENERATE_PROOF:
 			errorMessage := "AttestationType_GENERATE_PROOF is not implemented yet"
 			log.L(ctx).Error(errorMessage)
-			return nil, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, errorMessage)
+			return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, errorMessage)
 
 		default:
 			errorMessage := fmt.Sprintf("Unsupported attestation type: %s", attRequest.AttestationType)
 			log.L(ctx).Error(errorMessage)
-			return nil, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, errorMessage)
+			return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, errorMessage)
 		}
 	}
 
@@ -292,13 +292,13 @@ func (e *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 					resolvedKey, err := keyMgr.ResolveKeyNewDatabaseTX(ctx, unqualifiedLookup, attRequest.Algorithm, attRequest.VerifierType)
 					if err != nil {
 						log.L(ctx).Errorf("failed to resolve local signer for %s (algorithm=%s): %s", unqualifiedLookup, attRequest.Algorithm, err)
-						return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerResolveError, unqualifiedLookup, attRequest.Algorithm)
+						return nil, i18n.WrapError(ctx, err, msgs.MsgSequencerResolveError, unqualifiedLookup, attRequest.Algorithm)
 					}
 
 					signaturePayload, err := keyMgr.Sign(ctx, resolvedKey, attRequest.PayloadType, attRequest.Payload)
 					if err != nil {
 						log.L(ctx).Errorf("failed to sign for party %s (verifier=%s,algorithm=%s): %s", unqualifiedLookup, resolvedKey.Verifier.Verifier, attRequest.Algorithm, err)
-						return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerSignError, unqualifiedLookup, resolvedKey.Verifier.Verifier, attRequest.Algorithm)
+						return nil, i18n.WrapError(ctx, err, msgs.MsgSequencerSignError, unqualifiedLookup, resolvedKey.Verifier.Verifier, attRequest.Algorithm)
 					}
 					log.L(ctx).Debugf("payload: %x signed %x by %s (%s)", attRequest.Payload, signaturePayload, unqualifiedLookup, resolvedKey.Verifier.Verifier)
 

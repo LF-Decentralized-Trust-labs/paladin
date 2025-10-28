@@ -67,7 +67,7 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 	for _, recipient := range instruction.DistributionList {
 		nodeName, err := pldtypes.PrivateIdentityLocator(recipient).Node(ctx, false)
 		if err != nil {
-			return i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrDistributionNotFullyQualified, recipient)
+			return i18n.WrapError(ctx, err, msgs.MsgSequencerDistributionNotFullyQualified, recipient)
 		}
 
 		// See if we have a nullifier spec for this party
@@ -118,7 +118,7 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 	if len(remainingNullifiers) != 0 {
 		// .. the rules must have been broken
 		log.L(ctx).Errorf("Invalid nullifier / distribution list combination: %+v", instruction)
-		return i18n.NewError(ctx, msgs.MsgPrivateTxMgrInvalidNullifierSpecInDistro)
+		return i18n.NewError(ctx, msgs.MsgSequencerInvalidNullifierSpecInDistro)
 	}
 
 	return nil
@@ -138,14 +138,14 @@ func (sd *stateDistributionBuilder) Build(ctx context.Context) (sds *components.
 	// on the originating node. So as the transaction flows around everyone knows who the originating node is.
 	sd.OriginatorNode, err = pldtypes.PrivateIdentityLocator(tx.PreAssembly.TransactionSpecification.From).Node(ctx, false)
 	if err != nil {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrFromNotResolvedDistroTime)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgSequencerFromNotResolvedDistroTime)
 	}
 
 	if tx.PostAssembly == nil ||
 		len(tx.PostAssembly.OutputStatesPotential) != len(tx.PostAssembly.OutputStates) ||
 		len(tx.PostAssembly.InfoStatesPotential) != len(tx.PostAssembly.InfoStates) {
 		log.L(ctx).Debugf("Invalid post assembly: %+v", tx.PostAssembly)
-		return nil, i18n.NewError(ctx, msgs.MsgPrivateTxMgrInvalidTxStateStateDistro)
+		return nil, i18n.NewError(ctx, msgs.MsgSequencerInvalidTxStateStateDistro)
 	}
 
 	for i, fullState := range tx.PostAssembly.OutputStates {

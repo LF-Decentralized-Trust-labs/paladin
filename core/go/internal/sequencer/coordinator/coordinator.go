@@ -238,7 +238,7 @@ func (c *coordinator) selectNextActiveCoordinator(ctx context.Context) (string, 
 	log.L(ctx).Debugf("selected active coordinator for contract %s: %s", c.contractAddress.String(), coordinator)
 
 	if strings.Contains(coordinator, "@") || coordinator == "" {
-		return "", i18n.NewError(ctx, msgs.MsgDistSeqInternalError, "coordinator node is invalid")
+		return "", i18n.NewError(ctx, msgs.MsgSequencerInternalError, "coordinator node is invalid")
 	}
 
 	return coordinator, nil
