@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../administering_peers/">
+        <link rel="prev" href="../configuration/">
       
       
-        <link rel="next" href="../logging/">
+        <link rel="next" href="../administering_peers/">
       
       
       <link rel="icon" href="../../assets/paladin-icon-light.png">
@@ -20,7 +20,7 @@
     
     
       
-        <title>L1 and L2 Chains - Paladin</title>
+        <title>Certificate Management - Paladin</title>
       
     
     
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#running-paladin-with-a-public-l1-or-l2-chain-as-the-base-ledger" class="md-skip">
+        <a href="#certificate-management" class="md-skip">
           Skip to content
         </a>
       
@@ -196,7 +196,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              L1 and L2 Chains
+              Certificate Management
             
           </span>
         </div>
@@ -390,12 +390,12 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../certificate_management/" class="md-tabs__link">
+        <a href="../configuration/" class="md-tabs__link">
           
   
     
   
-  Guides
+  Administration
 
         </a>
       </li>
@@ -1547,6 +1547,8 @@
       
         
       
+        
+      
     
     
       
@@ -1567,7 +1569,7 @@
             
   
   <span class="md-ellipsis">
-    Guides
+    Administration
   </span>
   
 
@@ -1577,7 +1579,7 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
-            Guides
+            Administration
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -1588,7 +1590,48 @@
   
   
     <li class="md-nav__item">
-      <a href="../certificate_management/" class="md-nav__link">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Certificate Management
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -1597,6 +1640,77 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#cert-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      cert-manager
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-certificate-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      Custom certificate manager
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#certificate-rotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Certificate rotation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Certificate rotation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rotate-certificates-generated-with-cert-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      Rotate certificates generated with cert-manager
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-the-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      Update the registry
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1627,30 +1741,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    L1 and L2 Chains
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../l1-and-l2-chains/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1659,200 +1753,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#introduction" class="md-nav__link">
-    <span class="md-ellipsis">
-      Introduction
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#indexing" class="md-nav__link">
-    <span class="md-ellipsis">
-      Indexing
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#required-confirmations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Required confirmations
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Required confirmations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#default-behavior" class="md-nav__link">
-    <span class="md-ellipsis">
-      Default behavior
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#public-chain-considerations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Public chain considerations
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configuration-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      Configuration example
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#trade-offs" class="md-nav__link">
-    <span class="md-ellipsis">
-      Trade-offs
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#gas-price" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas price
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Gas price">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#fixed-gas-pricing-node-level" class="md-nav__link">
-    <span class="md-ellipsis">
-      Fixed gas pricing (node-level)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dynamic-gas-pricing-using-eth_feehistory" class="md-nav__link">
-    <span class="md-ellipsis">
-      Dynamic gas pricing using eth_feeHistory
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-oracle-api-pricing" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas oracle API pricing
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#fixed-gas-pricing-transaction-level" class="md-nav__link">
-    <span class="md-ellipsis">
-      Fixed gas pricing (transaction-level)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-price-increase-mechanism" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas price increase mechanism
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-price-caps" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas price caps
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-pricing-priority" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas pricing priority
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-price-caching" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas price caching
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      Examples
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#funding-signing-addresses-with-gas-tokens-eg-eth" class="md-nav__link">
-    <span class="md-ellipsis">
-      Funding signing addresses with gas tokens e.g. ETH
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3725,64 +3625,46 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#introduction" class="md-nav__link">
+  <a href="#cert-manager" class="md-nav__link">
     <span class="md-ellipsis">
-      Introduction
+      cert-manager
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#indexing" class="md-nav__link">
+  <a href="#custom-certificate-manager" class="md-nav__link">
     <span class="md-ellipsis">
-      Indexing
+      Custom certificate manager
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#required-confirmations" class="md-nav__link">
+  <a href="#certificate-rotation" class="md-nav__link">
     <span class="md-ellipsis">
-      Required confirmations
+      Certificate rotation
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Required confirmations">
+    <nav class="md-nav" aria-label="Certificate rotation">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#default-behavior" class="md-nav__link">
+  <a href="#rotate-certificates-generated-with-cert-manager" class="md-nav__link">
     <span class="md-ellipsis">
-      Default behavior
+      Rotate certificates generated with cert-manager
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#public-chain-considerations" class="md-nav__link">
+  <a href="#update-the-registry" class="md-nav__link">
     <span class="md-ellipsis">
-      Public chain considerations
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configuration-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      Configuration example
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#trade-offs" class="md-nav__link">
-    <span class="md-ellipsis">
-      Trade-offs
+      Update the registry
     </span>
   </a>
   
@@ -3790,111 +3672,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#gas-price" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas price
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Gas price">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#fixed-gas-pricing-node-level" class="md-nav__link">
-    <span class="md-ellipsis">
-      Fixed gas pricing (node-level)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dynamic-gas-pricing-using-eth_feehistory" class="md-nav__link">
-    <span class="md-ellipsis">
-      Dynamic gas pricing using eth_feeHistory
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-oracle-api-pricing" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas oracle API pricing
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#fixed-gas-pricing-transaction-level" class="md-nav__link">
-    <span class="md-ellipsis">
-      Fixed gas pricing (transaction-level)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-price-increase-mechanism" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas price increase mechanism
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-price-caps" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas price caps
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-pricing-priority" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas pricing priority
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gas-price-caching" class="md-nav__link">
-    <span class="md-ellipsis">
-      Gas price caching
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      Examples
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#funding-signing-addresses-with-gas-tokens-eg-eth" class="md-nav__link">
-    <span class="md-ellipsis">
-      Funding signing addresses with gas tokens e.g. ETH
-    </span>
-  </a>
   
 </li>
       
@@ -3916,277 +3693,158 @@
   
 
 
-<h1 id="running-paladin-with-a-public-l1-or-l2-chain-as-the-base-ledger">Running Paladin with a public L1 or L2 chain as the base ledger<a class="headerlink" href="#running-paladin-with-a-public-l1-or-l2-chain-as-the-base-ledger" title="Permanent link">&para;</a></h1>
-<h2 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h2>
-<p>Paladin supports any EVM compatible chain as the base ledger for public transactions. This includes using public chains that use paid gas, such as Ethereum Mainnet L1 chain or the Linea Mainnet L2 chain. There
-are certain considerations needed to run Paladin using a paid gas base ledger.</p>
-<h2 id="indexing">Indexing<a class="headerlink" href="#indexing" title="Permanent link">&para;</a></h2>
-<p>A public chain will have a long chain history. Paladin indexes the base ledger in order to confirm new transactions have been included in blocks. By default Paladin indexes the base ledger from block <code>0</code>. For a public
-chain this could take many days to index. Paladin only requires block history from the point at which Paladin tranasctions and contracts were deployed. To reduce the time to index the chain, use the <code>fromBlock</code> configuration
-option under the <code>blockIndexer</code> configuration section. For example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">blockIndexer</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nt">fromBlock</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9024200</span>
-</code></pre></div>
-<p>Set the <code>fromBlock</code> to a recent block near the head of the base ledger chain you are using. Indexing should complete within a few minutes and Paladin can then confirm any new Paladin transactions that are mined into blocks.</p>
-<h2 id="required-confirmations">Required confirmations<a class="headerlink" href="#required-confirmations" title="Permanent link">&para;</a></h2>
-<p>For public chains, it's important to configure the <code>requiredConfirmations</code> setting to ensure transaction finality. The block indexer waits for a specified number of confirmations before marking a transaction as succeeded, which helps protect against chain reorganizations.</p>
-<h3 id="default-behavior">Default behavior<a class="headerlink" href="#default-behavior" title="Permanent link">&para;</a></h3>
-<p>By default, Paladin sets <code>requiredConfirmations</code> to <code>0</code>, meaning transactions are considered confirmed immediately when they appear in a block. This is suitable for private chains or test networks where chain reorganizations are rare.</p>
-<h3 id="public-chain-considerations">Public chain considerations<a class="headerlink" href="#public-chain-considerations" title="Permanent link">&para;</a></h3>
-<p>Public chains can experience chain reorganizations, especially during periods of network congestion or when multiple validators produce blocks at similar times. Setting <code>requiredConfirmations</code> to a higher value provides protection against these reorganizations.</p>
-<h3 id="configuration-example">Configuration example<a class="headerlink" href="#configuration-example" title="Permanent link">&para;</a></h3>
-<p>To set the required confirmations for a public chain, add the following to your configuration:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">blockIndexer</span><span class="p">:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">fromBlock</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9024200</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">requiredConfirmations</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">12</span>
-</code></pre></div>
-<p>This configuration tells Paladin to wait for 12 block confirmations before considering a transaction as successfully confirmed. The block indexer will only process and mark transactions as succeeded after they have been included in a block that is at least 12 blocks behind the current chain head.</p>
-<h3 id="trade-offs">Trade-offs<a class="headerlink" href="#trade-offs" title="Permanent link">&para;</a></h3>
+<h1 id="certificate-management">Certificate management<a class="headerlink" href="#certificate-management" title="Permanent link">&para;</a></h1>
+<h2 id="cert-manager"><code>cert-manager</code><a class="headerlink" href="#cert-manager" title="Permanent link">&para;</a></h2>
+<p>By default Paladin uses the <code>cert-manager</code> operator to generate self signed certificates for each node. These certificates are published to the registry, and used for mTLS when Paladin nodes are communicating with each other over GRPC</p>
+<!-- TODO: in customnet it looks like it should be possible to create an issuer, but that helm chart value isn't respected. There's also limited value to providing a custom issuer if it's not possible to provide a spec for the cert it creates. So any non default use of cert-manager needs to be treated as a custom certificate manager but there's potential enhancements to be made here.-->
+
+<h2 id="custom-certificate-manager">Custom certificate manager<a class="headerlink" href="#custom-certificate-manager" title="Permanent link">&para;</a></h2>
+<p><code>customnet</code> installations may use certificates generated by a custom certificate manager provided the following requirements are met:</p>
 <ul>
-<li><strong>Higher confirmations</strong>: More secure against reorganizations but slower transaction confirmation</li>
-<li><strong>Lower confirmations</strong>: Faster confirmation but higher risk of transaction reversal due to reorganizations</li>
+<li>the key pair and certificate authority (if available) are made available in a <code>kubernetes.io/tls</code> Kubernetes secret</li>
+<li>the common name of the certificate is the node name</li>
+<li>the node endpoint that is published in the registry is a subject alternative name in the certificate</li>
 </ul>
-<p>Choose the number of confirmations based on your application's security requirements and the specific characteristics of the chain you're using.</p>
-<h2 id="gas-price">Gas price<a class="headerlink" href="#gas-price" title="Permanent link">&para;</a></h2>
-<p>Most public chains, whether they are an L1 or an L2, will use paid gas for all transactions. Paladin uses EIP1559 transactions and must set a suitable <code>maxFeePerGas</code> and <code>maxPriorityFeePerGas</code> value in those transactions
-in order for them to be mined into blocks. Paladin provides several options for configuring gas pricing, from fixed values to dynamic retrieval based on network conditions.</p>
-<h3 id="fixed-gas-pricing-node-level">Fixed gas pricing (node-level)<a class="headerlink" href="#fixed-gas-pricing-node-level" title="Permanent link">&para;</a></h3>
-<p>You can configure fixed gas prices at the node level that will be used for all transactions unless overridden at the transaction level:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">publicTxManager</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">gasPrice</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">fixedGasPrice</span><span class="p">:</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="nt">maxFeePerGas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0xdd71e69a</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">maxPriorityFeePerGas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0x307f4e</span>
+<p>The secret is provided in the <code>transports</code> section for the node in the helm values file.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">paladinNodes</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;node1&quot;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">transports</span><span class="p">:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grpc</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">tls</span><span class="p">:</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">        </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">node1-custom-certs</span><span class="w">  </span>
 </code></pre></div>
-<p>The gas prices must be set according to the following rules:</p>
-<ul>
-<li><code>maxPriorityFeePerGas</code> &gt;= the current value returned by <code>eth_maxPriorityFeePerGas</code><ul>
-<li>To accommodate fluctuations in the priority fee it may be necessary to set a value that is 10-50% higher than the current priority fee for the chain.</li>
-</ul>
-</li>
-<li><code>maxFeePerGas</code> &gt;= <code>maxPriorityFeePerGas</code></li>
-<li><code>maxFeePerGas</code> &gt;= <code>baseFeePerGas</code> returned from <code>eth_getBlockByNumber</code> for a recent block</li>
-<li><code>maxFeePerGas</code> &gt;= the minimum transaction pool gas fee for the chain</li>
-</ul>
-<p>Note: setting the fixed gas price values too high could result in paying more gas tokens (e.g. ETH) than necessary for transactions.</p>
-<h3 id="dynamic-gas-pricing-using-eth_feehistory">Dynamic gas pricing using eth_feeHistory<a class="headerlink" href="#dynamic-gas-pricing-using-eth_feehistory" title="Permanent link">&para;</a></h3>
-<p>Paladin can automatically retrieve optimal gas prices using the <code>eth_feeHistory</code> RPC method, which provides historical fee data from the network. This approach adapts to network conditions and can be more cost-effective than fixed pricing.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">publicTxManager</span><span class="p">:</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">gasPrice</span><span class="p">:</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">ethFeeHistory</span><span class="p">:</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">      </span><span class="nt">priorityFeePercentile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">85</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">      </span><span class="nt">historyBlockCount</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="nt">baseFeeBufferFactor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">      </span><span class="nt">cache</span><span class="p">:</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">        </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</code></pre></div>
-<p>Configuration options:</p>
-<ul>
-<li><strong><code>priorityFeePercentile</code></strong> (0-100): The percentile of historical priority fees to use. Higher values result in higher priority fees and faster transaction inclusion. Default: 85</li>
-<li><strong><code>historyBlockCount</code></strong>: Number of historical blocks to analyze for fee calculation. More blocks provide better averages but may be less responsive to recent changes. Default: 20</li>
-<li><strong><code>baseFeeBufferFactor</code></strong>: Multiplier for the base fee to provide a buffer against base fee increases. Default: 1 (no buffer)</li>
-<li><strong><code>cache.enabled</code></strong>: Whether to cache fee history results to reduce RPC calls. Default: true</li>
-</ul>
-<h3 id="gas-oracle-api-pricing">Gas oracle API pricing<a class="headerlink" href="#gas-oracle-api-pricing" title="Permanent link">&para;</a></h3>
-<p>Paladin can retrieve gas prices from external gas oracle APIs, which can provide more accurate or specialized gas price data than the standard <code>eth_feeHistory</code> method. This is particularly useful for chains with limited RPC capabilities or when using specialized gas price services.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">publicTxManager</span><span class="p">:</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">gasPrice</span><span class="p">:</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">gasOracleAPI</span><span class="p">:</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">      </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://api.example.com/gas&quot;</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">      </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;GET&quot;</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="nt">auth</span><span class="p">:</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;your-username&quot;</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">        </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;your-password&quot;</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">      </span><span class="nt">httpHeaders</span><span class="p">:</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="nt">X-API-Key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;your-api-key-here&quot;</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">      </span><span class="nt">responseTemplate</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">        </span><span class="no">{</span>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">          </span><span class="no">&quot;maxFeePerGas&quot;: &quot;{{.maxFeePerGas}}&quot;,</span>
-<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">          </span><span class="no">&quot;maxPriorityFeePerGas&quot;: &quot;{{.maxPriorityFeePerGas}}&quot;</span>
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">        </span><span class="no">}</span>
-</code></pre></div>
-<p>Configuration options:</p>
-<ul>
-<li><strong><code>url</code></strong>: The HTTP endpoint URL for the gas oracle API</li>
-<li><strong><code>method</code></strong>: The HTTP method to use for the request. Default: <code>"GET"</code></li>
-<li><strong><code>body</code></strong>: The request body to send with the request.</li>
-<li><strong><code>responseTemplate</code></strong>: A Go template string that extracts gas price data from the API response. The template receives the JSON response as data and should output a JSON object with <code>maxFeePerGas</code> and <code>maxPriorityFeePerGas</code> fields</li>
-<li><strong>Authentication</strong>: HTTP client authentication options are supported:</li>
-<li><strong><code>auth.username</code></strong> and <strong><code>auth.password</code></strong>: Basic authentication</li>
-<li><strong><code>httpHeaders</code></strong>: Custom HTTP headers (useful for API keys, bearer tokens, etc.)</li>
-</ul>
-<p>The gas oracle API must:
-- Return a JSON response containing gas price information
-- Be accessible via HTTP requests (GET, POST, etc.)
-- Return gas prices in either hexadecimal format (e.g., <code>"0x2FAF080"</code>) or decimal format (e.g., <code>"50000000"</code>)</p>
-<h4 id="custom-jsonrpc-methods">Custom JSON/RPC methods<a class="headerlink" href="#custom-jsonrpc-methods" title="Permanent link">&para;</a></h4>
-<p>Gas oracle APIs can also be custom JSON/RPC methods provided by your base ledger node. This is useful when your node supports specialized gas price calculation methods that aren't part of the standard Ethereum JSON/RPC specification.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">publicTxManager</span><span class="p">:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">gasPrice</span><span class="p">:</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">gasOracleAPI</span><span class="p">:</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">      </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;http://localhost:8545&quot;</span><span class="w">  </span><span class="c1"># Your base ledger node</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;POST&quot;</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="nt">body</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">        </span><span class="no">{</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">          </span><span class="no">&quot;jsonrpc&quot;: &quot;2.0&quot;,</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">          </span><span class="no">&quot;method&quot;: &quot;custom_feeHistory&quot;,</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">          </span><span class="no">&quot;params&quot;: [20, &quot;latest&quot;, [25, 50, 75]],</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">          </span><span class="no">&quot;id&quot;: 1</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">        </span><span class="no">}</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">      </span><span class="nt">responseTemplate</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">        </span><span class="no">{</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">          </span><span class="no">&quot;maxFeePerGas&quot;: &quot;{{.result.maxFeePerGas}}&quot;,</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">          </span><span class="no">&quot;maxPriorityFeePerGas&quot;: &quot;{{.result.maxPriorityFeePerGas}}&quot;</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">        </span><span class="no">}</span>
-</code></pre></div>
-<p><strong>Important considerations for custom JSON/RPC methods:</strong></p>
-<ul>
-<li><strong>Authentication</strong>: If your base ledger node requires authentication, you'll need to configure it in both the <code>blockIndexer</code> section (for standard RPC calls) and the <code>gasOracleAPI</code> section (for gas price calls)</li>
-<li><strong>Response format</strong>: The template receives the full JSON/RPC response, so you may need to access nested fields like <code>{{.result.fieldName}}</code> instead of <code>{{.fieldName}}</code></li>
-</ul>
-<p>Example API responses that work with the template above:</p>
-<p><strong>Hexadecimal format:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">&quot;result&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">&quot;maxFeePerGas&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0x2FAF080&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">&quot;maxPriorityFeePerGas&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0x3B9ACA0&quot;</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">}</span>
-</code></pre></div></p>
-<p><strong>Decimal format:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">&quot;result&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">&quot;maxFeePerGas&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;50000000&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">&quot;maxPriorityFeePerGas&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;62500000&quot;</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">}</span>
-</code></pre></div></p>
-<h3 id="fixed-gas-pricing-transaction-level">Fixed gas pricing (transaction-level)<a class="headerlink" href="#fixed-gas-pricing-transaction-level" title="Permanent link">&para;</a></h3>
-<p>You can override gas pricing for individual transactions by setting gas prices directly on the transaction. This disables the gas pricing engine for that specific transaction:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1">// Go SDK example</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nx">txBuilder</span><span class="p">.</span><span class="nx">PublicTxOptions</span><span class="p">(</span><span class="nx">pldapi</span><span class="p">.</span><span class="nx">PublicTxOptions</span><span class="p">{</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nx">MaxFeePerGas</span><span class="p">:</span><span class="w">         </span><span class="nx">pldtypes</span><span class="p">.</span><span class="nx">Uint64ToUint256</span><span class="p">(</span><span class="mi">20000000000</span><span class="p">),</span><span class="w"> </span><span class="c1">// 20 Gwei</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nx">MaxPriorityFeePerGas</span><span class="p">:</span><span class="w"> </span><span class="nx">pldtypes</span><span class="p">.</span><span class="nx">Uint64ToUint256</span><span class="p">(</span><span class="mi">2000000000</span><span class="p">),</span><span class="w">  </span><span class="c1">// 2 Gwei</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="p">})</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1">// TypeScript SDK example</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">sendTransaction</span><span class="p">({</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="c1">// ... transaction details</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nx">maxFeePerGas</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;0x4a817c800&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// 20 Gwei</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="nx">maxPriorityFeePerGas</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;0x77359400&quot;</span><span class="w"> </span><span class="c1">// 2 Gwei</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="p">});</span>
-</code></pre></div>
-<p>Transaction-level fixed gas pricing bypasses all automatic gas pricing logic and uses the exact values you specify.</p>
-<h3 id="gas-price-increase-mechanism">Gas price increase mechanism<a class="headerlink" href="#gas-price-increase-mechanism" title="Permanent link">&para;</a></h3>
-<p>When a transaction is rejected for being underpriced, Paladin can automatically increase the gas price by a configurable percentage and resubmit the transaction. This mechanism applies to node-level fixed pricing, gas oracle API pricing, and dynamic pricing, but not to transaction-level fixed pricing.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">publicTxManager</span><span class="p">:</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">gasPrice</span><span class="p">:</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">increasePercentage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
-</code></pre></div>
-<ul>
-<li><strong><code>increasePercentage</code></strong>: Percentage increase to apply when a transaction is underpriced. Default: 10%</li>
-<li>This increase is applied to the previously submitted gas price, not the current network price</li>
-<li>The mechanism helps ensure transactions are eventually included even during periods of rapidly increasing gas prices</li>
-</ul>
-<h3 id="gas-price-caps">Gas price caps<a class="headerlink" href="#gas-price-caps" title="Permanent link">&para;</a></h3>
-<p>To protect against excessive gas spending, you can configure maximum caps for both <code>maxFeePerGas</code> and <code>maxPriorityFeePerGas</code>. These caps apply universally to all gas pricing methods:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">publicTxManager</span><span class="p">:</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">gasPrice</span><span class="p">:</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">maxFeePerGasCap</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0x5d21dba00</span><span class="w">  </span><span class="c1"># 25 Gwei cap</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">maxPriorityFeePerGasCap</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0x77359400</span><span class="w">  </span><span class="c1"># 2 Gwei cap</span>
-</code></pre></div>
-<ul>
-<li><strong><code>maxFeePerGasCap</code></strong>: Maximum allowed <code>maxFeePerGas</code> value</li>
-<li><strong><code>maxPriorityFeePerGasCap</code></strong>: Maximum allowed <code>maxPriorityFeePerGas</code> value</li>
-<li>Caps are applied after all other gas pricing calculations, including increases for underpriced transactions</li>
-<li>If a calculated gas price exceeds the cap, it will be reduced to the cap value</li>
-<li>Setting caps too low may result in transactions being rejected by the network</li>
-</ul>
-<h3 id="gas-pricing-priority">Gas pricing priority<a class="headerlink" href="#gas-pricing-priority" title="Permanent link">&para;</a></h3>
-<p>Paladin uses the following priority order when determining gas prices for a transaction:</p>
+<h2 id="certificate-rotation">Certificate rotation<a class="headerlink" href="#certificate-rotation" title="Permanent link">&para;</a></h2>
+<p>If you are rotating certificates which the Paladin operator has generated via <code>cert-manager</code>, follow the steps under <a href="#rotate-certificates-generated-with-cert-manager">Rotate certificates generated with <code>cert-manager</code></a>.</p>
+<p>If you are rotating certificates from a custom certificate manager, follow their instructions to rotate certificates. </p>
+<p>Once the certificates have been rotated, or if you are updating the registry with certificates which have already rotated, follow the steps under <a href="#update-the-registry">Update the registry</a></p>
+<blockquote>
+<p>N.B. In the period of time between the certificates rotating and the registry being updated, nodes will be unable to communicate with each other.</p>
+</blockquote>
+<h3 id="rotate-certificates-generated-with-cert-manager">Rotate certificates generated with <code>cert-manager</code><a class="headerlink" href="#rotate-certificates-generated-with-cert-manager" title="Permanent link">&para;</a></h3>
 <ol>
-<li><strong>Zero gas price chain</strong>: If the chain is detected as having zero gas prices, return zero values</li>
-<li><strong>Transaction-level fixed pricing</strong>: If gas prices are set on the individual transaction</li>
-<li><strong>Node-level fixed pricing</strong>: If fixed gas prices are configured at the node level</li>
-<li><strong>Gas oracle API</strong>: If a gas oracle API is configured, retrieve gas prices from the external service</li>
-<li><strong>Dynamic pricing</strong>: Use <code>eth_feeHistory</code> to calculate optimal gas prices</li>
-</ol>
-<p>This priority system ensures that transaction-level overrides take precedence while providing multiple fallback mechanisms for automatic gas pricing.</p>
-<h3 id="gas-price-caching">Gas price caching<a class="headerlink" href="#gas-price-caching" title="Permanent link">&para;</a></h3>
-<p>Paladin includes a built-in caching mechanism for gas price data that can significantly improve performance when submitting multiple transactions. The cache is particularly valuable in high-throughput scenarios where multiple transactions are likely to be included in the same block.</p>
-<h4 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h4>
-<p>The gas price cache stores the most recent gas price data and automatically refreshes it at configurable intervals. When a transaction needs gas pricing, Paladin first checks the cache before making external API calls or RPC requests.</p>
-<h4 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h4>
-<p>Both <code>ethFeeHistory</code> and <code>gasOracleAPI</code> pricing methods support caching:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">publicTxManager</span><span class="p">:</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">gasPrice</span><span class="p">:</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="nt">ethFeeHistory</span><span class="p">:</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">      </span><span class="nt">cache</span><span class="p">:</span>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">        </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">        </span><span class="nt">refreshTime</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;30s&quot;</span>
-<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">    </span><span class="nt">gasOracleAPI</span><span class="p">:</span>
-<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">      </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://api.example.com/gas&quot;</span>
-<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">      </span><span class="nt">responseTemplate</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">        </span><span class="no">{</span>
-<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="w">          </span><span class="no">&quot;maxFeePerGas&quot;: &quot;{{.maxFeePerGas}}&quot;,</span>
-<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="w">          </span><span class="no">&quot;maxPriorityFeePerGas&quot;: &quot;{{.maxPriorityFeePerGas}}&quot;</span>
-<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="w">        </span><span class="no">}</span>
-<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="w">      </span><span class="nt">cache</span><span class="p">:</span>
-<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="w">        </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a><span class="w">        </span><span class="nt">refreshTime</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;30s&quot;</span>
+<li>Install the <a href="https://cert-manager.io/docs/reference/cmctl/"><code>cmctl</code> command line tool</a></li>
+<li>List all the certificates generated for Paladin nodes
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>certificate<span class="w"> </span>-l<span class="w"> </span>app.kubernetes.io/part-of<span class="o">=</span>paladin
 </code></pre></div>
-<p><strong>Cache configuration options:</strong></p>
-<ul>
-<li><strong><code>enabled</code></strong>: Whether to enable caching for gas price data. Default: <code>true</code></li>
-<li><strong><code>refreshTime</code></strong>: How often to refresh the cached gas price data. Default: <code>"30s"</code></li>
-</ul>
-<h4 id="refresh-time-considerations">Refresh time considerations<a class="headerlink" href="#refresh-time-considerations" title="Permanent link">&para;</a></h4>
-<p>The refresh time should be carefully considered based on your chain's characteristics and transaction patterns:</p>
-<ul>
-<li>
-<p><strong>Block period relationship</strong>: Consider your chain's block period when setting the refresh time. For example, if your chain has 10-second blocks, a 30-second refresh time would cover 3 blocks, while a 60-second refresh time would cover 6 blocks.</p>
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>NAME<span class="w">                 </span>READY<span class="w">   </span>SECRET<span class="w">               </span>AGE
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>paladin-node1-mtls<span class="w">   </span>True<span class="w">    </span>paladin-node1-mtls<span class="w">   </span>21h
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>paladin-node2-mtls<span class="w">   </span>True<span class="w">    </span>paladin-node2-mtls<span class="w">   </span>21h
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>paladin-node3-mtls<span class="w">   </span>True<span class="w">    </span>paladin-node3-mtls<span class="w">   </span>21h
+</code></pre></div></li>
+<li>Use <code>cmctl</code> to renew all the certificates
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>cmctl<span class="w"> </span>renew<span class="w"> </span>paladin-node1-mtls<span class="w"> </span>--namespace<span class="w"> </span>paladin
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>cmctl<span class="w"> </span>renew<span class="w"> </span>paladin-node2-mtls<span class="w"> </span>--namespace<span class="w"> </span>paladin
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>cmctl<span class="w"> </span>renew<span class="w"> </span>paladin-node3-mtls<span class="w"> </span>--namespace<span class="w"> </span>paladin
+</code></pre></div></li>
+<li>Wait for all the Paladin node pods to roll and pick up the new certificates
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>pods<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span>-w
+</code></pre></div>
+ <br />
+<details>
+    <summary>See example output</summary>
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>NAME              READY   STATUS    RESTARTS   AGE
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>paladin-node1-0   2/2     Running   0          21h
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>paladin-node2-0   2/2     Running   0          21h
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>paladin-node3-0   2/2     Running   0          21h
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>paladin-node1-0   2/2     Terminating   0          21h
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>paladin-node2-0   2/2     Terminating   0          21h
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>paladin-node3-0   2/2     Terminating   0          21h
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>paladin-node2-0   1/2     Terminating   0          21h
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>paladin-node1-0   0/2     Completed     0          21h
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>paladin-node2-0   0/2     Completed     0          21h
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>paladin-node3-0   0/2     Completed     0          21h
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>paladin-node1-0   0/2     Completed     0          21h
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>paladin-node1-0   0/2     Completed     0          21h
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>paladin-node3-0   0/2     Completed     0          21h
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>paladin-node1-0   0/2     Pending       0          0s
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>paladin-node3-0   0/2     Completed     0          21h
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>paladin-node1-0   0/2     Pending       0          0s
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>paladin-node3-0   0/2     Pending       0          0s
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>paladin-node2-0   0/2     Completed     0          21h
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>paladin-node3-0   0/2     Pending       0          0s
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>paladin-node2-0   0/2     Completed     0          21h
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>paladin-node2-0   0/2     Pending       0          0s
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>paladin-node2-0   0/2     Pending       0          0s
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>paladin-node1-0   0/2     ContainerCreating   0          1s
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>paladin-node3-0   0/2     ContainerCreating   0          1s
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>paladin-node2-0   0/2     ContainerCreating   0          0s
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>paladin-node1-0   1/2     Running             0          7s
+<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>paladin-node3-0   1/2     Running             0          8s
+<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>paladin-node2-0   1/2     Running             0          7s
+<a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>paladin-node1-0   2/2     Running             0          16s
+<a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>paladin-node3-0   2/2     Running             0          16s
+<a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>paladin-node2-0   2/2     Running             0          16s
+</code></pre></div>
+    </details>
 </li>
-<li>
-<p><strong>Higher refresh periods</strong>:</p>
+</ol>
+<h3 id="update-the-registry">Update the registry<a class="headerlink" href="#update-the-registry" title="Permanent link">&para;</a></h3>
+<p>These steps need to be repeated for every Paladin node</p>
+<ol>
+<li>Get the address of the registry
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>registry
+</code></pre></div>
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>NAME<span class="w">           </span>TYPE<span class="w">   </span>STATUS<span class="w">      </span>CONTRACT
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>evm-registry<span class="w">   </span>evm<span class="w">    </span>Available<span class="w">   </span>0x20627c59237c42aeefff4445519881d6dd9c8727
+</code></pre></div></li>
+<li>Get the identity hash of the node in the registry</li>
+<li>Get the local transport details
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>curl<span class="w"> </span>http://localhost:31548<span class="w"> </span>--header<span class="w"> </span><span class="s1">&#39;Content-Type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>--data<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="s1">    &quot;jsonrpc&quot;: &quot;2.0&quot;,</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="s1">    &quot;id&quot;: &quot;1&quot;,</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="s1">    &quot;method&quot;: &quot;transport_localTransportDetails&quot;,</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="s1">    &quot;params&quot;: [&quot;grpc&quot;]</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="s1">}&#39;</span>
+</code></pre></div><blockquote>
+<p>N.B. it is important to ensure that the Paladin node pod has rolled to pick up the new certificates so that the response from this RPC call is accurate</p>
+</blockquote>
 </li>
-<li>✅ Reduce API calls and RPC load</li>
-<li>✅ Lower resource usage</li>
-<li>❌ May result in outdated gas price data</li>
-<li>
-<p>❌ Transactions might be rejected for being underpriced</p>
-</li>
-<li>
-<p><strong>Lower refresh periods</strong>:</p>
-</li>
-<li>✅ More accurate, up-to-date gas prices</li>
-<li>✅ Better success rates for transaction inclusion</li>
-<li>❌ Increased API calls and resource usage</li>
-<li>❌ Higher costs for external gas oracle services</li>
-</ul>
-<h4 id="when-caching-is-most-valuable">When caching is most valuable<a class="headerlink" href="#when-caching-is-most-valuable" title="Permanent link">&para;</a></h4>
-<p>The gas price cache provides the most benefit when:</p>
-<ul>
-<li><strong>High transaction throughput</strong>: Multiple transactions are submitted frequently</li>
-<li><strong>Same-block inclusion</strong>: Transactions are likely to be included in the same or nearby blocks</li>
-<li><strong>Stable network conditions</strong>: Gas prices don't change rapidly between blocks</li>
-<li><strong>External API usage</strong>: Using gas oracle APIs where each call has a cost</li>
-</ul>
-<h4 id="cache-behavior">Cache behavior<a class="headerlink" href="#cache-behavior" title="Permanent link">&para;</a></h4>
-<ul>
-<li>Only one cache is active at a time (gas oracle API takes precedence over eth fee history)</li>
-<li>Cache is shared across all transactions and signing addresses</li>
-<li>Cache refresh happens in the background without blocking transaction submission</li>
-<li>If cache refresh fails, the previous cached value continues to be used</li>
-<li>Cache is automatically disabled if the gas pricing method is not configured</li>
-</ul>
-<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
-<p>The examples deploy contracts and invoke transactions before waiting for receipts to confirm they have succeesfully been mined. The default wait time in the Paladin examples is 30 seconds. This should be sufficient for most public chains, but it can be increased by modifying (<code>DEFAULT_POLL_TIMEOUT</code> in the examples config file)[<a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/common/src/config.ts">https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/common/src/config.ts</a>].</p>
-<p>Note: the example code won't wait the full polling period if the contract deploy completes early, so setting a large value won't increase the example run time unncessarily.</p>
-<h2 id="funding-signing-addresses-with-gas-tokens-eg-eth">Funding signing addresses with gas tokens e.g. ETH<a class="headerlink" href="#funding-signing-addresses-with-gas-tokens-eg-eth" title="Permanent link">&para;</a></h2>
-<p>Paladin uses a number of signing keys for the different domains and for initial deployment of the Paladin contracts. It also uses a new signing key for every public transaction as part of its approach to
-preventing transactions on the base ledger from being correlated with each other.</p>
-<p>A Paladin node can be configured to use predetermined signing keys, for example by using a pre-configured HD wallet mnemonic from which all signing keys are derived.</p>
-<p>It is necessary to ensure the addresses used by Paladin have sufficient gas tokens to fund transactions.</p>
+<li>Submit a transaction to the node to update the transport details, filling in the node name as well as the registry address, identity hash and local transport details from the above steps.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>--location<span class="w"> </span>http://localhost:31548<span class="w"> </span>--header<span class="w"> </span><span class="s1">&#39;Content-Type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>--data<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="s1">    &quot;jsonrpc&quot;: &quot;2.0&quot;,</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="s1">    &quot;id&quot;: &quot;1&quot;,</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="s1">    &quot;method&quot;: &quot;ptx_sendTransaction&quot;,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="s1">    &quot;params&quot;: [</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="s1">        {</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="s1">            &quot;type&quot;: &quot;public&quot;,</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="s1">            &quot;function&quot;: &quot;setIdentityProperty&quot;,</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="s1">            &quot;from&quot;: &quot;registry.&lt;node name&gt;&quot;,</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="s1">            &quot;to&quot;: &quot;&lt;registry address&gt;&quot;,</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="s1">            &quot;data&quot;: {</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="s1">                &quot;name&quot;: &quot;transport.grpc&quot;,</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="s1">                &quot;identityHash&quot;: &quot;&lt;identity hash&gt;&quot;,</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="s1">                &quot;value&quot;: &quot;&lt;local transport details&gt;&quot;</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="s1">            },</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="s1">            &quot;abi&quot;: [{</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="s1">                &quot;inputs&quot;: [</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="s1">                    {</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="s1">                        &quot;internalType&quot;: &quot;bytes32&quot;,</span>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="s1">                        &quot;name&quot;: &quot;identityHash&quot;,</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="s1">                        &quot;type&quot;: &quot;bytes32&quot;</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="s1">                    },</span>
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a><span class="s1">                    {</span>
+<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a><span class="s1">                        &quot;internalType&quot;: &quot;string&quot;,</span>
+<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a><span class="s1">                        &quot;name&quot;: &quot;name&quot;,</span>
+<a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a><span class="s1">                        &quot;type&quot;: &quot;string&quot;</span>
+<a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a><span class="s1">                    },</span>
+<a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a><span class="s1">                    {</span>
+<a id="__codelineno-9-30" name="__codelineno-9-30" href="#__codelineno-9-30"></a><span class="s1">                        &quot;internalType&quot;: &quot;string&quot;,</span>
+<a id="__codelineno-9-31" name="__codelineno-9-31" href="#__codelineno-9-31"></a><span class="s1">                        &quot;name&quot;: &quot;value&quot;,</span>
+<a id="__codelineno-9-32" name="__codelineno-9-32" href="#__codelineno-9-32"></a><span class="s1">                        &quot;type&quot;: &quot;string&quot;</span>
+<a id="__codelineno-9-33" name="__codelineno-9-33" href="#__codelineno-9-33"></a><span class="s1">                    }</span>
+<a id="__codelineno-9-34" name="__codelineno-9-34" href="#__codelineno-9-34"></a><span class="s1">                ],</span>
+<a id="__codelineno-9-35" name="__codelineno-9-35" href="#__codelineno-9-35"></a><span class="s1">                &quot;name&quot;: &quot;setIdentityProperty&quot;,</span>
+<a id="__codelineno-9-36" name="__codelineno-9-36" href="#__codelineno-9-36"></a><span class="s1">                &quot;outputs&quot;: [],</span>
+<a id="__codelineno-9-37" name="__codelineno-9-37" href="#__codelineno-9-37"></a><span class="s1">                &quot;stateMutability&quot;: &quot;nonpayable&quot;,</span>
+<a id="__codelineno-9-38" name="__codelineno-9-38" href="#__codelineno-9-38"></a><span class="s1">                &quot;type&quot;: &quot;function&quot;</span>
+<a id="__codelineno-9-39" name="__codelineno-9-39" href="#__codelineno-9-39"></a><span class="s1">            }]</span>
+<a id="__codelineno-9-40" name="__codelineno-9-40" href="#__codelineno-9-40"></a><span class="s1">        }</span>
+<a id="__codelineno-9-41" name="__codelineno-9-41" href="#__codelineno-9-41"></a><span class="s1">    ]</span>
+<a id="__codelineno-9-42" name="__codelineno-9-42" href="#__codelineno-9-42"></a><span class="s1">}&#39;</span>
+</code></pre></div></li>
+</ol>
 
 
 
@@ -4218,7 +3876,7 @@ preventing transactions on the base ledger from being correlated with each other
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../administering_peers/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Administering Peers">
+          <a href="../configuration/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Configuration">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -4228,20 +3886,20 @@ preventing transactions on the base ledger from being correlated with each other
                 Previous
               </span>
               <div class="md-ellipsis">
-                Administering Peers
+                Configuration
               </div>
             </div>
           </a>
         
         
           
-          <a href="../logging/" class="md-footer__link md-footer__link--next" aria-label="Next: Logging">
+          <a href="../administering_peers/" class="md-footer__link md-footer__link--next" aria-label="Next: Administering Peers">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Logging
+                Administering Peers
               </div>
             </div>
             <div class="md-footer__button md-icon">

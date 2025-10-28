@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../l1-and-l2-chains/">
+        <link rel="prev" href="../certificate_management/">
       
       
-        <link rel="next" href="../../reference/apis/bidx/">
+        <link rel="next" href="../l1-and-l2-chains/">
       
       
       <link rel="icon" href="../../assets/paladin-icon-light.png">
@@ -20,7 +20,7 @@
     
     
       
-        <title>Logging - Paladin</title>
+        <title>Administering Peers - Paladin</title>
       
     
     
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#logging-guide" class="md-skip">
+        <a href="#administering-peers" class="md-skip">
           Skip to content
         </a>
       
@@ -196,7 +196,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Logging
+              Administering Peers
             
           </span>
         </div>
@@ -390,12 +390,12 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../certificate_management/" class="md-tabs__link">
+        <a href="../configuration/" class="md-tabs__link">
           
   
     
   
-  Guides
+  Administration
 
         </a>
       </li>
@@ -1547,6 +1547,8 @@
       
         
       
+        
+      
     
     
       
@@ -1567,7 +1569,7 @@
             
   
   <span class="md-ellipsis">
-    Guides
+    Administration
   </span>
   
 
@@ -1577,9 +1579,30 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
-            Guides
+            Administration
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -1606,10 +1629,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../administering_peers/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Administering Peers
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -1618,6 +1661,68 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#debugging-peering-issues-in-the-reference-evm-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      Debugging peering issues in the reference evm registry
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Debugging peering issues in the reference evm registry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-confirm-the-status-of-the-paladinregistration" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Confirm the status of the paladinregistration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-confirm-that-all-registration-events-have-been-indexed" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Confirm that all registration events have been indexed
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-confirm-registry-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Confirm registry contents
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1648,30 +1753,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Logging
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../logging/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1680,134 +1765,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      Overview
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#log-level-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      Log Level Configuration
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Log Level Configuration">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#setting-log-levels" class="md-nav__link">
-    <span class="md-ellipsis">
-      Setting Log Levels
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#available-log-levels" class="md-nav__link">
-    <span class="md-ellipsis">
-      Available Log Levels
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#log-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      Log Structure
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Log Structure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#component-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      Component Reference
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#kubernetes-log-filtering" class="md-nav__link">
-    <span class="md-ellipsis">
-      Kubernetes Log Filtering
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Kubernetes Log Filtering">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#basic-log-filtering" class="md-nav__link">
-    <span class="md-ellipsis">
-      Basic Log Filtering
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#filtering-by-log-level" class="md-nav__link">
-    <span class="md-ellipsis">
-      Filtering by Log Level
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#real-time-log-monitoring" class="md-nav__link">
-    <span class="md-ellipsis">
-      Real-time Log Monitoring
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3659,103 +3616,37 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#debugging-peering-issues-in-the-reference-evm-registry" class="md-nav__link">
     <span class="md-ellipsis">
-      Overview
+      Debugging peering issues in the reference evm registry
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#log-level-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      Log Level Configuration
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Log Level Configuration">
+    <nav class="md-nav" aria-label="Debugging peering issues in the reference evm registry">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#setting-log-levels" class="md-nav__link">
+  <a href="#1-confirm-the-status-of-the-paladinregistration" class="md-nav__link">
     <span class="md-ellipsis">
-      Setting Log Levels
+      1. Confirm the status of the paladinregistration
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#available-log-levels" class="md-nav__link">
+  <a href="#2-confirm-that-all-registration-events-have-been-indexed" class="md-nav__link">
     <span class="md-ellipsis">
-      Available Log Levels
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#log-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      Log Structure
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Log Structure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#component-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      Component Reference
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#kubernetes-log-filtering" class="md-nav__link">
-    <span class="md-ellipsis">
-      Kubernetes Log Filtering
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Kubernetes Log Filtering">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#basic-log-filtering" class="md-nav__link">
-    <span class="md-ellipsis">
-      Basic Log Filtering
+      2. Confirm that all registration events have been indexed
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#filtering-by-log-level" class="md-nav__link">
+  <a href="#3-confirm-registry-contents" class="md-nav__link">
     <span class="md-ellipsis">
-      Filtering by Log Level
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#real-time-log-monitoring" class="md-nav__link">
-    <span class="md-ellipsis">
-      Real-time Log Monitoring
+      3. Confirm registry contents
     </span>
   </a>
   
@@ -3784,189 +3675,277 @@
   
 
 
-<h1 id="logging-guide">Logging Guide<a class="headerlink" href="#logging-guide" title="Permanent link">&para;</a></h1>
-<p>This guide covers Paladin's logging system, including component-based logging and how to filter logs in Kubernetes environments.</p>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Paladin uses structured logging with component-based context to provide clear visibility into system operations. Each log entry includes a <code>component</code> field that identifies which part of the system generated the log message.</p>
-<h2 id="log-level-configuration">Log Level Configuration<a class="headerlink" href="#log-level-configuration" title="Permanent link">&para;</a></h2>
-<h3 id="setting-log-levels">Setting Log Levels<a class="headerlink" href="#setting-log-levels" title="Permanent link">&para;</a></h3>
-<p>Log levels are configured in the YAML configuration file under the <code>log</code> section.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">log</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug</span>
+<h1 id="administering-peers">Administering peers<a class="headerlink" href="#administering-peers" title="Permanent link">&para;</a></h1>
+<!-- TODO: this section could include an overview of our reference registry implementations. The architecture page needs to be filled in for the generic registry architecture. -->
+
+<!-- TODO: talk about the difference in behaviour between directCertVerification being enabled or not -->
+
+<h2 id="debugging-peering-issues-in-the-reference-evm-registry">Debugging peering issues in the reference <code>evm</code> registry<a class="headerlink" href="#debugging-peering-issues-in-the-reference-evm-registry" title="Permanent link">&para;</a></h2>
+<p>Errors such as: 
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>PD012100: No entries found for node &#39;node2&#39;
 </code></pre></div>
-<h3 id="available-log-levels">Available Log Levels<a class="headerlink" href="#available-log-levels" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Level</th>
-<th>Description</th>
-<th>Use Case</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>trace</code></td>
-<td>Most detailed information for debugging</td>
-<td>Detailed tracing of function calls and internal operations</td>
-</tr>
-<tr>
-<td><code>debug</code></td>
-<td>Detailed information for debugging</td>
-<td>Development and troubleshooting</td>
-</tr>
-<tr>
-<td><code>info</code></td>
-<td>General information about system operation</td>
-<td>Normal operation monitoring</td>
-</tr>
-<tr>
-<td><code>warn</code></td>
-<td>Warning messages for potentially harmful situations</td>
-<td>Issues that don't stop operation</td>
-</tr>
-<tr>
-<td><code>error</code></td>
-<td>Error messages for failed operations</td>
-<td>Critical issues requiring attention</td>
-</tr>
-</tbody>
-</table>
-<h2 id="log-structure">Log Structure<a class="headerlink" href="#log-structure" title="Permanent link">&para;</a></h2>
-<p>Paladin logs are structured text with the following key fields:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>&quot;PD011206: TRANSPORT grpc returned error: PD030015: GRPC connection failed for endpoint &#39;dns:///paladin-node2.paladin.svc.cluster.local:9000&#39;: rpc error: code = Unavailable desc = connection error: desc = \&quot;transport: authentication handshake failed: PD030007: peer &#39;node2&#39; did not provide a certificate signed an expected issuer received=CN=node2 issuers=[CN=node1]: x509: certificate signed by unknown authority\&quot;&quot;
+</code></pre></div>
+can occur when</p>
 <ul>
-<li><strong><code>timestamp</code></strong>: ISO 8601 timestamp in brackets <code>[2025-09-16T14:02:51.439Z]</code></li>
-<li><strong><code>level</code></strong>: Log level (TRACE, DEBUG, INFO, WARN, ERROR)</li>
-<li><strong><code>message</code></strong>: Human-readable log message</li>
-<li><strong><code>component</code></strong>: Identifies the system component (see table below)</li>
-<li><strong><code>pid</code></strong>: Process ID</li>
-<li><strong><code>role</code></strong>: Additional context about the operation role</li>
-<li><strong>Additional fields</strong>: Component-specific context (transaction IDs, addresses, etc.)</li>
+<li>a node hasn't been published to the registry</li>
+<li>a node has been published to the registry but the events emitted from its registration have not been indexed</li>
+<li>there is a problem with the transport details published to the registry</li>
 </ul>
-<h3 id="component-reference">Component Reference<a class="headerlink" href="#component-reference" title="Permanent link">&para;</a></h3>
-<p>The following table lists all components that are included in Paladin logs based on actual <code>log.WithComponent</code> calls in the codebase:</p>
-<table>
-<thead>
-<tr>
-<th>Component</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>blockindexer</code></td>
-<td>Monitors blockchain events and indexes transactions</td>
-</tr>
-<tr>
-<td><code>domainmanager</code></td>
-<td>Manages domain plugins and smart contracts</td>
-</tr>
-<tr>
-<td><code>evmregistry</code></td>
-<td>EVM-based registry implementation</td>
-</tr>
-<tr>
-<td><code>examplesigningmodule</code></td>
-<td>Example signing module for testing</td>
-</tr>
-<tr>
-<td><code>grpctransport</code></td>
-<td>gRPC-based transport implementation</td>
-</tr>
-<tr>
-<td><code>groupmanager</code></td>
-<td>Group management system</td>
-</tr>
-<tr>
-<td><code>identityresolver</code></td>
-<td>Identity resolution service</td>
-</tr>
-<tr>
-<td><code>keymanager</code></td>
-<td>Key management system</td>
-</tr>
-<tr>
-<td><code>keyresolver</code></td>
-<td>Key resolution utilities</td>
-</tr>
-<tr>
-<td><code>noto</code></td>
-<td>Noto domain implementation</td>
-</tr>
-<tr>
-<td><code>pluginmanager</code></td>
-<td>Plugin management system</td>
-</tr>
-<tr>
-<td><code>privatetxnmanager</code></td>
-<td>Private transaction manager</td>
-</tr>
-<tr>
-<td><code>publictxnmanager</code></td>
-<td>Public transaction manager</td>
-</tr>
-<tr>
-<td><code>registrymanager</code></td>
-<td>Registry management system</td>
-</tr>
-<tr>
-<td><code>schema</code></td>
-<td>Schema management utilities</td>
-</tr>
-<tr>
-<td><code>statemanager</code></td>
-<td>State management system</td>
-</tr>
-<tr>
-<td><code>staticregistry</code></td>
-<td>Static registry implementation</td>
-</tr>
-<tr>
-<td><code>transportmanager</code></td>
-<td>Transport management system</td>
-</tr>
-<tr>
-<td><code>txmanager</code></td>
-<td>Transaction manager</td>
-</tr>
-<tr>
-<td><code>zeto</code></td>
-<td>Zeto domain implementation</td>
-</tr>
-</tbody>
-</table>
-<h2 id="kubernetes-log-filtering">Kubernetes Log Filtering<a class="headerlink" href="#kubernetes-log-filtering" title="Permanent link">&para;</a></h2>
-<h3 id="basic-log-filtering">Basic Log Filtering<a class="headerlink" href="#basic-log-filtering" title="Permanent link">&para;</a></h3>
-<p>To filter logs by component in Kubernetes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Filter logs for a specific component</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;component=txmanager&quot;</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Filter logs for multiple components</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">&quot;component=(txmanager|statemanager)&quot;</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Filter logs excluding certain components</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;component=retry&quot;</span>
+<p>If the error you are seeing is a certificate error, you can go directly to step 3 of this troubleshooting section.</p>
+<blockquote>
+<p>N.B. The steps below may ask you to make RPC requests to the "registry admin node". This is <code>node1</code> for <code>devnet</code> installations or the first node in the <code>paladinNodes</code> array from the values file for <code>customnet</code> installations.</p>
+</blockquote>
+<h3 id="1-confirm-the-status-of-the-paladinregistration">1. Confirm the status of the <code>paladinregistration</code><a class="headerlink" href="#1-confirm-the-status-of-the-paladinregistration" title="Permanent link">&para;</a></h3>
+<p>Run
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>kubectl get paladinregistration
+</code></pre></div></p>
+<details>
+<summary>See output</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>NAME<span class="w">    </span>PUBLISHED
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>node1<span class="w">   </span><span class="m">2</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>node2<span class="w">   </span><span class="m">2</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>node3<span class="w">   </span><span class="m">2</span>
 </code></pre></div>
-<h3 id="filtering-by-log-level">Filtering by Log Level<a class="headerlink" href="#filtering-by-log-level" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Show only error logs</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w">  </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;ERROR&quot;</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Show warnings and errors</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w">  </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">&quot;(WARN|ERROR)&quot;</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Exclude debug logs</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w">  </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;DEBUG&quot;</span>
+</details>
+<p>If the output shows 2 publications per node then registrations have completed successfully. </p>
+<p>If any of the numbers in the published column are below 2, get the detailed status for that node
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>kubectl describe paladinregistration node1
+</code></pre></div></p>
+<details>
+<summary>See output</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Name:<span class="w">         </span>node1
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Namespace:<span class="w">    </span>default
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>Labels:<span class="w">       </span>app.kubernetes.io/managed-by<span class="o">=</span>Helm
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">              </span>app.kubernetes.io/name<span class="o">=</span>operator-go
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>Annotations:<span class="w">  </span>meta.helm.sh/release-name:<span class="w"> </span>paladin
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">              </span>meta.helm.sh/release-namespace:<span class="w"> </span>default
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>API<span class="w"> </span>Version:<span class="w">  </span>core.paladin.io/v1alpha1
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>Kind:<span class="w">         </span>PaladinRegistration
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>Metadata:
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span>Creation<span class="w"> </span>Timestamp:<span class="w">  </span><span class="m">2025</span>-09-09T15:11:15Z
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">  </span>Generation:<span class="w">          </span><span class="m">1</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">  </span>Resource<span class="w"> </span>Version:<span class="w">    </span><span class="m">2350</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">  </span>UID:<span class="w">                 </span>6800bc37-f317-4b51-9799-872ad8f2aeff
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>Spec:
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">  </span>Node:<span class="w">                 </span>node1
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">  </span>Node<span class="w"> </span>Admin<span class="w"> </span>Key:<span class="w">       </span>registry.node1
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">  </span>Registry:<span class="w">             </span>evm-registry
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">  </span>Registry<span class="w"> </span>Admin<span class="w"> </span>Key:<span class="w">   </span>registry.operator
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">  </span>Registry<span class="w"> </span>Admin<span class="w"> </span>Node:<span class="w">  </span>node1
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="w">  </span>Transports:
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="w">    </span>grpc
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>Status:
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="w">  </span>Publish<span class="w"> </span>Count:<span class="w">  </span><span class="m">1</span>
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="w">  </span>Publish<span class="w"> </span>Txs:
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a><span class="w">    </span>Grpc:
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="w">      </span>Idempotency<span class="w"> </span>Key:<span class="w">     </span>k8s.reg.node1.grpc.1757430744774547
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a><span class="w">      </span>Transaction<span class="w"> </span>ID:<span class="w">      </span>83278a5f-5f89-412c-b8a4-9757bdb1f382
+<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a><span class="w">      </span>Transaction<span class="w"> </span>Status:<span class="w">  </span>Pending
+<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a><span class="w">  </span>Registration<span class="w"> </span>Tx:
+<a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a><span class="w">    </span>Block<span class="w"> </span>Number:<span class="w">        </span><span class="m">6</span>
+<a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a><span class="w">    </span>Idempotency<span class="w"> </span>Key:<span class="w">     </span>k8s.reg.node1.1757430743709513
+<a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a><span class="w">    </span>Transaction<span class="w"> </span>Hash:<span class="w">    </span>0xaa92ab37b2afab75dd77d04e0039e5e0748777b5d0ca72591c9ceb9d9907deea
+<a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a><span class="w">    </span>Transaction<span class="w"> </span>ID:<span class="w">      </span>8cdae679-a0ce-43e4-9be0-62a4313d37dc
+<a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a><span class="w">    </span>Transaction<span class="w"> </span>Status:<span class="w">  </span>Success
+<a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a>Events:<span class="w">                  </span>&lt;none&gt;
 </code></pre></div>
-<h3 id="real-time-log-monitoring">Real-time Log Monitoring<a class="headerlink" href="#real-time-log-monitoring" title="Permanent link">&para;</a></h3>
-<p>For real-time monitoring of specific components:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Follow logs for transaction manager in real-time</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;component=txmanager&quot;</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Follow error logs from all components</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;ERROR&quot;</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Follow logs for multiple components</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>kubectl<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span>paladin<span class="w"> </span>-l<span class="w"> </span>app.kubernetes.io/instance<span class="o">=</span>node1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">&quot;component=(txmanager|statemanager|domainmanager)&quot;</span>
+</details>
+<p>If one of the transactions has <code>Submitting</code> status, it has not yet been submitted to a Paladin node. Further information may be available in the operator logs.</p>
+<p>If one of the transactions has <code>Pending</code> status, there should also be a <code>Transaction ID</code> available. This transaction ID can be used to debug the transaction with a <code>ptx_getTransactionFull</code> RPC call. This call needs to be submitted to:</p>
+<ul>
+<li>the registry admin node in order to debug the <code>Registration Tx</code> transaction</li>
+<li>the node being registered in order to debug the <code>Publish Txs.Grpc</code> transaction.</li>
+</ul>
+<details>
+<summary>See example curl command</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>curl<span class="w"> </span>http://localhost:31548<span class="w"> </span>--header<span class="w"> </span><span class="s1">&#39;Content-Type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>--data<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="s1">    &quot;jsonrpc&quot;: &quot;2.0&quot;,</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="s1">    &quot;id&quot;: &quot;1&quot;,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="s1">    &quot;method&quot;: &quot;ptx_getTransactionFull&quot;,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="s1">    &quot;params&quot;: [&quot;83278a5f-5f89-412c-b8a4-9757bdb1f382&quot;]</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="s1">}&#39;</span>
 </code></pre></div>
+</details>
+<!-- TODO: There's scope here to write a whole guide on debugging pending transactions- e.g. indexer not yet caught up, insufficient funds etc. -->
+
+<h3 id="2-confirm-that-all-registration-events-have-been-indexed">2. Confirm that all registration events have been indexed<a class="headerlink" href="#2-confirm-that-all-registration-events-have-been-indexed" title="Permanent link">&para;</a></h3>
+<p>This can be confirmed in the <code>Registry</code> tab of the Paladin UI or by making a <code>reg_queryEntriesWithProps</code> RPC call.</p>
+<details>
+<summary>See example curl command</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>http://localhost:31548<span class="w"> </span>--header<span class="w"> </span><span class="s1">&#39;Content-Type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>--data<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="s1">    &quot;jsonrpc&quot;: &quot;2.0&quot;,</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="s1">    &quot;id&quot;: &quot;1&quot;,</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="s1">    &quot;method&quot;: &quot;reg_queryEntriesWithProps&quot;,</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="s1">    &quot;params&quot;: [&quot;evm-registry&quot;, {&quot;limit&quot;: 100}, &quot;any&quot;]</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="s1">}&#39;</span>
+</code></pre></div>
+</details>
+
+<p>There should be an entry for every node, and each node entry should have a <code>transport.grpc</code> property. This check needs to be made against every node in the installation, as they independently build their registries by indexing chain events.</p>
+<blockquote>
+<p>N.B. <code>root</code> is the root identity of the registry. It does not correspond to a node and is not expected to have any properties.</p>
+</blockquote>
+<p>If any node or property is missing it means that the event which held that information has not been indexed. This is usually due to the block indexer being configured to start from a later block than the start of the registry history, or the block indexer having not yet reached the block that contains the relevant event.</p>
+<p>First identify the block number which contains the event with the missing data by looking at the detailed registration status for the node which is missing or has the <code>transport.grpc</code> property missing.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>kubectl describe paladinregistration node1
+</code></pre></div></p>
+<details>
+<summary>See output</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Name:<span class="w">         </span>node1
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Namespace:<span class="w">    </span>default
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>Labels:<span class="w">       </span>app.kubernetes.io/managed-by<span class="o">=</span>Helm
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">              </span>app.kubernetes.io/name<span class="o">=</span>operator-go
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>Annotations:<span class="w">  </span>meta.helm.sh/release-name:<span class="w"> </span>paladin
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">              </span>meta.helm.sh/release-namespace:<span class="w"> </span>default
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>API<span class="w"> </span>Version:<span class="w">  </span>core.paladin.io/v1alpha1
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>Kind:<span class="w">         </span>PaladinRegistration
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>Metadata:
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span>Creation<span class="w"> </span>Timestamp:<span class="w">  </span><span class="m">2025</span>-09-09T15:11:15Z
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">  </span>Generation:<span class="w">          </span><span class="m">1</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">  </span>Resource<span class="w"> </span>Version:<span class="w">    </span><span class="m">2350</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">  </span>UID:<span class="w">                 </span>6800bc37-f317-4b51-9799-872ad8f2aeff
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>Spec:
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">  </span>Node:<span class="w">                 </span>node1
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">  </span>Node<span class="w"> </span>Admin<span class="w"> </span>Key:<span class="w">       </span>registry.node1
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">  </span>Registry:<span class="w">             </span>evm-registry
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="w">  </span>Registry<span class="w"> </span>Admin<span class="w"> </span>Key:<span class="w">   </span>registry.operator
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="w">  </span>Registry<span class="w"> </span>Admin<span class="w"> </span>Node:<span class="w">  </span>node1
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="w">  </span>Transports:
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="w">    </span>grpc
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>Status:
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="w">  </span>Publish<span class="w"> </span>Count:<span class="w">  </span><span class="m">2</span>
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a><span class="w">  </span>Publish<span class="w"> </span>Txs:
+<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a><span class="w">    </span>Grpc:
+<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a><span class="w">      </span>Block<span class="w"> </span>Number:<span class="w">        </span><span class="m">11</span>
+<a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a><span class="w">      </span>Idempotency<span class="w"> </span>Key:<span class="w">     </span>k8s.reg.node1.grpc.1757430744774547
+<a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a><span class="w">      </span>Transaction<span class="w"> </span>Hash:<span class="w">    </span>0x6f02b322be187569922ec8f2143e3f8ad5ce39e1eae874d0e2191c17ffc1f5a6
+<a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a><span class="w">      </span>Transaction<span class="w"> </span>ID:<span class="w">      </span>83278a5f-5f89-412c-b8a4-9757bdb1f382
+<a id="__codelineno-9-30" name="__codelineno-9-30" href="#__codelineno-9-30"></a><span class="w">      </span>Transaction<span class="w"> </span>Status:<span class="w">  </span>Success
+<a id="__codelineno-9-31" name="__codelineno-9-31" href="#__codelineno-9-31"></a><span class="w">  </span>Registration<span class="w"> </span>Tx:
+<a id="__codelineno-9-32" name="__codelineno-9-32" href="#__codelineno-9-32"></a><span class="w">    </span>Block<span class="w"> </span>Number:<span class="w">        </span><span class="m">6</span>
+<a id="__codelineno-9-33" name="__codelineno-9-33" href="#__codelineno-9-33"></a><span class="w">    </span>Idempotency<span class="w"> </span>Key:<span class="w">     </span>k8s.reg.node1.1757430743709513
+<a id="__codelineno-9-34" name="__codelineno-9-34" href="#__codelineno-9-34"></a><span class="w">    </span>Transaction<span class="w"> </span>Hash:<span class="w">    </span>0xaa92ab37b2afab75dd77d04e0039e5e0748777b5d0ca72591c9ceb9d9907deea
+<a id="__codelineno-9-35" name="__codelineno-9-35" href="#__codelineno-9-35"></a><span class="w">    </span>Transaction<span class="w"> </span>ID:<span class="w">      </span>8cdae679-a0ce-43e4-9be0-62a4313d37dc
+<a id="__codelineno-9-36" name="__codelineno-9-36" href="#__codelineno-9-36"></a><span class="w">    </span>Transaction<span class="w"> </span>Status:<span class="w">  </span>Success
+<a id="__codelineno-9-37" name="__codelineno-9-37" href="#__codelineno-9-37"></a>Events:<span class="w">                  </span>&lt;none&gt;
+</code></pre></div>
+</details>
+<ul>
+<li>if the node is missing look at the block number of the <code>Registration Tx</code> transaction</li>
+<li>if the <code>transport.grpc</code> property is missing look at the block number of the <code>Publish Txs.Grpc</code> transaction.</li>
+</ul>
+<p>Now we have a block number, we can check that the block indexer has indexed it by making two <code>bidx_queryIndexedBlocks</code> to get the first and last blocks that the node has indexed. Make these calls against the node which is missing data in its registry.</p>
+<details>
+<summary>See example curl command for getting the first indexed block</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>curl<span class="w"> </span>http://localhost:31548<span class="w"> </span>--header<span class="w"> </span><span class="s1">&#39;Content-Type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>--data<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="s1">    &quot;jsonrpc&quot;: &quot;2.0&quot;,</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="s1">    &quot;id&quot;: &quot;1&quot;,</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="s1">    &quot;method&quot;: &quot;bidx_queryIndexedBlocks&quot;,</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="s1">    &quot;params&quot;: [{&quot;limit&quot;:1, &quot;sort&quot;: [&quot;number ASC&quot;]}]</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="s1">}&#39;</span>
+</code></pre></div>
+</details>
+<details>
+<summary>See example curl command for getting the last indexed block</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>curl<span class="w"> </span>http://localhost:31548<span class="w"> </span>--header<span class="w"> </span><span class="s1">&#39;Content-Type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>--data<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="s1">    &quot;jsonrpc&quot;: &quot;2.0&quot;,</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="s1">    &quot;id&quot;: &quot;1&quot;,</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="s1">    &quot;method&quot;: &quot;bidx_queryIndexedBlocks&quot;,</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="s1">    &quot;params&quot;: [{&quot;limit&quot;:1, &quot;sort&quot;: [&quot;number DESC&quot;]}]</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="s1">}&#39;</span>
+</code></pre></div>
+</details>
+
+<p>If the block number is within the indexed range, look at the Paladin node pod logs to see if there are any errors writing registry data to the database.</p>
+<p>If the block number is above the indexed range, the node likely just needs more time to index all the blocks it needs for the registry. If the last indexed block is not increasing over time, look at the Paladin node pod logs for indexing errors.</p>
+<p>If the block number is below the indexed range, you are likely using a <code>customnet</code> installation and have overriden the default config to set a custom <code>fromBlock</code> for the block indexer.</p>
+<details>
+<summary>See example of overriding the default block indexer from block</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">paladinNodes</span><span class="p">:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">node1</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="nt">config</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">      </span><span class="no">blockIndexer:</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">        </span><span class="no">fromBlock: 17543 # can also be latest</span>
+</code></pre></div>
+</details>
+
+<p>If any of the nodes have started indexing from a later block than one which contains an event they require, it is difficult to recover the situation. It is typically easier to recreate the system, ensuring <code>fromBlock</code> is set to a block number that will come before the next registry contract deployment, than to take any sort of remedial action.</p>
+<h3 id="3-confirm-registry-contents">3. Confirm registry contents<a class="headerlink" href="#3-confirm-registry-contents" title="Permanent link">&para;</a></h3>
+<p>If all nodes have a fully populated registry, the next step is to verify the contents of the registry.</p>
+<p>The transport properties for a node can be found in the <code>Registry</code> tab of the Paladin UI or by making a <code>reg_queryEntriesWithProps</code> RPC call.</p>
+<details>
+<summary>See example curl command</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>curl<span class="w"> </span>http://localhost:31548<span class="w"> </span>--header<span class="w"> </span><span class="s1">&#39;Content-Type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>--data<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="s1">    &quot;jsonrpc&quot;: &quot;2.0&quot;,</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="s1">    &quot;id&quot;: &quot;1&quot;,</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="s1">    &quot;method&quot;: &quot;reg_queryEntriesWithProps&quot;,</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="s1">    &quot;params&quot;: [&quot;evm-registry&quot;, {&quot;limit&quot;: 100}, &quot;any&quot;]</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="s1">}&#39;</span>
+</code></pre></div>
+</details>
+<details>
+<summary>See example properties</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">{</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">   </span><span class="nt">&quot;$owner&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0xbd788c85660d249f23e084ee25cf82dd63861965&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">   </span><span class="nt">&quot;transport.grpc&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;{\&quot;endpoint\&quot;:\&quot;dns:///paladin-node3.default.svc.cluster.local:9000\&quot;,\&quot;issuers\&quot;:\&quot;-----BEGIN CERTIFICATE-----\\nMIIC/jCCAeagAwIBAgIQTFQ97yE+BI1FVWT53PlyHDANBgkqhkiG9w0BAQsFADAQ\\nMQ4wDAYDVQQDEwVub2RlMzAeFw0yNTA5MDkxNTExMThaFw0yNTEyMDgxNTExMTha\\nMBAxDjAMBgNVBAMTBW5vZGUzMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC\\nAQEAwhcU9dX0jAqIymu23QwIwBkQsh/Tj9AOUNIlVlAL7+Wrx/7bKoeUCW9kU4hn\\nGJSC23NGAtPWckXAVlTyWzz+Ssn8UCEUO/9drwhJPjXHjKmnwSI2is0koSG0Rm9e\\nFBfpi56KqbByXgDaiTzJDeANr67hKnB5ve6KlolTFheQdwiJ/rKI7TOlX8VgKHlj\\nPpIVxdpbmkwtOHJMl039RG6hWuCaf3r5AOreNKU2XxdFK51Zn0Md4KdcMs9HYOKj\\n0LSz8pw4rM8YJsb5RRcAtLljf0QRzjIrPF+70iWvZY0cvQiKbRr/J6fYN3Door+I\\nVJW8DD4h0jA3EOOk9deFO7WKTQIDAQABo1QwUjAOBgNVHQ8BAf8EBAMCBaAwDAYD\\nVR0TAQH/BAIwADAyBgNVHREEKzApgidwYWxhZGluLW5vZGUzLmRlZmF1bHQuc3Zj\\nLmNsdXN0ZXIubG9jYWwwDQYJKoZIhvcNAQELBQADggEBAHKHxoLYfd0VrzD0NXL9\\nJnnPHxF9S5u6uhMtJtFXtgOixQbTzM4eNL6Z+HtpJRbEZpUGeFvb85gmPryY2OvB\\nzlNZWPnkpfmrQnmFZOlmcjWh/slK8mp7DUjQMeYL42YevLmv2sn+eEbKNO7Z3rDw\\nX8IdOCJju5+HUeGnDobkgCWT8fx9xu6+RLIOhpsUQocoDSSTDP1b3kOjs8vQbF/T\\nCs1g3tP7tE4ARZOlSJXqacCkeStpXftpkI2vAm2bDf3dTNsHxjxRHU1GnEQQFyMW\\nXjvxzuL5J8ArAUVyfyhYjaC0AFMkbaedXI+MsCOmROGYdfYQWZyNbB7HNSJJny4D\\n7gI=\\n-----END CERTIFICATE-----\\n\&quot;}&quot;</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="p">}</span>
+</code></pre></div>
+</details>
+
+<h4 id="incorrect-endpoint-customnet-only">Incorrect endpoint: <code>customnet</code> only<a class="headerlink" href="#incorrect-endpoint-customnet-only" title="Permanent link">&para;</a></h4>
+<p><code>endpoint</code> in the <code>transport.grpc</code> properties is set to the internal cluster host name by default, which allows nodes installed into the same Kubernetes cluster to communicate with each other, but can be overriden in a <code>customnet</code> installation in the <code>transports</code> section of the values file for each node. If you have set this value, including setting it to the empty string <code>""</code>, confirm that the dns lookup of this hostname will work correctly for your infrastructure. </p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nt">transports</span><span class="p">:</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">   </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grpc</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">   </span><span class="nt">config</span><span class="p">:</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9000</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">      </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0.0.0</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">      </span><span class="nt">externalHostname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;...&quot;</span><span class="w"> </span>
+</code></pre></div>
+<p>If you need to update the <code>externalHostname</code> with a helm upgrade, follow <a href="../certificate_management/#update-the-registry">these instructions</a> to make the corresponding update to the registry. The instructions talk about certificate rotation but since the endpoint is included in the local transport details that get updated in the registry, they are applicable here as well.</p>
+<h4 id="overly-restrictive-network-policies">Overly restrictive network policies<a class="headerlink" href="#overly-restrictive-network-policies" title="Permanent link">&para;</a></h4>
+<p>Check that you do not have any network policies which prohibit nodes from communicating with each other on the grpc port.</p>
+<h4 id="invalid-certificates-customnet-only">Invalid certificates: <code>customnet</code> only<a class="headerlink" href="#invalid-certificates-customnet-only" title="Permanent link">&para;</a></h4>
+<p><code>customnet</code> installations allow more flexibility in how certificates are configured. The values file specifies a secret name which</p>
+<ul>
+<li>if it exists will be mounted into the Paladin node pod as is (this option allows for use of a <a href="../certificate_management/#custom-certificate-manager">custom certificate manager</a>)</li>
+<li>if it does not exist will be used by the Paladin operator to store <code>cert-manager</code> certificates</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="nt">transports</span><span class="p">:</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">   </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grpc</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">      </span><span class="l l-Scalar l-Scalar-Plain">tls</span><span class="p p-Indicator">:</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">         </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">paladin-bank-mtls</span><span class="w">  </span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">         </span><span class="nt">certName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">paladin-bank-mtls</span>
+</code></pre></div>
+<p>Ensure that all the <code>secretName</code> and <code>certName</code> (if using the Paladin operator to generate certificates) are unique per Paladin node. Duplication can result in one node using the certificates generated for another node.</p>
+<p>If using a custom certificate manager, inspect the certificates in this secret specified by <code>secretName</code> to confirm that:</p>
+<ul>
+<li>they are valid</li>
+<li>they have not expired</li>
+<li>the common name is the node name</li>
+<li>the published node endpoint is a subject alternative name</li>
+</ul>
+<p>If you make any changes to the certificates that each node is using, you will need to make a corresponding update to the registry by following <a href="../certificate_management/#update-the-registry">these instructions</a>.</p>
+<h4 id="rotated-certificates">Rotated certificates<a class="headerlink" href="#rotated-certificates" title="Permanent link">&para;</a></h4>
+<p>A certificate manager (including <code>cert-manager</code> which the Paladin operator uses by default) may rotate certificates automatically. In this case the Paladin node pod will automatically pick up the changes, but they will not be automatically reflected in the registry. To identify whether there is a discrepency between the certificates that the Paladin node is using and what is published in the registry, compare the <code>transport.grpc</code> property in the registry to the result of a <code>transport_localTransportDetails</code> call.</p>
+<details>
+<summary>See example curl command</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>curl<span class="w"> </span>http://localhost:31548<span class="w"> </span>--header<span class="w"> </span><span class="s1">&#39;Content-Type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>--data<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="s1">    &quot;jsonrpc&quot;: &quot;2.0&quot;,</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="s1">    &quot;id&quot;: &quot;1&quot;,</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="s1">    &quot;method&quot;: &quot;transport_localTransportDetails&quot;,</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="s1">    &quot;params&quot;: [&quot;grpc&quot;]</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="s1">}&#39;</span>
+</code></pre></div>
+</details>
+
+<p>If they are different, follow <a href="../certificate_management/#update-the-registry">these instructions</a> for updating the registry.</p>
 
 
 
@@ -3998,7 +3977,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../l1-and-l2-chains/" class="md-footer__link md-footer__link--prev" aria-label="Previous: L1 and L2 Chains">
+          <a href="../certificate_management/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Certificate Management">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -4008,20 +3987,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                L1 and L2 Chains
+                Certificate Management
               </div>
             </div>
           </a>
         
         
           
-          <a href="../../reference/apis/bidx/" class="md-footer__link md-footer__link--next" aria-label="Next: bidx_*">
+          <a href="../l1-and-l2-chains/" class="md-footer__link md-footer__link--next" aria-label="Next: L1 and L2 Chains">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                bidx_*
+                L1 and L2 Chains
               </div>
             </div>
             <div class="md-footer__button md-icon">
