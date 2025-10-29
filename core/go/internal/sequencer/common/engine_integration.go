@@ -108,7 +108,7 @@ type engineIntegration struct {
 func (e *engineIntegration) WriteLockStatesForTransaction(ctx context.Context, txn *components.PrivateTransaction) error {
 
 	// Write output states
-	if txn.PostAssembly.OutputStatesPotential != nil && txn.PostAssembly.OutputStates == nil {
+	if (txn.PostAssembly.OutputStatesPotential != nil && txn.PostAssembly.OutputStates == nil) || (txn.PostAssembly.InfoStatesPotential != nil && txn.PostAssembly.InfoStates == nil) {
 		readTX := e.components.Persistence().NOTX() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
 		err := e.domainSmartContract.WritePotentialStates(e.domainContext, readTX, txn)
 		if err != nil {
@@ -123,7 +123,7 @@ func (e *engineIntegration) WriteLockStatesForTransaction(ctx context.Context, t
 	}
 
 	// Lock input states
-	if len(txn.PostAssembly.InputStates) > 0 {
+	if len(txn.PostAssembly.InputStates) > 0 && txn.Intent == prototk.TransactionSpecification_SEND_TRANSACTION {
 		readTX := e.components.Persistence().NOTX() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
 		err := e.domainSmartContract.LockStates(e.domainContext, readTX, txn)
 		if err != nil {

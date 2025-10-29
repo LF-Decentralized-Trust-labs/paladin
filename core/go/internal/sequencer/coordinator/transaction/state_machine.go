@@ -157,6 +157,11 @@ func init() {
 						{
 							To: State_Endorsement_Gathering,
 							On: action_NotifyDependentsOfAssembled,
+							If: guard_Not(guard_AttestationPlanFulfilled),
+						},
+						{
+							To: State_Confirming_Dispatchable,
+							If: guard_And(guard_AttestationPlanFulfilled, guard_Not(guard_HasDependenciesNotReady)),
 						}},
 				},
 				Event_RequestTimeoutInterval: {
