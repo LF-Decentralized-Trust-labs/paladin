@@ -456,8 +456,6 @@ func (t *Transaction) HandleEvent(ctx context.Context, event common.Event) error
 func (t *Transaction) evaluateEvent(ctx context.Context, event common.Event) (*EventHandler, error) {
 	sm := t.stateMachine
 
-	// MRW TODO - does this event apply to this transaction. Should we check and just return if not?
-
 	//Determine if and how this event applies in the current state and which, if any, transition it triggers
 	eventHandlers := stateDefinitionsMap[sm.currentState].Events
 	eventHandler, isHandlerDefined := eventHandlers[event.Type()]

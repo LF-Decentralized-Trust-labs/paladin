@@ -531,6 +531,10 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 				Data:     pldtypes.RawJSON(transactionSpecification.FunctionParamsJson),
 			},
 		})
+		if err != nil {
+			log.L(ctx).Errorf("failed to resolve transaction inputs: %s", err)
+			return
+		}
 		log.L(ctx).Infof("transaction %s not found in the 'transactions' DB, inserting it", transactionSpecification.TransactionId)
 		err = sMgr.components.Persistence().Transaction(ctx, func(ctx context.Context, dbTx persistence.DBTX) error {
 			validatedTransaction := &components.ValidatedTransaction{

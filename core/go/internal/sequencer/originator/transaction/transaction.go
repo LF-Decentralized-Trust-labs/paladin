@@ -108,7 +108,6 @@ func (t *Transaction) GetEndorsementStatus(ctx context.Context) []components.Pri
 		if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
 			for _, party := range attRequest.Parties {
 				found := false
-				// MRW TODO - endorsement request time
 				endorsementRequestState := &components.PrivateTxEndorsementStatus{Party: party, EndorsementReceived: false}
 				for _, endorsement := range t.PostAssembly.Endorsements {
 					log.L(ctx).Debugf("existing endorsement from party %s", endorsement.Verifier.Lookup)

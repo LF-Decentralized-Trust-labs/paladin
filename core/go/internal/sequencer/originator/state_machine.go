@@ -205,6 +205,7 @@ func (o *originator) GetCurrentCoordinator() string {
 }
 
 func (o *originator) GetTxStatus(ctx context.Context, txID uuid.UUID) (status components.PrivateTxStatus, err error) {
+	// MRW TODO - this needs to use a thread safe mechanism similar to coordinator query queue
 	if txn, ok := o.transactionsByID[txID]; !ok {
 		endorsements := txn.GetEndorsementStatus(ctx)
 		return components.PrivateTxStatus{
@@ -212,7 +213,7 @@ func (o *originator) GetTxStatus(ctx context.Context, txID uuid.UUID) (status co
 			Status:       txn.GetCurrentState().String(),
 			LatestEvent:  txn.GetLatestEvent(),
 			Endorsements: endorsements,
-			// MRW TODO - latest error, failure message etc.
+			Transaction:  txn.PrivateTransaction,
 		}, nil
 	}
 	return components.PrivateTxStatus{

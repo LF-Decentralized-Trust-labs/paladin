@@ -93,7 +93,7 @@ func (sMgr *sequencerManager) Start() error {
 
 	sMgr.syncPoints.Start()
 
-	sMgr.pollForIncompleteTransactions(sMgr.ctx, confutil.DurationMin(sMgr.config.TransactionResumePollInterval, *&pldconf.SequencerMinimum.TransactionResumePollInterval, *pldconf.SequencerDefaults.TransactionResumePollInterval))
+	sMgr.pollForIncompleteTransactions(sMgr.ctx, confutil.DurationMin(sMgr.config.TransactionResumePollInterval, pldconf.SequencerMinimum.TransactionResumePollInterval, *pldconf.SequencerDefaults.TransactionResumePollInterval))
 
 	return nil
 }
@@ -482,9 +482,6 @@ func (sMgr *sequencerManager) GetNodeName() string {
 }
 
 func (sMgr *sequencerManager) GetTxStatus(ctx context.Context, domainAddress string, txID uuid.UUID) (status components.PrivateTxStatus, err error) {
-	// MRW TODO - what type of TX status does this return?
-	// MRW TODO - this returns status that we happen to have in memory at the moment and might be useful for debugging
-
 	sequencer, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *pldtypes.MustEthAddress(domainAddress), nil, nil)
 	if err != nil || sequencer == nil {
 		return components.PrivateTxStatus{

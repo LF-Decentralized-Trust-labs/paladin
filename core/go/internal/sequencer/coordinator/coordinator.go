@@ -238,7 +238,7 @@ func (c *coordinator) dispatchLoop(ctx context.Context) {
 
 			log.L(ctx).Debugf("coordinator asking for number of transactions currently in dispatch")
 		waitForDispatch:
-			for true {
+			for {
 				queryStart := time.Now() // While this mechanism is proving out, capture query times
 				c.externalQueries <- coordinatorQuery
 				select {

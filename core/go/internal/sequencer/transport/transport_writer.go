@@ -531,7 +531,7 @@ func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, originato
 
 	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send pre-dispatch request to node %s", originatorNode)
 
-	// MRW TODO - should dispatch confirmations also take the hash?
+	// MRW TODO There should be a different proto message type instead of TransactionDispatched
 	dispatchConfirmationRequest := &engineProto.TransactionDispatched{
 		Id:               idempotencyKey.String(),
 		TransactionId:    transactionSpecification.TransactionId,

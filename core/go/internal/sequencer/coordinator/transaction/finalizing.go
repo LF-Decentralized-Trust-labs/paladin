@@ -28,6 +28,5 @@ func guard_HasGracePeriodPassedSinceStateChange(ctx context.Context, txn *Transa
 
 func action_Cleanup(ctx context.Context, txn *Transaction) error {
 	log.L(ctx).Infof("action_Cleanup - cleaning up transaction %s", txn.ID.String())
-	txn.cleanup(ctx)
-	return nil
+	return txn.cleanup(ctx)
 }
