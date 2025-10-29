@@ -351,12 +351,12 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 				})
 
 				if bnd.TransactionType == pldapi.TransactionTypePrivate.Enum() {
-					theTx, err := ptm.rootTxMgr.GetTransactionByIDWithDBTX(ctx, dbTX, bnd.TransactionID)
+					privTx, err := ptm.rootTxMgr.GetTransactionByIDWithDBTX(ctx, dbTX, bnd.TransactionID)
 					if err != nil {
 						log.L(ctx).Errorf("%s", i18n.NewError(ctx, msgs.MsgSequencerInternalError, err).Error())
 						continue
 					}
-					if theTx == nil {
+					if privTx == nil {
 						log.L(ctx).Errorf("%s", i18n.NewError(ctx, msgs.MsgTxMgrTransactionNotFound, bnd.TransactionID).Error())
 						continue
 					}
@@ -364,7 +364,7 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 					binding := &pldapi.PublicTxBinding{
 						Transaction:       bnd.TransactionID,
 						TransactionType:   bnd.TransactionType,
-						TransactionSender: theTx.From,
+						TransactionSender: privTx.From,
 					}
 					transactionsToDistribute[i].Bindings = append(transactionsToDistribute[i].Bindings, binding)
 				} else {

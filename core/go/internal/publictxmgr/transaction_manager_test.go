@@ -204,8 +204,11 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	})
 	defer done()
 
-	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	m.sequencerManager.On("HandlePublicTXsWritten", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	fakeTx := &pldapi.Transaction{}
+	fakeTx.From = "sender@node1"
+	m.txManager.On("GetTransactionByIDWithDBTX", mock.Anything, mock.Anything, mock.Anything).Return(fakeTx, nil)
 
 	// Mock a gas price
 	chainID, _ := rand.Int(rand.Reader, big.NewInt(100000000000000))
@@ -510,8 +513,11 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 	})
 	defer done()
 
-	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	m.sequencerManager.On("HandlePublicTXsWritten", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	fakeTx := &pldapi.Transaction{}
+	fakeTx.From = "sender@node1"
+	m.txManager.On("GetTransactionByIDWithDBTX", mock.Anything, mock.Anything, mock.Anything).Return(fakeTx, nil)
 
 	keyMapping, err := m.keyManager.ResolveKeyNewDatabaseTX(ctx, "signer1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
@@ -602,8 +608,11 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 	})
 	defer done()
 
-	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	m.sequencerManager.On("HandlePublicTXsWritten", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	fakeTx := &pldapi.Transaction{}
+	fakeTx.From = "sender@node1"
+	m.txManager.On("GetTransactionByIDWithDBTX", mock.Anything, mock.Anything, mock.Anything).Return(fakeTx, nil)
 
 	keyMapping, err := m.keyManager.ResolveKeyNewDatabaseTX(ctx, "signer1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
