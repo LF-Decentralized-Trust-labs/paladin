@@ -81,9 +81,9 @@ func (tw *transportWriter) SendDelegationRequest(
 			log.L(ctx).Errorf("error marshalling transaction message: %s", err)
 		}
 		delegationRequest := &engineProto.DelegationRequest{
-			// DelegationId:       delegationId,
+			// DelegationId:       delegationId, // MRW TODO
 			TransactionId: transaction.ID.String(),
-			// DelegateNodeId:     delegateNodeId,
+			// DelegateNodeId:     delegateNodeId, // MRW TODO
 			PrivateTransaction: transactionBytes,
 			BlockHeight:        int64(blockHeight),
 		}
@@ -98,7 +98,7 @@ func (tw *transportWriter) SendDelegationRequest(
 			node = parts[1]
 		}
 
-		log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Debugf("delegate | TX   | %s | %s", transaction.ID.String()[0:8], node)
+		log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Debugf("delegate | %s   | %s | %s", transaction.Address.String()[0:8], transaction.ID.String()[0:8], node)
 		if err = tw.send(ctx, &components.FireAndForgetMessageSend{
 			MessageType: "DelegationRequest",
 			Payload:     delegationRequestBytes,

@@ -708,11 +708,7 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 	}
 
 	if sequencer != nil {
-		if deploy {
-			// For a deploy we won't have tracked the transaction through the state machine, but we can load it ready for upcoming transactions and start
-			// of with ourselves as the active coordinator
-			sequencer.GetCoordinator().SetActiveCoordinatorNode(ctx, sMgr.nodeName)
-		} else if sequencer.GetCoordinator().GetActiveCoordinatorNode(ctx) == sMgr.nodeName {
+		if !deploy && sequencer.GetCoordinator().GetActiveCoordinatorNode(ctx) == sMgr.nodeName {
 			mtx := sequencer.GetCoordinator().GetTransactionByID(ctx, confirmedTxn.TransactionID)
 			if mtx == nil {
 				log.L(ctx).Infof("Coordinator not tracking transaction ID %s", confirmedTxn.TransactionID)
