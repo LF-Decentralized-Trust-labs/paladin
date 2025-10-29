@@ -113,6 +113,7 @@ type TXManager interface {
 	ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*ResolvedFunction, *abi.ComponentValue, pldtypes.RawJSON, error)
 	PrepareTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (*pldapi.Transaction, error)
+	GetTransactionByIDWithDBTX(ctx context.Context, dbTX persistence.DBTX, id uuid.UUID) (*pldapi.Transaction, error)
 	GetResolvedTransactionByID(ctx context.Context, id uuid.UUID) (*ResolvedTransaction, error) // cache optimized
 	GetTransactionByIDFull(ctx context.Context, id uuid.UUID) (result *pldapi.TransactionFull, err error)
 	GetTransactionDependencies(ctx context.Context, id uuid.UUID) (*pldapi.TransactionDependencies, error)

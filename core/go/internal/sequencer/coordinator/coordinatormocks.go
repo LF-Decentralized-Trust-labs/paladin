@@ -361,49 +361,63 @@ func (_c *MockSeqCoordinator_QueueEvent_Call) RunAndReturn(run func(ctx context.
 	return _c
 }
 
-// SetActiveCoordinatorNode provides a mock function for the type MockSeqCoordinator
-func (_mock *MockSeqCoordinator) SetActiveCoordinatorNode(ctx context.Context, coordinatorNode string) {
-	_mock.Called(ctx, coordinatorNode)
-	return
+// SelectActiveCoordinatorNode provides a mock function for the type MockSeqCoordinator
+func (_mock *MockSeqCoordinator) SelectActiveCoordinatorNode(ctx context.Context) (string, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SelectActiveCoordinatorNode")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (string, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) string); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
-// MockSeqCoordinator_SetActiveCoordinatorNode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetActiveCoordinatorNode'
-type MockSeqCoordinator_SetActiveCoordinatorNode_Call struct {
+// MockSeqCoordinator_SelectActiveCoordinatorNode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SelectActiveCoordinatorNode'
+type MockSeqCoordinator_SelectActiveCoordinatorNode_Call struct {
 	*mock.Call
 }
 
-// SetActiveCoordinatorNode is a helper method to define mock.On call
+// SelectActiveCoordinatorNode is a helper method to define mock.On call
 //   - ctx context.Context
-//   - coordinatorNode string
-func (_e *MockSeqCoordinator_Expecter) SetActiveCoordinatorNode(ctx interface{}, coordinatorNode interface{}) *MockSeqCoordinator_SetActiveCoordinatorNode_Call {
-	return &MockSeqCoordinator_SetActiveCoordinatorNode_Call{Call: _e.mock.On("SetActiveCoordinatorNode", ctx, coordinatorNode)}
+func (_e *MockSeqCoordinator_Expecter) SelectActiveCoordinatorNode(ctx interface{}) *MockSeqCoordinator_SelectActiveCoordinatorNode_Call {
+	return &MockSeqCoordinator_SelectActiveCoordinatorNode_Call{Call: _e.mock.On("SelectActiveCoordinatorNode", ctx)}
 }
 
-func (_c *MockSeqCoordinator_SetActiveCoordinatorNode_Call) Run(run func(ctx context.Context, coordinatorNode string)) *MockSeqCoordinator_SetActiveCoordinatorNode_Call {
+func (_c *MockSeqCoordinator_SelectActiveCoordinatorNode_Call) Run(run func(ctx context.Context)) *MockSeqCoordinator_SelectActiveCoordinatorNode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
 		run(
 			arg0,
-			arg1,
 		)
 	})
 	return _c
 }
 
-func (_c *MockSeqCoordinator_SetActiveCoordinatorNode_Call) Return() *MockSeqCoordinator_SetActiveCoordinatorNode_Call {
-	_c.Call.Return()
+func (_c *MockSeqCoordinator_SelectActiveCoordinatorNode_Call) Return(s string, err error) *MockSeqCoordinator_SelectActiveCoordinatorNode_Call {
+	_c.Call.Return(s, err)
 	return _c
 }
 
-func (_c *MockSeqCoordinator_SetActiveCoordinatorNode_Call) RunAndReturn(run func(ctx context.Context, coordinatorNode string)) *MockSeqCoordinator_SetActiveCoordinatorNode_Call {
-	_c.Run(run)
+func (_c *MockSeqCoordinator_SelectActiveCoordinatorNode_Call) RunAndReturn(run func(ctx context.Context) (string, error)) *MockSeqCoordinator_SelectActiveCoordinatorNode_Call {
+	_c.Call.Return(run)
 	return _c
 }
 

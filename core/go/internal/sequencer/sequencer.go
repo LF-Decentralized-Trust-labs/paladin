@@ -560,7 +560,7 @@ func (sMgr *sequencerManager) HandleNonceAssigned(ctx context.Context, nonce uin
 }
 
 // Handle public TX submission, both for our own coordination state machine(s), and by distributing this public TX submission to other parties who need to have it
-func (sMgr *sequencerManager) HandlePublicTXSubmission(ctx context.Context, dbTX persistence.DBTX, txHash *pldtypes.Bytes32, contractAddress string, gasPricing string, txID uuid.UUID) error {
+func (sMgr *sequencerManager) HandlePublicTXSubmission(ctx context.Context, dbTX persistence.DBTX, txHash *pldtypes.Bytes32, sender string, contractAddress string, gasPricing string, txID uuid.UUID) error {
 	log.L(sMgr.ctx).Tracef("HandlePublicTXSubmission %s %s %s %s", txHash.String(), contractAddress, gasPricing, txID.String())
 
 	deploy := contractAddress == ""
@@ -591,55 +591,38 @@ func (sMgr *sequencerManager) HandlePublicTXSubmission(ctx context.Context, dbTX
 				if err != nil {
 					return err
 				}
+			}
+		}
 
-				// Inform endorsers about the public submission
-				tx := sequencer.GetCoordinator().GetTransactionByID(ctx, txID)
-				if tx == nil {
-					return fmt.Errorf("transaction %s not found in coordinator", txID)
-				}
+		// As well as updating ths state machine(s) we must distribute the public TX submission to the originator who needs visibility of public transactions
+		// related to their coordinated private transaction submissions
+		publicTXSubmission := &pldapi.PublicTxToDistribute{
+			TransactionHash: txHash,
+			GasPricing:      []byte(gasPricing),
+			Bindings: []*pldapi.PublicTxBinding{
+				{
+					Transaction: txID,
+				},
+			},
+		}
 
-				if tx.PostAssembly != nil {
-					// This is currently a best-effort attempt to distribute public TX submissions to all parties who should know about it.
-					// TODO - this should accommodate distribution after restarts which means we need a way to determine which parties for any
-					// domain should receive public TX information
-					publicTXSubmission := &pldapi.PublicTxToDistribute{
-						TransactionHash: txHash,
-						GasPricing:      []byte(gasPricing),
-						Bindings: []*pldapi.PublicTxBinding{
-							{
-								Transaction: txID,
-							},
-						},
-					}
-
-					// Get all endorsers
-					for _, endorsement := range tx.PostAssembly.Endorsements {
-						if strings.Contains(endorsement.Verifier.Lookup, "@") {
-							node := strings.Split(endorsement.Verifier.Lookup, "@")[1]
-							if node != sMgr.nodeName {
-								// Send reliable message to the node under the current DBTX
-								err = sMgr.components.TransportManager().SendReliable(ctx, dbTX, &pldapi.ReliableMessage{
-									MessageType: pldapi.RMTPublicTransactionSubmission.Enum(),
-									Metadata:    pldtypes.JSONString(publicTXSubmission),
-									Node:        node,
-								})
-								if err != nil {
-									return err
-								}
-							}
-						}
-					}
-				} else {
-					// Log as a warning for now as we need a better way to distribute public TX info among nodes.
-					log.L(sMgr.ctx).Warnf("Transaction %s has no post assembly, cannot distribute public TX submission", txID)
-				}
+		senderNode := strings.Split(sender, "@")[1]
+		if senderNode != sMgr.nodeName {
+			// Send reliable message to the node under the current DBTX
+			err = sMgr.components.TransportManager().SendReliable(ctx, dbTX, &pldapi.ReliableMessage{
+				MessageType: pldapi.RMTPublicTransactionSubmission.Enum(),
+				Metadata:    pldtypes.JSONString(publicTXSubmission),
+				Node:        senderNode,
+			})
+			if err != nil {
+				return err
 			}
 		}
 	}
 	return nil
 }
 
-// Distribute locally written public transactions to other parties who need to have the public TX
+// Distribute locally written public transactions to the originator who also needs to have the public TX
 func (sMgr *sequencerManager) HandlePublicTXsWritten(ctx context.Context, dbTX persistence.DBTX, persistedTxns []*pldapi.PublicTxToDistribute) error {
 	log.L(sMgr.ctx).Tracef("HandlePublicTXsWritten %d", len(persistedTxns))
 
@@ -649,34 +632,18 @@ func (sMgr *sequencerManager) HandlePublicTXsWritten(ctx context.Context, dbTX p
 				// Deploy not handled by sequencer
 				continue
 			}
-			sequencer, err := sMgr.LoadSequencer(ctx, dbTX, *persistedTxn.To, nil, nil)
-			if err != nil {
-				return err
-			}
 
-			if sequencer != nil {
-				tx := sequencer.GetCoordinator().GetTransactionByID(ctx, binding.Transaction)
-				if tx == nil {
-					return fmt.Errorf("transaction %s not found in coordinator", binding.Transaction)
-				}
-
-				// Get all endorsers
-				for _, endorsement := range tx.PostAssembly.Endorsements {
-					if strings.Contains(endorsement.Verifier.Lookup, "@") {
-						node := strings.Split(endorsement.Verifier.Lookup, "@")[1]
-						if node != sMgr.nodeName {
-							log.L(sMgr.ctx).Debugf("Endorser %s is not the sequencer node, send this info to them", node)
-							// Send reliable message to the node under the current DBTX
-							err = sMgr.components.TransportManager().SendReliable(ctx, dbTX, &pldapi.ReliableMessage{
-								MessageType: pldapi.RMTPublicTransaction.Enum(),
-								Metadata:    pldtypes.JSONString(persistedTxn),
-								Node:        node,
-							})
-							if err != nil {
-								return err
-							}
-						}
-					}
+			senderNode := strings.Split(binding.TransactionSender, "@")[1]
+			if senderNode != sMgr.nodeName {
+				log.L(sMgr.ctx).Debugf("Send public TX to %s", binding.TransactionSender)
+				// Send reliable message to the node under the current DBTX
+				err := sMgr.components.TransportManager().SendReliable(ctx, dbTX, &pldapi.ReliableMessage{
+					MessageType: pldapi.RMTPublicTransaction.Enum(),
+					Metadata:    pldtypes.JSONString(persistedTxn),
+					Node:        senderNode,
+				})
+				if err != nil {
+					return err
 				}
 			}
 		}
@@ -708,7 +675,11 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 	}
 
 	if sequencer != nil {
-		if !deploy && sequencer.GetCoordinator().GetActiveCoordinatorNode(ctx) == sMgr.nodeName {
+		if deploy {
+			// For a deploy we won't have tracked the transaction through the state machine, but we can load it ready for upcoming transactions and start
+			// off by selecting the next coordinator for the contract
+			sequencer.GetCoordinator().SelectActiveCoordinatorNode(ctx)
+		} else if sequencer.GetCoordinator().GetActiveCoordinatorNode(ctx) == sMgr.nodeName {
 			mtx := sequencer.GetCoordinator().GetTransactionByID(ctx, confirmedTxn.TransactionID)
 			if mtx == nil {
 				log.L(ctx).Infof("Coordinator not tracking transaction ID %s", confirmedTxn.TransactionID)

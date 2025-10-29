@@ -123,7 +123,7 @@ func (e *engineIntegration) WriteLockStatesForTransaction(ctx context.Context, t
 	}
 
 	// Lock input states
-	if len(txn.PostAssembly.InputStates) > 0 && txn.Intent == prototk.TransactionSpecification_SEND_TRANSACTION {
+	if len(txn.PostAssembly.InputStates) > 0 { // && txn.Intent == prototk.TransactionSpecification_SEND_TRANSACTION? MRW TODO
 		readTX := e.components.Persistence().NOTX() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
 		err := e.domainSmartContract.LockStates(e.domainContext, readTX, txn)
 		if err != nil {

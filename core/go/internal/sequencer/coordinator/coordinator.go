@@ -74,7 +74,7 @@ type SeqCoordinator interface {
 
 	// Manage the state of the coordinator
 	GetActiveCoordinatorNode(ctx context.Context) string
-	SetActiveCoordinatorNode(ctx context.Context, coordinatorNode string)
+	SelectActiveCoordinatorNode(ctx context.Context) (string, error)
 	GetCurrentState() State
 	UpdateOriginatorNodePool(ctx context.Context, originatorNode string)
 
@@ -282,7 +282,7 @@ func (c *coordinator) sendHandoverRequest(ctx context.Context) {
 func (c *coordinator) GetActiveCoordinatorNode(ctx context.Context) string {
 	if c.activeCoordinatorNode == "" {
 		// If we don't yet have an active coordinator, select one based on the appropriate algorithm for the contract type
-		activeCoordinator, err := c.selectNextActiveCoordinator(ctx)
+		activeCoordinator, err := c.SelectActiveCoordinatorNode(ctx)
 		if err != nil {
 			log.L(ctx).Errorf("error selecting next active coordinator: %v", err)
 			return ""
@@ -292,12 +292,7 @@ func (c *coordinator) GetActiveCoordinatorNode(ctx context.Context) string {
 	return c.activeCoordinatorNode
 }
 
-func (c *coordinator) SetActiveCoordinatorNode(ctx context.Context, coordinatorNode string) {
-	log.L(ctx).Debugf("set active coordinator for contract %s: %s", c.contractAddress.String(), coordinatorNode)
-	c.activeCoordinatorNode = coordinatorNode
-}
-
-func (c *coordinator) selectNextActiveCoordinator(ctx context.Context) (string, error) {
+func (c *coordinator) SelectActiveCoordinatorNode(ctx context.Context) (string, error) {
 	coordinator := ""
 	if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_STATIC {
 		// E.g. Noto
@@ -316,8 +311,8 @@ func (c *coordinator) selectNextActiveCoordinator(ctx context.Context) (string, 
 		// E.g. Pente
 		// Make a fair choice about the next coordinator, but for now just choose the node this request arrived at
 		if len(c.originatorNodePool) == 0 {
-			coordinator = c.nodeName
-			log.L(ctx).Warnf("coordinator %s selected based on empty originator pool (local node)", coordinator)
+			log.L(ctx).Warnf("no pool to select a coordinator from yet")
+			return "", nil
 		} else {
 			// Round block number down to the nearest block range (e.g. block 1012, 1013, 1014 etc. all become 1000 for hashing)
 			effectiveBlockNumber := c.currentBlockHeight - (c.currentBlockHeight % c.coordinatorSelectionBlockRange)

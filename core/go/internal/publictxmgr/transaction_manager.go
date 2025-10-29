@@ -180,7 +180,7 @@ func (ptm *pubTxManager) PostInit(pic components.AllComponents) error {
 	ptm.bIndexer = pic.BlockIndexer()
 	ptm.rootTxMgr = pic.TxManager()
 	ptm.sequencerManager = pic.SequencerManager()
-	ptm.submissionWriter = newSubmissionWriter(ptm.ctx, ptm.p, ptm.conf, ptm.thMetrics, ptm.sequencerManager)
+	ptm.submissionWriter = newSubmissionWriter(ptm.ctx, ptm.p, ptm.conf, ptm.thMetrics, ptm.sequencerManager, ptm.rootTxMgr)
 	ptm.balanceManager = NewBalanceManagerWithInMemoryTracking(ctx, ptm.conf, ptm)
 
 	log.L(ctx).Debugf("Initialized public transaction manager")
@@ -351,10 +351,20 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 				})
 
 				if bnd.TransactionType == pldapi.TransactionTypePrivate.Enum() {
+					theTx, err := ptm.rootTxMgr.GetTransactionByIDWithDBTX(ctx, dbTX, bnd.TransactionID)
+					if err != nil {
+						log.L(ctx).Errorf("%s", i18n.NewError(ctx, msgs.MsgSequencerInternalError, err).Error())
+						continue
+					}
+					if theTx == nil {
+						log.L(ctx).Errorf("%s", i18n.NewError(ctx, msgs.MsgTxMgrTransactionNotFound, bnd.TransactionID).Error())
+						continue
+					}
 					// We only distribute public transactions where they were the result of a private Paladin TX
 					binding := &pldapi.PublicTxBinding{
-						Transaction:     bnd.TransactionID,
-						TransactionType: bnd.TransactionType,
+						Transaction:       bnd.TransactionID,
+						TransactionType:   bnd.TransactionType,
+						TransactionSender: theTx.From,
 					}
 					transactionsToDistribute[i].Bindings = append(transactionsToDistribute[i].Bindings, binding)
 				} else {

@@ -18,9 +18,11 @@ package publictxmgr
 import (
 	"context"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/flushwriter"
+	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr/metrics"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 
@@ -35,12 +37,14 @@ type submissionWriter struct {
 	flushwriter.Writer[*DBPubTxnSubmission, *noResult]
 	metrics          metrics.PublicTransactionManagerMetrics
 	sequencerManager components.SequencerManager
+	rootTxMgr        components.TXManager
 }
 
-func newSubmissionWriter(bgCtx context.Context, p persistence.Persistence, conf *pldconf.PublicTxManagerConfig, metrics metrics.PublicTransactionManagerMetrics, sequencerManager components.SequencerManager) *submissionWriter {
+func newSubmissionWriter(bgCtx context.Context, p persistence.Persistence, conf *pldconf.PublicTxManagerConfig, metrics metrics.PublicTransactionManagerMetrics, sequencerManager components.SequencerManager, rootTxMgr components.TXManager) *submissionWriter {
 	sw := &submissionWriter{}
 	sw.metrics = metrics
 	sw.sequencerManager = sequencerManager
+	sw.rootTxMgr = rootTxMgr
 	sw.Writer = flushwriter.NewWriter(bgCtx, sw.runBatch, p, &conf.Manager.SubmissionWriter, &pldconf.PublicTxManagerDefaults.Manager.SubmissionWriter)
 	return sw
 }
@@ -61,9 +65,17 @@ func (sw *submissionWriter) runBatch(ctx context.Context, tx persistence.DBTX, v
 	// The sequencer needs to distribute the public submission to all relevant nodes. We submit a reliable message
 	// under the same DBTX as the local persist.
 	for _, value := range values {
+		privTx, err := sw.rootTxMgr.GetTransactionByIDWithDBTX(ctx, tx, value.PrivateTXID)
+		if err != nil {
+			return nil, err
+		}
+		if privTx == nil {
+			return nil, i18n.NewError(ctx, msgs.MsgTxMgrTransactionNotFound, value.PrivateTXID)
+		}
 		err = sw.sequencerManager.HandlePublicTXSubmission(ctx,
 			tx,
 			(*pldtypes.Bytes32)(&value.TransactionHash),
+			privTx.From,
 			value.ContractAddress,
 			value.GasPricing.StringValue(),
 			value.PrivateTXID)
