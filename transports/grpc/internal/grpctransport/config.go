@@ -36,11 +36,14 @@ type Config struct {
 	// By default directCertVerification will expect the CN of the subject to be the exact registered node name.
 	// Optionally certSubjectMatcher can supply a regexp containing a SINGLE CAPTURE GROUP that can be used to extract the name from the subject string
 	CertSubjectMatcher *string `json:"certSubjectMatcher,omitempty"`
+	// Graceful shutdown timeout. After this we will terminate connections forcibly
+	GracefulShutdownTimeout *string `json:"gracefulShutdownTimeout,omitempty"`
 }
 
 var ConfigDefaults = &Config{
-	Address:                confutil.P("0.0.0.0"), // public connectivity
-	DirectCertVerification: confutil.P(true),      // with self-signed certificates
+	Address:                 confutil.P("0.0.0.0"), // public connectivity
+	DirectCertVerification:  confutil.P(true),      // with self-signed certificates
+	GracefulShutdownTimeout: confutil.P("500ms"),   // allow 500ms before forcibly terminating gRPC connections
 }
 
 // This is the JSON structure that any node in the network must share to be connectable
