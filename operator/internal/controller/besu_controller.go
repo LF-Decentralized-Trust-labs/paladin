@@ -646,6 +646,7 @@ func (r *BesuReconciler) generateStatefulSetTemplate(node *corev1alpha1.Besu, na
 								TimeoutSeconds:      2,
 								PeriodSeconds:       5,
 							},
+							Resources: r.config.Besu.Resources,
 						},
 					},
 					Tolerations:  r.config.Besu.Tolerations,

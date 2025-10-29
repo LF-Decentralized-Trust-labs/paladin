@@ -8,7 +8,8 @@
     "tolerations": {{ toJson .Values.paladin.tolerations }},
     "affinity": {{ toJson .Values.paladin.affinity }},
     "nodeSelector": {{ toJson .Values.paladin.nodeSelector }},
-    "securityContext": {{ toJson .Values.paladin.securityContext }}
+    "securityContext": {{ toJson .Values.paladin.securityContext }},
+    "resources": {{ toJson .Values.paladin.resources }}
   },
   "besu": {
     "image": "{{ .Values.besu.image.repository }}:{{ .Values.besu.image.tag }}",
@@ -19,13 +20,15 @@
     "tolerations": {{ toJson .Values.besu.tolerations }},
     "affinity": {{ toJson .Values.besu.affinity }},
     "nodeSelector": {{ toJson .Values.besu.nodeSelector }},
-    "securityContext": {{ toJson .Values.besu.securityContext }}
+    "securityContext": {{ toJson .Values.besu.securityContext }},
+    "resources": {{ toJson .Values.besu.resources }}
   },
   "postgres": {
     "image": "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}",
     "imagePullPolicy": "{{ .Values.postgres.image.pullPolicy }}",
     "labels": {{ toJson .Values.postgres.labels }},
     "annotations": {{ toJson .Values.postgres.annotations }},
-    "envs": {{ toJson .Values.postgres.envs }}
+    "envs": {{ toJson .Values.postgres.envs }},
+    "resources": {{ toJson .Values.postgres.resources }}
   }
 }

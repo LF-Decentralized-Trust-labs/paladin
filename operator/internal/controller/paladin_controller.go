@@ -419,6 +419,7 @@ func (r *PaladinReconciler) generateStatefulSetTemplate(node *corev1alpha1.Palad
 								TimeoutSeconds:      1,
 								PeriodSeconds:       2,
 							},
+							Resources: r.config.Paladin.Resources,
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									TCPSocket: &corev1.TCPSocketAction{
@@ -435,6 +436,7 @@ func (r *PaladinReconciler) generateStatefulSetTemplate(node *corev1alpha1.Palad
 					Tolerations:  r.config.Paladin.Tolerations,
 					NodeSelector: r.config.Paladin.NodeSelector,
 					Affinity:     r.config.Paladin.Affinity,
+
 					Volumes: []corev1.Volume{
 						{
 							Name: "config",
@@ -467,6 +469,7 @@ func (r *PaladinReconciler) addPostgresSidecar(ss *appsv1.StatefulSet, passwordS
 			Image:           r.config.Postgres.Image, // Use the image from the config
 			ImagePullPolicy: r.config.Postgres.ImagePullPolicy,
 			SecurityContext: r.config.Postgres.SecurityContext,
+			Resources:       r.config.Postgres.Resources,
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					Name:      "pgdata",
