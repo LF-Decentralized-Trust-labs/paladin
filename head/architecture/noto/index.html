@@ -4050,7 +4050,7 @@ hash of the state data, while the private state data is only exchanged via priva
 of state data to transactions. The private state data provides a record of ownership and value
 transfer.</p>
 <h2 id="private-abi">Private ABI<a class="headerlink" href="#private-abi" title="Permanent link">&para;</a></h2>
-<p>The private ABI of Noto is implemented in <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/domains/noto">Go</a>,
+<p>The private ABI of Noto is implemented in <a href="https://github.com/LFDT-Paladin/paladin/tree/main/domains/noto">Go</a>,
 and can be accessed by calling <code>ptx_sendTransaction</code> with <code>"type": "private"</code>.</p>
 <h3 id="constructor">constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
 <p>Creates a new Noto token, with a new address on the base ledger.</p>
@@ -4278,7 +4278,7 @@ states will be created for the remaining amount (if any).</p>
 <li><strong>data</strong> - user/application data to include with the transaction (will be accessible from an "info" state in the state receipt)</li>
 </ul>
 <h2 id="public-abi">Public ABI<a class="headerlink" href="#public-abi" title="Permanent link">&para;</a></h2>
-<p>The public ABI of Noto is implemented in Solidity by <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/noto/Noto.sol">Noto.sol</a>,
+<p>The public ABI of Noto is implemented in Solidity by <a href="https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/domains/noto/Noto.sol">Noto.sol</a>,
 and can be accessed by calling <code>ptx_sendTransaction</code> with <code>"type": "public"</code>. However, it is not often required
 to invoke the public ABI directly.</p>
 <h3 id="mint_1">mint<a class="headerlink" href="#mint_1" title="Permanent link">&para;</a></h3>
@@ -4447,7 +4447,7 @@ to invoke the public ABI directly.</p>
 </ul>
 <p><strong>Note:</strong> This function is limited to querying up to 1000 states and should not be used as a replacement for proper indexing infrastructure.</p>
 <h2 id="notary-logic">Notary logic<a class="headerlink" href="#notary-logic" title="Permanent link">&para;</a></h2>
-<p>The notary logic (implemented in the domain <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/domains/noto">Go library</a>) is responsible for validating and
+<p>The notary logic (implemented in the domain <a href="https://github.com/LFDT-Paladin/paladin/tree/main/domains/noto">Go library</a>) is responsible for validating and
 submitting all transactions to the base shared ledger.</p>
 <p>The notary will validate the following:</p>
 <ul>
@@ -4500,7 +4500,7 @@ notary logic can be easily configured as described below.</p>
 </ul>
 <h3 id="notary-mode-hooks">Notary mode: hooks<a class="headerlink" href="#notary-mode-hooks" title="Permanent link">&para;</a></h3>
 <p>When a Noto contract is constructed with notary mode <code>hooks</code>, the address of a private Pente contract implementing
-<a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/interfaces/INotoHooks.sol">INotoHooks</a>
+<a href="https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/domains/interfaces/INotoHooks.sol">INotoHooks</a>
 must be provided. This contract may be deployed into a privacy group only visible to the notary, or into a group
 that includes other parties for observability.</p>
 <p>The relevant hook will be invoked for each Noto operation, allowing the contract to determine if the operation is

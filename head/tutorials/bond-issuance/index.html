@@ -3730,12 +3730,12 @@
 
 
 <h1 id="bond-issuance">Bond Issuance<a class="headerlink" href="#bond-issuance" title="Permanent link">&para;</a></h1>
-<p>The code for this tutorial can be found in <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/bond">examples/bond</a>.</p>
+<p>The code for this tutorial can be found in <a href="https://github.com/LFDT-Paladin/paladin/blob/main/examples/bond">examples/bond</a>.</p>
 <p>This shows how to leverage the <a href="../../architecture/noto/">Noto</a> and <a href="../../architecture/pente/">Pente</a> domains together in order to build a bond issuance process, illustrating multiple aspects of Paladin's privacy capabilities.</p>
 <p><img alt="Bond issuance" src="../../images/paladin_bond.png" /></p>
 <h2 id="running-the-example">Running the example<a class="headerlink" href="#running-the-example" title="Permanent link">&para;</a></h2>
 <p>Follow the <a href="../../getting-started/installation/">Getting Started</a> instructions to set up a Paladin environment, and
-then follow the example <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/bond/README.md">README</a>
+then follow the example <a href="https://github.com/LFDT-Paladin/paladin/blob/main/examples/bond/README.md">README</a>
 to run the code.</p>
 <h2 id="explanation">Explanation<a class="headerlink" href="#explanation" title="Permanent link">&para;</a></h2>
 <p>Below is a walkthrough of each step in the example, with an explanation of what it does.</p>
@@ -3801,7 +3801,7 @@ recorded on the base ledger contract.</p>
 <a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">  </span><span class="p">},</span>
 <a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="p">});</span>
 </code></pre></div>
-<p>This sends a public EVM transaction to deploy the <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/shared/BondTrackerPublic.sol">public bond tracker</a>.
+<p>This sends a public EVM transaction to deploy the <a href="https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/shared/BondTrackerPublic.sol">public bond tracker</a>.
 This is equivalent to performing a deploy directly on the base ledger, without any special
 handling for privacy.</p>
 <p>The public bond tracker is used to advertise public information about our bond, such as its
@@ -3815,8 +3815,8 @@ events throughout the bond's lifetime.</p>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nx">publicTracker</span><span class="o">:</span><span class="w"> </span><span class="kt">bondTrackerPublicAddress</span><span class="p">,</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">});</span>
 </code></pre></div>
-<p>The <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/private/BondTracker.sol">private bond tracker</a>
-is an ERC-20 token, and implements the <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/interfaces/INotoHooks.sol">INotoHooks</a> interface.</p>
+<p>The <a href="https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/private/BondTracker.sol">private bond tracker</a>
+is an ERC-20 token, and implements the <a href="https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/domains/interfaces/INotoHooks.sol">INotoHooks</a> interface.</p>
 <p>Noto supports using a Pente private smart contract to define "hooks" which are executed inline with every mint/transfer.
 This provides a flexible (and EVM-native) means of writing custom policies that are enforced by the notary. In this case,
 the notary tracks the bond value as an ERC-20. Every mint and transfer of the Noto token will be reflected on this private
@@ -3854,7 +3854,7 @@ The "hooks" configuration points it to the private hooks contract that was deplo
 </code></pre></div>
 <p>Many programming patterns in Paladin will require a contract on the shared ledger that
 can prepare and execute atomic transactions. This is provided by the
-<a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/shared/Atom.sol">Atom and AtomFactory</a> contracts.</p>
+<a href="https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/shared/Atom.sol">Atom and AtomFactory</a> contracts.</p>
 <p>At least one instance of <code>AtomFactory</code> must be deployed to run this example. Once in place,
 note that this same factory contract can be reused for atomic transactions of any composition.</p>
 <h3 id="bond-issuance_1">Bond issuance<a class="headerlink" href="#bond-issuance_1" title="Permanent link">&para;</a></h3>
@@ -3913,7 +3913,7 @@ between the issuer and custodian.</p>
 <a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">  </span><span class="p">}</span>
 <a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="p">);</span>
 </code></pre></div>
-<p>An investor may request to subscribe to the bond by creating a <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/private/BondSubscription.sol">private subscription contract</a>
+<p>An investor may request to subscribe to the bond by creating a <a href="https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/private/BondSubscription.sol">private subscription contract</a>
 in their private EVM with the bond custodian.</p>
 <h4 id="prepare-cash-transfer">Prepare cash transfer<a class="headerlink" href="#prepare-cash-transfer" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nx">receipt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">notoCash</span>

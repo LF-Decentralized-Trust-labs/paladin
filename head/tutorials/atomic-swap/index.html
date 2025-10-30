@@ -3898,11 +3898,11 @@
 
 
 <h1 id="atomic-swap">Atomic Swap<a class="headerlink" href="#atomic-swap" title="Permanent link">&para;</a></h1>
-<p>The code for this tutorial can be found in <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/swap">examples/swap</a>.</p>
+<p>The code for this tutorial can be found in <a href="https://github.com/LFDT-Paladin/paladin/blob/main/examples/swap">examples/swap</a>.</p>
 <p>This example demonstrates an <strong>atomic swap</strong> scenario on Paladin, showing how to perform secure exchanges between different types of privacy-preserving tokens. It illustrates the power of combining multiple Paladin domains (<a href="../../architecture/zeto/">Zeto</a>, <a href="../../architecture/noto/">Noto</a>, and <a href="../../architecture/pente/">Pente</a>) to create complex privacy-preserving operations with guaranteed atomicity on a single ledger.</p>
 <h2 id="running-the-example">Running the example<a class="headerlink" href="#running-the-example" title="Permanent link">&para;</a></h2>
 <p>Follow the <a href="../../getting-started/installation/">Getting Started</a> instructions to set up a Paladin environment, and
-then follow the example <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/swap/README.md">README</a>
+then follow the example <a href="https://github.com/LFDT-Paladin/paladin/blob/main/examples/swap/README.md">README</a>
 to run the code.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>The atomic swap demonstrates an exchange between:</p>
@@ -3930,7 +3930,7 @@ to run the code.</p>
 <h4 id="deploy-atom-factory">Deploy atom factory<a class="headerlink" href="#deploy-atom-factory" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">atomFactory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">newAtomFactory</span><span class="p">(</span><span class="nx">paladin1</span><span class="p">,</span><span class="w"> </span><span class="nx">cashIssuer</span><span class="p">);</span>
 </code></pre></div>
-<p>The <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/shared/Atom.sol">Atom Factory</a> is a utility contract on the base ledger. It creates atomic transaction containers that can execute multiple operations as a single unit. While it is not a part of any Paladin domain, it is useful for coordinating operations from multiple domains.</p>
+<p>The <a href="https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/shared/Atom.sol">Atom Factory</a> is a utility contract on the base ledger. It creates atomic transaction containers that can execute multiple operations as a single unit. While it is not a part of any Paladin domain, it is useful for coordinating operations from multiple domains.</p>
 <h4 id="deploy-zeto-cash-token">Deploy Zeto cash token<a class="headerlink" href="#deploy-zeto-cash-token" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">zetoFactory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">ZetoFactory</span><span class="p">(</span><span class="nx">paladin1</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;zeto&quot;</span><span class="p">);</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">zetoCash</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">zetoFactory</span>

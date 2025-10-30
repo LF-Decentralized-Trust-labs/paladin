@@ -3851,7 +3851,7 @@
 
 <h1 id="hello-world-with-paladin">Hello World with Paladin<a class="headerlink" href="#hello-world-with-paladin" title="Permanent link">&para;</a></h1>
 <p>This tutorial walks you through deploying and interacting with a simple <code>HelloWorld</code> smart contract using the Paladin SDK. The example demonstrates how to deploy a contract, interact with it by calling its <code>sayHello</code> function, and retrieve and verify the emitted event.</p>
-<p>The code for this tutorial can be found in <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/helloworld">examples/helloworld</a>.</p>
+<p>The code for this tutorial can be found in <a href="https://github.com/LFDT-Paladin/paladin/blob/main/examples/helloworld">examples/helloworld</a>.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>Before starting, ensure you have:</p>
 <ol>
@@ -3864,15 +3864,15 @@
 <p>⚠️ To ensure you are using a stable version, <strong>always clone the most recent release tag</strong> instead of <code>main</code>.</p>
 </blockquote>
 <p>Clone the repository at the latest release:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">REPO</span><span class="o">=</span>https://github.com/LF-Decentralized-Trust-labs/paladin.git
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">REPO</span><span class="o">=</span>https://github.com/LFDT-Paladin/paladin.git
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nv">TAG</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>ls-remote<span class="w"> </span>--tags<span class="w"> </span><span class="nv">$REPO</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d/<span class="w"> </span>-f3<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span><span class="s1">&#39;\-rc&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-V<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-n1<span class="k">)</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>git<span class="w"> </span>clone<span class="w"> </span><span class="nv">$REPO</span><span class="w"> </span>-b<span class="w"> </span><span class="nv">$TAG</span>
 </code></pre></div>
 <p>Once cloned, navigate to the example:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>paladin/examples/helloworld
 </code></pre></div>
-<p>The HelloWorld solidity contract is located at: <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/tutorials/HelloWorld.sol"><code>solidity/contracts/tutorials/HelloWorld.sol</code></a></p>
-<p>Follow the example <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/helloworld/README.md">README</a> to run the code.</p>
+<p>The HelloWorld solidity contract is located at: <a href="https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/tutorials/HelloWorld.sol"><code>solidity/contracts/tutorials/HelloWorld.sol</code></a></p>
+<p>Follow the example <a href="https://github.com/LFDT-Paladin/paladin/blob/main/examples/helloworld/README.md">README</a> to run the code.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>This tutorial demonstrates how traditional, non-private Ethereum smart contract interactions can be achieved via a Paladin node and its transaction manager. Later tutorials will demonstrate how to make use of more advanced features of the Paladin APIs.</p>
 <p>We have a <code>HelloWorld</code> smart contract, which:</p>

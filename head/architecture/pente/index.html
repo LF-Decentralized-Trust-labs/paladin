@@ -3955,7 +3955,7 @@
 </li>
 </ul>
 <h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
-<p>The Pente private domain is implemented <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/domains/pente/src">in Java</a>
+<p>The Pente private domain is implemented <a href="https://github.com/LFDT-Paladin/paladin/tree/main/domains/pente/src">in Java</a>
 using the <a href="https://github.com/hyperledger/besu">Besu EVM</a> as a code module to start and run ephemeral in-memory EVMs.</p>
 <h2 id="submitting-transactions">Submitting transactions<a class="headerlink" href="#submitting-transactions" title="Permanent link">&para;</a></h2>
 <p>The recommended way to submit transactions is to:</p>
@@ -4038,7 +4038,7 @@ containing ABI, as they will not be the same as the public transaction that is s
 <li><strong>outputs</strong> - ABI method outputs for the contract (only valid for <code>ptx_call</code>, must be filled in to match the contract).</li>
 </ul>
 <h2 id="public-abi">Public ABI<a class="headerlink" href="#public-abi" title="Permanent link">&para;</a></h2>
-<p>The public ABI of Pente is implemented in Solidity by <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/pente/PentePrivacyGroup.sol">PentePrivacyGroup.sol</a>,
+<p>The public ABI of Pente is implemented in Solidity by <a href="https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/domains/pente/PentePrivacyGroup.sol">PentePrivacyGroup.sol</a>,
 and can be accessed by calling <code>ptx_sendTransaction</code> with <code>"type": "public"</code>. However, it is not often required
 to invoke the public ABI directly.</p>
 <h3 id="transition">transition<a class="headerlink" href="#transition" title="Permanent link">&para;</a></h3>

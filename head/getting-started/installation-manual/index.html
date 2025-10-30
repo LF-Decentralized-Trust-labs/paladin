@@ -3939,7 +3939,7 @@
 </ul>
 <h2 id="step-1-install-paladin-operator-crds">Step 1: Install Paladin Operator CRDs<a class="headerlink" href="#step-1-install-paladin-operator-crds" title="Permanent link">&para;</a></h2>
 <p>Add the Paladin Helm repository:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>helm<span class="w"> </span>repo<span class="w"> </span>add<span class="w"> </span>paladin<span class="w"> </span>https://LF-Decentralized-Trust-labs.github.io/paladin<span class="w"> </span>--force-update
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>helm<span class="w"> </span>repo<span class="w"> </span>add<span class="w"> </span>paladin<span class="w"> </span>https://LFDT-Paladin.github.io/paladin<span class="w"> </span>--force-update
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>helm<span class="w"> </span>upgrade<span class="w"> </span>--install<span class="w"> </span>paladin-crds<span class="w"> </span>paladin/paladin-operator-crd
 </code></pre></div>
 <h2 id="step-2-install-cert-manager-crds">Step 2: Install cert-manager CRDs<a class="headerlink" href="#step-2-install-cert-manager-crds" title="Permanent link">&para;</a></h2>
@@ -3953,7 +3953,7 @@
 </code></pre></div>
 <h2 id="step-4-deploy-smart-contract-artifacts">Step 4: Deploy Smart Contract Artifacts<a class="headerlink" href="#step-4-deploy-smart-contract-artifacts" title="Permanent link">&para;</a></h2>
 <p>Download the latest release artifacts:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>wget<span class="w"> </span>https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/latest/artifacts.tar.gz
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>wget<span class="w"> </span>https://github.com/LFDT-Paladin/paladin/releases/download/latest/artifacts.tar.gz
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tar<span class="w"> </span>-xzvf<span class="w"> </span>artifacts.tar.gz
 </code></pre></div>
 <p>Apply the self-signed certificate issuer in all Kubernetes clusters:</p>
@@ -4232,7 +4232,7 @@
 </code></pre></div>
 <h3 id="config"><code>config</code><a class="headerlink" href="#config" title="Permanent link">&para;</a></h3>
 <p>This section contains an inline yaml/json string which can be used to provide Paladin node configuration that isn't exposed directly by the CRD. If the same configuration value is provided in the inline config and a CR field, the CR field will take precedence.</p>
-<p><a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/config/pkg/pldconf/config.go">This code file</a> defines the full set of Paladin configuration.</p>
+<p><a href="https://github.com/LFDT-Paladin/paladin/blob/main/config/pkg/pldconf/config.go">This code file</a> defines the full set of Paladin configuration.</p>
 <h3 id="database"><code>database</code><a class="headerlink" href="#database" title="Permanent link">&para;</a></h3>
 <p><div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">database</span><span class="p">:</span>
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">migrationMode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>

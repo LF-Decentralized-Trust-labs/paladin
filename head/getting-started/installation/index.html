@@ -3814,10 +3814,10 @@
 <h2 id="quick-start-with-kind">Quick Start with kind<a class="headerlink" href="#quick-start-with-kind" title="Permanent link">&para;</a></h2>
 <p>If you are new to Kubernetes or simply need a quick way to get a running cluster, <a href="https://kind.sigs.k8s.io/">kind</a>
 provides a lightweight way to run a local Kubernetes cluster on your machine. This repo contains a
-<a href="https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/operator/paladin-kind.yaml">starter config file</a>
+<a href="https://github.com/LFDT-Paladin/paladin/blob/main/operator/paladin-kind.yaml">starter config file</a>
 for kind which will open up the container ports used by the Paladin charts below.</p>
 <p>You can create a new cluster with:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>https://raw.githubusercontent.com/LF-Decentralized-Trust-labs/paladin/refs/heads/main/operator/paladin-kind.yaml<span class="w"> </span>-L<span class="w"> </span>-O
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>https://raw.githubusercontent.com/LFDT-Paladin/paladin/refs/heads/main/operator/paladin-kind.yaml<span class="w"> </span>-L<span class="w"> </span>-O
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>kind<span class="w"> </span>create<span class="w"> </span>cluster<span class="w"> </span>--name<span class="w"> </span>paladin<span class="w"> </span>--config<span class="w"> </span>paladin-kind.yaml
 </code></pre></div>
 <p>If you need to start over, you can delete the cluster with:</p>
@@ -3828,7 +3828,7 @@ documentation for any issues with these tools.</p>
 <h2 id="installation_1">Installation<a class="headerlink" href="#installation_1" title="Permanent link">&para;</a></h2>
 <h3 id="step-1-install-the-crd-chart">Step 1: Install the CRD Chart<a class="headerlink" href="#step-1-install-the-crd-chart" title="Permanent link">&para;</a></h3>
 <p>Install the CRD chart that contains the necessary Custom Resource Definitions (CRDs) for the Paladin operator:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>helm<span class="w"> </span>repo<span class="w"> </span>add<span class="w"> </span>paladin<span class="w"> </span>https://LF-Decentralized-Trust-labs.github.io/paladin<span class="w"> </span>--force-update
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>helm<span class="w"> </span>repo<span class="w"> </span>add<span class="w"> </span>paladin<span class="w"> </span>https://LFDT-Paladin.github.io/paladin<span class="w"> </span>--force-update
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>helm<span class="w"> </span>upgrade<span class="w"> </span>--install<span class="w"> </span>paladin-crds<span class="w"> </span>paladin/paladin-operator-crd
 </code></pre></div>
 <h3 id="step-2-install-cert-manager-crds">Step 2: Install cert-manager CRDs<a class="headerlink" href="#step-2-install-cert-manager-crds" title="Permanent link">&para;</a></h3>
@@ -3941,7 +3941,7 @@ documentation for any issues with these tools.</p>
 <p>This guide is designed for first-time Paladin users looking for a quick and easy introduction. For more complex setups, integration with existing blockchain networks, or detailed customization, please refer to the <a href="../installation-advanced/">Advanced Installation</a> or <a href="../installation-manual/">Manual Installation</a> guides.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <p>If you encounter any issues during installation, please refer to the <a href="../troubleshooting/">Troubleshooting Guide</a>.  </p>
-<p>If your issue is not listed or remains unresolved, please report it by <a href="https://github.com/LF-Decentralized-Trust-labs/paladin/issues">opening an issue on the Paladin GitHub page</a>.</p>
+<p>If your issue is not listed or remains unresolved, please report it by <a href="https://github.com/LFDT-Paladin/paladin/issues">opening an issue on the Paladin GitHub page</a>.</p>
 <h2 id="uninstall">Uninstall<a class="headerlink" href="#uninstall" title="Permanent link">&para;</a></h2>
 <p>To remove the Paladin operator and related resources, run the following commands:
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>helm<span class="w"> </span>uninstall<span class="w"> </span>paladin<span class="w"> </span>-n<span class="w"> </span>paladin
