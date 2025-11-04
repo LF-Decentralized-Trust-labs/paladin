@@ -452,7 +452,6 @@ func (cm *componentManager) CompleteStart() error {
 		cm.registerRPCModules()
 
 		// Set RPC authorizers if configured
-		// TODO AM: fix this coverage- check coverage overall
 		if len(cm.conf.RPCServer.Authorizers) > 0 {
 			// Only set authorizers if explicitly configured in RPCServer config
 			auths := make([]rpcserver.Authorizer, 0, len(cm.conf.RPCServer.Authorizers))

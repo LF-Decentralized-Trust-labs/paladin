@@ -37,10 +37,3 @@ type RPCAuthManager interface {
 	RPCAuthorizerRegistered(name string, id uuid.UUID, toAuthorizer RPCAuthManagerToAuthorizer) (fromAuthorizer plugintk.RPCAuthCallbacks, err error)
 	GetRPCAuthorizer(name string) rpcserver.Authorizer
 }
-
-// AuthResult holds the result of RPC authorization
-type AuthResult struct {
-	Authorized   bool
-	StatusCode   int
-	ErrorMessage string
-}

@@ -63,7 +63,7 @@ func (s *rpcServer) newWSConnection(conn *websocket.Conn, req *http.Request) {
 		} else {
 			// This shouldn't happen if auth is required (should have failed before upgrade)
 			// But handle gracefully - connection will work but won't be authorized
-			log.L(c.ctx).Warnf("WebSocket connection without stored authentication results (auth may not be required)")
+			log.L(c.ctx).Warnf("WebSocket connection without stored authentication results")
 		}
 	}
 

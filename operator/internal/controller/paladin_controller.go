@@ -260,7 +260,7 @@ func (r *PaladinReconciler) createStatefulSet(ctx context.Context, node *corev1a
 	r.addTLSSecretMounts(statefulSet, paladinContainer, tlsSecrets)
 
 	// Mount RPC auth secret if configured
-	if node.Spec.RPCAuth != nil {
+	if node.Spec.RPCAuth != nil && node.Spec.RPCAuth.SecretName != "" {
 		if err := r.addRPCAuthSecretMount(ctx, statefulSet, paladinContainer, node); err != nil {
 			return nil, err
 		}
@@ -645,10 +645,6 @@ func (r *PaladinReconciler) addPaladinDBSecret(ctx context.Context, ss *appsv1.S
 
 func (r *PaladinReconciler) addRPCAuthSecretMount(ctx context.Context, ss *appsv1.StatefulSet, ct *corev1.Container, node *corev1alpha1.Paladin) error {
 	secretName := node.Spec.RPCAuth.SecretName
-	if secretName == "" {
-		// If secretName is not provided, treat it the same as rpcAuth being nil (skip mounting)
-		return nil
-	}
 
 	// Verify secret exists
 	var secret corev1.Secret

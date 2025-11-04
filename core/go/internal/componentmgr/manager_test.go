@@ -228,7 +228,7 @@ func TestStartOK(t *testing.T) {
 
 	mockRPCServer := rpcservermocks.NewRPCServer(t)
 	mockRPCServer.On("Start").Return(nil)
-	mockRPCServer.On("Register", mock.Anything).Return()
+	mockRPCServer.On("Register", mock.AnythingOfType("*rpcserver.RPCModule")).Return()
 	mockRPCServer.On("Stop").Return()
 	mockRPCServer.On("HTTPAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8545})
 	mockRPCServer.On("WSAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8546})
@@ -288,17 +288,6 @@ func TestBuildInternalEventStreamsPreCommitPostCommit(t *testing.T) {
 	assert.Equal(t, blockindexer.IESTypePreCommitHandler, streams[0].Type)
 	assert.NotNil(t, streams[0].PreCommitHandler)
 
-}
-
-// testAuthorizer is a simple mock implementation of rpcserver.Authorizer for testing
-type testAuthorizer struct{}
-
-func (t *testAuthorizer) Authenticate(ctx context.Context, headers map[string]string) (string, error) {
-	return `{"test":"auth"}`, nil
-}
-
-func (t *testAuthorizer) Authorize(ctx context.Context, result string, method string, payload []byte) (*rpcserver.AuthResult, error) {
-	return &rpcserver.AuthResult{Authorized: true}, nil
 }
 
 func TestErrorWrapping(t *testing.T) {
@@ -374,8 +363,8 @@ func TestCompleteStart_MultipleAuthorizers(t *testing.T) {
 	mockStateManager.On("Stop").Return()
 
 	// Create mock authorizers (simple struct implementing Authorizer interface)
-	mockAuthorizer1 := &testAuthorizer{}
-	mockAuthorizer2 := &testAuthorizer{}
+	mockAuthorizer1 := rpcservermocks.NewAuthorizer(t)
+	mockAuthorizer2 := rpcservermocks.NewAuthorizer(t)
 
 	// Expect GetRPCAuthorizer to be called twice
 	mockRPCAuthManager.On("GetRPCAuthorizer", "auth1").Return(mockAuthorizer1)
@@ -508,8 +497,7 @@ func TestCompleteStart_SingleAuthorizer(t *testing.T) {
 	mockRPCAuthManager.On("Start").Return(nil)
 	mockRPCAuthManager.On("Stop").Return()
 
-	// Create mock authorizer (simple struct implementing Authorizer interface)
-	mockAuthorizer := &testAuthorizer{}
+	mockAuthorizer := rpcservermocks.NewAuthorizer(t)
 
 	// Expect GetRPCAuthorizer to be called once
 	mockRPCAuthManager.On("GetRPCAuthorizer", "auth1").Return(mockAuthorizer)

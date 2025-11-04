@@ -77,7 +77,7 @@ func TestWebSocketConnectionFailureHandling(t *testing.T) {
 		for _, wsConn = range s.wsConnections {
 		}
 		if time.Since(before) > 1*time.Second {
-			panic("timed out waiting for connection")
+			t.Fatal("timed out waiting for connection")
 		}
 	}
 
@@ -102,130 +102,7 @@ func TestWebSocketConnectionFailureHandling(t *testing.T) {
 
 }
 
-func TestWebSocketConnection_SetAuthenticationResults(t *testing.T) {
-	wsc := &webSocketConnection{
-		authenticationResults: []string{},
-	}
-
-	// Test setAuthenticationResults
-	authenticationResults := []string{`{"user":"test1"}`, `{"user":"test2"}`}
-	wsc.setAuthenticationResults(authenticationResults)
-
-	// Test getAuthenticationResults
-	retrieved := wsc.getAuthenticationResults()
-	assert.Equal(t, authenticationResults, retrieved)
-	assert.Len(t, retrieved, 2)
-}
-
-func TestWebSocketConnection_GetAuthenticationResults_Empty(t *testing.T) {
-	wsc := &webSocketConnection{
-		authenticationResults: []string{},
-	}
-
-	retrieved := wsc.getAuthenticationResults()
-	assert.Empty(t, retrieved)
-	assert.NotNil(t, retrieved)
-}
-
-func TestNewWSConnection_WithAuthenticationResults(t *testing.T) {
-	ctx := context.Background()
-	server, err := NewRPCServer(ctx, &pldconf.RPCServerConfig{
-		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
-		WS: pldconf.RPCServerConfigWS{
-			HTTPServerConfig: pldconf.HTTPServerConfig{
-				Port: confutil.P(0),
-			},
-		},
-	})
-	require.NoError(t, err)
-	defer server.Stop()
-
-	// Create a mock websocket connection (we can't easily test real upgrade in unit tests)
-	// This test verifies the identity handling logic
-	req := httptest.NewRequest("GET", "/test", nil)
-	authenticationResults := []string{`{"user":"test1"}`, `{"user":"test2"}`}
-	req = req.WithContext(context.WithValue(req.Context(), wsAuthResultKey, authenticationResults))
-
-	// Set up authorizers
-	auth := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			return `{"user":"test"}`, nil
-		},
-	}
-	server.SetAuthorizers([]Authorizer{auth})
-
-	// We can't easily test newWSConnection directly without a real WebSocket connection
-	// But we can verify the authentication result retrieval logic would work
-	if storedResults, ok := req.Context().Value(wsAuthResultKey).([]string); ok {
-		assert.Equal(t, authenticationResults, storedResults)
-		assert.Len(t, storedResults, 2)
-	} else {
-		t.Fatal("Authentication results not found in context")
-	}
-}
-
-func TestNewWSConnection_WithoutAuthenticationResults_WithAuthorizers(t *testing.T) {
-	ctx := context.Background()
-	server, err := NewRPCServer(ctx, &pldconf.RPCServerConfig{
-		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
-		WS: pldconf.RPCServerConfigWS{
-			HTTPServerConfig: pldconf.HTTPServerConfig{
-				Port: confutil.P(0),
-			},
-		},
-	})
-	require.NoError(t, err)
-	defer server.Stop()
-
-	// Create a request without authentication results in context
-	req := httptest.NewRequest("GET", "/test", nil)
-
-	// Set up authorizers
-	auth := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			return `{"user":"test"}`, nil
-		},
-	}
-	server.SetAuthorizers([]Authorizer{auth})
-
-	// Verify that authentication results are not in context (this is the case we're testing)
-	if storedResults, ok := req.Context().Value(wsAuthResultKey).([]string); ok {
-		// Should be empty or not ok
-		assert.Empty(t, storedResults)
-	} else {
-		// This is expected - no authentication results in context
-		assert.False(t, ok)
-	}
-}
-
-func TestNewWSConnection_NoAuthorizers(t *testing.T) {
-	ctx := context.Background()
-	server, err := NewRPCServer(ctx, &pldconf.RPCServerConfig{
-		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
-		WS: pldconf.RPCServerConfigWS{
-			HTTPServerConfig: pldconf.HTTPServerConfig{
-				Port: confutil.P(0),
-			},
-		},
-	})
-	require.NoError(t, err)
-	defer server.Stop()
-
-	// No authorizers configured
-	server.SetAuthorizers(nil)
-
-	// Create a request (should work fine without authentication results)
-	req := httptest.NewRequest("GET", "/test", nil)
-
-	// Verify no authorizers
-	assert.Empty(t, server.authorizers)
-
-	// Request should be fine (we can't test full connection without real websocket, but logic is covered)
-	_ = req
-}
-
-func TestNewWSConnection_WithAuthenticationResults_CallsNewWSConnection(t *testing.T) {
-	// This test covers the if branch (lines 60-62) where authentication results ARE found in context
+func TestNewWSConnectionWithAuthenticationResults(t *testing.T) {
 	ctx := context.Background()
 	server, err := NewRPCServer(ctx, &pldconf.RPCServerConfig{
 		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
@@ -239,63 +116,34 @@ func TestNewWSConnection_WithAuthenticationResults_CallsNewWSConnection(t *testi
 	defer server.Stop()
 
 	// Set up authorizers
-	auth := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			return `{"user":"test"}`, nil
-		},
-	}
-	server.SetAuthorizers([]Authorizer{auth})
+	server.SetAuthorizers([]Authorizer{&mockAuthorizer{}})
 
 	// Track if setAuthenticationResults was called
 	resultsToStore := []string{`{"user":"test1"}`, `{"user":"test2"}`}
 
+	// Channel to signal when connection is ready for verification
+	connReady := make(chan *webSocketConnection, 1)
+
 	// Create a test server that provides WebSocket upgrade
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Create request WITH authentication results in context - this is what we're testing
-		req := httptest.NewRequest("GET", "/test", nil)
-		req = req.WithContext(context.WithValue(r.Context(), wsAuthResultKey, resultsToStore))
+		r = r.WithContext(context.WithValue(r.Context(), wsAuthResultKey, resultsToStore))
 
-		// Use server's upgrader or create one if needed
-		if server.wsUpgrader == nil {
-			server.wsUpgrader = &websocket.Upgrader{}
-		}
-
-		// Upgrade to WebSocket
-		conn, err := server.wsUpgrader.Upgrade(w, r, nil)
+		// Upgrade the WebSocket to get the connection
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
 		if err != nil {
 			return
 		}
 
 		// Call newWSConnection with request that HAS authentication results
-		// This should trigger the if branch (lines 60-62) - the code path we're testing
-		server.newWSConnection(conn, req)
+		server.newWSConnection(conn, r)
 
-		// Give goroutines time to start
-		time.Sleep(50 * time.Millisecond)
-
-		// Verify authentication results were stored by checking the connection
 		server.wsMux.Lock()
-		var wsConn *webSocketConnection
-		for _, conn := range server.wsConnections {
-			wsConn = conn
+		defer server.wsMux.Unlock()
+		for _, wsConn := range server.wsConnections {
+			connReady <- wsConn
 			break
 		}
-		server.wsMux.Unlock()
-
-		if wsConn != nil {
-			storedResults := wsConn.getAuthenticationResults()
-			assert.Equal(t, resultsToStore, storedResults, "Authentication results should be stored")
-			assert.Len(t, storedResults, 2)
-		}
-
-		// Clean up connections
-		server.wsMux.Lock()
-		for _, wsConn := range server.wsConnections {
-			if wsConn != nil {
-				wsConn.close()
-			}
-		}
-		server.wsMux.Unlock()
 	}))
 	defer testServer.Close()
 
@@ -309,15 +157,17 @@ func TestNewWSConnection_WithAuthenticationResults_CallsNewWSConnection(t *testi
 	connectCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	// The connection may fail but that's OK - we're testing the newWSConnection path
-	_ = wsClient.Connect(connectCtx)
-	// Give time for connection setup
-	time.Sleep(100 * time.Millisecond)
+	err = wsClient.Connect(connectCtx)
+	require.NoError(t, err)
+
+	// Wait for connection to be ready
+	wsConn := <-connReady
+
+	storedResults := wsConn.getAuthenticationResults()
+	assert.Equal(t, resultsToStore, storedResults, "Authentication results should be stored")
 }
 
-func TestNewWSConnection_WithoutAuthenticationResults_CallsNewWSConnection(t *testing.T) {
-	// This test directly calls newWSConnection to cover the else branch (lines 63-67)
-	// where authorizers are configured but authentication results are missing
+func TestNewWSConnectionWithoutAuthenticationResults(t *testing.T) {
 	ctx := context.Background()
 	server, err := NewRPCServer(ctx, &pldconf.RPCServerConfig{
 		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
@@ -331,45 +181,30 @@ func TestNewWSConnection_WithoutAuthenticationResults_CallsNewWSConnection(t *te
 	defer server.Stop()
 
 	// Set up authorizers
-	auth := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			return `{"user":"test"}`, nil
-		},
-	}
-	server.SetAuthorizers([]Authorizer{auth})
+	server.SetAuthorizers([]Authorizer{&mockAuthorizer{}})
+
+	// Channel to signal when connection is ready
+	connReady := make(chan *webSocketConnection, 1)
 
 	// Create a test server that provides WebSocket upgrade
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Create request WITHOUT authentication results in context - this is what we're testing
-		req := httptest.NewRequest("GET", "/test", nil)
-		req = req.WithContext(r.Context())
+		// don't add auth results to the request context
 
-		// Use server's upgrader or create one if needed
-		if server.wsUpgrader == nil {
-			server.wsUpgrader = &websocket.Upgrader{}
-		}
-
-		// Upgrade to WebSocket
-		conn, err := server.wsUpgrader.Upgrade(w, r, nil)
+		// Upgrade the WebSocket to get the connection
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
 		if err != nil {
 			return
 		}
 
 		// Now call newWSConnection with request that has NO authentication results
-		// This should trigger the else branch (lines 63-67) - the code path we're testing
-		server.newWSConnection(conn, req)
+		server.newWSConnection(conn, r)
 
-		// Give goroutines time to start
-		time.Sleep(50 * time.Millisecond)
-
-		// Clean up connections
 		server.wsMux.Lock()
+		defer server.wsMux.Unlock()
 		for _, wsConn := range server.wsConnections {
-			if wsConn != nil {
-				wsConn.close()
-			}
+			connReady <- wsConn
+			break
 		}
-		server.wsMux.Unlock()
 	}))
 	defer testServer.Close()
 
@@ -383,76 +218,12 @@ func TestNewWSConnection_WithoutAuthenticationResults_CallsNewWSConnection(t *te
 	connectCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	// The connection may fail but that's OK - we're testing the newWSConnection path
-	_ = wsClient.Connect(connectCtx)
-	// Give time for connection setup
-	time.Sleep(100 * time.Millisecond)
-}
-
-func TestNewWSConnection_EmptyAuthenticationResults_CallsNewWSConnection(t *testing.T) {
-	// This test covers the case where authentication results exist in context but are empty
-	// Should also trigger the else branch (lines 63-67)
-	ctx := context.Background()
-	server, err := NewRPCServer(ctx, &pldconf.RPCServerConfig{
-		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
-		WS: pldconf.RPCServerConfigWS{
-			HTTPServerConfig: pldconf.HTTPServerConfig{
-				Port: confutil.P(0),
-			},
-		},
-	})
+	err = wsClient.Connect(connectCtx)
 	require.NoError(t, err)
-	defer server.Stop()
 
-	// Set up authorizers
-	auth := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			return `{"user":"test"}`, nil
-		},
-	}
-	server.SetAuthorizers([]Authorizer{auth})
+	// Wait for connection to be ready
+	wsConn := <-connReady
 
-	// Create test server
-	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set EMPTY authentication results in context
-		req := httptest.NewRequest("GET", "/test", nil)
-		emptyResults := []string{} // Empty slice
-		req = req.WithContext(context.WithValue(r.Context(), wsAuthResultKey, emptyResults))
-
-		if server.wsUpgrader == nil {
-			server.wsUpgrader = &websocket.Upgrader{}
-		}
-
-		conn, err := server.wsUpgrader.Upgrade(w, r, nil)
-		if err != nil {
-			return
-		}
-
-		// Call newWSConnection with empty identities - should trigger else branch
-		server.newWSConnection(conn, req)
-
-		time.Sleep(50 * time.Millisecond)
-
-		// Clean up
-		server.wsMux.Lock()
-		for _, wsConn := range server.wsConnections {
-			if wsConn != nil {
-				wsConn.close()
-			}
-		}
-		server.wsMux.Unlock()
-	}))
-	defer testServer.Close()
-
-	wsURL := "ws" + testServer.URL[4:]
-	wsConfig := &pldconf.WSClientConfig{}
-	wsConfig.URL = wsURL
-	wsClient := rpcclient.WrapWSConfig(wsConfig)
-	defer wsClient.Close()
-
-	connectCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-
-	_ = wsClient.Connect(connectCtx)
-	time.Sleep(100 * time.Millisecond)
+	storedResults := wsConn.getAuthenticationResults()
+	assert.Empty(t, storedResults, "Authentication results should be empty")
 }

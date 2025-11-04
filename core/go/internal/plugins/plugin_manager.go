@@ -238,8 +238,6 @@ func (pm *pluginManager) ReloadPluginList() (err error) {
 			err = initPlugin(pm.bgCtx, pm, pm.registryPlugins, name, prototk.PluginInfo_REGISTRY, tp)
 		}
 	}
-
-	// Initialize RPC auth plugins
 	for name, ap := range pm.rpcAuthManager.ConfiguredRPCAuthorizers() {
 		if err == nil {
 			err = initPlugin(pm.bgCtx, pm, pm.authPlugins, name, prototk.PluginInfo_RPC_AUTH, ap)
