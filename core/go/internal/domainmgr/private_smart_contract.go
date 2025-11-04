@@ -488,7 +488,6 @@ func (dc *domainContract) EndorseTransaction(dCtx components.DomainContext, read
 	if err != nil {
 		return nil, err
 	}
-	log.L(dCtx.Ctx()).Infof("Endorse transaction returning endorsement result with payload length %d: %+v", len(res.Payload), res.Payload)
 	endRes := &components.EndorsementResult{
 		Endorser:     req.Endorser,
 		Result:       res.EndorsementResult,

@@ -170,19 +170,7 @@ func (sMgr *sequencerManager) handleAssembleResponse(ctx context.Context, messag
 		return
 	}
 
-	err = json.Unmarshal(assembleResponse.PostAssembly, postAssembly)
-	if err != nil {
-		sMgr.logPaladinMessageJsonUnmarshalError(ctx, "TransactionPostAssembly", message, err)
-		return
-	}
-
 	preAssembly := &components.TransactionPreAssembly{}
-	err = json.Unmarshal(assembleResponse.PreAssembly, preAssembly)
-	if err != nil {
-		sMgr.logPaladinMessageJsonUnmarshalError(ctx, "TransactionPreAssembly", message, err)
-		return
-	}
-
 	err = json.Unmarshal(assembleResponse.PreAssembly, preAssembly)
 	if err != nil {
 		sMgr.logPaladinMessageJsonUnmarshalError(ctx, "TransactionPreAssembly", message, err)
@@ -658,7 +646,6 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 	privateEndorsementRequest.InfoStates = transactionInfoStates
 
 	// Log private endorsement info states length
-	log.L(ctx).Debugf("private endorsement info states length: %+v", len(privateEndorsementRequest.InfoStates))
 	for _, state := range privateEndorsementRequest.InfoStates {
 		log.L(ctx).Debugf("private endorsement info state: %+v", state)
 	}

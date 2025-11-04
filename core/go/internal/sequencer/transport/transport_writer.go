@@ -231,6 +231,7 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, txID uuid
 		Verifiers:                verifiersAny,
 		Signatures:               signaturesAny,
 		InputStates:              inputStatesAny,
+		ReadStates:               readStatesAny,
 		OutputStates:             outputStatesAny,
 		InfoStates:               infoStatesAny,
 	}
