@@ -72,13 +72,16 @@ var (
 	MsgComponentIdentityResolverInitError  = pde("PD010029", "Error initializing identity resolver")
 	MsgComponentIdentityResolverStartError = pde("PD010030", "Error starting identity resolver")
 	MsgComponentAdditionalMgrInitError     = pde("PD010031", "Error initializing %s manager")
-	MsgComponentAdditionalMgrStartError    = pde("PD010032", "Error initializing %s manager")
+	MsgComponentAdditionalMgrStartError    = pde("PD010032", "Error starting %s manager")
 	MsgComponentDebugServerStartError      = pde("PD010033", "Error starting debug server")
 	MsgComponentGroupManagerInitError      = pde("PD010034", "Error initializing privacy group manager")
 	MsgComponentGroupManagerStartError     = pde("PD010035", "Error starting group manager")
 	MsgComponentMetricsServerInitError     = pde("PD010036", "Error initializing metrics server")
 	MsgComponentMetricsServerStartError    = pde("PD010037", "Error starting metrics server")
 	MsgComponentMetricsManagerInitError    = pde("PD010038", "Error initializing metrics manager")
+	MsgComponentRPCAuthManagerInitError    = pde("PD010039", "Error initializing RPC auth manager")
+	MsgComponentRPCAuthManagerStartError   = pde("PD010040", "Error starting RPC auth manager")
+	MsgRPCAuthorizerNotFound               = pde("PD010041", "RPC authorizer '%s' not found")
 
 	// States PD0101XX
 	MsgStateInvalidLength             = pde("PD010101", "Invalid hash len expected=%d actual=%d")

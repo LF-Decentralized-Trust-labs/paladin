@@ -65,6 +65,7 @@ type testManagers struct {
 	testTransportManager *testTransportManager
 	testRegistryManager  *testRegistryManager
 	testKeyManager       *testKeyManager
+	testRPCAuthManager   *testRPCAuthManager
 }
 
 func (tm *testManagers) componentsmocks(t *testing.T) *componentsmocks.AllComponents {
@@ -86,6 +87,10 @@ func (tm *testManagers) componentsmocks(t *testing.T) *componentsmocks.AllCompon
 		tm.testKeyManager = &testKeyManager{}
 	}
 	mc.On("KeyManager").Return(tm.testKeyManager.mock(t)).Maybe()
+	if tm.testRPCAuthManager == nil {
+		tm.testRPCAuthManager = &testRPCAuthManager{}
+	}
+	mc.On("RPCAuthManager").Return(tm.testRPCAuthManager.mock(t)).Maybe()
 	mc.On("MetricsManager").Return(mm).Maybe()
 
 	return mc
@@ -93,17 +98,30 @@ func (tm *testManagers) componentsmocks(t *testing.T) *componentsmocks.AllCompon
 
 func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
 	testPlugins := make(map[string]plugintk.Plugin)
-	for name, td := range ts.testDomainManager.domains {
-		testPlugins[name] = td
+	if ts.testDomainManager != nil {
+		for name, td := range ts.testDomainManager.domains {
+			testPlugins[name] = td
+		}
 	}
-	for name, tt := range ts.testTransportManager.transports {
-		testPlugins[name] = tt
+	if ts.testTransportManager != nil {
+		for name, tt := range ts.testTransportManager.transports {
+			testPlugins[name] = tt
+		}
 	}
-	for name, tr := range ts.testRegistryManager.registries {
-		testPlugins[name] = tr
+	if ts.testRegistryManager != nil {
+		for name, tr := range ts.testRegistryManager.registries {
+			testPlugins[name] = tr
+		}
 	}
-	for name, tsm := range ts.testKeyManager.signingModules {
-		testPlugins[name] = tsm
+	if ts.testKeyManager != nil {
+		for name, tsm := range ts.testKeyManager.signingModules {
+			testPlugins[name] = tsm
+		}
+	}
+	if ts.testRPCAuthManager != nil {
+		for name, tam := range ts.testRPCAuthManager.rpcauthPlugins {
+			testPlugins[name] = tam
+		}
 	}
 	return testPlugins
 }

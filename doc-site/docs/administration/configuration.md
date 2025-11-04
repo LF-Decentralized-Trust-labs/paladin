@@ -24,6 +24,7 @@
 | reliableMessageResend | Reliable message resend configuration | `string` | - |
 | reliableMessageWriter | Reliable message writer configuration | [`FlushWriterConfig`](#reliablemessagewriter) | - |
 | reliableScanRetry | Reliable scan retry configuration | [`RetryConfig`](#reliablescanretry) | - |
+| rpcAuthorizers | Map of RPC authorizer configurations | [`map[string][RPCAuthorizerConfig]`](#rpcauthorizers) | - |
 | rpcServer | RPC server configuration | [`RPCServerConfig`](#rpcserver) | - |
 | sendQueueLen | Maximum length of send queue | `int` | - |
 | sendRetry | Send retry configuration | [`RetryConfigWithMax`](#sendretry) | - |
@@ -724,10 +725,26 @@
 | initialDelay | Initial delay before retry | `string` | - |
 | maxDelay | Maximum delay between retries | `string` | - |
 
+## rpcAuthorizers[]
+
+| Key | Description | Type | Default |
+|-----|-------------|------|---------|
+| config | Plugin-specific config (JSON string) | `string` | - |
+| plugin | Plugin configuration (library, type, etc.) | [`PluginConfig`](#rpcauthorizersplugin) | - |
+
+## rpcAuthorizers[].plugin
+
+| Key | Description | Type | Default |
+|-----|-------------|------|---------|
+| class | Plugin class name | `string` | - |
+| library | Plugin library path | `string` | - |
+| type | Plugin type | `string` | - |
+
 ## rpcServer
 
 | Key | Description | Type | Default |
 |-----|-------------|------|---------|
+| authorizers | Ordered array of authorizer plugin names to use | `[string]` | - |
 | http | HTTP server configuration | [`RPCServerConfigHTTP`](#rpcserverhttp) | - |
 | ws | WebSocket server configuration | [`RPCServerConfigWS`](#rpcserverws) | - |
 

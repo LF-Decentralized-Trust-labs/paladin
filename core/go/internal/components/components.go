@@ -54,6 +54,7 @@ type Managers interface {
 	StateManager() StateManager
 	IdentityResolver() IdentityResolver
 	GroupManager() GroupManager
+	RPCAuthManager() RPCAuthManager
 }
 
 // All managers conform to a standard lifecycle

@@ -115,6 +115,7 @@ var (
 	MsgJSONRPCIncorrectParamCount = pde("PD020703", "method %s requires %d params (supplied=%d)")
 	MsgJSONRPCInvalidParam        = pde("PD020704", "method %s parameter %d invalid: %s")
 	MsgJSONRPCResultSerialization = pde("PD020705", "method %s result serialization failed: %s")
+	MsgJSONRPCUnauthorized        = pde("PD020707", "Unauthorized: %s")
 	MsgJSONRPCAysncNonWSConn      = pde("PD020706", "method %s only available on WebSocket connections")
 
 	// Signing module PD0208XX

@@ -148,6 +148,141 @@ func TestWSHandler(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, res.Code)
 }
 
+func TestWSHandler_AuthenticationFailure(t *testing.T) {
+	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
+		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
+		WS: pldconf.RPCServerConfigWS{
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Port: confutil.P(0),
+			},
+		},
+	})
+	require.NoError(t, err)
+	defer rpcServer.Stop()
+
+	// Set up authorizer that fails
+	auth := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			return "", assert.AnError
+		},
+	}
+	rpcServer.SetAuthorizers([]Authorizer{auth})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	req.Header.Set("Sec-WebSocket-Version", "13")
+	res := httptest.NewRecorder()
+
+	rpcServer.WSHandler(res, req)
+
+	// Should return 401 Unauthorized
+	assert.Equal(t, http.StatusUnauthorized, res.Code)
+	assert.Contains(t, res.Body.String(), "error")
+}
+
+func TestWSHandler_AuthenticationSuccess(t *testing.T) {
+	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
+		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
+		WS: pldconf.RPCServerConfigWS{
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Port: confutil.P(0),
+			},
+		},
+	})
+	require.NoError(t, err)
+	defer rpcServer.Stop()
+
+	// Set up authorizer that succeeds
+	auth := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			return `{"user":"test"}`, nil
+		},
+	}
+	rpcServer.SetAuthorizers([]Authorizer{auth})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	req.Header.Set("Sec-WebSocket-Version", "13")
+	res := httptest.NewRecorder()
+
+	// Note: This will fail upgrade in test environment, but we're testing the auth path
+	rpcServer.WSHandler(res, req)
+
+	// Should not return 401 (auth succeeded), might fail on upgrade which is expected in test
+	assert.NotEqual(t, http.StatusUnauthorized, res.Code)
+}
+
+func TestWSHandler_ChainAuthentication_Failure(t *testing.T) {
+	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
+		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
+		WS: pldconf.RPCServerConfigWS{
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Port: confutil.P(0),
+			},
+		},
+	})
+	require.NoError(t, err)
+	defer rpcServer.Stop()
+
+	// First succeeds, second fails
+	auth1Called := false
+	auth2Called := false
+	auth1 := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			auth1Called = true
+			return `{"user":"test"}`, nil
+		},
+	}
+	auth2 := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			auth2Called = true
+			return "", assert.AnError
+		},
+	}
+	rpcServer.SetAuthorizers([]Authorizer{auth1, auth2})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	req.Header.Set("Sec-WebSocket-Version", "13")
+	res := httptest.NewRecorder()
+
+	rpcServer.WSHandler(res, req)
+
+	// Should return 401 because second authorizer failed
+	assert.Equal(t, http.StatusUnauthorized, res.Code)
+	assert.True(t, auth1Called)
+	assert.True(t, auth2Called)
+}
+
+func TestSendAuthErrorResponse(t *testing.T) {
+	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
+		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
+		WS: pldconf.RPCServerConfigWS{
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Port: confutil.P(0),
+			},
+		},
+	})
+	require.NoError(t, err)
+	defer rpcServer.Stop()
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	res := httptest.NewRecorder()
+
+	authErr := assert.AnError
+	rpcServer.sendAuthErrorResponse(res, req, authErr)
+
+	assert.Equal(t, http.StatusUnauthorized, res.Code)
+	assert.Equal(t, "application/json; charset=utf-8", res.Header().Get("Content-Type"))
+	assert.Contains(t, res.Body.String(), "error")
+}
+
 func TestHTTPHandler(t *testing.T) {
 	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
 		HTTP: pldconf.RPCServerConfigHTTP{

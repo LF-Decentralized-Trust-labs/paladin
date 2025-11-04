@@ -563,8 +563,16 @@ var (
 	RPCServerConfigWSWriteBufferSize = pdm("RPCServerConfigWS.writeBufferSize", "Write buffer size for WebSocket connections")
 
 	// RPCServerConfig field descriptions
-	RPCServerConfigHTTPField = pdm("RPCServerConfig.http", "HTTP server configuration")
-	RPCServerConfigWSField   = pdm("RPCServerConfig.ws", "WebSocket server configuration")
+	RPCServerConfigHTTPField   = pdm("RPCServerConfig.http", "HTTP server configuration")
+	RPCServerConfigWSField     = pdm("RPCServerConfig.ws", "WebSocket server configuration")
+	RPCServerConfigAuthorizers = pdm("RPCServerConfig.authorizers", "Ordered array of authorizer plugin names to use")
+
+	// RPCAuthManagerConfig field descriptions
+	RPCAuthManagerConfigRPCAuthorizers = pdm("RPCAuthManagerConfig.rpcAuthorizers", "Map of RPC authorizer configurations")
+
+	// RPCAuthorizerConfig field descriptions
+	RPCAuthorizerConfigPlugin = pdm("RPCAuthorizerConfig.plugin", "Plugin configuration (library, type, etc.)")
+	RPCAuthorizerConfigConfig = pdm("RPCAuthorizerConfig.config", "Plugin-specific config (JSON string)")
 
 	// HTTPServerConfig field descriptions
 	HTTPServerConfigTLS                   = pdm("HTTPServerConfig.tls", "TLS configuration")

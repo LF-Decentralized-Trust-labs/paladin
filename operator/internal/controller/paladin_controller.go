@@ -259,6 +259,13 @@ func (r *PaladinReconciler) createStatefulSet(ctx context.Context, node *corev1a
 
 	r.addTLSSecretMounts(statefulSet, paladinContainer, tlsSecrets)
 
+	// Mount RPC auth secret if configured
+	if node.Spec.RPCAuth != nil {
+		if err := r.addRPCAuthSecretMount(ctx, statefulSet, paladinContainer, node); err != nil {
+			return nil, err
+		}
+	}
+
 	// Check if the StatefulSet already exists, create if not
 	var foundStatefulSet appsv1.StatefulSet
 	if err := r.Get(ctx, types.NamespacedName{Name: statefulSet.Name, Namespace: statefulSet.Namespace}, &foundStatefulSet); err != nil {
@@ -636,6 +643,50 @@ func (r *PaladinReconciler) addPaladinDBSecret(ctx context.Context, ss *appsv1.S
 	return nil
 }
 
+func (r *PaladinReconciler) addRPCAuthSecretMount(ctx context.Context, ss *appsv1.StatefulSet, ct *corev1.Container, node *corev1alpha1.Paladin) error {
+	secretName := node.Spec.RPCAuth.SecretName
+	if secretName == "" {
+		// If secretName is not provided, treat it the same as rpcAuth being nil (skip mounting)
+		return nil
+	}
+
+	// Verify secret exists
+	var secret corev1.Secret
+	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: node.Namespace}, &secret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return fmt.Errorf("secret '%s' does not exist for RPC auth", secretName)
+		}
+		return fmt.Errorf("failed to get RPC auth secret '%s': %s", secretName, err)
+	}
+
+	// Verify the credentials.htpasswd key exists
+	if secret.Data["credentials.htpasswd"] == nil {
+		return fmt.Errorf("secret '%s' does not contain required key 'credentials.htpasswd'", secretName)
+	}
+
+	ct.VolumeMounts = append(ct.VolumeMounts, corev1.VolumeMount{
+		Name:      "rpc-auth-creds",
+		MountPath: "/rpcauth",
+	})
+	ss.Spec.Template.Spec.Volumes = append(ss.Spec.Template.Spec.Volumes, corev1.Volume{
+		Name: "rpc-auth-creds",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: secretName,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  "credentials.htpasswd",
+						Path: "credentials.htpasswd",
+					},
+				},
+			},
+		},
+	})
+
+	return nil
+}
+
 func (r *PaladinReconciler) createConfigMap(ctx context.Context, node *corev1alpha1.Paladin, name string) (string, []string, *corev1.ConfigMap, error) {
 	configSum, tlsSecrets, configMap, err := r.generateConfigMap(ctx, node, name)
 	if err != nil {
@@ -770,6 +821,12 @@ func (r *PaladinReconciler) generatePaladinConfig(ctx context.Context, node *cor
 
 	// Add any provided signing modules into the supplied config
 	r.generatePaladinSigningModules(ctx, node, &pldConf)
+
+	// Generate RPC auth configuration if specified
+	_, err := r.generatePaladinRPCAuth(ctx, node, &pldConf)
+	if err != nil {
+		return "", nil, err
+	}
 
 	tlsSecrets, err := r.generatePaladinTransports(ctx, node, &pldConf)
 	if err != nil {
@@ -1092,6 +1149,52 @@ func (r *PaladinReconciler) generatePaladinRegistries(ctx context.Context, node 
 	}
 
 	return nil
+}
+
+func (r *PaladinReconciler) generatePaladinRPCAuth(ctx context.Context, node *corev1alpha1.Paladin, pldConf *pldconf.PaladinConfig) (string, error) {
+	if node.Spec.RPCAuth == nil || node.Spec.RPCAuth.SecretName == "" {
+		return "", nil
+	}
+
+	secretName := node.Spec.RPCAuth.SecretName
+
+	// Validate secret exists and contains the required key
+	var secret corev1.Secret
+	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: node.Namespace}, &secret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return "", fmt.Errorf("waiting for secret '%s' to be available for RPC auth", secretName)
+		}
+		return "", fmt.Errorf("failed to lookup secret for RPC auth: %s", err)
+	}
+
+	// Verify the credentials.htpasswd key exists
+	if secret.Data["credentials.htpasswd"] == nil {
+		return "", fmt.Errorf("secret '%s' does not contain required key 'credentials.htpasswd'", secretName)
+	}
+
+	// Build the config JSON for basicauth plugin
+	credentialsPath := "/rpcauth/credentials.htpasswd"
+	configJSON := fmt.Sprintf(`{"credentialsFile": "%s"}`, credentialsPath)
+
+	// Initialize rpcAuthorizers map if needed
+	if pldConf.RPCAuthorizers == nil {
+		pldConf.RPCAuthorizers = make(map[string]*pldconf.RPCAuthorizerConfig)
+	}
+
+	// Add basicauth authorizer configuration
+	pldConf.RPCAuthorizers["basicauth"] = &pldconf.RPCAuthorizerConfig{
+		Plugin: pldconf.PluginConfig{
+			Type:    "c-shared",
+			Library: "/app/rpcauth/libbasicauth.so",
+		},
+		Config: configJSON,
+	}
+
+	// Set rpcServer.authorizers to use basicauth
+	pldConf.RPCServer.Authorizers = []string{"basicauth"}
+
+	return secretName, nil
 }
 
 func (r *PaladinReconciler) generatePaladinSigningModules(ctx context.Context, node *corev1alpha1.Paladin, pldConf *pldconf.PaladinConfig) {

@@ -23,7 +23,9 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
 	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/pldmsgs"
 	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/httpserver"
@@ -32,6 +34,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+const httpHeadersKey contextKey = "httpHeaders"
+const wsAuthResultKey contextKey = "wsAuthResult" // For storing authenticated results in WebSocket upgrade request
+
 type RPCServer interface {
 	Start() error
 	Stop()
@@ -39,6 +47,7 @@ type RPCServer interface {
 	WSAddr() net.Addr
 
 	Register(module *RPCModule)
+	SetAuthorizers(auths []Authorizer)
 
 	WSHandler(w http.ResponseWriter, r *http.Request)   // Provides access to the WebSocket handler directly to be able to install it into another server
 	HTTPHandler(w http.ResponseWriter, r *http.Request) // Provides access to the http handler directly to be able to install it into another server
@@ -99,6 +108,21 @@ type rpcServer struct {
 	wsUpgrader    *websocket.Upgrader
 	wsConnections map[string]*webSocketConnection
 	rpcModules    map[string]*RPCModule
+	authorizers   []Authorizer
+}
+
+type Authorizer interface {
+	Authenticate(ctx context.Context, headers map[string]string) (result string, err error)
+	Authorize(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error)
+}
+
+type AuthResult struct {
+	Authorized   bool
+	ErrorMessage string
+}
+
+func (s *rpcServer) SetAuthorizers(auths []Authorizer) {
+	s.authorizers = auths
 }
 
 func (s *rpcServer) Register(module *RPCModule) {
@@ -133,7 +157,17 @@ func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusMethodNotAllowed)
 	}
 
-	r := s.rpcHandler(req.Context(), req.Body, nil /* not websockets */)
+	// Extract headers and store in context for auth plugin
+	ctx := req.Context()
+	headers := make(map[string]string)
+	for key, values := range req.Header {
+		if len(values) > 0 {
+			headers[key] = values[0] // Take first value for each header
+		}
+	}
+	ctx = context.WithValue(ctx, httpHeadersKey, headers)
+
+	r := s.rpcHandler(ctx, req.Body, nil /* not websockets */)
 
 	res.Header().Set("Content-Type", "application/json; charset=utf-8")
 	status := http.StatusOK
@@ -145,12 +179,55 @@ func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {
 }
 
 func (s *rpcServer) wsHandler(res http.ResponseWriter, req *http.Request) {
+	// Authenticate BEFORE upgrade if authorizers are configured
+	if len(s.authorizers) > 0 {
+		// Extract headers from upgrade request
+		headers := make(map[string]string)
+		for key, values := range req.Header {
+			if len(values) > 0 {
+				headers[key] = values[0]
+			}
+		}
+
+		// Authenticate through chain of authorizers
+		authenticationResults := make([]string, len(s.authorizers))
+		for i, auth := range s.authorizers {
+			authenticationResult, err := auth.Authenticate(req.Context(), headers)
+			if err != nil {
+				// Authentication failed - send HTTP error response
+				log.L(req.Context()).Errorf("WebSocket authentication failed at authorizer %d: %s", i, err)
+				s.sendAuthErrorResponse(res, req, err)
+				return // Do not proceed with upgrade
+			}
+			authenticationResults[i] = authenticationResult
+		}
+
+		// Store ordered authentication results in request context for use after upgrade
+		req = req.WithContext(context.WithValue(req.Context(), wsAuthResultKey, authenticationResults))
+	}
+
+	// Now proceed with upgrade (only if auth succeeded or not required)
 	conn, err := s.wsUpgrader.Upgrade(res, req, nil)
 	if err != nil {
 		log.L(req.Context()).Errorf("WebSocket upgrade failed: %s", err)
 		return
 	}
-	s.newWSConnection(conn)
+	s.newWSConnection(conn, req)
+}
+
+func (s *rpcServer) sendAuthErrorResponse(res http.ResponseWriter, req *http.Request, authErr error) {
+	// Use same i18n error formatting as HTTP path for authentication failures
+	i18nErr := i18n.NewError(req.Context(), pldmsgs.MsgJSONRPCUnauthorized, authErr.Error())
+
+	// Send HTTP 401 with JSON error response
+	res.Header().Set("Content-Type", "application/json; charset=utf-8")
+	res.WriteHeader(http.StatusUnauthorized)
+
+	// Send JSON error response with the i18n-formatted error message
+	errorResponse := map[string]string{
+		"error": i18nErr.Error(),
+	}
+	_ = json.NewEncoder(res).Encode(errorResponse)
 }
 
 func (s *rpcServer) Start() (err error) {

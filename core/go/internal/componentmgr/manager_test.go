@@ -218,13 +218,17 @@ func TestStartOK(t *testing.T) {
 	mockGroupManager.On("Start").Return(nil)
 	mockGroupManager.On("Stop").Return()
 
+	mockRPCAuthManager := componentsmocks.NewRPCAuthManager(t)
+	mockRPCAuthManager.On("Start").Return(nil)
+	mockRPCAuthManager.On("Stop").Return()
+
 	mockStateManager := componentsmocks.NewStateManager(t)
 	mockStateManager.On("Start").Return(nil)
 	mockStateManager.On("Stop").Return()
 
 	mockRPCServer := rpcservermocks.NewRPCServer(t)
 	mockRPCServer.On("Start").Return(nil)
-	mockRPCServer.On("Register", mock.AnythingOfType("*rpcserver.RPCModule")).Return()
+	mockRPCServer.On("Register", mock.Anything).Return()
 	mockRPCServer.On("Stop").Return()
 	mockRPCServer.On("HTTPAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8545})
 	mockRPCServer.On("WSAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8546})
@@ -255,6 +259,7 @@ func TestStartOK(t *testing.T) {
 	cm.privateTxManager = mockPrivateTxManager
 	cm.txManager = mockTxManager
 	cm.groupManager = mockGroupManager
+	cm.rpcAuthManager = mockRPCAuthManager
 	cm.additionalManagers = append(cm.additionalManagers, mockExtraManager)
 
 	err := cm.StartManagers()
@@ -285,6 +290,17 @@ func TestBuildInternalEventStreamsPreCommitPostCommit(t *testing.T) {
 
 }
 
+// testAuthorizer is a simple mock implementation of rpcserver.Authorizer for testing
+type testAuthorizer struct{}
+
+func (t *testAuthorizer) Authenticate(ctx context.Context, headers map[string]string) (string, error) {
+	return `{"test":"auth"}`, nil
+}
+
+func (t *testAuthorizer) Authorize(ctx context.Context, result string, method string, payload []byte) (*rpcserver.AuthResult, error) {
+	return &rpcserver.AuthResult{Authorized: true}, nil
+}
+
 func TestErrorWrapping(t *testing.T) {
 	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), &pldconf.PaladinConfig{}, nil).(*componentManager)
 
@@ -296,4 +312,391 @@ func TestErrorWrapping(t *testing.T) {
 	assert.Regexp(t, "PD010002.*pop", cm.addIfStarted("eth_client", mockEthClientFactory, errors.New("pop"), msgs.MsgComponentEthClientInitError))
 	assert.Regexp(t, "PD010008.*pop", cm.wrapIfErr(errors.New("pop"), msgs.MsgComponentBlockIndexerInitError))
 
+}
+
+func TestCompleteStart_MultipleAuthorizers(t *testing.T) {
+	mockEthClientFactory := ethclientmocks.NewEthClientFactory(t)
+	mockEthClientFactory.On("Start").Return(nil)
+	mockEthClientFactory.On("Stop").Return()
+
+	mockPluginManager := componentsmocks.NewPluginManager(t)
+	mockPluginManager.On("Start").Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_SIGNING_MODULE).Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_DOMAIN).Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_RPC_AUTH).Return(nil)
+	mockPluginManager.On("Stop").Return()
+
+	mockBlockIndexer := blockindexermocks.NewBlockIndexer(t)
+	mockBlockIndexer.On("Start", mock.Anything).Return(nil)
+	mockBlockIndexer.On("GetBlockListenerHeight", mock.Anything).Return(uint64(0), nil)
+	mockBlockIndexer.On("RPCModule").Return(nil)
+	mockBlockIndexer.On("Stop").Return()
+
+	mockRPCAuthManager := componentsmocks.NewRPCAuthManager(t)
+	mockRPCAuthManager.On("Start").Return(nil)
+	mockRPCAuthManager.On("Stop").Return()
+
+	mockKeyManager := componentsmocks.NewKeyManager(t)
+	mockKeyManager.On("Start").Return(nil)
+	mockKeyManager.On("Stop").Return()
+
+	mockDomainManager := componentsmocks.NewDomainManager(t)
+	mockDomainManager.On("Start").Return(nil)
+	mockDomainManager.On("Stop").Return()
+
+	mockTransportManager := componentsmocks.NewTransportManager(t)
+	mockTransportManager.On("Start").Return(nil)
+	mockTransportManager.On("Stop").Return()
+
+	mockRegistryManager := componentsmocks.NewRegistryManager(t)
+	mockRegistryManager.On("Start").Return(nil)
+	mockRegistryManager.On("Stop").Return()
+
+	mockPublicTxManager := componentsmocks.NewPublicTxManager(t)
+	mockPublicTxManager.On("Start").Return(nil)
+	mockPublicTxManager.On("Stop").Return()
+
+	mockPrivateTxManager := componentsmocks.NewPrivateTxManager(t)
+	mockPrivateTxManager.On("Start").Return(nil)
+	mockPrivateTxManager.On("Stop").Return()
+
+	mockTxManager := componentsmocks.NewTXManager(t)
+	mockTxManager.On("Start").Return(nil)
+	mockTxManager.On("Stop").Return()
+	mockTxManager.On("LoadBlockchainEventListeners").Return(nil)
+
+	mockGroupManager := componentsmocks.NewGroupManager(t)
+	mockGroupManager.On("Start").Return(nil)
+	mockGroupManager.On("Stop").Return()
+
+	mockStateManager := componentsmocks.NewStateManager(t)
+	mockStateManager.On("Start").Return(nil)
+	mockStateManager.On("Stop").Return()
+
+	// Create mock authorizers (simple struct implementing Authorizer interface)
+	mockAuthorizer1 := &testAuthorizer{}
+	mockAuthorizer2 := &testAuthorizer{}
+
+	// Expect GetRPCAuthorizer to be called twice
+	mockRPCAuthManager.On("GetRPCAuthorizer", "auth1").Return(mockAuthorizer1)
+	mockRPCAuthManager.On("GetRPCAuthorizer", "auth2").Return(mockAuthorizer2)
+
+	mockRPCServer := rpcservermocks.NewRPCServer(t)
+	mockRPCServer.On("Start").Return(nil)
+	mockRPCServer.On("Register", mock.Anything).Return()
+	mockRPCServer.On("SetAuthorizers", mock.MatchedBy(func(auths []rpcserver.Authorizer) bool {
+		return len(auths) == 2 && auths[0] == mockAuthorizer1 && auths[1] == mockAuthorizer2
+	})).Return()
+	mockRPCServer.On("Stop").Return()
+	mockRPCServer.On("HTTPAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8545})
+	mockRPCServer.On("WSAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8546})
+
+	testConfig := &pldconf.PaladinConfig{
+		RPCAuthManagerConfig: pldconf.RPCAuthManagerConfig{
+			RPCAuthorizers: map[string]*pldconf.RPCAuthorizerConfig{
+				"auth1": {
+					Plugin: pldconf.PluginConfig{
+						Type:    "rpc_auth",
+						Library: "/tmp/auth1.so",
+					},
+					Config: `{}`,
+				},
+				"auth2": {
+					Plugin: pldconf.PluginConfig{
+						Type:    "rpc_auth",
+						Library: "/tmp/auth2.so",
+					},
+					Config: `{}`,
+				},
+			},
+		},
+		RPCServer: pldconf.RPCServerConfig{
+			Authorizers: []string{"auth1", "auth2"},
+		},
+	}
+
+	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), testConfig).(*componentManager)
+	cm.ethClientFactory = mockEthClientFactory
+	cm.keyManager = mockKeyManager
+	cm.domainManager = mockDomainManager
+	cm.transportManager = mockTransportManager
+	cm.registryManager = mockRegistryManager
+	cm.publicTxManager = mockPublicTxManager
+	cm.privateTxManager = mockPrivateTxManager
+	cm.txManager = mockTxManager
+	cm.groupManager = mockGroupManager
+	cm.stateManager = mockStateManager
+	cm.pluginManager = mockPluginManager
+	cm.blockIndexer = mockBlockIndexer
+	cm.rpcAuthManager = mockRPCAuthManager
+	cm.rpcServer = mockRPCServer
+	cm.initResults = map[string]*components.ManagerInitResult{
+		"utengine": {
+			RPCModules: []*rpcserver.RPCModule{
+				rpcserver.NewRPCModule("ut"),
+			},
+		},
+	}
+
+	err := cm.StartManagers()
+	require.NoError(t, err)
+	err = cm.CompleteStart()
+	require.NoError(t, err)
+
+	cm.Stop()
+
+	mockRPCServer.AssertExpectations(t)
+	mockRPCAuthManager.AssertExpectations(t)
+}
+
+func TestCompleteStart_SingleAuthorizer(t *testing.T) {
+	mockEthClientFactory := ethclientmocks.NewEthClientFactory(t)
+	mockEthClientFactory.On("Start").Return(nil)
+	mockEthClientFactory.On("Stop").Return()
+
+	mockKeyManager := componentsmocks.NewKeyManager(t)
+	mockKeyManager.On("Start").Return(nil)
+	mockKeyManager.On("Stop").Return()
+
+	mockDomainManager := componentsmocks.NewDomainManager(t)
+	mockDomainManager.On("Start").Return(nil)
+	mockDomainManager.On("Stop").Return()
+
+	mockTransportManager := componentsmocks.NewTransportManager(t)
+	mockTransportManager.On("Start").Return(nil)
+	mockTransportManager.On("Stop").Return()
+
+	mockRegistryManager := componentsmocks.NewRegistryManager(t)
+	mockRegistryManager.On("Start").Return(nil)
+	mockRegistryManager.On("Stop").Return()
+
+	mockPublicTxManager := componentsmocks.NewPublicTxManager(t)
+	mockPublicTxManager.On("Start").Return(nil)
+	mockPublicTxManager.On("Stop").Return()
+
+	mockPrivateTxManager := componentsmocks.NewPrivateTxManager(t)
+	mockPrivateTxManager.On("Start").Return(nil)
+	mockPrivateTxManager.On("Stop").Return()
+
+	mockTxManager := componentsmocks.NewTXManager(t)
+	mockTxManager.On("Start").Return(nil)
+	mockTxManager.On("Stop").Return()
+	mockTxManager.On("LoadBlockchainEventListeners").Return(nil)
+
+	mockGroupManager := componentsmocks.NewGroupManager(t)
+	mockGroupManager.On("Start").Return(nil)
+	mockGroupManager.On("Stop").Return()
+
+	mockStateManager := componentsmocks.NewStateManager(t)
+	mockStateManager.On("Start").Return(nil)
+	mockStateManager.On("Stop").Return()
+
+	mockPluginManager := componentsmocks.NewPluginManager(t)
+	mockPluginManager.On("Start").Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_SIGNING_MODULE).Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_DOMAIN).Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_RPC_AUTH).Return(nil)
+	mockPluginManager.On("Stop").Return()
+
+	mockBlockIndexer := blockindexermocks.NewBlockIndexer(t)
+	mockBlockIndexer.On("Start", mock.Anything).Return(nil)
+	mockBlockIndexer.On("GetBlockListenerHeight", mock.Anything).Return(uint64(0), nil)
+	mockBlockIndexer.On("RPCModule").Return(nil)
+	mockBlockIndexer.On("Stop").Return()
+
+	mockRPCAuthManager := componentsmocks.NewRPCAuthManager(t)
+	mockRPCAuthManager.On("Start").Return(nil)
+	mockRPCAuthManager.On("Stop").Return()
+
+	// Create mock authorizer (simple struct implementing Authorizer interface)
+	mockAuthorizer := &testAuthorizer{}
+
+	// Expect GetRPCAuthorizer to be called once
+	mockRPCAuthManager.On("GetRPCAuthorizer", "auth1").Return(mockAuthorizer)
+
+	mockRPCServer := rpcservermocks.NewRPCServer(t)
+	mockRPCServer.On("Start").Return(nil)
+	mockRPCServer.On("Register", mock.Anything).Return()
+	mockRPCServer.On("SetAuthorizers", mock.MatchedBy(func(auths []rpcserver.Authorizer) bool {
+		return len(auths) == 1 && auths[0] == mockAuthorizer
+	})).Return()
+	mockRPCServer.On("Stop").Return()
+	mockRPCServer.On("HTTPAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8545})
+	mockRPCServer.On("WSAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8546})
+
+	testConfig := &pldconf.PaladinConfig{
+		RPCAuthManagerConfig: pldconf.RPCAuthManagerConfig{
+			RPCAuthorizers: map[string]*pldconf.RPCAuthorizerConfig{
+				"auth1": {
+					Plugin: pldconf.PluginConfig{
+						Type:    "rpc_auth",
+						Library: "/tmp/auth1.so",
+					},
+					Config: `{}`,
+				},
+			},
+		},
+		RPCServer: pldconf.RPCServerConfig{
+			Authorizers: []string{"auth1"},
+		},
+	}
+
+	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), testConfig).(*componentManager)
+	cm.ethClientFactory = mockEthClientFactory
+	cm.keyManager = mockKeyManager
+	cm.domainManager = mockDomainManager
+	cm.transportManager = mockTransportManager
+	cm.registryManager = mockRegistryManager
+	cm.publicTxManager = mockPublicTxManager
+	cm.privateTxManager = mockPrivateTxManager
+	cm.txManager = mockTxManager
+	cm.groupManager = mockGroupManager
+	cm.stateManager = mockStateManager
+	cm.pluginManager = mockPluginManager
+	cm.blockIndexer = mockBlockIndexer
+	cm.rpcAuthManager = mockRPCAuthManager
+	cm.rpcServer = mockRPCServer
+	cm.initResults = map[string]*components.ManagerInitResult{
+		"utengine": {
+			RPCModules: []*rpcserver.RPCModule{
+				rpcserver.NewRPCModule("ut"),
+			},
+		},
+	}
+
+	err := cm.StartManagers()
+	require.NoError(t, err)
+	err = cm.CompleteStart()
+	require.NoError(t, err)
+
+	cm.Stop()
+
+	mockRPCServer.AssertExpectations(t)
+	mockRPCAuthManager.AssertExpectations(t)
+}
+
+func TestCompleteStart_AuthorizerNotFound(t *testing.T) {
+	mockEthClientFactory := ethclientmocks.NewEthClientFactory(t)
+	mockEthClientFactory.On("Start").Return(nil)
+	mockEthClientFactory.On("Stop").Return().Maybe()
+
+	mockPluginManager := componentsmocks.NewPluginManager(t)
+	mockPluginManager.On("Start").Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_SIGNING_MODULE).Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_DOMAIN).Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything, prototk.PluginInfo_RPC_AUTH).Return(nil)
+	mockPluginManager.On("Stop").Return().Maybe()
+
+	mockBlockIndexer := blockindexermocks.NewBlockIndexer(t)
+	mockBlockIndexer.On("Start", mock.Anything).Return(nil).Maybe()
+	mockBlockIndexer.On("GetBlockListenerHeight", mock.Anything).Return(uint64(0), nil).Maybe()
+	mockBlockIndexer.On("RPCModule").Return(nil)
+	mockBlockIndexer.On("Stop").Return().Maybe()
+
+	mockRPCAuthManager := componentsmocks.NewRPCAuthManager(t)
+	mockRPCAuthManager.On("Start").Return(nil)
+	mockRPCAuthManager.On("Stop").Return().Maybe()
+
+	mockKeyManager := componentsmocks.NewKeyManager(t)
+	mockKeyManager.On("Start").Return(nil)
+	mockKeyManager.On("Stop").Return().Maybe()
+
+	mockDomainManager := componentsmocks.NewDomainManager(t)
+	mockDomainManager.On("Start").Return(nil)
+	mockDomainManager.On("Stop").Return().Maybe()
+
+	mockTransportManager := componentsmocks.NewTransportManager(t)
+	mockTransportManager.On("Start").Return(nil)
+	mockTransportManager.On("Stop").Return().Maybe()
+
+	mockRegistryManager := componentsmocks.NewRegistryManager(t)
+	mockRegistryManager.On("Start").Return(nil)
+	mockRegistryManager.On("Stop").Return().Maybe()
+
+	mockPublicTxManager := componentsmocks.NewPublicTxManager(t)
+	mockPublicTxManager.On("Start").Return(nil)
+	mockPublicTxManager.On("Stop").Return().Maybe()
+
+	mockPrivateTxManager := componentsmocks.NewPrivateTxManager(t)
+	mockPrivateTxManager.On("Start").Return(nil)
+	mockPrivateTxManager.On("Stop").Return().Maybe()
+
+	mockTxManager := componentsmocks.NewTXManager(t)
+	mockTxManager.On("Start").Return(nil)
+	mockTxManager.On("Stop").Return().Maybe()
+	mockTxManager.On("LoadBlockchainEventListeners").Return(nil).Maybe()
+
+	mockGroupManager := componentsmocks.NewGroupManager(t)
+	mockGroupManager.On("Start").Return(nil)
+	mockGroupManager.On("Stop").Return().Maybe()
+
+	mockStateManager := componentsmocks.NewStateManager(t)
+	mockStateManager.On("Start").Return(nil)
+	mockStateManager.On("Stop").Return().Maybe()
+
+	// Expect GetRPCAuthorizer to return nil (not found)
+	mockRPCAuthManager.On("GetRPCAuthorizer", "nonexistent").Return(nil)
+
+	mockRPCServer := rpcservermocks.NewRPCServer(t)
+	// Register is called even if CompleteStart fails early
+	mockRPCServer.On("Register", mock.Anything).Return().Maybe()
+	// Start and Stop are NOT called if CompleteStart fails early, so make them optional
+	mockRPCServer.On("Start").Return(nil).Maybe()
+	mockRPCServer.On("Stop").Return().Maybe()
+	mockRPCServer.On("HTTPAddr").Maybe().Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8545})
+	mockRPCServer.On("WSAddr").Maybe().Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8546})
+
+	testConfig := &pldconf.PaladinConfig{
+		RPCAuthManagerConfig: pldconf.RPCAuthManagerConfig{
+			RPCAuthorizers: map[string]*pldconf.RPCAuthorizerConfig{
+				"auth1": {
+					Plugin: pldconf.PluginConfig{
+						Type:    "rpc_auth",
+						Library: "/tmp/auth1.so",
+					},
+					Config: `{}`,
+				},
+			},
+		},
+		RPCServer: pldconf.RPCServerConfig{
+			Authorizers: []string{"nonexistent"},
+		},
+	}
+
+	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), testConfig).(*componentManager)
+	cm.ethClientFactory = mockEthClientFactory
+	cm.keyManager = mockKeyManager
+	cm.domainManager = mockDomainManager
+	cm.transportManager = mockTransportManager
+	cm.registryManager = mockRegistryManager
+	cm.publicTxManager = mockPublicTxManager
+	cm.privateTxManager = mockPrivateTxManager
+	cm.txManager = mockTxManager
+	cm.groupManager = mockGroupManager
+	cm.stateManager = mockStateManager
+	cm.pluginManager = mockPluginManager
+	cm.blockIndexer = mockBlockIndexer
+	cm.rpcAuthManager = mockRPCAuthManager
+	cm.rpcServer = mockRPCServer
+	cm.initResults = map[string]*components.ManagerInitResult{
+		"utengine": {
+			RPCModules: []*rpcserver.RPCModule{
+				rpcserver.NewRPCModule("ut"),
+			},
+		},
+	}
+
+	err := cm.StartManagers()
+	require.NoError(t, err)
+	err = cm.CompleteStart()
+	require.Error(t, err)
+	assert.Regexp(t, "PD.*nonexistent", err.Error())
+
+	cm.Stop()
+
+	// Only assert the specific expectations we care about for this test
+	mockRPCAuthManager.AssertExpectations(t)
+	mockRPCServer.AssertExpectations(t)
+	// Note: Other managers' Stop() expectations may not be met if CompleteStart()
+	// failed before they were started, so we don't assert them here
 }

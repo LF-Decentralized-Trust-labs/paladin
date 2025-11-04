@@ -25,6 +25,7 @@ import "to_registry.proto";
 import "from_registry.proto";
 import "to_signing_module.proto";
 import "from_signing_module.proto";
+import "to_rpc_auth.proto";
 
 option java_multiple_files = true;
 
@@ -203,6 +204,24 @@ message SigningModuleMessage {
   }
 }
 
+message RPCAuthMessage {
+  Header header = 1;
+
+  // Requests to plugin (manager → plugin)
+  oneof request_to_authplugin {
+    ConfigureRPCAuthorizerRequest configure_rpc_authorizer = 1010;
+    AuthenticateRequest authenticate = 1011;
+    AuthorizeRequest authorize = 1012;
+  }
+
+  // Responses from plugin (plugin → manager)
+  oneof response_from_authplugin {
+    ConfigureRPCAuthorizerResponse configure_rpc_authorizer_res = 1020;
+    AuthenticateResponse authenticate_res = 1021;
+    AuthorizeResponse authorize_res = 1022;
+  }
+}
+
 // establishes the long-lived connection
 message PluginLoaderInit {
   string id = 1; // UUID that is unique the plugin loader that it shared with the controller out of band to start the channel
@@ -214,6 +233,7 @@ message PluginInfo {
     TRANSPORT = 1;
     REGISTRY = 2;
     SIGNING_MODULE = 3;
+    RPC_AUTH = 4;
   }
   string id = 1; // UUID that is unique to this runtime instance of the domain
   string name = 2; // The plugin manager ensures only once instance is loaded with this ID
@@ -261,4 +281,7 @@ service PluginController {
 
   // Connect as a signing module plugin establishing the bidirectional stream of communications
   rpc ConnectSigningModule(stream SigningModuleMessage) returns (stream SigningModuleMessage) {}
+
+  // Connect as an RPC auth plugin establishing the bidirectional stream of communications
+  rpc ConnectRPCAuthPlugin(stream RPCAuthMessage) returns (stream RPCAuthMessage) {}
 }

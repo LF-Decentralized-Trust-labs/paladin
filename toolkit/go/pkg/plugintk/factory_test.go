@@ -39,6 +39,7 @@ type testController struct {
 	fakeTransportController     func(grpc.BidiStreamingServer[prototk.TransportMessage, prototk.TransportMessage]) error
 	fakeRegistryController      func(grpc.BidiStreamingServer[prototk.RegistryMessage, prototk.RegistryMessage]) error
 	fakeSigningModuleController func(grpc.BidiStreamingServer[prototk.SigningModuleMessage, prototk.SigningModuleMessage]) error
+	fakeAuthController          func(grpc.BidiStreamingServer[prototk.RPCAuthMessage, prototk.RPCAuthMessage]) error
 }
 
 func newTestController(t *testing.T) (context.Context, *testController, func()) {
@@ -80,6 +81,10 @@ func (tc *testController) ConnectRegistry(stream grpc.BidiStreamingServer[protot
 
 func (tc *testController) ConnectSigningModule(stream grpc.BidiStreamingServer[prototk.SigningModuleMessage, prototk.SigningModuleMessage]) error {
 	return tc.fakeSigningModuleController(stream)
+}
+
+func (tc *testController) ConnectRPCAuthPlugin(stream grpc.BidiStreamingServer[prototk.RPCAuthMessage, prototk.RPCAuthMessage]) error {
+	return tc.fakeAuthController(stream)
 }
 
 func tempSocketFile(t *testing.T) string {

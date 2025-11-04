@@ -8,7 +8,7 @@ require (
 	github.com/Code-Hex/go-generics-cache v1.5.1
 	github.com/LFDT-Paladin/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/LFDT-Paladin/paladin/config v0.0.0-00010101000000-000000000000
-	github.com/LFDT-Paladin/paladin/sdk/go v0.0.0-20250828150332-fbc1c1bc663b
+	github.com/LFDT-Paladin/paladin/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/btcsuite/btcd v0.24.2
 	github.com/btcsuite/btcd/btcutil v1.1.6
 	github.com/go-resty/resty/v2 v2.14.0

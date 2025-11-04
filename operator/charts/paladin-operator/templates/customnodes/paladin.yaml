@@ -94,6 +94,11 @@ spec:
       keySelector: {{ .keySelector }}
   {{- end }}
 
+  {{- if .rpcAuth }}
+  rpcAuth:
+    secretName: {{ .rpcAuth.secretName }}
+  {{- end }}
+
   config: |-
 {{ .config | indent 4 }}
 {{- end }}

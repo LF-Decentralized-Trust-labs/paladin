@@ -34,8 +34,9 @@ type RPCServerConfigWS struct {
 }
 
 type RPCServerConfig struct {
-	HTTP RPCServerConfigHTTP `json:"http,omitempty"`
-	WS   RPCServerConfigWS   `json:"ws,omitempty"`
+	HTTP        RPCServerConfigHTTP `json:"http,omitempty"`
+	WS          RPCServerConfigWS   `json:"ws,omitempty"`
+	Authorizers []string            `json:"authorizers,omitempty"` // Ordered array of authorizer plugin names to use
 }
 
 var RPCServerConfigDefaults = RPCServerConfig{

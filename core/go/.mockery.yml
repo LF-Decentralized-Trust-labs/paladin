@@ -43,6 +43,9 @@ packages:
   github.com/LFDT-Paladin/paladin/core/internal/privatetxnmgr/syncpoints:
     config:
       all: true
+  github.com/LFDT-Paladin/paladin/core/internal/rpcauthmgr:
+    config:
+      all: true
   github.com/LFDT-Paladin/paladin/core/internal/publictxmgr:
     interfaces:
       InFlightStageActionTriggers:
