@@ -177,7 +177,7 @@ func (cm *componentManager) Init() (err error) {
 
 	// pre-init managers
 	if err == nil {
-		cm.keyManager = keymanager.NewKeyManager(cm.bgCtx, &cm.conf.KeyManagerConfig)
+		cm.keyManager = keymanager.NewKeyManager(cm.bgCtx, &cm.conf.KeyManagerInlineConfig)
 		cm.initResults["key_manager"], err = cm.keyManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentKeyManagerInitError)
 	}
@@ -187,25 +187,25 @@ func (cm *componentManager) Init() (err error) {
 		err = cm.wrapIfErr(err, msgs.MsgComponentStateManagerInitError)
 	}
 	if err == nil {
-		cm.domainManager = domainmgr.NewDomainManager(cm.bgCtx, &cm.conf.DomainManagerConfig)
+		cm.domainManager = domainmgr.NewDomainManager(cm.bgCtx, &cm.conf.DomainManagerInlineConfig)
 		cm.initResults["domain_manager"], err = cm.domainManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentDomainInitError)
 	}
 
 	if err == nil {
-		cm.transportManager = transportmgr.NewTransportManager(cm.bgCtx, &cm.conf.TransportManagerConfig)
+		cm.transportManager = transportmgr.NewTransportManager(cm.bgCtx, &cm.conf.TransportManagerInlineConfig)
 		cm.initResults["transports_manager"], err = cm.transportManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentTransportInitError)
 	}
 
 	if err == nil {
-		cm.registryManager = registrymgr.NewRegistryManager(cm.bgCtx, &cm.conf.RegistryManagerConfig)
+		cm.registryManager = registrymgr.NewRegistryManager(cm.bgCtx, &cm.conf.RegistryManagerInlineConfig)
 		cm.initResults["registry_manager"], err = cm.registryManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentRegistryInitError)
 	}
 
 	if err == nil {
-		cm.pluginManager = plugins.NewPluginManager(cm.bgCtx, cm.grpcTarget, cm.instanceUUID, &cm.conf.PluginManagerConfig)
+		cm.pluginManager = plugins.NewPluginManager(cm.bgCtx, cm.grpcTarget, cm.instanceUUID, &cm.conf.PluginManagerInlineConfig)
 		cm.initResults["plugin_manager"], err = cm.pluginManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentPluginInitError)
 	}

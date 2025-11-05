@@ -67,6 +67,7 @@ export interface IPaladinTransaction {
   data: {
     [key: string]: string;
   };
+  receipt?: ITransactionReceipt;
 }
 
 export interface ITransactionReceipt {

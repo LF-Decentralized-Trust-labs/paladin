@@ -8,6 +8,11 @@ permissions:
 on:
   workflow_call:
     inputs:
+      ref:
+        required: false
+        description: 'Commit ref for checkout'
+        type: string
+        default: ''
       latest:
         required: false
         type: boolean
@@ -30,6 +35,11 @@ on:
 
   workflow_dispatch:
     inputs:
+      ref:
+        required: false
+        description: 'Commit ref for checkout'
+        type: string
+        default: ''
       latest:
         required: false
         description: 'Whether to mark the release as latest'
@@ -60,6 +70,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
 
       - name: Install pre-requisites
         uses: ./.github/actions/setup

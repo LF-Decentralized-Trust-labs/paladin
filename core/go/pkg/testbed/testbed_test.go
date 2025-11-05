@@ -117,5 +117,5 @@ log:
 	err := yaml.Unmarshal([]byte(yamlConf), &conf)
 	require.NoError(t, err)
 
-	assert.NotNil(t, conf.DomainManagerConfig.Domains["pente"].Config)
+	assert.NotNil(t, conf.DomainManagerInlineConfig.Domains["pente"].Config)
 }

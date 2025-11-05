@@ -11,7 +11,7 @@ transfer.
 
 ## Private ABI
 
-The private ABI of Noto is implemented in [Go](https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/domains/noto),
+The private ABI of Noto is implemented in [Go](https://github.com/LFDT-Paladin/paladin/tree/main/domains/noto),
 and can be accessed by calling `ptx_sendTransaction` with `"type": "private"`.
 
 ### constructor
@@ -280,7 +280,7 @@ Inputs:
 
 ## Public ABI
 
-The public ABI of Noto is implemented in Solidity by [Noto.sol](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/noto/Noto.sol),
+The public ABI of Noto is implemented in Solidity by [Noto.sol](https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/domains/noto/Noto.sol),
 and can be accessed by calling `ptx_sendTransaction` with `"type": "public"`. However, it is not often required
 to invoke the public ABI directly.
 
@@ -485,7 +485,7 @@ Outputs:
 
 ## Notary logic
 
-The notary logic (implemented in the domain [Go library](../../../domains/noto)) is responsible for validating and
+The notary logic (implemented in the domain [Go library](https://github.com/LFDT-Paladin/paladin/tree/main/domains/noto)) is responsible for validating and
 submitting all transactions to the base shared ledger.
 
 The notary will validate the following:
@@ -523,7 +523,7 @@ In addition, the following restrictions will always be enforced, and cannot be d
 ### Notary mode: hooks
 
 When a Noto contract is constructed with notary mode `hooks`, the address of a private Pente contract implementing
-[INotoHooks](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/interfaces/INotoHooks.sol)
+[INotoHooks](https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/domains/interfaces/INotoHooks.sol)
 must be provided. This contract may be deployed into a privacy group only visible to the notary, or into a group
 that includes other parties for observability.
 

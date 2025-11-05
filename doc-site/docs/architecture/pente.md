@@ -101,7 +101,7 @@ The guiding principals are:
 
 ## Implementation
 
-The Pente private domain is implemented [in Java](https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/domains/pente/src)
+The Pente private domain is implemented [in Java](https://github.com/LFDT-Paladin/paladin/tree/main/domains/pente/src)
 using the [Besu EVM](https://github.com/hyperledger/besu) as a code module to start and run ephemeral in-memory EVMs.
 
 ## Submitting transactions
@@ -182,7 +182,7 @@ Other fields:
 
 ## Public ABI
 
-The public ABI of Pente is implemented in Solidity by [PentePrivacyGroup.sol](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/pente/PentePrivacyGroup.sol),
+The public ABI of Pente is implemented in Solidity by [PentePrivacyGroup.sol](https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/domains/pente/PentePrivacyGroup.sol),
 and can be accessed by calling `ptx_sendTransaction` with `"type": "public"`. However, it is not often required
 to invoke the public ABI directly.
 

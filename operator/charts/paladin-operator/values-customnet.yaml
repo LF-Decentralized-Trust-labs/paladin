@@ -124,9 +124,7 @@ paladinNodes:
     # ======== Paladin Registration ========
     # Register Paladin node to the network
     paladinRegistration:
-      registryAdminNode: bank  # The admin node that manages the registry
-      registryAdminKey: registry.operator
-      registry: evm-registry
+      nodeAdminKey: ""  # Node admin key for PaladinRegistration (leave empty to use default pattern)
 
 # Domains can be configured with a default signing identity
 domains:

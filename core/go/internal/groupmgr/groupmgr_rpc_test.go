@@ -122,7 +122,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 			mwpgt1.Return(&pldapi.TransactionInput{
 				TransactionBase: pldapi.TransactionBase{
 					Type: pldapi.TransactionTypePrivate.Enum(),
-					From: `my.key`,
+					From: `me@node1`,
 					Data: pldtypes.RawJSON(`{"wrapped":"transaction"}`),
 				},
 			}, nil)
@@ -133,7 +133,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 			Return([]uuid.UUID{tx1ID}, nil).
 			Run(func(args mock.Arguments) {
 				tx := args[2].([]*pldapi.TransactionInput)[0]
-				assert.Regexp(t, `my.key`, tx.From)
+				assert.Regexp(t, `me@node1`, tx.From)
 				assert.Equal(t, "pgtx_deploy", tx.IdempotencyKey)
 				assert.JSONEq(t, `{"wrapped":"transaction"}`, tx.Data.Pretty())
 			}).Once()
@@ -236,7 +236,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 		Group:          group.ID,
 		IdempotencyKey: "pgtx_deploy",
 		PrivacyGroupEVMTX: pldapi.PrivacyGroupEVMTX{
-			From:     "my.key",
+			From:     "me",
 			To:       nil, // simulate is a deploy inside the privacy group
 			Function: &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{{Type: "string", Name: "input1"}}},
 			Gas:      confutil.P(pldtypes.HexUint64(12345)),

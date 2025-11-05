@@ -20,7 +20,7 @@ type IdentityResolverConfig struct {
 	VerifierCache CacheConfig `json:"verifierCache"`
 }
 
-var IdentityResolverDefaults = &IdentityResolverConfig{
+var IdentityResolverDefaults = IdentityResolverConfig{
 	VerifierCache: CacheConfig{
 		Capacity: confutil.P(1000),
 	},

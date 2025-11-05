@@ -19,10 +19,12 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "axios": "^1.7.7",
     "ethers": "^6.13.4",
     "uuid": "^11.0.2",
     "ws": "^8.18.1"
+  },
+  "peerDependencies": {
+    "axios": "^1.7.7"
   },
   "repository": {
     "url": "https://github.com/LF-Decentralized-Trust-labs/paladin"

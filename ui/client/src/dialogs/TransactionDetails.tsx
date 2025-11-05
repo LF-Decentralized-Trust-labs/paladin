@@ -78,6 +78,7 @@ export const PaladinTransactionsDetailsDialog: React.FC<Props> = ({
         { selectedTransaction ?
           <PaladinTransactionsDetails
             paladinTransaction={selectedTransaction}
+            transactionReceipt={selectedTransaction.receipt}
           />
           : undefined
         }

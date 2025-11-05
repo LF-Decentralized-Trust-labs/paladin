@@ -44,7 +44,7 @@ import (
 type keyManager struct {
 	bgCtx context.Context
 
-	conf                    *pldconf.KeyManagerConfig
+	conf                    *pldconf.KeyManagerInlineConfig
 	rpcModule               *rpcserver.RPCModule
 	identifierCache         cache.Cache[string, *pldapi.KeyMappingWithPath]
 	verifierByIdentityCache cache.Cache[string, *pldapi.KeyVerifier]
@@ -63,7 +63,7 @@ type keyManager struct {
 	p persistence.Persistence
 }
 
-func NewKeyManager(bgCtx context.Context, conf *pldconf.KeyManagerConfig) components.KeyManager {
+func NewKeyManager(bgCtx context.Context, conf *pldconf.KeyManagerInlineConfig) components.KeyManager {
 	return &keyManager{
 		bgCtx:                   bgCtx,
 		conf:                    conf,

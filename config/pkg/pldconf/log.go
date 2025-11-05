@@ -65,7 +65,7 @@ type LogJSONConfig struct {
 	FileField *string `json:"fileField"`
 }
 
-var LogDefaults = &LogConfig{
+var LogDefaults = LogConfig{
 	Level:        confutil.P("info"),
 	Format:       confutil.P("simple"),
 	Output:       confutil.P("stderr"),

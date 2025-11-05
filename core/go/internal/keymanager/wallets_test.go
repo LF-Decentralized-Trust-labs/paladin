@@ -31,7 +31,7 @@ import (
 )
 
 func TestNewWalletConfigErrors(t *testing.T) {
-	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{}, nil)
+	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerInlineConfig{}, nil)
 	defer done()
 
 	_, err := km.newWallet(ctx, &pldconf.WalletConfig{
@@ -75,7 +75,7 @@ func TestNewWalletConfigErrors(t *testing.T) {
 
 func TestResolveKeyAndVerifierErr(t *testing.T) {
 
-	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
+	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerInlineConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
 	}, nil)
 	defer done()
@@ -96,7 +96,7 @@ func TestResolveKeyAndVerifierErr(t *testing.T) {
 
 func TestResolveBadSignerResponse(t *testing.T) {
 
-	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
+	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerInlineConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
 	}, nil)
 	defer done()
@@ -121,7 +121,7 @@ func TestResolveBadSignerResponse(t *testing.T) {
 
 func TestSignError(t *testing.T) {
 
-	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
+	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerInlineConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
 	}, nil)
 	defer done()

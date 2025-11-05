@@ -2,7 +2,7 @@
 
 This example demonstrates a privacy-preserving stablecoin using Zeto with KYC compliance and nullifiers for enhanced security and regulatory oversight.
 
-See the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tutorials/private-stablecoin/) for a detailed explanation.
+See the [tutorial](https://LFDT-Paladin.github.io/paladin/head/tutorials/private-stablecoin/) for a detailed explanation.
 
 ## Pre-requisites
 

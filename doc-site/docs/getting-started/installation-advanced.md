@@ -20,7 +20,7 @@ Default installation:
 helm install paladin paladin/paladin-operator -n paladin --create-namespace
 ```
 
-Refer to the provided [`values.yaml`](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/operator/charts/paladin-operator/values.yaml) for additional configurable options, including: `Number of nodes`, `node name prefixes`, `ports`, `images`, `environment variables`, etc.
+Refer to the provided [`values.yaml`](https://github.com/LFDT-Paladin/paladin/blob/main/operator/charts/paladin-operator/values.yaml) for additional configurable options, including: `Number of nodes`, `node name prefixes`, `ports`, `images`, `environment variables`, etc.
 
 Example custom installation:
 
@@ -114,7 +114,7 @@ helm install paladin paladin/paladin-operator -n paladin --create-namespace \
 
 This will deploy one Paladin node named `bank`. Add more entries under `paladinNodes` to scale horizontally.
 
-Refer to the provided [`values-customnet.yaml`](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/operator/charts/paladin-operator/values-customnet.yaml) for additional configurable options.
+Refer to the provided [`values-customnet.yaml`](https://github.com/LFDT-Paladin/paladin/blob/main/operator/charts/paladin-operator/values-customnet.yaml) for additional configurable options.
 
 ### Options
 Here are some customizations that you will most likely make when in stalling with `customnet ` mode.

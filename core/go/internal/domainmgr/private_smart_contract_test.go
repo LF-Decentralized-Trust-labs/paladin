@@ -361,7 +361,7 @@ func TestEncodeDecodeABIData(t *testing.T) {
 }
 
 func initRealKeyManagerForTest(t *testing.T) (components.KeyManager, func(mc *mockComponents)) {
-	keymgr := keymanager.NewKeyManager(context.Background(), &pldconf.KeyManagerConfig{
+	keymgr := keymanager.NewKeyManager(context.Background(), &pldconf.KeyManagerInlineConfig{
 		Wallets: []*pldconf.WalletConfig{
 			{
 				Name: "wallet1",

@@ -20,14 +20,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
 )
 
-const DefaultHTTPPort = 8645
-const DefaultWebSocketPort = 8646
-
-var WSDefaults = RPCServerConfigWS{
-	ReadBufferSize:  confutil.P("64KB"),
-	WriteBufferSize: confutil.P("64KB"),
-}
-
 type RPCServerConfigHTTP struct {
 	Disabled         bool                 `json:"disabled,omitempty"`
 	StaticServers    []StaticServerConfig `json:"staticServers,omitempty"` // Configurations for static file servers handled by the HTTP server (e.g., for serving a UI hosted on the same server as the RPC server)
@@ -44,4 +36,15 @@ type RPCServerConfigWS struct {
 type RPCServerConfig struct {
 	HTTP RPCServerConfigHTTP `json:"http,omitempty"`
 	WS   RPCServerConfigWS   `json:"ws,omitempty"`
+}
+
+var RPCServerConfigDefaults = RPCServerConfig{
+	HTTP: RPCServerConfigHTTP{
+		HTTPServerConfig: HTTPDefaults,
+	},
+	WS: RPCServerConfigWS{
+		ReadBufferSize:   confutil.P("64KB"),
+		WriteBufferSize:  confutil.P("64KB"),
+		HTTPServerConfig: HTTPDefaults,
+	},
 }

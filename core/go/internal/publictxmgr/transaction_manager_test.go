@@ -124,7 +124,7 @@ func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...fu
 		p, dbClose, err = persistence.NewUnitTestPersistence(ctx, "publictxmgr")
 		require.NoError(t, err)
 
-		mocks.keyManager = keymanager.NewKeyManager(ctx, &pldconf.KeyManagerConfig{
+		mocks.keyManager = keymanager.NewKeyManager(ctx, &pldconf.KeyManagerInlineConfig{
 			Wallets: []*pldconf.WalletConfig{
 				{
 					Name: "wallet1",

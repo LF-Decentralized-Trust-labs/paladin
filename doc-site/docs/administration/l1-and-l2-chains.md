@@ -325,7 +325,7 @@ The gas price cache provides the most benefit when:
 
 ## Examples
 
-The examples deploy contracts and invoke transactions before waiting for receipts to confirm they have succeesfully been mined. The default wait time in the Paladin examples is 30 seconds. This should be sufficient for most public chains, but it can be increased by modifying (`DEFAULT_POLL_TIMEOUT` in the examples config file)[https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/common/src/config.ts].
+The examples deploy contracts and invoke transactions before waiting for receipts to confirm they have succeesfully been mined. The default wait time in the Paladin examples is 30 seconds. This should be sufficient for most public chains, but it can be increased by modifying (`DEFAULT_POLL_TIMEOUT` in the examples config file)[https://github.com/LFDT-Paladin/paladin/blob/main/examples/common/src/config.ts].
 
 Note: the example code won't wait the full polling period if the contract deploy completes early, so setting a large value won't increase the example run time unncessarily.
 

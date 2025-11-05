@@ -39,13 +39,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func mockGetStateRetryThenOk(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+func mockGetStateRetryThenOk(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 	mc.stateManager.On("GetStatesByID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false).
 		Return(nil, fmt.Errorf("pop")).Once()
 	mockGetStateOk(mc, conf)
 }
 
-func mockGetStateOk(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+func mockGetStateOk(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 	mGS := mc.stateManager.On("GetStatesByID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false)
 	mGS.Run(func(args mock.Arguments) {
 		id := (args[4].([]pldtypes.HexBytes))[0]
@@ -67,7 +67,7 @@ func TestReliableMessageResendRealDB(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, true,
 		mockGoodTransport,
 		mockGetStateRetryThenOk,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.registryManager.On("GetNodeTransports", mock.Anything, "node3").Return([]*components.RegistryNodeTransportEntry{
 				{
 					Node:      "node3",
@@ -172,7 +172,7 @@ func TestReliableMessageResendRealDB(t *testing.T) {
 func TestReliableMessageSendSendQuiesceRealDB(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, true,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			conf.PeerReaperInterval = confutil.P("50ms")
 		},
 		mockGoodTransport,
@@ -250,7 +250,7 @@ func TestSendBadReliableMessageMarkedFailRealDB(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, true,
 		mockGoodTransport,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			// missing state
 			mc.stateManager.On("GetStatesByID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false).
 				Return(nil, nil).Once()
@@ -337,7 +337,7 @@ func TestConnectionRace(t *testing.T) {
 	connRelease := make(chan struct{})
 
 	ctx, tm, tp, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mGNT := mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 				{
 					Node:      "node2",
@@ -425,7 +425,7 @@ func TestDeactivateFail(t *testing.T) {
 
 func TestGetReliableMessageByIDFail(t *testing.T) {
 
-	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 		mc.db.Mock.ExpectQuery("SELECT.*reliable_msgs").WillReturnError(fmt.Errorf("pop"))
 	})
 	defer done()
@@ -476,7 +476,7 @@ func TestProcessReliableMsgPageIgnoreBeforeHWM(t *testing.T) {
 
 func TestProcessReliableMsgPageIgnoreUnsupported(t *testing.T) {
 
-	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 		mc.db.Mock.ExpectExec("INSERT.*reliable_msg_acks").WillReturnError(fmt.Errorf("pop"))
 	})
 	defer done()
@@ -502,7 +502,7 @@ func TestProcessReliableMsgPageInsertFail(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGetStateOk,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectExec("INSERT.*reliable_msgs").WillReturnResult(driver.ResultNoRows)
 		})
 	defer done()
@@ -539,7 +539,7 @@ func TestProcessReliableMsgPagePrivacyGroup(t *testing.T) {
 	schemaID := pldtypes.RandBytes32()
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGetStateOk,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectExec("INSERT.*reliable_msgs").WillReturnResult(driver.ResultNoRows)
 		})
 	defer done()
@@ -608,7 +608,7 @@ func TestProcessReliableMsgPagePrivacyGroupMessage(t *testing.T) {
 		},
 	}
 	ctx, tm, tp, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.groupManager.On("GetMessageByID", mock.Anything, mock.Anything, origMsg.ID, false).
 				Return(origMsg, nil)
 
@@ -663,7 +663,7 @@ func TestProcessReliableMsgPagePrivacyGroupMessage(t *testing.T) {
 func TestProcessReliableMsgPageReceipt(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectExec("INSERT.*reliable_msgs").WillReturnResult(driver.ResultNoRows)
 		})
 	defer done()

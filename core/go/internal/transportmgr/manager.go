@@ -48,7 +48,7 @@ type transportManager struct {
 	mux       sync.Mutex
 
 	rpcModule        *rpcserver.RPCModule
-	conf             *pldconf.TransportManagerConfig
+	conf             *pldconf.TransportManagerInlineConfig
 	localNodeName    string
 	registryManager  components.RegistryManager
 	stateManager     components.StateManager
@@ -94,7 +94,7 @@ var reliableMessageAckFilters = filters.FieldMap{
 	"error":     filters.StringField("error"),
 }
 
-func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerConfig) components.TransportManager {
+func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerInlineConfig) components.TransportManager {
 	tm := &transportManager{
 		conf:                    conf,
 		localNodeName:           conf.NodeName,

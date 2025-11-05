@@ -35,15 +35,16 @@ async function main(): Promise<boolean> {
   const clients = nodeConnections.map(node => new PaladinClient(node.clientOptions));
   const [paladinNode1, paladinNode2, paladinNode3] = clients;
 
-  const [verifierNode1] = paladinNode1.getVerifiers(`member@${nodeConnections[0].id}`);
-  const [verifierNode2] = paladinNode2.getVerifiers(`member@${nodeConnections[1].id}`);
-  const [verifierNode3] = paladinNode3.getVerifiers(`outsider@${nodeConnections[2].id}`);
+  const [memberNode1] = paladinNode1.getVerifiers(`member@${nodeConnections[0].id}`);
+  const [memberNode2] = paladinNode2.getVerifiers(`member@${nodeConnections[1].id}`);
+  const [outsiderNode1] = paladinNode1.getVerifiers(`outsider@${nodeConnections[0].id}`);
+  const [outsiderNode3] = paladinNode3.getVerifiers(`outsider@${nodeConnections[2].id}`);
 
   // Step 1: Create a privacy group for members
-  logger.log("Creating a privacy group for Node1 and Node2...");
+  logger.log("Creating a privacy group for member@node1 and member@node2...");
   const penteFactory = new PenteFactory(paladinNode1, "pente");
   const memberPrivacyGroup = await penteFactory.newPrivacyGroup({
-    members: [verifierNode1, verifierNode2],
+    members: [memberNode1, memberNode2],
     evmVersion: "shanghai",
     externalCallsEnabled: true,
   }).waitForDeploy(DEFAULT_POLL_TIMEOUT);
@@ -56,7 +57,7 @@ async function main(): Promise<boolean> {
   const contractAddress = await memberPrivacyGroup.deploy({
     abi: storageJson.abi,
     bytecode: storageJson.bytecode,
-    from: verifierNode1.lookup,
+    from: memberNode1.lookup,
   }).waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!contractAddress) {
     logger.error("Failed to deploy the contract. No address returned.");
@@ -75,7 +76,7 @@ async function main(): Promise<boolean> {
   const valueToStore = 125; // Example value to store
   logger.log(`Storing a value "${valueToStore}" in the contract...`);
   const storeReceipt = await privateStorageContract.sendTransaction({
-    from: verifierNode1.lookup,
+    from: memberNode1.lookup,
     function: "store",
     data: { num: valueToStore },
   }).waitForReceipt(DEFAULT_POLL_TIMEOUT);
@@ -91,58 +92,76 @@ async function main(): Promise<boolean> {
     storeReceipt?.transactionHash
   );
 
-  // Retrieve the value as Node1
-  logger.log("Node1 retrieving the value from the contract...");
+  // Retrieve the value as member@node1
+  logger.log("member@node1 retrieving the value from the contract...");
   const retrievedValueNode1 = await privateStorageContract.call({
-    from: verifierNode1.lookup,
+    from: memberNode1.lookup,
     function: "retrieve",
   });
   
   // Validate the retrieved value
   if (retrievedValueNode1["value"] !== valueToStore.toString()) {
-    logger.error(`Value retrieval validation failed for Node1! Expected: "${valueToStore}", Retrieved: "${retrievedValueNode1["value"]}"`);
+    logger.error(`Value retrieval validation failed for member@node1! Expected: "${valueToStore}", Retrieved: "${retrievedValueNode1["value"]}"`);
     return false;
   }
   
   logger.log(
-    "Node1 retrieved the value successfully:",
+    "member@node1 retrieved the value successfully:",
     retrievedValueNode1["value"]
   );
 
-  // Retrieve the value as Node2
-  logger.log("Node2 retrieving the value from the contract...");
+  // Retrieve the value as member@node2
+  logger.log("member@node2 retrieving the value from the contract...");
   const retrievedValueNode2 = await privateStorageContract
     .using(paladinNode2)
     .call({
-      from: verifierNode2.lookup,
+      from: memberNode2.lookup,
       function: "retrieve",
     });
     
   // Validate the retrieved value
   if (retrievedValueNode2["value"] !== valueToStore.toString()) {
-    logger.error(`Value retrieval validation failed for Node2! Expected: "${valueToStore}", Retrieved: "${retrievedValueNode2["value"]}"`);
+    logger.error(`Value retrieval validation failed for member@node2! Expected: "${valueToStore}", Retrieved: "${retrievedValueNode2["value"]}"`);
     return false;
   }
   
   logger.log(
-    "Node2 retrieved the value successfully:",
+    "member@node2 retrieved the value successfully:",
     retrievedValueNode2["value"]
   );
 
-  // Attempt to retrieve the value as Node3 (outsider)
+
+    // Attempt to retrieve the value as outsider@node1 (non-member on same node as a member)
+    try {
+      logger.log("outsider@node1 attempting to retrieve the value...");
+      await privateStorageContract.using(paladinNode1).call({
+        from: outsiderNode1.lookup,
+        function: "retrieve",
+      });
+      logger.error(
+        "outsider@node1 should not have access to the privacy group!"
+      );
+      return false;
+    } catch (error) {
+      logger.log(
+        "outsider@node1 correctly denied access to the privacy group!"
+      );
+    }
+
+  // Attempt to retrieve the value as outsider@node3 (non-member on node with no members)
   try {
-    logger.log("Node3 (outsider) attempting to retrieve the value...");
+    logger.log("outsider@node3 attempting to retrieve the value...");
     await privateStorageContract.using(paladinNode3).call({
-      from: verifierNode3.lookup,
+      from: outsiderNode3.lookup,
       function: "retrieve",
     });
     logger.error(
-      "Node3 (outsider) should not have access to the privacy group!"
+      "outsider@node3 should not have access to the privacy group!"
     );
     return false;
   } catch (error) {
     logger.log(
-      "Node3 (outsider) correctly denied access to the privacy group!"
+      "outsider@node3 correctly denied access to the privacy group!"
     );
   }
 
@@ -154,9 +173,10 @@ async function main(): Promise<boolean> {
     retrievedValueNode1: retrievedValueNode1["value"],
     retrievedValueNode2: retrievedValueNode2["value"],
     storeTransactionHash: storeReceipt?.transactionHash,
-    node1Verifier: verifierNode1.lookup,
-    node2Verifier: verifierNode2.lookup,
-    node3Verifier: verifierNode3.lookup,
+    memberAtNode1Verifier: memberNode1.lookup,
+    memberAtNode2Verifier: memberNode2.lookup,
+    outsiderAtNode1Verifier: outsiderNode1.lookup,
+    outsideAtNode3Verifier: outsiderNode3.lookup,
     timestamp: new Date().toISOString()
   };
 

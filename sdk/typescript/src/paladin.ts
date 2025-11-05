@@ -64,6 +64,10 @@ export default class PaladinClient {
       });
   }
 
+  getHttpInstance(): AxiosInstance {
+    return this.http;
+  }
+
   protected defaultHeaders() {
     return {
       Accept: "application/json",

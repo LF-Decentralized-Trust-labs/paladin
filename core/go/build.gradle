@@ -399,7 +399,16 @@ task aggregateCoverage(type: Copy, dependsOn: buildCoverageTxt) {
     filter(LineContains, negate: true, contains: getProject().ext.coverageExcludedPackages, matchAny: true) 
 }
 
-task checkCoverage(type: GoCheckCoverage, dependsOn: [aggregateCoverage]) {
+task buildCoverageHTML(type: Exec, dependsOn: aggregateCoverage) {
+    outputs.files('coverage/coverage.html')
+    executable 'go'
+    args 'tool', 'cover'
+    args '-html'
+    args "${projectDir}/coverage/coverage.txt"
+    args '-o', "${projectDir}/coverage/coverage.html"
+}
+
+task checkCoverage(type: GoCheckCoverage, dependsOn: [buildCoverageHTML]) {
     coverageFile('coverage/coverage.txt')
     target = targetCoverage
     maxGap = maxCoverageBarGap

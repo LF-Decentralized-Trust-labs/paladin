@@ -141,7 +141,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, dbTX pers
 	}
 
 	// Validate the fromBlock
-	if _, err := bi.getFromBlock(ctx, def.Config.FromBlock, EventStreamDefaults.FromBlock); err != nil {
+	if _, err := bi.getFromBlock(ctx, def.Config.FromBlock, EventStreamsDefaults.FromBlock); err != nil {
 		return nil, err
 	}
 
@@ -231,7 +231,7 @@ func (bi *blockIndexer) initEventStreamDBTX(ctx context.Context, definition *Eve
 // Note that the event stream must be stopped when this is called
 func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventStream) *eventStream {
 	es := bi.eventStreams[definition.ID]
-	batchSize := confutil.IntMin(definition.Config.BatchSize, 1, *EventStreamDefaults.BatchSize)
+	batchSize := confutil.IntMin(definition.Config.BatchSize, 1, *EventStreamsDefaults.BatchSize)
 	if es != nil {
 		// If we're already initialized, the only thing that can be changed is the pldconf.
 		// Caller is responsible for ensuring we're stopped at this point
@@ -249,9 +249,9 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 
 	// Set the batch config
 	es.batchSize = batchSize
-	es.batchTimeout = confutil.DurationMin(definition.Config.BatchTimeout, 0, *EventStreamDefaults.BatchTimeout)
+	es.batchTimeout = confutil.DurationMin(definition.Config.BatchTimeout, 0, *EventStreamsDefaults.BatchTimeout)
 	// The error is already checked before writing to the DB
-	es.fromBlock, _ = es.bi.getFromBlock(ctx, definition.Config.FromBlock, EventStreamDefaults.FromBlock)
+	es.fromBlock, _ = es.bi.getFromBlock(ctx, definition.Config.FromBlock, EventStreamsDefaults.FromBlock)
 	es.checkpoint.Store(-1)
 	es.catchup.Store(true)
 

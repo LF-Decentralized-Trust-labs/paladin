@@ -187,7 +187,7 @@ func newTestPlugin(domainFuncs *plugintk.DomainAPIFunctions) *testPlugin {
 
 func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig, extraSetup ...func(mc *mockComponents)) (*testDomainContext, func()) {
 
-	ctx, dm, mc, dmDone := newTestDomainManager(t, realDB, &pldconf.DomainManagerConfig{
+	ctx, dm, mc, dmDone := newTestDomainManager(t, realDB, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"test1": {
 				Config:          map[string]any{"some": "conf"},
@@ -430,7 +430,7 @@ func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
 
 func TestDomainConfigureFail(t *testing.T) {
 
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"test1": {
 				Config:          map[string]any{"some": "config"},

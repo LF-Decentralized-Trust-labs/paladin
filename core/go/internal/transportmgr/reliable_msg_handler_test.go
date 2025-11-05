@@ -66,7 +66,7 @@ func setupAckOrNackCheck(t *testing.T, tp *testPlugin, msgID uuid.UUID, expected
 func TestReceiveMessageStateWithNullifierSendAckRealDB(t *testing.T) {
 	ctx, _, tp, done := newTestTransport(t, true,
 		mockGoodTransport,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
 				Return(nil, nil).Once()
 			nullifier := &components.NullifierUpsert{ID: pldtypes.RandBytes(32)}
@@ -126,7 +126,7 @@ func TestHandleStateDistroBadState(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
@@ -168,7 +168,7 @@ func TestHandleStateDistroMixedBatchBadAndGoodStates(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
@@ -212,7 +212,7 @@ func TestHandleStateDistroBadNullifier(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 			mkr := componentsmocks.NewKeyResolver(t)
@@ -258,7 +258,7 @@ func TestHandleStateDistroBadMsg(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 		},
@@ -298,7 +298,7 @@ func TestHandleStateDistroUnknownMsgType(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 		},
@@ -325,7 +325,7 @@ func TestHandleStateDistroUnknownMsgType(t *testing.T) {
 }
 
 func TestHandleAckFailReadMsg(t *testing.T) {
-	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 		mc.db.Mock.ExpectBegin()
 		mc.db.Mock.ExpectQuery("SELECT.*reliable_msgs").WillReturnError(fmt.Errorf("pop"))
 	})
@@ -350,7 +350,7 @@ func TestHandleAckFailReadMsg(t *testing.T) {
 func TestHandleNackFailWriteAck(t *testing.T) {
 	msgID := uuid.New()
 
-	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 		mc.db.Mock.ExpectBegin()
 		mc.db.Mock.ExpectQuery("SELECT.*reliable_msgs").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(msgID.String()))
 		mc.db.Mock.ExpectExec("INSERT.*reliable_msg_acks").WillReturnError(fmt.Errorf("pop"))
@@ -376,7 +376,7 @@ func TestHandleNackFailWriteAck(t *testing.T) {
 
 func TestHandleBadAckNoCorrelId(t *testing.T) {
 
-	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 		mc.db.Mock.ExpectBegin()
 		mc.db.Mock.ExpectCommit()
 	})
@@ -400,7 +400,7 @@ func TestHandleBadAckNoCorrelId(t *testing.T) {
 
 func TestHandleReceiptFail(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.txManager.On("FinalizeTransactions", mock.Anything, mock.Anything, mock.Anything).
 				Return(fmt.Errorf("pop"))
@@ -432,7 +432,7 @@ func TestHandleReceiptFail(t *testing.T) {
 func TestHandleReceiptOk(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t, false,
 		mockGoodTransport,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 			mc.txManager.On("FinalizeTransactions", mock.Anything, mock.Anything, mock.Anything).
@@ -463,7 +463,7 @@ func TestHandleReceiptOk(t *testing.T) {
 
 func TestHandlePreparedTxFail(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.txManager.On("WritePreparedTransactions", mock.Anything, mock.Anything, mock.Anything).
 				Return(fmt.Errorf("pop"))
@@ -494,7 +494,7 @@ func TestHandlePreparedTxFail(t *testing.T) {
 
 func TestHandleNullifierFail(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.stateManager.On("WriteReceivedStates", mock.Anything, mock.Anything, "domain1", mock.Anything).
 				Return(nil, nil).Once()
@@ -540,7 +540,7 @@ func TestHandleReceiptBadData(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 		},
@@ -571,7 +571,7 @@ func TestHandlePreparedTxBadData(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 		},
@@ -601,7 +601,7 @@ func TestHandlePreparedOk(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 			mc.txManager.On("WritePreparedTransactions", mock.Anything, mock.Anything, mock.Anything).
@@ -640,7 +640,7 @@ func TestHandlePrivacyGroupOK(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.stateManager.On("EnsureABISchemas", mock.Anything, mock.Anything, "domain1", mock.Anything).Return([]components.Schema{
 				schema,
 			}, nil).Once()
@@ -696,7 +696,7 @@ func TestHandlePrivacyGroupBadState(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.stateManager.On("EnsureABISchemas", mock.Anything, mock.Anything, "domain1", mock.Anything).Return([]components.Schema{
 				schema,
 			}, nil).Once()
@@ -747,7 +747,7 @@ func TestHandlePrivacyGroupGroupFail(t *testing.T) {
 	schema := componentsmocks.NewSchema(t)
 	ctx, tm, _, done := newTestTransport(t, false,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.stateManager.On("EnsureABISchemas", mock.Anything, mock.Anything, "domain1", mock.Anything).Return([]components.Schema{
 				schema,
 			}, nil).Once()
@@ -796,7 +796,7 @@ func TestHandlePrivacyGroupGroupFail(t *testing.T) {
 func TestHandlePrivacyGroupBuiltInABIFail(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t, false,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.stateManager.On("EnsureABISchemas", mock.Anything, mock.Anything, "domain1", mock.Anything).Return(nil, fmt.Errorf("pop"))
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
@@ -836,7 +836,7 @@ func TestHandlePrivacyGroupInvalid(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 		},
@@ -866,7 +866,7 @@ func TestHandlePrivacyGroupInvalid(t *testing.T) {
 	ackNackCheck()
 }
 
-func mockReceiveMessagesOK(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+func mockReceiveMessagesOK(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 	mrm := mc.groupManager.On("ReceiveMessages", mock.Anything, mock.Anything, mock.Anything)
 	mrm.Run(func(args mock.Arguments) {
 		pms := args[2].([]*pldapi.PrivacyGroupMessage)
@@ -902,7 +902,7 @@ func TestHandlePrivacyGroupMessageOK(t *testing.T) {
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
 		mockReceiveMessagesOK,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 		},
@@ -931,7 +931,7 @@ func TestHandlePrivacyGroupMessageReject(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mrm := mc.groupManager.On("ReceiveMessages", mock.Anything, mock.Anything, mock.Anything)
 			mrm.Run(func(args mock.Arguments) {
 				pms := args[2].([]*pldapi.PrivacyGroupMessage)
@@ -969,7 +969,7 @@ func TestHandlePrivacyGroupMessageReject(t *testing.T) {
 func TestHandlePrivacyGroupMessageFail(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t, false,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.groupManager.On("ReceiveMessages", mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
 			mc.db.Mock.ExpectBegin()
 		},
@@ -995,7 +995,7 @@ func TestHandlePrivacyGroupMessageBad(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 		},
@@ -1025,7 +1025,7 @@ func TestHandlePrivacyGroupMessageBad(t *testing.T) {
 func TestBuildPrivacyGroupDistributionMsgBadMsg(t *testing.T) {
 
 	ctx, tm, _, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 		},
@@ -1041,7 +1041,7 @@ func TestBuildPrivacyGroupDistributionMsgBadMsg(t *testing.T) {
 func TestBuildPrivacyGroupDistributionMsgGetStatesError(t *testing.T) {
 
 	ctx, tm, _, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.stateManager.On("GetStatesByID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false).
 				Return(nil, fmt.Errorf("pop")).Once()
 
@@ -1074,7 +1074,7 @@ func TestBuildPrivacyGroupDistributionMsgGetStatesError(t *testing.T) {
 func TestBuildPrivacyGroupDistributionMsgGetStatesNotFound(t *testing.T) {
 
 	ctx, tm, _, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.stateManager.On("GetStatesByID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false).
 				Return(nil, nil).Once()
 
@@ -1108,7 +1108,7 @@ func TestBuildPrivacyGroupDistributionMsgGetStatesNotFound(t *testing.T) {
 func TestParsePrivacyGroupMessageDistributionFail(t *testing.T) {
 
 	ctx, tm, _, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 		},
@@ -1129,7 +1129,7 @@ func TestParsePrivacyGroupMessageDistributionFail(t *testing.T) {
 func TestParsePrivacyGroupMessageGetMessageError(t *testing.T) {
 
 	ctx, tm, _, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.groupManager.On("GetMessageByID", mock.Anything, mock.Anything, mock.Anything, false).Return(nil, fmt.Errorf("pop"))
 
 			mc.db.Mock.ExpectBegin()
@@ -1155,7 +1155,7 @@ func TestParsePrivacyGroupMessageGetMessageError(t *testing.T) {
 func TestParsePrivacyGroupMessageGetMessageNotFound(t *testing.T) {
 
 	ctx, tm, _, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.groupManager.On("GetMessageByID", mock.Anything, mock.Anything, mock.Anything, false).Return(nil, nil)
 
 			mc.db.Mock.ExpectBegin()
@@ -1182,7 +1182,7 @@ func TestParsePrivacyGroupMessageGetMessageNotFound(t *testing.T) {
 func TestBuildReceiptDistributionMsgBadMsg(t *testing.T) {
 
 	ctx, tm, _, done := newTestTransport(t, false,
-		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
 			mc.db.Mock.ExpectBegin()
 			mc.db.Mock.ExpectCommit()
 		},

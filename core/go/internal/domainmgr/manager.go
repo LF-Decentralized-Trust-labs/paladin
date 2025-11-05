@@ -61,7 +61,7 @@ var smartContractFilters = filters.FieldMap{
 	"address":       filters.HexBytesField("address"),
 }
 
-func NewDomainManager(bgCtx context.Context, conf *pldconf.DomainManagerConfig) components.DomainManager {
+func NewDomainManager(bgCtx context.Context, conf *pldconf.DomainManagerInlineConfig) components.DomainManager {
 	bgCtx = log.WithComponent(bgCtx, "domainmanager")
 	allDomains := []string{}
 	for name := range conf.Domains {
@@ -74,7 +74,7 @@ func NewDomainManager(bgCtx context.Context, conf *pldconf.DomainManagerConfig) 
 		domainsByName:    make(map[string]*domain),
 		domainsByAddress: make(map[pldtypes.EthAddress]*domain),
 		privateTxWaiter:  inflight.NewInflightManager[uuid.UUID, *components.ReceiptInput](uuid.Parse),
-		contractCache:    cache.NewCache[pldtypes.EthAddress, *domainContract](&conf.DomainManager.ContractCache, pldconf.ContractCacheDefaults),
+		contractCache:    cache.NewCache[pldtypes.EthAddress, *domainContract](&conf.DomainManager.ContractCache, &pldconf.PaladinConfigDefaults.DomainManager.ContractCache),
 	}
 }
 
@@ -82,7 +82,7 @@ type domainManager struct {
 	bgCtx context.Context
 	mux   sync.Mutex
 
-	conf             *pldconf.DomainManagerConfig
+	conf             *pldconf.DomainManagerInlineConfig
 	persistence      persistence.Persistence
 	stateStore       components.StateManager
 	privateTxManager components.PrivateTxManager

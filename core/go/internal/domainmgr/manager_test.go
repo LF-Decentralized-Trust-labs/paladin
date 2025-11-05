@@ -52,7 +52,7 @@ type mockComponents struct {
 	transportMgr     *componentsmocks.TransportManager
 }
 
-func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *domainManager, *mockComponents, func()) {
+func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManagerInlineConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *domainManager, *mockComponents, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
 	allComponents := componentsmocks.NewAllComponents(t)
@@ -130,7 +130,7 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManager
 }
 
 func TestConfiguredDomains(t *testing.T) {
-	_, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	_, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"test1": {
 				Plugin: pldconf.PluginConfig{
@@ -152,7 +152,7 @@ func TestConfiguredDomains(t *testing.T) {
 }
 
 func TestDomainRegisteredNotFound(t *testing.T) {
-	_, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	_, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),
@@ -166,7 +166,7 @@ func TestDomainRegisteredNotFound(t *testing.T) {
 }
 
 func TestDomainMissingRegistryAddress(t *testing.T) {
-	config := &pldconf.DomainManagerConfig{
+	config := &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				Plugin: pldconf.PluginConfig{
@@ -210,7 +210,7 @@ func TestDomainMissingRegistryAddress(t *testing.T) {
 }
 
 func TestGetDomainNotFound(t *testing.T) {
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),
@@ -267,7 +267,7 @@ func TestWaitForDeployDomainNotFound(t *testing.T) {
 	domainAddr := pldtypes.RandAddress()
 	contractAddr := pldtypes.RandAddress()
 
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),
@@ -304,7 +304,7 @@ func TestWaitForDeployDomainNotFound(t *testing.T) {
 }
 
 func TestWaitForDeployNotADeploy(t *testing.T) {
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),
@@ -337,7 +337,7 @@ func TestWaitForDeployNotADeploy(t *testing.T) {
 }
 
 func TestWaitForDeployTimeout(t *testing.T) {
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),
@@ -353,7 +353,7 @@ func TestWaitForDeployTimeout(t *testing.T) {
 }
 
 func TestWaitForTransactionTimeout(t *testing.T) {
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),

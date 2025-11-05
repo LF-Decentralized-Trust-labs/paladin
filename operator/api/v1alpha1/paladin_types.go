@@ -178,6 +178,8 @@ type Database struct {
 
 const SignerType_AutoHDWallet = "autoHDWallet"
 
+const DerivationType_BIP32 = "bip32"
+
 type SecretBackedSigner struct {
 	Secret string `json:"secret"`
 	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
@@ -196,6 +198,10 @@ type SecretBackedSigner struct {
 	// key identifier DOES NOT match against the given regular expression for the key selector.
 	// +kubebuilder:default=false
 	KeySelectorMustNotMatch bool `json:"keySelectorMustNotMatch"`
+	// +kubebuilder:validation:Enum=bip32;direct
+	// +kubebuilder:default=bip32
+	// The Paladin signer can use single BIP39 seed mnemonic to derive keys, or use direct key mapping.
+	DerivationType string `json:"derivationType"`
 }
 
 type AuthType string

@@ -61,15 +61,15 @@ func configToKeyResolutionRequest(k *pldconf.StaticKeyReference) (string, *proto
 }
 
 func (sm *signingModule[C]) initHDWallet(ctx context.Context, conf *pldconf.KeyDerivationConfig) (err error) {
-	bip44Prefix := confutil.StringNotEmpty(conf.BIP44Prefix, *pldconf.KeyDerivationDefaults.BIP44Prefix)
+	bip44Prefix := confutil.StringNotEmpty(conf.BIP44Prefix, *pldconf.SignerConfigDefaults.KeyDerivation.BIP44Prefix)
 	bip44Prefix = strings.ReplaceAll(bip44Prefix, " ", "")
 	sm.hd = &hdDerivation[C]{
 		sm:                    sm,
 		bip44Prefix:           bip44Prefix,
 		bip44DirectResolution: conf.BIP44DirectResolution,
-		bip44HardenedSegments: confutil.IntMin(conf.BIP44HardenedSegments, 0, *pldconf.KeyDerivationDefaults.BIP44HardenedSegments),
+		bip44HardenedSegments: confutil.IntMin(conf.BIP44HardenedSegments, 0, *pldconf.SignerConfigDefaults.KeyDerivation.BIP44HardenedSegments),
 	}
-	seedKeyPath := pldconf.KeyDerivationDefaults.SeedKeyPath
+	seedKeyPath := pldconf.SignerConfigDefaults.KeyDerivation.SeedKeyPath
 	if conf.SeedKeyPath.Name != "" || conf.SeedKeyPath.KeyHandle != "" || len(conf.SeedKeyPath.Attributes) > 0 {
 		seedKeyPath = conf.SeedKeyPath
 	}

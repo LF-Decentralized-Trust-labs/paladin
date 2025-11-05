@@ -30,7 +30,8 @@ type WSClientConfig struct {
 	HeartbeatInterval      *string     `json:"heartbeatInterval"`
 }
 
-var DefaultWSConfig = &WSClientConfig{
+var DefaultWSConfig = WSClientConfig{
+	HTTPClientConfig:       DefaultHTTPConfig,
 	ReadBufferSize:         confutil.P("16Kb"),
 	WriteBufferSize:        confutil.P("16Kb"),
 	InitialConnectAttempts: confutil.P(0),

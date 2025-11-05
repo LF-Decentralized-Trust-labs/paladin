@@ -128,11 +128,12 @@ nav:
     - Private Stablecoin with KYC: tutorials/private-stablecoin.md
     - Atomic Swap: tutorials/atomic-swap.md
     - Bond Issuance: tutorials/bond-issuance.md
-  - Guides:
-    - Certificate Management: guides/certificate_management.md
-    - Administering Peers: guides/administering_peers.md
-    - L1 and L2 Chains: guides/l1-and-l2-chains.md
-    - Logging: guides/logging.md
+  - Administration:
+    - Configuration: administration/configuration.md
+    - Certificate Management: administration/certificate_management.md
+    - Administering Peers: administration/administering_peers.md
+    - L1 and L2 Chains: administration/l1-and-l2-chains.md
+    - Logging: administration/logging.md
   - Reference:
     - APIs: reference/apis/*.md
     - Types: reference/types/*.md

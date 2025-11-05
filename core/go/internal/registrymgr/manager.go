@@ -39,7 +39,7 @@ type registryManager struct {
 	bgCtx context.Context
 	mux   sync.Mutex
 
-	conf *pldconf.RegistryManagerConfig
+	conf *pldconf.RegistryManagerInlineConfig
 
 	p            persistence.Persistence
 	blockIndexer blockindexer.BlockIndexer
@@ -57,14 +57,14 @@ type registryManager struct {
 	metrics          metrics.RegistryManagerMetrics
 }
 
-func NewRegistryManager(bgCtx context.Context, conf *pldconf.RegistryManagerConfig) components.RegistryManager {
+func NewRegistryManager(bgCtx context.Context, conf *pldconf.RegistryManagerInlineConfig) components.RegistryManager {
 	return &registryManager{
 		bgCtx:                    log.WithComponent(bgCtx, "registrymanager"),
 		conf:                     conf,
 		registriesByID:           make(map[uuid.UUID]*registry),
 		registriesByName:         make(map[string]*registry),
 		registryTransportLookups: make(map[string]*transportLookup),
-		transportDetailsCache:    cache.NewCache[string, []*components.RegistryNodeTransportEntry](&conf.RegistryManager.RegistryCache, pldconf.RegistryCacheDefaults),
+		transportDetailsCache:    cache.NewCache[string, []*components.RegistryNodeTransportEntry](&conf.RegistryManager.RegistryCache, &pldconf.PaladinConfigDefaults.RegistryManager.RegistryCache),
 	}
 }
 
@@ -74,7 +74,7 @@ func (rm *registryManager) PreInit(pic components.PreInitComponents) (_ *compone
 
 	// For each of the registries, parse the transport lookup semantics
 	for regName, regConf := range rm.conf.Registries {
-		if confutil.Bool(regConf.Transports.Enabled, *pldconf.RegistryTransportsDefaults.Enabled) {
+		if confutil.Bool(regConf.Transports.Enabled, *pldconf.RegistryConfigDefaults.Transports.Enabled) {
 			if rm.registryTransportLookups[regName], err = newTransportLookup(rm.bgCtx, regName, &regConf.Transports); err != nil {
 				return nil, err
 			}

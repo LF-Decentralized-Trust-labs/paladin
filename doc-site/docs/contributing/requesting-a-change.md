@@ -12,7 +12,7 @@ This guide is our best effort to explain the criteria and reasoning behind our
 decisions when evaluating change requests and considering them for
 implementation. 
 
-  [issue tracker]: https://github.com/LF-Decentralized-Trust-labs/paladin/issues
+  [issue tracker]: https://github.com/LFDT-Paladin/paladin/issues
 
 ## Before creating an issue
 

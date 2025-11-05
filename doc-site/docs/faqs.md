@@ -69,7 +69,7 @@ These domains are _reference_ domains and have been implemented using Paladin's 
 
 **You can get a local Paladin network running quickly using the official quick start guide.** This process uses a Kubernetes operator to automatically deploy all the necessary components, including a private Besu blockchain and a three-node Paladin network, right on your laptop.
 
-You can find the complete, step-by-step instructions in the **[Installation Guide](https://lf-decentralized-trust-labs.github.io/paladin/head/getting-started/installation/)**.
+You can find the complete, step-by-step instructions in the **[Installation Guide](https://LFDT-Paladin.github.io/paladin/head/getting-started/installation/)**.
 
 ### Where is the best place to ask questions or get help?
 
@@ -81,13 +81,13 @@ You can find the complete, step-by-step instructions in the **[Installation Guid
 
 **Bugs should be reported by creating a new issue in the official GitHub repository.** When reporting a bug, please provide as much detail as possible, including your operating system, project version, and clear steps to reproduce the issue.
 
-* Report a bug here: **[Paladin GitHub Issues](https://github.com/LF-Decentralized-Trust-labs/paladin/issues)**
+* Report a bug here: **[Paladin GitHub Issues](https://github.com/LFDT-Paladin/paladin/issues)**
 
 ### What are the guidelines for contributing to Paladin?
 
 **Contributions from the community are highly encouraged and welcome.** The general process involves forking the repository, creating a feature branch for your changes, and submitting a pull request for review. All code contributions must include tests and a "Signed-off-by" line in the commit message to comply with the Developer Certificate of Origin (DCO).
 
-* Explore the code and contribute here: **[Paladin GitHub Repository](https://github.com/LF-Decentralized-Trust-labs/paladin)**
+* Explore the code and contribute here: **[Paladin GitHub Repository](https://github.com/LFDT-Paladin/paladin)**
 
 ### Who maintains Paladin and what is its governance model?
 

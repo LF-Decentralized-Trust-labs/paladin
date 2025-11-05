@@ -43,13 +43,13 @@ type transportLookup struct {
 func newTransportLookup(ctx context.Context, regName string, conf *pldconf.RegistryTransportsConfig) (tl *transportLookup, err error) {
 	tl = &transportLookup{
 		regName:           regName,
-		requiredPrefix:    confutil.StringNotEmpty(&conf.RequiredPrefix, pldconf.RegistryTransportsDefaults.RequiredPrefix),
-		hierarchySplitter: confutil.StringNotEmpty(&conf.HierarchySplitter, pldconf.RegistryTransportsDefaults.HierarchySplitter),
+		requiredPrefix:    confutil.StringNotEmpty(&conf.RequiredPrefix, pldconf.RegistryConfigDefaults.Transports.RequiredPrefix),
+		hierarchySplitter: confutil.StringNotEmpty(&conf.HierarchySplitter, pldconf.RegistryConfigDefaults.Transports.HierarchySplitter),
 		transportNameMap:  map[string]string{},
 	}
 
 	tl.propertyRegexp, err = regexp.Compile(
-		confutil.StringNotEmpty(&conf.PropertyRegexp, pldconf.RegistryTransportsDefaults.PropertyRegexp),
+		confutil.StringNotEmpty(&conf.PropertyRegexp, pldconf.RegistryConfigDefaults.Transports.PropertyRegexp),
 	)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryTransportPropertyRegexp, regName)
