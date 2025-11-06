@@ -62,7 +62,7 @@ func setupRegistryTests(t *testing.T) (context.Context, *pluginExerciser[prototk
 	}
 }
 
-func TestRegistryallback_UpsertRegistryRecords(t *testing.T) {
+func TestRegistryCallback_UpsertRegistryRecords(t *testing.T) {
 	ctx, _, _, callbacks, inOutMap, done := setupRegistryTests(t)
 	defer done()
 
@@ -123,4 +123,18 @@ func TestRegistryWrapperFields(t *testing.T) {
 	m := &RegistryPluginMessage{m: &prototk.RegistryMessage{}}
 	assert.Nil(t, m.RequestFromPlugin())
 	assert.Nil(t, m.ResponseToPlugin())
+}
+
+func TestRegistry_ClosePlugin(t *testing.T) {
+	registryPlugin := &registryPlugin{
+		factory: func(callbacks RegistryCallbacks) RegistryAPI {
+			return &RegistryAPIBase{
+				Functions: &RegistryAPIFunctions{},
+			}
+		},
+	}
+	handler := registryPlugin.NewHandler(nil)
+	msg, err := handler.ClosePlugin(context.Background())
+	require.NoError(t, err)
+	assert.Nil(t, msg)
 }

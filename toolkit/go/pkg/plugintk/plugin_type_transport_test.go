@@ -186,6 +186,23 @@ func TestTransportFunction_DeactivatePeer(t *testing.T) {
 	})
 }
 
+func TestTransportFunction_StopTransport(t *testing.T) {
+	_, exerciser, funcs, _, _, done := setupTransportTests(t)
+	defer done()
+
+	// InitTransport - paladin to transport
+	funcs.StopTransport = func(ctx context.Context, cdr *prototk.StopTransportRequest) (*prototk.StopTransportResponse, error) {
+		return &prototk.StopTransportResponse{}, nil
+	}
+	exerciser.doExchangeToPlugin(func(req *prototk.TransportMessage) {
+		req.RequestToTransport = &prototk.TransportMessage_StopTransport{
+			StopTransport: &prototk.StopTransportRequest{},
+		}
+	}, func(res *prototk.TransportMessage) {
+		assert.IsType(t, &prototk.TransportMessage_StopTransportRes{}, res.ResponseFromTransport)
+	})
+}
+
 func TestTransportRequestError(t *testing.T) {
 	_, exerciser, _, _, _, done := setupTransportTests(t)
 	defer done()
@@ -194,4 +211,19 @@ func TestTransportRequestError(t *testing.T) {
 	exerciser.doExchangeToPlugin(func(req *prototk.TransportMessage) {}, func(res *prototk.TransportMessage) {
 		assert.Regexp(t, "PD020300", *res.Header.ErrorMessage)
 	})
+}
+
+func TestTransport_ClosePlugin(t *testing.T) {
+	transportPlugin := &transportPlugin{
+		factory: func(callbacks TransportCallbacks) TransportAPI {
+			return &TransportAPIBase{
+				Functions: &TransportAPIFunctions{},
+			}
+		},
+	}
+	handler := transportPlugin.NewHandler(nil)
+	msg, err := handler.ClosePlugin(context.Background())
+	require.Regexp(t, "PD020302", err)
+	assert.NotNil(t, msg)
+	assert.IsType(t, &prototk.TransportMessage_StopTransportRes{}, msg.Message().ResponseFromTransport)
 }
