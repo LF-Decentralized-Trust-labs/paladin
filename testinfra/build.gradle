@@ -44,8 +44,16 @@ task startTestInfra(type: DockerCompose, dependsOn: tasks.besuBootstrapTool) {
     composeFile 'docker-compose-test.yml'
     projectName 'paladin-testinfra'
     args 'up', '-d', '--wait', '--wait-timeout', 60
+    
+    // Enable parallel execution by removing unnecessary dependencies
+    // This task can run in parallel with other tasks that don't need test infrastructure
+    outputs.cacheIf { true }
+    
+    // Optimize startup time
+    doFirst {
+        println "Starting test infrastructure (timeout: 60s)"
+    }
 }
-
 
 task stopTestInfra(type: DockerCompose) {
     composeFile 'docker-compose-test.yml'

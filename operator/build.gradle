@@ -51,9 +51,10 @@ dependencies {
 }
 
 ext {
-    clusterName = project.hasProperty('clusterName') ? project.clusterName : 'paladin' 
+    clusterName = project.hasProperty('clusterName') ? project.clusterName : 'paladin'
     namespace = project.hasProperty('namespace') ? project.namespace : 'default' // Default namespace is 'default'
-    deleteCluster = project.hasProperty('deleteCluster') ? project.deleteCluster.toBoolean() : false // By default, do not delete the cluster
+    deleteCluster = project.hasProperty('deleteCluster') ? project.deleteCluster.toBoolean() : false // delete the kind cluster after the run. Default is false.
+    uninstallChart = project.hasProperty('uninstallChart') ? project.uninstallChart.toBoolean() : false // uninstall paladin chart after the run. Default is false.
     loadImages = project.hasProperty('loadImages') ? project.loadImages == 'true' : true // Default is to load images
     buildPaladin = project.hasProperty('buildPaladin') ? project.buildPaladin == 'true' : true // Default is to build Paladin
     buildOperator = project.hasProperty('buildOperator') ? project.buildOperator == 'true' : true // Default is to build the operator
@@ -64,6 +65,7 @@ ext {
     paladinImageTag = project.hasProperty('paladinImageTag') ? project.paladinImageTag : 'test'
 
     artifactDir = project.hasProperty('artifactDir') ? project.artifactDir : 'artifacts'
+
 }
 
 def printClusterStatus(String namespace) {
@@ -77,13 +79,8 @@ def printClusterStatus(String namespace) {
     def getOperatorPodProcess = getOperatorPodCommand.execute()
     getOperatorPodProcess.waitFor()
 } 
+ 
 
-
-def restartOperator(String namespace) {
-    def restartCommand = ["kubectl", "rollout", "restart", "deployment", "paladin-operator", "-n", namespace]
-    def restart = restartCommand.execute()
-    restart.waitFor()
-} 
 
 def verifyResourceCreated(String namespace, String resourceType, String resourceName, String desiredReplicas = "1", int timeoutSeconds = 60) {
     def startTime = System.currentTimeMillis()
@@ -110,7 +107,7 @@ def verifyResourceCreated(String namespace, String resourceType, String resource
         println "${resourceType} ${resourceName} in namespace ${namespace} is ready with ${desiredReplicas} replicas. Time: ${((System.currentTimeMillis() - startTime) / 1000.0)} seconds."
     }
 }
- 
+
 def waitForAllRegistriesPublished(String namespace, int timeoutSeconds = 240) {
     def startTime = System.currentTimeMillis()
     def endTime = startTime + (timeoutSeconds * 1000)
@@ -189,7 +186,7 @@ def waitForAllSuccess(String namespace, String kind, int timeoutSeconds = 180) {
                 def status = columns[1]
                 if (status != "Success") {
                     allSuccess = false
-                }  
+                }
             } else {
                 allSuccess = false
             }
@@ -407,11 +404,13 @@ task installOperatorDefault(dependsOn: [installCrds, promoteKindImages, helmUnit
 
         printClusterStatus(namespace)
     }
+    rootProject.helpers.dumpChartInfo(it, "installOperatorDefault", namespace, namespace)
 }
 
 task installOperatorDevnet(dependsOn: [installCrds, promoteKindImages, prepareOperatorChart]) {
+    def namespace = "ci-devnet"
+
     doLast {
-        def namespace = "ci-devnet"
         installOperator(namespace, 'charts/paladin-operator/ci/values-devnet.yaml')
         
         println 'Waiting for operator deployment to become ready...'
@@ -433,7 +432,9 @@ task installOperatorDevnet(dependsOn: [installCrds, promoteKindImages, prepareOp
         waitForAllRegistriesPublished(namespace, 120)
 
         printClusterStatus(namespace)
+
     }
+    rootProject.helpers.dumpChartInfo(it, "installOperatorDevnet", namespace, namespace)
 }
 
 // Task to deploy the operator and the Paladin nodes
@@ -451,7 +452,7 @@ task ciOperatorDefault(dependsOn: [deploy]) {
 
 task ciOperatorDevnet(dependsOn: [installOperatorDevnet]) {
     def namespace = "ci-devnet"
-    
+
     doLast {
         println 'Uninstalling operator...'
         uninstallOperator(namespace)
@@ -468,19 +469,17 @@ task cleanCluster(type: Exec) {
 }
 
 task clean {
+    doFirst {
+        uninstallOperator("ci-devnet")
+        uninstallOperator("default")
+    }
     dependsOn cleanCluster
     delete 'test/e2e/abis'
     delete 'charts/paladin-operator/templates/samples'
 }
 
-// The CI task runs the different CI permutations of the chart installation
-task ci(dependsOn: [ciOperatorDevnet]) {
-    // This is a grouping task, so it doesn't need a body.
-}
-
 // The 'e2e' task runs the whole flow.
-// It depends on both 'ci' and 'deploy' to ensure they are part of the execution plan.
-task e2e(type: Exec, dependsOn: [ci, deploy]) {
+task e2e(type: Exec, dependsOn: [deploy]) {
 
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.notoGo)
@@ -495,12 +494,18 @@ task e2e(type: Exec, dependsOn: [ci, deploy]) {
     if (deleteCluster) {
         finalizedBy cleanCluster
     }
+    rootProject.helpers.dumpChartInfo(it, "e2e")
 }
  
-// This rule enforces that IF both 'ci' and 'deploy' are scheduled to run
-// (which happens when you run 'e2e'), 'deploy' must wait for 'ci' to finish.
-// This does NOT create a dependency. Running 'gradle deploy' alone will NOT trigger 'ci'.
-deploy.mustRunAfter(ci)
+// The CI task runs the different CI permutations of the chart installation
+task ci() {    
+    doFirst {
+        project.ext.uninstallChart = true // no need for the chart to run after the tests
+        project.ext.deleteCluster = false // deleting the cluster can effect other CI flows
+    }
+    dependsOn e2e
+    dependsOn ciOperatorDevnet
+}
 
 // Existing 'make' task
 task make(type: Exec, dependsOn: [copySolidity, copyZetoSolidity]) {

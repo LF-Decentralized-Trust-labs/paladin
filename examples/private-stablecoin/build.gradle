@@ -30,6 +30,10 @@ dependencies {
     buildCommon project(path: ':examples:common', configuration: 'buildCommon')
 }
 
+ext {
+    namespace = project.hasProperty('namespace') ? project.namespace : 'default' // Default namespace is 'default'
+}
+
 task copyContracts(type: Copy, dependsOn: [":domains:zeto:extractZetoArtifacts"]) {
     from fileTree("../../domains/zeto/zkp/artifacts/contracts") {
         include '**/SampleERC20.json'
@@ -80,13 +84,21 @@ task start(type: Exec, dependsOn: [build]) {
     executable 'npm'
     args 'run'
     args 'start'
+
+    rootProject.helpers.dumpChartInfo(it, "start", namespace, namespace)
+    rootProject.helpers.lockResource(it, "examples-lock")
 }
 
 task e2e(type: Exec, dependsOn: [start]) {
-
     executable 'npm'
     args 'run'
     args 'verify'
+
+    rootProject.helpers.dumpChartInfo(it, "e2e", namespace, namespace)
+    rootProject.helpers.lockResource(it, "examples-lock")
+}
+
+task ci(dependsOn: [e2e]) {
 }
 
 task clean(type: Delete) {

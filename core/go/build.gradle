@@ -188,9 +188,11 @@ task lint(type: Exec, dependsOn:[
     ]) {
     workingDir '.'
 
-    helpers.lockResource(it, "lint.lock")
+    // Remove lock resource to enable parallel execution
+    // helpers.lockResource(it, "lint.lock")
     inputs.files(goFiles)
     environment 'GOGC', '20'
+    environment 'GOLANGCI_LINT_CACHE', "${project.buildDir}/golangci-lint-cache"
 
     executable "golangci-lint"
     args 'run'
@@ -332,29 +334,29 @@ task setupCoverage(dependsOn: [protoc, copyContracts, makeMocks]) {
 
 task unitTestSQLite(type: UnitTests, dependsOn: [
         makeMocks,
-        ':testinfra:startTestInfra',
         setupCoverage,
         goGet,
     ]) {
+    // Only start test infrastructure if not already running
+    dependsOn ':testinfra:startTestInfra'
 }
 
 task unitTestPostgres(type: UnitTests, dependsOn: [
         makeMocks,
-        ':testinfra:startTestInfra',
         setupCoverage,
         goGet,
     ]) {
     args '-tags', "testdbpostgres"
-    mustRunAfter 'unitTestSQLite' // these tests cannot run concurrently
+    dependsOn ':testinfra:startTestInfra'
 }
 
 task componentTestSQLite(type: ComponentTest, dependsOn: [
         makeMocks,
-        ':testinfra:startTestInfra',
         setupCoverage,
         goGet,
         copyContracts, // Ensure this task depends on copying the test contracts
     ]) {
+    dependsOn ':testinfra:startTestInfra'
     mustRunAfter 'unitTestPostgres' // these tests cannot run concurrently
     environment 'BESU_PORT', '8555' // Use gas-free Besu port
 

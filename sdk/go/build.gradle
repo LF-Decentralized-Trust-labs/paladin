@@ -57,9 +57,9 @@ task goGet(type:Exec) {
 task lint(type: Exec, dependsOn:[":installGolangCILint"]) {
     workingDir '.'
 
-    helpers.lockResource(it, "lint.lock")
     inputs.files(goFiles)
     environment 'GOGC', '20'
+    environment 'GOLANGCI_LINT_CACHE', "${project.buildDir}/golangci-lint-cache"
 
     executable "golangci-lint"
     args 'run'
@@ -67,6 +67,7 @@ task lint(type: Exec, dependsOn:[":installGolangCILint"]) {
     args '--color=always'
     args '--timeout', '5m'
     args '--tests=false'
+    args '--allow-parallel-runners'
 }
 
 task test(type: Exec, dependsOn: [goGet]) {

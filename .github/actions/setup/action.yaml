@@ -28,6 +28,12 @@ runs:
       cache-dependency-path: |
         **/*.sum
 
+  # Override gradle.properties
+  - name: Override gradle.properties
+    shell: bash
+    run: |
+      cp gradle.properties.ci gradle.properties
+ 
   # Set up Gradle
   - name: Setup Gradle
     uses: gradle/actions/setup-gradle@v4

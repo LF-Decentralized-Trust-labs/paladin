@@ -77,6 +77,9 @@ task protoc(type: ProtoCompile, dependsOn: [":installProtocGenGo", ":installProt
             }
         }
     }
+    
+    // Enable caching for protobuf compilation
+    outputs.cacheIf { true }
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
@@ -107,9 +110,9 @@ task goGet(type:Exec, dependsOn: protoc) {
 task lint(type: Exec, dependsOn:[protoc, ":installGolangCILint"]) {
     workingDir '.'
 
-    helpers.lockResource(it, "lint.lock")
     inputs.files(goFiles)
     environment 'GOGC', '20'
+    environment 'GOLANGCI_LINT_CACHE', "${project.buildDir}/golangci-lint-cache"
 
     executable "golangci-lint"
     args 'run'

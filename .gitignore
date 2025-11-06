@@ -65,3 +65,11 @@ bin/
 examples/data
 
 **.tar.gz
+
+# e2e dump files
+dump-*/
+
+# Node modules and package files (in the root dir) that are not needed for the build
+node_modules/
+package-lock.json
+package.json
