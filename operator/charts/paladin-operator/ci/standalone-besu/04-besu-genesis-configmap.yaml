@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: besu-standalone-testnet-genesis
+  labels:
+    app.kubernetes.io/name: standalone-besu
+    app.kubernetes.io/component: genesis
+    besu-genesis: standalone-testnet
+data:
+  genesis.json: |
+    {
+      "config": {
+        "chainId": 1337,
+        "homesteadBlock": 0,
+        "eip150Block": 0,
+        "eip155Block": 0,
+        "eip158Block": 0,
+        "byzantiumBlock": 0,
+        "constantinopleBlock": 0,
+        "petersburgBlock": 0,
+        "istanbulBlock": 0,
+        "berlinBlock": 0,
+        "londonBlock": 0,
+        "mergeForkBlock": 0,
+        "shanghaiTime": 0,
+        "clique": {
+          "period": 15,
+          "epoch": 30000
+        }
+      },
+      "nonce": "0x0",
+      "timestamp": "0x0",
+      "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000f723f4d257e8be1085bee0a7f8d6813bfb2ac38f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "gasLimit": "0x29b92700",
+      "difficulty": "0x1",
+      "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "coinbase": "0x0000000000000000000000000000000000000000",
+      "alloc": {
+        "0xf723f4d257e8be1085bee0a7f8d6813bfb2ac38f": {
+          "balance": "0x200000000000000000000000000000000000000000000000000000000000000"
+        }
+      }
+    }

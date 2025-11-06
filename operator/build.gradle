@@ -258,6 +258,46 @@ def waitForPaladinRunning(String namespace, Integer counter, String prefix) {
     }
 }
 
+def uninstallBesuNode() {
+    def command = [
+        "bash",
+        "charts/paladin-operator/ci/standalone-besu/cleanup-besu-e2e.sh"
+    ]
+    def process = command.execute(null, project.projectDir)
+    process.waitFor()
+    if (process.exitValue() != 0) {
+        throw new Exception("Failed to uninstall Besu node: ${process.err.text}")
+    }
+    println "Besu node uninstalled successfully."
+}
+
+def createBesuSecret(namespace) {
+    // create namespace and ignore error if it already exists
+    def command = [
+        "kubectl",
+        "create",
+        "namespace",
+        namespace
+    ]
+    def process = command.execute(null, project.projectDir)
+    process.waitFor()
+    
+    def command2 = [
+        "kubectl",
+        "apply",
+        "-f",
+        "charts/paladin-operator/ci/standalone-besu/11-besu-auth-secret.yaml",
+        "-n",
+        namespace
+    ]
+    def process2 = command2.execute(null, project.projectDir)
+    process2.waitFor()
+    if (process2.exitValue() != 0) {
+        throw new Exception("Failed to create Besu secret: ${process2.err.text}")
+    }
+    println "Besu secret created successfully in namespace ${namespace}."
+}
+
 task copySolidity(type: Copy) {
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
@@ -409,9 +449,16 @@ task installOperatorDefault(dependsOn: [installCrds, promoteKindImages, helmUnit
     }
 }
 
+task installBesuNode(type: Exec, dependsOn: [startKindCluster]) {
+    executable 'bash'
+    args '-c'
+    args 'charts/paladin-operator/ci/standalone-besu/deploy-besu-for-e2e.sh'
+}
+
 task installOperatorDevnet(dependsOn: [installCrds, promoteKindImages, prepareOperatorChart]) {
     doLast {
         def namespace = "ci-devnet"
+
         installOperator(namespace, 'charts/paladin-operator/ci/values-devnet.yaml')
         
         println 'Waiting for operator deployment to become ready...'
@@ -422,6 +469,33 @@ task installOperatorDevnet(dependsOn: [installCrds, promoteKindImages, prepareOp
         
         println 'Waiting for paladin statefulSets to become ready...'
         waitForPaladinRunning(namespace, 2, "worker")
+        
+        println 'Verifying all scd resources have status "Success"...'
+        waitForAllSuccess(namespace, "scd", 120)
+        
+        println 'Verifying all txn resources have status "Success"...'
+        waitForAllSuccess(namespace, "txn", 60)
+        
+        println 'Verifying all registries are published...'
+        waitForAllRegistriesPublished(namespace, 120)
+
+        printClusterStatus(namespace)
+    }
+}
+
+task installOperatorCustomnet(dependsOn: [installCrds, promoteKindImages, prepareOperatorChart, installBesuNode]) {
+    doLast {
+        def namespace = "ci-customnet"
+        
+        createBesuSecret(namespace)
+
+        installOperator(namespace, 'charts/paladin-operator/ci/values-customnet.yaml')
+
+        println 'Waiting for operator deployment to become ready...'
+        waitForOperatorRunning(namespace)
+        
+        println 'Waiting for paladin statefulSets to become ready...'
+        waitForPaladinRunning(namespace, 1, "bank")
         
         println 'Verifying all scd resources have status "Success"...'
         waitForAllSuccess(namespace, "scd", 120)
@@ -457,9 +531,25 @@ task ciOperatorDevnet(dependsOn: [installOperatorDevnet]) {
         uninstallOperator(namespace)
     }
 }
+
+task ciOperatorCustomnet(dependsOn: [installOperatorCustomnet]) {
+    def namespace = "ci-customnet"
+    
+    doLast {
+        println 'Uninstalling operator...'
+        uninstallOperator(namespace)
+        uninstallBesuNode()
+    }
+}
+ 
  
 // Task to clean up resources
 task cleanCluster(type: Exec) {
+    doFirst {
+        uninstallOperator('ci-customnet')
+        uninstallBesuNode()
+    }
+
     executable 'make'
     args 'clean'
     args "NAMESPACE=${namespace}"
@@ -469,12 +559,16 @@ task cleanCluster(type: Exec) {
 
 task clean {
     dependsOn cleanCluster
+
     delete 'test/e2e/abis'
     delete 'charts/paladin-operator/templates/samples'
+
+    def namespace = "ci-customnet"
+    
 }
 
 // The CI task runs the different CI permutations of the chart installation
-task ci(dependsOn: [ciOperatorDevnet]) {
+task ci(dependsOn: [ciOperatorDevnet, ciOperatorCustomnet]) {
     // This is a grouping task, so it doesn't need a body.
 }
 
