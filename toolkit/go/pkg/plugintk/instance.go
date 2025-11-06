@@ -17,6 +17,7 @@ package plugintk
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
@@ -168,7 +169,14 @@ func (pr *pluginRun[M]) serve() error {
 	for {
 		sMsg, err := pr.stream.Recv()
 		if err != nil {
-			log.L(pr.ctx).Errorf("received failed: %s", err)
+			// Should check if the err is io.EOF but `errors.Is(err, io.EOF)` returns false even where the
+			// err description is "error reading from server: EOF" so for now just exit on any error. If the
+			// error isn't as a result of Paladin shutting down the server will be relaunched by the plugin loader.
+			if strings.Contains(err.Error(), "EOF") {
+				log.L(pr.ctx).Warnf("recv failed, err %s. Assuming the server shut down the gRPC connection so closing plugin", err)
+				pr.closePlugin()
+				return nil
+			}
 			return err
 		}
 		msg := pr.pi.impl.Wrap(sMsg)
@@ -198,7 +206,14 @@ func (pr *pluginRun[M]) serve() error {
 			l.Warnf("UNEXPECTED %s", PluginMessageToJSON(msg))
 		}
 	}
+}
 
+func (pr *pluginRun[M]) closePlugin() {
+	// Call the handler
+	_, err := pr.handler.ClosePlugin(pr.ctx)
+	if err != nil {
+		log.L(pr.ctx).Errorf("Error closing plugin: %s", err)
+	}
 }
 
 func (pr *pluginRun[M]) handleRequestToPlugin(msg PluginMessage[M]) {

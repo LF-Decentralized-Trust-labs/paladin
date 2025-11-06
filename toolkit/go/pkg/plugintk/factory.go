@@ -64,7 +64,7 @@ func (pf *pluginFactory[M]) instanceStarted(inst *pluginInstance[M]) {
 }
 
 func (pf *pluginFactory[M]) instanceStopped(inst *pluginInstance[M]) {
-	log.L(context.Background()).Infof("%s plugin instance starting %s", pf.pluginType, inst.id)
+	log.L(context.Background()).Infof("%s plugin instance stopping %s", pf.pluginType, inst.id)
 	pf.mux.Lock()
 	defer pf.mux.Unlock()
 	delete(pf.instances, inst.id)

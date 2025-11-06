@@ -97,7 +97,7 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX per
 			if a.Error != "" {
 				log.L(ctx).Errorf("Sending nack to node '%s' for message %s: %s", a.node, a.id, a.Error)
 			}
-			_ = tm.queueFireAndForget(ctx, a.node, buildAck(a.id, a.Error))
+			_ = tm.queueFireAndForget(ctx, a.node, buildAck(a.id, a.Error), nil)
 		}
 	})
 

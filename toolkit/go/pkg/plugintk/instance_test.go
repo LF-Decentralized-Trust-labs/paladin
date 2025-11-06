@@ -233,3 +233,44 @@ func TestEmptyErrorFromServer(t *testing.T) {
 	_, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{})
 	assert.Regexp(t, "PD020303", err)
 }
+
+func TestClosePluginError(t *testing.T) {
+	_, tc, tcDone := newTestController(t)
+	defer tcDone()
+
+	funcs := &TransportAPIFunctions{
+		StopTransport: func(ctx context.Context, req *prototk.StopTransportRequest) (*prototk.StopTransportResponse, error) {
+			return nil, assert.AnError
+		},
+	}
+	waitForCallbacks := make(chan TransportCallbacks, 1)
+	transport := NewTransport(func(callbacks TransportCallbacks) TransportAPI {
+		waitForCallbacks <- callbacks
+		return &TransportAPIBase{funcs}
+	})
+	defer transport.Stop()
+
+	pluginID := uuid.NewString()
+	waitConnected := make(chan grpc.BidiStreamingServer[prototk.TransportMessage, prototk.TransportMessage])
+	tc.fakeTransportController = func(bss grpc.BidiStreamingServer[prototk.TransportMessage, prototk.TransportMessage]) error {
+		waitConnected <- bss
+		// Wait for register message, then close the stream to trigger EOF
+		_, err := bss.Recv()
+		if err != nil {
+			return err
+		}
+		// Return immediately to close the stream, which will trigger EOF on the client side
+		return nil
+	}
+
+	transportDone := make(chan struct{})
+	go func() {
+		defer close(transportDone)
+		transport.Run("unix:"+tc.socketFile, pluginID)
+	}()
+	<-waitForCallbacks
+	<-waitConnected
+
+	// Wait for the transport to finish (which should have called closePlugin with an error)
+	<-transportDone
+}

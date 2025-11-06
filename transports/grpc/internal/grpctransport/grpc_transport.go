@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
 	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
@@ -63,6 +64,8 @@ type grpcTransport struct {
 	conf                Config
 	connLock            sync.RWMutex
 	outboundConnections map[string]*outboundConn
+
+	gracefulShutdownTimeout time.Duration
 }
 
 func NewPlugin(ctx context.Context) plugintk.PluginBase {
@@ -144,6 +147,9 @@ func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.Con
 		},
 		baseTLSConfig: baseTLSConfig,
 	}
+
+	t.gracefulShutdownTimeout = confutil.DurationMin(t.conf.GracefulShutdownTimeout, 0, *ConfigDefaults.GracefulShutdownTimeout)
+
 	t.grpcServer = grpc.NewServer(grpc.Creds(t.peerVerifier))
 	proto.RegisterPaladinGRPCTransportServer(t.grpcServer, t)
 
@@ -330,4 +336,21 @@ func (t *grpcTransport) GetLocalDetails(ctx context.Context, req *prototk.GetLoc
 		TransportDetails: string(jsonDetails),
 	}, nil
 
+}
+
+func (t *grpcTransport) StopTransport(ctx context.Context, req *prototk.StopTransportRequest) (*prototk.StopTransportResponse, error) {
+	log.L(t.bgCtx).Infof("Stopping gRPC server for plugin %s", t.name)
+
+	gracefullyStopped := make(chan struct{})
+	go func() {
+		defer close(gracefullyStopped)
+		t.grpcServer.GracefulStop()
+	}()
+	select {
+	case <-gracefullyStopped:
+	case <-time.After(t.gracefulShutdownTimeout):
+		t.grpcServer.Stop()
+	}
+
+	return &prototk.StopTransportResponse{}, nil
 }
