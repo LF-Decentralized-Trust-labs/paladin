@@ -374,7 +374,7 @@ func (r *PaladinReconciler) generateStatefulSetTemplate(node *corev1alpha1.Palad
 						{
 							Name:            "paladin",
 							Image:           r.config.Paladin.Image, // Use the image from the config
-							ImagePullPolicy: corev1.PullNever,
+							ImagePullPolicy: r.config.Paladin.ImagePullPolicy,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "config",

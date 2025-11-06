@@ -70,7 +70,7 @@ spec:
       image:
         repository: ghcr.io/lf-decentralized-trust-labs/paladin
         tag: main
-        pullPolicy: PullNever
+        pullPolicy: Always
       # tollerations:
       # nodeSelector:
       # affinity:
