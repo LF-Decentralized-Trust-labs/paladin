@@ -21,8 +21,7 @@ ready to report a vulnerability, please jump to [Report Intakes](#report-intakes
 
 This document has the following sections:
 
-- [Paladin Security Policy](#project-an-lf-decentralized-trust-project-security-policy)
-  - [Instructions](#instructions)
+- [Paladin, an LF Decentralized Trust Project Security Policy](#paladin-an-lf-decentralized-trust-project-security-policy)
   - [About this document](#about-this-document)
   - [Outline](#outline)
   - [What Is a Vulnerability Disclosure Policy?](#what-is-a-vulnerability-disclosure-policy)
@@ -52,11 +51,10 @@ contributors have agreed to follow.
 
 The current Paladin security team is:
 
-| Name             | Email ID           | Discord ID | Area/Specialty  |
-| ---------------- | ------------------ | ---------- | --------------- |
-| Satoshi Nakamoto | satoshi@nsa.gov    |            | Everything      |
-| Hart Montgomery  | hart@donotmail.com |            | Else            |
-| <>               | <>                 | <>         | (if applicable) |
+| Name              | Email ID                     | Discord ID       | Area/Specialty |
+| ----------------- | ---------------------------- | ---------------- | -------------- |
+| Matthew Whitehead | matthew.whitehead@kaleido.io | matthewwhitehead | Paladin & Zeto |
+| TBC               | TBC                          | TBC              | TBC            |
 
 The security team for Paladin must include at least three project
 Maintainers that agree to carry out the following duties and responsibilities.
