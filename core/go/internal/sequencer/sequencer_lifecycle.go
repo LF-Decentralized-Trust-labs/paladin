@@ -105,7 +105,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 		//double check in case another goroutine has created the sequencer while we were waiting for the write lock
 		if sMgr.sequencers[contractAddr.String()] == nil {
 
-			log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("creating sequencer for contract address %s", contractAddr.String())
+			log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Debugf("creating sequencer for contract address %s", contractAddr.String())
 
 			// Are we handing this off to the sequencer now?
 			// Locally we store mappings of contract address to originator/coordinator pair
@@ -213,7 +213,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				sMgr.sequencers[contractAddr.String()].lastTXTime = time.Now()
 			}
 
-			log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("created  | %s", contractAddr.String())
+			log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Debugf("created  | %s", contractAddr.String())
 		}
 	} else {
 		// We already have a sequencer initialized but we might not have an initial coordinator selected
@@ -438,7 +438,7 @@ func (sMgr *sequencerManager) dispatch(ctx context.Context, t *coordTransaction.
 // Must be called within the sequencer's write lock
 func (sMgr *sequencerManager) stopLowestPrioritySequencer(ctx context.Context) {
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("max concurrent sequencers reached, finding lowest priority sequencer to stop")
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Debugf("max concurrent sequencers reached, finding lowest priority sequencer to stop")
 	if len(sMgr.sequencers) != 0 {
 		// If any sequencers are already closing we can wait for them to close instead of stopping a different one
 		for _, sequencer := range sMgr.sequencers {
@@ -449,13 +449,13 @@ func (sMgr *sequencerManager) stopLowestPrioritySequencer(ctx context.Context) {
 				// we don't wait for the closing ones to complete. The aim is to allow the node to remain stable while
 				// still being responsive to new contract activity so a closing sequencer is allowed to page out in its
 				// own time.
-				log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("coordinator %s is closing, waiting for it to close", sequencer.contractAddress)
+				log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Debugf("coordinator %s is closing, waiting for it to close", sequencer.contractAddress)
 				return
 			} else if sequencer.coordinator.GetCurrentState() == coordinator.State_Idle ||
 				sequencer.coordinator.GetCurrentState() == coordinator.State_Observing {
 				// This sequencer is already idle or observing so we can page it out immediately
 
-				log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("stopping coordinator %s", sequencer.contractAddress)
+				log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Debugf("stopping coordinator %s", sequencer.contractAddress)
 				sequencer.originator.Stop()
 				delete(sMgr.sequencers, sequencer.contractAddress)
 				return
@@ -472,7 +472,7 @@ func (sMgr *sequencerManager) stopLowestPrioritySequencer(ctx context.Context) {
 		})
 
 		// Stop the lowest priority sequencer by emitting an event and waiting for it to move to closed
-		log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("stopping coordinator %s", sequencers[0].contractAddress)
+		log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Debugf("stopping coordinator %s", sequencers[0].contractAddress)
 		sequencers[0].coordinator.Stop()
 		sequencers[0].originator.Stop()
 		delete(sMgr.sequencers, sequencers[0].contractAddress)
@@ -480,7 +480,7 @@ func (sMgr *sequencerManager) stopLowestPrioritySequencer(ctx context.Context) {
 }
 
 func (sMgr *sequencerManager) updateActiveCoordinators(ctx context.Context) {
-	log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("checking if max concurrent coordinators limit reached")
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Debugf("checking if max concurrent coordinators limit reached")
 
 	readlock := true
 	sMgr.sequencersLock.RLock()
@@ -493,7 +493,7 @@ func (sMgr *sequencerManager) updateActiveCoordinators(ctx context.Context) {
 	activeCoordinators := 0
 	// If any sequencers are already closing we can wait for them to close instead of stopping a different one
 	for _, sequencer := range sMgr.sequencers {
-		log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("coordinator %s state %s", sequencer.contractAddress, sequencer.coordinator.GetCurrentState())
+		log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_STATE)).Debugf("coordinator %s state %s", sequencer.contractAddress, sequencer.coordinator.GetCurrentState())
 		if sequencer.coordinator.GetCurrentState() == coordinator.State_Active {
 			activeCoordinators++
 		}
@@ -502,7 +502,7 @@ func (sMgr *sequencerManager) updateActiveCoordinators(ctx context.Context) {
 	sMgr.metrics.SetActiveCoordinators(activeCoordinators)
 
 	if activeCoordinators >= sMgr.targetActiveCoordinatorsLimit {
-		log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("%d coordinators currently active, max concurrent coordinators reached, asking the lowest priority coordinator to hand over to another node", activeCoordinators)
+		log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Debugf("%d coordinators currently active, max concurrent coordinators reached, asking the lowest priority coordinator to hand over to another node", activeCoordinators)
 		// Order existing sequencers by LRU time
 		sequencers := make([]*sequencer, 0)
 		for _, sequencer := range sMgr.sequencers {
@@ -513,10 +513,10 @@ func (sMgr *sequencerManager) updateActiveCoordinators(ctx context.Context) {
 		})
 
 		// Stop the lowest priority coordinator by emitting an event asking it to handover to another coordinator
-		log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("stopping coordinator %s", sequencers[0].contractAddress)
+		log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Debugf("stopping coordinator %s", sequencers[0].contractAddress)
 		sequencers[0].coordinator.Stop()
 		delete(sMgr.sequencers, sequencers[0].contractAddress)
 	} else {
-		log.L(log.WithComponent(ctx, common.SUBCOMP_LIFECYCLE)).Debugf("%d coordinators within max coordinator limit %d", activeCoordinators, sMgr.targetActiveCoordinatorsLimit)
+		log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Debugf("%d coordinators within max coordinator limit %d", activeCoordinators, sMgr.targetActiveCoordinatorsLimit)
 	}
 }

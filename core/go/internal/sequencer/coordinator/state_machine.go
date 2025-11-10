@@ -90,7 +90,6 @@ func init() {
 		State_Idle: {
 			OnTransitionTo: action_Idle,
 			Events: map[EventType]EventHandler{
-
 				Event_TransactionsDelegated: {
 					Transitions: []Transition{{
 						To: State_Active,
@@ -361,7 +360,7 @@ func (c *coordinator) evaluateTransitions(ctx context.Context, event common.Even
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, c) { //if there is no guard defined, or the guard returns true
-			log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("coord    | %s   | %T | %s -> %s", c.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_STATE)).Debugf("coord    | %s   | %T | %s -> %s", c.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]
 			//run any actions specific to the transition first
@@ -425,7 +424,7 @@ func (c *coordinator) heartbeatLoop(ctx context.Context) {
 	if c.heartbeatCtx == nil {
 		c.heartbeatCtx, c.heartbeatCancel = context.WithCancel(ctx)
 
-		log.L(log.WithComponent(ctx, common.SUBCOMP_STATE)).Debugf("coord   | %s | Starting heartbeat loop", c.contractAddress.String()[0:8])
+		log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_STATE)).Debugf("coord    | %s  | Starting heartbeat loop", c.contractAddress.String()[0:8])
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 		for {

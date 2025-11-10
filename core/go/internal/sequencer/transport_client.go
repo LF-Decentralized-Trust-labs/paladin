@@ -81,7 +81,7 @@ func (sMgr *sequencerManager) HandlePaladinMsg(ctx context.Context, message *com
 }
 
 func (sMgr *sequencerManager) logPaladinMessage(ctx context.Context, message *components.ReceivedMessage) {
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGRX)).Debugf("%+v received from %s", message.MessageType, message.FromNode)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGRX)).Debugf("%+v received from %s", message.MessageType, message.FromNode)
 }
 
 func (sMgr *sequencerManager) logPaladinMessageUnmarshalError(ctx context.Context, message *components.ReceivedMessage, err error) {

@@ -98,9 +98,9 @@ func (tw *transportWriter) SendDelegationRequest(
 			node = parts[1]
 		}
 
-		log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Debugf("delegate | %s   | %s | %s", transaction.Address.String()[0:8], transaction.ID.String()[0:8], node)
+		log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Debugf("delegate | %s   | %s | %s", transaction.Address.String()[0:8], transaction.ID.String()[0:8], node)
 		if err = tw.send(ctx, &components.FireAndForgetMessageSend{
-			MessageType: "DelegationRequest",
+			MessageType: MessageType_DelegationRequest,
 			Payload:     delegationRequestBytes,
 			Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 			Node:        node,
@@ -133,7 +133,7 @@ func (tw *transportWriter) SendDelegationRequestAcknowledgment(
 	}
 
 	if err = tw.send(ctx, &components.FireAndForgetMessageSend{
-		MessageType: "DelegationRequestAcknowledgment",
+		MessageType: MessageType_DelegationRequestAcknowledgment,
 		Payload:     delegationRequestAcknowledgmentBytes,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Node:        delegatingNodeName,
@@ -249,7 +249,7 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, txID uuid
 	}
 
 	err = tw.send(ctx, &components.FireAndForgetMessageSend{
-		MessageType: "EndorsementRequest",
+		MessageType: MessageType_EndorsementRequest,
 		Node:        partyNode,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Payload:     endorsementRequestBytes,
@@ -296,7 +296,7 @@ func (tw *transportWriter) SendEndorsementResponse(ctx context.Context, transact
 
 func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNode string, txID uuid.UUID, idempotencyId uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error {
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send assemble request to assembling node %s", assemblingNode)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Tracef("transport writer attempting to send assemble request to assembling node %s", assemblingNode)
 
 	preAssemblyBytes, err := json.Marshal(preAssembly)
 	if err != nil {
@@ -320,7 +320,7 @@ func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNo
 	}
 
 	payload := &components.FireAndForgetMessageSend{
-		MessageType: "AssembleRequest",
+		MessageType: MessageType_AssembleRequest,
 		Node:        assemblingNode,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Payload:     assembleRequestBytes,
@@ -333,7 +333,7 @@ func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNo
 
 func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.UUID, assembleRequestId uuid.UUID, postAssembly *components.TransactionPostAssembly, preAssembly *components.TransactionPreAssembly, recipient string) error {
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send assemble response to node %s", recipient)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Tracef("transport writer attempting to send assemble response to node %s", recipient)
 
 	postAssemblyBytes, err := json.Marshal(postAssembly)
 	if err != nil {
@@ -358,7 +358,7 @@ func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.U
 	}
 
 	err = tw.send(ctx, &components.FireAndForgetMessageSend{
-		MessageType: "AssembleResponse",
+		MessageType: MessageType_AssembleResponse,
 		Node:        recipient,
 		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		Payload:     assembleResponseBytes,
@@ -373,7 +373,7 @@ func (tw *transportWriter) SendAssembleResponse(ctx context.Context, txID uuid.U
 
 func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordinator string, contractAddress *pldtypes.EthAddress) error {
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send handover request to node %s", activeCoordinator)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Tracef("transport writer attempting to send handover request to node %s", activeCoordinator)
 
 	if contractAddress == nil {
 		err := fmt.Errorf("attempt to send handover request without specifying contract address")
@@ -401,7 +401,7 @@ func (tw *transportWriter) SendHandoverRequest(ctx context.Context, activeCoordi
 
 func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce uint64) error {
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send nonce assigned message to node %s", originatorNode)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Tracef("transport writer attempting to send nonce assigned message to node %s", originatorNode)
 
 	if contractAddress == nil {
 		err := fmt.Errorf("attempt to send nonce assigned event request without specifying contract address")
@@ -432,7 +432,7 @@ func (tw *transportWriter) SendNonceAssigned(ctx context.Context, txID uuid.UUID
 
 func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, txHash *pldtypes.Bytes32) error {
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send transaction submitted message to node %s", originatorNode)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Tracef("transport writer attempting to send transaction submitted message to node %s", originatorNode)
 
 	if contractAddress == nil {
 		err := fmt.Errorf("attempt to send TX submitted event without specifying contract address")
@@ -463,7 +463,7 @@ func (tw *transportWriter) SendTransactionSubmitted(ctx context.Context, txID uu
 
 func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uuid.UUID, originatorNode string, contractAddress *pldtypes.EthAddress, nonce *pldtypes.HexUint64, revertReason pldtypes.HexBytes) error {
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send transaction confirmed message to node %s", originatorNode)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Tracef("transport writer attempting to send transaction confirmed message to node %s", originatorNode)
 
 	if contractAddress == nil {
 		err := fmt.Errorf("attempt to send TX submitted event without specifying contract address")
@@ -498,7 +498,7 @@ func (tw *transportWriter) SendTransactionConfirmed(ctx context.Context, txID uu
 
 func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string, contractAddress *pldtypes.EthAddress, coordinatorSnapshot *common.CoordinatorSnapshot) error {
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send haertbeat to node %s", targetNode)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Tracef("transport writer attempting to send haertbeat to node %s", targetNode)
 
 	coordinatorSnapshotBytes, err := json.Marshal(coordinatorSnapshot)
 	if err != nil {
@@ -530,7 +530,7 @@ func (tw *transportWriter) SendHeartbeat(ctx context.Context, targetNode string,
 
 func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, originatorNode string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification, hash *pldtypes.Bytes32) error {
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send pre-dispatch request to node %s", originatorNode)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Tracef("transport writer attempting to send pre-dispatch request to node %s", originatorNode)
 
 	// MRW TODO There should be a different proto message type instead of TransactionDispatched
 	dispatchConfirmationRequest := &engineProto.TransactionDispatched{
@@ -558,7 +558,7 @@ func (tw *transportWriter) SendPreDispatchRequest(ctx context.Context, originato
 
 func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send pre-dispatch response to node %s", transactionOriginator)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Tracef("transport writer attempting to send pre-dispatch response to node %s", transactionOriginator)
 
 	dispatchResponseEvent := &engineProto.TransactionDispatched{
 		Id:              idempotencyKey.String(),
@@ -592,7 +592,7 @@ func (tw *transportWriter) SendPreDispatchResponse(ctx context.Context, transact
 
 func (tw *transportWriter) SendDispatched(ctx context.Context, transactionOriginator string, idempotencyKey uuid.UUID, transactionSpecification *prototk.TransactionSpecification) error {
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Tracef("transport writer attempting to send dispatched message to node %s", transactionOriginator)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Tracef("transport writer attempting to send dispatched message to node %s", transactionOriginator)
 
 	dispatchedEvent := &engineProto.TransactionDispatched{
 		Id:              idempotencyKey.String(),
@@ -630,7 +630,7 @@ func (tw *transportWriter) send(ctx context.Context, payload *components.FireAnd
 		return err
 	}
 
-	log.L(log.WithComponent(ctx, common.SUBCOMP_MSGTX)).Debugf("%+v sent to %s", payload.MessageType, payload.Node)
+	log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_MSGTX)).Debugf("%+v sent to %s", payload.MessageType, payload.Node)
 	if payload.Node == "" || payload.Node == tw.transportManager.LocalNodeName() {
 		// "Localhost" loopback
 		log.L(ctx).Debugf("sending %s to loopback interface", payload.MessageType)

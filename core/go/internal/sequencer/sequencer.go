@@ -66,7 +66,7 @@ type sequencerManager struct {
 
 // Init implements Engine.
 func (sMgr *sequencerManager) PreInit(c components.PreInitComponents) (*components.ManagerInitResult, error) {
-	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_LIFECYCLE)).Infof("PreInit distributed sequencer manager")
+	log.L(log.WithLogField(sMgr.ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Infof("PreInit distributed sequencer manager")
 	sMgr.metrics = metrics.InitMetrics(sMgr.ctx, c.MetricsManager().Registry())
 
 	return &components.ManagerInitResult{
@@ -81,7 +81,7 @@ func (sMgr *sequencerManager) PreInit(c components.PreInitComponents) (*componen
 }
 
 func (sMgr *sequencerManager) PostInit(c components.AllComponents) error {
-	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_LIFECYCLE)).Infof("PostInit distributed sequencer manager")
+	log.L(log.WithLogField(sMgr.ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Infof("PostInit distributed sequencer manager")
 	sMgr.components = c
 	sMgr.nodeName = sMgr.components.TransportManager().LocalNodeName()
 	sMgr.syncPoints = syncpoints.NewSyncPoints(sMgr.ctx, &sMgr.config.Writer, c.Persistence(), c.TxManager(), c.PublicTxManager(), c.TransportManager())
@@ -89,7 +89,7 @@ func (sMgr *sequencerManager) PostInit(c components.AllComponents) error {
 }
 
 func (sMgr *sequencerManager) Start() error {
-	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_LIFECYCLE)).Infof("Starting distributed sequencer manager")
+	log.L(log.WithLogField(sMgr.ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Infof("Starting distributed sequencer manager")
 
 	sMgr.syncPoints.Start()
 
@@ -99,7 +99,7 @@ func (sMgr *sequencerManager) Start() error {
 }
 
 func (sMgr *sequencerManager) Stop() {
-	log.L(log.WithComponent(sMgr.ctx, common.SUBCOMP_LIFECYCLE)).Infof("Stopping distributed sequencer manager")
+	log.L(log.WithLogField(sMgr.ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_LIFECYCLE)).Infof("Stopping distributed sequencer manager")
 	sMgr.cancelCtx()
 }
 

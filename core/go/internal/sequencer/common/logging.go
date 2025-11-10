@@ -15,14 +15,11 @@
 
 package common
 
-import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-)
+const SEQUENCER_LOG_CATEGORY_FIELD = "category"
 
 const (
-	SUBCOMP_STATE     log.Component = "state"
-	SUBCOMP_LIFECYCLE log.Component = "life"
-	SUBCOMP_MSGTX     log.Component = "msgtx"
-	SUBCOMP_MSGRX     log.Component = "msgrx"
-	SUBCOMP_COORD     log.Component = "coord"
+	CATEGORY_STATE     string = "state"
+	CATEGORY_LIFECYCLE string = "life"
+	CATEGORY_MSGTX     string = "msgtx"
+	CATEGORY_MSGRX     string = "msgrx"
 )
