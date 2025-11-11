@@ -598,7 +598,7 @@ func TestRPCAuthManager_BridgeWrapper_Authenticate_Failure(t *testing.T) {
 	result, err := authorizer.Authenticate(context.Background(), map[string]string{})
 	assert.Error(t, err)
 	assert.Empty(t, result)
-	assert.Contains(t, err.Error(), "invalid credentials")
+	assert.Contains(t, err.Error(), "authentication failed")
 }
 
 func TestRPCAuthManager_BridgeWrapper_Authenticate_Failure_NoMessage(t *testing.T) {
