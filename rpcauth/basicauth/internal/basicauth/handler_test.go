@@ -98,6 +98,19 @@ func TestBasicAuthHandler_Configure_MissingFile(t *testing.T) {
 	assert.Nil(t, handler.store)
 }
 
+func TestBasicAuthHandler_Configure_EmptyConfig(t *testing.T) {
+	handler := &BasicAuthHandler{}
+	ctx := context.Background()
+
+	req := &prototk.ConfigureRPCAuthorizerRequest{
+		ConfigJson: "", // Empty config
+	}
+
+	_, err := handler.ConfigureRPCAuthorizer(ctx, req)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "config is required")
+}
+
 func TestBasicAuthHandler_Configure_InvalidJSON(t *testing.T) {
 	handler := &BasicAuthHandler{}
 	ctx := context.Background()
@@ -127,7 +140,6 @@ func TestBasicAuthHandler_Authenticate_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, resp.Authenticated)
 	assert.NotNil(t, resp.ResultJson)
-	assert.Nil(t, resp.ErrorMessage)
 }
 
 func TestBasicAuthHandler_Authenticate_WrongPassword(t *testing.T) {
@@ -145,7 +157,6 @@ func TestBasicAuthHandler_Authenticate_WrongPassword(t *testing.T) {
 	resp, err := handler.Authenticate(context.Background(), req)
 	require.NoError(t, err)
 	assert.False(t, resp.Authenticated)
-	assert.NotNil(t, resp.ErrorMessage)
 }
 
 func TestBasicAuthHandler_Authenticate_NoHeader(t *testing.T) {
@@ -211,8 +222,6 @@ func TestBasicAuthHandler_Authenticate_NotConfigured(t *testing.T) {
 	resp, err := handler.Authenticate(context.Background(), req)
 	require.NoError(t, err)
 	assert.False(t, resp.Authenticated)
-	assert.NotNil(t, resp.ErrorMessage)
-	assert.Contains(t, *resp.ErrorMessage, "not configured")
 }
 
 func TestBasicAuthHandler_Authenticate_InvalidHeadersJSON(t *testing.T) {
@@ -254,7 +263,6 @@ func TestBasicAuthHandler_Authorize_Success(t *testing.T) {
 	resp, err := handler.Authorize(context.Background(), req)
 	require.NoError(t, err)
 	assert.True(t, resp.Authorized)
-	assert.Nil(t, resp.ErrorMessage)
 }
 
 func TestBasicAuthHandler_Authorize_InvalidResult(t *testing.T) {
@@ -269,7 +277,6 @@ func TestBasicAuthHandler_Authorize_InvalidResult(t *testing.T) {
 	resp, err := handler.Authorize(context.Background(), req)
 	require.NoError(t, err)
 	assert.False(t, resp.Authorized)
-	assert.NotNil(t, resp.ErrorMessage)
 }
 
 func TestBasicAuthHandler_Authorize_NotConfigured(t *testing.T) {
@@ -284,6 +291,34 @@ func TestBasicAuthHandler_Authorize_NotConfigured(t *testing.T) {
 	resp, err := handler.Authorize(context.Background(), req)
 	require.NoError(t, err)
 	assert.False(t, resp.Authorized)
-	assert.NotNil(t, resp.ErrorMessage)
-	assert.Contains(t, *resp.ErrorMessage, "not configured")
+}
+
+func TestBasicAuthHandler_Authorize_MissingUsername(t *testing.T) {
+	handler := setupHandlerWithCredentials(t)
+
+	// Authentication result without "username" key
+	req := &prototk.AuthorizeRequest{
+		ResultJson:  `{"user":"test"}`, // Wrong key name
+		Method:      "account_sendTransaction",
+		PayloadJson: `{}`,
+	}
+
+	resp, err := handler.Authorize(context.Background(), req)
+	require.NoError(t, err)
+	assert.False(t, resp.Authorized)
+}
+
+func TestBasicAuthHandler_Authorize_EmptyUsername(t *testing.T) {
+	handler := setupHandlerWithCredentials(t)
+
+	// Authentication result with empty username
+	req := &prototk.AuthorizeRequest{
+		ResultJson:  `{"username":""}`, // Empty username
+		Method:      "account_sendTransaction",
+		PayloadJson: `{}`,
+	}
+
+	resp, err := handler.Authorize(context.Background(), req)
+	require.NoError(t, err)
+	assert.False(t, resp.Authorized)
 }

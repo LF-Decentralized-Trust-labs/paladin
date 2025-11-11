@@ -35,7 +35,6 @@ message AuthenticateRequest {
 message AuthenticateResponse {
   bool authenticated = 1;
   optional string result_json = 2;  // Opaque authentication result string (plugin-specific format, only if authenticated=true)
-  optional string error_message = 3;  // Error message if authenticated=false
 }
 
 // Authorize an RPC request
@@ -47,6 +46,5 @@ message AuthorizeRequest {
 
 message AuthorizeResponse {
   bool authorized = 1;
-  optional string error_message = 2; // Error message if unauthorized
 }
 

@@ -27,11 +27,17 @@ import (
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/rpcclient"
 )
 
-func extractHeadersFromContext(ctx context.Context) map[string]string {
-	if headers, ok := ctx.Value(httpHeadersKey).(map[string]string); ok {
-		return headers
+// getAuthenticationResults retrieves authentication results from either HTTP context or WebSocket connection
+func getAuthenticationResults(ctx context.Context, wsc *webSocketConnection) []string {
+	if wsc == nil {
+		// HTTP request: get from context
+		if results, ok := ctx.Value(authResultKey).([]string); ok {
+			return results
+		}
+		return nil
 	}
-	return make(map[string]string)
+	// WebSocket request: get from connection (which was populated from context during upgrade)
+	return wsc.getAuthenticationResults()
 }
 
 func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcclient.RPCRequest, wsc *webSocketConnection) (*rpcclient.RPCResponse, bool) {
@@ -45,39 +51,17 @@ func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcclient.RPCRequest
 
 	// Check authorizers if configured
 	if len(s.authorizers) > 0 {
-		var authenticationResults []string
-
-		if wsc == nil {
-			// HTTP request: authenticate and authorize in sequence through chain
-			headers := extractHeadersFromContext(ctx)
-			authenticationResults = make([]string, len(s.authorizers))
-
-			// Authenticate through chain - stop on first failure
-			for i, auth := range s.authorizers {
-				authenticationResult, err := auth.Authenticate(ctx, headers)
-				if err != nil {
-					log.L(ctx).Errorf("Authentication failed at authorizer %d: %s", i, err)
-					return rpcclient.NewRPCErrorResponse(
-						i18n.NewError(ctx, pldmsgs.MsgJSONRPCUnauthorized, err.Error()),
-						rpcReq.ID,
-						rpcclient.RPCCodeUnauthorized,
-					), false
-				}
-				authenticationResults[i] = authenticationResult
-			}
-		} else {
-			// WebSocket request: use stored authentication results
-			authenticationResults = wsc.getAuthenticationResults()
-			if len(authenticationResults) == 0 {
-				// This shouldn't happen if auth is required and upgrade succeeded
-				// But handle gracefully
-				log.L(ctx).Errorf("WebSocket request without stored authentication results")
-				return rpcclient.NewRPCErrorResponse(
-					i18n.NewError(ctx, pldmsgs.MsgJSONRPCUnauthorized, "no authentication results"),
-					rpcReq.ID,
-					rpcclient.RPCCodeUnauthorized,
-				), false
-			}
+		// Get authentication results (from context for HTTP, from connection for WebSocket)
+		authenticationResults := getAuthenticationResults(ctx, wsc)
+		if len(authenticationResults) == 0 {
+			// This shouldn't happen if auth is required and authentication succeeded
+			// But handle gracefully
+			log.L(ctx).Errorf("Request without stored authentication results")
+			return rpcclient.NewRPCErrorResponse(
+				i18n.NewError(ctx, pldmsgs.MsgJSONRPCUnauthorized),
+				rpcReq.ID,
+				rpcclient.RPCCodeUnauthorized,
+			), false
 		}
 
 		// Authorize through chain - stop on first failure
@@ -86,23 +70,17 @@ func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcclient.RPCRequest
 			if i >= len(authenticationResults) {
 				log.L(ctx).Errorf("Mismatch: authorizer index %d exceeds authentication results count %d", i, len(authenticationResults))
 				return rpcclient.NewRPCErrorResponse(
-					i18n.NewError(ctx, pldmsgs.MsgJSONRPCUnauthorized, "authentication result mismatch"),
+					i18n.NewError(ctx, pldmsgs.MsgJSONRPCUnauthorized),
 					rpcReq.ID,
 					rpcclient.RPCCodeUnauthorized,
 				), false
 			}
 
-			authResult, err := auth.Authorize(ctx, authenticationResults[i], rpcReq.Method, payload)
-			if err != nil {
-				log.L(ctx).Errorf("Authorizer error at authorizer %d: %s", i, err)
-				return rpcclient.NewRPCErrorResponse(err, rpcReq.ID, rpcclient.RPCCodeUnauthorized), false
-			}
-
-			if !authResult.Authorized {
-				errMsg := authResult.ErrorMessage
-				log.L(ctx).Errorf("Unauthorized request to %s at authorizer %d: %s", rpcReq.Method, i, errMsg)
+			authorized := auth.Authorize(ctx, authenticationResults[i], rpcReq.Method, payload)
+			if !authorized {
+				log.L(ctx).Errorf("Unauthorized request to %s at authorizer %d", rpcReq.Method, i)
 				return rpcclient.NewRPCErrorResponse(
-					i18n.NewError(ctx, pldmsgs.MsgJSONRPCUnauthorized, errMsg),
+					i18n.NewError(ctx, pldmsgs.MsgJSONRPCUnauthorized),
 					rpcReq.ID,
 					rpcclient.RPCCodeUnauthorized,
 				), false

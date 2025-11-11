@@ -451,8 +451,22 @@ func (cm *componentManager) CompleteStart() error {
 	if err == nil {
 		cm.registerRPCModules()
 
+		// Validate that all configured RPC authorizers are included in the authorizers array
+		if len(cm.conf.RPCAuthorizers) > 0 {
+			authorizersMap := make(map[string]bool, len(cm.conf.RPCServer.Authorizers))
+			for _, authName := range cm.conf.RPCServer.Authorizers {
+				authorizersMap[authName] = true
+			}
+			for authName := range cm.conf.RPCAuthorizers {
+				if !authorizersMap[authName] {
+					err = i18n.NewError(cm.bgCtx, msgs.MsgRPCAuthorizerMissing, authName)
+					break
+				}
+			}
+		}
+
 		// Set RPC authorizers if configured
-		if len(cm.conf.RPCServer.Authorizers) > 0 {
+		if err == nil && len(cm.conf.RPCServer.Authorizers) > 0 {
 			// Only set authorizers if explicitly configured in RPCServer config
 			auths := make([]rpcserver.Authorizer, 0, len(cm.conf.RPCServer.Authorizers))
 			for _, authPluginName := range cm.conf.RPCServer.Authorizers {

@@ -448,23 +448,18 @@ func TestRPCAuthManager_BridgeWrapper_Authorize_Success(t *testing.T) {
 	assert.NotEmpty(t, authenticationResult)
 
 	// Test authorization with authentication result
-	result, err := authorizer.Authorize(context.Background(), authenticationResult, "test_method", []byte("test"))
-	require.NoError(t, err)
-	assert.True(t, result.Authorized)
-	assert.Empty(t, result.ErrorMessage)
+	authorized := authorizer.Authorize(context.Background(), authenticationResult, "test_method", []byte("test"))
+	assert.True(t, authorized)
 }
 
 func TestRPCAuthManager_BridgeWrapper_Authorize_Failure(t *testing.T) {
 	manager := NewRPCAuthManager(context.Background(), nil)
 
-	// Create bridge that returns failure with custom error
-	errorMsg := "access denied"
-
+	// Create bridge that returns failure
 	mockBridge := &mockRPCAuthBridge{
 		authorizeFunc: func(ctx context.Context, req *prototk.AuthorizeRequest) (*prototk.AuthorizeResponse, error) {
 			return &prototk.AuthorizeResponse{
-				Authorized:   false,
-				ErrorMessage: &errorMsg,
+				Authorized: false,
 			}, nil
 		},
 	}
@@ -481,23 +476,18 @@ func TestRPCAuthManager_BridgeWrapper_Authorize_Failure(t *testing.T) {
 	assert.NotEmpty(t, authenticationResult)
 
 	// Test authorization with authentication result
-	result, err := authorizer.Authorize(context.Background(), authenticationResult, "test_method", []byte("test"))
-	require.NoError(t, err)
-	assert.False(t, result.Authorized)
-	assert.Equal(t, "access denied", result.ErrorMessage)
+	authorized := authorizer.Authorize(context.Background(), authenticationResult, "test_method", []byte("test"))
+	assert.False(t, authorized)
 }
 
 func TestRPCAuthManager_BridgeWrapper_Authorize_Failure_Default(t *testing.T) {
 	manager := NewRPCAuthManager(context.Background(), nil)
 
-	// Create bridge that returns failure with error message
-	errorMsg := "invalid credentials"
-
+	// Create bridge that returns failure
 	mockBridge := &mockRPCAuthBridge{
 		authorizeFunc: func(ctx context.Context, req *prototk.AuthorizeRequest) (*prototk.AuthorizeResponse, error) {
 			return &prototk.AuthorizeResponse{
-				Authorized:   false,
-				ErrorMessage: &errorMsg,
+				Authorized: false,
 			}, nil
 		},
 	}
@@ -514,10 +504,8 @@ func TestRPCAuthManager_BridgeWrapper_Authorize_Failure_Default(t *testing.T) {
 	assert.NotEmpty(t, authenticationResult)
 
 	// Test authorization with authentication result
-	result, err := authorizer.Authorize(context.Background(), authenticationResult, "test_method", []byte("test"))
-	require.NoError(t, err)
-	assert.False(t, result.Authorized)
-	assert.Equal(t, "invalid credentials", result.ErrorMessage)
+	authorized := authorizer.Authorize(context.Background(), authenticationResult, "test_method", []byte("test"))
+	assert.False(t, authorized)
 }
 
 func TestRPCAuthManager_BridgeWrapper_Authorize_Failure_NoMessage(t *testing.T) {
@@ -544,10 +532,8 @@ func TestRPCAuthManager_BridgeWrapper_Authorize_Failure_NoMessage(t *testing.T) 
 	assert.NotEmpty(t, authenticationResult)
 
 	// Test authorization with authentication result
-	result, err := authorizer.Authorize(context.Background(), authenticationResult, "test_method", []byte("test"))
-	require.NoError(t, err)
-	assert.False(t, result.Authorized)
-	assert.Equal(t, "authorization failed", result.ErrorMessage) // Default message
+	authorized := authorizer.Authorize(context.Background(), authenticationResult, "test_method", []byte("test"))
+	assert.False(t, authorized)
 }
 
 // TestRPCAuthManager_PreInit_MockComponents tests the PreInit with mock components
@@ -585,23 +571,19 @@ func TestRPCAuthManager_BridgeWrapper_Authorize_Error(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, authenticationResult)
 
-	// Test that error from Authorize is returned
-	result, err := authorizer.Authorize(context.Background(), authenticationResult, "test_method", []byte("test"))
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "authorization error")
+	// Test that error from plugin Authorize results in false
+	authorized := authorizer.Authorize(context.Background(), authenticationResult, "test_method", []byte("test"))
+	assert.False(t, authorized)
 }
 
 func TestRPCAuthManager_BridgeWrapper_Authenticate_Failure(t *testing.T) {
 	manager := NewRPCAuthManager(context.Background(), nil)
 
 	// Create bridge that returns authenticated=false
-	errorMsg := "invalid credentials"
 	mockBridge := &mockRPCAuthBridge{
 		authenticateFunc: func(ctx context.Context, req *prototk.AuthenticateRequest) (*prototk.AuthenticateResponse, error) {
 			return &prototk.AuthenticateResponse{
 				Authenticated: false,
-				ErrorMessage:  &errorMsg,
 			}, nil
 		},
 	}

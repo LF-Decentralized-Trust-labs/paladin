@@ -82,6 +82,7 @@ var (
 	MsgComponentRPCAuthManagerInitError    = pde("PD010039", "Error initializing RPC auth manager")
 	MsgComponentRPCAuthManagerStartError   = pde("PD010040", "Error starting RPC auth manager")
 	MsgRPCAuthorizerNotFound               = pde("PD010041", "RPC authorizer '%s' not found")
+	MsgRPCAuthorizerMissing                = pde("PD010042", "RPC authorizer '%s' is configured but not included in rpcServer.authorizers")
 
 	// States PD0101XX
 	MsgStateInvalidLength             = pde("PD010101", "Invalid hash len expected=%d actual=%d")

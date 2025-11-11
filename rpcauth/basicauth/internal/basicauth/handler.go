@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 )
@@ -55,27 +56,27 @@ func (h *BasicAuthHandler) ConfigureRPCAuthorizer(ctx context.Context, req *prot
 // Authenticate validates credentials and returns authentication result information
 func (h *BasicAuthHandler) Authenticate(ctx context.Context, req *prototk.AuthenticateRequest) (*prototk.AuthenticateResponse, error) {
 	if h.store == nil {
+		log.L(ctx).Warnf("Authentication failed: plugin not configured")
 		return &prototk.AuthenticateResponse{
 			Authenticated: false,
-			ErrorMessage:  stringPtr("plugin not configured"),
 		}, nil
 	}
 
 	// Parse headers JSON
 	var headers map[string]string
 	if err := json.Unmarshal([]byte(req.HeadersJson), &headers); err != nil {
+		log.L(ctx).Warnf("Authentication failed: invalid headers JSON: %v", err)
 		return &prototk.AuthenticateResponse{
 			Authenticated: false,
-			ErrorMessage:  stringPtr("invalid headers"),
 		}, nil
 	}
 
 	// Check authentication
 	username := CheckHeaderAuthentication(headers, h.store)
 	if username == "" {
+		log.L(ctx).Warnf("Authentication failed: invalid credentials")
 		return &prototk.AuthenticateResponse{
 			Authenticated: false,
-			ErrorMessage:  stringPtr("authentication failed"),
 		}, nil
 	}
 
@@ -93,9 +94,9 @@ func (h *BasicAuthHandler) Authenticate(ctx context.Context, req *prototk.Authen
 // Authorize uses authentication result information to determine if an operation is permitted
 func (h *BasicAuthHandler) Authorize(ctx context.Context, req *prototk.AuthorizeRequest) (*prototk.AuthorizeResponse, error) {
 	if h.store == nil {
+		log.L(ctx).Warnf("Authorization failed: plugin not configured")
 		return &prototk.AuthorizeResponse{
-			Authorized:   false,
-			ErrorMessage: stringPtr("authorization plugin not configured"),
+			Authorized: false,
 		}, nil
 	}
 
@@ -103,18 +104,18 @@ func (h *BasicAuthHandler) Authorize(ctx context.Context, req *prototk.Authorize
 	// The plugin receives the same string it returned from Authenticate
 	var authenticationResult map[string]string
 	if err := json.Unmarshal([]byte(req.ResultJson), &authenticationResult); err != nil {
+		log.L(ctx).Warnf("Authorization failed: failed to parse authentication result: %v", err)
 		return &prototk.AuthorizeResponse{
-			Authorized:   false,
-			ErrorMessage: stringPtr("failed to parse authentication result"),
+			Authorized: false,
 		}, nil
 	}
 
 	// Verify authentication result has username (basic validation)
 	username, ok := authenticationResult["username"]
 	if !ok || username == "" {
+		log.L(ctx).Warnf("Authorization failed: authentication result missing username")
 		return &prototk.AuthorizeResponse{
-			Authorized:   false,
-			ErrorMessage: stringPtr("authentication result missing username"),
+			Authorized: false,
 		}, nil
 	}
 

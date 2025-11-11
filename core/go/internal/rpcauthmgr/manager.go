@@ -117,12 +117,7 @@ func (bw *bridgeWrapper) Authenticate(ctx context.Context, headers map[string]st
 		return "", err
 	}
 	if !res.Authenticated {
-		// Return appropriate error with error message
-		errMsg := "authentication failed"
-		if res.ErrorMessage != nil {
-			errMsg = *res.ErrorMessage
-		}
-		return "", errors.New(errMsg)
+		return "", errors.New("authentication failed")
 	}
 	if res.ResultJson == nil {
 		return "", errors.New("plugin returned authenticated=true but no result")
@@ -131,7 +126,7 @@ func (bw *bridgeWrapper) Authenticate(ctx context.Context, headers map[string]st
 	return *res.ResultJson, nil
 }
 
-func (bw *bridgeWrapper) Authorize(ctx context.Context, result string, method string, payload []byte) (*rpcserver.AuthResult, error) {
+func (bw *bridgeWrapper) Authorize(ctx context.Context, result string, method string, payload []byte) bool {
 	// result is an opaque authentication result string passed directly to plugin (format is plugin-specific)
 	req := &prototk.AuthorizeRequest{
 		ResultJson:  result, // Opaque string (plugin determines format)
@@ -140,19 +135,10 @@ func (bw *bridgeWrapper) Authorize(ctx context.Context, result string, method st
 	}
 	res, err := bw.toAuthorizer.Authorize(ctx, req)
 	if err != nil {
-		return nil, err
+		log.L(ctx).Errorf("Authorization error from plugin: %s", err)
+		return false
 	}
-	authResult := &rpcserver.AuthResult{
-		Authorized: res.Authorized,
-	}
-	if !res.Authorized {
-		if res.ErrorMessage != nil {
-			authResult.ErrorMessage = *res.ErrorMessage
-		} else {
-			authResult.ErrorMessage = "authorization failed"
-		}
-	}
-	return authResult, nil
+	return res.Authorized
 }
 
 func toJSON(v any) string {

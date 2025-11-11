@@ -127,7 +127,7 @@ func TestNewWSConnectionWithAuthenticationResults(t *testing.T) {
 	// Create a test server that provides WebSocket upgrade
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Create request WITH authentication results in context - this is what we're testing
-		r = r.WithContext(context.WithValue(r.Context(), wsAuthResultKey, resultsToStore))
+		r = r.WithContext(context.WithValue(r.Context(), authResultKey, resultsToStore))
 
 		// Upgrade the WebSocket to get the connection
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)

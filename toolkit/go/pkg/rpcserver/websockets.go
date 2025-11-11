@@ -57,7 +57,7 @@ func (s *rpcServer) newWSConnection(conn *websocket.Conn, req *http.Request) {
 
 	// Retrieve authentication results from context (set in wsHandler before upgrade)
 	if len(s.authorizers) > 0 {
-		if authenticationResults, ok := req.Context().Value(wsAuthResultKey).([]string); ok && len(authenticationResults) > 0 {
+		if authenticationResults, ok := req.Context().Value(authResultKey).([]string); ok && len(authenticationResults) > 0 {
 			c.setAuthenticationResults(authenticationResults)
 			log.L(c.ctx).Infof("WebSocket authenticated, %d authentication results stored", len(authenticationResults))
 		} else {

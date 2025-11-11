@@ -177,9 +177,9 @@ func TestWSHandler_AuthenticationFailure(t *testing.T) {
 
 	rpcServer.WSHandler(res, req)
 
-	// Should return 401 Unauthorized
+	// Should return 401 Unauthorized without JSON body (native transport response)
 	assert.Equal(t, http.StatusUnauthorized, res.Code)
-	assert.Contains(t, res.Body.String(), "error")
+	assert.Empty(t, res.Body.String())
 }
 
 func TestWSHandler_AuthenticationSuccess(t *testing.T) {
@@ -272,15 +272,13 @@ func TestSendAuthErrorResponse(t *testing.T) {
 	require.NoError(t, err)
 	defer rpcServer.Stop()
 
-	req := httptest.NewRequest("GET", "/test", nil)
 	res := httptest.NewRecorder()
 
-	authErr := assert.AnError
-	rpcServer.sendAuthErrorResponse(res, req, authErr)
+	rpcServer.sendAuthErrorResponse(res)
 
 	assert.Equal(t, http.StatusUnauthorized, res.Code)
-	assert.Equal(t, "application/json; charset=utf-8", res.Header().Get("Content-Type"))
-	assert.Contains(t, res.Body.String(), "error")
+	// Should not have JSON body (native transport response)
+	assert.Empty(t, res.Body.String())
 }
 
 func TestHTTPHandler(t *testing.T) {
@@ -301,6 +299,201 @@ func TestHTTPHandler(t *testing.T) {
 	res := httptest.NewRecorder()
 	rpcServer.HTTPHandler(res, req)
 	assert.Equal(t, http.StatusInternalServerError, res.Code)
+}
+
+func TestHTTPHandler_AuthenticationFailure(t *testing.T) {
+	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
+		HTTP: pldconf.RPCServerConfigHTTP{
+			Disabled: false,
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Address: confutil.P("127.0.0.1"),
+				Port:    confutil.P(0), // Use dynamic port
+			},
+		},
+		WS: pldconf.RPCServerConfigWS{Disabled: true},
+	})
+	require.NoError(t, err)
+	defer rpcServer.Stop()
+
+	// Set up authorizer that fails
+	auth := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			return "", assert.AnError
+		},
+	}
+	rpcServer.SetAuthorizers([]Authorizer{auth})
+
+	// Create a valid JSON-RPC request
+	body := strings.NewReader(`{"jsonrpc":"2.0","method":"test_method","id":1}`)
+	req := httptest.NewRequest("POST", "/", body)
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+
+	rpcServer.HTTPHandler(res, req)
+
+	// Should return HTTP 401 without JSON body (native transport response)
+	assert.Equal(t, http.StatusUnauthorized, res.Code)
+	assert.Empty(t, res.Body.String())
+}
+
+func TestHTTPHandler_ChainAuthentication_Success(t *testing.T) {
+	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
+		HTTP: pldconf.RPCServerConfigHTTP{
+			Disabled: false,
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Address: confutil.P("127.0.0.1"),
+				Port:    confutil.P(0),
+			},
+		},
+		WS: pldconf.RPCServerConfigWS{Disabled: true},
+	})
+	require.NoError(t, err)
+	defer rpcServer.Stop()
+
+	// Set up chain of two authorizers that both succeed
+	auth1Called := false
+	auth2Called := false
+	auth1 := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			auth1Called = true
+			return `{"plugin":"auth1","user":"test"}`, nil
+		},
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
+			return true
+		},
+	}
+	auth2 := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			auth2Called = true
+			return `{"plugin":"auth2","user":"test"}`, nil
+		},
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
+			return true
+		},
+	}
+	rpcServer.SetAuthorizers([]Authorizer{auth1, auth2})
+
+	regTestRPC(rpcServer, "test_echo", RPCMethod0(func(ctx context.Context) (string, error) {
+		return "hello", nil
+	}))
+
+	// Create a valid JSON-RPC request
+	body := strings.NewReader(`{"jsonrpc":"2.0","method":"test_echo","id":1}`)
+	req := httptest.NewRequest("POST", "/", body)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token123")
+	res := httptest.NewRecorder()
+
+	rpcServer.HTTPHandler(res, req)
+
+	// Both authorizers should have been called
+	assert.True(t, auth1Called)
+	assert.True(t, auth2Called)
+	// Should succeed (not return 401)
+	assert.NotEqual(t, http.StatusUnauthorized, res.Code)
+	assert.Equal(t, http.StatusOK, res.Code)
+}
+
+func TestHTTPHandler_ChainAuthentication_FirstFails(t *testing.T) {
+	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
+		HTTP: pldconf.RPCServerConfigHTTP{
+			Disabled: false,
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Address: confutil.P("127.0.0.1"),
+				Port:    confutil.P(0),
+			},
+		},
+		WS: pldconf.RPCServerConfigWS{Disabled: true},
+	})
+	require.NoError(t, err)
+	defer rpcServer.Stop()
+
+	// First authorizer fails, second should never be called
+	auth1Called := false
+	auth2Called := false
+	auth1 := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			auth1Called = true
+			return "", assert.AnError
+		},
+	}
+	auth2 := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			auth2Called = true
+			return `{"plugin":"auth2"}`, nil
+		},
+	}
+	rpcServer.SetAuthorizers([]Authorizer{auth1, auth2})
+
+	// Create a valid JSON-RPC request
+	body := strings.NewReader(`{"jsonrpc":"2.0","method":"test_method","id":1}`)
+	req := httptest.NewRequest("POST", "/", body)
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+
+	rpcServer.HTTPHandler(res, req)
+
+	// First should be called, second should not
+	assert.True(t, auth1Called)
+	assert.False(t, auth2Called) // Should not be called after first failure
+	// Should return HTTP 401 without JSON body (native transport response)
+	assert.Equal(t, http.StatusUnauthorized, res.Code)
+	assert.Empty(t, res.Body.String())
+}
+
+func TestHTTPHandler_ChainAuthentication_MiddleFails(t *testing.T) {
+	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
+		HTTP: pldconf.RPCServerConfigHTTP{
+			Disabled: false,
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Address: confutil.P("127.0.0.1"),
+				Port:    confutil.P(0),
+			},
+		},
+		WS: pldconf.RPCServerConfigWS{Disabled: true},
+	})
+	require.NoError(t, err)
+	defer rpcServer.Stop()
+
+	// First succeeds, second fails, third should never be called
+	auth1Called := false
+	auth2Called := false
+	auth3Called := false
+	auth1 := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			auth1Called = true
+			return `{"plugin":"auth1"}`, nil
+		},
+	}
+	auth2 := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			auth2Called = true
+			return "", assert.AnError
+		},
+	}
+	auth3 := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			auth3Called = true
+			return `{"plugin":"auth3"}`, nil
+		},
+	}
+	rpcServer.SetAuthorizers([]Authorizer{auth1, auth2, auth3})
+
+	// Create a valid JSON-RPC request
+	body := strings.NewReader(`{"jsonrpc":"2.0","method":"test_method","id":1}`)
+	req := httptest.NewRequest("POST", "/", body)
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+
+	rpcServer.HTTPHandler(res, req)
+
+	// First and second should be called, third should not
+	assert.True(t, auth1Called)
+	assert.True(t, auth2Called)
+	assert.False(t, auth3Called) // Should not be called after second failure
+	// Should return HTTP 401 without JSON body (native transport response)
+	assert.Equal(t, http.StatusUnauthorized, res.Code)
+	assert.Empty(t, res.Body.String())
 }
 
 // Helper to create a temporary UI directory with files for testing

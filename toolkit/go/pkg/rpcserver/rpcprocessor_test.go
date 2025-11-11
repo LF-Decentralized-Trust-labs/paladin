@@ -69,7 +69,7 @@ func TestRCPUnknownMethod(t *testing.T) {
 // mockAuthorizer is a mock implementation of the Authorizer interface for testing
 type mockAuthorizer struct {
 	authenticateFunc func(ctx context.Context, headers map[string]string) (string, error)
-	authorizeFunc    func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error)
+	authorizeFunc    func(ctx context.Context, result string, method string, payload []byte) bool
 }
 
 func (m *mockAuthorizer) Authenticate(ctx context.Context, headers map[string]string) (string, error) {
@@ -79,11 +79,11 @@ func (m *mockAuthorizer) Authenticate(ctx context.Context, headers map[string]st
 	return `{"username":"test"}`, nil
 }
 
-func (m *mockAuthorizer) Authorize(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+func (m *mockAuthorizer) Authorize(ctx context.Context, result string, method string, payload []byte) bool {
 	if m.authorizeFunc != nil {
 		return m.authorizeFunc(ctx, result, method, payload)
 	}
-	return &AuthResult{Authorized: true}, nil
+	return true
 }
 
 func TestRPCProcessor_WithAuth_Success(t *testing.T) {
@@ -95,9 +95,9 @@ func TestRPCProcessor_WithAuth_Success(t *testing.T) {
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"username":"test"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			assert.NotEmpty(t, method)
-			return &AuthResult{Authorized: true}, nil
+			return true
 		},
 	}
 	server.SetAuthorizers([]Authorizer{auth})
@@ -116,28 +116,6 @@ func TestRPCProcessor_WithoutAuth_Bypass(t *testing.T) {
 	assert.Empty(t, server.authorizers)
 }
 
-func TestExtractHeadersFromContext(t *testing.T) {
-	// Test extracting headers from context
-	expectedHeaders := map[string]string{
-		"Authorization": "Basic dXNlcjpwYXNz",
-		"Content-Type":  "application/json",
-	}
-
-	ctx := context.WithValue(context.Background(), httpHeadersKey, expectedHeaders)
-	headers := extractHeadersFromContext(ctx)
-
-	assert.Equal(t, "Basic dXNlcjpwYXNz", headers["Authorization"])
-	assert.Equal(t, "application/json", headers["Content-Type"])
-}
-
-func TestExtractHeadersFromContext_NoRequest(t *testing.T) {
-	// Test with no HTTP request in context
-	ctx := context.Background()
-	headers := extractHeadersFromContext(ctx)
-
-	assert.Empty(t, headers)
-}
-
 func TestProcessRPC_AuthorizerCalled(t *testing.T) {
 	url, server, done := newTestServerHTTP(t, &pldconf.RPCServerConfig{})
 	defer done()
@@ -152,10 +130,10 @@ func TestProcessRPC_AuthorizerCalled(t *testing.T) {
 			headersReceived = headers
 			return `{"username":"test"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			authorizerCalled = true
 			methodReceived = method
-			return &AuthResult{Authorized: true}, nil
+			return true
 		},
 	}
 	server.SetAuthorizers([]Authorizer{auth})
@@ -189,11 +167,8 @@ func TestProcessRPC_AuthorizerDeniesAccess(t *testing.T) {
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"username":"test"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
-			return &AuthResult{
-				Authorized:   false,
-				ErrorMessage: "access denied: invalid token",
-			}, nil
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
+			return false
 		},
 	}
 	server.SetAuthorizers([]Authorizer{auth})
@@ -209,30 +184,7 @@ func TestProcessRPC_AuthorizerDeniesAccess(t *testing.T) {
 
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcclient.RPCCodeUnauthorized), errResponse.Error.Code)
-	assert.Contains(t, errResponse.Error.Message, "access denied")
-}
-
-func TestProcessRPC_AuthorizerReturnsError(t *testing.T) {
-	url, server, done := newTestServerHTTP(t, &pldconf.RPCServerConfig{})
-	defer done()
-
-	auth := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			return "", assert.AnError
-		},
-	}
-	server.SetAuthorizers([]Authorizer{auth})
-
-	// Make request - should fail due to authorizer error
-	var errResponse rpcclient.RPCResponse
-	res, err := resty.New().R().
-		SetBody(`{"id": 1, "method": "test_method"}`).
-		SetError(&errResponse).
-		Post(url)
-	require.NoError(t, err)
-
-	assert.False(t, res.IsSuccess())
-	assert.Equal(t, int64(rpcclient.RPCCodeUnauthorized), errResponse.Error.Code)
+	assert.Contains(t, errResponse.Error.Message, "Unauthorized")
 }
 
 func TestProcessRPC_PayloadMarshaled(t *testing.T) {
@@ -244,9 +196,9 @@ func TestProcessRPC_PayloadMarshaled(t *testing.T) {
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"username":"test"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			payloadReceived = payload
-			return &AuthResult{Authorized: true}, nil
+			return true
 		},
 	}
 	server.SetAuthorizers([]Authorizer{auth})
@@ -291,119 +243,6 @@ func TestProcessRPC_NoAuthorizer_Bypass(t *testing.T) {
 	assert.Equal(t, "success", result)
 }
 
-func TestRPCProcessor_ChainAuthenticate_Success(t *testing.T) {
-	url, server, done := newTestServerHTTP(t, &pldconf.RPCServerConfig{})
-	defer done()
-
-	// Set up chain of two authorizers that both succeed
-	auth1 := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			return `{"plugin":"auth1","user":"test"}`, nil
-		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
-			return &AuthResult{Authorized: true}, nil
-		},
-	}
-	auth2 := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			return `{"plugin":"auth2","user":"test"}`, nil
-		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
-			return &AuthResult{Authorized: true}, nil
-		},
-	}
-	server.SetAuthorizers([]Authorizer{auth1, auth2})
-
-	regTestRPC(server, "test_echo", RPCMethod0(func(ctx context.Context) (string, error) {
-		return "hello", nil
-	}))
-
-	var response rpcclient.RPCResponse
-	res, err := resty.New().R().
-		SetHeader("Authorization", "Bearer token123").
-		SetBody(`{"id": 1, "method": "test_echo"}`).
-		SetResult(&response).
-		Post(url)
-	require.NoError(t, err)
-	assert.True(t, res.IsSuccess())
-}
-
-func TestRPCProcessor_ChainAuthenticate_FirstFails(t *testing.T) {
-	url, server, done := newTestServerHTTP(t, &pldconf.RPCServerConfig{})
-	defer done()
-
-	// First authorizer fails, second should never be called
-	auth1Called := false
-	auth2Called := false
-	auth1 := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			auth1Called = true
-			return "", assert.AnError
-		},
-	}
-	auth2 := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			auth2Called = true
-			return `{"plugin":"auth2"}`, nil
-		},
-	}
-	server.SetAuthorizers([]Authorizer{auth1, auth2})
-
-	var errResponse rpcclient.RPCResponse
-	res, err := resty.New().R().
-		SetBody(`{"id": 1, "method": "test_method"}`).
-		SetError(&errResponse).
-		Post(url)
-	require.NoError(t, err)
-
-	assert.False(t, res.IsSuccess())
-	assert.True(t, auth1Called)
-	assert.False(t, auth2Called) // Should not be called after first failure
-	assert.Equal(t, int64(rpcclient.RPCCodeUnauthorized), errResponse.Error.Code)
-}
-
-func TestRPCProcessor_ChainAuthenticate_MiddleFails(t *testing.T) {
-	url, server, done := newTestServerHTTP(t, &pldconf.RPCServerConfig{})
-	defer done()
-
-	// First succeeds, second fails, third should never be called
-	auth1Called := false
-	auth2Called := false
-	auth3Called := false
-	auth1 := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			auth1Called = true
-			return `{"plugin":"auth1"}`, nil
-		},
-	}
-	auth2 := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			auth2Called = true
-			return "", assert.AnError
-		},
-	}
-	auth3 := &mockAuthorizer{
-		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
-			auth3Called = true
-			return `{"plugin":"auth3"}`, nil
-		},
-	}
-	server.SetAuthorizers([]Authorizer{auth1, auth2, auth3})
-
-	var errResponse rpcclient.RPCResponse
-	res, err := resty.New().R().
-		SetBody(`{"id": 1, "method": "test_method"}`).
-		SetError(&errResponse).
-		Post(url)
-	require.NoError(t, err)
-
-	assert.False(t, res.IsSuccess())
-	assert.True(t, auth1Called)
-	assert.True(t, auth2Called)
-	assert.False(t, auth3Called) // Should not be called after second failure
-	assert.Equal(t, int64(rpcclient.RPCCodeUnauthorized), errResponse.Error.Code)
-}
-
 func TestRPCProcessor_ChainAuthorize_Success(t *testing.T) {
 	url, server, done := newTestServerHTTP(t, &pldconf.RPCServerConfig{})
 	defer done()
@@ -413,20 +252,20 @@ func TestRPCProcessor_ChainAuthorize_Success(t *testing.T) {
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"plugin":"auth1"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			// Verify authentication result matches what auth1 returned
 			assert.Contains(t, result, "auth1")
-			return &AuthResult{Authorized: true}, nil
+			return true
 		},
 	}
 	auth2 := &mockAuthorizer{
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"plugin":"auth2"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			// Verify authentication result matches what auth2 returned
 			assert.Contains(t, result, "auth2")
-			return &AuthResult{Authorized: true}, nil
+			return true
 		},
 	}
 	server.SetAuthorizers([]Authorizer{auth1, auth2})
@@ -455,21 +294,18 @@ func TestRPCProcessor_ChainAuthorize_Fails(t *testing.T) {
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"plugin":"auth1"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			auth1Called = true
-			return &AuthResult{
-				Authorized:   false,
-				ErrorMessage: "access denied by auth1",
-			}, nil
+			return false
 		},
 	}
 	auth2 := &mockAuthorizer{
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"plugin":"auth2"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			auth2Called = true
-			return &AuthResult{Authorized: true}, nil
+			return true
 		},
 	}
 	server.SetAuthorizers([]Authorizer{auth1, auth2})
@@ -485,7 +321,7 @@ func TestRPCProcessor_ChainAuthorize_Fails(t *testing.T) {
 	assert.True(t, auth1Called)
 	assert.False(t, auth2Called) // Should not be called after first authorization failure
 	assert.Equal(t, int64(rpcclient.RPCCodeUnauthorized), errResponse.Error.Code)
-	assert.Contains(t, errResponse.Error.Message, "access denied by auth1")
+	assert.Contains(t, errResponse.Error.Message, "Unauthorized")
 }
 
 func TestRPCProcessor_ChainAuthorize_MiddleFails(t *testing.T) {
@@ -504,9 +340,9 @@ func TestRPCProcessor_ChainAuthorize_MiddleFails(t *testing.T) {
 			auth1AuthCalled = true
 			return `{"plugin":"auth1"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			auth1AuthzCalled = true
-			return &AuthResult{Authorized: true}, nil
+			return true
 		},
 	}
 	auth2 := &mockAuthorizer{
@@ -514,21 +350,18 @@ func TestRPCProcessor_ChainAuthorize_MiddleFails(t *testing.T) {
 			auth2AuthCalled = true
 			return `{"plugin":"auth2"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			auth2AuthzCalled = true
-			return &AuthResult{
-				Authorized:   false,
-				ErrorMessage: "access denied by auth2",
-			}, nil
+			return false
 		},
 	}
 	auth3 := &mockAuthorizer{
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"plugin":"auth3"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			auth3AuthzCalled = true
-			return &AuthResult{Authorized: true}, nil
+			return true
 		},
 	}
 	server.SetAuthorizers([]Authorizer{auth1, auth2, auth3})
@@ -551,7 +384,7 @@ func TestRPCProcessor_ChainAuthorize_MiddleFails(t *testing.T) {
 	assert.True(t, auth2AuthzCalled)
 	assert.False(t, auth3AuthzCalled) // Should not be called after auth2 authorization failure
 	assert.Equal(t, int64(rpcclient.RPCCodeUnauthorized), errResponse.Error.Code)
-	assert.Contains(t, errResponse.Error.Message, "access denied by auth2")
+	assert.Contains(t, errResponse.Error.Message, "Unauthorized")
 }
 
 func TestRPCProcessor_ChainAuthorize_ReturnsError(t *testing.T) {
@@ -570,9 +403,9 @@ func TestRPCProcessor_ChainAuthorize_ReturnsError(t *testing.T) {
 			auth1AuthCalled = true
 			return `{"plugin":"auth1"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			auth1AuthzCalled = true
-			return &AuthResult{Authorized: true}, nil
+			return true
 		},
 	}
 	auth2 := &mockAuthorizer{
@@ -580,18 +413,18 @@ func TestRPCProcessor_ChainAuthorize_ReturnsError(t *testing.T) {
 			auth2AuthCalled = true
 			return `{"plugin":"auth2"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			auth2AuthzCalled = true
-			return nil, assert.AnError
+			return false
 		},
 	}
 	auth3 := &mockAuthorizer{
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"plugin":"auth3"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
 			auth3AuthzCalled = true
-			return &AuthResult{Authorized: true}, nil
+			return true
 		},
 	}
 	server.SetAuthorizers([]Authorizer{auth1, auth2, auth3})
@@ -616,6 +449,45 @@ func TestRPCProcessor_ChainAuthorize_ReturnsError(t *testing.T) {
 	assert.Equal(t, int64(rpcclient.RPCCodeUnauthorized), errResponse.Error.Code)
 }
 
+func TestRPCProcessor_HTTP_NoStoredAuthenticationResults(t *testing.T) {
+	// Test HTTP request where context doesn't have authentication results
+	// This covers the case where getAuthenticationResults returns nil for HTTP (line 37)
+	ctx := context.Background() // Context without authResultKey
+
+	// Create server with authorizers
+	_, server, done := newTestServerHTTP(t, &pldconf.RPCServerConfig{})
+	defer done()
+
+	auth1 := &mockAuthorizer{
+		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
+			return `{"plugin":"auth1"}`, nil
+		},
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
+			return true
+		},
+	}
+	server.SetAuthorizers([]Authorizer{auth1})
+
+	regTestRPC(server, "test_method", RPCMethod0(func(ctx context.Context) (string, error) {
+		return "success", nil
+	}))
+
+	// Create RPC request
+	rpcReq := &rpcclient.RPCRequest{
+		ID:     pldtypes.RawJSON(`1`),
+		Method: "test_method",
+	}
+
+	// Call processRPC directly with HTTP context (wsc == nil) that has no authentication results
+	response, isOK := server.processRPC(ctx, rpcReq, nil /* HTTP request, no WebSocket connection */)
+
+	assert.False(t, isOK)
+	assert.NotNil(t, response)
+	assert.NotNil(t, response.Error)
+	assert.Equal(t, int64(rpcclient.RPCCodeUnauthorized), response.Error.Code)
+	assert.Contains(t, response.Error.Message, "Unauthorized")
+}
+
 func TestRPCProcessor_WebSocket_NoStoredIdentities(t *testing.T) {
 	// Create a minimal webSocketConnection with no authentication results
 	ctx := context.Background()
@@ -631,8 +503,8 @@ func TestRPCProcessor_WebSocket_NoStoredIdentities(t *testing.T) {
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"plugin":"auth1"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
-			return &AuthResult{Authorized: true}, nil
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
+			return true
 		},
 	}
 	server.SetAuthorizers([]Authorizer{auth1})
@@ -654,7 +526,7 @@ func TestRPCProcessor_WebSocket_NoStoredIdentities(t *testing.T) {
 	assert.NotNil(t, response)
 	assert.NotNil(t, response.Error)
 	assert.Equal(t, int64(rpcclient.RPCCodeUnauthorized), response.Error.Code)
-	assert.Contains(t, response.Error.Message, "no authentication results")
+	assert.Contains(t, response.Error.Message, "Unauthorized")
 }
 
 func TestRPCProcessor_AuthenticationResultMismatch(t *testing.T) {
@@ -672,16 +544,16 @@ func TestRPCProcessor_AuthenticationResultMismatch(t *testing.T) {
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"plugin":"auth1"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
-			return &AuthResult{Authorized: true}, nil
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
+			return true
 		},
 	}
 	auth2 := &mockAuthorizer{
 		authenticateFunc: func(ctx context.Context, headers map[string]string) (string, error) {
 			return `{"plugin":"auth2"}`, nil
 		},
-		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) (*AuthResult, error) {
-			return &AuthResult{Authorized: true}, nil
+		authorizeFunc: func(ctx context.Context, result string, method string, payload []byte) bool {
+			return true
 		},
 	}
 	server.SetAuthorizers([]Authorizer{auth1, auth2})
@@ -703,5 +575,5 @@ func TestRPCProcessor_AuthenticationResultMismatch(t *testing.T) {
 	assert.NotNil(t, response)
 	assert.NotNil(t, response.Error)
 	assert.Equal(t, int64(rpcclient.RPCCodeUnauthorized), response.Error.Code)
-	assert.Contains(t, response.Error.Message, "authentication result mismatch")
+	assert.Contains(t, response.Error.Message, "Unauthorized")
 }

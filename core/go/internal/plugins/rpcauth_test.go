@@ -162,7 +162,6 @@ func TestRPCAuthBridge_Authenticate_Failure(t *testing.T) {
 					Authenticate: func(ctx context.Context, ar *prototk.AuthenticateRequest) (*prototk.AuthenticateResponse, error) {
 						return &prototk.AuthenticateResponse{
 							Authenticated: false,
-							ErrorMessage:  confutil.P("invalid credentials"),
 						}, nil
 					},
 					Authorize: func(ctx context.Context, ar *prototk.AuthorizeRequest) (*prototk.AuthorizeResponse, error) {
@@ -198,8 +197,6 @@ func TestRPCAuthBridge_Authenticate_Failure(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.False(t, authResp.Authenticated)
-	assert.NotNil(t, authResp.ErrorMessage)
-	assert.Equal(t, "invalid credentials", *authResp.ErrorMessage)
 	assert.Nil(t, authResp.ResultJson)
 }
 
@@ -292,8 +289,7 @@ func TestRPCAuthBridge_Authorize_Unauthorized(t *testing.T) {
 					},
 					Authorize: func(ctx context.Context, ar *prototk.AuthorizeRequest) (*prototk.AuthorizeResponse, error) {
 						return &prototk.AuthorizeResponse{
-							Authorized:   false,
-							ErrorMessage: confutil.P("invalid credentials"),
+							Authorized: false,
 						}, nil
 					},
 				}}
@@ -337,7 +333,6 @@ func TestRPCAuthBridge_Authorize_Unauthorized(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.False(t, ar.Authorized)
-	assert.Equal(t, "invalid credentials", *ar.ErrorMessage)
 }
 
 func TestRPCAuthBridge_RequestReply_NoOp(t *testing.T) {
