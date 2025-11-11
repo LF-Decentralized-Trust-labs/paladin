@@ -14,7 +14,7 @@
  */
 import PaladinClient, {
   TransactionType,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import storageJson from "./abis/Storage.json";
 import * as fs from 'fs';
 import * as path from 'path';

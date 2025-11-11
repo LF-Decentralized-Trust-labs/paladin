@@ -15,7 +15,7 @@
 import PaladinClient, {
   PaladinVerifier,
   TransactionType,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import atomJson from "../abis/Atom.json";
 import atomFactoryJson from "../abis/AtomFactory.json";
 import { DEFAULT_POLL_TIMEOUT } from "paladin-example-common";

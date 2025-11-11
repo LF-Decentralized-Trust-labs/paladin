@@ -19,7 +19,7 @@ import PaladinClient, {
   NotoFactory,
   PenteFactory,
   ZetoFactory,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import { ethers } from "ethers";
 import {
   checkDeploy,

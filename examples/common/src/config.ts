@@ -1,4 +1,4 @@
-import { PaladinConfig } from "@lfdecentralizedtrust-labs/paladin-sdk";
+import { PaladinConfig } from "@lfdecentralizedtrust/paladin-sdk";
 import https from "https";
 import fs from "fs";
 import path from "path";

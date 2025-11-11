@@ -18,7 +18,7 @@ import PaladinClient, {
   NotoFactory,
   PenteFactory,
   TransactionType,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import {
   checkDeploy,
   checkReceipt,

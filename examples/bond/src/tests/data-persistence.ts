@@ -16,7 +16,7 @@ import PaladinClient, {
   PaladinVerifier,
   NotoFactory,
   PenteFactory,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
 import { nodeConnections, findLatestContractDataFile, getCachePath } from "paladin-example-common";
@@ -140,7 +140,7 @@ async function main(): Promise<boolean> {
   const [investor] = paladin3.getVerifiers("investor@node3");
 
   // Import necessary classes from the SDK
-  const { NotoInstance } = await import("@lfdecentralizedtrust-labs/paladin-sdk");
+  const { NotoInstance } = await import("@lfdecentralizedtrust/paladin-sdk");
   
   // Recreate contract instances
   const notoCash = new NotoInstance(paladin1, contractData.notoCashAddress);

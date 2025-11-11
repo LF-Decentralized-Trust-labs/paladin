@@ -14,7 +14,7 @@
  */
 import PaladinClient, {
   PenteFactory,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import { DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import { PrivateStorage } from "../helpers/storage";
 import * as fs from 'fs';
