@@ -4,7 +4,7 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="MFZU3HRR1KX5dudQivj--50" value="Paladin Node 3" style="rounded=1;whiteSpace=wrap;html=1;arcSize=4;align=right;verticalAlign=bottom;fontSize=5;spacingLeft=0;spacingBottom=5;spacingRight=7;" parent="1" vertex="1">
+        <mxCell id="MFZU3HRR1KX5dudQivj--50" value="Paladin Node 4" style="rounded=1;whiteSpace=wrap;html=1;arcSize=4;align=right;verticalAlign=bottom;fontSize=5;spacingLeft=0;spacingBottom=5;spacingRight=7;" parent="1" vertex="1">
           <mxGeometry x="574" y="180" width="140" height="197" as="geometry" />
         </mxCell>
         <mxCell id="MFZU3HRR1KX5dudQivj--1" value="Paladin Node 1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=4;align=right;verticalAlign=bottom;fontSize=5;spacingLeft=0;spacingBottom=5;spacingRight=7;" parent="1" vertex="1">
@@ -71,7 +71,7 @@
         <mxCell id="MFZU3HRR1KX5dudQivj--42" value="Paladin Node 3" style="rounded=1;whiteSpace=wrap;html=1;arcSize=4;align=right;verticalAlign=bottom;fontSize=5;spacingLeft=0;spacingBottom=5;spacingRight=7;" parent="1" vertex="1">
           <mxGeometry x="424" y="180" width="140" height="198" as="geometry" />
         </mxCell>
-        <mxCell id="MFZU3HRR1KX5dudQivj--39" value="&lt;font color=&quot;#7d7d7d&quot;&gt;Notarized Token&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=2;align=right;verticalAlign=top;fontSize=5;spacingLeft=3;spacingBottom=3;dashed=1;strokeColor=#737373;spacingRight=5;dashPattern=1 2;" parent="1" vertex="1">
+        <mxCell id="MFZU3HRR1KX5dudQivj--39" value="&lt;font color=&quot;#7d7d7d&quot;&gt;Domain&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=2;align=right;verticalAlign=top;fontSize=5;spacingLeft=3;spacingBottom=3;dashed=1;strokeColor=#737373;spacingRight=5;dashPattern=1 2;" parent="1" vertex="1">
           <mxGeometry x="134" y="190" width="570" height="122" as="geometry" />
         </mxCell>
         <mxCell id="MFZU3HRR1KX5dudQivj--44" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;align=center;verticalAlign=bottom;fontSize=5;spacingLeft=3;spacingBottom=3;fillColor=#F2F2F2;" parent="1" vertex="1">
@@ -101,7 +101,7 @@
         <mxCell id="4EduVCgQz5uBQDLYcrN7-1" value="member1 calls&#xa;ptx_sendTransaction()" style="rounded=0;whiteSpace=wrap;strokeColor=none;fontSize=7;fillColor=none;" vertex="1" parent="1">
           <mxGeometry x="134" y="110" width="120" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="4EduVCgQz5uBQDLYcrN7-4" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;TX1&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=none;" vertex="1" parent="1">
+        <mxCell id="4EduVCgQz5uBQDLYcrN7-4" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;TX1&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
           <mxGeometry x="178" y="140" width="50" height="30" as="geometry" />
         </mxCell>
         <mxCell id="4EduVCgQz5uBQDLYcrN7-3" value="" style="endArrow=blockThin;html=1;rounded=0;entryX=0.48;entryY=-0.002;entryDx=0;entryDy=0;entryPerimeter=0;endFill=1;" edge="1" parent="1" target="MFZU3HRR1KX5dudQivj--1">
