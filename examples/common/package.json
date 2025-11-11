@@ -18,6 +18,7 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@lfdecentralizedtrust-labs/paladin-sdk": "file:../../sdk/typescript"
+    "@lfdecentralizedtrust-labs/paladin-sdk": "file:../../sdk/typescript",
+    "@lfdecentralizedtrust/paladin-sdk": "^0.13.0-rc.2"
   }
 }
