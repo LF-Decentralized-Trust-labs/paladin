@@ -152,26 +152,12 @@ func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 
 	// Authenticate BEFORE parsing request body if authorizers are configured
-	if len(s.authorizers) > 0 {
-		// Extract headers for authentication
-		headers := make(map[string]string)
-		for key, values := range req.Header {
-			if len(values) > 0 {
-				headers[key] = values[0] // Take first value for each header
-			}
-		}
-
-		authenticationResults := make([]string, len(s.authorizers))
-		for i, auth := range s.authorizers {
-			authenticationResult, err := auth.Authenticate(ctx, headers)
-			if err != nil {
-				log.L(ctx).Errorf("HTTP authentication failed at authorizer %d: %s", i, err)
-				// Return HTTP 401 without JSON body (native transport response)
-				res.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-			authenticationResults[i] = authenticationResult
-		}
+	authenticated, authenticationResults := s.authenticate(ctx, req)
+	if !authenticated {
+		res.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	if authenticationResults != nil {
 		// Store authentication results in context for use in authorization phase
 		ctx = context.WithValue(ctx, authResultKey, authenticationResults)
 	}
@@ -188,33 +174,16 @@ func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {
 }
 
 func (s *rpcServer) wsHandler(res http.ResponseWriter, req *http.Request) {
-	// Authenticate BEFORE upgrade if authorizers are configured
-	if len(s.authorizers) > 0 {
-		// Extract headers from upgrade request
-		headers := make(map[string]string)
-		for key, values := range req.Header {
-			if len(values) > 0 {
-				headers[key] = values[0]
-			}
-		}
-
-		// Authenticate through chain of authorizers
-		authenticationResults := make([]string, len(s.authorizers))
-		for i, auth := range s.authorizers {
-			authenticationResult, err := auth.Authenticate(req.Context(), headers)
-			if err != nil {
-				// Authentication failed - send HTTP error response
-				log.L(req.Context()).Errorf("WebSocket authentication failed at authorizer %d: %s", i, err)
-				s.sendAuthErrorResponse(res)
-				return // Do not proceed with upgrade
-			}
-			authenticationResults[i] = authenticationResult
-		}
-
-		// Store ordered authentication results in request context for use after upgrade
+	// Authenticate BEFORE parsing request body if authorizers are configured
+	authenticated, authenticationResults := s.authenticate(req.Context(), req)
+	if !authenticated {
+		res.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	if authenticationResults != nil {
+		// Store authentication results in context for use in authorization phase
 		req = req.WithContext(context.WithValue(req.Context(), authResultKey, authenticationResults))
 	}
-
 	// Now proceed with upgrade (only if auth succeeded or not required)
 	conn, err := s.wsUpgrader.Upgrade(res, req, nil)
 	if err != nil {
@@ -224,9 +193,29 @@ func (s *rpcServer) wsHandler(res http.ResponseWriter, req *http.Request) {
 	s.newWSConnection(conn, req)
 }
 
-func (s *rpcServer) sendAuthErrorResponse(res http.ResponseWriter) {
-	// Send HTTP 401 without body (native transport response)
-	res.WriteHeader(http.StatusUnauthorized)
+func (s *rpcServer) authenticate(ctx context.Context, req *http.Request) (bool, []string) {
+	if len(s.authorizers) == 0 {
+		return true, nil
+	}
+
+	// Extract headers for authentication
+	headers := make(map[string]string)
+	for key, values := range req.Header {
+		if len(values) > 0 {
+			headers[key] = values[0] // Take first value for each header
+		}
+	}
+
+	authenticationResults := make([]string, len(s.authorizers))
+	for i, auth := range s.authorizers {
+		authenticationResult, err := auth.Authenticate(ctx, headers)
+		if err != nil {
+			log.L(ctx).Errorf("HTTP authentication failed at authorizer %d: %s", i, err)
+			return false, nil
+		}
+		authenticationResults[i] = authenticationResult
+	}
+	return true, authenticationResults
 }
 
 func (s *rpcServer) Start() (err error) {

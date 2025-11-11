@@ -259,28 +259,6 @@ func TestWSHandler_ChainAuthentication_Failure(t *testing.T) {
 	assert.True(t, auth1Called)
 	assert.True(t, auth2Called)
 }
-
-func TestSendAuthErrorResponse(t *testing.T) {
-	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
-		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
-		WS: pldconf.RPCServerConfigWS{
-			HTTPServerConfig: pldconf.HTTPServerConfig{
-				Port: confutil.P(0),
-			},
-		},
-	})
-	require.NoError(t, err)
-	defer rpcServer.Stop()
-
-	res := httptest.NewRecorder()
-
-	rpcServer.sendAuthErrorResponse(res)
-
-	assert.Equal(t, http.StatusUnauthorized, res.Code)
-	// Should not have JSON body (native transport response)
-	assert.Empty(t, res.Body.String())
-}
-
 func TestHTTPHandler(t *testing.T) {
 	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
 		HTTP: pldconf.RPCServerConfigHTTP{
