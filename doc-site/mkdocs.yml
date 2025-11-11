@@ -120,6 +120,7 @@ nav:
           - Architecture: architecture/distributed_sequencer_architecture.md
           - Components: architecture/distributed_sequencer_components.md
           - State Machine: architecture/distributed_sequencer_state_machine.md
+          - Data Flows: architecture/distributed_sequencer_data_flows.md
           - Protocol: architecture/distributed_sequencer_protocol.md
   - Getting Started:
       - Installation:
