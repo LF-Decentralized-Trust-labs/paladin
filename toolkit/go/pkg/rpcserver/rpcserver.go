@@ -32,6 +32,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+const authResultKey contextKey = "authResult" // For storing authenticated results (used for both HTTP and WebSocket)
+
 type RPCServer interface {
 	Start() error
 	Stop()
@@ -39,6 +44,7 @@ type RPCServer interface {
 	WSAddr() net.Addr
 
 	Register(module *RPCModule)
+	SetAuthorizers(auths []Authorizer)
 
 	WSHandler(w http.ResponseWriter, r *http.Request)   // Provides access to the WebSocket handler directly to be able to install it into another server
 	HTTPHandler(w http.ResponseWriter, r *http.Request) // Provides access to the http handler directly to be able to install it into another server
@@ -99,6 +105,16 @@ type rpcServer struct {
 	wsUpgrader    *websocket.Upgrader
 	wsConnections map[string]*webSocketConnection
 	rpcModules    map[string]*RPCModule
+	authorizers   []Authorizer
+}
+
+type Authorizer interface {
+	Authenticate(ctx context.Context, headers map[string]string) (result string, err error)
+	Authorize(ctx context.Context, result string, method string, payload []byte) bool
+}
+
+func (s *rpcServer) SetAuthorizers(auths []Authorizer) {
+	s.authorizers = auths
 }
 
 func (s *rpcServer) Register(module *RPCModule) {
@@ -133,7 +149,20 @@ func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusMethodNotAllowed)
 	}
 
-	r := s.rpcHandler(req.Context(), req.Body, nil /* not websockets */)
+	ctx := req.Context()
+
+	// Authenticate BEFORE parsing request body if authorizers are configured
+	authenticated, authenticationResults := s.authenticate(ctx, req)
+	if !authenticated {
+		res.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	if authenticationResults != nil {
+		// Store authentication results in context for use in authorization phase
+		ctx = context.WithValue(ctx, authResultKey, authenticationResults)
+	}
+
+	r := s.rpcHandler(ctx, req.Body, nil /* not websockets */)
 
 	res.Header().Set("Content-Type", "application/json; charset=utf-8")
 	status := http.StatusOK
@@ -145,12 +174,48 @@ func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {
 }
 
 func (s *rpcServer) wsHandler(res http.ResponseWriter, req *http.Request) {
+	// Authenticate BEFORE parsing request body if authorizers are configured
+	authenticated, authenticationResults := s.authenticate(req.Context(), req)
+	if !authenticated {
+		res.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	if authenticationResults != nil {
+		// Store authentication results in context for use in authorization phase
+		req = req.WithContext(context.WithValue(req.Context(), authResultKey, authenticationResults))
+	}
+	// Now proceed with upgrade (only if auth succeeded or not required)
 	conn, err := s.wsUpgrader.Upgrade(res, req, nil)
 	if err != nil {
 		log.L(req.Context()).Errorf("WebSocket upgrade failed: %s", err)
 		return
 	}
-	s.newWSConnection(conn)
+	s.newWSConnection(conn, req)
+}
+
+func (s *rpcServer) authenticate(ctx context.Context, req *http.Request) (bool, []string) {
+	if len(s.authorizers) == 0 {
+		return true, nil
+	}
+
+	// Extract headers for authentication
+	headers := make(map[string]string)
+	for key, values := range req.Header {
+		if len(values) > 0 {
+			headers[key] = values[0] // Take first value for each header
+		}
+	}
+
+	authenticationResults := make([]string, len(s.authorizers))
+	for i, auth := range s.authorizers {
+		authenticationResult, err := auth.Authenticate(ctx, headers)
+		if err != nil {
+			log.L(ctx).Errorf("HTTP authentication failed at authorizer %d: %s", i, err)
+			return false, nil
+		}
+		authenticationResults[i] = authenticationResult
+	}
+	return true, authenticationResults
 }
 
 func (s *rpcServer) Start() (err error) {

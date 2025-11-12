@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
 	"sync"
 
 	"github.com/google/uuid"
@@ -30,7 +31,17 @@ import (
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/rpcclient"
 )
 
-func (s *rpcServer) newWSConnection(conn *websocket.Conn) {
+func (c *webSocketConnection) setAuthenticationResults(authenticationResults []string) {
+	c.authenticationResults = authenticationResults // Ordered authentication results from authorizer chain, written once before any goroutines start
+}
+
+func (c *webSocketConnection) getAuthenticationResults() []string {
+	// Returns the ordered authentication results stored during authentication
+	// Authentication results are written once before any goroutines start, so no mutex needed
+	return c.authenticationResults
+}
+
+func (s *rpcServer) newWSConnection(conn *websocket.Conn, req *http.Request) {
 	s.wsMux.Lock()
 	defer s.wsMux.Unlock()
 
@@ -43,6 +54,18 @@ func (s *rpcServer) newWSConnection(conn *websocket.Conn) {
 		closing:        make(chan struct{}),
 	}
 	c.ctx, c.cancelCtx = context.WithCancel(log.WithLogField(s.bgCtx, "wsconn", c.id))
+
+	// Retrieve authentication results from context (set in wsHandler before upgrade)
+	if len(s.authorizers) > 0 {
+		if authenticationResults, ok := req.Context().Value(authResultKey).([]string); ok && len(authenticationResults) > 0 {
+			c.setAuthenticationResults(authenticationResults)
+			log.L(c.ctx).Infof("WebSocket authenticated, %d authentication results stored", len(authenticationResults))
+		} else {
+			// This shouldn't happen if auth is required (should have failed before upgrade)
+			// But handle gracefully - connection will work but won't be authorized
+			log.L(c.ctx).Warnf("WebSocket connection without stored authentication results")
+		}
+	}
 
 	s.wsConnections[c.id] = c
 	go c.listen()
@@ -57,17 +80,18 @@ func (s *rpcServer) wsClosed(id string) {
 }
 
 type webSocketConnection struct {
-	ctx            context.Context
-	cancelCtx      context.CancelFunc
-	server         *rpcServer
-	id             string
-	closeMux       sync.Mutex
-	closed         bool
-	conn           *websocket.Conn
-	asyncMux       sync.Mutex
-	asyncInstances map[uuid.UUID]*asyncWrapper
-	send           chan ([]byte)
-	closing        chan (struct{})
+	ctx                   context.Context
+	cancelCtx             context.CancelFunc
+	server                *rpcServer
+	id                    string
+	closeMux              sync.Mutex
+	closed                bool
+	conn                  *websocket.Conn
+	authenticationResults []string // Ordered authenticated results from authorizer chain (opaque strings, plugin-specific format)
+	asyncMux              sync.Mutex
+	asyncInstances        map[uuid.UUID]*asyncWrapper
+	send                  chan ([]byte)
+	closing               chan (struct{})
 }
 
 type asyncWrapper struct {

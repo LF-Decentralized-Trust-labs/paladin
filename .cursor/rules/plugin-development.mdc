@@ -1,0 +1,483 @@
+---
+name: Paladin Plugin Development Rules
+description: >-
+  Enforces architectural patterns, initialization sequencing, communication flows, and
+  testing requirements for Paladin plugins and plugin managers. This rule replaces
+  separate guides; follow it exactly when adding or modifying plugin-related code.
+globs: # This potentially covers too many files to want to pull it in automatically
+alwaysApply: false
+version: 1
+tags: [architecture, plugins, grpc, bridge, initialization, testing]
+priority: high
+---
+
+# Paladin Plugin Development Rules
+
+This file contains architectural patterns, conventions, and critical rules for developing plugins and plugin managers in the Paladin system. Always follow these patterns when implementing or modifying plugin code.
+
+## Core Architecture Principles
+
+### Plugin System Overview
+- **Plugins are separate processes** communicating via bidirectional gRPC streams
+- **Isolation**: Plugin crashes don't affect core system
+- **Single long-lived connection** per plugin instance
+- **Correlation IDs** link requests to responses in both directions
+- All plugins must follow the **Bridge Pattern** structure
+
+### Communication Pattern
+```
+Plugin Process ◄─── gRPC Stream (bidirectional) ───► Plugin Manager (Core)
+```
+- Messages use `Header` with `plugin_id`, `message_id`, `correlation_id`, `message_type`
+- Message types: `REGISTER`, `REQUEST_TO_PLUGIN`, `RESPONSE_FROM_PLUGIN`, `REQUEST_FROM_PLUGIN`, `RESPONSE_TO_PLUGIN`, `ERROR_RESPONSE`
+
+## Bridge Pattern (CRITICAL)
+
+### Standard Bridge Structure (ALL plugins must follow)
+```go
+type YourPluginBridge struct {
+    plugin     *plugin[prototk.YourMessage]      // Plugin instance reference
+    pluginType string                             // Plugin type identifier
+    pluginName string                             // Plugin name from config
+    pluginId   string                             // Plugin UUID as string
+    toPlugin   managerToPlugin[prototk.YourMessage]  // Manager → Plugin channel
+    manager    YourPluginCallbacks                // Plugin → Manager callbacks
+}
+```
+
+**Key Rules:**
+- ✅ **ALL plugin bridges MUST have these exact fields** (even unidirectional plugins)
+- ✅ **ALL plugins MUST implement `Initialized()` method** (calls `plugin.notifyInitialized()`)
+- ✅ **ALL plugins MUST implement `RequestReply()` method**
+  - Bidirectional plugins: Route callbacks to manager
+  - Unidirectional plugins: Return no-op `func(...) {}, nil` to conform
+
+### Required Methods
+
+1. **`Initialized()`** - REQUIRED for all plugins
+   - Called by manager after plugin completes initialization
+   - **CRITICAL**: Must NEVER call plugin API functions before `Initialized()` is called
+   - Pattern: `func (br *Bridge) Initialized() { br.plugin.notifyInitialized() }`
+
+2. **`RequestReply()`** - REQUIRED for all plugins
+   - Bidirectional: Routes plugin callbacks to manager methods
+   - Unidirectional: Returns no-op but maintains structure
+
+### Initialization Sequence (MUST follow strictly)
+1. Plugin connects to manager (gRPC stream established)
+2. Plugin sends REGISTER message
+3. Manager creates bridge with standard fields
+4. Manager registers bridge with specific manager (DomainManager, RPCAuthManager, etc.)
+5. Manager sends CONFIGURE request to plugin
+6. Plugin responds with configuration success
+7. Manager sends INIT request (for domain/transport plugins)
+8. Plugin responds with init success
+9. Manager calls `bridge.Initialized()`
+10. `WaitForInit()` unblocks
+
+**CRITICAL ANTI-PATTERN TO AVOID:**
+```go
+// ❌ WRONG - Will cause hangs!
+br := &domainBridge{...}
+pm.domainManager.DomainRegistered(pluginName, pluginID, bridge)
+br.ConfigureDomain(ctx, config)  // NEVER call before Initialized()!
+
+// ✅ CORRECT
+br := &domainBridge{...}
+pm.domainManager.DomainRegistered(pluginName, pluginID, bridge)
+// Let manager configure via CONFIGURE request, then call Initialized()
+```
+
+## Plugin Types
+
+### 1. Domain Plugins
+- **Purpose**: Blockchain domain logic (EVM, Hyperledger Fabric, etc.)
+- **Files**: `core/go/internal/plugins/domains.go`
+- **Manager Method**: `ConnectDomain()`, `DomainRegistered()`
+- **Type**: Bidirectional
+
+### 2. Transport Plugins
+- **Purpose**: Inter-node communication
+- **Files**: `core/go/internal/plugins/transports.go`
+- **Manager Method**: `ConnectTransport()`, `TransportRegistered()`
+- **Type**: Bidirectional
+
+### 3. Registry Plugins
+- **Purpose**: On-chain registries for contracts and nodes
+- **Files**: `core/go/internal/plugins/registries.go`
+- **Manager Method**: `ConnectRegistry()`, `RegistryRegistered()`
+- **Type**: Bidirectional
+
+### 4. Signing Module Plugins
+- **Purpose**: Cryptographic keys and signing operations
+- **Files**: `core/go/internal/plugins/signing_modules.go`
+- **Manager Method**: `ConnectSigningModule()`, `SigningModuleRegistered()`
+- **Type**: Bidirectional
+
+### 5. RPC Auth Plugins
+- **Purpose**: RPC request authentication/authorization
+- **Files**: `core/go/internal/plugins/rpcauth.go`
+- **Manager Method**: `ConnectRPCAuthPlugin()`, `RPCAuthorizerRegistered()`
+- **Type**: Unidirectional (but still uses standard bridge structure)
+
+## Implementation Patterns
+
+### Protobuf Message Structure
+All plugin messages in `toolkit/proto/protos/service.proto` follow this pattern:
+```protobuf
+message YourMessage {
+  Header header = 1;
+  
+  // Manager → Plugin
+  oneof request_to_yourplugin {
+    YourRequest1 request1 = 1010;
+  }
+  
+  // Plugin → Manager (responses)
+  oneof response_from_yourplugin {
+    YourResponse1 response1 = 1011;
+  }
+  
+  // Plugin → Manager (requests/callbacks)
+  oneof request_from_yourplugin {
+    YourManagerRequest1 mgr_request1 = 2010;
+  }
+  
+  // Manager → Plugin (responses to callbacks)
+  oneof response_to_yourplugin {
+    YourManagerResponse1 mgr_response1 = 2011;
+  }
+}
+```
+
+**Always regenerate protobuf code after modifying `.proto` files:**
+```bash
+gradle :toolkit:go:protoc  # For Go
+gradle :toolkit:java:generateProto  # For Java
+```
+
+### Configuration Pattern
+```go
+func (h *Handler) handleConfigure(ctx context.Context, req *prototk.ConfigureRequest) {
+    var config PluginConfig
+    json.Unmarshal([]byte(req.ConfigJson), &config)
+    
+    // Validate config
+    if config.Setting1 == "" {
+        return nil, fmt.Errorf("setting1 required")
+    }
+    
+    // Store config
+    h.impl.config = &config
+    
+    // Build response
+    resp := h.ctx.Wrap(new(prototk.YourMessage))
+    resp.Message().ResponseFromPlugin = &prototk.YourMessage_ConfigureRes{
+        ConfigureRes: &prototk.ConfigureResponse{},
+    }
+    return resp, nil
+}
+```
+
+### Error Handling Pattern
+```go
+func (h *Handler) handleRequest(ctx context.Context, req ...) (plugintk.PluginMessage[...], error) {
+    result, err := h.doOperation(ctx, req)
+    if err != nil {
+        // Build error response (NOT return error directly cause that breaks stream)
+        resp := h.ctx.Wrap(new(prototk.YourMessage))
+        resp.Header().MessageType = prototk.Header_ERROR_RESPONSE
+        errMsg := err.Error()
+        resp.Header().ErrorMessage = &errMsg
+        return resp, nil  // Return message with error
+    }
+    
+    // Build success response
+    resp := h.ctx.Wrap(new(prototk.YourMessage))
+    resp.Message().ResponseFromPlugin = &prototk.YourMessage_SuccessRes{...}
+    return resp, nil
+}
+```
+
+### Plugin-to-Manager Request Pattern
+```go
+func (h *Handler) requestFromManager(ctx context.Context, req *prototk.ManagerRequest) (*prototk.ManagerResponse, error) {
+    reqMsg := h.ctx.Wrap(new(prototk.YourMessage))
+    reqMsg.Message().RequestFromPlugin = &prototk.YourMessage_ManagerReq{
+        ManagerReq: req,
+    }
+    
+    // Send and wait for response
+    respMsg, err := h.ctx.RequestFromPlugin(ctx, reqMsg)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Extract response
+    resp := respMsg.Message().ResponseToPlugin.(*prototk.YourMessage_ManagerResp)
+    return resp.ManagerResp, nil
+}
+```
+
+## Testing Requirements
+
+### Three-Layer Testing Approach
+
+1. **Layer 1: Plugin Type Tests** (`toolkit/go/pkg/plugintk/plugin_type_*_test.go`)
+   - Test framework, message handling, handler logic
+   - Use `pluginExerciser` for request/response testing
+   - Use `setupYourTypeTests()` helper pattern
+
+2. **Layer 2: Bridge Tests** (`core/go/internal/plugins/*_test.go`)
+   - Test bridge creation, initialization tracking
+   - Test configuration flows
+   - Test request/response flows (both directions if bidirectional)
+   - Use `UnitTestPluginLoader` for integration testing
+
+3. **Layer 3: Manager Tests** (`core/go/internal/yourtypemgr/manager_test.go`)
+   - Test manager lifecycle (PreInit, PostInit, Start, Stop)
+   - Test bridge registration and retrieval
+   - Test thread safety with concurrent access
+   - Test `WaitForInit()` behavior
+
+
+
+### Testing Tools
+
+- **`testController`**: Simulated gRPC server for isolated testing
+- **`pluginExerciser`**: Request/response flow testing with correlation ID matching
+- **`UnitTestPluginLoader`**: Load plugins in-process without shared library compilation
+- **Component Tests**: Full Paladin integration testing
+
+### Critical Test Patterns
+
+**Initialization Pattern Test:**
+```go
+func TestPluginInitialization(t *testing.T) {
+    ctx, pm, pmDone := newTestPluginManager(t, setup)
+    defer pmDone()
+    
+    loader, err := plugins.NewUnitTestPluginLoader(pm.GRPCTargetURL(), pm.LoaderID().String(), map[string]plugintk.Plugin{
+        "plugin1": NewPlugin(impl),
+    })
+    require.NoError(t, err)
+    
+    done := make(chan struct{})
+    go func() {
+        defer close(done)
+        loader.Run()
+    }()
+    defer func() {
+        loader.Stop()
+        <-done
+    }()
+    
+    // CRITICAL: Wait for initialization before testing
+    err = pm.WaitForInit(ctx)
+    require.NoError(t, err)
+    
+    // Now safe to test plugin functionality
+}
+```
+
+## File Organization
+
+### Plugin Implementation Files
+- **Bridge**: `core/go/internal/plugins/yourtype.go`
+- **Manager**: `core/go/internal/yourtypemgr/manager.go`
+- **Toolkit Factory**: `toolkit/go/pkg/plugintk/plugin_type_yourtype.go`
+- **Tests**: Follow three-layer testing approach above
+
+### Reference Implementations
+- **Domain**: `core/go/internal/plugins/domains.go` (lines 47-373)
+- **Transport**: `core/go/internal/plugins/transports.go` (lines 48-168)
+- **Registry**: `core/go/internal/plugins/registries.go` (lines 47-107)
+- **Signing Module**: `core/go/internal/plugins/signing_modules.go` (lines 47-144)
+- **RPC Auth**: `core/go/internal/plugins/rpcauth.go` (lines 55-146)
+
+## Critical Rules Summary
+
+1. ✅ **ALWAYS use standard bridge structure** (all 6 fields, even for unidirectional plugins)
+2. ✅ **ALWAYS implement `Initialized()`** (calls `plugin.notifyInitialized()`)
+3. ✅ **ALWAYS implement `RequestReply()`** (no-op for unidirectional is OK)
+4. ✅ **NEVER call plugin API functions before `Initialized()` is called**
+5. ✅ **ALWAYS follow strict initialization sequence** (REGISTER → CONFIGURE → INIT → Initialized())
+6. ✅ **ALWAYS use correlation IDs** for request/response matching
+7. ✅ **ALWAYS return error responses in message format** (not as Go errors)
+8. ✅ **ALWAYS regenerate protobuf code** after modifying `.proto` files
+9. ✅ **ALWAYS test at three layers** (plugin type, bridge, manager)
+10. ✅ **ALWAYS wait for `WaitForInit()`** before testing plugin functionality
+
+ 
+## Code Examples
+
+### Complete Domain Plugin Example
+```go
+package main
+
+import (
+    "context"
+    "C"
+    "encoding/json"
+    
+    "github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
+    "github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
+)
+
+type DomainPluginImpl struct {
+    config *Config
+}
+
+type Config struct {
+    ChainID   string `json:"chainID"`
+    RPCURL    string `json:"rpcURL"`
+}
+
+func (p *DomainPluginImpl) Wrap(msg prototk.DomainMessage) plugintk.PluginMessage[prototk.DomainMessage] {
+    return &plugintk.DomainMessageWrapper{DomainMessage: msg}
+}
+
+func (p *DomainPluginImpl) NewHandler(
+    ctx plugintk.PluginContext[prototk.DomainMessage],
+) plugintk.PluginHandler[prototk.DomainMessage] {
+    return &DomainHandler{ctx: ctx, impl: p}
+}
+
+type DomainHandler struct {
+    ctx  plugintk.PluginContext[prototk.DomainMessage]
+    impl *DomainPluginImpl
+}
+
+func (h *DomainHandler) RequestToPlugin(
+    ctx context.Context,
+    req plugintk.PluginMessage[prototk.DomainMessage],
+) (plugintk.PluginMessage[prototk.DomainMessage], error) {
+    
+    switch r := req.Message().RequestToDomain.(type) {
+    case *prototk.DomainMessage_ConfigureDomain:
+        return h.configure(ctx, r.ConfigureDomain)
+    case *prototk.DomainMessage_InitDomain:
+        return h.init(ctx, r.InitDomain)
+    default:
+        return nil, fmt.Errorf("unknown request: %T", r)
+    }
+}
+
+func (h *DomainHandler) configure(
+    ctx context.Context,
+    req *prototk.ConfigureDomainRequest,
+) (plugintk.PluginMessage[prototk.DomainMessage], error) {
+    
+    var config Config
+    if err := json.Unmarshal([]byte(req.ConfigJson), &config); err != nil {
+        return nil, err
+    }
+    
+    h.impl.config = &config
+    
+    resp := h.ctx.Wrap(new(prototk.DomainMessage))
+    resp.Message().ResponseFromDomain = &prototk.DomainMessage_ConfigureDomainRes{
+        ConfigureDomainRes: &prototk.ConfigureDomainResponse{},
+    }
+    
+    return resp, nil
+}
+
+func main() {
+    impl := &DomainPluginImpl{}
+    
+    plugin := plugintk.NewDomain(prototk.PluginInfo_DOMAIN, func(
+        ctx context.Context,
+        client prototk.PluginControllerClient,
+    ) (grpc.BidiStreamingClient[prototk.DomainMessage, prototk.DomainMessage], error) {
+        return client.ConnectDomain(ctx)
+    }, impl)
+    
+    ple := plugintk.NewPluginLibraryEntrypoint(func() plugintk.PluginBase {
+        return plugin
+    })
+    
+    // C exports would go here
+}
+
+//export Run
+func Run(grpcTargetPtr, pluginUUIDPtr *C.char) int {
+    return ple.Run(C.GoString(grpcTargetPtr), C.GoString(pluginUUIDPtr))
+}
+
+//export Stop
+func Stop(pluginUUIDPtr *C.char) {
+    ple.Stop(C.GoString(pluginUUIDPtr))
+}
+```
+
+### Message Flow Examples
+
+**Manager → Plugin Request:**
+```
+Manager: [REQUEST_TO_PLUGIN] message_id=X correlation_id=nil
+         ...
+Plugin:  [RESPONSE_FROM_PLUGIN] message_id=Y correlation_id=X
+```
+
+**Plugin → Manager Request:**
+```
+Plugin:  [REQUEST_FROM_PLUGIN] message_id=A correlation_id=nil
+         ...
+Manager: [RESPONSE_TO_PLUGIN] message_id=B correlation_id=A
+```
+
+## Anti-Patterns to Avoid
+
+### ❌ Calling Plugin API Before Initialization
+```go
+// WRONG - Will cause hangs!
+br := &domainBridge{...}
+pm.domainManager.DomainRegistered(pluginName, pluginID, bridge)
+br.ConfigureDomain(ctx, config)  // NEVER call before Initialized()!
+```
+
+### ❌ Returning Go Errors Instead of Error Messages
+```go
+// WRONG - Breaks gRPC stream
+func (h *Handler) handleRequest(ctx context.Context, req ...) (plugintk.PluginMessage[...], error) {
+    result, err := h.doOperation(ctx, req)
+    if err != nil {
+        return nil, err  // ❌ Don't return Go errors
+    }
+    // ...
+}
+
+// ✅ CORRECT - Return error message
+func (h *Handler) handleRequest(ctx context.Context, req ...) (plugintk.PluginMessage[...], error) {
+    result, err := h.doOperation(ctx, req)
+    if err != nil {
+        resp := h.ctx.Wrap(new(prototk.YourMessage))
+        resp.Header().MessageType = prototk.Header_ERROR_RESPONSE
+        errMsg := err.Error()
+        resp.Header().ErrorMessage = &errMsg
+        return resp, nil  // ✅ Return message with error
+    }
+    // ...
+}
+```
+
+### ❌ Skipping Bridge Structure for Unidirectional Plugins
+```go
+// WRONG - Inconsistent architecture
+type RPCAuthBridge struct {
+    plugin *plugin[prototk.RPCAuthMessage]
+    // Missing standard fields
+}
+
+// ✅ CORRECT - Follow standard structure
+type RPCAuthBridge struct {
+    plugin     *plugin[prototk.RPCAuthMessage]      // ✅ Standard field
+    pluginType string                               // ✅ Standard field
+    pluginName string                               // ✅ Standard field
+    pluginId   string                               // ✅ Standard field
+    toPlugin   managerToPlugin[prototk.RPCAuthMessage]  // ✅ Standard field
+    manager    plugintk.RPCAuthCallbacks           // ✅ Standard field (empty for unidirectional)
+}
+```
+

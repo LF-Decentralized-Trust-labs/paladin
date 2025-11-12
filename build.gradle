@@ -23,6 +23,10 @@ def signingmodules = [
     'signingmodules/example/build/libs',
 ]
 
+def rpcAuths = [
+    'rpcauth/basicauth/build/libs',
+]
+
 def uiClient = [
     'ui/client/dist',
 ]
@@ -36,6 +40,7 @@ def assembleSubprojects = [
     ':domains:zeto',
     ':registries:static',
     ':registries:evm',
+    ':rpcauth:basicauth',
     ':signingmodules:example',
     ':transports:grpc',
     ':ui:client',
@@ -188,6 +193,25 @@ task copyTransports(type: Copy) {
     }
 }
 
+task copyRPCAuth(type: Copy) {
+    def rpcAuthDir = file("${buildDir}/rpcauth")
+
+    doFirst {
+        rpcAuthDir.mkdirs()
+    }
+
+    rpcAuths.each { dir ->
+        from dir
+    }
+    into rpcAuthDir
+
+    outputs.upToDateWhen { false }
+
+    doLast {
+        println "Copied rpcauth plugins to ${rpcAuthDir}"
+    }
+}
+
 task copyUIFiles(type: Copy) {
     def uiDir = file("${buildDir}/ui")
 
@@ -281,7 +305,7 @@ task assemble {
     }
 }
 
-assemble.finalizedBy(copyLibraries, copyDomains, copyRegistries, copySigningModules, copyTransports, copyUIFiles, copyZetoZKPFiles)
+assemble.finalizedBy(copyLibraries, copyDomains, copyRegistries, copySigningModules, copyTransports, copyRPCAuth, copyUIFiles, copyZetoZKPFiles)
 
 defaultTasks 'build'
 

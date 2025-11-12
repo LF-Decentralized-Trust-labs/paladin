@@ -112,6 +112,12 @@ paladinNodes:
       #   type: preConfigured
       #   keySelector: .*      # Select all keys
 
+    # ======== RPC Authorization ========
+    # Configure RPC authorization using the basicauth reference implementation.
+    # The secret must exist and contain a key 'credentials.htpasswd' with htpasswd formatted credentials.
+    # rpcAuth:
+    #   secretName: paladin-basicauth-credentials  # Name of existing secret containing 'credentials.htpasswd' key
+
     # ======== Additional Config ========
     # Inline Paladin configuration; CR fields take precedence if duplicated
     config: |

@@ -67,6 +67,9 @@ type pluginManager struct {
 	signingModuleManager components.KeyManager
 	signingModulePlugins map[uuid.UUID]*plugin[prototk.SigningModuleMessage]
 
+	rpcAuthManager components.RPCAuthManager
+	authPlugins    map[uuid.UUID]*plugin[prototk.RPCAuthMessage]
+
 	notifyPluginsUpdated chan bool
 	notifySystemCommand  chan prototk.PluginLoad_SysCommand
 	pluginLoaderDone     chan struct{}
@@ -90,6 +93,7 @@ func NewPluginManager(bgCtx context.Context,
 		transportPlugins:     make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
 		registryPlugins:      make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
 		signingModulePlugins: make(map[uuid.UUID]*plugin[prototk.SigningModuleMessage]),
+		authPlugins:          make(map[uuid.UUID]*plugin[prototk.RPCAuthMessage]),
 
 		serverDone:           make(chan error),
 		notifyPluginsUpdated: make(chan bool, 1),
@@ -143,6 +147,7 @@ func (pm *pluginManager) PostInit(c components.AllComponents) error {
 	pm.transportManager = c.TransportManager()
 	pm.registryManager = c.RegistryManager()
 	pm.signingModuleManager = c.KeyManager()
+	pm.rpcAuthManager = c.RPCAuthManager()
 
 	if err := pm.ReloadPluginList(); err != nil {
 		return err
@@ -233,6 +238,11 @@ func (pm *pluginManager) ReloadPluginList() (err error) {
 			err = initPlugin(pm.bgCtx, pm, pm.registryPlugins, name, prototk.PluginInfo_REGISTRY, tp)
 		}
 	}
+	for name, ap := range pm.rpcAuthManager.ConfiguredRPCAuthorizers() {
+		if err == nil {
+			err = initPlugin(pm.bgCtx, pm, pm.authPlugins, name, prototk.PluginInfo_RPC_AUTH, ap)
+		}
+	}
 
 	if err != nil {
 		return err
@@ -269,6 +279,12 @@ func (pm *pluginManager) WaitForInit(ctx context.Context, pluginType prototk.Plu
 			}
 		case prototk.PluginInfo_TRANSPORT:
 			unloadedPlugins, _ := unloadedPlugins(pm, pm.transportPlugins, pluginType, false)
+			unloadedCount := len(unloadedPlugins)
+			if unloadedCount == 0 {
+				return nil
+			}
+		case prototk.PluginInfo_RPC_AUTH:
+			unloadedPlugins, _ := unloadedPlugins(pm, pm.authPlugins, pluginType, false)
 			unloadedCount := len(unloadedPlugins)
 			if unloadedCount == 0 {
 				return nil
@@ -424,6 +440,12 @@ func (pm *pluginManager) sendPluginsToLoader(stream prototk.PluginController_Ini
 		}
 		_, notInitializingRegistries := unloadedPlugins(pm, pm.registryPlugins, prototk.PluginInfo_REGISTRY, true)
 		for _, plugin := range notInitializingRegistries {
+			if err == nil {
+				err = stream.Send(plugin.def)
+			}
+		}
+		_, notInitializingAuth := unloadedPlugins(pm, pm.authPlugins, prototk.PluginInfo_RPC_AUTH, true)
+		for _, plugin := range notInitializingAuth {
 			if err == nil {
 				err = stream.Send(plugin.def)
 			}

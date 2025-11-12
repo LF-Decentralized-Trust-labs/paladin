@@ -515,6 +515,19 @@ spec:
                   - labelSelector
                   type: object
                 type: array
+              rpcAuth:
+                description: |-
+                  RPC authorization configuration using the basicauth reference implementation.
+                  The secret must contain a key named 'credentials.htpasswd' with the credentials file content.
+                properties:
+                  secretName:
+                    description: |-
+                      SecretName is the name of the Kubernetes secret containing the 'credentials.htpasswd' key
+                      with the htpasswd formatted credentials file content.
+                    type: string
+                required:
+                - secretName
+                type: object
               secretBackedSigners:
                 description: Adds signing modules that load their key materials from
                   a k8s secret

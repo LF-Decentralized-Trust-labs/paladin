@@ -131,6 +131,7 @@ COPY domains/noto domains/noto
 COPY domains/integration-test domains/integration-test
 COPY registries/static registries/static
 COPY registries/evm registries/evm
+COPY rpcauth/basicauth rpcauth/basicauth
 COPY signingmodules/example signingmodules/example
 COPY transports/grpc transports/grpc
 COPY ui/client ui/client

@@ -65,6 +65,7 @@ type testManagers struct {
 	testTransportManager *testTransportManager
 	testRegistryManager  *testRegistryManager
 	testKeyManager       *testKeyManager
+	testRPCAuthManager   *testRPCAuthManager
 }
 
 func (tm *testManagers) componentsmocks(t *testing.T) *componentsmocks.AllComponents {
@@ -86,6 +87,10 @@ func (tm *testManagers) componentsmocks(t *testing.T) *componentsmocks.AllCompon
 		tm.testKeyManager = &testKeyManager{}
 	}
 	mc.On("KeyManager").Return(tm.testKeyManager.mock(t)).Maybe()
+	if tm.testRPCAuthManager == nil {
+		tm.testRPCAuthManager = &testRPCAuthManager{}
+	}
+	mc.On("RPCAuthManager").Return(tm.testRPCAuthManager.mock(t)).Maybe()
 	mc.On("MetricsManager").Return(mm).Maybe()
 
 	return mc
@@ -104,6 +109,9 @@ func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
 	}
 	for name, tsm := range ts.testKeyManager.signingModules {
 		testPlugins[name] = tsm
+	}
+	for name, tam := range ts.testRPCAuthManager.rpcauthPlugins {
+		testPlugins[name] = tam
 	}
 	return testPlugins
 }

@@ -129,9 +129,10 @@ nav:
     - Atomic Swap: tutorials/atomic-swap.md
     - Bond Issuance: tutorials/bond-issuance.md
   - Administration:
-    - Configuration: administration/configuration.md
-    - Certificate Management: administration/certificate_management.md
     - Administering Peers: administration/administering_peers.md
+    - Authentication and Authorization: administration/auth.md
+    - Certificate Management: administration/certificate_management.md
+    - Configuration: administration/configuration.md
     - L1 and L2 Chains: administration/l1-and-l2-chains.md
     - Logging: administration/logging.md
   - Reference:

@@ -1,0 +1,41 @@
+---
+description: Toolkit package import path convention - omits /go from module path despite being in toolkit/go directory
+globs: toolkit/go/**
+alwaysApply: false
+---
+
+# Toolkit Package Naming Convention
+
+## Module Path Convention
+
+The `toolkit` package has a unique module path convention that differs from other Go packages in this repository:
+
+- **Physical directory location**: `toolkit/go/`
+- **Module path in go.mod**: `github.com/LFDT-Paladin/paladin/toolkit` (omits `/go`)
+- **Import path**: `github.com/LFDT-Paladin/paladin/toolkit/pkg/...` (omits `/go`)
+
+## Correct Usage
+
+When importing or referencing the toolkit package in code, documentation, or tool configuration:
+
+✅ **Use**: `github.com/LFDT-Paladin/paladin/toolkit/pkg/...`
+❌ **Don't use**: `github.com/LFDT-Paladin/paladin/toolkit/go/pkg/...`
+
+### Example Import
+
+```go
+import (
+    "github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
+    "github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
+    "github.com/LFDT-Paladin/paladin/toolkit/pkg/rpcserver"
+)
+```
+
+## Contrast with Other Packages
+
+Other Go packages in this repository follow a different pattern where the module path includes `/go`:
+
+- `common/go/`: module path is `github.com/LFDT-Paladin/paladin/common/go`
+- `sdk/go/`: module path is `github.com/LFDT-Paladin/paladin/sdk/go`
+
+The toolkit package intentionally breaks this pattern by omitting `/go` from its module path, even though its files are located in `toolkit/go/`. This is a deliberate design decision and must be maintained consistently across all references.

@@ -40,6 +40,9 @@ const (
 	RPCCodeParseError     RPCCode = -32700
 	RPCCodeInvalidRequest RPCCode = -32600
 	RPCCodeInternalError  RPCCode = -32603
+	// JSON-RPC 2.0 specification reserves -32000 to -32099 for "implementation-defined server-errors"
+	// Paladin uses this range for custom application errors like authentication failures
+	RPCCodeUnauthorized RPCCode = -32000 // Unauthorized request - authentication failed
 )
 
 // NewRPCClient Constructor

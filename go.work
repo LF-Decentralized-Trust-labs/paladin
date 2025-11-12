@@ -13,6 +13,7 @@ use (
 	./perf
 	./registries/evm
 	./registries/static
+	./rpcauth/basicauth
 	./sdk/go
 	./signingmodules/example
 	./testinfra
