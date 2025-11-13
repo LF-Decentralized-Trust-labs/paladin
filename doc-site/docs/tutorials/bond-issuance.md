@@ -1,6 +1,6 @@
 # Bond Issuance
 
-The code for this tutorial can be found in [examples/bond](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/bond).
+The code for this tutorial can be found in [examples/bond](https://github.com/LFDT-Paladin/paladin/blob/main/examples/bond).
 
 This shows how to leverage the [Noto](../../architecture/noto/) and [Pente](../../architecture/pente/) domains together in order to build a bond issuance process, illustrating multiple aspects of Paladin's privacy capabilities.
 
@@ -9,7 +9,7 @@ This shows how to leverage the [Noto](../../architecture/noto/) and [Pente](../.
 ## Running the example
 
 Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paladin environment, and
-then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/bond/README.md)
+then follow the example [README](https://github.com/LFDT-Paladin/paladin/blob/main/examples/bond/README.md)
 to run the code.
 
 ## Explanation
@@ -98,7 +98,7 @@ await paladin1.sendTransaction({
 });
 ```
 
-This sends a public EVM transaction to deploy the [public bond tracker](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/shared/BondTrackerPublic.sol).
+This sends a public EVM transaction to deploy the [public bond tracker](https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/shared/BondTrackerPublic.sol).
 This is equivalent to performing a deploy directly on the base ledger, without any special
 handling for privacy.
 
@@ -117,8 +117,8 @@ const bondTracker = await newBondTracker(issuerCustodianGroup, bondIssuer, {
 });
 ```
 
-The [private bond tracker](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/private/BondTracker.sol)
-is an ERC-20 token, and implements the [INotoHooks](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/domains/interfaces/INotoHooks.sol) interface.
+The [private bond tracker](https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/private/BondTracker.sol)
+is an ERC-20 token, and implements the [INotoHooks](https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/domains/interfaces/INotoHooks.sol) interface.
 
 Noto supports using a Pente private smart contract to define "hooks" which are executed inline with every mint/transfer.
 This provides a flexible (and EVM-native) means of writing custom policies that are enforced by the notary. In this case,
@@ -166,7 +166,7 @@ await paladin1.sendTransaction({
 
 Many programming patterns in Paladin will require a contract on the shared ledger that
 can prepare and execute atomic transactions. This is provided by the
-[Atom and AtomFactory](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/shared/Atom.sol) contracts.
+[Atom and AtomFactory](https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/shared/Atom.sol) contracts.
 
 At least one instance of `AtomFactory` must be deployed to run this example. Once in place,
 note that this same factory contract can be reused for atomic transactions of any composition.
@@ -246,7 +246,7 @@ const bondSubscription = await newBondSubscription(
 );
 ```
 
-An investor may request to subscribe to the bond by creating a [private subscription contract](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/private/BondSubscription.sol)
+An investor may request to subscribe to the bond by creating a [private subscription contract](https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/private/BondSubscription.sol)
 in their private EVM with the bond custodian.
 
 #### Prepare cash transfer

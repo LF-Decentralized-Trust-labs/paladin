@@ -18,7 +18,7 @@ package transport
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
 )
 
 type LoopbackTransportManager interface {

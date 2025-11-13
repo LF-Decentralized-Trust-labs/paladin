@@ -5,21 +5,29 @@
 # This workflow (phase 2) creates the final release after RC testing has been completed.
 name: Release
 
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  
 on:
-  push:
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
     inputs:
+      rc_tag:
+        required: true
+        type: string
+        description: 'RC tag to create the final release from (e.g. v1.2.3-rc.1)'
+
+      tag:
+        required: true
+        type: string
+        description: 'Release tag (e.g. v1.2.3)'
+
       latest:
         required: false
         type: boolean
         default: true
         description: 'Whether to mark this as the latest release'
-      tag:
-        required: true
-        type: string
-        description: 'Release tag (chart and images)'
 
 jobs:
   # ================================ SETUP ================================
@@ -30,6 +38,7 @@ jobs:
       tag: ${{ steps.set-vars.outputs.tag }}
       latest: ${{ steps.set-vars.outputs.latest }}
       sdk_tag: ${{ steps.set-vars.outputs.sdk_tag }}
+      rc_tag: ${{ steps.set-vars.outputs.rc_tag }}
     steps:
       - id: set-vars
         shell: bash
@@ -38,25 +47,32 @@ jobs:
           REF: ${{ github.ref }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
           INPUT_LATEST: ${{ github.event.inputs.latest }}
+          INPUT_RC_TAG: ${{ github.event.inputs.rc_tag }}
         run: |
-          if [[ "$EVENT_NAME" == "push" && "$REF" == refs/tags/v* ]]; then
-            echo "Tag push event"
-            TAG="${REF##*/}"
-            LATEST="true"
-          else
-            echo "Workflow dispatch or other event"
-            TAG="$INPUT_TAG"
-            # Ensure INPUT_LATEST is 'true' or 'false' string
-            if [[ "$INPUT_LATEST" == "true" ]]; then
-              LATEST="true"
-            else
-              LATEST="false"
-            fi
+          
+          echo "Workflow dispatch or other event"
+          TAG="$INPUT_TAG"
+          RC_TAG="$INPUT_RC_TAG"
+          
+          # Validate tags begin with 'v'
+          if [[ ! "$TAG" =~ ^v ]]; then
+            echo "Error: Release tag must begin with 'v' (e.g., v1.2.3)"
+            echo "Got: $TAG"
+            exit 1
           fi
-
-          if [[ "$LATEST" ==  "true" ]]; then
+          
+          if [[ ! "$RC_TAG" =~ ^v ]]; then
+            echo "Error: RC tag must begin with 'v' (e.g., v1.2.3-rc.1)"
+            echo "Got: $RC_TAG"
+            exit 1
+          fi
+          
+          # Ensure INPUT_LATEST is 'true' or 'false' string
+          if [[ "$INPUT_LATEST" == "true" ]]; then
+            LATEST="true"
             SDK_TAG="latest"
           else
+            LATEST="false"
             SDK_TAG="stable"
           fi
 
@@ -64,6 +80,7 @@ jobs:
             echo "tag=$TAG"
             echo "latest=$LATEST"
             echo "sdk_tag=$SDK_TAG"
+            echo "rc_tag=$RC_TAG"
           } >> $GITHUB_OUTPUT
       
       - id: new-tag
@@ -72,24 +89,32 @@ jobs:
         with:
           version: ${{ steps.set-vars.outputs.tag }}
           
-      - id: ref-tag
-        name: Validate ref tag follows semver versioning
+      - id: rc-tag
+        name: Validate RC tag follows semver versioning
         uses: matt-usurp/validate-semver@v2
         with:
-          version: ${{ github.ref }}
+          version: ${{ steps.set-vars.outputs.rc_tag }}
           
       - name: Validate workflow triggered from RC tag only
         shell: bash
         env:
-          REF_TAG_PRERELEASE: ${{ steps.ref-tag.outputs.prerelease }}
-          REF_TAG_VERSION: ${{ steps.ref-tag.outputs.version }}
+          RC_TAG_PRERELEASE: ${{ steps.rc-tag.outputs.prerelease }}
+          RC_TAG_VERSION: ${{ steps.rc-tag.outputs.version }}
         run: |
-          if [[ -z "$REF_TAG_PRERELEASE" ]]; then
-            echo "This workflow can only be triggered from an RC tag (e.g., v1.2.3-rc1)."
-            echo "Current ref: $REF"
+          if [[ -z "$RC_TAG_PRERELEASE" ]]; then
+            echo "This workflow can only be triggered from an RC tag (e.g. v1.2.3-rc.1)."
+            echo "Current RC tag: $RC_TAG_VERSION"
             exit 1
           fi
-          echo "Valid RC tag: $REF_TAG_VERSION"
+          
+          # Validate that prerelease follows rc.X format
+          if [[ ! "$RC_TAG_PRERELEASE" =~ ^rc\.[0-9]+$ ]]; then
+            echo "RC tag must follow the format vX.Y.Z-rc.W (e.g., v1.2.3-rc.1)."
+            echo "Current prerelease suffix: $RC_TAG_PRERELEASE"
+            exit 1
+          fi
+          
+          echo "Valid RC tag: $RC_TAG_VERSION"
 
       - name: Validate tag is final and RC exists
         shell: bash
@@ -99,9 +124,9 @@ jobs:
           NEW_TAG_MINOR: ${{ steps.new-tag.outputs.minor }}
           NEW_TAG_PATCH: ${{ steps.new-tag.outputs.patch }}
           NEW_TAG_VERSION: ${{ steps.new-tag.outputs.version }}
-          REF_TAG_MAJOR: ${{ steps.ref-tag.outputs.major }}
-          REF_TAG_MINOR: ${{ steps.ref-tag.outputs.minor }}
-          REF_TAG_PATCH: ${{ steps.ref-tag.outputs.patch }}
+          RC_TAG_MAJOR: ${{ steps.rc-tag.outputs.major }}
+          RC_TAG_MINOR: ${{ steps.rc-tag.outputs.minor }}
+          RC_TAG_PATCH: ${{ steps.rc-tag.outputs.patch }}
         run: |
           # Ensure the tag is NOT an RC
           if [[ -n "$NEW_TAG_PRERELEASE" ]]; then
@@ -109,16 +134,16 @@ jobs:
             exit 1
           fi
 
-          if [[ "$REF_TAG_MAJOR" != "$NEW_TAG_MAJOR" ]]; then
-            echo "New tag major version does not match ref tag major version $REF_TAG_MAJOR != $NEW_TAG_MAJOR"
+          if [[ "$RC_TAG_MAJOR" != "$NEW_TAG_MAJOR" ]]; then
+            echo "New tag major version does not match RC tag major version $RC_TAG_MAJOR != $NEW_TAG_MAJOR"
             exit 1
           fi
-          if [[ "$REF_TAG_MINOR" != "$NEW_TAG_MINOR" ]]; then
-            echo "New tag minor version does not match ref tag minor version $REF_TAG_MINOR != $NEW_TAG_MINOR"
+          if [[ "$RC_TAG_MINOR" != "$NEW_TAG_MINOR" ]]; then
+            echo "New tag minor version does not match RC tag minor version $RC_TAG_MINOR != $NEW_TAG_MINOR"
             exit 1
           fi
-          if [[ "$REF_TAG_PATCH" != "$NEW_TAG_PATCH" ]]; then
-            echo "New tag patch version does not match ref tag patch version $REF_TAG_PATCH != $NEW_TAG_PATCH"
+          if [[ "$RC_TAG_PATCH" != "$NEW_TAG_PATCH" ]]; then
+            echo "New tag patch version does not match RC tag patch version $RC_TAG_PATCH != $NEW_TAG_PATCH"
             exit 1
           fi
 
@@ -129,12 +154,14 @@ jobs:
   # Build and prepare all final release artifacts (images, charts, contracts, SDK)
   # These are the same artifacts that were tested in the RC phase
 
-  # Build and publish final release images
+  # Retag RC images with final release tags (much faster than rebuilding)
   release-images:
     needs: setup
-    uses: ./.github/workflows/release-images.yaml
+    uses: ./.github/workflows/retag-images.yaml
     with:
-      tag: ${{ needs.setup.outputs.tag }}
+      ref: ${{ needs.setup.outputs.rc_tag }}
+      source_tag: ${{ needs.setup.outputs.rc_tag }}
+      target_tag: ${{ needs.setup.outputs.tag }}
       latest: '${{ fromJSON(needs.setup.outputs.latest) }}'
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -145,9 +172,11 @@ jobs:
     needs: [setup, release-images]
     uses: ./.github/workflows/release-charts.yaml
     with:
+      ref: ${{ needs.setup.outputs.rc_tag }}
       chart_tag: ${{ needs.setup.outputs.tag }}
       images_tag: ${{ needs.setup.outputs.tag }}
       registry: docker.io
+      
     secrets:
       CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -155,6 +184,7 @@ jobs:
     needs: [setup, release-charts]
     uses: ./.github/workflows/test-examples.yaml
     with:
+      ref: ${{ needs.setup.outputs.rc_tag }}
       build_local_abi: true
       build_local_sdk: true
       chart_tag: ${{ needs.setup.outputs.tag }}
@@ -164,6 +194,7 @@ jobs:
     needs: [setup, test-examples]
     uses: ./.github/workflows/release-solidity-contracts.yaml
     with:
+      ref: ${{ needs.setup.outputs.rc_tag }}
       tag: ${{ needs.setup.outputs.tag }}
 
   # Release final TypeScript SDK
@@ -171,18 +202,55 @@ jobs:
     needs: [setup, test-examples]
     uses: ./.github/workflows/release-typescript-sdk.yaml
     with:
+      ref: ${{ needs.setup.outputs.rc_tag }}
       sdk_version: ${{ needs.setup.outputs.tag }}
       sdk_tag: ${{ needs.setup.outputs.sdk_tag }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }} 
 
+  # ================================ Prepare release ================================
+  # Override SDK version in examples and create a release branch
+  prepare-release:
+    needs: [setup, release-solidity-contracts, release-typescript-sdk]
+    runs-on: ubuntu-latest
+    outputs:
+      new_sha: ${{ steps.commit.outputs.NEW_SHA }}
+
+    steps:
+    - name: Checkout repository code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        ref: ${{ needs.setup.outputs.rc_tag }}
+
+    - name: override examples sdk version
+      uses: ./.github/actions/override-sdk-version
+      with:
+        sdk_version: ${{ needs.setup.outputs.tag }}
+
+    - name: Commit changes
+      id: commit
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add examples/
+        git commit -m "chore: Update SDK version in examples to ${{ needs.setup.outputs.tag }}"
+        git push origin HEAD:refs/heads/release-${{ needs.setup.outputs.tag }}
+        echo "NEW_SHA=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
   # ================================ CREATE FINAL RELEASE ================================
   # Bundle all built artifacts and create the final GitHub release
   # This step only runs after all artifacts have been successfully built and published
   create-final-release:
-    needs: [setup, release-solidity-contracts, release-typescript-sdk]
+    needs: [setup, prepare-release]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ needs.setup.outputs.rc_tag }}
+
       - name: Download Helm artifacts
         uses: actions/download-artifact@v4
         with:
@@ -198,11 +266,11 @@ jobs:
       - name: List downloaded artifacts
         run: |
           ls -R
-
       - name: Create final release with all artifacts
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.setup.outputs.tag }}
+          target_commitish: ${{ needs.prepare-release.outputs.new_sha }}
           body: "Release ${{ needs.setup.outputs.tag }}"
           generate_release_notes: true
           make_latest: '${{ fromJSON(needs.setup.outputs.latest) }}'

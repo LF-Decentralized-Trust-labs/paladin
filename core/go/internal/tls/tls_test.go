@@ -31,7 +31,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"

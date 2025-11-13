@@ -18,7 +18,7 @@ package domain
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 )
 
 type MockDomainCallbacks struct {

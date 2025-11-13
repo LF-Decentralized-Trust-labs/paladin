@@ -2,7 +2,7 @@
 
 This example demonstrates a privacy-preserving fungible tokens using [Zeto](https://github.com/hyperledger-labs/zeto) on Paladin.
 
-See the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tutorials/zkp-cbdc/) for a detailed explanation.
+See the [tutorial](https://LFDT-Paladin.github.io/paladin/head/tutorials/zkp-cbdc/) for a detailed explanation.
 
 ## Pre-requisites
 

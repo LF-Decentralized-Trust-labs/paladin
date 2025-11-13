@@ -21,19 +21,19 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/statemgr"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/blockindexermocks"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/ethclientmocks"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/statemgr"
+	"github.com/LFDT-Paladin/paladin/core/mocks/blockindexermocks"
+	"github.com/LFDT-Paladin/paladin/core/mocks/componentsmocks"
+	"github.com/LFDT-Paladin/paladin/core/mocks/ethclientmocks"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence/mockpersistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence/mockpersistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -53,7 +53,7 @@ type mockComponents struct {
 	publicTxManager  *componentsmocks.PublicTxManager
 }
 
-func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *domainManager, *mockComponents, func()) {
+func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManagerInlineConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *domainManager, *mockComponents, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
 	allComponents := componentsmocks.NewAllComponents(t)
@@ -133,7 +133,7 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManager
 }
 
 func TestConfiguredDomains(t *testing.T) {
-	_, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	_, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"test1": {
 				Plugin: pldconf.PluginConfig{
@@ -155,7 +155,7 @@ func TestConfiguredDomains(t *testing.T) {
 }
 
 func TestDomainRegisteredNotFound(t *testing.T) {
-	_, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	_, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),
@@ -169,7 +169,7 @@ func TestDomainRegisteredNotFound(t *testing.T) {
 }
 
 func TestDomainMissingRegistryAddress(t *testing.T) {
-	config := &pldconf.DomainManagerConfig{
+	config := &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				Plugin: pldconf.PluginConfig{
@@ -214,7 +214,7 @@ func TestDomainMissingRegistryAddress(t *testing.T) {
 }
 
 func TestGetDomainNotFound(t *testing.T) {
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),
@@ -271,7 +271,7 @@ func TestWaitForDeployDomainNotFound(t *testing.T) {
 	domainAddr := pldtypes.RandAddress()
 	contractAddr := pldtypes.RandAddress()
 
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),
@@ -308,7 +308,7 @@ func TestWaitForDeployDomainNotFound(t *testing.T) {
 }
 
 func TestWaitForDeployNotADeploy(t *testing.T) {
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),
@@ -341,7 +341,7 @@ func TestWaitForDeployNotADeploy(t *testing.T) {
 }
 
 func TestWaitForDeployTimeout(t *testing.T) {
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),
@@ -357,7 +357,7 @@ func TestWaitForDeployTimeout(t *testing.T) {
 }
 
 func TestWaitForTransactionTimeout(t *testing.T) {
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerInlineConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
 				RegistryAddress: pldtypes.RandHex(20),

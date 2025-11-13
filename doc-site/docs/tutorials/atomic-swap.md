@@ -1,13 +1,13 @@
 # Atomic Swap
 
-The code for this tutorial can be found in [examples/swap](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/swap).
+The code for this tutorial can be found in [examples/swap](https://github.com/LFDT-Paladin/paladin/blob/main/examples/swap).
 
 This example demonstrates an **atomic swap** scenario on Paladin, showing how to perform secure exchanges between different types of privacy-preserving tokens. It illustrates the power of combining multiple Paladin domains ([Zeto](../../architecture/zeto/), [Noto](../../architecture/noto/), and [Pente](../../architecture/pente/)) to create complex privacy-preserving operations with guaranteed atomicity on a single ledger.
 
 ## Running the example
 
 Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paladin environment, and
-then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/swap/README.md)
+then follow the example [README](https://github.com/LFDT-Paladin/paladin/blob/main/examples/swap/README.md)
 to run the code.
 
 ## Overview
@@ -43,7 +43,7 @@ Below is a walkthrough of each step in the example, with an explanation of what 
 const atomFactory = await newAtomFactory(paladin1, cashIssuer);
 ```
 
-The [Atom Factory](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/shared/Atom.sol) is a utility contract on the base ledger. It creates atomic transaction containers that can execute multiple operations as a single unit. While it is not a part of any Paladin domain, it is useful for coordinating operations from multiple domains.
+The [Atom Factory](https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/shared/Atom.sol) is a utility contract on the base ledger. It creates atomic transaction containers that can execute multiple operations as a single unit. While it is not a part of any Paladin domain, it is useful for coordinating operations from multiple domains.
 
 #### Deploy Zeto cash token
 

@@ -20,12 +20,12 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/pkg/ethclient"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -87,17 +87,11 @@ func (it *inFlightTransactionStageController) submitTX(ctx context.Context, sign
 			// We have some simple rules for handling reasons from the connector, which could be enhanced by extending the connector.
 			switch submissionErrorReason {
 			case ethclient.ErrorReasonTransactionUnderpriced:
-				// if this is not already a retry
-				// retry the request without using the oracle immediately as the oracle sometimes set the price too low for the node to accept
-				// this is because each node can set the gas price limit in the config which is independent from other nodes
-				// but a gas oracle typically come up the value based on the data collected from all nodes
-				it.gasPriceClient.DeleteCache(ctx)
-				log.L(ctx).Debug("Underpriced, removed gas price cache")
+				log.L(ctx).Debugf("Transaction %s underpriced", signerNonce)
 				submissionOutcome = SubmissionOutcomeFailedRequiresRetry
 			case ethclient.ErrorReasonTransactionReverted:
-				// transaction could be reverted due to gas estimate too low, clear the cache before try again
-				it.gasPriceClient.DeleteCache(ctx)
-				log.L(ctx).Debug("Transaction reverted, removed gas price cache")
+				// transaction could be reverted due to gas limit estimate too low
+				log.L(ctx).Debugf("Transaction %s reverted", signerNonce)
 				submissionOutcome = SubmissionOutcomeFailedRequiresRetry
 			case ethclient.ErrorKnownTransaction:
 				// check mined transaction also returns this error code

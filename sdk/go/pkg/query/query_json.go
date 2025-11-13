@@ -19,7 +19,7 @@ package query
 import (
 	"encoding/json"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 )
 
 type QueryJSON struct {

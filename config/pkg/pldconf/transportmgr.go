@@ -14,9 +14,9 @@
  */
 package pldconf
 
-import "github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+import "github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 
-type TransportManagerConfig struct {
+type TransportManagerInlineConfig struct {
 	NodeName              string                      `json:"nodeName"`
 	SendQueueLen          *int                        `json:"sendQueueLen"`
 	PeerInactivityTimeout *string                     `json:"peerInactivityTimeout"`
@@ -25,14 +25,14 @@ type TransportManagerConfig struct {
 	ReliableScanRetry     RetryConfig                 `json:"reliableScanRetry"`
 	ReliableMessageResend *string                     `json:"reliableMessageResend"`
 	ReliableMessageWriter FlushWriterConfig           `json:"reliableMessageWriter"`
-	Transports            map[string]*TransportConfig `json:"transports"`
+	Transports            map[string]*TransportConfig `json:"transports" configdefaults:"TransportConfigDefaults"`
 }
 
 type TransportInitConfig struct {
 	Retry RetryConfig `json:"retry"`
 }
 
-var TransportManagerDefaults = &TransportManagerConfig{
+var TransportManagerDefaults = TransportManagerInlineConfig{
 	SendQueueLen:          confutil.P(10),
 	ReliableMessageResend: confutil.P("30s"),
 	PeerInactivityTimeout: confutil.P("1m"),
@@ -58,4 +58,10 @@ type TransportConfig struct {
 	Init   TransportInitConfig `json:"init"`
 	Plugin PluginConfig        `json:"plugin"`
 	Config map[string]any      `json:"config"`
+}
+
+var TransportConfigDefaults = TransportConfig{
+	Init: TransportInitConfig{
+		Retry: GenericRetryDefaults.RetryConfig,
+	},
 }

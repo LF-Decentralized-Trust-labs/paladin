@@ -18,6 +18,7 @@ import PaladinClient, {
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import atomJson from "../abis/Atom.json";
 import atomFactoryJson from "../abis/AtomFactory.json";
+import { DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 
 export interface AtomOperation {
   contractAddress: string;
@@ -36,7 +37,7 @@ export const newAtomFactory = async (
     from: from.lookup,
     data: {},
   });
-  const receipt = await paladin.pollForReceipt(txID, 10000);
+  const receipt = await paladin.pollForReceipt(txID, DEFAULT_POLL_TIMEOUT);
   return receipt?.contractAddress
     ? new AtomFactory(paladin, receipt.contractAddress)
     : undefined;
@@ -61,7 +62,7 @@ export class AtomFactory {
       to: this.address,
       data: { operations },
     });
-    const receipt = await this.paladin.pollForReceipt(txID, 10000);
+    const receipt = await this.paladin.pollForReceipt(txID, DEFAULT_POLL_TIMEOUT);
     if (receipt) {
       const events = await this.paladin.bidx.decodeTransactionEvents(
         receipt.transactionHash,
@@ -97,6 +98,6 @@ export class Atom {
       to: this.address,
       data: {},
     });
-    return this.paladin.pollForReceipt(txID, 10000);
+    return this.paladin.pollForReceipt(txID, DEFAULT_POLL_TIMEOUT);
   }
 }

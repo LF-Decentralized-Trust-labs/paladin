@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2025 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -12,5 +12,26 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+package basicauth
 
-package publictxmgr
+import (
+	"encoding/json"
+	"fmt"
+)
+
+type Config struct {
+	CredentialsFile string `json:"credentialsFile"`
+}
+
+func parseConfig(configJSON string) (*Config, error) {
+	var config Config
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	if config.CredentialsFile == "" {
+		return nil, fmt.Errorf("credentialsFile is required")
+	}
+
+	return &config, nil
+}

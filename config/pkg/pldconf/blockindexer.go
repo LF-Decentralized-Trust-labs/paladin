@@ -19,7 +19,7 @@ package pldconf
 import (
 	"encoding/json"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 )
 
 type BlockIndexerConfig struct {
@@ -32,6 +32,7 @@ type BlockIndexerConfig struct {
 	EventStreams            EventStreamsConfig `json:"eventStreams"`
 	Retry                   RetryConfig        `json:"retry"`
 	IgnoredTransactionTypes []int64            `json:"ignoredTransactionTypes"`
+	InsertDBBatchSize       *int               `json:"insertDBBatchSize"` // Amount of tx and events to insert in a single DB transaction
 }
 
 type EventStreamsConfig struct {
@@ -39,12 +40,7 @@ type EventStreamsConfig struct {
 	CatchUpQueryPageSize     *int `json:"catchupQueryPageSize"`
 }
 
-var EventStreamDefaults = &EventStreamsConfig{
-	BlockDispatchQueueLength: confutil.P(100),
-	CatchUpQueryPageSize:     confutil.P(100),
-}
-
-var BlockIndexerDefaults = &BlockIndexerConfig{
+var BlockIndexerDefaults = BlockIndexerConfig{
 	FromBlock:               json.RawMessage(`0`),
 	CommitBatchSize:         confutil.P(50),
 	CommitBatchTimeout:      confutil.P("100ms"),
@@ -52,4 +48,9 @@ var BlockIndexerDefaults = &BlockIndexerConfig{
 	ChainHeadCacheLen:       confutil.P(50),
 	BlockPollingInterval:    confutil.P("10s"),
 	IgnoredTransactionTypes: []int64{0x7e},
+	InsertDBBatchSize:       confutil.P(5000),
+	EventStreams: EventStreamsConfig{
+		BlockDispatchQueueLength: confutil.P(100),
+		CatchUpQueryPageSize:     confutil.P(100),
+	},
 }

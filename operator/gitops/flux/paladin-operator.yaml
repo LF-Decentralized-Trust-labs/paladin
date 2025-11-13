@@ -9,7 +9,7 @@ metadata:
   name: paladin
   namespace: paladin
 spec:
-  url: https://LF-Decentralized-Trust-labs.github.io/paladin
+  url: https://LFDT-Paladin.github.io/paladin
   interval: 5m
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2beta1

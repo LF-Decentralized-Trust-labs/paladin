@@ -19,16 +19,17 @@ package statemgr
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/filters"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"gorm.io/gorm/clause"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 )
 
 type labelType int
@@ -77,6 +78,7 @@ func (ss *stateManager) persistSchemas(ctx context.Context, dbTX persistence.DBT
 }
 
 func (ss *stateManager) GetSchemaByID(ctx context.Context, dbTX persistence.DBTX, domainName string, schemaID pldtypes.Bytes32, failNotFound bool) (*pldapi.Schema, error) {
+	ctx = log.WithComponent(ctx, "statemanager")
 	s, err := ss.getSchemaByID(ctx, dbTX, domainName, schemaID, failNotFound)
 	if err != nil || s == nil {
 		return nil, err
@@ -156,6 +158,7 @@ func (ss *stateManager) ListSchemasForJSON(ctx context.Context, dbTX persistence
 }
 
 func (ss *stateManager) EnsureABISchemas(ctx context.Context, dbTX persistence.DBTX, domainName string, defs []*abi.Parameter) ([]components.Schema, error) {
+	ctx = log.WithComponent(ctx, "statemanager")
 	if len(defs) == 0 {
 		return nil, nil
 	}

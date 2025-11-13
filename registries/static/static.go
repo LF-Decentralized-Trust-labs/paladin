@@ -18,8 +18,8 @@ import (
 	"C"
 )
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/registries/static/internal/staticregistry"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LFDT-Paladin/paladin/registries/static/internal/staticregistry"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
 )
 
 var ple = plugintk.NewPluginLibraryEntrypoint(func() plugintk.PluginBase {

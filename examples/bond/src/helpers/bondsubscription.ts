@@ -3,6 +3,7 @@ import PaladinClient, {
   PentePrivacyGroup,
   PentePrivateContract,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
+import { DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import bondSubscription from "../abis/BondSubscription.json";
 
 const bondSubscriptionConstructor = bondSubscription.abi.find(
@@ -41,7 +42,7 @@ export const newBondSubscription = async (
       from: from.lookup,
       inputs: params,
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   return address ? new BondSubscription(pente, address) : undefined;
 };
 

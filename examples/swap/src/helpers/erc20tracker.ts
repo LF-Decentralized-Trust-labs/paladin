@@ -18,6 +18,7 @@ import PaladinClient, {
   PentePrivateContract,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
 import erc20Tracker from "../abis/NotoTrackerERC20.json";
+import { DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 
 export interface ERC20TrackerConstructorParams {
   name: string;
@@ -34,7 +35,7 @@ export const newERC20Tracker = async (
     bytecode: erc20Tracker.bytecode,
     from: from.lookup,
     inputs: params,
-  }).waitForDeploy(10000);
+  }).waitForDeploy(DEFAULT_POLL_TIMEOUT);
   return address ? new BondTracker(pente, address) : undefined;
 };
 

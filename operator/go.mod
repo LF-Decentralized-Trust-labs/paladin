@@ -1,17 +1,17 @@
-module github.com/LF-Decentralized-Trust-labs/paladin/operator
+module github.com/LFDT-Paladin/paladin/operator
 
 go 1.24.0
 
 toolchain go1.24.3
 
 require (
-	github.com/LF-Decentralized-Trust-labs/paladin/common/go v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/domains/noto v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/sdk/go v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/testinfra v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/toolkit v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/common/go v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/domains/noto v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/domains/zeto v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/sdk/go v0.0.0-20250828150332-fbc1c1bc663b
+	github.com/LFDT-Paladin/paladin/testinfra v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/google/uuid v1.6.0
 	github.com/hyperledger/firefly-signer v1.1.21
@@ -67,7 +67,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20241004174307-aa3c1fdf0966 // indirect
-	github.com/hyperledger/firefly-common v1.5.4 // indirect
+	github.com/hyperledger/firefly-common v1.5.6 // indirect
 	github.com/iden3/go-iden3-crypto v0.0.17 // indirect
 	github.com/iden3/go-rapidsnark/prover v0.0.12 // indirect
 	github.com/iden3/go-rapidsnark/types v0.0.3 // indirect
@@ -133,16 +133,16 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/common/go => ../common/go
+replace github.com/LFDT-Paladin/paladin/common/go => ../common/go
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../config
+replace github.com/LFDT-Paladin/paladin/config => ../config
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/domains/noto => ../domains/noto
+replace github.com/LFDT-Paladin/paladin/domains/noto => ../domains/noto
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto => ../domains/zeto
+replace github.com/LFDT-Paladin/paladin/domains/zeto => ../domains/zeto
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/testinfra => ../testinfra
+replace github.com/LFDT-Paladin/paladin/testinfra => ../testinfra
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/sdk/go => ../sdk/go
+replace github.com/LFDT-Paladin/paladin/sdk/go => ../sdk/go
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/toolkit => ../toolkit/go
+replace github.com/LFDT-Paladin/paladin/toolkit => ../toolkit/go

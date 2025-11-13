@@ -125,6 +125,9 @@ spec:
             description: SmartContractDeploymentStatus defines the observed state
               of SmartContractDeployment
             properties:
+              blockNumber:
+                format: int64
+                type: integer
               contractAddress:
                 type: string
               contractDepsSummary:

@@ -14,7 +14,7 @@ When a developer opens a PR, several automated checks are triggered to validate 
     > **Note:** Charts are **not published** but tested locally.
 
 - **[Test Examples](workflows/on-pr-push-examples.yaml):**
-  - **Status:** [![Test Examples](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/on-pr-push-examples.yaml/badge.svg?branch=main)](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/on-pr-push-examples.yaml)
+  - **Status:** [![Test Examples](https://github.com/LFDT-Paladin/paladin/actions/workflows/on-pr-push-examples.yaml/badge.svg?branch=main)](https://github.com/LFDT-Paladin/paladin/actions/workflows/on-pr-push-examples.yaml)
   - **Trigger:** Runs on pushes and pull requests to `main` that modify files under `examples/**`.
   - **Purpose:** Validates that example changes don't break existing functionality by running them against both the latest published and local versions of the SDK and contracts.
   - **Key Steps:**
@@ -36,7 +36,7 @@ When a developer opens a PR, several automated checks are triggered to validate 
 
 All checks must pass before PRs can be merged to the main branch.
 
-## Changes Pushed to Main 🌟
+## Changes Pushed to Main
 Once changes are merged into the `main` branch, workflows prepare the project for production:
 
 - **[Build (push)](workflows/on-push.yml):**  
@@ -53,10 +53,10 @@ Once changes are merged into the `main` branch, workflows prepare the project fo
 - **[Update Documentation](workflows/docs.yaml):**  
   Detects documentation updates and publishes the latest content to the documentation site.
 
-## Release Time 🚀
+## Release Time
 Paladin follows a two-stage release process to ensure quality and stability:
 
-### Stage 1: Release Candidate (RC) 🧪
+### [Stage 1: Release Candidate (RC)](https://github.com/LFDT-Paladin/paladin/actions/workflows/release-candidate.yaml)
 Release candidates are created first for testing and validation:
 
 - **[Release Candidate Workflow](workflows/release-candidate.yaml):**  
@@ -75,7 +75,7 @@ Release candidates are created first for testing and validation:
     Packages contract ABIs and deployment artifacts for distribution.
   - **GitHub Release:** Creates a pre-release with all artifacts
  
-### Stage 2: Final Release 🎯
+### [Stage 2: Final Release](https://github.com/LFDT-Paladin/paladin/actions/workflows/release.yaml)
 Once the RC has been tested and validated, the final release can be created:
 
 - **[Release Orchestrator](workflows/release.yaml):**  
@@ -99,14 +99,141 @@ Once the RC has been tested and validated, the final release can be created:
     Packages contract ABIs and deployment artifacts for distribution.
   - **GitHub Release:** Creates a final release with all artifacts
 
-### Releasing Options: 
-* **Release Candidate:** Trigger the [RC workflow](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/release-candidate.yaml) via the GitHub Actions interface, specifying the RC version.
-* **Release:** Trigger the [release workflow](https://github.com/LF-Decentralized-Trust-labs/paladin/actions/workflows/release.yaml) via the GitHub Actions interface, specifying the final version and selecting the "latest" option if needed.
+## How to Create a Release
+
+### Quick Start: Release Process
+Follow these steps to create a new Paladin release:
+
+#### Step 1: Create a Release Candidate
+1. Go to **[Actions → Release Candidate](https://github.com/LFDT-Paladin/paladin/actions/workflows/release-candidate.yaml)**
+2. Click **"Run workflow"**
+3. Enter the RC tag (e.g., `v1.2.3-rc.1`)
+4. Click **"Run workflow"**
+5. Wait for the workflow to complete and test the RC thoroughly
+
+#### Step 2: Create the Final Release
+1. Go to **[Actions → Release](https://github.com/LFDT-Paladin/paladin/actions/workflows/release.yaml)**
+2. Click **"Run workflow"**
+3. Fill in the required fields:
+   - **tag**: Final release version (e.g., `v1.2.3`)
+   - **rc_tag**: The RC tag you tested (e.g., `v1.2.3-rc.1`)
+   - **latest**: Check if this should be marked as the latest release
+4. Click **"Run workflow"**
+
+### Example Release Flow
+```
+1. Create RC:     v1.2.3-rc.1  → Test thoroughly
+2. Final Release: v1.2.3       → Built from v1.2.3-rc.1
+```
 
 ### Important Release Process Notes:
-- **RC Required:** Final releases can only be created if a corresponding RC exists
+- **RC Required:** Final releases must be built from a tested RC tag
 - **Testing:** Always test RCs thoroughly before promoting to final release
 - **Version Consistency:** The RC version must match the final version (e.g., `v1.0.0-rc.1` → `v1.0.0`)
+- **Format:** RC tags must follow `vX.Y.Z-rc.W` format (e.g., `v1.2.3-rc.1`)
+
+## Manual Docker Image Release
+
+> ⚠️ **Note:** This is **not the standard release process**.
+> Use this workflow only as a **workaround** when you need to release Docker images for testing, hotfixes, or other exceptional cases.
+> Official releases should always go through the [Release Candidate](#stage-1-release-candidate-rc-) and [Final Release](#stage-2-final-release-) workflows.
+
+Paladin includes a manual workflow for pushing Docker images to both DockerHub and GHCR.
+
+### How to Run
+
+1. Navigate to **Actions → [Image Release](https://github.com/LFDT-Paladin/paladin/actions/workflows/release-images.yaml)**.
+
+2. Click **"Run workflow"**.
+
+3. Fill in the required fields:
+
+   * **Tag:**
+
+     * Required.
+     * The version to tag the images with (e.g., `v0.1.0-hotfix.0`).
+   * **Whether to also tag the images with "latest":**
+
+     * Optional.
+     * Set to `true` only if you want this build to overwrite the `latest` tag.
+
+4. Click **Run workflow**.
+
+### What Happens
+
+* Builds cross-platform Docker images (`linux/amd64`, `linux/arm64`).
+* Pushes them to both:
+
+  * **DockerHub:** `docker.io/lfdecentralizedtrust/...`
+  * **GHCR:** `ghcr.io/lf-decentralized-trust-labs/...`
+* Tags include the version you specified, and optionally `latest`.
+
+### Example
+
+If you run with:
+
+* **Tag:** `v0.1.0-hotfix.0`
+* **Latest:** `false`
+
+Images will be published as:
+
+* `docker.io/lfdecentralizedtrust/paladin:v0.1.0-hotfix.0`
+* `ghcr.io/lf-decentralized-trust-labs/paladin:v0.1.0-hotfix.0`
+
+If you set **Latest = true**, the same images will also be tagged as `latest`.
+
+
+## Manual Helm Chart Release
+
+> ⚠️ **Note:** This is **not part of the standard release process**.
+> Use this workflow only as a **workaround** when you need to release a Helm chart for testing, debugging, or other exceptional cases.
+> Official releases should always go through the [Release Candidate](#stage-1-release-candidate-rc-) and [Final Release](#stage-2-final-release-) workflows.
+
+Paladin includes a manual workflow for publishing Helm charts outside of the normal release cycle.
+
+### How to Run
+
+1. Navigate to **Actions → [Release Helm Chart](https://github.com/LFDT-Paladin/paladin/actions/workflows/release-charts.yaml)**.
+
+2. Click **"Run workflow"**.
+
+3. Fill in the required fields:
+
+   * **Branch:** Choose the branch to release from (e.g., `main` or a feature branch).
+   * **Whether to mark the release as latest:** Optional.
+
+     * Leave unchecked for testing or patch releases.
+     * Check only if you explicitly want this to be marked as `latest`.
+   * **The docker registry to use for the images:**
+
+     * Options: `docker.io` or `ghcr.io` (default).
+   * **The images tags to patch the chart with:**
+
+     * Example: `main`, `test-branch`, or `v0.1.0-hotfix.0`.
+     * Must match an existing built/published image tag.
+   * **The helm chart tag to release the chart:**
+
+     * Example: `v0.1.0-hotfix.0`.
+     * Becomes the chart’s version in the repository.
+
+4. Click **Run workflow**.
+
+### What Happens
+
+* The workflow rebuilds the CRDs and Operator charts.
+* Patches image references and Helm dependencies with the provided tags.
+* Runs **Helm template validation** and **E2E tests**.
+* Publishes the chart to the [GitHub Pages chart repository](https://LFDT-Paladin.github.io/paladin).
+* Uploads deployment artifacts (`basenet.yaml`, `devnet.yaml`, `customnet.yaml`, etc.) for download.
+
+### Example
+
+If you run with:
+
+* **Images tag:** `test-branch`
+* **Helm chart tag:** `v0.1.0-hotfix.0`
+
+You will publish a Helm chart version `0.11.0-fix.0` that points to images built with the tag `test-branch`.
 
 
 ## Manual Actions 🛠️

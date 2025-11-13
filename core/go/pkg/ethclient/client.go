@@ -21,18 +21,18 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signpayloads"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/algorithms"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signerapi"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signpayloads"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -52,6 +52,7 @@ type EthClient interface {
 	CallContractNoResolve(ctx context.Context, tx *ethsigner.Transaction, block string, opts ...CallOption) (res CallResult, err error)
 	GetTransactionCount(ctx context.Context, fromAddr pldtypes.EthAddress) (transactionCount *pldtypes.HexUint64, err error)
 	SendRawTransaction(ctx context.Context, rawTX pldtypes.HexBytes) (*pldtypes.Bytes32, error)
+	FeeHistory(ctx context.Context, blockCount int, newestBlock string, rewardPercentiles []float64) (*FeeHistoryResult, error)
 }
 
 // Higher level client interface to the base Ethereum ledger for TX submission.
@@ -116,6 +117,14 @@ type CallResult struct {
 	Data          pldtypes.HexBytes
 	DecodedResult *abi.ComponentValue
 	RevertData    pldtypes.HexBytes
+}
+
+// FeeHistoryResult represents the result of eth_feeHistory RPC call
+type FeeHistoryResult struct {
+	OldestBlock   pldtypes.HexUint64      `json:"oldestBlock"`
+	BaseFeePerGas []pldtypes.HexUint256   `json:"baseFeePerGas"`
+	GasUsedRatio  []float64               `json:"gasUsedRatio"`
+	Reward        [][]pldtypes.HexUint256 `json:"reward"`
 }
 
 // Convenience func that bypasses errors and uses the serializer provided
@@ -321,6 +330,15 @@ func (ec *ethClient) GetTransactionCount(ctx context.Context, fromAddr pldtypes.
 		return nil, rpcErr
 	}
 	return &transactionCount, nil
+}
+
+func (ec *ethClient) FeeHistory(ctx context.Context, blockCount int, newestBlock string, rewardPercentiles []float64) (*FeeHistoryResult, error) {
+	var feeHistory FeeHistoryResult
+	if rpcErr := ec.rpc.CallRPC(ctx, &feeHistory, "eth_feeHistory", blockCount, newestBlock, rewardPercentiles); rpcErr != nil {
+		log.L(ctx).Errorf("eth_feeHistory failed: %+v", rpcErr)
+		return nil, rpcErr
+	}
+	return &feeHistory, nil
 }
 
 func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction, opts ...CallOption) (pldtypes.HexBytes, error) {

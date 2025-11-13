@@ -34,12 +34,12 @@ ext {
     targetCoverage = 91
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
-        'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto',
-        'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto/transaction',
-        'github.com/LF-Decentralized-Trust-labs/paladin/toolkit/prototk',
-        'github.com/LF-Decentralized-Trust-labs/paladin/core/internal/plugins/loader',
-        'github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/testbed',
-        'github.com/LF-Decentralized-Trust-labs/paladin/core/noderuntests',
+        'github.com/LFDT-Paladin/paladin/core/pkg/proto',
+        'github.com/LFDT-Paladin/paladin/core/pkg/proto/transaction',
+        'github.com/LFDT-Paladin/paladin/toolkit/prototk',
+        'github.com/LFDT-Paladin/paladin/core/internal/plugins/loader',
+        'github.com/LFDT-Paladin/paladin/core/pkg/testbed',
+        'github.com/LFDT-Paladin/paladin/core/noderuntests',
         'test_utils',
         'testutil',
         'mocks',
@@ -305,7 +305,29 @@ abstract class ComponentTest extends Exec {
         args 'test'
         args './noderuntests/componenttest', './pkg/testbed'
         args '-cover'
-        args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..." // toolkit handled seperately
+        args "-coverpkg=github.com/LFDT-Paladin/paladin/core/..." // toolkit handled seperately
+        args '-covermode=atomic'
+        args '-timeout=120s'
+        if (project.findProperty('verboseTests') == 'true') {
+            args '-v'
+        }
+        args "-test.gocoverdir=${project.projectDir}/coverage"
+
+        project.helpers.dumpLogsOnFailure(this, ':testinfra:startTestInfra')
+    }
+}
+
+abstract class GasComponentTest extends Exec {
+    GasComponentTest() {
+        inputs.files(project.goFiles)
+        outputs.dir('coverage')
+
+        workingDir '.'
+        executable 'go'
+        args 'test'
+        args './noderuntests/componenttest'
+        args '-cover'
+        args "-coverpkg=github.com/LFDT-Paladin/paladin/core/..."
         args '-covermode=atomic'
         args '-timeout=120s'
         if (project.findProperty('verboseTests') == 'true') {
@@ -331,7 +353,7 @@ abstract class CoordinationTest extends Exec {
         args 'test'
         args './noderuntests/coordinationtest'
         args '-cover'
-        args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..." // toolkit handled seperately
+        args "-coverpkg=github.com/LFDT-Paladin/paladin/core/..." // toolkit handled seperately
         args '-covermode=atomic'
         args '-timeout=120s'
         if (project.findProperty('verboseTests') == 'true') {
@@ -381,6 +403,19 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [
         copyContracts, // Ensure this task depends on copying the test contracts
     ]) {
     mustRunAfter 'unitTestPostgres' // these tests cannot run concurrently
+    environment 'BESU_PORT', '8545' // Use gas-free Besu port
+
+}
+
+task componentTestWithGasSQLite(type: GasComponentTest, dependsOn: [
+        makeMocks,
+        ':testinfra:startTestInfra',
+        setupCoverage,
+        goGet,
+        copyContracts, // Ensure this task depends on copying the test contracts
+    ]) {
+    mustRunAfter 'componentTestSQLite' // these tests cannot run concurrently
+    environment 'BESU_PORT', '8555' // Use gas-priced Besu port
 }
 
 task coordinationTestPostgres(type: CoordinationTest, dependsOn: [
@@ -390,6 +425,7 @@ task coordinationTestPostgres(type: CoordinationTest, dependsOn: [
         goGet,
         copyContracts, // Ensure this task depends on copying the test contracts
     ]) {
+    environment 'BESU_PORT', '8545' // Use gas-free Besu port
 }
 
 task buildCoverageTxt(type: Exec, dependsOn: [
@@ -397,6 +433,7 @@ task buildCoverageTxt(type: Exec, dependsOn: [
         unitTestSQLite,
         unitTestPostgres,
         componentTestSQLite,
+        componentTestWithGasSQLite,
         coordinationTestPostgres
     ]) {
     inputs.files(fileTree(project.mkdir('coverage')) {
@@ -420,7 +457,16 @@ task aggregateCoverage(type: Copy, dependsOn: buildCoverageTxt) {
     filter(LineContains, negate: true, contains: getProject().ext.coverageExcludedPackages, matchAny: true) 
 }
 
-task checkCoverage(type: GoCheckCoverage, dependsOn: [aggregateCoverage]) {
+task buildCoverageHTML(type: Exec, dependsOn: aggregateCoverage) {
+    outputs.files('coverage/coverage.html')
+    executable 'go'
+    args 'tool', 'cover'
+    args '-html'
+    args "${projectDir}/coverage/coverage.txt"
+    args '-o', "${projectDir}/coverage/coverage.html"
+}
+
+task checkCoverage(type: GoCheckCoverage, dependsOn: [buildCoverageHTML]) {
     coverageFile('coverage/coverage.txt')
     target = targetCoverage
     maxGap = maxCoverageBarGap

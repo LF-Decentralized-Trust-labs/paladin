@@ -20,8 +20,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr/metrics"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/publictxmgrmocks"
+	"github.com/LFDT-Paladin/paladin/core/internal/publictxmgr/metrics"
+	"github.com/LFDT-Paladin/paladin/core/mocks/publictxmgrmocks"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,21 +76,21 @@ func TestStateManagerStageManagementCanSubmit(t *testing.T) {
 		PreviousNonceCostUnknown: false,
 		// no availableToSpend provided, this means we don't need to check balance
 	})
-	assert.True(t, stateManager.CanSubmit(context.Background(), big.NewInt(0)))
+	assert.True(t, stateManager.CanSubmit(context.Background(), big.NewInt(0), ""))
 	stateManager.SetOrchestratorContext(ctx, &OrchestratorContext{
 		PreviousNonceCostUnknown: false,
 		AvailableToSpend:         big.NewInt(30),
 	})
-	assert.True(t, stateManager.CanSubmit(context.Background(), big.NewInt(29)))
-	assert.True(t, stateManager.CanSubmit(context.Background(), big.NewInt(30)))
-	assert.False(t, stateManager.CanSubmit(context.Background(), big.NewInt(31)))
-	assert.False(t, stateManager.CanSubmit(context.Background(), nil)) //unknown cost for the current transaction
+	assert.True(t, stateManager.CanSubmit(context.Background(), big.NewInt(29), ""))
+	assert.True(t, stateManager.CanSubmit(context.Background(), big.NewInt(30), ""))
+	assert.False(t, stateManager.CanSubmit(context.Background(), big.NewInt(31), ""))
+	assert.False(t, stateManager.CanSubmit(context.Background(), nil, "")) //unknown cost for the current transaction
 
 	stateManager.SetOrchestratorContext(ctx, &OrchestratorContext{
 		PreviousNonceCostUnknown: true,
 		AvailableToSpend:         big.NewInt(30),
 	})
 
-	assert.False(t, stateManager.CanSubmit(context.Background(), big.NewInt(29)))
+	assert.False(t, stateManager.CanSubmit(context.Background(), big.NewInt(29), ""))
 
 }

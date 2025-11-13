@@ -28,9 +28,9 @@ import (
 	"regexp"
 	"strings"
 
-	corev1alpha1 "github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/solutils"
+	corev1alpha1 "github.com/LFDT-Paladin/paladin/operator/api/v1alpha1"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/solutils"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/yaml"
@@ -41,6 +41,44 @@ var scope = map[string][]string{
 	"devnet":    {"issuer", "smartcontractdeployment", "transactioninvoke", "paladindomain", "paladinregistry"},
 	"customnet": {"issuer", "smartcontractdeployment", "transactioninvoke", "paladindomain", "paladinregistry"},
 	"attach":    {"issuer", "paladindomain", "paladinregistry"},
+}
+
+// Map of snake_case keys to camelCase keys for smart contract deployments and transaction invokes
+var snakeToCamelMap = map[string]string{
+	// Smart Contract Deployments
+	"default":                                           "default",
+	"registry":                                          "registry",
+	"noto_factory":                                      "notoFactory",
+	"pente_factory":                                     "penteFactory",
+	"zeto_g16_anon":                                     "zetoG16Anon",
+	"zeto_g16_anon_batch":                               "zetoG16AnonBatch",
+	"zeto_g16_anon_enc":                                 "zetoG16AnonEnc",
+	"zeto_g16_anon_enc_batch":                           "zetoG16AnonEncBatch",
+	"zeto_g16_anon_nullifier_transfer":                  "zetoG16AnonNullifierTransfer",
+	"zeto_g16_anon_nullifier_transfer_batch":            "zetoG16AnonNullifierTransferBatch",
+	"zeto_g16_anon_nullifier_kyc_transfer":              "zetoG16AnonNullifierKycTransfer",
+	"zeto_g16_anon_nullifier_kyc_transfer_batch":        "zetoG16AnonNullifierKycTransferBatch",
+	"zeto_g16_anon_nullifier_kyc_transfer_locked":       "zetoG16AnonNullifierKycTransferLocked",
+	"zeto_g16_anon_nullifier_kyc_transfer_locked_batch": "zetoG16AnonNullifierKycTransferLockedBatch",
+	"zeto_g16_deposit":                                  "zetoG16Deposit",
+	"zeto_g16_withdraw":                                 "zetoG16Withdraw",
+	"zeto_g16_withdraw_batch":                           "zetoG16WithdrawBatch",
+	"zeto_g16_withdraw_nullifier":                       "zetoG16WithdrawNullifier",
+	"zeto_g16_withdraw_nullifier_batch":                 "zetoG16WithdrawNullifierBatch",
+	"zeto_poseidon_unit2l":                              "zetoPoseidonUnit2l",
+	"zeto_poseidon_unit3l":                              "zetoPoseidonUnit3l",
+	"zeto_smt_lib":                                      "zetoSmtLib",
+	"zeto_impl_anon":                                    "zetoImplAnon",
+	"zeto_impl_anon_enc":                                "zetoImplAnonEnc",
+	"zeto_impl_anon_nullifier":                          "zetoImplAnonNullifier",
+	"zeto_impl_anon_nullifier_kyc":                      "zetoImplAnonNullifierKyc",
+	"zeto_factory":                                      "zetoFactory",
+
+	// Transaction Invokes
+	"zeto_anon":               "zetoAnon",
+	"zeto_anon_enc":           "zetoAnonEnc",
+	"zeto_anon_nullifier":     "zetoAnonNullifier",
+	"zeto_anon_nullifier_kyc": "zetoAnonNullifierKyc",
 }
 
 type ContractMap map[string]*ContractMapBuild
@@ -149,7 +187,7 @@ func (m *ContractMap) process(name string, b *ContractMapBuild) error {
 			return fmt.Errorf("mismatch in links for unlinked Solidity %s expected=%d provided=%d", name, libCount, len(b.LinkedLibs))
 		}
 	}
-	firstNameSegment := strings.SplitN(name, "_", 2)[0]
+	firstNameSegment := strings.SplitN(name, "-", 2)[0]
 	scd := corev1alpha1.SmartContractDeployment{
 		TypeMeta: v1.TypeMeta{
 			APIVersion: "core.paladin.io/v1alpha1",
@@ -251,8 +289,58 @@ func template() error {
 
 		newContent := string(content)
 
-		//  if paladinDomain, add more templating
-		if strings.Contains(file, "paladindomain") {
+		if strings.Contains(file, "smartcontractdeployment") {
+			var scd corev1alpha1.SmartContractDeployment
+			if err := yaml.Unmarshal(content, &scd); err != nil {
+				return fmt.Errorf("error unmarshalling content: %v", err)
+			}
+
+			from := scd.Spec.From
+			contractName := strings.ReplaceAll(scd.Name, "-", "_")
+			firstNameSegment := strings.SplitN(contractName, "_", 2)[0]
+
+			if content, err = yaml.Marshal(scd); err != nil {
+				return fmt.Errorf("error marshalling content: %v", err)
+			}
+
+			newContent = pattern.ReplaceAllString(string(content), "{{ `{{${1}}}` }}")
+
+			// Convert snake_case to camelCase using our map
+			camelCaseContractName := contractName
+			if mapped, exists := snakeToCamelMap[contractName]; exists {
+				camelCaseContractName = mapped
+			}
+
+			// string replace rather than modifying the gostruct so that the template is on one line
+			helmTemplate := fmt.Sprintf("\"{{if .Values.smartContractDeployments.%s.from}}{{.Values.smartContractDeployments.%s.from}}{{else if .Values.smartContractDeployments.default.from}}{{.Values.smartContractDeployments.default.from}}{{else}}%s.operator{{end}}\"", camelCaseContractName, camelCaseContractName, firstNameSegment)
+			newContent = strings.ReplaceAll(newContent, from, helmTemplate)
+
+		} else if strings.Contains(file, "transactioninvoke") {
+			var ti corev1alpha1.TransactionInvoke
+			if err := yaml.Unmarshal(content, &ti); err != nil {
+				return fmt.Errorf("error unmarshalling content: %v", err)
+			}
+
+			from := ti.Spec.From
+			transactionName := strings.ReplaceAll(ti.Name, "-", "_")
+			firstNameSegment := strings.SplitN(transactionName, "_", 2)[0]
+
+			if content, err = yaml.Marshal(ti); err != nil {
+				return fmt.Errorf("error marshalling content: %v", err)
+			}
+
+			newContent = pattern.ReplaceAllString(string(content), "{{ `{{${1}}}` }}")
+
+			// Convert snake_case to camelCase using our map
+			camelCaseTransactionName := transactionName
+			if mapped, exists := snakeToCamelMap[transactionName]; exists {
+				camelCaseTransactionName = mapped
+			}
+
+			// string replace rather than modifying the gostruct so that the template is on one line
+			helmTemplate := fmt.Sprintf("\"{{if .Values.transactionInvokes.%s.from}}{{.Values.transactionInvokes.%s.from}}{{else if .Values.transactionInvokes.default.from}}{{.Values.transactionInvokes.default.from}}{{else}}%s.operator{{end}}\"", camelCaseTransactionName, camelCaseTransactionName, firstNameSegment)
+			newContent = strings.ReplaceAll(newContent, from, helmTemplate)
+		} else if strings.Contains(file, "paladindomain") {
 
 			var domain corev1alpha1.PaladinDomain
 			if err := yaml.Unmarshal(content, &domain); err != nil {
@@ -260,7 +348,7 @@ func template() error {
 			}
 			n := fmt.Sprintf(".Values.smartContractsReferences.%sFactory", domain.Name)
 			domain.Spec.RegistryAddress = fmt.Sprintf("{{ %s.address }}", n)
-			domain.Spec.SmartContractDeployment = fmt.Sprintf("{{ %s.deployment }}", n)
+			domain.Spec.SmartContractDeployment = fmt.Sprintf("{{- if ne .Values.mode \"attach\" }}%s-factory{{- end }}", domain.Name)
 
 			domain.Spec.FixedSigningIdentity = fmt.Sprintf("{{ .Values.domains.%s.fixedSigningIdentity }}", domain.Name)
 			if content, err = yaml.Marshal(domain); err != nil {
@@ -273,14 +361,11 @@ func template() error {
 				return fmt.Errorf("error unmarshalling content: %v", err)
 			}
 			registry.Spec.EVM.ContractAddress = "{{ .Values.smartContractsReferences.registry.address }}"
-			registry.Spec.EVM.SmartContractDeployment = "{{ .Values.smartContractsReferences.registry.deployment }}"
+			registry.Spec.EVM.SmartContractDeployment = "{{- if ne .Values.mode \"attach\" }}registry{{- end }}"
 			if content, err = yaml.Marshal(registry); err != nil {
 				return fmt.Errorf("error marshalling content: %v", err)
 			}
 			newContent = string(content)
-		} else {
-			// Perform the regex replacement
-			newContent = pattern.ReplaceAllString(newContent, "{{ `{{${1}}}` }}")
 		}
 
 		// Replace the node name prefix

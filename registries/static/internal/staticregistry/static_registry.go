@@ -19,12 +19,12 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/registries/static/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/registries/static/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -47,12 +47,13 @@ func NewPlugin() plugintk.PluginBase {
 
 func NewStatic(callbacks plugintk.RegistryCallbacks) plugintk.RegistryAPI {
 	return &staticRegistry{
-		bgCtx:     context.Background(),
+		bgCtx:     log.WithComponent(context.Background(), "staticregistry"),
 		callbacks: callbacks,
 	}
 }
 
 func (r *staticRegistry) ConfigureRegistry(ctx context.Context, req *prototk.ConfigureRegistryRequest) (*prototk.ConfigureRegistryResponse, error) {
+	ctx = log.WithComponent(ctx, "staticregistry")
 	r.name = req.Name
 
 	err := json.Unmarshal([]byte(req.ConfigJson), &r.conf)

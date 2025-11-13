@@ -24,7 +24,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/text/language"
@@ -33,7 +33,7 @@ import (
 func TestGenerateMarkdownPages(t *testing.T) {
 	// TODO: Generate multiple languages when supported in the future here
 	ctx := i18n.WithLang(context.Background(), language.AmericanEnglish)
-	markdownMap, err := GenerateObjectsReferenceMarkdown(ctx)
+	markdownMap, err := GenerateAllReferenceMarkdown(ctx)
 	require.NoError(t, err)
 	assert.NotNil(t, markdownMap)
 

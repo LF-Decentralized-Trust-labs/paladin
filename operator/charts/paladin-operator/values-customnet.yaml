@@ -64,14 +64,14 @@ paladinNodes:
         config:
           port: 9000
           address: 0.0.0.0
-          externalHostname: ""  # External hostname if accessible outside cluster; leave empty if not required
+          # externalHostname: "bank.paladin"  # External hostname if accessible outside cluster; leave unset if not required
         ports:
           transportGrpc:
             port: 9000
             targetPort: 9000
         tls:
-          secretName: paladin-mtls  # Kubernetes Secret for TLS
-          certName: paladin-mtls    # Certificate name within the Secret
+          secretName: paladin-bank-mtls  # Kubernetes Secret for TLS - needs to be unique for each node
+          certName: paladin-bank-mtls    # Certificate name within the Secret - needs to be unique for each node
 
     # ======== Service ========
     service:
@@ -112,6 +112,12 @@ paladinNodes:
       #   type: preConfigured
       #   keySelector: .*      # Select all keys
 
+    # ======== RPC Authorization ========
+    # Configure RPC authorization using the basicauth reference implementation.
+    # The secret must exist and contain a key 'credentials.htpasswd' with htpasswd formatted credentials.
+    # rpcAuth:
+    #   secretName: paladin-basicauth-credentials  # Name of existing secret containing 'credentials.htpasswd' key
+
     # ======== Additional Config ========
     # Inline Paladin configuration; CR fields take precedence if duplicated
     config: |
@@ -124,9 +130,7 @@ paladinNodes:
     # ======== Paladin Registration ========
     # Register Paladin node to the network
     paladinRegistration:
-      registryAdminNode: bank  # The admin node that manages the registry
-      registryAdminKey: registry.operator
-      registry: evm-registry
+      nodeAdminKey: ""  # Node admin key for PaladinRegistration (leave empty to use default pattern)
 
 # Domains can be configured with a default signing identity
 domains:

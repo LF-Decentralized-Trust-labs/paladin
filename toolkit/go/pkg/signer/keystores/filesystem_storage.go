@@ -25,14 +25,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/pldmsgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/cache"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/pldmsgs"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/cache"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signerapi"
 	"github.com/hyperledger/firefly-signer/pkg/keystorev3"
 )
 
@@ -54,17 +54,17 @@ func (fsf *filesystemStoreFactory[C]) NewKeyStore(ctx context.Context, eConf C) 
 
 	// Determine the path
 	var pathInfo fs.FileInfo
-	path, err := filepath.Abs(confutil.StringNotEmpty(conf.Path, *pldconf.FileSystemDefaults.Path))
+	path, err := filepath.Abs(confutil.StringNotEmpty(conf.Path, *pldconf.SignerConfigDefaults.KeyStore.FileSystem.Path))
 	if err == nil {
 		pathInfo, err = os.Stat(path)
 	}
 	if err != nil || !pathInfo.IsDir() {
-		return nil, i18n.WrapError(ctx, err, pldmsgs.MsgSigningModuleBadPathError, *pldconf.FileSystemDefaults.Path)
+		return nil, i18n.WrapError(ctx, err, pldmsgs.MsgSigningModuleBadPathError, *pldconf.SignerConfigDefaults.KeyStore.FileSystem.Path)
 	}
 	return &filesystemStore{
-		cache:    cache.NewCache[string, keystorev3.WalletFile](&conf.Cache, &pldconf.FileSystemDefaults.Cache),
-		fileMode: confutil.UnixFileMode(conf.FileMode, *pldconf.FileSystemDefaults.FileMode),
-		dirMode:  confutil.UnixFileMode(conf.DirMode, *pldconf.FileSystemDefaults.DirMode),
+		cache:    cache.NewCache[string, keystorev3.WalletFile](&conf.Cache, &pldconf.SignerConfigDefaults.KeyStore.FileSystem.Cache),
+		fileMode: confutil.UnixFileMode(conf.FileMode, *pldconf.SignerConfigDefaults.KeyStore.FileSystem.FileMode),
+		dirMode:  confutil.UnixFileMode(conf.DirMode, *pldconf.SignerConfigDefaults.KeyStore.FileSystem.DirMode),
 		path:     path,
 	}, nil
 }

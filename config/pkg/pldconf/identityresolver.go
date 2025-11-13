@@ -14,13 +14,13 @@
  */
 package pldconf
 
-import "github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+import "github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 
 type IdentityResolverConfig struct {
 	VerifierCache CacheConfig `json:"verifierCache"`
 }
 
-var IdentityResolverDefaults = &IdentityResolverConfig{
+var IdentityResolverDefaults = IdentityResolverConfig{
 	VerifierCache: CacheConfig{
 		Capacity: confutil.P(1000),
 	},

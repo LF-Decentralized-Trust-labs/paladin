@@ -2,7 +2,7 @@
 
 In this tutorial, you'll learn how to deploy and interact with a **private storage contract** using **Paladin’s privacy groups**. Unlike the **public storage contract**, where data is visible to everyone, **private storage ensures that only authorized members** of a privacy group can interact with the contract.
 
-If you're new to **Pente privacy groups** or want to dive deeper into their architecture, check out the [Pente documentation](https://lf-decentralized-trust-labs.github.io/paladin/head/architecture/pente) for more information.
+If you're new to **Pente privacy groups** or want to dive deeper into their architecture, check out the [Pente documentation](https://LFDT-Paladin.github.io/paladin/head/architecture/pente) for more information.
 
 ---
 
@@ -34,7 +34,7 @@ There is a second example (`update.js`) in the privacy storage example folder wh
 
 You can use this second example to learn about using resuming use of existing privacy groups and contracts.
 
-The **full example** code is available in the [Paladin example repository](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/privacy-storage).
+The **full example** code is available in the [Paladin example repository](https://github.com/LFDT-Paladin/paladin/blob/main/examples/privacy-storage).
 
 ---
 

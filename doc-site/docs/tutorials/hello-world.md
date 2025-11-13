@@ -2,7 +2,7 @@
 
 This tutorial walks you through deploying and interacting with a simple `HelloWorld` smart contract using the Paladin SDK. The example demonstrates how to deploy a contract, interact with it by calling its `sayHello` function, and retrieve and verify the emitted event.
 
-The code for this tutorial can be found in [examples/helloworld](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/helloworld).
+The code for this tutorial can be found in [examples/helloworld](https://github.com/LFDT-Paladin/paladin/blob/main/examples/helloworld).
 
 ## Prerequisites
 
@@ -20,7 +20,7 @@ Follow the [Getting Started](../../getting-started/installation/) instructions t
 Clone the repository at the latest release:
 
 ```bash
-REPO=https://github.com/LF-Decentralized-Trust-labs/paladin.git
+REPO=https://github.com/LFDT-Paladin/paladin.git
 TAG=$(git ls-remote --tags $REPO | cut -d/ -f3 | grep -v '\-rc' | sort -V | tail -n1)
 git clone $REPO -b $TAG
 ```
@@ -31,9 +31,9 @@ Once cloned, navigate to the example:
 cd paladin/examples/helloworld
 ```
 
-The HelloWorld solidity contract is located at: [`solidity/contracts/tutorials/HelloWorld.sol`](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/tutorials/HelloWorld.sol)
+The HelloWorld solidity contract is located at: [`solidity/contracts/tutorials/HelloWorld.sol`](https://github.com/LFDT-Paladin/paladin/blob/main/solidity/contracts/tutorials/HelloWorld.sol)
 
-Follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/helloworld/README.md) to run the code.
+Follow the example [README](https://github.com/LFDT-Paladin/paladin/blob/main/examples/helloworld/README.md) to run the code.
 
 ## Overview
 

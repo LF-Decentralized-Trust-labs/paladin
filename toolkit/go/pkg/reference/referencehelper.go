@@ -24,8 +24,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/pldmsgs"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/pldmsgs"
 )
 
 func getIncludeFile(ctx context.Context, outputPath, name string) ([]byte, error) {
@@ -47,7 +47,7 @@ func shouldFilter(t reflect.Type) bool {
 }
 
 func isEnum(f reflect.Type) bool {
-	return f.PkgPath() == "github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes" && strings.HasPrefix(f.Name(), "Enum[")
+	return f.PkgPath() == "github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes" && strings.HasPrefix(f.Name(), "Enum[")
 }
 
 func generateEnumList(f reflect.Type) string {

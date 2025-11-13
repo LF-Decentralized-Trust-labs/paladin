@@ -15,7 +15,7 @@ title: Transaction
 |------------|-------------|------|
 | `id` | Server-generated UUID for this transaction (query only) | [`UUID`](simpletypes.md#uuid) |
 | `created` | Server-generated creation timestamp for this transaction (query only) | [`Timestamp`](simpletypes.md#timestamp) |
-| `submitMode` | Whether the submission of the transaction to the base ledger is to be performed automatically by the node or coordinated externally (query only) | `"auto", "external", "call"` |
+| `submitMode` | Whether the submission of the transaction to the base ledger is to be performed automatically by the node or coordinated externally (query only) | `"auto", "external", "call", "remote"` |
 | `idempotencyKey` | Externally supplied unique identifier for this transaction. 409 Conflict will be returned on attempt to re-submit | `string` |
 | `type` | Type of transaction (public or private) | `"private", "public"` |
 | `domain` | Name of a domain - only required on input for private deploy transactions | `string` |
@@ -28,5 +28,4 @@ title: Transaction
 | `value` | The value transferred in the transaction (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 | `maxPriorityFeePerGas` | The maximum priority fee per gas (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 | `maxFeePerGas` | The maximum fee per gas (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
-| `gasPrice` | The gas price (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 

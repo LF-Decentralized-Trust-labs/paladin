@@ -22,17 +22,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/pkg/ethclient"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/algorithms"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"gorm.io/gorm/clause"
@@ -80,7 +80,7 @@ type persistedTransactionHistory struct {
 	Data                 pldtypes.RawJSON                      `gorm:"column:data"` // we always store in JSON object format
 	Gas                  *pldtypes.HexUint64                   `gorm:"column:gas"`
 	Value                *pldtypes.HexUint256                  `gorm:"column:value"`
-	GasPrice             *pldtypes.HexUint256                  `gorm:"column:gas_price"`
+	GasPrice             *pldtypes.HexUint256                  `gorm:"column:gas_price"` // deprecated- this has never worked with EIP-1559
 	MaxFeePerGas         *pldtypes.HexUint256                  `gorm:"column:max_fee_per_gas"`
 	MaxPriorityFeePerGas *pldtypes.HexUint256                  `gorm:"column:max_priority_fee_per_gas"`
 }
@@ -284,6 +284,7 @@ func (tm *txManager) prepareTransactionNewDBTX(ctx context.Context, tx *pldapi.T
 }
 
 func (tm *txManager) CallTransaction(ctx context.Context, dbTX persistence.DBTX, result any, call *pldapi.TransactionCall) (err error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 
 	txi, err := tm.resolveNewTransaction(ctx, dbTX, &call.TransactionInput, pldapi.SubmitModeCall)
 	if err != nil {
@@ -349,6 +350,7 @@ func (tm *txManager) callTransactionPublic(ctx context.Context, result any, call
 }
 
 func (tm *txManager) PrepareChainedPrivateTransaction(ctx context.Context, dbTX persistence.DBTX, originalSender string, originalTxID uuid.UUID, originalDomain string, originalDomainAddress *pldtypes.EthAddress, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (chained *components.ChainedPrivateTransaction, err error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	tx.Type = pldapi.TransactionTypePrivate.Enum()
 	if tx.IdempotencyKey == "" {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrPrivateChainedTXIdemKey)
@@ -494,6 +496,7 @@ func (tm *txManager) writeChainingRecords(ctx context.Context, dbTX persistence.
 }
 
 func (tm *txManager) SendTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	return tm.processNewTransactions(ctx, dbTX, txs, pldapi.SubmitModeAuto)
 }
 
@@ -515,6 +518,7 @@ func (tm *txManager) prepareTransactionsNewDBTX(ctx context.Context, txs []*plda
 }
 
 func (tm *txManager) PrepareTransactions(ctx context.Context, dbTX persistence.DBTX, txs ...*pldapi.TransactionInput) (txIDs []uuid.UUID, err error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	log.L(ctx).Debugf("PrepareTransactions %+v", txs)
 	return tm.processNewTransactions(ctx, dbTX, txs, pldapi.SubmitModeExternal)
 }
@@ -714,6 +718,7 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX persistence
 }
 
 func (tm *txManager) ResolveTransactionInputs(ctx context.Context, dbTX persistence.DBTX, tx *pldapi.TransactionInput) (*components.ResolvedFunction, *abi.ComponentValue, pldtypes.RawJSON, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	fn, err := tm.resolveFunction(ctx, dbTX, tx.ABI, tx.ABIReference, tx.Function, tx.To)
 	if err != nil {
 		return nil, nil, nil, err
@@ -796,7 +801,6 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX persistence.DB
 			Data:                 ptxs[i].Data,
 			Gas:                  tx.Gas,
 			Value:                tx.Value,
-			GasPrice:             tx.GasPrice,
 			MaxFeePerGas:         tx.MaxFeePerGas,
 			MaxPriorityFeePerGas: tx.MaxPriorityFeePerGas,
 		}
@@ -943,7 +947,6 @@ func (tm *txManager) processUpdatedTransaction(ctx context.Context, dbTX persist
 			Data:                 tx.Data,
 			Gas:                  tx.Gas,
 			Value:                tx.Value,
-			GasPrice:             tx.GasPrice,
 			MaxFeePerGas:         tx.MaxFeePerGas,
 			MaxPriorityFeePerGas: tx.MaxPriorityFeePerGas,
 		}

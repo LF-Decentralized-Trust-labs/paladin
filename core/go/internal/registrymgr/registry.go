@@ -22,19 +22,19 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/retry"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/filters"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/pkg/blockindexer"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/retry"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"gorm.io/gorm/clause"
@@ -70,7 +70,7 @@ func (rm *registryManager) newRegistry(id uuid.UUID, name string, conf *pldconf.
 		api:       toRegistry,
 		initDone:  make(chan struct{}),
 	}
-	r.ctx, r.cancelCtx = context.WithCancel(log.WithLogField(rm.bgCtx, "registry", r.name))
+	r.ctx, r.cancelCtx = context.WithCancel(log.WithComponent(rm.bgCtx, log.Component(fmt.Sprintf("registry-%s", r.name))))
 	return r
 }
 
@@ -381,7 +381,7 @@ func (dfs *dynamicFieldSet) ResolverFor(propName string) filters.FieldResolver {
 }
 
 func (r *registry) QueryEntries(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, jq *query.QueryJSON) ([]*pldapi.RegistryEntry, error) {
-
+	ctx = log.WithComponent(ctx, log.Component(fmt.Sprintf("registry-%s", r.name)))
 	if jq.Limit == nil || *jq.Limit == 0 {
 		return nil, i18n.NewError(ctx, msgs.MsgRegistryQueryLimitRequired)
 	}
@@ -456,7 +456,7 @@ func (r *registry) QueryEntries(ctx context.Context, dbTX persistence.DBTX, fAct
 }
 
 func (r *registry) GetEntryProperties(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, entryIDs ...pldtypes.HexBytes) ([]*pldapi.RegistryProperty, error) {
-
+	ctx = log.WithComponent(ctx, log.Component(fmt.Sprintf("registry-%s", r.name)))
 	var dbProps []*DBProperty
 	q := dbTX.DB().WithContext(ctx).
 		Table("reg_props").
@@ -516,7 +516,7 @@ func filteredPropsMap(entryProps []*pldapi.RegistryProperty, entryID pldtypes.He
 }
 
 func (r *registry) QueryEntriesWithProps(ctx context.Context, dbTX persistence.DBTX, fActive pldapi.ActiveFilter, jq *query.QueryJSON) ([]*pldapi.RegistryEntryWithProperties, error) {
-
+	ctx = log.WithComponent(ctx, log.Component(fmt.Sprintf("registry-%s", r.name)))
 	entries, err := r.QueryEntries(ctx, dbTX, fActive, jq)
 	if err != nil {
 		return nil, err

@@ -12,13 +12,13 @@ Installing the operator in `devnet` mode also installs and configures a three no
 
 If you are new to Kubernetes or simply need a quick way to get a running cluster, [kind](https://kind.sigs.k8s.io/)
 provides a lightweight way to run a local Kubernetes cluster on your machine. This repo contains a
-[starter config file](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/operator/paladin-kind.yaml)
+[starter config file](https://github.com/LFDT-Paladin/paladin/blob/main/operator/paladin-kind.yaml)
 for kind which will open up the container ports used by the Paladin charts below.
 
 You can create a new cluster with:
 
 ```bash
-curl https://raw.githubusercontent.com/LF-Decentralized-Trust-labs/paladin/refs/heads/main/operator/paladin-kind.yaml -L -O
+curl https://raw.githubusercontent.com/LFDT-Paladin/paladin/refs/heads/main/operator/paladin-kind.yaml -L -O
 kind create cluster --name paladin --config paladin-kind.yaml
 ```
 
@@ -38,7 +38,7 @@ documentation for any issues with these tools.
 Install the CRD chart that contains the necessary Custom Resource Definitions (CRDs) for the Paladin operator:
 
 ```bash
-helm repo add paladin https://LF-Decentralized-Trust-labs.github.io/paladin --force-update
+helm repo add paladin https://LFDT-Paladin.github.io/paladin --force-update
 helm upgrade --install paladin-crds paladin/paladin-operator-crd
 ```
 
@@ -183,7 +183,7 @@ This guide is designed for first-time Paladin users looking for a quick and easy
 
 If you encounter any issues during installation, please refer to the [Troubleshooting Guide](./troubleshooting.md).  
 
-If your issue is not listed or remains unresolved, please report it by [opening an issue on the Paladin GitHub page](https://github.com/LF-Decentralized-Trust-labs/paladin/issues).
+If your issue is not listed or remains unresolved, please report it by [opening an issue on the Paladin GitHub page](https://github.com/LFDT-Paladin/paladin/issues).
 
 ## Uninstall
 

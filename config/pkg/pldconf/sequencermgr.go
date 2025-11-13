@@ -17,7 +17,7 @@ package pldconf
 import (
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 )
 
 type SequencerConfig struct {
@@ -47,7 +47,7 @@ type SequencerMinimumConfig struct {
 	TransactionResumePollInterval time.Duration
 }
 
-var SequencerDefaults = &SequencerConfig{
+var SequencerDefaults = SequencerConfig{
 	AssembleTimeout:               confutil.P("60s"),
 	RequestTimeout:                confutil.P("10s"),
 	BlockHeightTolerance:          confutil.P(uint64(10)),
@@ -60,7 +60,7 @@ var SequencerDefaults = &SequencerConfig{
 	TransactionResumePollInterval: confutil.P("5m"),
 }
 
-var SequencerMinimum = &SequencerMinimumConfig{
+var SequencerMinimum = SequencerMinimumConfig{
 	AssembleTimeout:               1 * time.Second,
 	RequestTimeout:                1 * time.Second,
 	BlockHeightTolerance:          1,

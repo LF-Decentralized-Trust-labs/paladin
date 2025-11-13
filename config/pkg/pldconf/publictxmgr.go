@@ -16,7 +16,7 @@
 package pldconf
 
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 )
 
 type PublicTxManagerConfig struct {
@@ -27,7 +27,7 @@ type PublicTxManagerConfig struct {
 	GasLimit       GasLimitConfig                    `json:"gasLimit"`
 }
 
-var PublicTxManagerDefaults = &PublicTxManagerConfig{
+var PublicTxManagerDefaults = PublicTxManagerConfig{
 	Manager: PublicTxManagerManagerConfig{
 		MaxInFlightOrchestrators: confutil.P(50),
 		Interval:                 confutil.P("5s"),
@@ -70,17 +70,29 @@ var PublicTxManagerDefaults = &PublicTxManagerConfig{
 			MaxAttempts: confutil.P(3),
 		},
 	},
+	// Gas price defaults are optimised for getting transactions onto chain as easily as possible
+	// When spending real gas, a user might want to be more conservative with setting caps or not allowing the fixed price to be increased
 	GasPrice: GasPriceConfig{
-		IncreaseMax:        nil,
-		IncreasePercentage: confutil.P(0),
-		FixedGasPrice:      nil,
-		Cache: CacheConfig{
-			Capacity: confutil.P(100),
-			// TODO: Enable a KB based cache with TTL in Paladin
-			//       Until then the gas price cache will not expire (which is problematic)
-			// Enabled: confutil.P(true),
-			// Size:    confutil.P("1kb"),
-			// TTL:     confutil.P("1s"),
+		IncreasePercentage:      confutil.P(10), // default to 10% increase - this is what Besu and other blockchains define as the minimum increase for a replacement transaction
+		MaxPriorityFeePerGasCap: nil,            // No cap by default
+		MaxFeePerGasCap:         nil,            // No cap by default
+		FixedGasPrice:           nil,
+		EthFeeHistory: EthFeeHistoryConfig{
+			PriorityFeePercentile: confutil.P(85), // Default to 85th percentile for getting transactions onto chain as easily as possible
+			HistoryBlockCount:     confutil.P(20), // Default to 20 blocks for fee history
+			BaseFeeBufferFactor:   confutil.P(1),  // Default to 1x buffer for base fee
+			Cache: GasPriceCacheConfig{
+				Enabled:     confutil.P(true),  // Default to enabled
+				RefreshTime: confutil.P("30s"), // Default to 30 seconds refresh time
+			},
+		},
+		GasOracleAPI: &GasOracleAPIConfig{
+			HTTPClientConfig: DefaultHTTPConfig,
+			Method:           confutil.P("GET"), // Default to GET method
+			Cache: GasPriceCacheConfig{
+				Enabled:     confutil.P(true),  // Default to enabled
+				RefreshTime: confutil.P("30s"), // Default to 30 seconds refresh time
+			},
 		},
 	},
 	BalanceManager: BalanceManagerConfig{
@@ -118,12 +130,34 @@ type BalanceManagerConfig struct {
 	Cache CacheConfig `json:"cache"`
 }
 
+// FixedGasPricing represents EIP-1559 gas pricing configuration
+type FixedGasPricing struct {
+	MaxFeePerGas         *string `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *string `json:"maxPriorityFeePerGas"`
+}
+
+// EthFeeHistoryConfig represents configuration for dynamic EIP-1559 gas pricing using eth_feeHistory
+type EthFeeHistoryConfig struct {
+	// PriorityFeePercentile for priority fee calculation (0-100)
+	PriorityFeePercentile *int `json:"priorityFeePercentile"`
+
+	// Number of historical blocks to query for fee history
+	HistoryBlockCount *int `json:"historyBlockCount"`
+
+	// Factor to multiply base fee by for buffering (default: 1)
+	BaseFeeBufferFactor *int `json:"baseFeeBufferFactor"`
+
+	// Cache configuration for gas price caching
+	Cache GasPriceCacheConfig `json:"cache"`
+}
+
 type GasPriceConfig struct {
-	IncreaseMax        *string            `json:"increaseMax"`
-	IncreasePercentage *int               `json:"increasePercentage"`
-	FixedGasPrice      any                `json:"fixedGasPrice"` // number or object
-	GasOracleAPI       GasOracleAPIConfig `json:"gasOracleAPI"`
-	Cache              CacheConfig        `json:"cache"`
+	IncreasePercentage      *int                `json:"increasePercentage"`
+	MaxPriorityFeePerGasCap *string             `json:"maxPriorityFeePerGasCap"`
+	MaxFeePerGasCap         *string             `json:"maxFeePerGasCap"`
+	FixedGasPrice           *FixedGasPricing    `json:"fixedGasPrice"`
+	EthFeeHistory           EthFeeHistoryConfig `json:"ethFeeHistory"`
+	GasOracleAPI            *GasOracleAPIConfig `json:"gasOracleAPI"`
 }
 
 type GasLimitConfig struct {
@@ -131,8 +165,11 @@ type GasLimitConfig struct {
 }
 
 type GasOracleAPIConfig struct {
-	URL      string `json:"url"`
-	Template string `json:"template"`
+	HTTPClientConfig `json:",inline"`
+	Method           *string             `json:"method"`
+	Body             *string             `json:"body"`
+	ResponseTemplate string              `json:"responseTemplate"`
+	Cache            GasPriceCacheConfig `json:"cache"`
 }
 
 type PublicTxManagerOrchestratorConfig struct {
@@ -145,4 +182,13 @@ type PublicTxManagerOrchestratorConfig struct {
 	UnavailableBalanceHandler *string            `json:"unavailableBalanceHandler"`
 	SubmissionRetry           RetryConfigWithMax `json:"submissionRetry"`
 	TimeLineLoggingMaxEntries int                `json:"timelineMaxEntries"`
+}
+
+// GasPriceCacheConfig represents cache configuration for gas price clients
+type GasPriceCacheConfig struct {
+	// Enabled controls whether caching is enabled
+	Enabled *bool `json:"enabled"`
+
+	// RefreshTime specifies how often the cache should be refreshed
+	RefreshTime *string `json:"refreshTime"`
 }

@@ -24,14 +24,14 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence/mockpersistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/pkg/blockindexer"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence/mockpersistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -79,10 +79,10 @@ func TestEventIndexingWithDB(t *testing.T) {
 						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
 					Data: pldtypes.RawJSON(`{
-						 "txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
-						 "instance": "` + contractAddr.String() + `",
-						 "config": "0xfeedbeef"
-					 }`),
+						  "txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
+						  "instance": "` + contractAddr.String() + `",
+						  "config": "0xfeedbeef"
+					  }`),
 				},
 			},
 		})
@@ -144,8 +144,8 @@ func TestEventIndexingBadEvent(t *testing.T) {
 					Address:           *td.d.registryAddress,
 					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
 					Data: pldtypes.RawJSON(`{
-						  "config": "cannot parse this"
-					  }`),
+						   "config": "cannot parse this"
+					   }`),
 				},
 			},
 		})
@@ -186,10 +186,10 @@ func TestEventIndexingInsertError(t *testing.T) {
 						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
 					Data: pldtypes.RawJSON(`{
-						 "txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
-						 "domain": "` + contractAddr.String() + `",
-						 "data": "0xfeedbeef"
-					 }`),
+						  "txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
+						  "domain": "` + contractAddr.String() + `",
+						  "data": "0xfeedbeef"
+					  }`),
 				},
 			},
 		})

@@ -22,15 +22,15 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/statemgr"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence/mockpersistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/statemgr"
+	"github.com/LFDT-Paladin/paladin/core/mocks/componentsmocks"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence/mockpersistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
@@ -107,6 +107,7 @@ func newTestGroupManager(t *testing.T, realDB bool, conf *pldconf.GroupManagerCo
 	logrus.SetLevel(logrus.TraceLevel)
 
 	mc := newMockComponents(t, realDB)
+	mc.domain.On("FixedSigningIdentity").Return("").Maybe()
 	for _, fn := range extraSetup {
 		fn(mc, conf)
 	}
@@ -601,6 +602,79 @@ func TestSendTransactionGroupGetContractFail(t *testing.T) {
 		Domain: "domain1",
 		Group:  groupID,
 	})
+	require.Regexp(t, "pop", err)
+
+}
+
+func TestSendTransactionFromNotMember(t *testing.T) {
+
+	ctx, gm, mc, done := newTestGroupManager(t, false, &pldconf.GroupManagerConfig{}, mockEmptyMessageListeners)
+	defer done()
+
+	schemaID := pldtypes.RandBytes32()
+	groupID := pldtypes.RandBytes(32)
+	contractAddr := pldtypes.RandAddress()
+	// Group members do NOT include the from identity we will use
+	mockDBPrivacyGroup(mc, schemaID, groupID, contractAddr, "me@node1", "you@node2")
+
+	_, err := gm.SendTransaction(ctx, gm.p.NOTX(), &pldapi.PrivacyGroupEVMTXInput{
+		Domain: "domain1",
+		Group:  groupID,
+		PrivacyGroupEVMTX: pldapi.PrivacyGroupEVMTX{
+			From: "them@node1",
+		},
+	})
+	require.Regexp(t, "PD012524", err)
+
+}
+
+func TestCallFromNotMember(t *testing.T) {
+
+	ctx, gm, mc, done := newTestGroupManager(t, false, &pldconf.GroupManagerConfig{}, mockEmptyMessageListeners)
+	defer done()
+
+	schemaID := pldtypes.RandBytes32()
+	groupID := pldtypes.RandBytes(32)
+	contractAddr := pldtypes.RandAddress()
+	mockDBPrivacyGroup(mc, schemaID, groupID, contractAddr, "me@node1", "you@node2")
+
+	var res any
+	err := gm.Call(ctx, gm.p.NOTX(), &res, &pldapi.PrivacyGroupEVMCall{
+		Domain: "domain1",
+		Group:  groupID,
+		PrivacyGroupEVMTX: pldapi.PrivacyGroupEVMTX{
+			From: "someone@node1",
+		},
+	})
+	require.Regexp(t, "PD012524", err)
+
+}
+
+func TestSendTransactionFromValidMemberUnqualified(t *testing.T) {
+
+	ctx, gm, mc, done := newTestGroupManager(t, false, &pldconf.GroupManagerConfig{}, mockEmptyMessageListeners)
+	defer done()
+
+	schemaID := pldtypes.RandBytes32()
+	groupID := pldtypes.RandBytes(32)
+	contractAddr := pldtypes.RandAddress()
+	// Group members include "me@node1" - we'll test with unqualified "me"
+	mockDBPrivacyGroup(mc, schemaID, groupID, contractAddr, "me@node1", "you@node2")
+
+	psc := componentsmocks.NewDomainSmartContract(t)
+	mc.domainManager.On("GetSmartContractByAddress", mock.Anything, mock.Anything, *contractAddr).Return(psc, nil)
+
+	psc.On("WrapPrivacyGroupEVMTX", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&pldapi.TransactionInput{}, nil)
+	mc.txManager.On("SendTransactions", mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
+
+	_, err := gm.SendTransaction(ctx, gm.p.NOTX(), &pldapi.PrivacyGroupEVMTXInput{
+		Domain: "domain1",
+		Group:  groupID,
+		PrivacyGroupEVMTX: pldapi.PrivacyGroupEVMTX{
+			From: "me", // Unqualified identity - should be resolved to "me@node1" and match
+		},
+	})
+	// Should pass membership validation and fail at transaction sending (which is expected)
 	require.Regexp(t, "pop", err)
 
 }

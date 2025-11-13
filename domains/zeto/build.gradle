@@ -28,9 +28,9 @@ ext {
     targetCoverage = 92.5
     maxCoverageBarGap = 1
     coveragePackages = [
-        "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/...",
-        "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/types/states.go",
-        "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner",
+        "github.com/LFDT-Paladin/paladin/domains/zeto/internal/...",
+        "github.com/LFDT-Paladin/paladin/domains/zeto/pkg/types/states.go",
+        "github.com/LFDT-Paladin/paladin/domains/zeto/pkg/zetosigner",
     ]
 
     zetoVersion = "v0.2.0"

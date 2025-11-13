@@ -19,13 +19,13 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/filters"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
 	"github.com/google/uuid"
 	"gorm.io/gorm/clause"
 )
@@ -72,7 +72,7 @@ var preparedTransactionFilters = filters.FieldMap{
 }
 
 func (tm *txManager) WritePreparedTransactions(ctx context.Context, dbTX persistence.DBTX, prepared []*components.PreparedTransactionWithRefs) error {
-
+	ctx = log.WithComponent(ctx, "txmanager")
 	var preparedTxInserts []*preparedTransaction
 	var preparedTxStateInserts []*preparedTransactionState
 	for _, p := range prepared {
@@ -155,6 +155,7 @@ func (tm *txManager) WritePreparedTransactions(ctx context.Context, dbTX persist
 }
 
 func (tm *txManager) QueryPreparedTransactions(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.PreparedTransaction, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	bpts, err := tm.queryPreparedTransactionsBase(ctx, dbTX, jq)
 	if err != nil {
 		return nil, err
@@ -163,6 +164,7 @@ func (tm *txManager) QueryPreparedTransactions(ctx context.Context, dbTX persist
 }
 
 func (tm *txManager) QueryPreparedTransactionsWithRefs(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*components.PreparedTransactionWithRefs, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	bpts, err := tm.queryPreparedTransactionsBase(ctx, dbTX, jq)
 	if err != nil {
 		return nil, err
@@ -280,6 +282,7 @@ func (tm *txManager) enrichPreparedTransactionsRefs(ctx context.Context, dbTX pe
 }
 
 func (tm *txManager) GetPreparedTransactionByID(ctx context.Context, dbTX persistence.DBTX, id uuid.UUID) (*pldapi.PreparedTransaction, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	pts, err := tm.QueryPreparedTransactions(ctx, dbTX, query.NewQueryBuilder().Limit(1).Equal("id", id).Query())
 	if len(pts) == 0 || err != nil {
 		return nil, err
@@ -288,6 +291,7 @@ func (tm *txManager) GetPreparedTransactionByID(ctx context.Context, dbTX persis
 }
 
 func (tm *txManager) GetPreparedTransactionWithRefsByID(ctx context.Context, dbTX persistence.DBTX, id uuid.UUID) (*components.PreparedTransactionWithRefs, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	pts, err := tm.QueryPreparedTransactionsWithRefs(ctx, dbTX, query.NewQueryBuilder().Limit(1).Equal("id", id).Query())
 	if len(pts) == 0 || err != nil {
 		return nil, err

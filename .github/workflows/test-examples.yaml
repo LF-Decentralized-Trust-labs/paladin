@@ -27,6 +27,11 @@ on:
         default: 'latest'
   workflow_call:
     inputs:
+      ref:
+        description: 'Commit ref for checkout'
+        required: false
+        type: string
+        default: ''
       build_local_sdk:
         description: 'Build local TypeScript SDK instead of using published package'
         required: false
@@ -60,6 +65,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
 
       - name: Install Kind
         uses: helm/kind-action@v1
@@ -70,7 +78,7 @@ jobs:
       - name: Create cluster
         run: |
           # Download the kind configuration
-          curl https://raw.githubusercontent.com/LF-Decentralized-Trust-labs/paladin/refs/heads/main/operator/paladin-kind.yaml -L -O
+          curl https://raw.githubusercontent.com/LFDT-Paladin/paladin/refs/heads/main/operator/paladin-kind.yaml -L -O
           
           # Create the cluster
           kind create cluster --name paladin --config paladin-kind.yaml
@@ -91,7 +99,7 @@ jobs:
       - name: Install latest Paladin charts
         run: |
           # Step 1: Add the charts
-          helm repo add paladin https://LF-Decentralized-Trust-labs.github.io/paladin --force-update
+          helm repo add paladin https://LFDT-Paladin.github.io/paladin --force-update
           helm repo add jetstack https://charts.jetstack.io --force-update
           helm repo update
 

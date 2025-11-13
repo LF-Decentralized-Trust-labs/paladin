@@ -18,7 +18,7 @@ package zeto
 import (
 	"testing"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/solutils"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/solutils"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -24,8 +24,8 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/pldmsgs"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/pldmsgs"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"

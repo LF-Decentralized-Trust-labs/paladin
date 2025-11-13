@@ -14,7 +14,7 @@
  */
 package pldconf
 
-import "github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+import "github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 
 type GroupManagerConfig struct {
 	Cache            CacheConfig      `json:"cache"`
@@ -26,7 +26,7 @@ type MessageListeners struct {
 	ReadPageSize *int        `json:"readPageSize"`
 }
 
-var GroupManagerDefaults = &GroupManagerConfig{
+var GroupManagerDefaults = GroupManagerConfig{
 	Cache: CacheConfig{
 		Capacity: confutil.P(50),
 	},

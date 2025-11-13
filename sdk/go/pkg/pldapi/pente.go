@@ -15,7 +15,7 @@
 
 package pldapi
 
-import "github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+import "github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 
 type PenteDomainReceipt struct {
 	Transaction *PrivateEVMTransaction `json:"transaction"`

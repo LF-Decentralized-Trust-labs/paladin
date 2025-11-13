@@ -29,7 +29,7 @@ This tutorial will cover:
 2. **Minting Tokens** – Issuing new tokens into circulation.
 3. **Transferring Tokens** – Simulating payments by moving tokens between nodes.
 
-💡 **The complete example code is available in the [Paladin example repository](https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/examples/notarized-tokens).**
+💡 **The complete example code is available in the [Paladin example repository](https://github.com/LFDT-Paladin/paladin/tree/main/examples/notarized-tokens).**
 
 ---
 

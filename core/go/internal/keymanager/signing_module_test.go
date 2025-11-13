@@ -21,12 +21,12 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signpayloads"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/algorithms"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signpayloads"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,8 +52,8 @@ func newTestPlugin(signingModuleFuncs *plugintk.SigningModuleAPIFunctions) *test
 	}
 }
 
-func newTestSigningModule(t *testing.T, realDB bool, extraSetup ...func(mc *mockComponents, conf *pldconf.KeyManagerConfig)) (context.Context, *keyManager, *testPlugin, *mockComponents, func()) {
-	conf := &pldconf.KeyManagerConfig{
+func newTestSigningModule(t *testing.T, realDB bool, extraSetup ...func(mc *mockComponents, conf *pldconf.KeyManagerInlineConfig)) (context.Context, *keyManager, *testPlugin, *mockComponents, func()) {
+	conf := &pldconf.KeyManagerInlineConfig{
 		SigningModules: map[string]*pldconf.SigningModuleConfig{
 			"test1": {
 				Config: map[string]any{"some": "conf"},

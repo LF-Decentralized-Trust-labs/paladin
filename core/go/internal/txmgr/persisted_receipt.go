@@ -19,15 +19,15 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/filters"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -96,6 +96,7 @@ var transactionReceiptFilters = filters.FieldMap{
 // FinalizeTransactions is called by the block indexing routine, but also can be called
 // by the private transaction manager if transactions fail without making it to the blockchain
 func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.DBTX, info []*components.ReceiptInput) error {
+	ctx = log.WithComponent(ctx, "txmanager")
 	log.L(ctx).Debugf("FinalizeTransactions: %v receipt infos", len(info))
 
 	if len(info) == 0 {
@@ -219,6 +220,7 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 }
 
 func (tm *txManager) CalculateRevertError(ctx context.Context, dbTX persistence.DBTX, revertData pldtypes.HexBytes) error {
+	ctx = log.WithComponent(ctx, "txmanager")
 	de, err := tm.DecodeRevertError(ctx, dbTX, revertData, "")
 	if err != nil {
 		return err
@@ -227,7 +229,7 @@ func (tm *txManager) CalculateRevertError(ctx context.Context, dbTX persistence.
 }
 
 func (tm *txManager) DecodeRevertError(ctx context.Context, dbTX persistence.DBTX, revertData pldtypes.HexBytes, dataFormat pldtypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
-
+	ctx = log.WithComponent(ctx, "txmanager")
 	if len(revertData) < 4 {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrRevertedNoData)
 	}
@@ -275,7 +277,7 @@ func (tm *txManager) DecodeRevertError(ctx context.Context, dbTX persistence.DBT
 }
 
 func (tm *txManager) DecodeCall(ctx context.Context, dbTX persistence.DBTX, callData pldtypes.HexBytes, dataFormat pldtypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
-
+	ctx = log.WithComponent(ctx, "txmanager")
 	if len(callData) < 4 {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrDecodeCallNoData)
 	}
@@ -319,7 +321,7 @@ func (tm *txManager) DecodeCall(ctx context.Context, dbTX persistence.DBTX, call
 }
 
 func (tm *txManager) DecodeEvent(ctx context.Context, dbTX persistence.DBTX, topics []pldtypes.Bytes32, eventData pldtypes.HexBytes, dataFormat pldtypes.JSONFormatOptions) (*pldapi.ABIDecodedData, error) {
-
+	ctx = log.WithComponent(ctx, "txmanager")
 	if len(topics) < 1 {
 		return nil, i18n.NewError(ctx, msgs.MsgTxMgrDecodeCallNoData)
 	}
@@ -364,6 +366,7 @@ func (tm *txManager) DecodeEvent(ctx context.Context, dbTX persistence.DBTX, top
 }
 
 func (tm *txManager) QueryTransactionReceipts(ctx context.Context, jq *query.QueryJSON) ([]*pldapi.TransactionReceipt, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	qw := &filters.QueryWrapper[transactionReceipt, pldapi.TransactionReceipt]{
 		P:           tm.p,
 		Table:       "transaction_receipts",
@@ -381,6 +384,7 @@ func (tm *txManager) QueryTransactionReceipts(ctx context.Context, jq *query.Que
 }
 
 func (tm *txManager) GetTransactionReceiptByID(ctx context.Context, id uuid.UUID) (*pldapi.TransactionReceipt, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	// Log the query details
 	log.L(ctx).Debugf("Querying transaction receipt by ID: %s", id)
 	prs, err := tm.QueryTransactionReceipts(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query())

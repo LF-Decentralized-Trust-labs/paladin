@@ -24,22 +24,22 @@ import (
 	"testing"
 	"time"
 
-	testutils "github.com/LF-Decentralized-Trust-labs/paladin/core/noderuntests/pkg"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/noderuntests/pkg/domains"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	testutils "github.com/LFDT-Paladin/paladin/core/noderuntests/pkg"
+	"github.com/LFDT-Paladin/paladin/core/noderuntests/pkg/domains"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/algorithms"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
 	"github.com/google/uuid"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // Map of node names to config paths. Each node needs its own DB and static signing key
 var CONFIG_PATHS = map[string]string{
-	"alice": "../../test/config/postgres.coordinationtest.alice.config.yaml",
-	"bob":   "../../test/config/postgres.coordinationtest.bob.config.yaml",
+	"alice": "./config/postgres.coordinationtest.alice.config.yaml",
+	"bob":   "./config/postgres.coordinationtest.bob.config.yaml",
 }
 
 func deployDomainRegistry(t *testing.T, nodeName string) *pldtypes.EthAddress {
@@ -139,14 +139,12 @@ func TestTransactionSuccessPrivacyGroupEndorsement(t *testing.T) {
 	assert.Equal(t, aliceTxFull.From, bobTxFull.From)
 	assert.Equal(t, aliceTxFull.To, bobTxFull.To)
 	assert.Equal(t, aliceTxFull.Gas, bobTxFull.Gas)
-	assert.Equal(t, aliceTxFull.GasPrice, bobTxFull.GasPrice)
 	assert.Equal(t, aliceTxFull.Data, bobTxFull.Data)
 	assert.Equal(t, aliceTxFull.Public[0].TransactionHash, bobTxFull.Public[0].TransactionHash)
 	assert.Equal(t, aliceTxFull.Public[0].From, bobTxFull.Public[0].From)
 	assert.Equal(t, aliceTxFull.Public[0].To, bobTxFull.Public[0].To)
 	assert.Equal(t, aliceTxFull.Public[0].Value, bobTxFull.Public[0].Value)
 	assert.Equal(t, aliceTxFull.Public[0].Gas, bobTxFull.Public[0].Gas)
-	assert.Equal(t, aliceTxFull.Public[0].GasPrice, bobTxFull.Public[0].GasPrice)
 }
 
 func TestTransactionSuccessAfterStartStopSingleNode(t *testing.T) {
