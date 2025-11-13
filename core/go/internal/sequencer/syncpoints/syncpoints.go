@@ -19,22 +19,15 @@ package syncpoints
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/flushwriter"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/flushwriter"
 	"github.com/google/uuid"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 	"gorm.io/gorm"
 )
-
-var WriterConfigDefaults = pldconf.FlushWriterConfig{
-	WorkerCount:  confutil.P(10),
-	BatchTimeout: confutil.P("25ms"),
-	BatchMaxSize: confutil.P(100),
-}
 
 type PublicTransactionsSubmit func(tx *gorm.DB) (publicTxID []string, err error)
 
@@ -80,7 +73,7 @@ func NewSyncPoints(ctx context.Context, conf *pldconf.FlushWriterConfig, p persi
 		pubTxMgr:     pubTxMgr,
 		transportMgr: transportMgr,
 	}
-	s.writer = flushwriter.NewWriter(ctx, s.runBatch, p, conf, &WriterConfigDefaults)
+	s.writer = flushwriter.NewWriter(ctx, s.runBatch, p, conf, &pldconf.PrivateTxManagerDefaults.Writer)
 	return s
 }
 

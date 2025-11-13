@@ -2,7 +2,7 @@
 
 This example is meant to get familiar with how to create and manage a basic token using the **Notarized Tokens (noto)** domain.
 
-See the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tutorials/notarized-tokens/) for a detailed explanation.
+See the [tutorial](https://LFDT-Paladin.github.io/paladin/head/tutorials/notarized-tokens/) for a detailed explanation.
 
 ## Pre-requisites
 

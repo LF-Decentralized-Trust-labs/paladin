@@ -8,7 +8,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
 )

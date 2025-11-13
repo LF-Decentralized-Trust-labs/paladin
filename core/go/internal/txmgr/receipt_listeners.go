@@ -21,18 +21,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/retry"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/filters"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/retry"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -129,7 +129,7 @@ func (tm *txManager) receiptsInit() {
 }
 
 func (tm *txManager) CreateReceiptListener(ctx context.Context, spec *pldapi.TransactionReceiptListener) error {
-
+	ctx = log.WithComponent(ctx, "txmanager")
 	log.L(ctx).Infof("Creating receipt listener '%s'", spec.Name)
 	if err := tm.validateReceiptListenerSpec(ctx, spec); err != nil {
 		return err
@@ -172,6 +172,7 @@ func (rr *registeredReceiptReceiver) Close() {
 }
 
 func (tm *txManager) AddReceiptReceiver(ctx context.Context, name string, r components.ReceiptReceiver) (components.ReceiverCloser, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	tm.receiptListenerLock.Lock()
 	defer tm.receiptListenerLock.Unlock()
 
@@ -184,7 +185,7 @@ func (tm *txManager) AddReceiptReceiver(ctx context.Context, name string, r comp
 }
 
 func (tm *txManager) GetReceiptListener(ctx context.Context, name string) *pldapi.TransactionReceiptListener {
-
+	// ctx = log.WithComponent(ctx, "txmanager")
 	tm.receiptListenerLock.Lock()
 	defer tm.receiptListenerLock.Unlock()
 
@@ -197,14 +198,17 @@ func (tm *txManager) GetReceiptListener(ctx context.Context, name string) *pldap
 }
 
 func (tm *txManager) StartReceiptListener(ctx context.Context, name string) error {
+	ctx = log.WithComponent(ctx, "txmanager")
 	return tm.setReceiptListenerStatus(ctx, name, true)
 }
 
 func (tm *txManager) StopReceiptListener(ctx context.Context, name string) error {
+	ctx = log.WithComponent(ctx, "txmanager")
 	return tm.setReceiptListenerStatus(ctx, name, false)
 }
 
 func (tm *txManager) NotifyStatesDBChanged(ctx context.Context) {
+	// ctx = log.WithComponent(ctx, "txmanager")
 	tm.lastStateUpdateTime.Store(int64(pldtypes.TimestampNow()))
 }
 
@@ -237,6 +241,7 @@ func (tm *txManager) setReceiptListenerStatus(ctx context.Context, name string, 
 }
 
 func (tm *txManager) DeleteReceiptListener(ctx context.Context, name string) error {
+	ctx = log.WithComponent(ctx, "txmanager")
 	tm.receiptListenerLock.Lock()
 	defer tm.receiptListenerLock.Unlock()
 
@@ -261,6 +266,7 @@ func (tm *txManager) DeleteReceiptListener(ctx context.Context, name string) err
 }
 
 func (tm *txManager) QueryReceiptListeners(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.TransactionReceiptListener, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	qw := &filters.QueryWrapper[persistedReceiptListener, pldapi.TransactionReceiptListener]{
 		P:           tm.p,
 		Table:       "receipt_listeners",

@@ -2,7 +2,7 @@
 
 This example demonstrates basic usage of Paladin on an Ethereum network, with a simple smart contract deployment.
 
-See the [tutorial](https://lf-decentralized-trust-labs.github.io/paladin/head/tutorials/hello-world/) for a detailed explanation.
+See the [tutorial](https://LFDT-Paladin.github.io/paladin/head/tutorials/hello-world/) for a detailed explanation.
 
 ## Pre-requisites
 

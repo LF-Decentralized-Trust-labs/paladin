@@ -19,10 +19,11 @@ package keymanager
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/rpcserver"
 )
 
 func (km *keyManager) RPCModule() *rpcserver.RPCModule {
@@ -52,6 +53,7 @@ func (km *keyManager) rpcResolveKey() rpcserver.RPCHandler {
 		algorithm string,
 		verifierType string,
 	) (*pldapi.KeyMappingAndVerifier, error) {
+		ctx = log.WithComponent(ctx, "keymanager")
 		return km.ResolveKeyNewDatabaseTX(ctx, identifier, algorithm, verifierType)
 	})
 }
@@ -60,6 +62,7 @@ func (km *keyManager) rpcResolveEthAddress() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		identifier string,
 	) (*pldtypes.EthAddress, error) {
+		ctx = log.WithComponent(ctx, "keymanager")
 		return km.ResolveEthAddressNewDatabaseTX(ctx, identifier)
 	})
 }
@@ -70,6 +73,7 @@ func (km *keyManager) rpcReverseKeyLookup() rpcserver.RPCHandler {
 		verifierType string,
 		verifier string,
 	) (*pldapi.KeyMappingAndVerifier, error) {
+		ctx = log.WithComponent(ctx, "keymanager")
 		return km.ReverseKeyLookup(ctx, km.p.NOTX(), algorithm, verifierType, verifier)
 	})
 }
@@ -78,6 +82,7 @@ func (km *keyManager) rpcQueryKeys() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		jq query.QueryJSON,
 	) ([]*pldapi.KeyQueryEntry, error) {
+		ctx = log.WithComponent(ctx, "keymanager")
 		return km.QueryKeys(ctx, km.p.DB(), &jq)
 	})
 }

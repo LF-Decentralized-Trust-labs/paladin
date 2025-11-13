@@ -21,16 +21,16 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldclient"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/mocks/componentsmocks"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldclient"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/rpcserver"
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -122,7 +122,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 			mwpgt1.Return(&pldapi.TransactionInput{
 				TransactionBase: pldapi.TransactionBase{
 					Type: pldapi.TransactionTypePrivate.Enum(),
-					From: `my.key`,
+					From: `me@node1`,
 					Data: pldtypes.RawJSON(`{"wrapped":"transaction"}`),
 				},
 			}, nil)
@@ -133,7 +133,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 			Return([]uuid.UUID{tx1ID}, nil).
 			Run(func(args mock.Arguments) {
 				tx := args[2].([]*pldapi.TransactionInput)[0]
-				assert.Regexp(t, `my.key`, tx.From)
+				assert.Regexp(t, `me@node1`, tx.From)
 				assert.Equal(t, "pgtx_deploy", tx.IdempotencyKey)
 				assert.JSONEq(t, `{"wrapped":"transaction"}`, tx.Data.Pretty())
 			}).Once()
@@ -236,7 +236,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 		Group:          group.ID,
 		IdempotencyKey: "pgtx_deploy",
 		PrivacyGroupEVMTX: pldapi.PrivacyGroupEVMTX{
-			From:     "my.key",
+			From:     "me",
 			To:       nil, // simulate is a deploy inside the privacy group
 			Function: &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{{Type: "string", Name: "input1"}}},
 			Gas:      confutil.P(pldtypes.HexUint64(12345)),

@@ -15,7 +15,7 @@
 
 package keymanager
 
-import "github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
+import "github.com/LFDT-Paladin/paladin/core/internal/filters"
 
 type DBKeyPath struct {
 	Parent string `gorm:"column:parent;primaryKey"`

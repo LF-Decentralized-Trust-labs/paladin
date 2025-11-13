@@ -21,16 +21,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/google/uuid"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/pkg/blockindexer"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/retry"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/core/pkg/ethclient"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/retry"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -173,7 +174,7 @@ func NewOrchestrator(
 		persistenceRetryTimeout: confutil.DurationMin(conf.Orchestrator.PersistenceRetryTime, veryShortMinimum, *pldconf.PublicTxManagerDefaults.Orchestrator.PersistenceRetryTime),
 
 		// submission retry
-		transactionSubmissionRetry: retry.NewRetryLimited(&conf.Orchestrator.SubmissionRetry),
+		transactionSubmissionRetry: retry.NewRetryLimited(&conf.Orchestrator.SubmissionRetry, &pldconf.PublicTxManagerDefaults.Orchestrator.SubmissionRetry),
 		staleTimeout:               confutil.DurationMin(conf.Orchestrator.StaleTimeout, 0, *pldconf.PublicTxManagerDefaults.Orchestrator.StaleTimeout),
 		hasZeroGasPrice:            ptm.gasPriceClient.HasZeroGasPrice(ctx),
 		InFlightTxsStale:           make(chan bool, 1),
@@ -432,7 +433,7 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 			err := oc.p.DB().
 				Table("public_txn_bindings").
 				Select(`"transaction"`).
-				Where(`"pub_txn_id" IN (?)`, tx.PublicTxnID).
+				Where(`"pub_txn_id" IN (?)`, []uint64{tx.PublicTxnID}).
 				Find(&txId).
 				Error
 			if err != nil {
@@ -486,7 +487,7 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 			err := oc.p.DB().
 				Table("public_txn_bindings").
 				Select(`"transaction"`).
-				Where(`"pub_txn_id" IN (?)`, tx.PublicTxnID).
+				Where(`"pub_txn_id" IN (?)`, []uint64{tx.PublicTxnID}).
 				Find(&txId).
 				Error
 			if err != nil {

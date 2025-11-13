@@ -34,7 +34,6 @@ title: PublicTx
 | `value` | The value transferred in the transaction (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 | `maxPriorityFeePerGas` | The maximum priority fee per gas (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 | `maxFeePerGas` | The maximum fee per gas (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
-| `gasPrice` | The gas price (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 
 ## PublicTxSubmissionData
 
@@ -44,7 +43,6 @@ title: PublicTx
 | `transactionHash` | The transaction hash | [`Bytes32`](simpletypes.md#bytes32) |
 | `maxPriorityFeePerGas` | The maximum priority fee per gas (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 | `maxFeePerGas` | The maximum fee per gas (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
-| `gasPrice` | The gas price (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 
 
 ## TransactionActivityRecord

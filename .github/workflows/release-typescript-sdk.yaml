@@ -10,6 +10,11 @@ on:
         description: 'NPM token'
         required: true
     inputs:
+      ref:
+        description: 'Commit ref for checkout'
+        required: false
+        type: string
+        default: ''
       sdk_version:
         description: 'The version to publish (e.g. v1.0.0)'
         required: true
@@ -20,6 +25,11 @@ on:
         type: string
   workflow_dispatch:
     inputs:
+      ref:
+        description: 'Commit ref for checkout'
+        required: false
+        type: string
+        default: ''
       sdk_version:
         description: 'The version to publish (e.g. v1.0.0)'
         required: true
@@ -38,6 +48,8 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+
       - uses: actions/setup-node@v4
         with:
           node-version: '18.x'

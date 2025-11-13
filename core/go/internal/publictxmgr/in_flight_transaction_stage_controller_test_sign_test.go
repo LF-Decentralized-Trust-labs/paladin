@@ -22,11 +22,12 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	"github.com/LFDT-Paladin/paladin/core/mocks/componentsmocks"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/algorithms"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -50,8 +51,11 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	}
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: pldtypes.Uint64ToUint256(10),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
 		},
 	})
 
@@ -173,8 +177,11 @@ func TestProduceLatestInFlightStageContextSigningPanic(t *testing.T) {
 	}
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: pldtypes.Uint64ToUint256(10),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
 		},
 	})
 
@@ -218,8 +225,11 @@ func TestProduceLatestInFlightStageContextTriggerSign(t *testing.T) {
 	}
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: pldtypes.Uint64ToUint256(10),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+				MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
+			},
 		},
 	})
 	it.testOnlyNoActionMode = false

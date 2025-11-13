@@ -38,9 +38,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	corev1alpha1 "github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	corev1alpha1 "github.com/LFDT-Paladin/paladin/operator/api/v1alpha1"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 )
 
 var _ = Describe("SmartContractDeployment Controller", func() {
@@ -255,7 +255,7 @@ func TestBuildDeployTransaction_Success(t *testing.T) {
 	assert.Equal(t, scd.Spec.Bytecode, tx.Bytecode.String())
 	// Additional assertions can be made on tx.ABI, tx.Data, etc.
 	assert.NotNil(t, tx.ABI)
-	assert.NotNil(t, tx.Data)
+	assert.Nil(t, tx.Data)
 }
 
 func TestBuildLinkReferences_Success(t *testing.T) {

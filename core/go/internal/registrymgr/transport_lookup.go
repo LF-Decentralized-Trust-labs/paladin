@@ -20,16 +20,16 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
 )
 
 type transportLookup struct {
@@ -43,13 +43,13 @@ type transportLookup struct {
 func newTransportLookup(ctx context.Context, regName string, conf *pldconf.RegistryTransportsConfig) (tl *transportLookup, err error) {
 	tl = &transportLookup{
 		regName:           regName,
-		requiredPrefix:    confutil.StringNotEmpty(&conf.RequiredPrefix, pldconf.RegistryTransportsDefaults.RequiredPrefix),
-		hierarchySplitter: confutil.StringNotEmpty(&conf.HierarchySplitter, pldconf.RegistryTransportsDefaults.HierarchySplitter),
+		requiredPrefix:    confutil.StringNotEmpty(&conf.RequiredPrefix, pldconf.RegistryConfigDefaults.Transports.RequiredPrefix),
+		hierarchySplitter: confutil.StringNotEmpty(&conf.HierarchySplitter, pldconf.RegistryConfigDefaults.Transports.HierarchySplitter),
 		transportNameMap:  map[string]string{},
 	}
 
 	tl.propertyRegexp, err = regexp.Compile(
-		confutil.StringNotEmpty(&conf.PropertyRegexp, pldconf.RegistryTransportsDefaults.PropertyRegexp),
+		confutil.StringNotEmpty(&conf.PropertyRegexp, pldconf.RegistryConfigDefaults.Transports.PropertyRegexp),
 	)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryTransportPropertyRegexp, regName)

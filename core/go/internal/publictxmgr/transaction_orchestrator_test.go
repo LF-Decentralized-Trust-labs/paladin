@@ -22,12 +22,13 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	"github.com/google/uuid"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -67,7 +68,12 @@ func TestNewOrchestratorLoadsSecondTxAndQueuesBalanceCheck(t *testing.T) {
 
 	ctx, o, m, done := newTestOrchestrator(t, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Orchestrator.MaxInFlight = confutil.P(2) // only poll once then we're full
-		conf.GasPrice.FixedGasPrice = 1
+		maxFeePerGasStr := pldtypes.Uint64ToUint256(1).HexString0xPrefix()
+		maxPriorityFeePerGasStr := pldtypes.Uint64ToUint256(1).HexString0xPrefix()
+		conf.GasPrice.FixedGasPrice = &pldconf.FixedGasPricing{
+			MaxFeePerGas:         &maxFeePerGasStr,
+			MaxPriorityFeePerGas: &maxPriorityFeePerGasStr,
+		}
 	})
 	defer done()
 
@@ -165,7 +171,12 @@ func TestNewOrchestratorPollingRemoveCompleted(t *testing.T) {
 func TestOrchestratorWaitingForBalance(t *testing.T) {
 	ctx, o, m, done := newTestOrchestrator(t, func(m *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Orchestrator.MaxInFlight = confutil.P(1) // just one inflight - which we inject in
-		conf.GasPrice.FixedGasPrice = 1
+		maxFeePerGasStr := pldtypes.Uint64ToUint256(1).HexString0xPrefix()
+		maxPriorityFeePerGasStr := pldtypes.Uint64ToUint256(1).HexString0xPrefix()
+		conf.GasPrice.FixedGasPrice = &pldconf.FixedGasPricing{
+			MaxFeePerGas:         &maxFeePerGasStr,
+			MaxPriorityFeePerGas: &maxPriorityFeePerGasStr,
+		}
 	})
 	defer done()
 
@@ -173,8 +184,11 @@ func TestOrchestratorWaitingForBalance(t *testing.T) {
 		tx.Gas = 100
 	})
 	txState.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &pldapi.PublicTxGasPricing{
-			GasPrice: pldtypes.Int64ToInt256(1000),
+		NewValues: BaseTXUpdateNewValues{
+			GasPricing: &pldapi.PublicTxGasPricing{
+				MaxFeePerGas:         pldtypes.Int64ToInt256(1000),
+				MaxPriorityFeePerGas: pldtypes.Int64ToInt256(100),
+			},
 		},
 	})
 

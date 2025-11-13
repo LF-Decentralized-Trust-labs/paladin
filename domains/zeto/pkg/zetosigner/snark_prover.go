@@ -1,9 +1,9 @@
 package zetosigner
 
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/signer"
-	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
+	"github.com/LFDT-Paladin/paladin/domains/zeto/internal/zeto/signer"
+	"github.com/LFDT-Paladin/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signerapi"
 )
 
 func NewSnarkProver(conf *zetosignerapi.SnarkProverConfig) (signerapi.InMemorySigner, error) {

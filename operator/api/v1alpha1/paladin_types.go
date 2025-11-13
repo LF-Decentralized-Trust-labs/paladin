@@ -65,6 +65,11 @@ type PaladinSpec struct {
 
 	// Transports are configured individually on each node, as they reference security details specific to that node
 	Transports []TransportConfig `json:"transports"`
+
+	// RPC authorization configuration using the basicauth reference implementation.
+	// The secret must contain a key named 'credentials.htpasswd' with the credentials file content.
+	// +optional
+	RPCAuth *RPCAuthConfig `json:"rpcAuth,omitempty"`
 }
 type BaseLedgerEndpointType string
 
@@ -178,6 +183,8 @@ type Database struct {
 
 const SignerType_AutoHDWallet = "autoHDWallet"
 
+const DerivationType_BIP32 = "bip32"
+
 type SecretBackedSigner struct {
 	Secret string `json:"secret"`
 	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
@@ -196,6 +203,10 @@ type SecretBackedSigner struct {
 	// key identifier DOES NOT match against the given regular expression for the key selector.
 	// +kubebuilder:default=false
 	KeySelectorMustNotMatch bool `json:"keySelectorMustNotMatch"`
+	// +kubebuilder:validation:Enum=bip32;direct
+	// +kubebuilder:default=bip32
+	// The Paladin signer can use single BIP39 seed mnemonic to derive keys, or use direct key mapping.
+	DerivationType string `json:"derivationType"`
 }
 
 type AuthType string
@@ -229,6 +240,14 @@ type AuthSecret struct {
 type AuthInline struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+// RPCAuthConfig defines the configuration for RPC authorization using the basicauth plugin.
+// Only the basicauth reference implementation is supported.
+type RPCAuthConfig struct {
+	// SecretName is the name of the Kubernetes secret containing the 'credentials.htpasswd' key
+	// with the htpasswd formatted credentials file content.
+	SecretName string `json:"secretName"`
 }
 
 // StatusReason is an enumeration of possible failure causes.  Each StatusReason

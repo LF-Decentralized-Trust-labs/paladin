@@ -18,11 +18,11 @@ package originator
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/common"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/metrics"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator/transaction"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/common"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/metrics"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/originator/transaction"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 	uuid "github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 )

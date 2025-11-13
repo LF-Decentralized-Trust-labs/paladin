@@ -19,11 +19,12 @@ package identityresolver
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
 )
 
 func (ir *identityResolver) HandlePaladinMsg(ctx context.Context, message *components.ReceivedMessage) {
+	ctx = log.WithComponent(ctx, log.Component("identityresolver"))
 	//TODO this need to become an ultra low latency, non blocking, handover to the event loop thread.
 	// need some thought on how to handle errors, retries, buffering, swapping idle sequencers in and out of memory etc...
 

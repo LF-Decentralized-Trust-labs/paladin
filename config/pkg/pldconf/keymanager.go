@@ -15,15 +15,15 @@
 
 package pldconf
 
-import "github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+import "github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 
-type KeyManagerConfig struct {
-	KeyManagerManagerConfig `json:"keyManager"`
-	SigningModules          map[string]*SigningModuleConfig `json:"signingModules"`
-	Wallets                 []*WalletConfig                 `json:"wallets"` // ordered list
+type KeyManagerInlineConfig struct {
+	KeyManagerConfig `json:"keyManager"`
+	SigningModules   map[string]*SigningModuleConfig `json:"signingModules" configdefaults:"SigningModuleConfigDefaults"`
+	Wallets          []*WalletConfig                 `json:"wallets" configdefaults:"WalletConfigDefaults"` // ordered list
 }
 
-type KeyManagerManagerConfig struct {
+type KeyManagerConfig struct {
 	IdentifierCache CacheConfig `json:"identifierCache"`
 	VerifierCache   CacheConfig `json:"verifierCache"`
 }
@@ -36,6 +36,12 @@ type SigningModuleConfig struct {
 
 type SigningModuleInitConfig struct {
 	Retry RetryConfig `json:"retry"`
+}
+
+var SigningModuleConfigDefaults = SigningModuleConfig{
+	Init: SigningModuleInitConfig{
+		Retry: GenericRetryDefaults.RetryConfig,
+	},
 }
 
 type WalletConfig struct {
@@ -56,10 +62,11 @@ var WalletDefaults = &WalletConfig{
 	KeySelector:             `.*`, // catch-all
 	KeySelectorMustNotMatch: false,
 	SignerType:              WalletSignerTypeEmbedded, // uses the embedded signing module running in the Paladin process
+	Signer:                  &SignerConfigDefaults,
 }
 
-var KeyManagerDefaults = &KeyManagerConfig{
-	KeyManagerManagerConfig: KeyManagerManagerConfig{
+var KeyManagerDefaults = KeyManagerInlineConfig{
+	KeyManagerConfig: KeyManagerConfig{
 		IdentifierCache: CacheConfig{
 			Capacity: confutil.P(1000),
 		},

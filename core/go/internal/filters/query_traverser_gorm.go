@@ -21,7 +21,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
 	"gorm.io/gorm"
 )
 

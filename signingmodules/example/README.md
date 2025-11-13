@@ -116,4 +116,4 @@ To then use the signing module a wallet must be configured that references it, b
 ]
 ```
 
-Please see https://lf-decentralized-trust-labs.github.io/paladin/head/architecture/key_management/ for more information on key management and signing modules.
+Please see https://LFDT-Paladin.github.io/paladin/head/architecture/key_management/ for more information on key management and signing modules.

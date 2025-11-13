@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 
 pragma solidity ^0.8.13;
 
@@ -42,13 +42,15 @@ contract IdentityRegistry {
     // This is used to store property names and values for each identity
     mapping(bytes32 => mapping(bytes32 => Property)) private properties;
 
-    constructor() {
+    constructor(bool rootless) {
+        // if rootless, owner is set to the max address (0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF)
+        address owner = rootless ? address(type(uint160).max) : msg.sender;
         // Root identity is created
         Identity memory rootIdentity = Identity(
             0,
             new bytes32[](0),
             "root",
-            msg.sender
+            owner
         );
         identities[0] = rootIdentity;
         emit IdentityRegistered(
@@ -59,7 +61,7 @@ contract IdentityRegistry {
         );
 
         // Root identity is created
-        identities[0] = Identity(0, new bytes32[](0), "root", msg.sender);
+        identities[0] = Identity(0, new bytes32[](0), "root", owner);
     }
 
     function registerIdentity(bytes32 parentIdentityHash, string memory name, address owner) public {
@@ -67,9 +69,9 @@ contract IdentityRegistry {
         require(bytes(name).length != 0, "Name cannot be empty");
 
         // Ensure sender owns parent identity
-        require(identities[parentIdentityHash].owner == msg.sender, "Forbidden");
+        require(identities[parentIdentityHash].owner == msg.sender || identities[parentIdentityHash].owner == address(type(uint160).max), "Forbidden");
 
-        // Calculate identiy hash based on its name and the hash of the parent identity
+        // Calculate identity hash based on its name and the hash of the parent identity
         bytes32 hash = sha256(abi.encodePacked(parentIdentityHash, name));
 
         // Ensure each child has a unique name

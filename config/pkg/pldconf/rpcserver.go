@@ -17,16 +17,8 @@
 package pldconf
 
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 )
-
-const DefaultHTTPPort = 8645
-const DefaultWebSocketPort = 8646
-
-var WSDefaults = RPCServerConfigWS{
-	ReadBufferSize:  confutil.P("64KB"),
-	WriteBufferSize: confutil.P("64KB"),
-}
 
 type RPCServerConfigHTTP struct {
 	Disabled         bool                 `json:"disabled,omitempty"`
@@ -42,6 +34,18 @@ type RPCServerConfigWS struct {
 }
 
 type RPCServerConfig struct {
-	HTTP RPCServerConfigHTTP `json:"http,omitempty"`
-	WS   RPCServerConfigWS   `json:"ws,omitempty"`
+	HTTP        RPCServerConfigHTTP `json:"http,omitempty"`
+	WS          RPCServerConfigWS   `json:"ws,omitempty"`
+	Authorizers []string            `json:"authorizers,omitempty"` // Ordered array of authorizer plugin names to use
+}
+
+var RPCServerConfigDefaults = RPCServerConfig{
+	HTTP: RPCServerConfigHTTP{
+		HTTPServerConfig: HTTPDefaults,
+	},
+	WS: RPCServerConfigWS{
+		ReadBufferSize:   confutil.P("64KB"),
+		WriteBufferSize:  confutil.P("64KB"),
+		HTTPServerConfig: HTTPDefaults,
+	},
 }

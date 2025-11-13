@@ -28,13 +28,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/pldmsgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/retry"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/tlsconf"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/pldmsgs"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/retry"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/tlsconf"
 	"github.com/gorilla/websocket"
 )
 
@@ -92,10 +92,7 @@ func New(ctx context.Context, config *pldconf.WSClientConfig, beforeConnect WSPr
 			TLSClientConfig:  tlsConfig,
 			HandshakeTimeout: confutil.DurationMin(config.ConnectionTimeout, 0, *pldconf.DefaultWSConfig.ConnectionTimeout),
 		},
-		retry: *retry.NewRetryIndefinite(&pldconf.RetryConfig{
-			InitialDelay: config.ConnectRetry.InitialDelay,
-			MaxDelay:     config.ConnectRetry.MaxDelay,
-		}),
+		retry:                *retry.NewRetryIndefinite(&config.ConnectRetry),
 		initialRetryAttempts: confutil.IntMin(config.InitialConnectAttempts, 0, *pldconf.DefaultWSConfig.InitialConnectAttempts),
 		headers:              make(http.Header),
 		send:                 make(chan []byte),

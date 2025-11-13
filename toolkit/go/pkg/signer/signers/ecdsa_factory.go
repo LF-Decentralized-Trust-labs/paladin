@@ -18,7 +18,7 @@ package signers
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signerapi"
 )
 
 func NewECDSASignerFactory[C signerapi.ExtensibleConfig]() signerapi.InMemorySignerFactory[C] {

@@ -20,26 +20,26 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/flushwriter"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/filters"
+	"github.com/LFDT-Paladin/paladin/core/internal/flushwriter"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/retry"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/retry"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/rpcserver"
 )
 
 type transportManager struct {
@@ -48,7 +48,7 @@ type transportManager struct {
 	mux       sync.Mutex
 
 	rpcModule        *rpcserver.RPCModule
-	conf             *pldconf.TransportManagerConfig
+	conf             *pldconf.TransportManagerInlineConfig
 	localNodeName    string
 	registryManager  components.RegistryManager
 	stateManager     components.StateManager
@@ -95,7 +95,7 @@ var reliableMessageAckFilters = filters.FieldMap{
 	"error":     filters.StringField("error"),
 }
 
-func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerConfig) components.TransportManager {
+func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerInlineConfig) components.TransportManager {
 	tm := &transportManager{
 		conf:                    conf,
 		localNodeName:           conf.NodeName,
@@ -111,7 +111,7 @@ func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerCo
 		quiesceTimeout:          1 * time.Second, // not currently tunable (considered very small edge case)
 		reliableMessagePageSize: 100,             // not currently tunable
 	}
-	tm.bgCtx, tm.cancelCtx = context.WithCancel(bgCtx)
+	tm.bgCtx, tm.cancelCtx = context.WithCancel(log.WithComponent(bgCtx, "transportmanager"))
 	return tm
 }
 
@@ -257,11 +257,13 @@ func (tm *transportManager) LocalNodeName() string {
 
 // See docs in components package
 func (tm *transportManager) Send(ctx context.Context, send *components.FireAndForgetMessageSend) error {
+	ctx = log.WithComponent(ctx, "transportmanager")
 	return tm.SendWithNack(ctx, send, nil)
 }
 
 // See docs in components package
 func (tm *transportManager) SendWithNack(ctx context.Context, send *components.FireAndForgetMessageSend, errChan chan error) error {
+	ctx = log.WithComponent(ctx, "transportmanager")
 
 	// Check the message is valid
 	if len(send.Payload) == 0 {
@@ -314,7 +316,7 @@ func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName str
 
 // See docs in components package
 func (tm *transportManager) SendReliable(ctx context.Context, dbTX persistence.DBTX, msgs ...*pldapi.ReliableMessage) (err error) {
-
+	ctx = log.WithComponent(ctx, "transportmanager")
 	peers := make(map[string]*peer)
 	for _, msg := range msgs {
 		log.L(ctx).Debugf("Sending reliable message %s/%+v to node %s", msg.MessageType, msg.ID, msg.Node)
@@ -385,6 +387,7 @@ func (tm *transportManager) getReliableMessageByID(ctx context.Context, dbTX per
 }
 
 func (tm *transportManager) QueryReliableMessages(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.ReliableMessage, error) {
+	ctx = log.WithComponent(ctx, "transportmanager")
 	qw := &filters.QueryWrapper[pldapi.ReliableMessage, pldapi.ReliableMessage]{
 		P:           tm.persistence,
 		DefaultSort: "-sequence",
@@ -401,6 +404,7 @@ func (tm *transportManager) QueryReliableMessages(ctx context.Context, dbTX pers
 }
 
 func (tm *transportManager) QueryReliableMessageAcks(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.ReliableMessageAck, error) {
+	ctx = log.WithComponent(ctx, "transportmanager")
 	qw := &filters.QueryWrapper[pldapi.ReliableMessageAck, pldapi.ReliableMessageAck]{
 		P:           tm.persistence,
 		DefaultSort: "-time",

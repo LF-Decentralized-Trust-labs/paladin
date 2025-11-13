@@ -5,9 +5,9 @@
 package sequencer
 
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/coordinator"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/originator"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/sequencer/transport"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/coordinator"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/originator"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/transport"
 	mock "github.com/stretchr/testify/mock"
 )
 

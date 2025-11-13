@@ -17,7 +17,7 @@
 package pldmsgs
 
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
 	"golang.org/x/text/language"
 )
 
@@ -116,6 +116,7 @@ var (
 	MsgJSONRPCInvalidParam        = pde("PD020704", "method %s parameter %d invalid: %s")
 	MsgJSONRPCResultSerialization = pde("PD020705", "method %s result serialization failed: %s")
 	MsgJSONRPCAysncNonWSConn      = pde("PD020706", "method %s only available on WebSocket connections")
+	MsgJSONRPCUnauthorized        = pde("PD020707", "Unauthorized")
 
 	// Signing module PD0208XX
 	MsgSigningModuleBadPathError                = pde("PD020800", "Path '%s' does not exist, or it is not a directory")

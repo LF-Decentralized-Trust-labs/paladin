@@ -15,12 +15,10 @@
 import PaladinClient, {
   PenteFactory,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
-import { checkDeploy } from "paladin-example-common";
-import storageJson from "../abis/Storage.json";
+import { DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import { PrivateStorage } from "../helpers/storage";
 import * as fs from 'fs';
-import * as path from 'path';
-import { nodeConnections } from "paladin-example-common";
+import { nodeConnections, findLatestContractDataFile, getCachePath } from "paladin-example-common";
 
 const logger = console;
 
@@ -35,23 +33,6 @@ interface ContractData {
   node2Verifier: string;
   node3Verifier: string;
   timestamp: string;
-}
-
-function findLatestContractDataFile(dataDir: string): string | null {
-  if (!fs.existsSync(dataDir)) {
-    return null;
-  }
-
-  const files = fs.readdirSync(dataDir)
-    .filter(file => file.startsWith('contract-data-') && file.endsWith('.json'))
-    .sort((a, b) => {
-      const timestampA = a.replace('contract-data-', '').replace('.json', '');
-      const timestampB = b.replace('contract-data-', '').replace('.json', '');
-      return new Date(timestampB).getTime() - new Date(timestampA).getTime(); // Descending order (newest first)
-    })
-    .reverse();
-
-  return files.length > 0 ? path.join(dataDir, files[0]) : null;
 }
 
 async function main(): Promise<boolean> {
@@ -71,7 +52,7 @@ async function main(): Promise<boolean> {
   // STEP 1: Load the saved contract data
   logger.log("STEP 1: Loading saved contract data...");
   // Use command-line argument for data directory if provided, otherwise use default
-  const dataDir = process.argv[2] || path.join(__dirname, '..', '..', 'data');
+  const dataDir = getCachePath();
   const dataFile = findLatestContractDataFile(dataDir);
   
   if (!dataFile) {
@@ -195,7 +176,7 @@ async function main(): Promise<boolean> {
       from: verifierNode1.lookup,
       function: "store",
       data: { num: newValueToStore },
-    }).waitForReceipt(10000);
+    }).waitForReceipt(DEFAULT_POLL_TIMEOUT);
 
     if (!storeReceipt?.transactionHash) {
       logger.error("STEP 7: Function call failed!");
@@ -255,7 +236,7 @@ async function main(): Promise<boolean> {
       from: verifierNode1.lookup,
       function: "store",
       data: { num: contractData.storedValue },
-    }).waitForReceipt(10000);
+    }).waitForReceipt(DEFAULT_POLL_TIMEOUT);
 
     if (!restoreReceipt?.transactionHash) {
       logger.error("STEP 8: Function call failed!");

@@ -20,10 +20,10 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/transports/grpc/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/transports/grpc/pkg/proto"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/transports/grpc/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/transports/grpc/pkg/proto"
 	"google.golang.org/grpc"
 )
 

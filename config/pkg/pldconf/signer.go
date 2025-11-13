@@ -16,7 +16,7 @@
 package pldconf
 
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 )
 
 const (
@@ -72,10 +72,22 @@ type KeyDerivationConfig struct {
 	BIP44HardenedSegments *int               `json:"bip44HardenedSegments"`
 }
 
-var KeyDerivationDefaults = &KeyDerivationConfig{
-	BIP44Prefix:           confutil.P("m/44'/60'"),
-	BIP44HardenedSegments: confutil.P(1), // in addition to the prefix, so `m/44'/60'/0'/0/0` for example with 3 segments, on top of the prefix
-	SeedKeyPath:           StaticKeyReference{Name: "seed", Index: 0},
+var SignerConfigDefaults = SignerConfig{
+	KeyStore: KeyStoreConfig{
+		FileSystem: FileSystemKeyStoreConfig{
+			Path:     confutil.P("keystore"),
+			FileMode: confutil.P("0600"),
+			DirMode:  confutil.P("0700"),
+			Cache: CacheConfig{
+				Capacity: confutil.P(100),
+			},
+		},
+	},
+	KeyDerivation: KeyDerivationConfig{
+		BIP44Prefix:           confutil.P("m/44'/60'"),
+		BIP44HardenedSegments: confutil.P(1), // in addition to the prefix, so `m/44'/60'/0'/0/0` for example with 3 segments, on top of the prefix
+		SeedKeyPath:           StaticKeyReference{Name: "seed", Index: 0},
+	},
 }
 
 type StaticKeyEntryEncoding string
@@ -103,13 +115,4 @@ type FileSystemKeyStoreConfig struct {
 	Cache    CacheConfig `json:"cache"`
 	FileMode *string     `json:"fileMode"`
 	DirMode  *string     `json:"dirMode"`
-}
-
-var FileSystemDefaults = &FileSystemKeyStoreConfig{
-	Path:     confutil.P("keystore"),
-	FileMode: confutil.P("0600"),
-	DirMode:  confutil.P("0700"),
-	Cache: CacheConfig{
-		Capacity: confutil.P(100),
-	},
 }

@@ -18,15 +18,15 @@ package groupmgr
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/filters"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
 	"github.com/google/uuid"
 	"gorm.io/gorm/clause"
 )
@@ -77,7 +77,7 @@ func (gm *persistedMessage) preValidate(ctx context.Context) error {
 }
 
 func (gm *groupManager) SendMessage(ctx context.Context, dbTX persistence.DBTX, msg *pldapi.PrivacyGroupMessageInput) (*uuid.UUID, error) {
-
+	ctx = log.WithComponent(ctx, log.Component("groupmanager"))
 	pg, err := gm.GetGroupByID(ctx, dbTX, msg.Domain, msg.Group)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (gm *groupManager) SendMessage(ctx context.Context, dbTX persistence.DBTX, 
 }
 
 func (gm *groupManager) ReceiveMessages(ctx context.Context, dbTX persistence.DBTX, messages []*pldapi.PrivacyGroupMessage) (results map[uuid.UUID]error, err error) {
-
+	ctx = log.WithComponent(ctx, log.Component("groupmanager"))
 	results = make(map[uuid.UUID]error)
 	now := pldtypes.TimestampNow()
 	pMsgs := make([]*persistedMessage, 0, len(messages))
@@ -199,6 +199,7 @@ func (gm *groupManager) ReceiveMessages(ctx context.Context, dbTX persistence.DB
 }
 
 func (gm *groupManager) QueryMessages(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.PrivacyGroupMessage, error) {
+	ctx = log.WithComponent(ctx, log.Component("groupmanager"))
 	qw := &filters.QueryWrapper[persistedMessage, pldapi.PrivacyGroupMessage]{
 		P:           gm.p,
 		DefaultSort: "-localSequence",
@@ -212,6 +213,7 @@ func (gm *groupManager) QueryMessages(ctx context.Context, dbTX persistence.DBTX
 }
 
 func (gm *groupManager) GetMessageByID(ctx context.Context, dbTX persistence.DBTX, id uuid.UUID, failNotFound bool) (*pldapi.PrivacyGroupMessage, error) {
+	ctx = log.WithComponent(ctx, log.Component("groupmanager"))
 	dbMsgs, err := gm.QueryMessages(ctx, dbTX, query.NewQueryBuilder().Equal("id", id).Limit(1).Query())
 	if err != nil {
 		return nil, err

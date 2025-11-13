@@ -19,7 +19,7 @@ As a client to Zeto tokens, Paladin has the following features built into the si
 
 ## Private ABI
 
-The private ABI of Zeto is implemented in [Go](https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/domains/zeto), and can be accessed by calling `ptx_sendTransaction` with `"type": "private"`.
+The private ABI of Zeto is implemented in [Go](https://github.com/LFDT-Paladin/paladin/tree/main/domains/zeto), and can be accessed by calling `ptx_sendTransaction` with `"type": "private"`.
 
 ### constructor
 

@@ -126,12 +126,16 @@ jobs:
         env:
           IMAGE_TAGS: ${{ inputs.image_tags }}
         run: |
+          echo "## Core images built" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+
           IFS=',' read -ra TAG_ARRAY <<< "$IMAGE_TAGS"
           for tag in "${TAG_ARRAY[@]}"; do
             docker manifest create $IMAGE:$tag \
             --amend $TEMP_IMAGE-arm64 \
             --amend $TEMP_IMAGE-amd64
             docker manifest push $IMAGE:$tag
+            echo "- $IMAGE:$tag" >> $GITHUB_STEP_SUMMARY
           done
 
   operator-docker-manifest:
@@ -159,10 +163,14 @@ jobs:
         env:
           IMAGE_TAGS: ${{ inputs.image_tags }}
         run: |
+          echo "## Operator images built" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          
           IFS=',' read -ra TAG_ARRAY <<< "$IMAGE_TAGS"
           for tag in "${TAG_ARRAY[@]}"; do
             docker manifest create $IMAGE:$tag \
             --amend $TEMP_IMAGE-arm64 \
             --amend $TEMP_IMAGE-amd64
             docker manifest push $IMAGE:$tag
+            echo "- $IMAGE:$tag" >> $GITHUB_STEP_SUMMARY
           done

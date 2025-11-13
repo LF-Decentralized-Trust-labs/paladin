@@ -19,7 +19,7 @@ package conf
 import (
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
 )
 
 type RunnerConfig struct {

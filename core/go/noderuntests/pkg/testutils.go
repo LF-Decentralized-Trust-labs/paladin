@@ -26,28 +26,28 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
-	"strings"
-
-	"context"
-	"net"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/componentmgr"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/plugins"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/noderuntests/pkg/domains"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/config"
-	"github.com/LF-Decentralized-Trust-labs/paladin/registries/static/pkg/static"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
-	"github.com/LF-Decentralized-Trust-labs/paladin/transports/grpc/pkg/grpc"
+	"context"
+	"net"
+
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/componentmgr"
+	"github.com/LFDT-Paladin/paladin/core/internal/plugins"
+	"github.com/LFDT-Paladin/paladin/core/noderuntests/pkg/domains"
+	"github.com/LFDT-Paladin/paladin/core/pkg/config"
+	"github.com/LFDT-Paladin/paladin/registries/static/pkg/static"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
+	"github.com/LFDT-Paladin/paladin/transports/grpc/pkg/grpc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -170,8 +170,9 @@ func NewInstanceForTesting(t *testing.T, domainRegistryAddress *pldtypes.EthAddr
 				Type:    string(pldtypes.LibraryTypeCShared),
 				Library: "loaded/via/unit/test/loader",
 			},
-			Config:          map[string]any{"submitMode": domainConfig.SubmitMode},
-			RegistryAddress: domainRegistryAddress.String(),
+			Config:               map[string]any{"submitMode": domainConfig.SubmitMode},
+			RegistryAddress:      domainRegistryAddress.String(),
+			FixedSigningIdentity: "fixed_signing_identity",
 		}
 	case *domains.SimpleStorageDomainConfig:
 		endorsementSet := make([]string, 1+len(peerNodes))
@@ -189,7 +190,8 @@ func NewInstanceForTesting(t *testing.T, domainRegistryAddress *pldtypes.EthAddr
 				"submitMode":     domainConfig.SubmitMode,
 				"endorsementSet": endorsementSet,
 			},
-			RegistryAddress: domainRegistryAddress.String(),
+			RegistryAddress:      domainRegistryAddress.String(),
+			FixedSigningIdentity: "fixed_signing_identity",
 		}
 	}
 
@@ -374,6 +376,15 @@ func DeployDomainRegistry(t *testing.T, configPath string) *pldtypes.EthAddress 
 
 }
 
+func getBesuPort() int {
+	if portStr := os.Getenv("BESU_PORT"); portStr != "" {
+		if port, err := strconv.Atoi(portStr); err == nil {
+			return port
+		}
+	}
+	return 0
+}
+
 func testConfig(t *testing.T, enableWS bool, configPath string) (pldconf.PaladinConfig, pldconf.WSClientConfig) {
 	ctx := context.Background()
 
@@ -423,10 +434,18 @@ func testConfig(t *testing.T, enableWS bool, configPath string) (pldconf.Paladin
 		key = pldtypes.RandHex(32)
 	}
 
+	// Use the provided seed for consistent test accounts
+	// This seed will generate the same accounts every time for testing
 	conf.Wallets[0].Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
 		Encoding: "hex",
 		Inline:   key,
 	}
+
+	// Configure Besu connection with the port determined by environment variable
+	besuPort := getBesuPort()
+	require.NotZero(t, besuPort, "BESU_PORT environment variable is not set")
+	conf.Blockchain.HTTP.URL = fmt.Sprintf("http://localhost:%d", besuPort)
+	conf.Blockchain.WS.URL = fmt.Sprintf("ws://localhost:%d", besuPort+1) // WS port is typically HTTP port + 1
 
 	conf.Log = pldconf.LogConfig{
 		Level:  confutil.P("debug"),
@@ -633,4 +652,8 @@ func (p *partyForTesting) Start(t *testing.T, domainConfig any, configPath strin
 func (p *partyForTesting) Stop(t *testing.T) {
 	p.instance.GetComponentManager().Stop()
 	p.instance.GetPluginManager().Stop()
+}
+
+func (p *partyForTesting) ResolveEthereumAddress(identity string) string {
+	return p.instance.ResolveEthereumAddress(identity)
 }
