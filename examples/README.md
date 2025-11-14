@@ -31,7 +31,6 @@ paladin-operator-bc788db4f-mzbs7   1/1     Running   0          19m
 ```shell
 cd <paladin-root>/examples/common
 npm install                        # install dependencies
-npm install @lfdecentralizedtrust-labs/paladin-sdk@latest
 npm run download-abi               # download ABIs
 npm run build                      # build the 'common' package
 ```
@@ -45,7 +44,6 @@ Most examples can be run using the default local configuration:
 ```sh
 cd <paladin-root>/examples/<example>
 npm install
-npm install @lfdecentralizedtrust-labs/paladin-sdk@latest
 npm run copy-abi
 npm run start
 ```
@@ -59,7 +57,6 @@ To run an example against a remote Paladin network, provide a custom configurati
 ```sh
 cd <paladin-root>/examples/<example>
 npm install
-npm install @lfdecentralizedtrust-labs/paladin-sdk@latest
 npm run copy-abi
 npm run start -- -c /path/to/your/config.json
 ```
