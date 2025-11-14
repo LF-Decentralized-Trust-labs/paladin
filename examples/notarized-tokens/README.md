@@ -12,7 +12,7 @@ Run the common [setup steps](../README.md) before running the example.
 
 ```shell
 npm install           # install dependencies
-npm install @lfdecentralizedtrust-labs/paladin-sdk@latest
+npm install @lfdecentralizedtrust/paladin-sdk@latest
 npm run copy-abi      # copy relevant ABIs
 npm run start         # run the example
 ```

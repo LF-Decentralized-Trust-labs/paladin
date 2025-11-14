@@ -17,7 +17,7 @@ import PaladinClient, {
   NotoFactory,
   PenteFactory,
   ZetoFactory,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
 import { nodeConnections, findLatestContractDataFile, getCachePath } from "paladin-example-common";
@@ -126,7 +126,7 @@ async function main(): Promise<boolean> {
   const [investor2] = paladin3.getVerifiers("investor2@node3");
 
   // Import necessary classes from the SDK
-  const { ZetoInstance, NotoInstance } = await import("@lfdecentralizedtrust-labs/paladin-sdk");
+  const { ZetoInstance, NotoInstance } = await import("@lfdecentralizedtrust/paladin-sdk");
   
   // Recreate contract instances
   const zetoCash = new ZetoInstance(paladin1, contractData.zetoCashAddress);

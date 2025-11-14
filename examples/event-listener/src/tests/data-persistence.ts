@@ -15,7 +15,7 @@
 import PaladinClient, {
   PenteFactory,
   TransactionType,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
 import helloWorldJson from "../abis/HelloWorld.json";

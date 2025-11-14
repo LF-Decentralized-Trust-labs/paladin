@@ -14,7 +14,7 @@
  */
 import PaladinClient, {
   NotoFactory,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContractData } from "./tests/data-persistence";

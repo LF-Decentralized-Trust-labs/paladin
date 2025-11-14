@@ -7,7 +7,7 @@ Before running any example, this package must be [built](#build).
 
 ```bash
 npm install                                  # install dependencies
-npm install @lfdecentralizedtrust-labs/paladin-sdk@latest
+npm install @lfdecentralizedtrust/paladin-sdk@latest
 npm run download-abi                         # download ABIs
 npm run build                                # build the 'common' package
 ```

@@ -2,7 +2,7 @@ import PaladinClient, {
   PaladinVerifier,
   PentePrivacyGroup,
   PentePrivateContract,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import investorList from "../abis/InvestorList.json";
 
 export interface AddInvestorParams {
