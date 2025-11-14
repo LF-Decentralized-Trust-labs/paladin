@@ -16,7 +16,7 @@ import PaladinClient, {
   PaladinVerifier,
   PentePrivacyGroup,
   PentePrivateContract,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import { DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import storage from "../abis/Storage.json";
 

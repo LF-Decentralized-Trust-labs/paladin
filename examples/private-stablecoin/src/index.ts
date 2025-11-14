@@ -18,7 +18,7 @@ import PaladinClient, {
   ZetoFactory,
   algorithmZetoSnarkBJJ,
   IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import { checkDeploy, checkReceipt, DEFAULT_POLL_TIMEOUT, LONG_POLL_TIMEOUT } from "paladin-example-common";
 import erc20Abi from "./zeto-abis/SampleERC20.json";
 import kycAbi from "./zeto-abis/IZetoKyc.json";

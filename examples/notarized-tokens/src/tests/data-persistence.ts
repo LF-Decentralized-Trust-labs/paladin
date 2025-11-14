@@ -14,7 +14,7 @@
  */
 import PaladinClient, {
   NotoFactory,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
 import { nodeConnections, findLatestContractDataFile, getCachePath, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
@@ -104,7 +104,7 @@ async function main(): Promise<boolean> {
   // STEP 2: Get verifiers and recreate token connection
   logger.log("STEP 2: Recreating token connection...");
   // Import NotoInstance from the SDK
-  const { NotoInstance } = await import("@lfdecentralizedtrust-labs/paladin-sdk");
+  const { NotoInstance } = await import("@lfdecentralizedtrust/paladin-sdk");
   const cashToken = new NotoInstance(paladinClientNode1, contractData.tokenAddress);
   
   if (!cashToken) {

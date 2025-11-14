@@ -17,7 +17,7 @@ import PaladinClient, {
   PaladinWebSocketClient,
   PenteFactory,
   TransactionType,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import { nanoid } from "nanoid";
 import { checkDeploy, getCachePath, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import helloWorldJson from "./abis/HelloWorld.json";

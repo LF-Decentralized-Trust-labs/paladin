@@ -15,7 +15,7 @@
 import PaladinClient, {
   PaladinVerifier,
   ZetoFactory,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
 import { nodeConnections, findLatestContractDataFile, getCachePath } from "paladin-example-common";
@@ -156,7 +156,7 @@ async function main(): Promise<boolean> {
   const [clientB] = paladin3.getVerifiers(`client-b-${contractData.runId}@${nodeConnections[2].id}`);
 
   // Import necessary classes from the SDK
-  const { ZetoInstance } = await import("@lfdecentralizedtrust-labs/paladin-sdk");
+  const { ZetoInstance } = await import("@lfdecentralizedtrust/paladin-sdk");
   
   // Recreate contract instances
   const privateStablecoin = new ZetoInstance(paladin1, contractData.privateStablecoinAddress);
