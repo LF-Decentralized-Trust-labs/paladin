@@ -89,6 +89,7 @@ func init() {
 					}},
 				},
 				Event_TransactionCreated: {
+					Validator: validator_TransactionDoesNotExist,
 					Transitions: []Transition{{
 						To: State_Sending,
 						On: action_SendDelegationRequest,
@@ -292,7 +293,7 @@ func (o *originator) evaluateTransitions(ctx context.Context, event common.Event
 
 	for _, rule := range eventHandler.Transitions {
 		if rule.If == nil || rule.If(ctx, o) { //if there is no guard defined, or the guard returns true
-			log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_STATE)).Debugf("sdr      | %s | %T | %s -> %s", o.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
+			log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_STATE)).Debugf("orig     | %s   | %T | %s -> %s", o.contractAddress.String()[0:8], event, sm.currentState.String(), rule.To.String())
 
 			sm.currentState = rule.To
 			newStateDefinition := stateDefinitionsMap[sm.currentState]

@@ -23,6 +23,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
 	"github.com/LFDT-Paladin/paladin/core/internal/components"
 	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/common"
 	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/originator/transaction"
 )
 
@@ -90,4 +91,20 @@ func guard_HasDroppedTransactions(ctx context.Context, o *originator) bool {
 		}
 	}
 	return false
+}
+
+// Validate that the transaction doesn't already exist. When we resume transactions from the DB, e.g. after a restart or a timeout, we may already be processing
+// the transaction and possibly taking a long time to complete them so we shouldn't restart the state machine from scratch for such in-progress transactions
+func validator_TransactionDoesNotExist(ctx context.Context, o *originator, event common.Event) (bool, error) {
+	transactionCreatedEvent, ok := event.(*TransactionCreatedEvent)
+	if !ok {
+		log.L(ctx).Errorf("expected event type *TransactionCreatedEvent, got %T", event)
+		return false, nil
+	}
+	if o.transactionsByID[transactionCreatedEvent.Transaction.ID] != nil {
+		log.L(ctx).Debugf("transaction %s already in progress, not resuming", transactionCreatedEvent.Transaction.ID.String())
+		return false, nil
+	}
+
+	return true, nil
 }

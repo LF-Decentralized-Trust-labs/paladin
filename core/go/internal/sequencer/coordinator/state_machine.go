@@ -22,6 +22,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
 	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/common"
 	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 )
 
 type State int
@@ -408,8 +409,12 @@ func action_SelectTransaction(ctx context.Context, c *coordinator) error {
 	// casued us to reach the node's limit on active coordinators.
 	c.coordinatorStarted(c.contractAddress, c.nodeName)
 
-	// Start heartbeating
-	go c.heartbeatLoop(ctx)
+	// For domain types that can coordinate other nodes' transactions (e.g. Noto or Pente), start heartbeating
+	// Domains such as Zeto that are always coordinated on the originating node, heartbeats aren't required
+	// because other nodes cannot take over coordination.
+	if c.domainAPI.ContractConfig().GetCoordinatorSelection() != prototk.ContractConfig_COORDINATOR_SENDER {
+		go c.heartbeatLoop(ctx)
+	}
 
 	// Select our next transaction
 	return c.selectNextTransaction(ctx, nil)
