@@ -39,7 +39,7 @@ func calculateTransactionHash(rawTxnData []byte) *pldtypes.Bytes32 {
 	return &hashBytes
 }
 
-func (it *inFlightTransactionStageController) submitTX(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32, signerNonce string, lastSubmitTime *pldtypes.Timestamp, cancelled func(context.Context) bool) (*pldtypes.Bytes32, *pldtypes.Timestamp, ethclient.ErrorReason, SubmissionOutcome, error) {
+func (it *inFlightTransactionStageController) submitTX(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32, signerNonce string, contractAddress string, lastSubmitTime *pldtypes.Timestamp, cancelled func(context.Context) bool) (*pldtypes.Bytes32, *pldtypes.Timestamp, ethclient.ErrorReason, SubmissionOutcome, error) {
 	var txHash *pldtypes.Bytes32
 	sendStart := time.Now()
 	if calculatedTxHash == nil {

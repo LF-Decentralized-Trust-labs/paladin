@@ -197,7 +197,16 @@ func (w *writer[T, R]) queue(ctx context.Context, value T, flush bool) *op[T, R]
 }
 
 func (w *writer[T, R]) worker(i int) {
-	defer close(w.workersDone[i])
+	defer func() {
+		if w.workersDone[i] != nil {
+			// Close the channel if it isn't closed already
+			select {
+			case <-w.workersDone[i]:
+			default:
+				close(w.workersDone[i])
+			}
+		}
+	}()
 	workerID := fmt.Sprintf("writer_%s_%.4d", w.writerId, i)
 	ctx := log.WithLogField(w.bgCtx, "job", workerID)
 	l := log.L(ctx)
@@ -246,7 +255,9 @@ func (w *writer[T, R]) worker(i int) {
 		}
 
 		if b != nil && (timedOutOrFlush || (len(b.ops) >= w.batchMaxSize)) {
-			b.timeoutCancel()
+			if b.timeoutContext != nil {
+				b.timeoutCancel()
+			}
 			l.Debugf("Running batch %s (len=%d,timeout=%t,age=%dms)", b.id, len(b.ops), timedOutOrFlush, time.Since(b.opened).Milliseconds())
 			w.runBatch(ctx, b)
 			b = nil

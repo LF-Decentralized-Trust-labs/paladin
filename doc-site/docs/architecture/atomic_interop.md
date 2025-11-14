@@ -5,11 +5,11 @@ Paladin allows different privacy preserving smart contracts, using different und
 The primary classes of privacy preserving smart contracts are:
 
 - Token contracts verified via Zero-knowledge Proofs
-   - Learn more about [Zeto](./zeto.md)
+     - Learn more about [Zeto](./zeto.md)
 - Token contracts verified via Notary / Issuer pre-verification
-   - Learn more about [Noto](./noto.md)
+     - Learn more about [Noto](./noto.md)
 - EVM Private Smart Contracts verified by Privacy Group endorsement
-   - Learn more about [Pente](./pente.md)
+     - Learn more about [Pente](./pente.md)
 
 > TODO: Feel like a high-level diagram would be helpful here.
 
@@ -47,43 +47,43 @@ See the [Programming Model](./programming_model.md) section for more information
 
 The first type of atomic interop supported by Paladin is approval-based atomic transactions.
 
-![Approval-based atomic transaction flow](../images/approval_based_atomic_tx.jpg)
+![Approval-based atomic transaction flow](../images/approval_based_atomic_tx.jpg){.zoomable-image}
 
 In the above example Bob and Sally are performing a DvP of some privacy preserving cash tokens, and some privacy preserving bond tokens, in coordination with a programmed EVM private smart contract that _only Bob and Sally are party to_.
 
 There are 4 ***base EVM** ledger smart contracts in this worked example:
 
 1. Privacy Group Maintenance Smart Contract
-   - This enforces the state transitions of the EVM smart contract private to Bob & Sally
-   - Each private smart contract has it's own set of UTXO states
-   - There could be many thousands of different EVM smart contracts running independently and privately, backed by this one base EVM smart contract
-   - Learn more in [Pente](./pente.md)
+     - This enforces the state transitions of the EVM smart contract private to Bob & Sally
+     - Each private smart contract has it's own set of UTXO states
+     - There could be many thousands of different EVM smart contracts running independently and privately, backed by this one base EVM smart contract
+     - Learn more in [Pente](./pente.md)
 2. Fund Token Contract example - Notary Based
-   - Enforcing the issuance, transfer, registry and other functions of the digital asset
-   - Pre-verification by a trusted party is necessary for each transaction
-      - The issuer, registrar, or transfer-agent has visibility of all transactions/data
-   - Transactions are confidential and anonymous between token holding parties
-   - The token is maintained through UTXO states representing ownership
-   - All tokens are trusted by all parties, because they trust the issuer
-   - Learn more in [Noto](./noto.md)
+     - Enforcing the issuance, transfer, registry and other functions of the digital asset
+     - Pre-verification by a trusted party is necessary for each transaction
+        - The issuer, registrar, or transfer-agent has visibility of all transactions/data
+     - Transactions are confidential and anonymous between token holding parties
+     - The token is maintained through UTXO states representing ownership
+     - All tokens are trusted by all parties, because they trust the issuer
+     - Learn more in [Noto](./noto.md)
 3. Cash Token Contract example - ZKP Based
-   - Enforcing total conservation of value for fungible cash tokens
-   - Transactions are confidential and anonymous to all
-   - Transfers require a zero-knowledge proof pre-calculated by the spender, to be verified on the base EVM ledger
+     - Enforcing total conservation of value for fungible cash tokens
+     - Transactions are confidential and anonymous to all
+     - Transfers require a zero-knowledge proof pre-calculated by the spender, to be verified on the base EVM ledger
 4. Swap Contract - pure public EVM
-   - Records the signature of an immutable set of pre-prepared transactions
-   - Records the right privacy preserving smart contract
-   - Has an unique smart contract account address to be authorized to complete the transaction (standard EVM swap semantics)
-   - Contains simple `execute()` function that invokes each smart contract in turn
-   - All smart contract sub-transactions must complete, or the transaction `reverts`
+     - Records the signature of an immutable set of pre-prepared transactions
+     - Records the right privacy preserving smart contract
+     - Has an unique smart contract account address to be authorized to complete the transaction (standard EVM swap semantics)
+     - Contains simple `execute()` function that invokes each smart contract in turn
+     - All smart contract sub-transactions must complete, or the transaction `reverts`
 
 ### Pre-approval/setup phase
 
 Before approval can happen:
 
 - Some arbitrary number of EVM private smart contract transitions have occurred between Bob & Sally that resulted in an agreed state
-   - This state is represented by the merkle tree root of _one or more_ private smart contracts
-   - Each state transition up to that point was agreed by Bob & Sally, because they were in the Privacy Group for the smart contract
+     - This state is represented by the merkle tree root of _one or more_ private smart contracts
+     - Each state transition up to that point was agreed by Bob & Sally, because they were in the Privacy Group for the smart contract
 - Bob has constructed a transaction that transfers some Fund tokens to Sally
 - Sally has constructed a transaction that transfers some Cash tokens to Bob
 

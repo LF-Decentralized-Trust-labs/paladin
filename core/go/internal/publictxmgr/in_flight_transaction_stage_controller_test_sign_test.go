@@ -21,18 +21,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/LFDT-Paladin/paladin/core/mocks/componentsmocks"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/algorithms"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
+
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -40,6 +43,11 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err pldtypes.RawJSON, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
+	}
+
+	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
+	for range 7 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
 	}
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
@@ -153,7 +161,7 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 }
 
 func TestProduceLatestInFlightStageContextSigningPanic(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -161,6 +169,11 @@ func TestProduceLatestInFlightStageContextSigningPanic(t *testing.T) {
 		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err pldtypes.RawJSON, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
+	}
+
+	// The orchestrator needs to pass events to the TX sequencer correlated by TX ID
+	for i := 0; i < 2; i++ {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
 	}
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{

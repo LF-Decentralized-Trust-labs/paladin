@@ -301,6 +301,7 @@ task copyZetoSolidity(type: Copy) {
     // Flatten all paths into the destination folder
     eachFile { path = name }
     includeEmptyDirs = false
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 task buildContractSamples(type: Exec, dependsOn: [copySolidity, copyZetoSolidity]) {

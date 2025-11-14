@@ -557,7 +557,7 @@ func TestDebugTransactionStatus(t *testing.T) {
 
 	ctx, url, _, done := newTestTransactionManagerWithRPC(t,
 		func(tmc *pldconf.TxManagerConfig, mc *mockComponents) {
-			mc.privateTxMgr.On("GetTxStatus", mock.Anything, contractAddress.String(), txID).Return(components.PrivateTxStatus{
+			mc.sequencerMgr.On("GetTxStatus", mock.Anything, contractAddress.String(), txID).Return(components.PrivateTxStatus{
 				TxID:        txID.String(),
 				Status:      "pending",
 				LatestEvent: "submitted",
@@ -603,7 +603,7 @@ func TestQueryPreparedTransactionsNotFound(t *testing.T) {
 func TestPrepareTransactions(t *testing.T) {
 
 	ctx, url, _, done := newTestTransactionManagerWithRPC(t, mockDomainContractResolve(t, "domain1"), func(tmc *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.privateTxMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.MatchedBy(func(tx *components.ValidatedTransaction) bool {
+		mc.sequencerMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.MatchedBy(func(tx *components.ValidatedTransaction) bool {
 			return tx.Transaction.SubmitMode.V() == pldapi.SubmitModeExternal
 		})).Return(nil)
 	})

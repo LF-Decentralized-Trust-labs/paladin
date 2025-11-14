@@ -175,13 +175,31 @@ func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup str
 			return
 		}
 
-		err = ir.transportManager.Send(ctx, &components.FireAndForgetMessageSend{
+		errChan := make(chan error, 1)
+		err = ir.transportManager.SendWithNack(ctx, &components.FireAndForgetMessageSend{
 			MessageID:   &requestID,
 			MessageType: "ResolveVerifierRequest",
 			Component:   prototk.PaladinMsg_IDENTITY_RESOLVER,
 			Node:        remoteNodeId,
 			Payload:     resolveVerifierRequestBytes,
-		})
+		}, errChan)
+
+		go func() {
+			// Handle transport-layer errors (e.g. the transport plugin couldn't reach the remote node)
+			select {
+			case <-ctx.Done():
+				return
+			case err, ok := <-errChan:
+				if !ok {
+					return
+				}
+				log.L(ctx).Errorf("Failed to send resolve verifier request to %s: %s", remoteNodeId, err)
+				ir.handleResolveVerifierError(ctx, resolveVerifierRequestBytes, requestID.String())
+				return
+			}
+		}()
+
+		// Handle plugin-layer errors (e.g. we couldn't communicate with the transport plugin)
 		if err != nil {
 			failed(ctx, err)
 			return

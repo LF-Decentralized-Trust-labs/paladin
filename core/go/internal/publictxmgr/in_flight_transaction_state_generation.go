@@ -167,7 +167,12 @@ func (v *inFlightTransactionStateGeneration) StartNewStageContext(ctx context.Co
 			signedMessage = v.SignedMessage
 			calculatedTxHash = v.TransactionHash
 		}
-		v.stageTriggerError = v.TriggerSubmitTx(ctx, signedMessage, calculatedTxHash)
+
+		toAddress := ""
+		if rsc.InMemoryTx.GetTo() != nil {
+			toAddress = rsc.InMemoryTx.GetTo().String()
+		}
+		v.stageTriggerError = v.TriggerSubmitTx(ctx, signedMessage, calculatedTxHash, toAddress)
 	case InFlightTxStageStatusUpdate:
 		log.L(ctx).Tracef("Transaction with ID %s, triggering status update", rsc.InMemoryTx.GetSignerNonce())
 		v.stageTriggerError = v.TriggerStatusUpdate(ctx)

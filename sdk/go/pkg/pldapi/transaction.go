@@ -65,6 +65,7 @@ const (
 	SubmitModeExternal SubmitMode = "external" // the transaction will result in a prepared transaction, that can be downloaded and externally obtained
 	SubmitModeCall     SubmitMode = "call"     // just a call (never persisted to a transaction in the DB)
 	SubmitModePrepare  SubmitMode = "prepare"  // occurs when writing the prepared TXN back to the DB - does not get persisted
+	SubmitModeRemote   SubmitMode = "remote"   // tracking a TX submitted via another node which we need visibility of
 )
 
 func (tt SubmitMode) Enum() pldtypes.Enum[SubmitMode] {
@@ -76,6 +77,7 @@ func (tt SubmitMode) Options() []string {
 		string(SubmitModeAuto),
 		string(SubmitModeExternal),
 		string(SubmitModeCall),
+		string(SubmitModeRemote),
 	}
 }
 

@@ -377,7 +377,7 @@ func (tm *txManager) rpcDebugTransactionStatus() rpcserver.RPCHandler {
 	) (components.PrivateTxStatus, error) {
 		ctx = log.WithComponent(ctx, "txmanager")
 		tm.metrics.IncRpc("debugTransactionStatus")
-		return tm.privateTxMgr.GetTxStatus(ctx, contractAddress, id)
+		return tm.sequencerMgr.GetTxStatus(ctx, contractAddress, id)
 	})
 }
 

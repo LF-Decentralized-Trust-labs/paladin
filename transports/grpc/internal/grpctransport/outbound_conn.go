@@ -104,9 +104,15 @@ func (oc *outboundConn) send(message *proto.Message) error {
 	}
 
 	if err != nil {
+		log.L(oc.t.bgCtx).Warnf("send failed, err %s", err)
 		// Clean up the stream - we'll create a new one on next send
-		_ = oc.stream.CloseSend()
-		oc.stream = nil
+		if oc.stream != nil {
+			log.L(oc.t.bgCtx).Warnf("closing stream")
+			_ = oc.stream.CloseSend()
+			oc.stream = nil
+		} else {
+			log.L(oc.t.bgCtx).Tracef("no stream to close")
+		}
 	}
 	return err
 }

@@ -13,7 +13,8 @@ contract SimpleDomain is IPaladinContractRegistry_V0 {
         bytes32 txId,
         string calldata endorsementMode, // "PrivacyGroupEndorsement",  "NotaryEndorsement" or "SelfEndorsement"
         string calldata notaryLocator, // empty string if endorsementMode is not "NotaryEndorsement"
-        string[] calldata endorsementSetLocators // empty array if endorsementMode is not "PrivacyGroupEndorsement"
+        string[] calldata endorsementSetLocators, // empty array if endorsementMode is not "PrivacyGroupEndorsement"
+        string calldata hookAddress // optional hook address for chaining transactions
 
     ) public {
         // Simply constructs the new contract
@@ -23,7 +24,7 @@ contract SimpleDomain is IPaladinContractRegistry_V0 {
         emit PaladinRegisterSmartContract_V0(
             txId,
             address(instance),
-            abi.encode(endorsementMode, notaryLocator, endorsementSetLocators)
+            abi.encode(endorsementMode, notaryLocator, endorsementSetLocators, hookAddress)
         );
     }
     

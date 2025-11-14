@@ -100,6 +100,10 @@ type TransportManager interface {
 	// at-most-once delivery semantics
 	Send(ctx context.Context, send *FireAndForgetMessageSend) error
 
+	// Send a message with the same semantics as Send, but with a channel for short-retry failures
+	// to be returned.
+	SendWithNack(ctx context.Context, send *FireAndForgetMessageSend, errChan chan error) error
+
 	// Sends a message with at-least-once delivery semantics
 	//
 	// Each reliable message type has special building code in the transport manager, which assembles the full

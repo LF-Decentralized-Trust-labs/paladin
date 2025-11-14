@@ -4,7 +4,7 @@ Each Paladin runtime needs to share data privately with other Paladins, based on
 
 These message are frequent and occur as part of the [Distributed transaction manager](./transaction_manager.md) operation to coordinate the assembly and submission of transactions.
 
-![Data transports & registry](../images/data_transports_and_registry.jpg)
+![Data transports & registry](../images/data_transports_and_registry.jpg){.zoomable-image}
 
 ## Types of identity
 

@@ -75,6 +75,12 @@ func (op *pendingStateWrites) exec(ctx context.Context, dbTX persistence.DBTX) e
 
 	var err error
 
+	if log.IsTraceEnabled() {
+		for _, s := range states {
+			log.L(ctx).Tracef("Writing state for contract %s, data=%s, domain=%s, created=%s", s.ContractAddress, s.Data, s.DomainName, s.Created)
+		}
+	}
+
 	if len(states) > 0 {
 		err = op.dc.ss.writeStates(ctx, dbTX, states)
 	}

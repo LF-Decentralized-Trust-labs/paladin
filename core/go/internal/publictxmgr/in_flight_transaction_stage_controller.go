@@ -31,6 +31,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/core/pkg/ethclient"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/google/uuid"
 )
 
 type InFlightStatus int
@@ -167,6 +168,7 @@ func (pot *PointOfTime) String() string {
 }
 func (it *inFlightTransactionStageController) TriggerNewStageRun(ctx context.Context, stage InFlightTxStage, substatus BaseTxSubStatus) {
 	it.MarkTime(fmt.Sprintf("stage_%s_wait_to_trigger_async_execution", string(stage)))
+
 	it.stateManager.GetCurrentGeneration(ctx).StartNewStageContext(ctx, stage, substatus)
 }
 
@@ -212,8 +214,32 @@ func (it *inFlightTransactionStageController) ProduceLatestInFlightStageContext(
 	// update the transaction orchestrator context
 	it.stateManager.SetOrchestratorContext(ctx, tIn)
 
+	var txId string
+	var txIdUUID uuid.UUID
+	err := it.orchestrator.p.DB().
+		Table("public_txn_bindings").
+		Select(`"transaction"`).
+		Where(`"pub_txn_id" IN (?)`, []uint64{it.stateManager.GetPubTxnID()}).
+		Find(&txId).
+		Error
+	if err != nil {
+		log.L(ctx).Warnf("failed to retrieve transaction ID for public TX ID %d triggering new stage", it.stateManager.GetPubTxnID())
+		return
+	}
+
+	if txId != "" {
+		txIdUUID, err = uuid.Parse(txId)
+		if err != nil {
+			log.L(ctx).Warnf("failed to parse transaction ID %s for public TX ID %d triggering new stage", txId, it.stateManager.GetPubTxnID())
+			return
+		}
+	} else {
+		log.L(ctx).Warnf("retrieved empty transaction ID for public TX ID %d triggering new stage", it.stateManager.GetPubTxnID())
+		return
+	}
+
 	// Only the current generation is progressed by looking at stage outputs and later starting a new stage
-	tOut.Error = it.processCurrentGenerationStageOutputs(ctx)
+	tOut.Error = it.processCurrentGenerationStageOutputs(ctx, txIdUUID)
 
 	if it.stateManager.GetGasPriceObject() != nil {
 		if it.stateManager.IsReadyToExit() {
@@ -239,7 +265,7 @@ func (it *inFlightTransactionStageController) ProduceLatestInFlightStageContext(
 	return tOut
 }
 
-func (it *inFlightTransactionStageController) processCurrentGenerationStageOutputs(ctx context.Context) (err error) {
+func (it *inFlightTransactionStageController) processCurrentGenerationStageOutputs(ctx context.Context, txnID uuid.UUID) (err error) {
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx)
 	if currentGeneration.GetRunningStageContext(ctx) != nil {
 		rsc := currentGeneration.GetRunningStageContext(ctx)
@@ -268,7 +294,7 @@ func (it *inFlightTransactionStageController) processCurrentGenerationStageOutpu
 							case InFlightTxStageRetrieveGasPrice:
 								err = it.processRetrieveGasPriceStageOutput(ctx, currentGeneration, rsc, stageOutput)
 							case InFlightTxStageSigning:
-								err = it.processSigningStageOutput(ctx, currentGeneration, rsc, stageOutput)
+								err = it.processSigningStageOutput(ctx, currentGeneration, rsc, stageOutput, txnID)
 							case InFlightTxStageSubmitting:
 								err = it.processSubmittingStageOutput(ctx, currentGeneration, rsc, stageOutput)
 							case InFlightTxStageStatusUpdate:
@@ -342,7 +368,7 @@ func (it *inFlightTransactionStageController) processRetrieveGasPriceStageOutput
 	return
 }
 
-func (it *inFlightTransactionStageController) processSigningStageOutput(ctx context.Context, generation InFlightTransactionStateGeneration, rsc *RunningStageContext, rsIn *StageOutput) (err error) {
+func (it *inFlightTransactionStageController) processSigningStageOutput(ctx context.Context, generation InFlightTransactionStateGeneration, rsc *RunningStageContext, rsIn *StageOutput, txnID uuid.UUID) (err error) {
 	// first check whether we've already completed the action and just waiting for required persistence to go to the next stage
 	if rsIn.PersistenceOutput != nil {
 		if rsc.StageOutput.SignOutput.Err != nil {
@@ -402,6 +428,10 @@ func (it *inFlightTransactionStageController) processSigningStageOutput(ctx cont
 			Created:         pldtypes.TimestampNow(),
 			TransactionHash: *rsc.StageOutput.SignOutput.TxHash,
 			GasPricing:      gasPriceJSON,
+			PrivateTXID:     txnID,
+		}
+		if rsc.InMemoryTx.GetTo() != nil {
+			rsc.StageOutputsToBePersisted.TxUpdates.NewValues.NewSubmission.ContractAddress = rsc.InMemoryTx.GetTo().String()
 		}
 		rsc.StageOutputsToBePersisted.TxUpdates.NewValues.TransactionHash = rsc.StageOutput.SignOutput.TxHash
 	}
@@ -645,13 +675,14 @@ func (it *inFlightTransactionStageController) TriggerSignTx(ctx context.Context)
 	return nil
 }
 
-func (it *inFlightTransactionStageController) TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedHash *pldtypes.Bytes32) error {
+func (it *inFlightTransactionStageController) TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedHash *pldtypes.Bytes32, contractAddress string) error {
 	generation := it.stateManager.GetCurrentGeneration(ctx)
 	signerNonce := it.stateManager.GetSignerNonce()
 	lastSubmitTime := it.stateManager.GetLastSubmitTime()
 
 	it.executeAsync(func() {
-		txHash, submissionTime, errReason, submissionOutcome, err := it.submitTX(ctx, signedMessage, calculatedHash, signerNonce, lastSubmitTime, generation.IsCancelled)
+		txHash, submissionTime, errReason, submissionOutcome, err := it.submitTX(ctx, signedMessage, calculatedHash, signerNonce, contractAddress, lastSubmitTime, generation.IsCancelled)
+
 		generation.AddSubmitOutput(ctx, txHash, submissionTime, submissionOutcome, errReason, err)
 	}, ctx, generation, false)
 	return nil

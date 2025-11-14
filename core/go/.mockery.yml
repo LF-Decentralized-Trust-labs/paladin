@@ -13,7 +13,10 @@ packages:
   github.com/LFDT-Paladin/paladin/toolkit/pkg/signer:
     interfaces:
       SigningModule:
-  github.com/LFDT-Paladin/paladin/core/pkg/blockindexer:
+  github.com/LFDT-Paladin/paladin/core/pkg/persistence:
+    config:
+      all: true
+  github.com/LFDT-Paladin/paladin/core/pkg/blockindexer:    
     interfaces:
       BlockIndexer:
   github.com/LFDT-Paladin/paladin/core/pkg/ethclient:
@@ -22,25 +25,10 @@ packages:
   github.com/LFDT-Paladin/paladin/core/internal/components:
     config:
       all: true
-    interfaces:
-      KeyManager:
   github.com/LFDT-Paladin/paladin/core/internal/componentmgr:
     config:
       all: true
   github.com/LFDT-Paladin/paladin/core/internal/metrics:
-    config:
-      all: true
-  github.com/LFDT-Paladin/paladin/core/internal/privatetxnmgr/ptmgrtypes:
-    config:
-      all: true
-    interfaces:
-      TransactionFlow:
-        config:
-          dir: "{{.InterfaceDir}}"
-          filename: "mock_transaction_flow.go"
-          pkgname: "{{.SrcPackageName}}"
-          structname: "Mock{{.InterfaceName}}"
-  github.com/LFDT-Paladin/paladin/core/internal/privatetxnmgr/syncpoints:
     config:
       all: true
   github.com/LFDT-Paladin/paladin/core/internal/rpcauthmgr:

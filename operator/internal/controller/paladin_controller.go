@@ -410,6 +410,11 @@ func (r *PaladinReconciler) generateStatefulSetTemplate(node *corev1alpha1.Palad
 									ContainerPort: 8549,
 									Protocol:      corev1.ProtocolTCP,
 								},
+								{
+									Name:          "metrics",
+									ContainerPort: 9090,
+									Protocol:      corev1.ProtocolTCP,
+								},
 							},
 							Env: buildEnv(r.config.Paladin.Envs),
 							LivenessProbe: &corev1.Probe{

@@ -74,9 +74,25 @@ type PublicTx struct {
 	PublicTxOptions
 }
 
+type PublicTxToDistribute struct {
+	Nonce           *pldtypes.HexUint64         `docstruct:"PublicTx" json:"nonce"`
+	CompletedAt     *pldtypes.Timestamp         `docstruct:"PublicTx" json:"completedAt,omitempty"` // only once confirmed
+	TransactionHash *pldtypes.Bytes32           `docstruct:"PublicTx" json:"transactionHash"`       // only once confirmed
+	Success         *bool                       `docstruct:"PublicTx" json:"success,omitempty"`     // only once confirmed
+	RevertData      pldtypes.HexBytes           `docstruct:"PublicTx" json:"revertData,omitempty"`  // only once confirmed, if available
+	Submissions     []*PublicTxSubmissionData   `docstruct:"PublicTx" json:"submissions,omitempty"`
+	Activity        []TransactionActivityRecord `docstruct:"PublicTx" json:"activity,omitempty"`
+	Bindings        []*PublicTxBinding
+	GasPricing      pldtypes.RawJSON `docstruct:"PublicTxToDistribute" json:"gasPricing"`
+	PublicTxInput
+	PublicTxOptions
+}
+
 type PublicTxBinding struct {
-	Transaction     uuid.UUID                      `docstruct:"PublicTxBinding" json:"transaction"`
-	TransactionType pldtypes.Enum[TransactionType] `docstruct:"PublicTxBinding" json:"transactionType"`
+	Transaction                uuid.UUID                      `docstruct:"PublicTxBinding" json:"transaction"`
+	TransactionType            pldtypes.Enum[TransactionType] `docstruct:"PublicTxBinding" json:"transactionType"`
+	TransactionSender          string                         `docstruct:"PublicTxBinding" json:"sender"`
+	TransactionContractAddress string                         `docstruct:"PublicTxBinding" json:"contractAddress"`
 }
 type PublicTxWithBinding struct {
 	*PublicTx

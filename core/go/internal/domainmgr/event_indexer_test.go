@@ -30,6 +30,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/core/pkg/persistence/mockpersistence"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -78,10 +79,10 @@ func TestEventIndexingWithDB(t *testing.T) {
 						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
 					Data: pldtypes.RawJSON(`{
-						 "txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
-						 "instance": "` + contractAddr.String() + `",
-						 "config": "0xfeedbeef"
-					 }`),
+						  "txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
+						  "instance": "` + contractAddr.String() + `",
+						  "config": "0xfeedbeef"
+					  }`),
 				},
 			},
 		})
@@ -143,8 +144,8 @@ func TestEventIndexingBadEvent(t *testing.T) {
 					Address:           *td.d.registryAddress,
 					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
 					Data: pldtypes.RawJSON(`{
-						  "config": "cannot parse this"
-					  }`),
+						   "config": "cannot parse this"
+					   }`),
 				},
 			},
 		})
@@ -185,10 +186,10 @@ func TestEventIndexingInsertError(t *testing.T) {
 						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
 					Data: pldtypes.RawJSON(`{
-						 "txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
-						 "domain": "` + contractAddr.String() + `",
-						 "data": "0xfeedbeef"
-					 }`),
+						  "txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
+						  "domain": "` + contractAddr.String() + `",
+						  "data": "0xfeedbeef"
+					  }`),
 				},
 			},
 		})
@@ -210,6 +211,8 @@ func TestHandleEventBatch(t *testing.T) {
 	stateInfo := pldtypes.RandHex(32)
 	fakeHash1 := pldtypes.RandHex(32)
 	fakeSchema := pldtypes.RandBytes32()
+	eventTx2Hash := pldtypes.RandHex(32)
+
 	event1 := &pldapi.EventWithData{
 		Address: *contract1,
 		IndexedEvent: &pldapi.IndexedEvent{
@@ -228,7 +231,7 @@ func TestHandleEventBatch(t *testing.T) {
 			BlockNumber:      2000,
 			TransactionIndex: 30,
 			LogIndex:         40,
-			TransactionHash:  pldtypes.MustParseBytes32(pldtypes.RandHex(32)),
+			TransactionHash:  pldtypes.MustParseBytes32(eventTx2Hash),
 			Signature:        pldtypes.MustParseBytes32(pldtypes.RandHex(32)),
 		},
 		SoliditySignature: "some event signature 2",
@@ -271,7 +274,17 @@ func TestHandleEventBatch(t *testing.T) {
 			return true
 		})).Return(nil)
 
-		mc.privateTxManager.On("PrivateTransactionConfirmed", mock.Anything, mock.Anything).Return()
+		matchTXNonce := pldtypes.MustParseHexUint64("1")
+		mc.sequencerManager.On("HandleTransactionConfirmed", mock.Anything, mock.Anything, mock.Anything, &matchTXNonce).Return(nil)
+
+		var queryJson *query.QueryJSON = nil
+		matchTxHash := pldtypes.MustParseBytes32(eventTx2Hash)
+		mc.publicTxManager.On("QueryPublicTxForTransactions", mock.Anything, mock.Anything, []uuid.UUID{txID}, queryJson).Return(map[uuid.UUID][]*pldapi.PublicTx{txID: {
+			{
+				TransactionHash: &matchTxHash,
+				Nonce:           &matchTXNonce,
+			},
+		}}, nil)
 
 		mc.txManager.On("SendTransactions", mock.Anything, mock.Anything, mock.Anything).Return([]uuid.UUID{txID}, nil)
 

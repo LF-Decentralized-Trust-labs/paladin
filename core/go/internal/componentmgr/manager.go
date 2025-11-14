@@ -31,10 +31,10 @@ import (
 	"github.com/LFDT-Paladin/paladin/core/internal/metrics"
 	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
 	"github.com/LFDT-Paladin/paladin/core/internal/plugins"
-	"github.com/LFDT-Paladin/paladin/core/internal/privatetxnmgr"
 	"github.com/LFDT-Paladin/paladin/core/internal/publictxmgr"
 	"github.com/LFDT-Paladin/paladin/core/internal/registrymgr"
 	"github.com/LFDT-Paladin/paladin/core/internal/rpcauthmgr"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer"
 	"github.com/LFDT-Paladin/paladin/core/internal/statemgr"
 	"github.com/LFDT-Paladin/paladin/core/internal/transportmgr"
 	"github.com/LFDT-Paladin/paladin/core/internal/txmgr"
@@ -75,17 +75,18 @@ type componentManager struct {
 	metricsManager   metrics.Metrics
 
 	// managers
-	stateManager     components.StateManager
-	domainManager    components.DomainManager
-	transportManager components.TransportManager
-	registryManager  components.RegistryManager
-	pluginManager    components.PluginManager
-	publicTxManager  components.PublicTxManager
-	privateTxManager components.PrivateTxManager
-	txManager        components.TXManager
-	identityResolver components.IdentityResolver
-	groupManager     components.GroupManager
-	rpcAuthManager   components.RPCAuthManager
+	stateManager             components.StateManager
+	domainManager            components.DomainManager
+	transportManager         components.TransportManager
+	loopbackTransportManager components.TransportManager
+	registryManager          components.RegistryManager
+	pluginManager            components.PluginManager
+	publicTxManager          components.PublicTxManager
+	sequencerManager         components.SequencerManager
+	txManager                components.TXManager
+	identityResolver         components.IdentityResolver
+	groupManager             components.GroupManager
+	rpcAuthManager           components.RPCAuthManager
 	// managers that are not a core part of the engine, but allow Paladin to operate in an extended mode - the testbed is an example.
 	// these cannot be queried by other components (no AdditionalManagers() function on AllComponents)
 	additionalManagers []components.AdditionalManager
@@ -143,6 +144,8 @@ func (cm *componentManager) startDebugServer() (httpserver.Server, error) {
 }
 
 func (cm *componentManager) Init() (err error) {
+	log.L(cm.bgCtx).Info("Initializing component manager")
+
 	// start the debug server as early as possible
 	if confutil.Bool(cm.conf.DebugServer.Enabled, *pldconf.DebugServerDefaults.Enabled) {
 		cm.debugServer, err = cm.startDebugServer()
@@ -224,9 +227,9 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	if err == nil {
-		cm.privateTxManager = privatetxnmgr.NewPrivateTransactionMgr(cm.bgCtx, &cm.conf.PrivateTxManager)
-		cm.initResults["private_tx_manager"], err = cm.privateTxManager.PreInit(cm)
-		err = cm.wrapIfErr(err, msgs.MsgComponentPrivateTxManagerInitError)
+		cm.sequencerManager = sequencer.NewDistributedSequencerManager(cm.bgCtx, &cm.conf.SequencerManager)
+		cm.initResults["distributed_sequencer_manager"], err = cm.sequencerManager.PreInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentDistributedSequencerManagerInitError)
 	}
 
 	if err == nil {
@@ -297,8 +300,8 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	if err == nil {
-		err = cm.privateTxManager.PostInit(cm)
-		err = cm.wrapIfErr(err, msgs.MsgComponentPrivateTxManagerInitError)
+		err = cm.sequencerManager.PostInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentDistributedSequencerManagerInitError)
 	}
 
 	if err == nil {
@@ -407,11 +410,6 @@ func (cm *componentManager) StartManagers() (err error) {
 	}
 
 	if err == nil {
-		err = cm.privateTxManager.Start()
-		err = cm.addIfStarted("private_tx_manager", cm.privateTxManager, err, msgs.MsgComponentPrivateTxManagerStartError)
-	}
-
-	if err == nil {
 		err = cm.txManager.Start()
 		err = cm.addIfStarted("tx_manager", cm.txManager, err, msgs.MsgComponentTxManagerStartError)
 	}
@@ -445,6 +443,12 @@ func (cm *componentManager) CompleteStart() error {
 	// then start the block indexer
 	if err == nil {
 		err = cm.startBlockIndexer()
+	}
+
+	// We need the domains to have initialised before we can use them in the sequencer
+	if err == nil {
+		err = cm.sequencerManager.Start()
+		err = cm.addIfStarted("sequencer_manager", cm.sequencerManager, err, msgs.MsgComponentDistributedSequencerStartError)
 	}
 
 	// start the RPC server last
@@ -608,6 +612,10 @@ func (cm *componentManager) TransportManager() components.TransportManager {
 	return cm.transportManager
 }
 
+func (cm *componentManager) LoopbackTransportManager() components.TransportManager {
+	return cm.loopbackTransportManager
+}
+
 func (cm *componentManager) RegistryManager() components.RegistryManager {
 	return cm.registryManager
 }
@@ -620,8 +628,8 @@ func (cm *componentManager) PublicTxManager() components.PublicTxManager {
 	return cm.publicTxManager
 }
 
-func (cm *componentManager) PrivateTxManager() components.PrivateTxManager {
-	return cm.privateTxManager
+func (cm *componentManager) SequencerManager() components.SequencerManager {
+	return cm.sequencerManager
 }
 
 func (cm *componentManager) TxManager() components.TXManager {

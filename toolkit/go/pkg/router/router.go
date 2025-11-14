@@ -42,6 +42,7 @@ func NewRouter(ctx context.Context, description string, conf *pldconf.HTTPServer
 	}
 
 	r.server, err = httpserver.NewServer(ctx, description, conf, r.router)
+	// r.router.Handle("/metrics", promhttp.Handler())
 	return r, err
 }
 
@@ -52,6 +53,10 @@ type router struct {
 	ctx    context.Context
 	router *mux.Router
 	server httpserver.Server
+}
+
+func (r *router) Router() *mux.Router {
+	return r.router
 }
 
 func (r *router) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {

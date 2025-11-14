@@ -147,7 +147,7 @@ func (tb *testbed) gatherSignatures(ctx context.Context, tx *testbedTransaction)
 
 func (tb *testbed) writeNullifiersToContext(dCtx components.DomainContext, tx *components.PrivateTransaction) error {
 
-	distributions, err := tb.c.PrivateTxManager().BuildStateDistributions(tb.ctx, tx)
+	distributions, err := tb.c.SequencerManager().BuildStateDistributions(tb.ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func (tb *testbed) writeNullifiersToContext(dCtx components.DomainContext, tx *c
 		return fmt.Errorf("testbed does not support states for remote nodes")
 	}
 
-	nullifiers, err := tb.c.PrivateTxManager().BuildNullifiers(tb.ctx, distributions.Local)
+	nullifiers, err := tb.c.SequencerManager().BuildNullifiers(tb.ctx, distributions.Local)
 	if err != nil {
 		return err
 	}

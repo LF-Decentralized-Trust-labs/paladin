@@ -23,6 +23,9 @@ import (
 
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,7 +38,7 @@ func (msu *mockStatusUpdater) UpdateSubStatus(ctx context.Context, imtx InMemory
 }
 
 func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -43,6 +46,10 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 		updateSubStatus: func(ctx context.Context, imtx InMemoryTxStateReadOnly, subStatus BaseTxSubStatus, action BaseTxAction, info, err pldtypes.RawJSON, actionOccurred *pldtypes.Timestamp) error {
 			return nil
 		},
+	}
+
+	for range 7 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
 	}
 
 	// trigger retrieve gas price
@@ -59,7 +66,6 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
-
 	retrievedGasPrice := &pldapi.PublicTxGasPricing{
 		MaxFeePerGas:         pldtypes.Int64ToInt256(10),
 		MaxPriorityFeePerGas: pldtypes.Int64ToInt256(1),
@@ -72,6 +78,7 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 		PreviousNonceCostUnknown: true,
 	})
 	assert.Empty(t, *tOut)
+
 	rsc = it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx)
 	assert.NotNil(t, rsc.StageOutputsToBePersisted)
 	assert.Equal(t, retrievedGasPrice.MaxFeePerGas, rsc.StageOutputsToBePersisted.TxUpdates.NewValues.GasPricing.MaxFeePerGas)
@@ -106,6 +113,7 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	assert.False(t, rsc.StageErrored)
 	it.persistenceRetryTimeout = 0
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
+
 	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now(), fmt.Errorf("persist gas price error"))
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
@@ -118,6 +126,7 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)
 	it.stateManager.GetCurrentGeneration(ctx).AddPersistenceOutput(ctx, InFlightTxStageRetrieveGasPrice, time.Now(), nil)
 	assert.NotNil(t, rsc.StageOutput.GasPriceOutput.Err)
+
 	tOut = it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
@@ -140,7 +149,7 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 }
 
 func TestProduceLatestInFlightStageContextRetrieveGasPanic(t *testing.T) {
-	ctx, o, _, done := newTestOrchestrator(t)
+	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, mTS := newInflightTransaction(o, 1)
 	it.testOnlyNoActionMode = true
@@ -152,6 +161,9 @@ func TestProduceLatestInFlightStageContextRetrieveGasPanic(t *testing.T) {
 		},
 	}
 	mTS.statusUpdater = mSU
+	for range 2 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	// trigger retrieve gas price
 	assert.Nil(t, it.stateManager.GetCurrentGeneration(ctx).GetRunningStageContext(ctx))

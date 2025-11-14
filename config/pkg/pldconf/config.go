@@ -33,7 +33,7 @@ type PaladinConfig struct {
 	BlockIndexer                 BlockIndexerConfig     `json:"blockIndexer"`
 	TempDir                      *string                `json:"tempDir"`
 	TxManager                    TxManagerConfig        `json:"txManager"`
-	PrivateTxManager             PrivateTxManagerConfig `json:"privateTxManager"`
+	SequencerManager             SequencerConfig        `json:"sequencerManager"`
 	PublicTxManager              PublicTxManagerConfig  `json:"publicTxManager"`
 	IdentityResolver             IdentityResolverConfig `json:"identityResolver"`
 	GroupManager                 GroupManagerConfig     `json:"groupManager"`
@@ -55,7 +55,7 @@ var PaladinConfigDefaults = &PaladinConfig{
 	StateStore:                   StateStoreConfigDefaults,
 	BlockIndexer:                 BlockIndexerDefaults,
 	TxManager:                    TxManagerDefaults,
-	PrivateTxManager:             PrivateTxManagerDefaults,
+	SequencerManager:             SequencerDefaults,
 	PublicTxManager:              PublicTxManagerDefaults,
 	IdentityResolver:             IdentityResolverDefaults,
 	GroupManager:                 GroupManagerDefaults,

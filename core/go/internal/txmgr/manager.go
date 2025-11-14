@@ -58,7 +58,7 @@ type txManager struct {
 	ethClientFactory    ethclient.EthClientFactory
 	keyManager          components.KeyManager
 	publicTxMgr         components.PublicTxManager
-	privateTxMgr        components.PrivateTxManager
+	sequencerMgr        components.SequencerManager
 	domainMgr           components.DomainManager
 	stateMgr            components.StateManager
 	identityResolver    components.IdentityResolver
@@ -97,7 +97,7 @@ func (tm *txManager) PostInit(c components.AllComponents) error {
 	tm.ethClientFactory = c.EthClientFactory()
 	tm.keyManager = c.KeyManager()
 	tm.publicTxMgr = c.PublicTxManager()
-	tm.privateTxMgr = c.PrivateTxManager()
+	tm.sequencerMgr = c.SequencerManager()
 	tm.domainMgr = c.DomainManager()
 	tm.stateMgr = c.StateManager()
 	tm.identityResolver = c.IdentityResolver()

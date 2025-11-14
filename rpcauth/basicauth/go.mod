@@ -5,13 +5,13 @@ go 1.24.0
 toolchain go1.24.3
 
 require (
+	github.com/LFDT-Paladin/paladin/common/go v0.0.0-00010101000000-000000000000
 	github.com/LFDT-Paladin/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/crypto v0.36.0
 )
 
 require (
-	github.com/LFDT-Paladin/paladin/common/go v0.0.0-00010101000000-000000000000 // indirect
 	github.com/LFDT-Paladin/paladin/config v0.0.0-00010101000000-000000000000 // indirect
 	github.com/LFDT-Paladin/paladin/sdk/go v0.0.0-20250828150332-fbc1c1bc663b // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

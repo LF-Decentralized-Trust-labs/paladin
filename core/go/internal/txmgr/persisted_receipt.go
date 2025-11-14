@@ -97,7 +97,10 @@ var transactionReceiptFilters = filters.FieldMap{
 // by the private transaction manager if transactions fail without making it to the blockchain
 func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.DBTX, info []*components.ReceiptInput) error {
 	ctx = log.WithComponent(ctx, "txmanager")
+	log.L(ctx).Debugf("FinalizeTransactions: %v receipt infos", len(info))
+
 	if len(info) == 0 {
+		log.L(ctx).Debugf("FinalizeTransactions: No receipts received to finalise - returning")
 		return nil
 	}
 
@@ -110,6 +113,7 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 			Indexed:         pldtypes.TimestampNow(),
 			ContractAddress: ri.ContractAddress,
 		}
+		log.L(ctx).Debugf("FinalizeTransactions: created receipt object %v, receipt type %+v", receipt, ri.ReceiptType)
 		if ri.OnChain.Type != pldtypes.NotOnChain {
 			receipt.TransactionHash = &ri.OnChain.TransactionHash
 			receipt.BlockNumber = &ri.OnChain.BlockNumber
@@ -199,7 +203,7 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX persistence.
 				}
 			}
 			if len(receiptsToWrite) > 0 {
-				err = tm.privateTxMgr.WriteOrDistributeReceiptsPostSubmit(ctx, dbTX, receiptsToWrite)
+				err = tm.sequencerMgr.WriteOrDistributeReceiptsPostSubmit(ctx, dbTX, receiptsToWrite)
 			}
 		}
 		if err != nil {
@@ -381,6 +385,8 @@ func (tm *txManager) QueryTransactionReceipts(ctx context.Context, jq *query.Que
 
 func (tm *txManager) GetTransactionReceiptByID(ctx context.Context, id uuid.UUID) (*pldapi.TransactionReceipt, error) {
 	ctx = log.WithComponent(ctx, "txmanager")
+	// Log the query details
+	log.L(ctx).Debugf("Querying transaction receipt by ID: %s", id)
 	prs, err := tm.QueryTransactionReceipts(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query())
 	if len(prs) == 0 || err != nil {
 		return nil, err
@@ -389,6 +395,7 @@ func (tm *txManager) GetTransactionReceiptByID(ctx context.Context, id uuid.UUID
 }
 
 func (tm *txManager) buildFullReceipt(ctx context.Context, receipt *pldapi.TransactionReceipt, domainReceipt bool) (fullReceipt *pldapi.TransactionReceiptFull, err error) {
+	log.L(ctx).Debugf("Building full transaction receipt by ID: %s", receipt.ID)
 	fullReceipt = &pldapi.TransactionReceiptFull{TransactionReceipt: receipt}
 	if receipt.Domain != "" {
 		fullReceipt.States, err = tm.stateMgr.GetTransactionStates(ctx, tm.p.NOTX(), fullReceipt.ID)
@@ -409,6 +416,9 @@ func (tm *txManager) buildFullReceipt(ctx context.Context, receipt *pldapi.Trans
 }
 
 func (tm *txManager) GetTransactionReceiptByIDFull(ctx context.Context, id uuid.UUID) (*pldapi.TransactionReceiptFull, error) {
+
+	// Log the transaction we're querying
+	log.L(ctx).Debugf("Querying full transaction receipt by ID: %s", id)
 	receipt, err := tm.GetTransactionReceiptByID(ctx, id)
 	if err != nil || receipt == nil {
 		return nil, err

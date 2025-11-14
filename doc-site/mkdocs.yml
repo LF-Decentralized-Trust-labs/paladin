@@ -81,6 +81,10 @@ plugins:
   - literate-nav
   - search
   - mike
+  - panzoom:
+      full_screen: true
+      include_selectors:
+        - .zoomable-image
 extra:
   analytics:
     provider: google
@@ -92,25 +96,32 @@ exclude_docs: |
   _includes/
 nav:
   - Introduction:
-    - Introduction: index.md
-    - Privacy Preserving Tokens: concepts/tokens.md
-    - Private EVM Smart Contracts: concepts/private_evm.md
-    - Advanced Cryptography: concepts/advanced_crypto.md
-    - Atomic EVM Programmability: concepts/atomic_programmability.md
-    - Full Enterprise Privacy Stack: concepts/full_stack.md
-    - Cloud Native Runtime: concepts/cloud_native.md
+      - Introduction: index.md
+      - Privacy Preserving Tokens: concepts/tokens.md
+      - Private EVM Smart Contracts: concepts/private_evm.md
+      - Advanced Cryptography: concepts/advanced_crypto.md
+      - Atomic EVM Programmability: concepts/atomic_programmability.md
+      - Full Enterprise Privacy Stack: concepts/full_stack.md
+      - Cloud Native Runtime: concepts/cloud_native.md
   - Architecture:
-    - Overview: architecture/overview.md
-    - Programming model: architecture/programming_model.md
-    - Domains: architecture/domains.md
-    - Zeto - ZKP Tokens: architecture/zeto.md
-    - Noto - Notarized Tokens: architecture/noto.md
-    - Pente - EVM Privacy Groups: architecture/pente.md
-    - Key management: architecture/key_management.md
-    - State store: architecture/state_store.md
-    - Atomic interop: architecture/atomic_interop.md
-    - Data Transports & Registry: architecture/data_and_registry.md
-    - Ledger Layers: architecture/ledger_layers.md
+      - Overview: architecture/overview.md
+      - Programming model: architecture/programming_model.md
+      - Domains: architecture/domains.md
+      - Zeto - ZKP Tokens: architecture/zeto.md
+      - Noto - Notarized Tokens: architecture/noto.md
+      - Pente - EVM Privacy Groups: architecture/pente.md
+      - Key management: architecture/key_management.md
+      - State store: architecture/state_store.md
+      - Atomic interop: architecture/atomic_interop.md
+      - Data Transports & Registry: architecture/data_and_registry.md
+      - Ledger Layers: architecture/ledger_layers.md
+      - Distributed Sequencer:
+          - Overview: architecture/distributed_sequencer_overview.md
+          - Architecture: architecture/distributed_sequencer_architecture.md
+          - Components: architecture/distributed_sequencer_components.md
+          - State Machine: architecture/distributed_sequencer_state_machine.md
+          - Data Flows: architecture/distributed_sequencer_data_flows.md
+          - Protocol: architecture/distributed_sequencer_protocol.md
   - Getting Started:
     - Installation: 
       - Default Installation: getting-started/installation.md
@@ -136,16 +147,16 @@ nav:
     - L1 and L2 Chains: administration/l1-and-l2-chains.md
     - Logging: administration/logging.md
   - Reference:
-    - APIs: reference/apis/*.md
-    - Types: reference/types/*.md
-    - Kubernetes CRDs: reference/crds/*.md
-    - Architecture: reference/architecture.md
-    - Commands: reference/commands.md
-    - Roadmap: reference/roadmap.md
+      - APIs: reference/apis/*.md
+      - Types: reference/types/*.md
+      - Kubernetes CRDs: reference/crds/*.md
+      - Architecture: reference/architecture.md
+      - Commands: reference/commands.md
+      - Roadmap: reference/roadmap.md
   - Contributing:
-    - How to Contribute: contributing/how-to-contribute.md
-    - Reporting a Bug: contributing/reporting-a-bug.md
-    - Requesting a Change: contributing/requesting-a-change.md
-    - Asking a Question: contributing/asking-a-question.md
+      - How to Contribute: contributing/how-to-contribute.md
+      - Reporting a Bug: contributing/reporting-a-bug.md
+      - Requesting a Change: contributing/requesting-a-change.md
+      - Asking a Question: contributing/asking-a-question.md
   - FAQs: faqs.md
   - Glossary: glossary.md

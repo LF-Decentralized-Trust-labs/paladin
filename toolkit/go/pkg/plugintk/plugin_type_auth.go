@@ -132,6 +132,11 @@ func (ah *rpcAuthHandler) RequestToPlugin(ctx context.Context, iReq PluginMessag
 	return ah.Wrap(res), err
 }
 
+func (ah *rpcAuthHandler) ClosePlugin(ctx context.Context) (PluginMessage[prototk.RPCAuthMessage], error) {
+	// Not implemented
+	return nil, nil
+}
+
 type RPCAuthAPIFunctions struct {
 	ConfigureRPCAuthorizer func(context.Context, *prototk.ConfigureRPCAuthorizerRequest) (*prototk.ConfigureRPCAuthorizerResponse, error)
 	Authenticate           func(context.Context, *prototk.AuthenticateRequest) (*prototk.AuthenticateResponse, error)

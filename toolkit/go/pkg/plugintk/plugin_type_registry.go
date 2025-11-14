@@ -128,6 +128,11 @@ func (th *registryHandler) RequestToPlugin(ctx context.Context, iReq PluginMessa
 	return th.Wrap(res), err
 }
 
+func (dh *registryHandler) ClosePlugin(ctx context.Context) (PluginMessage[prototk.RegistryMessage], error) {
+	// Not implemented
+	return nil, nil
+}
+
 func (dh *registryHandler) UpsertRegistryRecords(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest) (*prototk.UpsertRegistryRecordsResponse, error) {
 	res, err := dh.proxy.RequestFromPlugin(ctx, dh.Wrap(&prototk.RegistryMessage{
 		RequestFromRegistry: &prototk.RegistryMessage_UpsertRegistryRecords{

@@ -56,6 +56,7 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 	// successful send with tx hash returned
 	txSendMock := m.ethClient.On("SendRawTransaction", ctx, mock.Anything)
+
 	txSendMock.Run(func(args mock.Arguments) {
 		txRawMessage := args[1].(pldtypes.HexBytes)
 		assert.Equal(t, pldtypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
@@ -66,6 +67,7 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	require.NoError(t, err)
@@ -84,6 +86,7 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	require.NoError(t, err)
@@ -102,6 +105,7 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	assert.Regexp(t, "PD011905", err)
@@ -120,6 +124,7 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	assert.Regexp(t, "transaction underpriced", err)
@@ -137,6 +142,7 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	assert.Regexp(t, "execution reverted", err)
@@ -154,6 +160,7 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	require.NoError(t, err)
@@ -171,6 +178,7 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	require.NoError(t, err)
@@ -189,6 +197,7 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	assert.Regexp(t, "error submitting", err)
@@ -219,6 +228,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	require.NoError(t, err)
@@ -236,6 +246,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	require.NoError(t, err)
@@ -252,6 +263,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	require.NoError(t, err)
@@ -267,6 +279,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	assert.Regexp(t, "transaction underpriced", err)
@@ -280,6 +293,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	assert.Regexp(t, "execution reverted", err)
@@ -293,6 +307,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	require.NoError(t, err)
@@ -306,6 +321,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	require.NoError(t, err)
@@ -324,6 +340,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	require.NoError(t, err)
@@ -339,6 +356,7 @@ func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 		[]byte(testHashedSignedMessage),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 	assert.Regexp(t, "PD020000", err)
@@ -358,6 +376,7 @@ func TestTxSubmissionWithNilCalculatedTxHash(t *testing.T) {
 		[]byte(testTransactionData),
 		nil, // calculatedTxHash is nil - this should trigger the error path
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		testCancel)
 
@@ -402,6 +421,7 @@ func TestTxSubmissionWithCancelledDuringRetry(t *testing.T) {
 		[]byte(testTransactionData),
 		it.stateManager.GetTransactionHash(),
 		it.stateManager.GetSignerNonce(),
+		it.stateManager.GetTo().String(),
 		it.stateManager.GetLastSubmitTime(),
 		cancelledFunc)
 

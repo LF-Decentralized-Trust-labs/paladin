@@ -81,6 +81,7 @@ type pubTxManager struct {
 	thMetrics        metrics.PublicTransactionManagerMetrics
 	p                persistence.Persistence
 	bIndexer         blockindexer.BlockIndexer
+	sequencerManager components.SequencerManager
 	ethClient        ethclient.EthClient
 	keymgr           components.KeyManager
 	rootTxMgr        components.TXManager
@@ -171,7 +172,8 @@ func (ptm *pubTxManager) PostInit(pic components.AllComponents) error {
 	ptm.p = pic.Persistence()
 	ptm.bIndexer = pic.BlockIndexer()
 	ptm.rootTxMgr = pic.TxManager()
-	ptm.submissionWriter = newSubmissionWriter(ptm.ctx, ptm.p, ptm.conf, ptm.thMetrics)
+	ptm.sequencerManager = pic.SequencerManager()
+	ptm.submissionWriter = newSubmissionWriter(ptm.ctx, ptm.p, ptm.conf, ptm.thMetrics, ptm.sequencerManager, ptm.rootTxMgr)
 	ptm.balanceManager = NewBalanceManagerWithInMemoryTracking(ctx, ptm.conf, ptm)
 
 	log.L(ctx).Debugf("Initialized public transaction manager")
@@ -233,6 +235,8 @@ func buildEthTX(
 
 func (ptm *pubTxManager) SingleTransactionSubmit(ctx context.Context, txi *components.PublicTxSubmission) (tx *pldapi.PublicTx, err error) {
 	ctx = log.WithComponent(ctx, "publictxnmanager")
+	log.L(ctx).Debugf("SingleTransactionSubmit transaction: %+v", txi)
+
 	var txs []*pldapi.PublicTx
 	err = ptm.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		err := ptm.ValidateTransaction(ctx, dbTX, txi)
@@ -249,7 +253,7 @@ func (ptm *pubTxManager) SingleTransactionSubmit(ctx context.Context, txi *compo
 
 func (ptm *pubTxManager) ValidateTransaction(ctx context.Context, dbTX persistence.DBTX, txi *components.PublicTxSubmission) error {
 	ctx = log.WithComponent(ctx, "publictxnmanager")
-	log.L(ctx).Tracef("PrepareSubmission transaction: %+v", txi)
+	log.L(ctx).Debugf("PrepareSubmission transaction: %+v", txi)
 
 	if txi.From == nil {
 		return i18n.NewError(ctx, msgs.MsgInvalidTXMissingFromAddr)
@@ -295,7 +299,9 @@ func (ptm *pubTxManager) ValidateTransaction(ctx context.Context, dbTX persisten
 
 func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persistence.DBTX, transactions []*components.PublicTxSubmission) (pubTxns []*pldapi.PublicTx, err error) {
 	ctx = log.WithComponent(ctx, "publictxnmanager")
+	log.L(ctx).Debugf("WriteNewTransactions transactions: %+v", transactions)
 	persistedTransactions := make([]*DBPublicTxn, len(transactions))
+	transactionsToDistribute := make([]*pldapi.PublicTxToDistribute, len(transactions))
 	for i, txi := range transactions {
 		persistedTransactions[i] = &DBPublicTxn{
 			From:            *txi.From, // safe because validated in ValidateTransaction
@@ -305,10 +311,20 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 			Data:            txi.Data,
 			FixedGasPricing: pldtypes.JSONString(txi.PublicTxGasPricing),
 		}
+		transactionsToDistribute[i] = &pldapi.PublicTxToDistribute{
+			PublicTxInput: pldapi.PublicTxInput{
+				To:              txi.To,
+				Data:            txi.Data,
+				From:            txi.From,
+				PublicTxOptions: txi.PublicTxOptions,
+			},
+			PublicTxOptions: txi.PublicTxOptions,
+		}
 	}
 	// All the nonce processing to this point should have ensured we do not have a conflict on nonces.
 	// It is the caller's responsibility to ensure we do not have a conflict on transaction+resubmit_idx.
 	if len(persistedTransactions) > 0 {
+		log.L(ctx).Debugf("WriteNewTransactions persisted transactions: %d", len(persistedTransactions))
 		err = dbTX.DB().
 			WithContext(ctx).
 			Table("public_txns").
@@ -319,7 +335,9 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 	if err == nil {
 		publicTxBindings := make([]*DBPublicTxnBinding, 0, len(transactions))
 		for i, txi := range transactions {
+			transactionsToDistribute[i].Bindings = make([]*pldapi.PublicTxBinding, 0)
 			pubTxnID := persistedTransactions[i].PublicTxnID
+			log.L(ctx).Debugf("WriteNewTransactions public txn binding ID: %+v", pubTxnID)
 			for _, bnd := range txi.Bindings {
 				publicTxBindings = append(publicTxBindings, &DBPublicTxnBinding{
 					Transaction:     bnd.TransactionID,
@@ -328,9 +346,31 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 					ContractAddress: bnd.TransactionContractAddress,
 					PublicTxnID:     pubTxnID,
 				})
+
+				if bnd.TransactionType == pldapi.TransactionTypePrivate.Enum() {
+					privTx, err := ptm.rootTxMgr.GetTransactionByIDWithDBTX(ctx, dbTX, bnd.TransactionID)
+					if err != nil {
+						log.L(ctx).Errorf("%s", i18n.NewError(ctx, msgs.MsgSequencerInternalError, err).Error())
+						continue
+					}
+					if privTx == nil {
+						log.L(ctx).Errorf("%s", i18n.NewError(ctx, msgs.MsgTxMgrTransactionNotFound, bnd.TransactionID).Error())
+						continue
+					}
+					// We only distribute public transactions where they were the result of a private Paladin TX
+					binding := &pldapi.PublicTxBinding{
+						Transaction:       bnd.TransactionID,
+						TransactionType:   bnd.TransactionType,
+						TransactionSender: privTx.From,
+					}
+					transactionsToDistribute[i].Bindings = append(transactionsToDistribute[i].Bindings, binding)
+				} else {
+					log.L(ctx).Debugf("Public transaction %s is not the result of a private Paladin TX, skipping distribution", bnd.TransactionID)
+				}
 			}
 		}
 		if len(publicTxBindings) > 0 {
+			log.L(ctx).Debugf("WriteNewTransactions public txn bindings: %d", len(persistedTransactions))
 			err = dbTX.DB().
 				WithContext(ctx).
 				Table("public_txn_bindings").
@@ -346,6 +386,103 @@ func (ptm *pubTxManager) WriteNewTransactions(ctx context.Context, dbTX persiste
 			toNotify[ptx.From] = true
 		}
 		dbTX.AddPostCommit(ptm.postCommitNewTransactions(toNotify))
+	}
+
+	// Hand off to the sequencer
+	err = ptm.sequencerManager.HandlePublicTXsWritten(ctx, dbTX, transactionsToDistribute)
+	if err != nil {
+		return nil, err
+	}
+
+	return pubTxns, err
+}
+
+func (ptm *pubTxManager) WriteReceivedTransactions(ctx context.Context, dbTX persistence.DBTX, transactions []*pldapi.PublicTxToDistribute) (pubTxns []*pldapi.PublicTx, err error) {
+	log.L(ctx).Debugf("WriteReceivedTransactions transactions: %+v", transactions)
+	persistedTransactions := make([]*DBPublicTxn, len(transactions))
+	for i, txi := range transactions {
+		persistedTransactions[i] = &DBPublicTxn{
+			From:            *txi.From, // safe because validated in ValidateTransaction
+			To:              txi.To,
+			Gas:             txi.Gas.Uint64(),
+			Value:           txi.Value,
+			Data:            txi.Data,
+			FixedGasPricing: pldtypes.JSONString(txi.PublicTxGasPricing),
+		}
+	}
+	// All the nonce processing to this point should have ensured we do not have a conflict on nonces.
+	// It is the caller's responsibility to ensure we do not have a conflict on transaction+resubmit_idx.
+	if len(persistedTransactions) > 0 {
+		log.L(ctx).Debugf("WriteReceivedTransactions persisted transactions: %d", len(persistedTransactions))
+		err = dbTX.DB().
+			WithContext(ctx).
+			Table("public_txns").
+			Clauses(clause.Returning{Columns: []clause.Column{{Name: "pub_txn_id"}}}).
+			Create(persistedTransactions).
+			Error
+	}
+	if err == nil {
+		publicTxBindings := make([]*DBPublicTxnBinding, 0, len(transactions))
+		for i, txi := range transactions {
+			pubTxnID := persistedTransactions[i].PublicTxnID
+			log.L(ctx).Debugf("WriteReceivedTransactions public txn binding ID: %+v", pubTxnID)
+			for _, bnd := range txi.Bindings {
+				publicTxBindings = append(publicTxBindings, &DBPublicTxnBinding{
+					Transaction:     bnd.Transaction,
+					TransactionType: bnd.TransactionType,
+					Sender:          bnd.TransactionSender,
+					ContractAddress: bnd.TransactionContractAddress,
+					PublicTxnID:     pubTxnID,
+				})
+			}
+		}
+		if len(publicTxBindings) > 0 {
+			log.L(ctx).Debugf("WriteReceivedTransactions public txn bindings: %d", len(persistedTransactions))
+			err = dbTX.DB().
+				WithContext(ctx).
+				Table("public_txn_bindings").
+				Create(publicTxBindings).
+				Error
+		}
+	}
+
+	return pubTxns, err
+}
+
+func (ptm *pubTxManager) WriteReceivedPublicTransactionSubmissions(ctx context.Context, dbTX persistence.DBTX, submissions []*pldapi.PublicTxToDistribute) (pubTxns []*pldapi.PublicTx, err error) {
+	log.L(ctx).Debugf("WriteReceivedTransactions transactions: %+v", submissions)
+	persistedSubmissions := make([]*DBPubTxnSubmission, 0, len(submissions))
+	for _, submission := range submissions {
+		for _, binding := range submission.Bindings {
+			dbSubmission := &DBPubTxnSubmission{
+				TransactionHash: *submission.TransactionHash,
+				GasPricing:      submission.GasPricing.Bytes(),
+				PrivateTXID:     binding.Transaction,
+			}
+			persistedSubmissions = append(persistedSubmissions, dbSubmission)
+
+			err = dbTX.DB().
+				Table("public_txn_bindings").
+				Select(`"pub_txn_id"`).
+				Where(`"transaction" IN (?)`, []uuid.UUID{binding.Transaction}).
+				Find(&dbSubmission.PublicTxnID).
+				Error
+			if err != nil {
+				log.L(ctx).Warnf("could not load pub_txn_id for TX %s: %s", binding.Transaction, err)
+				continue
+			}
+		}
+	}
+
+	// All the nonce processing to this point should have ensured we do not have a conflict on nonces.
+	// It is the caller's responsibility to ensure we do not have a conflict on transaction+resubmit_idx.
+	if len(persistedSubmissions) > 0 {
+		log.L(ctx).Debugf("WriteReceivedTransactions persisted submissions: %d", len(persistedSubmissions))
+		err = dbTX.DB().
+			WithContext(ctx).
+			Table("public_submissions").
+			Create(persistedSubmissions).
+			Error
 	}
 
 	return pubTxns, err
@@ -428,6 +565,10 @@ func (ptm *pubTxManager) QueryPublicTxForTransactions(ctx context.Context, dbTX 
 }
 
 func (ptm *pubTxManager) queryPublicTxWithBinding(ctx context.Context, dbTX persistence.DBTX, scopeToTxns []uuid.UUID, jq *query.QueryJSON) ([]*pldapi.PublicTxWithBinding, error) {
+	log.L(ctx).Infof("queryPublicTxWithBinding: %d transactions", len(scopeToTxns))
+	for _, tx := range scopeToTxns {
+		log.L(ctx).Infof("queryPublicTxWithBinding: %s", tx)
+	}
 	q := dbTX.DB().Table("public_txns").
 		WithContext(ctx).
 		Joins("Completed")
@@ -438,6 +579,7 @@ func (ptm *pubTxManager) queryPublicTxWithBinding(ctx context.Context, dbTX pers
 	if err != nil {
 		return nil, err
 	}
+	log.L(ctx).Infof("queryPublicTxWithBinding: %d public transactions", len(ptxs))
 	results := make([]*pldapi.PublicTxWithBinding, len(ptxs))
 	for iTx, ptx := range ptxs {
 		tx := mapPersistedTransaction(ptx)
@@ -757,10 +899,11 @@ func (ptm *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, d
 	// via our node to the network).
 	txHashes := make([]pldtypes.Bytes32, len(itxs))
 	for i, itx := range itxs {
+		log.L(ctx).Debugf("MatchUpdateConfirmedTransactions: checking for %+v", itx.Hash)
 		txHashes[i] = itx.Hash
 	}
 	var lookups []*bindingsMatchingSubmission
-
+	log.L(ctx).Debugf("MatchUpdateConfirmedTransactions: Selecting from 'public_txn_bindings'")
 	err := dbTX.DB().
 		Table("public_txn_bindings").
 		Select(`"transaction"`, "sender", "contract_address", `"tx_type"`, `"Submission"."pub_txn_id"`, `"Submission"."tx_hash"`).
@@ -804,6 +947,7 @@ func (ptm *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, d
 
 	if len(completions) > 0 {
 		// We have some completions to persis - in the same order as the confirmations that came in
+		log.L(ctx).Debugf("MatchUpdateConfirmedTransactions: Writing %d completions to 'public_completions'", len(completions))
 		err := dbTX.DB().
 			Table("public_completions").
 			Clauses(clause.OnConflict{
@@ -813,11 +957,13 @@ func (ptm *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, d
 			Create(completions).
 			Error
 		if err != nil {
+			log.L(ctx).Errorf("MatchUpdateConfirmedTransactions: error writing to `public_completions`: %s", err.Error())
 			return nil, err
 		}
 		ptm.thMetrics.IncCompletedTransactionsByN(uint64(len(completions)))
 	}
 
+	log.L(ctx).Debugf("MatchUpdateConfirmedTransactions: Returning %d results", len(results))
 	return results, nil
 }
 

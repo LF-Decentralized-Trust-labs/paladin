@@ -1,4 +1,4 @@
-![Domain API lifecycle](../images/domain_lifecycle.svg)
+![Domain API lifecycle](../images/domain_lifecycle.svg){.zoomable-image}
 
 Work in progress page to provide more information on the above workflow.
 
