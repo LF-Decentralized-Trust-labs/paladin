@@ -443,6 +443,7 @@ func TestAddRemoveBlockchainEventReceiver(t *testing.T) {
 }
 
 func TestNextReceiver(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
 	readyToReceive := make(chan struct{}) // used to signal when goroutine
 
 	// waiting for a receiver to be added
@@ -450,11 +451,10 @@ func TestNextReceiver(t *testing.T) {
 	el := &blockchainEventListener{
 		newReceivers: make(chan bool, 1),
 	}
-	el.ctx, el.cancelCtx = context.WithCancel(context.Background())
 
 	go func() {
 		close(readyToReceive) // signal that we're about to call nextReceiver
-		r, err := el.nextReceiver()
+		r, err := el.nextReceiver(ctx)
 		require.NoError(t, err)
 		nextReceiver <- r
 	}()
@@ -473,12 +473,12 @@ func TestNextReceiver(t *testing.T) {
 	el.addReceiver(&testBlockchainEventReceiver{
 		index: 1,
 	})
-	r2, err := el.nextReceiver()
+	r2, err := el.nextReceiver(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, 1, r2.(*registeredBlockchainEventReceiver).BlockchainEventReceiver.(*testBlockchainEventReceiver).index)
 
 	// getting the next receiver should go back to the first receiver
-	r1, err = el.nextReceiver()
+	r1, err = el.nextReceiver(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, 0, r1.(*registeredBlockchainEventReceiver).BlockchainEventReceiver.(*testBlockchainEventReceiver).index)
 
@@ -488,20 +488,23 @@ func TestNextReceiver(t *testing.T) {
 	// closing the context should make nextReceiver return an error
 	gotError := make(chan bool, 1)
 	go func() {
-		_, err := el.nextReceiver()
+		_, err := el.nextReceiver(ctx)
 		require.Error(t, err)
 		gotError <- true
 	}()
 
-	el.cancelCtx()
+	cancel()
 	<-gotError
 }
 
 func TestHandleEventBatch(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
 	el := &blockchainEventListener{
 		newReceivers: make(chan bool, 1),
+		definition: &blockindexer.EventStream{
+			Name: "bel1",
+		},
 	}
-	el.ctx, el.cancelCtx = context.WithCancel(context.Background())
 
 	testBatchID := uuid.New()
 	testEvents := []*pldapi.EventWithData{{
@@ -519,7 +522,7 @@ func TestHandleEventBatch(t *testing.T) {
 		},
 	})
 
-	err := el.handleEventBatch(context.Background(), &blockindexer.EventDeliveryBatch{
+	err := el.handleEventBatch(ctx, &blockindexer.EventDeliveryBatch{
 		BatchID: testBatchID,
 		Events:  testEvents,
 	})
@@ -530,11 +533,11 @@ func TestHandleEventBatch(t *testing.T) {
 	// call again in a goroutine with no listeners and cancel
 	gotError := make(chan bool, 1)
 	go func() {
-		err := el.handleEventBatch(context.Background(), nil)
+		err := el.handleEventBatch(ctx, nil)
 		require.Error(t, err)
 		gotError <- true
 	}()
-	el.cancelCtx()
+	cancel()
 	<-gotError
 
 }
