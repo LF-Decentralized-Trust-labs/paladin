@@ -1,0 +1,99 @@
+name: Copy Images Between Registries
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+on:
+  workflow_call:
+    inputs:
+      source_tag:
+        required: true
+        type: string
+        description: 'The source tag to copy from (e.g., v1.2.3-rc.1)'
+      target_tag:
+        required: true
+        type: string
+        description: 'The target tag to copy to (e.g., v1.2.3)'
+      latest:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to also tag the images with "latest"'
+    secrets:
+      DOCKERHUB_USERNAME:
+        description: 'DockerHub username'
+        required: true
+      DOCKERHUB_TOKEN:
+        description: 'DockerHub token'
+        required: true
+
+jobs:
+  copy-to-dockerhub:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: [paladin, paladin-operator]
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR (source)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to DockerHub (target)
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set Source Repository Name
+        id: source_repo
+        uses: ./.github/actions/repository
+        with:
+          repository: ${{ github.repository_owner }}
+          registry: ghcr.io
+
+      - name: Set Target Repository Name
+        id: target_repo
+        uses: ./.github/actions/repository
+        with:
+          repository: ${{ github.repository_owner }}
+          registry: docker.io
+
+      - name: Copy multi-arch manifest from GHCR to DockerHub
+        run: |
+          SOURCE_TAG="${{ inputs.source_tag }}"
+          TARGET_TAG="${{ inputs.target_tag }}"
+          SOURCE_REPO="${{ steps.source_repo.outputs.repository }}"
+          TARGET_REPO="${{ steps.target_repo.outputs.repository }}"
+          IMAGE="${{ matrix.image }}"
+          
+          SOURCE_IMAGE="ghcr.io/${SOURCE_REPO}/${IMAGE}"
+          TARGET_IMAGE="docker.io/${TARGET_REPO}/${IMAGE}"
+          
+          echo "Copying multi-arch manifest from ${SOURCE_IMAGE} -> ${TARGET_IMAGE}"
+          
+          # Use buildx imagetools to copy the multi-arch manifest
+          docker buildx imagetools create \
+            --tag ${TARGET_IMAGE}:${TARGET_TAG} \
+            ${SOURCE_IMAGE}:${SOURCE_TAG}
+          
+          # Create latest tag if requested
+          if [[ "${{ inputs.latest }}" == "true" ]]; then
+            echo "Also creating latest tag"
+            docker buildx imagetools create \
+              --tag ${TARGET_IMAGE}:latest \
+              ${SOURCE_IMAGE}:${SOURCE_TAG}
+          fi
+
+
