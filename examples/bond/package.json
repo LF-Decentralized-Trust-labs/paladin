@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@lfdecentralizedtrust-labs/paladin-sdk": "file:../../sdk/typescript",
+    "@lfdecentralizedtrust/paladin-sdk": "^0.14.0-rc.0",
     "paladin-example-common": "file:../common"
   }
 }
