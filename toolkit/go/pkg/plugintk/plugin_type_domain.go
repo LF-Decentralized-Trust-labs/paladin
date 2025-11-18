@@ -219,6 +219,11 @@ func (dp *domainHandler) RequestToPlugin(ctx context.Context, iReq PluginMessage
 	return dp.Wrap(res), err
 }
 
+func (dp *domainHandler) ClosePlugin(ctx context.Context) (PluginMessage[prototk.DomainMessage], error) {
+	// Not implemented
+	return nil, nil
+}
+
 func (dp *domainHandler) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
 	res, err := dp.proxy.RequestFromPlugin(ctx, dp.Wrap(&prototk.DomainMessage{
 		RequestFromDomain: &prototk.DomainMessage_FindAvailableStates{

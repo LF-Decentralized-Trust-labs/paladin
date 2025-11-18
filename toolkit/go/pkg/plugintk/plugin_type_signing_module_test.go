@@ -21,6 +21,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func setupSigningModuleTests(t *testing.T) (context.Context, *pluginExerciser[prototk.SigningModuleMessage], *SigningModuleAPIFunctions, SigningModuleCallbacks, map[string]func(*prototk.SigningModuleMessage), func()) {
@@ -159,4 +160,18 @@ func TestSigningModuleWrapperFields(t *testing.T) {
 	m := &SigningModulePluginMessage{m: &prototk.SigningModuleMessage{}}
 	assert.Nil(t, m.RequestFromPlugin())
 	assert.Nil(t, m.ResponseToPlugin())
+}
+
+func TestSigningModule_ClosePlugin(t *testing.T) {
+	signingModulePlugin := &signingModulePlugin{
+		factory: func(callbacks SigningModuleCallbacks) SigningModuleAPI {
+			return &SigningModuleAPIBase{
+				Functions: &SigningModuleAPIFunctions{},
+			}
+		},
+	}
+	handler := signingModulePlugin.NewHandler(nil)
+	msg, err := handler.ClosePlugin(context.Background())
+	require.NoError(t, err)
+	assert.Nil(t, msg)
 }

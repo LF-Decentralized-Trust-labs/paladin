@@ -142,6 +142,11 @@ func (smh *signingModuleHandler) RequestToPlugin(ctx context.Context, iReq Plugi
 	return smh.Wrap(res), err
 }
 
+func (smh *signingModuleHandler) ClosePlugin(ctx context.Context) (PluginMessage[prototk.SigningModuleMessage], error) {
+	// Not implemented
+	return nil, nil
+}
+
 type SigningModuleAPIFunctions struct {
 	ConfigureSigningModule func(context.Context, *prototk.ConfigureSigningModuleRequest) (*prototk.ConfigureSigningModuleResponse, error)
 	ResolveKey             func(context.Context, *prototk.ResolveKeyRequest) (*prototk.ResolveKeyResponse, error)

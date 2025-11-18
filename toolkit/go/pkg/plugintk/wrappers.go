@@ -65,6 +65,7 @@ type PluginMessageWrapper[M any] interface {
 
 type PluginHandler[M any] interface {
 	RequestToPlugin(ctx context.Context, req PluginMessage[M]) (PluginMessage[M], error)
+	ClosePlugin(ctx context.Context) (PluginMessage[M], error)
 }
 
 type PluginProxy[M any] interface {

@@ -100,6 +100,12 @@ type TransportManager interface {
 	// at-most-once delivery semantics
 	Send(ctx context.Context, send *FireAndForgetMessageSend) error
 
+	// Send a message with the same semantics as Send, but with a channel for transport errors to be passed back to the
+	// caller rather than have to infer the outcome after some arbitrary period of time. This gives the caller the ability to
+	// choose the same error handling semantics for both a) the peer replied to the request with some sort of error (the way Send()
+	// already behaves), and b) the request couldn't even be sent to the peer due to an error.
+	SendWithNack(ctx context.Context, send *FireAndForgetMessageSend, errChan chan error) error
+
 	// Sends a message with at-least-once delivery semantics
 	//
 	// Each reliable message type has special building code in the transport manager, which assembles the full

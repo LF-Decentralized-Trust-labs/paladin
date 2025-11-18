@@ -65,7 +65,7 @@ func getBesuPort() int {
 			return port
 		}
 	}
-	return 0
+	return 8545 // Default to the free-gas Besu port, otherwise running through IDE requires env to be setup
 }
 
 func transactionReceiptCondition(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool {
