@@ -26,6 +26,7 @@ type TransactionResult struct {
 	ID                  uuid.UUID                `json:"id"`
 	EncodedCall         pldtypes.HexBytes        `json:"encodedCall"`
 	PreparedTransaction *pldapi.TransactionInput `json:"preparedTransaction"`
+	PreparedMetadata    pldtypes.RawJSON         `json:"preparedMetadata"`
 	InputStates         []*pldapi.StateEncoded   `json:"inputStates"`
 	OutputStates        []*pldapi.StateEncoded   `json:"outputStates"`
 	ReadStates          []*pldapi.StateEncoded   `json:"readStates"`

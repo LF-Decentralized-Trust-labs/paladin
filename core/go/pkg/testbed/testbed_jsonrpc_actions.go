@@ -456,6 +456,7 @@ func (tb *testbed) mapTransaction(ctx context.Context, tx *testbedTransaction) (
 		ID:                  tx.ptx.ID,
 		EncodedCall:         encodedCall,
 		PreparedTransaction: preparedTransaction,
+		PreparedMetadata:    tx.ptx.PreparedMetadata,
 		InputStates:         inputStates,
 		OutputStates:        outputStates,
 		ReadStates:          readStates,
