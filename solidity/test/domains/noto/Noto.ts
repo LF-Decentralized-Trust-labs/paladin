@@ -15,6 +15,7 @@ import {
   newUnlockHash,
   randomBytes32,
 } from "./util";
+import { ZeroHash } from "ethers";
 
 describe("Noto", function () {
   async function deployNotoFixture() {
@@ -102,11 +103,8 @@ describe("Noto", function () {
     const txo2 = fakeTXO();
     const txo3 = fakeTXO();
     const txo4 = fakeTXO();
-    const txo5 = fakeTXO();
 
-    const lockId = randomBytes32();
     const locked1 = fakeTXO();
-    const locked2 = fakeTXO();
 
     // Make two UTXOs
     await doTransfer(
@@ -119,29 +117,29 @@ describe("Noto", function () {
     );
 
     // Lock both of them
-    await doLock(
-      randomBytes32(),
-      notary,
-      noto,
-      lockId,
-      [txo1, txo2],
-      [txo3],
-      [locked1],
-      randomBytes32()
-    );
+    const txId1 = randomBytes32();
+    const params = {
+      txId: txId1,
+      inputs: [txo1, txo2],
+      outputs: [txo3],
+      lockedOutputs: [locked1],
+      proof: "0x",
+      options: "0x",
+    };
+    const lockId = await doLock(notary, noto, params, ZeroHash);
 
-    // Check that the same state cannot be locked again with the same lock
+    // Check that the same state cannot be locked again with a different lock
+    const txId2 = randomBytes32();
+    const params2 = {
+      txId: txId2,
+      inputs: [],
+      outputs: [],
+      lockedOutputs: [locked1],
+      proof: "0x",
+      options: "0x",
+    };
     await expect(
-      doLock(
-        randomBytes32(),
-        notary,
-        noto,
-        lockId,
-        [],
-        [],
-        [locked1],
-        randomBytes32()
-      )
+      doLock(notary, noto, params2, randomBytes32())
     ).to.be.rejectedWith("NotoInvalidOutput");
 
     // Check that locked value cannot be spent
@@ -149,52 +147,29 @@ describe("Noto", function () {
       doTransfer(randomBytes32(), notary, noto, [locked1], [], randomBytes32())
     ).to.be.rejectedWith("NotoInvalidInput");
 
-    // Unlock the UTXO
-    await doUnlock(
-      randomBytes32(),
-      notary,
-      noto,
-      lockId,
-      [locked1],
-      [locked2],
-      [txo4],
-      randomBytes32()
-    );
-
-    // Check that the same state cannot be unlocked again
-    await expect(
-      doUnlock(
-        randomBytes32(),
-        notary,
-        noto,
-        lockId,
-        [locked1],
-        [],
-        [],
-        randomBytes32()
-      )
-    ).to.be.rejectedWith("NotoInvalidInput");
-
-    // Prepare an unlock operation
+    // Prepare unlock operations (both spend and cancel) before unlocking
+    const unlockTxId = randomBytes32();
     const unlockData = randomBytes32();
-    const unlockHash = await newUnlockHash(
+    const spendHash = await newUnlockHash(
       noto,
-      [locked2],
-      [],
-      [txo5],
+      unlockTxId,
+      [locked1],
+      [txo4],
       unlockData
     );
+    const cancelHash = await newUnlockHash(noto, unlockTxId, [locked1], [], unlockData);
     await doPrepareUnlock(
       randomBytes32(),
       notary,
       noto,
       lockId,
-      [locked2],
-      unlockHash,
+      [locked1],
+      spendHash,
+      cancelHash,
       unlockData
     );
 
-    // Delegate the unlock
+    // Delegate the lock
     await doDelegateLock(
       randomBytes32(),
       notary,
@@ -204,55 +179,68 @@ describe("Noto", function () {
       randomBytes32()
     );
 
-    // Attempt to perform an incorrect unlock
+    // Attempt to perform an incorrect unlock with wrong inputs
     await expect(
       doUnlock(
-        randomBytes32(),
+        unlockTxId,
         delegate,
         noto,
         lockId,
-        [locked1, locked2],
-        [],
-        [txo5],
+        [locked1, fakeTXO()],
+        [txo4],
         unlockData
-      ) // mismatched input states
-    ).to.be.rejectedWith("NotoInvalidInput");
+      ) // mismatched input states - hash won't match
+    ).to.be.rejectedWith("NotoInvalidUnlockHash");
+
+    // Try to unlock with wrong outputs
     await expect(
       doUnlock(
-        randomBytes32(),
+        unlockTxId,
         delegate,
         noto,
         lockId,
-        [locked2],
-        [],
-        [txo5],
-        randomBytes32()
-      ) // wrong data
+        [locked1],
+        [fakeTXO()], // different output than prepared
+        unlockData
+      ) // wrong outputs - hash won't match
     ).to.be.rejectedWith("NotoInvalidUnlockHash");
+
+    // Try to unlock with wrong delegate
     await expect(
       doUnlock(
-        randomBytes32(),
+        unlockTxId,
         other,
         noto,
         lockId,
-        [locked2],
-        [],
-        [txo5],
+        [locked1],
+        [txo4],
         unlockData
       ) // wrong delegate
-    ).to.be.rejectedWith("NotoInvalidDelegate");
+    ).to.be.rejectedWith("LockUnauthorized");
 
     // Perform the prepared unlock
     await doUnlock(
-      randomBytes32(),
+      unlockTxId,
       delegate,
       noto,
       lockId,
-      [locked2],
-      [],
-      [txo5],
+      [locked1],
+      [txo4],
       unlockData
     );
+
+    // Check that the same state cannot be unlocked again (lock is already spent, so not active)
+    await expect(
+      doUnlock(
+        randomBytes32(),
+        notary,
+        noto,
+        lockId,
+        [locked1],
+        [],
+        randomBytes32()
+      )
+    ).to.be.rejectedWith("LockNotActive");
   });
 
   it("Duplicate TXID reverts transfer", async function () {
@@ -293,64 +281,51 @@ describe("Noto", function () {
     await doTransfer(txId1, notary, noto, [], [txo1, txo2], randomBytes32());
 
     // Try to lock both of them using the same TX ID - should fail
+    const params1 = {
+      txId: txId1,
+      inputs: [txo1, txo2],
+      outputs: [txo3],
+      lockedOutputs: [locked1],
+      proof: "0x",
+      options: "0x",
+    };
     await expect(
-      doLock(
-        txId1,
-        notary,
-        noto,
-        randomBytes32(),
-        [txo1, txo2],
-        [txo3],
-        [locked1],
-        randomBytes32()
-      )
+      doLock(notary, noto, params1, randomBytes32())
     ).to.be.rejectedWith("NotoDuplicateTransaction");
 
     // Lock both of them using a new TX ID - should succeed
-    await doLock(
-      randomBytes32(),
-      notary,
-      noto,
-      randomBytes32(),
-      [txo1, txo2],
-      [txo3],
-      [locked1],
-      randomBytes32()
-    );
+    const txId2 = randomBytes32();
+    const params2 = {
+      txId: txId2,
+      inputs: [txo1, txo2],
+      outputs: [txo3],
+      lockedOutputs: [locked1],
+      proof: "0x",
+      options: "0x",
+    };
+    const lockId = await doLock(notary, noto, params2, randomBytes32());
 
-    // Unlock the UTXO using the same TX ID as the transfer - should fail
-    await expect(
-      doUnlock(
-        txId1,
-        notary,
-        noto,
-        randomBytes32(),
-        [locked1],
-        [locked2],
-        [txo4],
-        randomBytes32()
-      )
-    ).to.be.rejectedWith("NotoDuplicateTransaction");
-
-    // Prepare an unlock operation
+    // Prepare unlock operations (both spend and cancel) using the same TX ID as the transfer - should fail
+    const unlockTxId = txId1; // Use same txId as transfer to test duplicate
     const unlockData = randomBytes32();
-    const unlockHash = await newUnlockHash(
+    const spendHash = await newUnlockHash(
       noto,
-      [locked2],
-      [],
-      [txo5],
+      unlockTxId,
+      [locked1],
+      [txo4],
       unlockData
     );
-
-    // Delegate the lock using the same TX ID as the transfer - should fail
+    const cancelHash = await newUnlockHash(noto, unlockTxId, [locked1], [], unlockData);
     await expect(
-      doDelegateLock(
+      doPrepareUnlock(
         txId1,
         notary,
         noto,
-        unlockHash,
-        delegate.address,
-        randomBytes32()
+        lockId,
+        [locked1],
+        spendHash,
+        cancelHash,
+        unlockData
       )
     ).to.be.rejectedWith("NotoDuplicateTransaction");
   });
@@ -371,103 +346,5 @@ describe("Noto", function () {
     await expect(
       doMint(txId1, notary, noto, [txo3, txo4], randomBytes32())
     ).rejectedWith("NotoDuplicateTransaction");
-  });
-
-  it("lock expiration functionality", async function () {
-    const { noto, notary } = await loadFixture(deployNotoFixture);
-    const [_, delegate] = await ethers.getSigners();
-
-    const txo1 = fakeTXO();
-    const txo2 = fakeTXO();
-    const txo3 = fakeTXO();
-    const txo4 = fakeTXO();
-
-    const lockId = randomBytes32();
-    const locked1 = fakeTXO();
-
-    // Make two UTXOs
-    await doTransfer(
-      randomBytes32(),
-      notary,
-      noto,
-      [],
-      [txo1, txo2],
-      randomBytes32()
-    );
-
-    // Get current block timestamp
-    const currentBlock = await ethers.provider.getBlock("latest");
-    const currentTime = currentBlock!.timestamp;
-
-    // Lock with expiration set to 1 second in the future
-    const expirationTime = currentTime + 1;
-    const options = createLockOptions(undefined, expirationTime);
-
-    await doLock(
-      randomBytes32(),
-      notary,
-      noto,
-      lockId,
-      [txo1, txo2],
-      [txo3],
-      [locked1],
-      randomBytes32(),
-      options
-    );
-
-    // Delegate the lock
-    await doDelegateLock(
-      randomBytes32(),
-      notary,
-      noto,
-      lockId,
-      delegate.address,
-      randomBytes32()
-    );
-
-    // Verify delegate is set
-    const delegateBefore = await noto.getLockDelegate(lockId);
-    expect(delegateBefore).to.equal(delegate.address);
-
-    // Wait for expiration
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // Try to unlock as delegate - should fail because lock is expired
-    await expect(
-      doUnlock(
-        randomBytes32(),
-        delegate,
-        noto,
-        lockId,
-        [locked1],
-        [],
-        [txo4],
-        randomBytes32()
-      )
-    ).to.be.rejectedWith("NotoLockExpired");
-
-    // Try to delegate again as delegate - should fail because lock is expired
-    await expect(
-      doDelegateLock(
-        randomBytes32(),
-        delegate,
-        noto,
-        lockId,
-        delegate.address,
-        randomBytes32()
-      )
-    ).to.be.rejectedWith("NotoLockExpired");
-
-    // Notary should be able to unlock after expiration
-    await doUnlock(
-      randomBytes32(),
-      notary,
-      noto,
-      lockId,
-      [locked1],
-      [],
-      [txo4],
-      randomBytes32()
-    );
   });
 });

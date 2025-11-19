@@ -5,6 +5,7 @@ import { Atom, Noto } from "../../../typechain-types";
 import {
   createLockOptions,
   deployNotoInstance,
+  doLock,
   fakeTXO,
   newUnlockHash,
   randomBytes32,
@@ -29,41 +30,58 @@ describe("Atom", function () {
     const erc20 = await ERC20Simple.connect(notary2).deploy("Token", "TOK");
 
     // Bring TXOs and tokens into being
-    const lockId = randomBytes32();
+    const txId1 = randomBytes32();
     const [f1txo1, f1txo2] = [fakeTXO(), fakeTXO()];
-    await noto.connect(notary1).lock(
-      randomBytes32(),
-      lockId,
-      {
-        inputs: [],
-        outputs: [],
-        lockedOutputs: [f1txo1, f1txo2],
-      },
-      ZeroAddress,
-      "0x",
-      "0x",
-      "0x"
-    );
+    // Compute lockId before creating lock
+    const params = {
+      txId: txId1,
+      inputs: [],
+      outputs: [],
+      lockedOutputs: [f1txo1, f1txo2],
+      proof: "0x",
+      options: "0x",
+    };
+    // Create lock with no inputs/outputs, just locked outputs (minting locked states)
+    const lockId = await doLock(notary1, noto, params, "0x");
     await erc20.mint(notary2, 1000);
 
     // Encode two function calls
     const [f1txo3, f1txo4] = [fakeTXO(), fakeTXO()];
     const f1TxData = randomBytes32();
-    const unlockHash = await newUnlockHash(
+    // Encode UnlockParams for spendLock
+    const unlockTxId = randomBytes32();
+    const unlockParams = {
+      txId: unlockTxId,
+      inputs: [f1txo1, f1txo2],
+      outputs: [f1txo3, f1txo4],
+      data: f1TxData,
+    };
+    const encodedParams = ethers.AbiCoder.defaultAbiCoder().encode(
+      ["bytes32", "bytes32[]", "bytes32[]", "bytes"],
+      [
+        unlockParams.txId,
+        unlockParams.inputs,
+        unlockParams.outputs,
+        unlockParams.data,
+      ]
+    );
+    const spendHash = await newUnlockHash(
       noto,
+      unlockTxId,
       [f1txo1, f1txo2],
-      [],
       [f1txo3, f1txo4],
       f1TxData
     );
-    const encoded1 = noto.interface.encodeFunctionData("transferLocked", [
-      randomBytes32(),
-      lockId,
+    const cancelHash = await newUnlockHash(
+      noto,
+      unlockTxId,
       [f1txo1, f1txo2],
       [],
-      [f1txo3, f1txo4],
-      "0x",
-      f1TxData,
+      f1TxData
+    );
+    const encoded1 = noto.interface.encodeFunctionData("spendLock", [
+      lockId,
+      encodedParams,
     ]);
     const encoded2 = erc20.interface.encodeFunctionData("transferFrom", [
       notary2.address,
@@ -90,11 +108,26 @@ describe("Atom", function () {
     const atomAddr = createAtomEvent?.args.addr;
 
     // Do the delegation/approval transactions
-    const options = createLockOptions(unlockHash, 0);
-    await noto
-      .connect(notary1)
-      .setLockOptions(randomBytes32(), lockId, [f1txo1, f1txo2], options, "0x", "0x");
-    await noto.connect(notary1).delegateLock(randomBytes32(), lockId, atomAddr, "0x", "0x");
+    const options = createLockOptions(spendHash, cancelHash);
+    const txId2 = randomBytes32();
+    const updateParams = {
+      txId: txId2,
+      lockedInputs: [f1txo1, f1txo2],
+      proof: "0x",
+      options: options,
+    };
+    await noto.connect(notary1).updateLock(lockId, updateParams, "0x");
+    // Encode DelegateLockParams with txId and data
+    const delegateTxId = randomBytes32();
+    const delegateLockParams = {
+      txId: delegateTxId,
+      data: "0x",
+    };
+    const encodedDelegateParams = ethers.AbiCoder.defaultAbiCoder().encode(
+      ["bytes32", "bytes"],
+      [delegateLockParams.txId, delegateLockParams.data]
+    );
+    await noto.connect(notary1).delegateLock(lockId, atomAddr, encodedDelegateParams);
     await erc20.approve(atomAddr, 1000);
 
     // Run the atomic op (anyone can initiate)
@@ -130,15 +163,31 @@ describe("Atom", function () {
     const [f1txo1, f1txo2] = [fakeTXO(), fakeTXO()];
     const [f1txo3, f1txo4] = [fakeTXO(), fakeTXO()];
     const f1TxData = randomBytes32();
+    // Encode UnlockParams for spendLock
+    const unlockTxId = randomBytes32();
+    const unlockParams = {
+      txId: unlockTxId,
+      inputs: [f1txo1, f1txo2],
+      outputs: [f1txo3, f1txo4],
+      lockedOutputs: [],
+      data: f1TxData,
+    };
+    const encodedParams = ethers.AbiCoder.defaultAbiCoder().encode(
+      ["tuple(bytes32,bytes32[],bytes32[],bytes32[],bytes)"],
+      [
+        [
+          unlockParams.txId,
+          unlockParams.inputs,
+          unlockParams.outputs,
+          unlockParams.lockedOutputs,
+          unlockParams.data,
+        ],
+      ]
+    );
 
-    const encoded1 = noto.interface.encodeFunctionData("transferLocked", [
-      randomBytes32(),
+    const encoded1 = noto.interface.encodeFunctionData("spendLock", [
       lockId,
-      [f1txo1, f1txo2],
-      [],
-      [f1txo3, f1txo4],
-      randomBytes32(),
-      f1TxData,
+      encodedParams,
     ]);
 
     // Deploy the delegation contract
@@ -155,10 +204,10 @@ describe("Atom", function () {
       .find((l) => l?.name === "AtomDeployed");
     const mcAddr = createMFEvent?.args.addr;
 
-    // Run the atomic op (will revert because delegation was never actually created)
+    // Run the atomic op (will revert because lock doesn't exist/is not active)
     const atom = Atom.connect(anybody2).attach(mcAddr) as Atom;
     await expect(atom.execute())
-      .to.be.revertedWithCustomError(Noto, "NotoNotNotary")
-      .withArgs(mcAddr);
+      .to.be.revertedWithCustomError(Noto, "LockNotActive")
+      .withArgs(lockId);
   });
 });

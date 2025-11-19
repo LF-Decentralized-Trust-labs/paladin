@@ -11,16 +11,17 @@ interface INoto is IConfidentialTokenLockable {
     // Options that control how a lock may be utilized.
     // This struct may be ABI-encoded and passed as the "options" parameter to a lock.
     struct LockOptions {
-        // Represents a specific unlock operation, in the form of an EIP-712 hash over the type:
-        //   Unlock(bytes32[] lockedInputs,bytes32[] lockedOutputs,bytes32[] outputs,bytes data)
-        // If set to non-zero, this is the only valid outcome for the lock.
-        bytes32 unlockHash;
+        // Represents a specific spend operation, in the form of an EIP-712 hash over the type:
+        //   Unlock(bytes32[] lockedInputs,bytes32[] outputs,bytes data)
+        // If set to non-zero, this is the only valid outcome for spendLock().
+        // A lock may not be delegated unless both spendHash and cancelHash have been prepared.
+        bytes32 spendHash;
 
-        // The time at which a lock delegation expires, in seconds since the Unix epoch.
-        // If set to zero, the lock delegation never expires.
-        // After expiration, any lock delegation is ignored, and control of the locked
-        // states returns to the original creator.
-        uint256 expiration;
+        // Represents a specific cancel operation, in the form of an EIP-712 hash over the type:
+        //   Unlock(bytes32[] lockedInputs,bytes32[] outputs,bytes data)
+        // If set to non-zero, this is the only valid outcome for cancelLock().
+        // A lock may not be delegated unless both spendHash and cancelHash have been prepared.
+        bytes32 cancelHash;
     }
 
     function initialize(
