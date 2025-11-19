@@ -226,6 +226,7 @@ func (kr *keyResolver) getStoredVerifier(ctx context.Context, identifier, algori
 }
 
 func (kr *keyResolver) ResolveKey(ctx context.Context, identifier, algorithm, verifierType string) (_ *pldapi.KeyMappingAndVerifier, err error) {
+	ctx = log.WithComponent(ctx, log.Component("keyresolver"))
 	return kr.resolveKey(ctx, identifier, algorithm, verifierType, false /* allow creation */)
 }
 

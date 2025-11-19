@@ -26,47 +26,47 @@ jobs:
         with:
           # Fetch all history and tags to build the full upgrade path.
           fetch-depth: 0
-          ref: ${{ github.ref }}
           fetch-tags: true
-
       - name: Get all previous release tags
         id: get_tags
         shell: bash
+        env:
+          NEW_TAG: ${{ inputs.new_tag }}
         run: |
-          echo "Finding all tags before ${{ inputs.new_tag }}..."
+          echo "Finding all final release tags after v0.9.0 and before $NEW_TAG..."
+  
+          previous_tags=()
           
-          # This test is only compatible with releases from v0.10.0 onwards.
-          # The 'sed' command filters the sorted tag list to exclude everything up to and including v0.9.0.
-          all_tags=$(git tag --sort=v:refname | sed '1,/^v0.9\.0$/d')
-          new_tag="${{ inputs.new_tag }}"
-          previous_tags=""
+          # The 'sed' command filters the list to exclude everything up to and including v0.9.0
+          # This effectively re-implements the original restriction.
+          filtered_tags=$(git tag --sort=v:refname | sed '1,/^v0.9\.0$/d')
           
-          # This loop builds a space-separated list of final release tags (e.g., vX.Y.Z)
-          # that exist before the new RC tag being tested.
           while read -r tag; do
-            if [[ "$tag" == "$new_tag" ]]; then
+            if [[ "$tag" == "$NEW_TAG" ]]; then
               break
             fi
-            
+          
             if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              previous_tags+="$tag "
+              previous_tags+=("$tag")
             fi
-          done <<< "$all_tags"
+          done <<< "$filtered_tags" # We now loop over the filtered list
           
-          echo "Found previous tags: $previous_tags"
+          echo "Found previous tags: ${previous_tags[*]}"
           
-          # TODO: remove this once we have a v0.10.0 release
-          # Handle case where no previous tags are found
-          if [[ -z "$previous_tags" ]]; then
-            echo "No previous tags found, skipping backward compatibility tests"
-            echo "tags=[]" >> $GITHUB_OUTPUT
+          if [ ${#previous_tags[@]} -eq 0 ]; then
+            echo "No previous release tags found after v0.9.0."
+            echo "tags=[]" >> "$GITHUB_OUTPUT"
           else
-            # The list of tags is converted to a JSON array. This is a robust way to pass
-            # multi-line or complex strings between steps and could be used in a matrix strategy in the future.
-            tags_json=$(echo "$previous_tags" | tr ' ' '\n' | grep -v '^$' | jq -R . | jq -s .)
-            echo "tags=$tags_json" >> $GITHUB_OUTPUT
+            # The '-c' flag is added to 'jq -s' to produce compact, single-line output.
+            tags_json=$(printf "%s\n" "${previous_tags[@]}" | jq -R . | jq -sc .)
+            echo "tags=${tags_json}" >> "$GITHUB_OUTPUT"
           fi
-
+  
+      - name: Tags
+        run: |
+          echo "The following tags will be tested:"
+          echo "${{ steps.get_tags.outputs.tags }}"
+  
       - name: Install Dependencies
         uses: ./.github/actions/setup
 
@@ -112,13 +112,6 @@ jobs:
         id: cache_data
         shell: bash
         run: |
-          # TODO: remove this once we have a v0.10.0 release
-          # Check if we have any previous tags to process
-          tags_array=$(echo '${{ steps.get_tags.outputs.tags }}' | jq -r '.[]')
-          if [[ -z "$tags_array" ]]; then
-            echo "No previous tags found, skipping Phase 1"
-            exit 0
-          fi
           
           # This loop simulates a real-world cluster being upgraded over time.
           # For each historical version, we install it, check out its corresponding source code,
@@ -156,26 +149,21 @@ jobs:
           
           # We check out the new tag here primarily to validate the new chart installation
           # with the corresponding version of the validation script.
-          git checkout main
+          git checkout ${{ github.sha }}
           IMAGE_TAG="$NEW_TAG" ./scripts/default-installation-validation.sh paladin
 
           echo "--- Verifying Backwards Compatibility ---"
-          
-          # TODO: remove this once we have a v0.10.0 release
-          # Check if we have any previous tags to verify
-          tags_array=$(echo '${{ steps.get_tags.outputs.tags }}' | jq -r '.[]')
-          if [[ -z "$tags_array" ]]; then
-            echo "No previous tags found, skipping Phase 2"
-            exit 0
-          fi
           
           # This loop tests two critical user scenarios after an upgrade.
           # For each historical version, we check out its code to get the original examples and dependencies.
           for tag in $tags_array; do
             echo "--- Verifying data from $tag ---"
-            
-            echo "Checking out git ref $tag..."
-            git checkout "$tag"
+
+            # version 10 does not support the cache path, so we use a later tag for this test
+            if [ "$tag" != "v0.10.0" ]; then
+              echo "Checking out git ref $tag..."
+              git checkout "$tag"
+            fi
             
             # Scenario 1: A user has upgraded their server (the chart) but NOT their client code.
             # We test if the old SDK can still interact with the new server to verify old data.
@@ -196,7 +184,7 @@ jobs:
         run: |
           NEW_TAG="${{ inputs.new_tag }}"
           echo "--- Testing Release Candidate $NEW_TAG ---"
-          git checkout ${{ github.ref }}
+          git checkout ${{ github.sha }}
           
           RUN_COMMANDS=start,verify BUILD_PALADIN_SDK=true BUILD_PALADIN_ABI=true ./scripts/run-examples.sh
           

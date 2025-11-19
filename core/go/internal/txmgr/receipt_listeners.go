@@ -129,7 +129,7 @@ func (tm *txManager) receiptsInit() {
 }
 
 func (tm *txManager) CreateReceiptListener(ctx context.Context, spec *pldapi.TransactionReceiptListener) error {
-
+	ctx = log.WithComponent(ctx, "txmanager")
 	log.L(ctx).Infof("Creating receipt listener '%s'", spec.Name)
 	if err := tm.validateReceiptListenerSpec(ctx, spec); err != nil {
 		return err
@@ -172,6 +172,7 @@ func (rr *registeredReceiptReceiver) Close() {
 }
 
 func (tm *txManager) AddReceiptReceiver(ctx context.Context, name string, r components.ReceiptReceiver) (components.ReceiverCloser, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	tm.receiptListenerLock.Lock()
 	defer tm.receiptListenerLock.Unlock()
 
@@ -184,7 +185,7 @@ func (tm *txManager) AddReceiptReceiver(ctx context.Context, name string, r comp
 }
 
 func (tm *txManager) GetReceiptListener(ctx context.Context, name string) *pldapi.TransactionReceiptListener {
-
+	// ctx = log.WithComponent(ctx, "txmanager")
 	tm.receiptListenerLock.Lock()
 	defer tm.receiptListenerLock.Unlock()
 
@@ -197,14 +198,17 @@ func (tm *txManager) GetReceiptListener(ctx context.Context, name string) *pldap
 }
 
 func (tm *txManager) StartReceiptListener(ctx context.Context, name string) error {
+	ctx = log.WithComponent(ctx, "txmanager")
 	return tm.setReceiptListenerStatus(ctx, name, true)
 }
 
 func (tm *txManager) StopReceiptListener(ctx context.Context, name string) error {
+	ctx = log.WithComponent(ctx, "txmanager")
 	return tm.setReceiptListenerStatus(ctx, name, false)
 }
 
 func (tm *txManager) NotifyStatesDBChanged(ctx context.Context) {
+	// ctx = log.WithComponent(ctx, "txmanager")
 	tm.lastStateUpdateTime.Store(int64(pldtypes.TimestampNow()))
 }
 
@@ -237,6 +241,7 @@ func (tm *txManager) setReceiptListenerStatus(ctx context.Context, name string, 
 }
 
 func (tm *txManager) DeleteReceiptListener(ctx context.Context, name string) error {
+	ctx = log.WithComponent(ctx, "txmanager")
 	tm.receiptListenerLock.Lock()
 	defer tm.receiptListenerLock.Unlock()
 
@@ -261,6 +266,7 @@ func (tm *txManager) DeleteReceiptListener(ctx context.Context, name string) err
 }
 
 func (tm *txManager) QueryReceiptListeners(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.TransactionReceiptListener, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	qw := &filters.QueryWrapper[persistedReceiptListener, pldapi.TransactionReceiptListener]{
 		P:           tm.p,
 		Table:       "receipt_listeners",

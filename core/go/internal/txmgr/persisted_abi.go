@@ -91,6 +91,7 @@ func (tm *txManager) storeABI(ctx context.Context, dbTX persistence.DBTX, a abi.
 }
 
 func (tm *txManager) UpsertABI(ctx context.Context, dbTX persistence.DBTX, a abi.ABI) (*pldapi.StoredABI, error) {
+	ctx = log.WithComponent(ctx, "txmanager")
 	hash, err := pldtypes.ABISolDefinitionHash(ctx, a)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrInvalidABI)

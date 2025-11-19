@@ -409,6 +409,7 @@ func (n *Noto) DataSchemaID() string {
 }
 
 func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
+	ctx = log.WithComponent(ctx, "noto")
 	var config types.DomainConfig
 	err := json.Unmarshal([]byte(req.ConfigJson), &config)
 	if err != nil {
@@ -429,6 +430,7 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomain
 }
 
 func (n *Noto) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
+	ctx = log.WithComponent(ctx, "noto")
 	for i, schema := range allSchemas {
 		switch schema.Name {
 		case types.NotoCoinABI.Name:
@@ -445,6 +447,7 @@ func (n *Noto) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (
 }
 
 func (n *Noto) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error) {
+	ctx = log.WithComponent(ctx, "noto")
 	params, err := n.validateDeploy(req.Transaction)
 	if err != nil {
 		return nil, err
@@ -484,6 +487,7 @@ func (n *Noto) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (
 }
 
 func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
+	ctx = log.WithComponent(ctx, "noto")
 	params, err := n.validateDeploy(req.Transaction)
 	if err != nil {
 		return nil, err
@@ -579,6 +583,7 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 }
 
 func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractRequest) (*prototk.InitContractResponse, error) {
+	ctx = log.WithComponent(ctx, "noto")
 	var notoContractConfigJSON []byte
 
 	domainConfig, decodedData, err := n.decodeConfig(ctx, req.ContractConfig)
@@ -632,6 +637,7 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 }
 
 func (n *Noto) InitTransaction(ctx context.Context, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
+	ctx = log.WithComponent(ctx, "noto")
 	tx, handler, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err
@@ -640,6 +646,7 @@ func (n *Noto) InitTransaction(ctx context.Context, req *prototk.InitTransaction
 }
 
 func (n *Noto) AssembleTransaction(ctx context.Context, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
+	ctx = log.WithComponent(ctx, "noto")
 	tx, handler, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err
@@ -648,6 +655,7 @@ func (n *Noto) AssembleTransaction(ctx context.Context, req *prototk.AssembleTra
 }
 
 func (n *Noto) EndorseTransaction(ctx context.Context, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
+	ctx = log.WithComponent(ctx, "noto")
 	tx, handler, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err
@@ -656,6 +664,7 @@ func (n *Noto) EndorseTransaction(ctx context.Context, req *prototk.EndorseTrans
 }
 
 func (n *Noto) PrepareTransaction(ctx context.Context, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+	ctx = log.WithComponent(ctx, "noto")
 	tx, handler, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err
@@ -960,6 +969,7 @@ func (n *Noto) ValidateStateHashes(ctx context.Context, req *prototk.ValidateSta
 }
 
 func (n *Noto) InitCall(ctx context.Context, req *prototk.InitCallRequest) (*prototk.InitCallResponse, error) {
+	ctx = log.WithComponent(ctx, "noto")
 	ptx, handler, err := n.validateCall(ctx, req.Transaction)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorValidateInitCallTxSpec, err)
@@ -968,6 +978,7 @@ func (n *Noto) InitCall(ctx context.Context, req *prototk.InitCallRequest) (*pro
 }
 
 func (n *Noto) ExecCall(ctx context.Context, req *prototk.ExecCallRequest) (*prototk.ExecCallResponse, error) {
+	ctx = log.WithComponent(ctx, "noto")
 	ptx, handler, err := n.validateCall(ctx, req.Transaction)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorValidateExecCallTxSpec, err)

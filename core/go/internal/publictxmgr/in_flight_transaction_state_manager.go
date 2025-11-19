@@ -76,16 +76,24 @@ func (iftxs *inFlightTransactionState) CanBeRemoved(ctx context.Context) bool {
 	return iftxs.IsReadyToExit()
 }
 
-func (iftxs *inFlightTransactionState) CanSubmit(ctx context.Context, cost *big.Int) bool {
+func (iftxs *inFlightTransactionState) CanSubmit(ctx context.Context, cost *big.Int, signerNonce string) bool {
 	log.L(ctx).Tracef("ProcessInFlightTransaction transaction entry, transaction orchestrator context: %+v, cost: %s", iftxs.orchestratorContext, cost.String())
 	if iftxs.orchestratorContext.AvailableToSpend == nil {
 		log.L(ctx).Tracef("ProcessInFlightTransaction transaction can be submitted for zero gas price chain, orchestrator context: %+v", iftxs.orchestratorContext)
 		return true
 	}
 	if cost != nil {
-		return iftxs.orchestratorContext.AvailableToSpend.Cmp(cost) != -1 && !iftxs.orchestratorContext.PreviousNonceCostUnknown
+		if iftxs.orchestratorContext.PreviousNonceCostUnknown {
+			log.L(ctx).Warnf("ProcessInFlightTransaction cannot submit transaction %s, transaction orchestrator context: %+v, cost: %s, previous nonce cost unknown", signerNonce, iftxs.orchestratorContext, cost.String())
+			return false
+		}
+		sufficientFunds := iftxs.orchestratorContext.AvailableToSpend.Cmp(cost) != -1
+		if !sufficientFunds {
+			log.L(ctx).Warnf("ProcessInFlightTransaction cannot submit transaction %s, transaction orchestrator context: %+v, cost: %s, insufficient funds", signerNonce, iftxs.orchestratorContext, cost.String())
+		}
+		return sufficientFunds
 	}
-	log.L(ctx).Debugf("ProcessInFlightTransaction cannot submit transaction, transaction orchestrator context: %+v, cost: %s", iftxs.orchestratorContext, cost.String())
+	log.L(ctx).Debugf("ProcessInFlightTransaction cannot submit transaction %s, transaction orchestrator context: %+v, cost: %s", signerNonce, iftxs.orchestratorContext, cost.String())
 	return false
 }
 

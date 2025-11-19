@@ -68,6 +68,15 @@ var (
 	KeyVerifierAlgorithm               = pdm("KeyVerifier.algorithm", "The algorithm used by the verifier")
 	KeyPathSegmentName                 = pdm("KeyPathSegment.name", "The name of the path segment")
 	KeyPathSegmentIndex                = pdm("KeyPathSegment.index", "The index of the path segment")
+	KeyQueryEntryIsKey                 = pdm("KeyQueryEntry.isKey", "Whether this is a key")
+	KeyQueryEntryHasChildren           = pdm("KeyQueryEntry.hasChildren", "Whether this has children")
+	KeyQueryEntryParent                = pdm("KeyQueryEntry.parent", "The parent of this key")
+	KeyQueryEntryPath                  = pdm("KeyQueryEntry.path", "The path of this key")
+	KeyQueryEntryName                  = pdm("KeyQueryEntry.name", "The name of this key")
+	KeyQueryEntryIndex                 = pdm("KeyQueryEntry.index", "The index of this key")
+	KeyQueryEntryWallet                = pdm("KeyQueryEntry.wallet", "The wallet of this key")
+	KeyQueryEntryKeyHandle             = pdm("KeyQueryEntry.keyHandle", "The handle of this key")
+	KeyQueryEntryVerifiers             = pdm("KeyQueryEntry.verifiers", "The verifiers of this key")
 )
 
 // pldapi/public_tx.go

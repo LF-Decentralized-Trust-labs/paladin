@@ -142,7 +142,7 @@ func (r *SmartContractDeploymentReconciler) updateStatusAndRequeue(ctx context.C
 
 func (r *SmartContractDeploymentReconciler) buildDeployTransaction(ctx context.Context, scd *corev1alpha1.SmartContractDeployment) (bool, *pldapi.TransactionInput, error) {
 	var data pldtypes.RawJSON
-	if scd.Spec.ParamsJSON == "" {
+	if scd.Spec.ParamsJSON != "" {
 		data = pldtypes.RawJSON(scd.Spec.ParamsJSON)
 	}
 	build := solutils.SolidityBuildWithLinks{

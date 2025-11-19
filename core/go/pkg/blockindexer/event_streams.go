@@ -103,6 +103,7 @@ func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
 }
 
 func (bi *blockIndexer) AddEventStream(ctx context.Context, dbTX persistence.DBTX, stream *InternalEventStream) (*EventStream, error) {
+	ctx = log.WithComponent(ctx, "blockindexer")
 	es, err := bi.upsertInternalEventStream(ctx, dbTX, stream)
 	if err != nil {
 		return nil, err
@@ -283,6 +284,7 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 }
 
 func (bi *blockIndexer) RemoveEventStream(ctx context.Context, id uuid.UUID) error {
+	ctx = log.WithComponent(ctx, "blockindexer")
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
 
@@ -309,6 +311,7 @@ func (bi *blockIndexer) RemoveEventStream(ctx context.Context, id uuid.UUID) err
 }
 
 func (bi *blockIndexer) QueryEventStreamDefinitions(ctx context.Context, dbTX persistence.DBTX, esType pldtypes.Enum[EventStreamType], jq *query.QueryJSON) ([]*EventStream, error) {
+	ctx = log.WithComponent(ctx, "blockindexer")
 	if jq == nil || jq.Limit == nil || *jq.Limit == 0 {
 		return nil, i18n.NewError(ctx, msgs.MsgBlockIndexerLimitRequired)
 	}
@@ -325,6 +328,7 @@ func (bi *blockIndexer) QueryEventStreamDefinitions(ctx context.Context, dbTX pe
 }
 
 func (bi *blockIndexer) StartEventStream(ctx context.Context, id uuid.UUID) error {
+	ctx = log.WithComponent(ctx, "blockindexer")
 	if bi.eventStreams[id] == nil {
 		return i18n.NewError(ctx, msgs.MsgBlockIndexerEventStreamNotFound, id)
 	}
@@ -332,6 +336,7 @@ func (bi *blockIndexer) StartEventStream(ctx context.Context, id uuid.UUID) erro
 }
 
 func (bi *blockIndexer) StopEventStream(ctx context.Context, id uuid.UUID) error {
+	ctx = log.WithComponent(ctx, "blockindexer")
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
 
@@ -342,6 +347,7 @@ func (bi *blockIndexer) StopEventStream(ctx context.Context, id uuid.UUID) error
 }
 
 func (bi *blockIndexer) GetEventStreamStatus(ctx context.Context, id uuid.UUID) (*EventStreamStatus, error) {
+	ctx = log.WithComponent(ctx, "blockindexer")
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
 

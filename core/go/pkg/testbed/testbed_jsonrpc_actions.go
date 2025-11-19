@@ -305,7 +305,11 @@ func (tb *testbed) execPrivateTransaction(ctx context.Context, tx *testbedTransa
 	switch tx.ptx.PostAssembly.AssemblyResult {
 	case prototk.AssembleTransactionResponse_OK:
 	default:
-		return fmt.Errorf("assemble result was %s", tx.ptx.PostAssembly.AssemblyResult)
+		revertReason := "(no revert reason)"
+		if tx.ptx.PostAssembly.RevertReason != nil {
+			revertReason = *tx.ptx.PostAssembly.RevertReason
+		}
+		return fmt.Errorf("assemble result was %s (reason: %s)", tx.ptx.PostAssembly.AssemblyResult, revertReason)
 	}
 
 	// The testbed always chooses to take the assemble output and progress to endorse

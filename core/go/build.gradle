@@ -296,6 +296,28 @@ abstract class ComponentTest extends Exec {
     }
 }
 
+abstract class GasComponentTest extends Exec {
+    GasComponentTest() {
+        inputs.files(project.goFiles)
+        outputs.dir('coverage')
+
+        workingDir '.'
+        executable 'go'
+        args 'test'
+        args './componenttest'
+        args '-cover'
+        args "-coverpkg=github.com/LF-Decentralized-Trust-labs/paladin/core/..."
+        args '-covermode=atomic'
+        args '-timeout=120s'
+        if (project.findProperty('verboseTests') == 'true') {
+            args '-v'
+        }
+        args "-test.gocoverdir=${project.projectDir}/coverage"
+
+        project.helpers.dumpLogsOnFailure(this, ':testinfra:startTestInfra')
+    }
+}
+
 task setupCoverage(dependsOn: [protoc, copyContracts, makeMocks]) {
     inputs.files(goFiles)
     outputs.dir('coverage')
@@ -334,6 +356,19 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [
         copyContracts, // Ensure this task depends on copying the test contracts
     ]) {
     mustRunAfter 'unitTestPostgres' // these tests cannot run concurrently
+    environment 'BESU_PORT', '8555' // Use gas-free Besu port
+
+}
+
+task componentTestWithGasSQLite(type: GasComponentTest, dependsOn: [
+        makeMocks,
+        ':testinfra:startTestInfra',
+        setupCoverage,
+        goGet,
+        copyContracts, // Ensure this task depends on copying the test contracts
+    ]) {
+    mustRunAfter 'componentTestSQLite' // these tests cannot run concurrently
+    environment 'BESU_PORT', '8555' // Use gas-priced Besu port
 }
 
 task buildCoverageTxt(type: Exec, dependsOn: [
@@ -341,7 +376,7 @@ task buildCoverageTxt(type: Exec, dependsOn: [
         unitTestSQLite,
         unitTestPostgres,
         componentTestSQLite,
-        // componentTestPostgres
+        componentTestWithGasSQLite
     ]) {
     inputs.files(fileTree(project.mkdir('coverage')) {
         include "covcounters.*"
@@ -371,7 +406,7 @@ task checkCoverage(type: GoCheckCoverage, dependsOn: [aggregateCoverage]) {
 }
 
 task test {
-    finalizedBy checkCoverage
+    dependsOn checkCoverage
 }
 
 task testcov(type: Exec, dependsOn: [test, aggregateCoverage]) {

@@ -110,7 +110,7 @@ func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerCo
 		quiesceTimeout:          1 * time.Second, // not currently tunable (considered very small edge case)
 		reliableMessagePageSize: 100,             // not currently tunable
 	}
-	tm.bgCtx, tm.cancelCtx = context.WithCancel(bgCtx)
+	tm.bgCtx, tm.cancelCtx = context.WithCancel(log.WithComponent(bgCtx, "transportmanager"))
 	return tm
 }
 
@@ -255,6 +255,7 @@ func (tm *transportManager) LocalNodeName() string {
 
 // See docs in components package
 func (tm *transportManager) Send(ctx context.Context, send *components.FireAndForgetMessageSend) error {
+	ctx = log.WithComponent(ctx, "transportmanager")
 
 	// Check the message is valid
 	if len(send.Payload) == 0 {
@@ -306,7 +307,7 @@ func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName str
 
 // See docs in components package
 func (tm *transportManager) SendReliable(ctx context.Context, dbTX persistence.DBTX, msgs ...*pldapi.ReliableMessage) (err error) {
-
+	ctx = log.WithComponent(ctx, "transportmanager")
 	peers := make(map[string]*peer)
 	for _, msg := range msgs {
 		var p *peer
@@ -376,6 +377,7 @@ func (tm *transportManager) getReliableMessageByID(ctx context.Context, dbTX per
 }
 
 func (tm *transportManager) QueryReliableMessages(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.ReliableMessage, error) {
+	ctx = log.WithComponent(ctx, "transportmanager")
 	qw := &filters.QueryWrapper[pldapi.ReliableMessage, pldapi.ReliableMessage]{
 		P:           tm.persistence,
 		DefaultSort: "-sequence",
@@ -392,6 +394,7 @@ func (tm *transportManager) QueryReliableMessages(ctx context.Context, dbTX pers
 }
 
 func (tm *transportManager) QueryReliableMessageAcks(ctx context.Context, dbTX persistence.DBTX, jq *query.QueryJSON) ([]*pldapi.ReliableMessageAck, error) {
+	ctx = log.WithComponent(ctx, "transportmanager")
 	qw := &filters.QueryWrapper[pldapi.ReliableMessageAck, pldapi.ReliableMessageAck]{
 		P:           tm.persistence,
 		DefaultSort: "-time",

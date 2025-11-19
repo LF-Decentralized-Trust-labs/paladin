@@ -183,6 +183,7 @@ jobs:
     needs: [setup, release-solidity-contracts, release-typescript-sdk]
     runs-on: ubuntu-latest
     steps:
+
       - name: Download Helm artifacts
         uses: actions/download-artifact@v4
         with:
@@ -198,7 +199,6 @@ jobs:
       - name: List downloaded artifacts
         run: |
           ls -R
-
       - name: Create final release with all artifacts
         uses: softprops/action-gh-release@v2
         with:

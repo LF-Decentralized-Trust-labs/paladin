@@ -18,6 +18,7 @@ package grpctransport
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -50,13 +51,14 @@ type grpcTransport struct {
 	bgCtx     context.Context
 	callbacks plugintk.TransportCallbacks
 
-	name             string
-	listener         net.Listener
-	grpcServer       *grpc.Server
-	serverDone       chan struct{}
-	peerVerifier     *tlsVerifier
-	externalHostname string
-	localCertificate *tls.Certificate
+	name               string
+	listener           net.Listener
+	grpcServer         *grpc.Server
+	serverDone         chan struct{}
+	peerVerifier       *tlsVerifier
+	externalHostname   string
+	localCertificate   *tls.Certificate
+	localCACertificate *x509.Certificate
 
 	conf                Config
 	connLock            sync.RWMutex
@@ -69,13 +71,14 @@ func NewPlugin(ctx context.Context) plugintk.PluginBase {
 
 func NewGRPCTransport(callbacks plugintk.TransportCallbacks) plugintk.TransportAPI {
 	return &grpcTransport{
-		bgCtx:               context.Background(),
+		bgCtx:               log.WithComponent(context.Background(), "grpctransport"),
 		callbacks:           callbacks,
 		outboundConnections: make(map[string]*outboundConn),
 	}
 }
 
 func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error) {
+	ctx = log.WithComponent(ctx, "grpctransport")
 	// Hold the connlock while setting our state (as we'll read it when creating new conns)
 	t.connLock.Lock()
 	defer t.connLock.Unlock()
@@ -112,12 +115,14 @@ func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.Con
 	}
 	baseTLSConfig := tlsDetail.TLSConfig
 	t.localCertificate = tlsDetail.Certificate
+	t.localCACertificate = tlsDetail.CACertificate
 
 	directCertVerification := confutil.Bool(t.conf.DirectCertVerification, *ConfigDefaults.DirectCertVerification)
 	baseTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
 	if directCertVerification {
 		// Check the tls default settings haven't been set with conflicting config
-		if t.conf.TLS.CAFile != "" || t.conf.TLS.CA != "" || t.conf.TLS.InsecureSkipHostVerify || len(t.conf.TLS.RequiredDNAttributes) > 0 {
+		// Note: We allow CAFile and CA to be set for publishing purposes, but they won't be used for verification
+		if t.conf.TLS.InsecureSkipHostVerify || len(t.conf.TLS.RequiredDNAttributes) > 0 {
 			return nil, i18n.NewError(ctx, msgs.MsgConfIncompatibleWithDirectCertVerify)
 		}
 		// Set InsecureSkipVerify and RequireAnyClientCert to skip the default
@@ -226,6 +231,7 @@ func (t *grpcTransport) getTransportDetails(ctx context.Context, node string) (t
 }
 
 func (t *grpcTransport) ActivatePeer(ctx context.Context, req *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error) {
+	ctx = log.WithComponent(ctx, "grpctransport")
 	t.connLock.Lock()
 	defer t.connLock.Unlock()
 
@@ -247,6 +253,7 @@ func (t *grpcTransport) ActivatePeer(ctx context.Context, req *prototk.ActivateP
 }
 
 func (t *grpcTransport) DeactivatePeer(ctx context.Context, req *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error) {
+	ctx = log.WithComponent(ctx, "grpctransport")
 	t.connLock.Lock()
 	defer t.connLock.Unlock()
 
@@ -269,6 +276,7 @@ func (t *grpcTransport) getConnection(nodeName string) *outboundConn {
 }
 
 func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
+	ctx = log.WithComponent(ctx, "grpctransport")
 	msg := req.Message
 	oc := t.getConnection(req.Node)
 	if oc == nil {
@@ -291,9 +299,20 @@ func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessag
 }
 
 func (t *grpcTransport) GetLocalDetails(ctx context.Context, req *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error) {
+	// ctx = log.WithComponent(ctx, "grpctransport")
 
-	certList := t.localCertificate.Certificate
 	issuersText := new(strings.Builder)
+
+	// First, add the CA certificate if available
+	if t.localCACertificate != nil {
+		_ = pem.Encode(issuersText, &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: t.localCACertificate.Raw,
+		})
+	}
+
+	// Then, add the node's certificate chain
+	certList := t.localCertificate.Certificate
 	for _, cert := range certList {
 		_ = pem.Encode(issuersText, &pem.Block{
 			Type:  "CERTIFICATE",

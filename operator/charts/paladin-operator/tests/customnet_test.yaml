@@ -1051,12 +1051,12 @@ tests:
         template: customnodes/paladin.yaml
       - equal:
           path: 'spec.transports[0].tls.secretName'
-          value: 'paladin-mtls'
+          value: 'paladin-bank-mtls'
         documentIndex: 0
         template: customnodes/paladin.yaml
       - equal:
           path: 'spec.transports[0].tls.certName'
-          value: 'paladin-mtls'
+          value: 'paladin-bank-mtls'
         documentIndex: 0
         template: customnodes/paladin.yaml
       # Test PaladinRegistration

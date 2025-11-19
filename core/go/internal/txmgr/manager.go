@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
 	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/txmgr/metrics"
@@ -38,7 +39,7 @@ import (
 
 func NewTXManager(ctx context.Context, conf *pldconf.TxManagerConfig) components.TXManager {
 	tm := &txManager{
-		bgCtx:    ctx,
+		bgCtx:    log.WithComponent(ctx, "txmanager"),
 		conf:     conf,
 		abiCache: cache.NewCache[pldtypes.Bytes32, *pldapi.StoredABI](&conf.ABI.Cache, &pldconf.TxManagerDefaults.ABI.Cache),
 		txCache:  cache.NewCache[uuid.UUID, *components.ResolvedTransaction](&conf.Transactions.Cache, &pldconf.TxManagerDefaults.Transactions.Cache),

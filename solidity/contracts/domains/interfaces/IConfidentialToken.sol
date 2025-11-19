@@ -3,7 +3,13 @@ pragma solidity ^0.8.20;
 
 /**
  * @title IConfidentialToken
- * @dev Base interface for a confidential UTXO token.
+ * @dev Base interface for a confidential token.
+ *
+ *      All token transactions are represented as state transitions, where details (such as
+ *      ownership and amounts) are kept private but provably bound to the state IDs.
+ *
+ *      The interface is agnostic to the model chosen for proving the validity of a given
+ *      transition, and the method of distributing any private data associated with the states.
  */
 interface IConfidentialToken {
     event Transfer(
@@ -16,11 +22,11 @@ interface IConfidentialToken {
     );
 
     /**
-     * @dev Spend UTXOs and create new UTXOs.
+     * @dev Spend states and create new states.
      *
      * @param txId a unique identifier for this transaction which must not have been used before
-     * @param inputs array of zero or more UTXOs that the signer is authorized to spend
-     * @param outputs array of zero or more new UTXOs to generate, for future transactions to spend
+     * @param inputs array of zero or more states that the signer is authorized to spend
+     * @param outputs array of zero or more new states to generate, for future transactions to spend
      * @param proof implementation-specific proof for this transaction - may be validated by
      *              the smart contract, or may represent evidence of off-chain validation
      * @param data any additional transaction data (opaque to the blockchain)
@@ -48,7 +54,7 @@ interface IConfidentialToken {
 
     /**
      * @dev query whether a TXO is currently in the unspent list
-     * @param id the UTXO identifier
+     * @param id the state identifier
      * @return unspent true or false depending on whether the identifier is in the unspent map
      */
     function isUnspent(bytes32 id) external view returns (bool unspent);

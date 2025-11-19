@@ -25,7 +25,6 @@ title: TransactionInput
 | `value` | The value transferred in the transaction (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 | `maxPriorityFeePerGas` | The maximum priority fee per gas (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 | `maxFeePerGas` | The maximum fee per gas (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
-| `gasPrice` | The gas price (optional) | [`HexUint256`](simpletypes.md#hexuint256) |
 | `dependsOn` | Transactions that must be mined on the blockchain successfully before this transaction submits | [`UUID[]`](simpletypes.md#uuid) |
 | `abi` | Application Binary Interface (ABI) definition - required if abiReference not supplied | [`Entry[]`](#entry) |
 | `bytecode` | Bytecode prepended to encoded data inputs for deploy transactions | [`HexBytes`](simpletypes.md#hexbytes) |

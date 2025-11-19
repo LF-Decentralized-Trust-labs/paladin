@@ -150,6 +150,7 @@ func (km *keyManager) SigningModuleRegistered(name string, id uuid.UUID, toSigni
 }
 
 func (km *keyManager) GetSigningModule(ctx context.Context, name string) (signer.SigningModule, error) {
+	ctx = log.WithComponent(ctx, log.Component("keymanager"))
 	km.mux.Lock()
 	defer km.mux.Unlock()
 
@@ -161,6 +162,7 @@ func (km *keyManager) GetSigningModule(ctx context.Context, name string) (signer
 }
 
 func (km *keyManager) Sign(ctx context.Context, mapping *pldapi.KeyMappingAndVerifier, payloadType string, payload []byte) ([]byte, error) {
+	ctx = log.WithComponent(ctx, log.Component("keymanager"))
 	w, err := km.getWalletByName(ctx, mapping.Wallet)
 	if err != nil {
 		return nil, err
@@ -221,6 +223,7 @@ func (km *keyManager) AddInMemorySigner(prefix string, signer signerapi.InMemory
 
 // Convenience function
 func (km *keyManager) ResolveKeyNewDatabaseTX(ctx context.Context, identifier, algorithm, verifierType string) (resolvedKey *pldapi.KeyMappingAndVerifier, err error) {
+	ctx = log.WithComponent(ctx, log.Component("keymanager"))
 	resolvedKeys, err := km.ResolveBatchNewDatabaseTX(ctx, algorithm, verifierType, []string{identifier})
 	if err != nil {
 		return nil, err
@@ -229,6 +232,7 @@ func (km *keyManager) ResolveKeyNewDatabaseTX(ctx context.Context, identifier, a
 }
 
 func (km *keyManager) ResolveEthAddressNewDatabaseTX(ctx context.Context, identifier string) (ethAddress *pldtypes.EthAddress, err error) {
+	ctx = log.WithComponent(ctx, log.Component("keymanager"))
 	ethAddresses, err := km.ResolveEthAddressBatchNewDatabaseTX(ctx, []string{identifier})
 	if err != nil {
 		return nil, err
@@ -237,6 +241,7 @@ func (km *keyManager) ResolveEthAddressNewDatabaseTX(ctx context.Context, identi
 }
 
 func (km *keyManager) ResolveEthAddressBatchNewDatabaseTX(ctx context.Context, identifiers []string) (ethAddresses []*pldtypes.EthAddress, err error) {
+	ctx = log.WithComponent(ctx, log.Component("keymanager"))
 	ethAddresses = make([]*pldtypes.EthAddress, len(identifiers))
 	resolvedKeys, err := km.ResolveBatchNewDatabaseTX(ctx, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, identifiers)
 	for i := 0; i < len(identifiers); i++ {
@@ -252,6 +257,7 @@ func (km *keyManager) ResolveEthAddressBatchNewDatabaseTX(ctx context.Context, i
 
 // Convenience function
 func (km *keyManager) ResolveBatchNewDatabaseTX(ctx context.Context, algorithm, verifierType string, identifiers []string) (resolvedKeys []*pldapi.KeyMappingAndVerifier, err error) {
+	ctx = log.WithComponent(ctx, log.Component("keymanager"))
 	resolvedKeys = make([]*pldapi.KeyMappingAndVerifier, len(identifiers))
 	err = km.p.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
 		kr := km.KeyResolverForDBTX(dbTX)
@@ -269,6 +275,7 @@ func (km *keyManager) ResolveBatchNewDatabaseTX(ctx context.Context, algorithm, 
 }
 
 func (km *keyManager) ReverseKeyLookup(ctx context.Context, dbTX persistence.DBTX, algorithm, verifierType, verifier string) (*pldapi.KeyMappingAndVerifier, error) {
+	ctx = log.WithComponent(ctx, log.Component("keymanager"))
 	vKey := verifierReverseCacheKey(algorithm, verifierType, verifier)
 	mapping, _ := km.verifierReverseCache.Get(vKey)
 	if mapping != nil {

@@ -96,7 +96,7 @@ func NewPrivateTransactionMgr(ctx context.Context, config *pldconf.PrivateTxMana
 		endorsementGatherers: make(map[string]ptmgrtypes.EndorsementGatherer),
 		subscribers:          make([]components.PrivateTxEventSubscriber, 0),
 	}
-	p.ctx, p.ctxCancel = context.WithCancel(ctx)
+	p.ctx, p.ctxCancel = context.WithCancel(log.WithComponent(ctx, "privatetxnmanager"))
 	return p
 }
 
@@ -203,6 +203,7 @@ func (p *privateTxManager) getEndorsementGathererForContract(ctx context.Context
 }
 
 func (p *privateTxManager) HandleNewTx(ctx context.Context, dbTX persistence.DBTX, txi *components.ValidatedTransaction) error {
+	ctx = log.WithComponent(ctx, "privatetxnmanager")
 	tx := txi.Transaction
 	if tx.To == nil {
 		if txi.Transaction.SubmitMode.V() != pldapi.SubmitModeAuto {
@@ -501,6 +502,7 @@ func (p *privateTxManager) evaluateDeployment(ctx context.Context, domain compon
 
 func (p *privateTxManager) GetTxStatus(ctx context.Context, domainAddress string, txID uuid.UUID) (status components.PrivateTxStatus, err error) {
 	// this returns status that we happen to have in memory at the moment and might be useful for debugging
+	ctx = log.WithComponent(ctx, "privatetxnmanager")
 
 	p.sequencersLock.RLock()
 	defer p.sequencersLock.RUnlock()
@@ -953,6 +955,7 @@ func (p *privateTxManager) handleAssembleError(ctx context.Context, messagePaylo
 // into the reliability of the event delivery or maybe there is only a consumer of the event and it is responsible
 // for managing multiple subscribers and durability etc...
 func (p *privateTxManager) Subscribe(ctx context.Context, subscriber components.PrivateTxEventSubscriber) {
+	// ctx = log.WithComponent(ctx, "privatetxnmanager")
 	p.subscribersLock.Lock()
 	defer p.subscribersLock.Unlock()
 	//TODO implement this
@@ -969,6 +972,7 @@ func (p *privateTxManager) publishToSubscribers(ctx context.Context, event compo
 }
 
 func (p *privateTxManager) NotifyFailedPublicTx(ctx context.Context, dbTX persistence.DBTX, failures []*components.PublicTxMatch) error {
+	ctx = log.WithComponent(ctx, "privatetxnmanager")
 	// TODO: We have processing we need to do here to resubmit
 	privateFailureReceipts := make([]*components.ReceiptInputWithOriginator, len(failures))
 	for i, tx := range failures {
@@ -997,6 +1001,7 @@ func (p *privateTxManager) NotifyFailedPublicTx(ctx context.Context, dbTX persis
 // at which point it is important for us to remove transactions from our Domain Context in-memory buffer.
 // This might also unblock significant extra processing for more transactions.
 func (p *privateTxManager) PrivateTransactionConfirmed(ctx context.Context, receipt *components.TxCompletion) {
+	ctx = log.WithComponent(ctx, "privatetxnmanager")
 	log.L(ctx).Infof("private TX manager notified of transaction confirmation %s deploy=%t",
 		receipt.TransactionID, receipt.PSC == nil)
 	if receipt.PSC != nil {
@@ -1010,7 +1015,7 @@ func (p *privateTxManager) PrivateTransactionConfirmed(ctx context.Context, rece
 }
 
 func (p *privateTxManager) CallPrivateSmartContract(ctx context.Context, call *components.ResolvedTransaction) (*abi.ComponentValue, error) {
-
+	ctx = log.WithComponent(ctx, "privatetxnmanager")
 	callTx := call.Transaction
 	psc, err := p.components.DomainManager().GetSmartContractByAddress(ctx, p.components.Persistence().NOTX(), *callTx.To)
 	if err != nil {
@@ -1054,11 +1059,12 @@ func (p *privateTxManager) CallPrivateSmartContract(ctx context.Context, call *c
 }
 
 func (p *privateTxManager) BuildStateDistributions(ctx context.Context, tx *components.PrivateTransaction) (*components.StateDistributionSet, error) {
+	ctx = log.WithComponent(ctx, "privatetxnmanager")
 	return newStateDistributionBuilder(p.components, tx).Build(ctx)
 }
 
 func (p *privateTxManager) WriteOrDistributeReceiptsPostSubmit(ctx context.Context, dbTX persistence.DBTX, receipts []*components.ReceiptInputWithOriginator) error {
-
+	ctx = log.WithComponent(ctx, "privatetxnmanager")
 	// For any failures in a post submission, it basically invalidates the whole working state of our in-memory sequencer.
 	// In this version of the engine, we simply unload the whole engine.
 	// This is like a restart of the Paladin engine - and means anything in-flight is aborted.

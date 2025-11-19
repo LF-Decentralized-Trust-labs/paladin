@@ -77,6 +77,7 @@ func (tv *tlsVerifier) returnAuthInfo(dir string, aip *atomic.Pointer[tlsVerifie
 }
 
 func (tv *tlsVerifier) ClientHandshake(ctx context.Context, s string, c net.Conn) (net.Conn, credentials.AuthInfo, error) {
+	ctx = log.WithComponent(ctx, "grpctransport")
 	log.L(tv.t.bgCtx).Debugf("Client TLS handshake initiated remote=%s", c.RemoteAddr())
 	authInfo, validator := tv.peerValidator()
 	c, tlsAuthInfo, err := validator.ClientHandshake(ctx, s, c)

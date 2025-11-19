@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signer"
@@ -47,6 +48,7 @@ func NewKeyManagerSigningModule(callbacks plugintk.SigningModuleCallbacks) plugi
 }
 
 func (kmsm *exampleSigningModule) ConfigureSigningModule(ctx context.Context, req *prototk.ConfigureSigningModuleRequest) (*prototk.ConfigureSigningModuleResponse, error) {
+	ctx = log.WithComponent(ctx, "examplesigningmodule")
 	kmsm.name = req.Name
 
 	// Extract the config
@@ -68,18 +70,22 @@ func (kmsm *exampleSigningModule) ConfigureSigningModule(ctx context.Context, re
 	return &prototk.ConfigureSigningModuleResponse{}, nil
 }
 func (kmsm *exampleSigningModule) ResolveKey(ctx context.Context, req *prototk.ResolveKeyRequest) (*prototk.ResolveKeyResponse, error) {
+	ctx = log.WithComponent(ctx, "examplesigningmodule")
 	return kmsm.signingModule.Resolve(ctx, req)
 }
 
 func (kmsm *exampleSigningModule) Sign(ctx context.Context, req *prototk.SignWithKeyRequest) (*prototk.SignWithKeyResponse, error) {
+	ctx = log.WithComponent(ctx, "examplesigningmodule")
 	return kmsm.signingModule.Sign(ctx, req)
 }
 
 func (kmsm *exampleSigningModule) ListKeys(ctx context.Context, req *prototk.ListKeysRequest) (*prototk.ListKeysResponse, error) {
+	ctx = log.WithComponent(ctx, "examplesigningmodule")
 	return kmsm.signingModule.List(ctx, req)
 }
 
 func (kmsm *exampleSigningModule) Close(ctx context.Context, req *prototk.CloseRequest) (*prototk.CloseResponse, error) {
+	// ctx = log.WithComponent(ctx, "examplesigningmodule")
 	kmsm.signingModule.Close()
 
 	return &prototk.CloseResponse{}, nil
