@@ -18,11 +18,11 @@ package publictxmgr
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/flushwriter"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr/metrics"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/flushwriter"
+	"github.com/LFDT-Paladin/paladin/core/internal/publictxmgr/metrics"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
 
 	"gorm.io/gorm/clause"
 )

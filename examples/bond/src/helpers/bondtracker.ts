@@ -3,6 +3,7 @@ import PaladinClient, {
   PentePrivacyGroup,
   PentePrivateContract,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
+import { DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import bondTracker from "../abis/BondTracker.json";
 import { InvestorList } from "./investorlist";
 
@@ -30,7 +31,7 @@ export const newBondTracker = async (
       from: from.lookup,
       inputs: params,
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   return address ? new BondTracker(pente, address) : undefined;
 };
 

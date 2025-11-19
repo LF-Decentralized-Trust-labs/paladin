@@ -16,7 +16,7 @@
 package pldconf
 
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 )
 
 type TxManagerConfig struct {
@@ -39,7 +39,7 @@ type ReceiptListeners struct {
 	StateGapCheckInterval *string     `json:"stateGapCheckInterval"`
 }
 
-var TxManagerDefaults = &TxManagerConfig{
+var TxManagerDefaults = TxManagerConfig{
 	ABI: ABIConfig{
 		Cache: CacheConfig{
 			Capacity: confutil.P(100),

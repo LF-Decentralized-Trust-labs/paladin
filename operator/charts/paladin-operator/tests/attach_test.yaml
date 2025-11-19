@@ -66,7 +66,7 @@ tests:
             migrationMode: auto
           secretBackedSigners:
             - name: signer-auto-wallet
-              secret: central-bank.keys
+              secret: bank-a.keys
               type: autoHDWallet
               keySelector: ".*"
           paladinRegistration:
@@ -158,7 +158,7 @@ tests:
         template: customnodes/paladin.yaml
       - equal:
           path: 'spec.secretBackedSigners[0].secret'
-          value: 'central-bank.keys'
+          value: 'bank-a.keys'
         documentIndex: 0
         template: customnodes/paladin.yaml
       - equal:
@@ -222,11 +222,13 @@ tests:
           value: 'evm-registry'
         documentIndex: 0
         template: customnodes/paladinregistration.yaml
-      - equal:
-          path: 'spec.registryAdminNode'
-          value: 'central-bank'
-        documentIndex: 0
-        template: customnodes/paladinregistration.yaml
+      # This test is not a meaningful test as paladin registrations don't work as is today in cross cluster mode  
+      # https://github.com/LFDT-Paladin/paladin/issues/860
+      # - equal:
+      #     path: 'spec.registryAdminNode'
+      #     value: 'central-bank'
+      #   documentIndex: 0
+      #   template: customnodes/paladinregistration.yaml
       - equal:
           path: 'spec.registryAdminKey'
           value: 'registry.operator'

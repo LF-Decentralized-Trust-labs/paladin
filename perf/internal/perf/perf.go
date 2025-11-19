@@ -32,11 +32,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/perf/internal/conf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/perf/internal/util"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldclient"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/rpcclient"
+	"github.com/LFDT-Paladin/paladin/perf/internal/conf"
+	"github.com/LFDT-Paladin/paladin/perf/internal/util"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldclient"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/rpcclient"
 
 	dto "github.com/prometheus/client_model/go"
 	log "github.com/sirupsen/logrus"

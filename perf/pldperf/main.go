@@ -19,7 +19,7 @@ package main
 import (
 	"os"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/perf/cmd"
+	"github.com/LFDT-Paladin/paladin/perf/cmd"
 )
 
 func main() {

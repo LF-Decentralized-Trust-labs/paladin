@@ -20,17 +20,17 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence/mockpersistence"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/mocks/componentsmocks"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence/mockpersistence"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,7 +82,7 @@ func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	return mc
 }
 
-func newTestTransportManager(t *testing.T, realDB bool, conf *pldconf.TransportManagerConfig, extraSetup ...func(mc *mockComponents, conf *pldconf.TransportManagerConfig)) (context.Context, *transportManager, *mockComponents, func()) {
+func newTestTransportManager(t *testing.T, realDB bool, conf *pldconf.TransportManagerInlineConfig, extraSetup ...func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig)) (context.Context, *transportManager, *mockComponents, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	oldLevel := logrus.GetLevel()
 	logrus.SetLevel(logrus.TraceLevel)
@@ -116,13 +116,13 @@ func newTestTransportManager(t *testing.T, realDB bool, conf *pldconf.TransportM
 }
 
 func TestMissingName(t *testing.T) {
-	tm := NewTransportManager(context.Background(), &pldconf.TransportManagerConfig{})
+	tm := NewTransportManager(context.Background(), &pldconf.TransportManagerInlineConfig{})
 	_, err := tm.PreInit(newMockComponents(t, false).c)
 	assert.Regexp(t, "PD012002", err)
 }
 
 func TestConfiguredTransports(t *testing.T) {
-	_, dm, _, done := newTestTransportManager(t, false, &pldconf.TransportManagerConfig{
+	_, dm, _, done := newTestTransportManager(t, false, &pldconf.TransportManagerInlineConfig{
 		NodeName: "node1",
 		Transports: map[string]*pldconf.TransportConfig{
 			"test1": {
@@ -144,7 +144,7 @@ func TestConfiguredTransports(t *testing.T) {
 }
 
 func TestTransportRegisteredNotFound(t *testing.T) {
-	_, dm, _, done := newTestTransportManager(t, false, &pldconf.TransportManagerConfig{
+	_, dm, _, done := newTestTransportManager(t, false, &pldconf.TransportManagerInlineConfig{
 		NodeName:   "node1",
 		Transports: map[string]*pldconf.TransportConfig{},
 	})
@@ -155,7 +155,7 @@ func TestTransportRegisteredNotFound(t *testing.T) {
 }
 
 func TestConfigureTransportFail(t *testing.T) {
-	_, tm, _, done := newTestTransportManager(t, false, &pldconf.TransportManagerConfig{
+	_, tm, _, done := newTestTransportManager(t, false, &pldconf.TransportManagerInlineConfig{
 		NodeName: "node1",
 		Transports: map[string]*pldconf.TransportConfig{
 			"test1": {
@@ -177,7 +177,7 @@ func TestConfigureTransportFail(t *testing.T) {
 }
 
 func TestGetLocalTransportDetailsNotFound(t *testing.T) {
-	tm := NewTransportManager(context.Background(), &pldconf.TransportManagerConfig{}).(*transportManager)
+	tm := NewTransportManager(context.Background(), &pldconf.TransportManagerInlineConfig{}).(*transportManager)
 
 	_, err := tm.getLocalTransportDetails(context.Background(), "nope")
 	assert.Regexp(t, "PD012001", err)

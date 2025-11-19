@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/testinfra/pkg/besugenesis"
-	"github.com/LF-Decentralized-Trust-labs/paladin/testinfra/pkg/testutils"
+	"github.com/LFDT-Paladin/paladin/testinfra/pkg/besugenesis"
+	"github.com/LFDT-Paladin/paladin/testinfra/pkg/testutils"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 )

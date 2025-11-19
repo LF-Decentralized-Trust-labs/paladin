@@ -15,20 +15,16 @@
 package pldconf
 
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 )
 
+type RegistryManagerInlineConfig struct {
+	Registries      map[string]*RegistryConfig `json:"registries" configdefaults:"RegistryConfigDefaults"`
+	RegistryManager RegistryManagerConfig      `json:"registryManager"`
+}
+
 type RegistryManagerConfig struct {
-	Registries      map[string]*RegistryConfig   `json:"registries"`
-	RegistryManager RegistryManagerManagerConfig `json:"registryManager"`
-}
-
-type RegistryManagerManagerConfig struct {
 	RegistryCache CacheConfig `json:"registryCache"`
-}
-
-var RegistryCacheDefaults = &CacheConfig{
-	Capacity: confutil.P(100),
 }
 
 type RegistryInitConfig struct {
@@ -45,7 +41,7 @@ type RegistryConfig struct {
 type RegistryTransportsConfig struct {
 
 	// If true, then this registry will be used for lookup of node transports
-	Enabled *bool
+	Enabled *bool `json:"enabled"`
 
 	// Prefix if set that will be matched and cut from any supplied lookup
 	// node name before performing a lookup. If it does not match (or matches
@@ -79,10 +75,23 @@ type RegistryTransportsConfig struct {
 	// This allows you to use different configurations (MTLS certs etc.)
 	// for different private node networks that all use the same logical
 	// transport name.
-	TransportMap map[string]string
+	TransportMap map[string]string `json:"transportMap"`
 }
 
-var RegistryTransportsDefaults = &RegistryTransportsConfig{
-	Enabled:        confutil.P(true),
-	PropertyRegexp: "^transport.(.*)$",
+var RegistryManagerInlineConfigDefaults = RegistryManagerInlineConfig{
+	RegistryManager: RegistryManagerConfig{
+		RegistryCache: CacheConfig{
+			Capacity: confutil.P(100),
+		},
+	},
+}
+
+var RegistryConfigDefaults = RegistryConfig{
+	Init: RegistryInitConfig{
+		Retry: GenericRetryDefaults.RetryConfig,
+	},
+	Transports: RegistryTransportsConfig{
+		Enabled:        confutil.P(true),
+		PropertyRegexp: "^transport.(.*)$",
+	},
 }

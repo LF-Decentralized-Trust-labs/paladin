@@ -2,6 +2,11 @@ name: Upload Solidity Artifacts
 on:
   workflow_call:
     inputs:
+      ref:
+        description: 'Commit ref for checkout'
+        required: false
+        type: string
+        default: ''
       tag:
         description: 'The tag of the release'
         required: true
@@ -9,6 +14,11 @@ on:
        
   workflow_dispatch:
     inputs:
+      ref:
+        description: 'Commit ref for checkout'
+        required: false
+        type: string
+        default: ''
       tag:
         description: 'The tag of the release'
         required: true
@@ -42,6 +52,7 @@ jobs:
       with:
         fetch-depth: 0
         submodules: recursive
+        ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
 
     - name: Install pre-requisites
       uses: ./.github/actions/setup

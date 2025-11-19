@@ -20,28 +20,28 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr/ptmgrtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr/syncpoints"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/privatetxnmgr/ptmgrtypes"
+	"github.com/LFDT-Paladin/paladin/core/internal/privatetxnmgr/syncpoints"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	pbEngine "github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/proto/engine"
+	"github.com/LFDT-Paladin/paladin/core/pkg/blockindexer"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	pbEngine "github.com/LFDT-Paladin/paladin/core/pkg/proto/engine"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 )
 
 type privateTxManager struct {
@@ -1069,7 +1069,7 @@ func (p *privateTxManager) WriteOrDistributeReceiptsPostSubmit(ctx context.Conte
 	// In this version of the engine, we simply unload the whole engine.
 	// This is like a restart of the Paladin engine - and means anything in-flight is aborted.
 	// New transactions will load a fresh engine.
-	// TODO: See https://github.com/LF-Decentralized-Trust-labs/paladin/pull/673 for work on the more comprehensive stateful sequencer.
+	// TODO: See https://github.com/LFDT-Paladin/paladin/pull/673 for work on the more comprehensive stateful sequencer.
 
 	for _, r := range receipts {
 		if r.ReceiptType != components.RT_Success && r.DomainContractAddress != "" {

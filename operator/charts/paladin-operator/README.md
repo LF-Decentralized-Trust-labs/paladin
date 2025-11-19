@@ -1,6 +1,6 @@
 # Paladin Operator Helm Chart
 
-This chart is part of the larger Paladin ecosystem. For comprehensive setup and usage instructions, please refer to the [main Paladin documentation](https://lf-decentralized-trust-labs.github.io/paladin/head/getting-started/installation/).
+This chart is part of the larger Paladin ecosystem. For comprehensive setup and usage instructions, please refer to the [main Paladin documentation](https://LFDT-Paladin.github.io/paladin/head/getting-started/installation/).
 
 ## Node Configuration
 

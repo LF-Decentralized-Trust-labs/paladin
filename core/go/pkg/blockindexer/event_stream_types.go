@@ -26,10 +26,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 )
 
 type EventStreamConfig struct {
@@ -38,7 +38,7 @@ type EventStreamConfig struct {
 	FromBlock    json.RawMessage `json:"fromBlock,omitempty"`
 }
 
-var EventStreamDefaults = &EventStreamConfig{
+var EventStreamsDefaults = &EventStreamConfig{
 	BatchSize:    confutil.P(50),
 	BatchTimeout: confutil.P("75ms"),
 	FromBlock:    json.RawMessage(`0`),

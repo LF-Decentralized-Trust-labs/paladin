@@ -17,7 +17,7 @@
 package pldmsgs
 
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
 	"golang.org/x/text/language"
 )
 

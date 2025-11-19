@@ -1,19 +1,19 @@
-module github.com/LF-Decentralized-Trust-labs/paladin/domains/integration-test
+module github.com/LFDT-Paladin/paladin/domains/integration-test
 
 go 1.24.0
 
 toolchain go1.24.3
 
 require (
+	github.com/LFDT-Paladin/paladin/common/go v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/config v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/core v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/domains/noto v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/domains/zeto v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/sdk/go v0.0.0-20250828150332-fbc1c1bc663b
+	github.com/LFDT-Paladin/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/go-resty/resty/v2 v2.14.0
 	github.com/hyperledger/firefly-signer v1.1.21
-	github.com/LF-Decentralized-Trust-labs/paladin/common/go v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/core v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/domains/noto v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/sdk/go v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.10.0
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -38,7 +38,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20241004174307-aa3c1fdf0966 // indirect
-	github.com/hyperledger/firefly-common v1.5.4 // indirect
+	github.com/hyperledger/firefly-common v1.5.6 // indirect
 	github.com/iden3/go-iden3-crypto v0.0.17 // indirect
 	github.com/iden3/go-rapidsnark/prover v0.0.12 // indirect
 	github.com/iden3/go-rapidsnark/types v0.0.3 // indirect
@@ -90,16 +90,16 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/common/go => ../../common/go
+replace github.com/LFDT-Paladin/paladin/common/go => ../../common/go
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/core => ../../core/go
+replace github.com/LFDT-Paladin/paladin/core => ../../core/go
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/sdk/go => ../../sdk/go
+replace github.com/LFDT-Paladin/paladin/sdk/go => ../../sdk/go
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/toolkit => ../../toolkit/go
+replace github.com/LFDT-Paladin/paladin/toolkit => ../../toolkit/go
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/domains/noto => ../noto
+replace github.com/LFDT-Paladin/paladin/domains/noto => ../noto
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto => ../zeto
+replace github.com/LFDT-Paladin/paladin/domains/zeto => ../zeto
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../../config
+replace github.com/LFDT-Paladin/paladin/config => ../../config

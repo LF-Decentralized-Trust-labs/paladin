@@ -16,9 +16,9 @@
 package zeto
 
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto"
-	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/types"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LFDT-Paladin/paladin/domains/zeto/internal/zeto"
+	"github.com/LFDT-Paladin/paladin/domains/zeto/pkg/types"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
 )
 
 var _ Zeto = &zeto.Zeto{}

@@ -16,7 +16,7 @@
 package domain
 
 import (
-	pb "github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	pb "github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 )
 
 func FindVerifier(lookup, algorithm, verifierType string, verifiers []*pb.ResolvedVerifier) *pb.ResolvedVerifier {

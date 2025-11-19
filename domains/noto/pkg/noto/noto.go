@@ -16,9 +16,9 @@
 package noto
 
 import (
-	internal "github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/internal/noto"
-	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/types"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	internal "github.com/LFDT-Paladin/paladin/domains/noto/internal/noto"
+	"github.com/LFDT-Paladin/paladin/domains/noto/pkg/types"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
 )
 
 type Noto interface {

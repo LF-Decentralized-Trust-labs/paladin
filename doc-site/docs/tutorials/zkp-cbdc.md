@@ -1,13 +1,13 @@
 # Cash Tokens based on Zeto
 
-The code for this tutorial can be found in [examples/zeto](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/zeto).
+The code for this tutorial can be found in [examples/zeto](https://github.com/LFDT-Paladin/paladin/blob/main/examples/zeto).
 
 This shows how to leverage [Zeto](../../architecture/zeto/) tokens in order to build a cash payment solution, for instance wholesale CBDC or a payment rail with commercial bank money, with privacy, illustrating multiple aspects of Paladin's privacy capabilities.
 
 ## Running the example
 
 Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paladin environment, and
-then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/zeto/README.md)
+then follow the example [README](https://github.com/LFDT-Paladin/paladin/blob/main/examples/zeto/README.md)
 to run the code.
 
 ## Scenario #1: cash solution with private minting

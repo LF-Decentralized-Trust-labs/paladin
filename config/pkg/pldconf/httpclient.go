@@ -17,7 +17,7 @@
 package pldconf
 
 import (
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 )
 
 type HTTPBasicAuthConfig struct {
@@ -43,7 +43,7 @@ type HTTPClientConfig struct {
 	ConnectionTimeout *string                `json:"connectionTimeout,omitempty"`
 }
 
-var DefaultHTTPConfig = &HTTPClientConfig{
+var DefaultHTTPConfig = HTTPClientConfig{
 	ConnectionTimeout: confutil.P("30s"),
 	RequestTimeout:    confutil.P("30s"),
 	Retry: HTTPRetryConfig{

@@ -9,7 +9,7 @@ metadata:
   name: paladin
   namespace: paladin
 spec:
-  url: https://LF-Decentralized-Trust-labs.github.io/paladin
+  url: https://LFDT-Paladin.github.io/paladin
   interval: 5m
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
@@ -63,12 +63,12 @@ spec:
     operator:
       namespace: paladin # This value must match metadata.namespace
       image:
-        repository: ghcr.io/lf-decentralized-trust-labs/paladin-operator
+        repository: ghcr.io/lfdt-paladin/paladin-operator
         tag: main
         pullPolicy: Always
     paladin:
       image:
-        repository: ghcr.io/lf-decentralized-trust-labs/paladin
+        repository: ghcr.io/lfdt-paladin/paladin
         tag: main
         pullPolicy: Always
       # tollerations:

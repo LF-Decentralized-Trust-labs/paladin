@@ -1,4 +1,19 @@
 {{- if or (eq .Values.mode "customnet") (eq .Values.mode "attach") }}
+
+{{- $registryAdminKey := .Values.smartContractDeployments.registry.from }}
+{{- if not $registryAdminKey }}
+{{- $registryAdminKey = .Values.smartContractDeployments.default.from }}
+{{- end }}
+{{- if not $registryAdminKey }}
+{{- $registryAdminKey = "registry.operator" }}
+{{- end }}
+
+{{- $registryAdminNode := "" }}
+{{- if and .Values.paladinNodes (gt (len .Values.paladinNodes) 0) }}
+{{- $registryAdminNode = (index .Values.paladinNodes 0).name }}
+{{- end }}
+
+
 {{- range .Values.paladinNodes }}
 {{- $name := .name }}
 {{- $pr := .paladinRegistration }}
@@ -10,11 +25,11 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ $name }}
 spec:
-  registry: {{ .paladinRegistration.registry }}
-  registryAdminNode: {{ .paladinRegistration.registryAdminNode }}
-  registryAdminKey: {{ .paladinRegistration.registryAdminKey }}
+  registry: evm-registry
+  registryAdminNode: {{ $registryAdminNode }}
+  registryAdminKey: {{ $registryAdminKey }}
   node: {{ $name }}
-  nodeAdminKey: registry.{{ $name }}
+  nodeAdminKey: "{{- if .paladinRegistration.nodeAdminKey }}{{ .paladinRegistration.nodeAdminKey }}{{- else }}registry.{{ $name }}{{- end }}"
   transports:
     - grpc
 {{- end }}

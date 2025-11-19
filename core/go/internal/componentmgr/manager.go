@@ -19,32 +19,32 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/domainmgr"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/groupmgr"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/identityresolver"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/keymanager"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/metrics"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/plugins"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/privatetxnmgr"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/publictxmgr"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/registrymgr"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/statemgr"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/transportmgr"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/txmgr"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/blockindexer"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/ethclient"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/retry"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/httpserver"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/metricsserver"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/domainmgr"
+	"github.com/LFDT-Paladin/paladin/core/internal/groupmgr"
+	"github.com/LFDT-Paladin/paladin/core/internal/identityresolver"
+	"github.com/LFDT-Paladin/paladin/core/internal/keymanager"
+	"github.com/LFDT-Paladin/paladin/core/internal/metrics"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/internal/plugins"
+	"github.com/LFDT-Paladin/paladin/core/internal/privatetxnmgr"
+	"github.com/LFDT-Paladin/paladin/core/internal/publictxmgr"
+	"github.com/LFDT-Paladin/paladin/core/internal/registrymgr"
+	"github.com/LFDT-Paladin/paladin/core/internal/statemgr"
+	"github.com/LFDT-Paladin/paladin/core/internal/transportmgr"
+	"github.com/LFDT-Paladin/paladin/core/internal/txmgr"
+	"github.com/LFDT-Paladin/paladin/core/pkg/blockindexer"
+	"github.com/LFDT-Paladin/paladin/core/pkg/ethclient"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/retry"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/httpserver"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/metricsserver"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/rpcserver"
 	"github.com/google/uuid"
 )
 
@@ -177,7 +177,7 @@ func (cm *componentManager) Init() (err error) {
 
 	// pre-init managers
 	if err == nil {
-		cm.keyManager = keymanager.NewKeyManager(cm.bgCtx, &cm.conf.KeyManagerConfig)
+		cm.keyManager = keymanager.NewKeyManager(cm.bgCtx, &cm.conf.KeyManagerInlineConfig)
 		cm.initResults["key_manager"], err = cm.keyManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentKeyManagerInitError)
 	}
@@ -187,25 +187,25 @@ func (cm *componentManager) Init() (err error) {
 		err = cm.wrapIfErr(err, msgs.MsgComponentStateManagerInitError)
 	}
 	if err == nil {
-		cm.domainManager = domainmgr.NewDomainManager(cm.bgCtx, &cm.conf.DomainManagerConfig)
+		cm.domainManager = domainmgr.NewDomainManager(cm.bgCtx, &cm.conf.DomainManagerInlineConfig)
 		cm.initResults["domain_manager"], err = cm.domainManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentDomainInitError)
 	}
 
 	if err == nil {
-		cm.transportManager = transportmgr.NewTransportManager(cm.bgCtx, &cm.conf.TransportManagerConfig)
+		cm.transportManager = transportmgr.NewTransportManager(cm.bgCtx, &cm.conf.TransportManagerInlineConfig)
 		cm.initResults["transports_manager"], err = cm.transportManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentTransportInitError)
 	}
 
 	if err == nil {
-		cm.registryManager = registrymgr.NewRegistryManager(cm.bgCtx, &cm.conf.RegistryManagerConfig)
+		cm.registryManager = registrymgr.NewRegistryManager(cm.bgCtx, &cm.conf.RegistryManagerInlineConfig)
 		cm.initResults["registry_manager"], err = cm.registryManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentRegistryInitError)
 	}
 
 	if err == nil {
-		cm.pluginManager = plugins.NewPluginManager(cm.bgCtx, cm.grpcTarget, cm.instanceUUID, &cm.conf.PluginManagerConfig)
+		cm.pluginManager = plugins.NewPluginManager(cm.bgCtx, cm.grpcTarget, cm.instanceUUID, &cm.conf.PluginManagerInlineConfig)
 		cm.initResults["plugin_manager"], err = cm.pluginManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentPluginInitError)
 	}

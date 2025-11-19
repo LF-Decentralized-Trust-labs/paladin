@@ -20,15 +20,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/metrics"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/componentsmocks"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/metrics"
+	"github.com/LFDT-Paladin/paladin/core/mocks/componentsmocks"
 	"github.com/google/uuid"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
-	prototk "github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
+	prototk "github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -111,7 +111,7 @@ func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
 func newTestPluginManager(t *testing.T, setup *testManagers) *pluginManager {
 	udsString := tempUDS(t)
 	loaderId := uuid.New()
-	pc := NewPluginManager(context.Background(), udsString, loaderId, &pldconf.PluginManagerConfig{
+	pc := NewPluginManager(context.Background(), udsString, loaderId, &pldconf.PluginManagerInlineConfig{
 		GRPC: pldconf.GRPCConfig{
 			ShutdownTimeout: confutil.P("1ms"),
 		},
@@ -137,7 +137,7 @@ func TestInitPluginManagerBadPlugin(t *testing.T) {
 	tdm := &testDomainManager{domains: map[string]plugintk.Plugin{
 		"!badname": &mockPlugin[prototk.DomainMessage]{t: t},
 	}}
-	pc := NewPluginManager(context.Background(), tempUDS(t), uuid.New(), &pldconf.PluginManagerConfig{})
+	pc := NewPluginManager(context.Background(), tempUDS(t), uuid.New(), &pldconf.PluginManagerInlineConfig{})
 	err := pc.PostInit((&testManagers{testDomainManager: tdm}).componentsmocks(t))
 	assert.Regexp(t, "PD020005", err)
 }
@@ -145,7 +145,7 @@ func TestInitPluginManagerBadPlugin(t *testing.T) {
 func TestInitPluginManagerBadSocket(t *testing.T) {
 	pc := NewPluginManager(context.Background(),
 		t.TempDir(), /* can't use a dir as a socket */
-		uuid.New(), &pldconf.PluginManagerConfig{},
+		uuid.New(), &pldconf.PluginManagerInlineConfig{},
 	)
 	err := pc.PostInit((&testManagers{}).componentsmocks(t))
 	require.NoError(t, err)
@@ -162,7 +162,7 @@ func TestInitPluginManagerUDSTooLong(t *testing.T) {
 
 	pc := NewPluginManager(context.Background(),
 		string(longerThanUDSSafelySupportsCrossPlatform), /* can't use a dir as a socket */
-		uuid.New(), &pldconf.PluginManagerConfig{},
+		uuid.New(), &pldconf.PluginManagerInlineConfig{},
 	)
 
 	err := pc.PostInit((&testManagers{}).componentsmocks(t))
@@ -177,7 +177,7 @@ func TestInitPluginManagerTCP4(t *testing.T) {
 
 	pc := NewPluginManager(context.Background(),
 		"tcp4:127.0.0.1:0",
-		uuid.New(), &pldconf.PluginManagerConfig{},
+		uuid.New(), &pldconf.PluginManagerInlineConfig{},
 	)
 	err := pc.PostInit((&testManagers{}).componentsmocks(t))
 	require.NoError(t, err)
@@ -195,7 +195,7 @@ func TestInitPluginManagerTCP6(t *testing.T) {
 
 	pc := NewPluginManager(context.Background(),
 		"tcp6:[::1]:0",
-		uuid.New(), &pldconf.PluginManagerConfig{},
+		uuid.New(), &pldconf.PluginManagerInlineConfig{},
 	)
 	err := pc.PostInit((&testManagers{}).componentsmocks(t))
 	require.NoError(t, err)
@@ -206,7 +206,7 @@ func TestInitPluginManagerTCP6(t *testing.T) {
 }
 
 func TestNotifyPluginUpdateNotStarted(t *testing.T) {
-	pc := NewPluginManager(context.Background(), tempUDS(t), uuid.New(), &pldconf.PluginManagerConfig{})
+	pc := NewPluginManager(context.Background(), tempUDS(t), uuid.New(), &pldconf.PluginManagerInlineConfig{})
 	err := pc.PostInit((&testManagers{}).componentsmocks(t))
 	require.NoError(t, err)
 
@@ -247,7 +247,7 @@ func TestLoaderErrors(t *testing.T) {
 	pc := NewPluginManager(ctx,
 		"tcp:127.0.0.1:0",
 		uuid.New(),
-		&pldconf.PluginManagerConfig{
+		&pldconf.PluginManagerInlineConfig{
 			GRPC: pldconf.GRPCConfig{
 				ShutdownTimeout: confutil.P("1ms"),
 			},

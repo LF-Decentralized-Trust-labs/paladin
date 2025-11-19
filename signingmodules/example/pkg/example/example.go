@@ -17,8 +17,8 @@ package example
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/plugintk"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/key-manager/signingmodules/example/internal/examplesigningmodule"
 )
 

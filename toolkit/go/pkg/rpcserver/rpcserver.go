@@ -23,12 +23,12 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/httpserver"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/router"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/staticserver"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/httpserver"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/router"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/staticserver"
 	"github.com/gorilla/websocket"
 )
 
@@ -76,8 +76,8 @@ func NewRPCServer(ctx context.Context, conf *pldconf.RPCServerConfig) (_ *rpcSer
 	// Add the WebSocket server
 	if !conf.WS.Disabled {
 		s.wsUpgrader = &websocket.Upgrader{
-			ReadBufferSize:  int(confutil.ByteSize(conf.WS.ReadBufferSize, 0, *pldconf.WSDefaults.ReadBufferSize)),
-			WriteBufferSize: int(confutil.ByteSize(conf.WS.WriteBufferSize, 0, *pldconf.WSDefaults.WriteBufferSize)),
+			ReadBufferSize:  int(confutil.ByteSize(conf.WS.ReadBufferSize, 0, *pldconf.RPCServerConfigDefaults.WS.ReadBufferSize)),
+			WriteBufferSize: int(confutil.ByteSize(conf.WS.WriteBufferSize, 0, *pldconf.RPCServerConfigDefaults.WS.WriteBufferSize)),
 		}
 		log.L(ctx).Infof("WebSocket server readBufferSize=%d writeBufferSize=%d", s.wsUpgrader.ReadBufferSize, s.wsUpgrader.WriteBufferSize)
 		if s.wsServer, err = httpserver.NewServer(ctx, "JSON/RPC (WebSocket)", &conf.WS.HTTPServerConfig, http.HandlerFunc(s.wsHandler)); err != nil {

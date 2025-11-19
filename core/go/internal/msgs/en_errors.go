@@ -21,7 +21,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
 	"golang.org/x/text/language"
 )
 
@@ -501,4 +501,5 @@ var (
 	MsgPGroupsJSONRPCSubscriptionNack       = pde("PD012521", "JSON/RPC subscription '%s' returned nack for message batch")
 	MsgPGroupsGenesisSaltUnset              = pde("PD012522", "Genesis salt must be set")
 	MsgPGroupsReceivedGenesisInvalid        = pde("PD012523", "Received genesis state is invalid")
+	MsgPGroupsFromNotMember                 = pde("PD012524", "From identity '%s' is not a member of privacy group '%s'")
 )

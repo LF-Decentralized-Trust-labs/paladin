@@ -1,13 +1,13 @@
-module github.com/LF-Decentralized-Trust-labs/paladin/domains/noto
+module github.com/LFDT-Paladin/paladin/domains/noto
 
 go 1.24.0
 
 toolchain go1.24.3
 
 require (
-	github.com/LF-Decentralized-Trust-labs/paladin/common/go v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/sdk/go v0.0.0-00010101000000-000000000000
-	github.com/LF-Decentralized-Trust-labs/paladin/toolkit v0.0.0-00010101000000-00000000000
+	github.com/LFDT-Paladin/paladin/common/go v0.0.0-00010101000000-000000000000
+	github.com/LFDT-Paladin/paladin/sdk/go v0.0.0-20250828150332-fbc1c1bc663b
+	github.com/LFDT-Paladin/paladin/toolkit v0.0.0-00010101000000-00000000000
 	github.com/google/uuid v1.6.0
 	github.com/hyperledger/firefly-signer v1.1.21
 	github.com/stretchr/testify v1.10.0
@@ -15,13 +15,13 @@ require (
 )
 
 require (
-	github.com/LF-Decentralized-Trust-labs/paladin/config v0.0.0-00010101000000-000000000000 // indirect
+	github.com/LFDT-Paladin/paladin/config v0.0.0-00010101000000-000000000000 // indirect
 	github.com/aidarkhanov/nanoid v1.0.8 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/hyperledger/firefly-common v1.5.4 // indirect
+	github.com/hyperledger/firefly-common v1.5.6 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
@@ -40,12 +40,12 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/common/go => ../../common/go
+replace github.com/LFDT-Paladin/paladin/common/go => ../../common/go
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/core => ../../core/go
+replace github.com/LFDT-Paladin/paladin/core => ../../core/go
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/sdk/go => ../../sdk/go
+replace github.com/LFDT-Paladin/paladin/sdk/go => ../../sdk/go
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/toolkit => ../../toolkit/go
+replace github.com/LFDT-Paladin/paladin/toolkit => ../../toolkit/go
 
-replace github.com/LF-Decentralized-Trust-labs/paladin/config => ../../config
+replace github.com/LFDT-Paladin/paladin/config => ../../config

@@ -195,7 +195,7 @@ async function main(): Promise<boolean> {
     .newZeto(financialInstitution, {
       tokenName: "Zeto_AnonNullifierKyc",
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(privateStablecoin)) return false;
   logger.log(
     `     ✓ Private stablecoin deployed at: ${privateStablecoin.address}`

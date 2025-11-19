@@ -16,7 +16,7 @@
 
 package pldconf
 
-import "github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
+import "github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 
 type LogConfig struct {
 	// the logging level
@@ -65,7 +65,7 @@ type LogJSONConfig struct {
 	FileField *string `json:"fileField"`
 }
 
-var LogDefaults = &LogConfig{
+var LogDefaults = LogConfig{
 	Level:        confutil.P("info"),
 	Format:       confutil.P("simple"),
 	Output:       confutil.P("stderr"),

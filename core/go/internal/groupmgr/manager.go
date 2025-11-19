@@ -21,24 +21,24 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/filters"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/msgs"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/pkg/persistence"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/filters"
+	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
+	"github.com/LFDT-Paladin/paladin/core/pkg/persistence"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/query"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/retry"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/cache"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/rpcserver"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/retry"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/cache"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/rpcserver"
 )
 
 var groupDBOnlyFilters = filters.FieldMap{
@@ -512,6 +512,28 @@ func (gm *groupManager) prepareTransaction(ctx context.Context, dbTX persistence
 	}
 	if pg.ContractAddress == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgPGroupsNotReady, groupID, pg.GenesisTransaction)
+	}
+
+	// Validate that the from identity is a member of the privacy group
+	if pgTX.From != "" {
+		// Resolve the from identity to fully qualified form
+		identifier, node, err := pldtypes.PrivateIdentityLocator(pgTX.From).Validate(ctx, gm.transportManager.LocalNodeName(), false)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrPublicSenderNotValidLocal, pgTX.From)
+		}
+		fullyQualifiedFrom := fmt.Sprintf("%s@%s", identifier, node)
+
+		isMember := false
+		for _, member := range pg.Members {
+			if member == fullyQualifiedFrom {
+				isMember = true
+				break
+			}
+		}
+		if !isMember {
+			return nil, i18n.NewError(ctx, msgs.MsgPGroupsFromNotMember, fullyQualifiedFrom, pg.ID)
+		}
+		pgTX.From = fullyQualifiedFrom
 	}
 
 	// Get the domain smart contract object from domain mgr

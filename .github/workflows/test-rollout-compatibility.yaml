@@ -78,7 +78,7 @@ jobs:
 
       - name: Create Kind Cluster
         run: |
-          curl -sL https://raw.githubusercontent.com/LF-Decentralized-Trust-labs/paladin/main/operator/paladin-kind.yaml -o paladin-kind.yaml
+          curl -sL https://raw.githubusercontent.com/LFDT-Paladin/paladin/main/operator/paladin-kind.yaml -o paladin-kind.yaml
           kind create cluster --name paladin --config paladin-kind.yaml
           kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
@@ -94,7 +94,7 @@ jobs:
 
       - name: Add Helm Repositories
         run: |
-          helm repo add paladin https://LF-Decentralized-Trust-labs.github.io/paladin --force-update
+          helm repo add paladin https://LFDT-Paladin.github.io/paladin --force-update
           helm repo add jetstack https://charts.jetstack.io --force-update
           helm repo update
           

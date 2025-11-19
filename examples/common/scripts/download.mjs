@@ -13,7 +13,7 @@ export async function downloadZetoAbis(zetoVersion = 'v0.2.0') {
 
 // download the paladin contracts
 export async function downloadPaladinAbis(paladinVersion = 'latest') {
-    const paladinOrg = 'LF-Decentralized-Trust-labs';
+    const paladinOrg = 'LFDT-Paladin';
     const filename = `abis.tar.gz`;
     let url;
     if (paladinVersion === "latest") {

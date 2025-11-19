@@ -19,8 +19,8 @@ package identityresolver
 import (
 	"context"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/log"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
 )
 
 func (ir *identityResolver) HandlePaladinMsg(ctx context.Context, message *components.ReceivedMessage) {

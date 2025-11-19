@@ -152,7 +152,7 @@ async function main(): Promise<boolean> {
         },
       },
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(notoBond)) return false;
 
   // Deploy the atom factory on the base ledger

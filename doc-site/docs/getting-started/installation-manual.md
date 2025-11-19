@@ -14,7 +14,7 @@ Ensure the following are installed:
 Add the Paladin Helm repository:
 
 ```bash
-helm repo add paladin https://LF-Decentralized-Trust-labs.github.io/paladin --force-update
+helm repo add paladin https://LFDT-Paladin.github.io/paladin --force-update
 helm upgrade --install paladin-crds paladin/paladin-operator-crd
 ```
 
@@ -40,7 +40,7 @@ helm upgrade --install paladin paladin/paladin-operator -n paladin --create-name
 Download the latest release artifacts:
 
 ```bash
-wget https://github.com/LF-Decentralized-Trust-labs/paladin/releases/download/latest/artifacts.tar.gz
+wget https://github.com/LFDT-Paladin/paladin/releases/download/latest/artifacts.tar.gz
 tar -xzvf artifacts.tar.gz
 ```
 
@@ -351,7 +351,7 @@ type: Opaque
 ### `config`
 This section contains an inline yaml/json string which can be used to provide Paladin node configuration that isn't exposed directly by the CRD. If the same configuration value is provided in the inline config and a CR field, the CR field will take precedence.
 
-[This code file](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/config/pkg/pldconf/config.go) defines the full set of Paladin configuration.
+[This code file](https://github.com/LFDT-Paladin/paladin/blob/main/config/pkg/pldconf/config.go) defines the full set of Paladin configuration.
 
 ### `database`
 ```yaml

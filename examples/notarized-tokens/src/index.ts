@@ -52,7 +52,7 @@ async function main(): Promise<boolean> {
       notary: verifierNode1,
       notaryMode: "basic",
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!cashToken) {
     logger.error("Failed to deploy the Noto cash token!");
     return false;

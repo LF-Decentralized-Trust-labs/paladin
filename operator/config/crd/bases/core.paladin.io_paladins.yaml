@@ -520,6 +520,14 @@ spec:
                   a k8s secret
                 items:
                   properties:
+                    derivationType:
+                      default: bip32
+                      description: The Paladin signer can use single BIP39 seed mnemonic
+                        to derive keys, or use direct key mapping.
+                      enum:
+                      - bip32
+                      - direct
+                      type: string
                     keySelector:
                       default: .*
                       description: |-
@@ -548,6 +556,7 @@ spec:
                       - preConfigured
                       type: string
                   required:
+                  - derivationType
                   - keySelector
                   - keySelectorMustNotMatch
                   - name

@@ -11,7 +11,7 @@ Welcome to the Paladin tutorials! These tutorials provide a comprehensive introd
 ⚠️ To ensure you are using a stable version, **always clone the most recent release tag**:
 
 ```shell
-REPO=https://github.com/LF-Decentralized-Trust-labs/paladin.git
+REPO=https://github.com/LFDT-Paladin/paladin.git
 TAG=$(git ls-remote --tags $REPO | cut -d/ -f3 | grep -v '\-rc' | sort -V | tail -n1)
 git clone $REPO -b $TAG
 ```
@@ -87,5 +87,5 @@ The tutorials are designed to be completed in sequence, with each building upon 
 If you encounter issues while working through the tutorials:
 - Check the [Troubleshooting guide](../../getting-started/troubleshooting.md).
 - Review the [Architecture documentation](../../architecture/).
-- Explore the [Examples repository](https://github.com/LF-Decentralized-Trust-labs/paladin/tree/main/examples).
+- Explore the [Examples repository](https://github.com/LFDT-Paladin/paladin/tree/main/examples).
 - Join the [Paladin community on Discord](https://discord.com/channels/905194001349627914/1303371167020879903) for support and updates.

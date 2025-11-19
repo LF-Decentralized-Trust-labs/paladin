@@ -18,10 +18,10 @@ package zetosigner
 import (
 	"context"
 
-	zetosigner "github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/internal/zeto/signer"
-	"github.com/LF-Decentralized-Trust-labs/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signer"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signerapi"
+	zetosigner "github.com/LFDT-Paladin/paladin/domains/zeto/internal/zeto/signer"
+	"github.com/LFDT-Paladin/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signer"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signerapi"
 )
 
 // This is a direct implementation of the extension point for signing in the Paladin signing toolkit.

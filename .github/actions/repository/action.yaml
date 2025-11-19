@@ -24,10 +24,10 @@ runs:
         # Initialize the modified repository with the lowercase name
         modified_repository="$repository_lower"
         
-        # Step 2: If registry is docker.io and repository is lf-decentralized-trust-labs,
-        # remove the '-' characters from the repository name
-        if [ "${{ inputs.registry }}" = "docker.io" ] && [ "$repository_lower" = "lf-decentralized-trust-labs" ]; then
-          modified_repository=$(echo "$repository_lower" | sed 's/-//g')
+        # Step 2: If registry is docker.io and repository is LFDT-Paladin,
+        # replace with lfdecentralizedtrust
+        if [ "${{ inputs.registry }}" = "docker.io" ] && [ "$repository_lower" = "lfdt-paladin" ]; then
+          modified_repository="lfdecentralizedtrust"
         fi
         
         # Set the output

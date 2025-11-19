@@ -15,7 +15,7 @@
 
 package staticregistry
 
-import "github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
+import "github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 
 type Config struct {
 	Entries map[string]*StaticEntry `json:"entries"`

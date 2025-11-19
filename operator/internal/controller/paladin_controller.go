@@ -29,8 +29,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
 	"github.com/Masterminds/sprig/v3"
 	"github.com/tyler-smith/go-bip39"
 	appsv1 "k8s.io/api/apps/v1"
@@ -52,8 +52,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 
-	corev1alpha1 "github.com/LF-Decentralized-Trust-labs/paladin/operator/api/v1alpha1"
-	"github.com/LF-Decentralized-Trust-labs/paladin/operator/pkg/config"
+	corev1alpha1 "github.com/LFDT-Paladin/paladin/operator/api/v1alpha1"
+	"github.com/LFDT-Paladin/paladin/operator/pkg/config"
 
 	_ "embed"
 )
@@ -959,12 +959,14 @@ func (r *PaladinReconciler) generatePaladinSigners(ctx context.Context, node *co
 			Signer:                  &pldconf.SignerConfig{},
 		}
 
-		// Upsert a secret if we've been asked to. We use a mnemonic in this case (rather than directly generating a 32byte seed)
-		if s.Type == corev1alpha1.SignerType_AutoHDWallet {
+		if s.DerivationType == corev1alpha1.DerivationType_BIP32 {
 			wallet.Signer.KeyDerivation.Type = pldconf.KeyDerivationTypeBIP32
 			wallet.Signer.KeyDerivation.SeedKeyPath = pldconf.StaticKeyReference{Name: "seed"}
-			if err := r.generateBIP39SeedSecretIfNotExist(ctx, node, s.Secret); err != nil {
-				return err
+			if s.Type == corev1alpha1.SignerType_AutoHDWallet {
+				// Upsert a secret if we've been asked to. We use a mnemonic in this case (rather than directly generating a 32byte seed)
+				if err := r.generateBIP39SeedSecretIfNotExist(ctx, node, s.Secret); err != nil {
+					return err
+				}
 			}
 		}
 

@@ -16,7 +16,7 @@ operator:
   name: paladin-operator
   namespace: "" # DEPRECATED: Use the namespace field in the HelmRelease instead. e.g. helm install ... --namespace <namespace>
   image:
-    repository: ghcr.io/lf-decentralized-trust-labs/paladin-operator
+    repository: ghcr.io/lfdt-paladin/paladin-operator
     tag: main
     pullPolicy: Always
 
@@ -102,22 +102,95 @@ postgres: # the postgres container runs as a sidecar to the paladin container
     pullPolicy: IfNotPresent
 
 # Smart Contracts References
-# Provide either 'deployment' or 'address':
-# - 'deployment' should be set for new installations.
-# - 'address' should be set if using an existing deployment from another operator, to join the same network.
+# Only used when mode is "attach" to join an existing network.
+# - Set 'address' to join an existing deployment from another operator.
 smartContractsReferences:
   notoFactory:
-    address: ""       # Existing contract address (leave blank if deploying new)
-    deployment: noto-factory   # Deployment resource name (leave blank if using existing address)
+    address: ""
   zetoFactory:
     address: ""
-    deployment: zeto-factory
   penteFactory:
     address: ""
-    deployment: pente-factory
   registry:
     address: ""
-    deployment: registry
+
+# Smart Contract Deployments Configuration
+# Controls the signing keys for smart contract deployments.
+# If a 'from' key is set for a specific contract, that value is used.
+# If not set, it falls back to the value in 'default'.
+# If default not set, it falls back to the value set by the operator
+smartContractDeployments:
+  default:
+    from: ""
+  registry:
+    from: ""
+  notoFactory:
+    from: ""
+  penteFactory:
+    from: ""
+  zetoG16Anon:
+    from: ""
+  zetoG16AnonBatch:
+    from: ""
+  zetoG16AnonEnc:
+    from: ""
+  zetoG16AnonEncBatch:
+    from: ""
+  zetoG16AnonNullifierTransfer:
+    from: ""
+  zetoG16AnonNullifierTransferBatch:
+    from: ""
+  zetoG16AnonNullifierKycTransfer:
+    from: ""
+  zetoG16AnonNullifierKycTransferBatch:
+    from: ""
+  zetoG16AnonNullifierKycTransferLocked:
+    from: ""
+  zetoG16AnonNullifierKycTransferLockedBatch:
+    from: ""
+  zetoG16Deposit:
+    from: ""
+  zetoG16Withdraw:
+    from: ""
+  zetoG16WithdrawBatch:
+    from: ""
+  zetoG16WithdrawNullifier:
+    from: ""
+  zetoG16WithdrawNullifierBatch:
+    from: ""
+  zetoPoseidonUnit2l:
+    from: ""
+  zetoPoseidonUnit3l:
+    from: ""
+  zetoSmtLib:
+    from: ""
+  zetoImplAnon:
+    from: ""
+  zetoImplAnonEnc:
+    from: ""
+  zetoImplAnonNullifier:
+    from: ""
+  zetoImplAnonNullifierKyc:
+    from: ""
+  zetoFactory:
+    from: ""
+
+# Transaction Invoke Configuration
+# Controls the signing keys for transaction invocations.
+# If a 'from' key is set for a specific transaction, that value is used.
+# If not set, it falls back to the value in 'default'.
+# If default not set, it falls back to the value set by the operator
+transactionInvokes:
+  default:
+    from: ""
+  zetoAnon:
+    from: ""
+  zetoAnonEnc:
+    from: ""
+  zetoAnonNullifier:
+    from: ""
+  zetoAnonNullifierKyc:
+    from: ""
 
     
 # Install CRDs as part of the chart installation
@@ -128,7 +201,7 @@ installCRDs: false
 paladin:
   nodeNamePrefix: node
   image:
-    repository: ghcr.io/lf-decentralized-trust-labs/paladin
+    repository: ghcr.io/lfdt-paladin/paladin
     tag: main
     pullPolicy: Always
   labels:

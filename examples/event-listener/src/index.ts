@@ -48,7 +48,7 @@ async function main(): Promise<boolean> {
       evmVersion: "shanghai",
       externalCallsEnabled: true,
     })
-    .waitForDeploy();
+    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(memberPrivacyGroup)) return false;
 
   // Deploy a smart contract within the privacy group
@@ -59,7 +59,7 @@ async function main(): Promise<boolean> {
     from: verifierNode1.lookup,
   });
   const receipt = await deploy.waitForReceipt(DEFAULT_POLL_TIMEOUT);
-  const contractAddress = await deploy.waitForDeploy();
+  const contractAddress = await deploy.waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!receipt || !contractAddress) {
     logger.error("Failed to deploy the contract. No address returned.");
     return false;

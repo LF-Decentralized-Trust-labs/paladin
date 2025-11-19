@@ -20,8 +20,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/confutil"
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
 	migratedb "github.com/golang-migrate/migrate/v4/database"
 	migratesqlite3 "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	gormSQLite "gorm.io/driver/sqlite"

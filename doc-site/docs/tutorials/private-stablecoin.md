@@ -1,13 +1,13 @@
 # Private Stablecoin with KYC and Deposit/Withdraw
 
-The code for this tutorial can be found in [examples/private-stablecoin](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/private-stablecoin).
+The code for this tutorial can be found in [examples/private-stablecoin](https://github.com/LFDT-Paladin/paladin/blob/main/examples/private-stablecoin).
 
 This example demonstrates a **private stablecoin with KYC compliance** that exists as both a **public ERC20 token** and a **private Zeto token**, showcasing **deposit/withdraw functionality** using Paladin's [Zeto domain](../../architecture/zeto/). It illustrates how financial institutions can manage regulatory compliance while enabling users to seamlessly move between public and private representations of the same asset for enhanced privacy preservation.
 
 ## Running the example
 
 Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paladin environment, and
-then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/examples/private-stablecoin/README.md)
+then follow the example [README](https://github.com/LFDT-Paladin/paladin/blob/main/examples/private-stablecoin/README.md)
 to run the code.
 
 ## Key Features

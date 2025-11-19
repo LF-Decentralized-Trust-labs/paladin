@@ -19,19 +19,19 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/LF-Decentralized-Trust-labs/paladin/config/pkg/pldconf"
-	"github.com/LF-Decentralized-Trust-labs/paladin/core/mocks/signermocks"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
-	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
+	"github.com/LFDT-Paladin/paladin/core/mocks/signermocks"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/algorithms"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewWalletConfigErrors(t *testing.T) {
-	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{}, nil)
+	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerInlineConfig{}, nil)
 	defer done()
 
 	_, err := km.newWallet(ctx, &pldconf.WalletConfig{
@@ -75,7 +75,7 @@ func TestNewWalletConfigErrors(t *testing.T) {
 
 func TestResolveKeyAndVerifierErr(t *testing.T) {
 
-	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
+	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerInlineConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
 	}, nil)
 	defer done()
@@ -96,7 +96,7 @@ func TestResolveKeyAndVerifierErr(t *testing.T) {
 
 func TestResolveBadSignerResponse(t *testing.T) {
 
-	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
+	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerInlineConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
 	}, nil)
 	defer done()
@@ -121,7 +121,7 @@ func TestResolveBadSignerResponse(t *testing.T) {
 
 func TestSignError(t *testing.T) {
 
-	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerConfig{
+	ctx, km, _, done := newTestKeyManager(t, false, &pldconf.KeyManagerInlineConfig{
 		Wallets: []*pldconf.WalletConfig{hdWalletConfig("hdwallet1", "")},
 	}, nil)
 	defer done()
