@@ -147,8 +147,8 @@ func (n *Noto) validateSignature(ctx context.Context, name string, attestations 
 }
 
 // Check that all coins are owned by the transaction sender
-func (n *Noto) validateOwners(ctx context.Context, owner string, req *prototk.EndorseTransactionRequest, coins []*types.NotoCoin, states []*prototk.StateRef) error {
-	fromAddress, err := n.findEthAddressVerifier(ctx, "from", owner, req.ResolvedVerifiers)
+func (n *Noto) validateOwners(ctx context.Context, owner string, verifiers []*prototk.ResolvedVerifier, coins []*types.NotoCoin, states []*prototk.StateRef) error {
+	fromAddress, err := n.findEthAddressVerifier(ctx, "from", owner, verifiers)
 	if err != nil {
 		return err
 	}
@@ -173,6 +173,17 @@ func (n *Noto) validateLockOwners(ctx context.Context, owner string, verifiers [
 		}
 	}
 	return nil
+}
+
+// Split unlock output states into spend and cancel
+func (n *Noto) splitUnlockOutputs(ctx context.Context, outputs []*prototk.EndorsableState) (spendOutputs, cancelOutputs []*prototk.EndorsableState, err error) {
+	// Assume exactly one "spend" output and one "cancel" output (in that order)
+	// If variable output states need to be supported in the future, details can be passed
+	// from Assemble to Endorse using DomainData.
+	if len(outputs) != 2 {
+		return nil, nil, i18n.NewError(ctx, msgs.MsgInvalidOutputCount, 2, len(outputs))
+	}
+	return outputs[0:1], outputs[1:2], nil
 }
 
 // Parse a resolved verifier as an eth address

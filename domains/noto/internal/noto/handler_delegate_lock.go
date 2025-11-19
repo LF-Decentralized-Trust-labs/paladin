@@ -23,7 +23,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
 	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/types"
-	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldapi"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/algorithms"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/domain"
@@ -66,8 +65,8 @@ func (h *delegateLockHandler) Assemble(ctx context.Context, tx *types.ParsedTran
 		return nil, err
 	}
 
-	// Requester must own the locked states (only search for the first one)
-	lockedInputs, revert, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.LockID, fromAddress, big.NewInt(1))
+	// Requester must own at least one locked coin state to show ownership of the lock
+	lockedInputs, revert, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.LockID, fromAddress, big.NewInt(1), false)
 	if err != nil {
 		if revert {
 			message := err.Error()
@@ -83,7 +82,7 @@ func (h *delegateLockHandler) Assemble(ctx context.Context, tx *types.ParsedTran
 	if err != nil {
 		return nil, err
 	}
-	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, params.Delegate, []string{notary, tx.Transaction.From})
+	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
@@ -125,18 +124,6 @@ func (h *delegateLockHandler) Assemble(ctx context.Context, tx *types.ParsedTran
 	}, nil
 }
 
-func (h *delegateLockHandler) decodeStates(states []*pldapi.StateEncoded) []*prototk.EndorsableState {
-	result := make([]*prototk.EndorsableState, len(states))
-	for i, state := range states {
-		result[i] = &prototk.EndorsableState{
-			Id:            state.ID.String(),
-			SchemaId:      state.Schema.String(),
-			StateDataJson: pldtypes.RawJSON(state.Data).String(),
-		}
-	}
-	return result
-}
-
 func (h *delegateLockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.DelegateLockParams)
 	inputs, err := h.noto.parseCoinList(ctx, "read", req.Reads)
@@ -173,7 +160,19 @@ func (h *delegateLockHandler) baseLedgerInvoke(ctx context.Context, tx *types.Pa
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
 	}
 
-	data, err := h.noto.encodeTransactionData(ctx, req.Transaction, req.InfoStates)
+	txData, err := h.noto.encodeTransactionData(ctx, req.InfoStates)
+	if err != nil {
+		return nil, err
+	}
+	delegateLockData := DelegateLockDataStrings{
+		TxId: pldtypes.MustParseBytes32(req.Transaction.TransactionId).String(),
+		Data: txData,
+	}
+	delegateLockDataJSON, err := json.Marshal(delegateLockData)
+	if err != nil {
+		return nil, err
+	}
+	delegateLockDataEncoded, err := DelegateLockDataABI.EncodeABIDataJSONCtx(ctx, delegateLockDataJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -187,11 +186,9 @@ func (h *delegateLockHandler) baseLedgerInvoke(ctx context.Context, tx *types.Pa
 		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
 		functionName = "delegateLock"
 		params := &NotoDelegateLockParams{
-			TxId:     req.Transaction.TransactionId,
-			LockID:   inParams.LockID,
-			Delegate: inParams.Delegate,
-			Proof:    sender.Payload,
-			Data:     data,
+			LockID:     inParams.LockID,
+			NewSpender: inParams.Delegate,
+			Data:       delegateLockDataEncoded,
 		}
 		paramsJSON, err = json.Marshal(params)
 	default:
@@ -202,7 +199,7 @@ func (h *delegateLockHandler) baseLedgerInvoke(ctx context.Context, tx *types.Pa
 			UnlockHash: inParams.LockID.String(),
 			Delegate:   inParams.Delegate,
 			Signature:  sender.Payload,
-			Data:       data,
+			Data:       txData,
 		}
 		paramsJSON, err = json.Marshal(params)
 	}

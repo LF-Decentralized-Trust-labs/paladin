@@ -39,10 +39,9 @@ type ReceiptStates struct {
 }
 
 type ReceiptLockInfo struct {
-	LockID       pldtypes.Bytes32            `json:"lockId"`
-	Delegate     *pldtypes.EthAddress        `json:"delegate,omitempty"`     // only set for delegateLock
-	UnlockParams *TransferLockedPublicParams `json:"unlockParams,omitempty"` // only set for prepareUnlock
-	UnlockCall   pldtypes.HexBytes           `json:"unlockCall,omitempty"`   // only set for prepareUnlock
+	LockID       pldtypes.Bytes32       `json:"lockId"`
+	UnlockParams *SpendLockPublicParams `json:"unlockParams,omitempty"` // only set for prepareUnlock
+	UnlockCall   pldtypes.HexBytes      `json:"unlockCall,omitempty"`   // only set for prepareUnlock
 }
 
 type ReceiptState struct {
@@ -108,10 +107,9 @@ var NotoLockedCoinABI = &abi.Parameter{
 }
 
 type NotoLockInfo struct {
-	Salt     pldtypes.Bytes32     `json:"salt"`
-	LockID   pldtypes.Bytes32     `json:"lockId"`
-	Owner    *pldtypes.EthAddress `json:"owner"`
-	Delegate *pldtypes.EthAddress `json:"delegate"`
+	Salt   pldtypes.Bytes32     `json:"salt"`
+	LockID pldtypes.Bytes32     `json:"lockId"`
+	Owner  *pldtypes.EthAddress `json:"owner"`
 }
 
 var NotoLockInfoABI = &abi.Parameter{
@@ -120,9 +118,8 @@ var NotoLockInfoABI = &abi.Parameter{
 	InternalType: "struct NotoLockInfo",
 	Components: abi.ParameterArray{
 		{Name: "salt", Type: "bytes32"},
-		{Name: "lockId", Type: "bytes32"},
-		{Name: "owner", Type: "address"},
-		{Name: "delegate", Type: "address"},
+		{Name: "lockId", Type: "bytes32", Indexed: true},
+		{Name: "owner", Type: "address", Indexed: true},
 	},
 }
 

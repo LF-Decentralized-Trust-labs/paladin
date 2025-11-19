@@ -74,11 +74,12 @@ var (
 )
 
 var (
-	EventTransfer       = "Transfer"
-	EventLock           = "Lock"
-	EventTransferLocked = "TransferLocked"
-	EventLockUpdate     = "LockUpdate"
-	EventLockDelegation = "LockDelegation"
+	EventTransfer      = "Transfer"
+	EventLockCreated   = "LockCreated"
+	EventLockSpent     = "LockSpent"
+	EventLockCancelled = "LockCancelled"
+	EventLockUpdated   = "LockUpdated"
+	EventLockDelegated = "LockDelegated"
 
 	// Old variant 0 events
 	EventNotoTransfer       = "NotoTransfer"
@@ -90,10 +91,11 @@ var (
 
 var allEvents = []string{
 	EventTransfer,
-	EventLock,
-	EventTransferLocked,
-	EventLockUpdate,
-	EventLockDelegation,
+	EventLockCreated,
+	EventLockSpent,
+	EventLockCancelled,
+	EventLockUpdated,
+	EventLockDelegated,
 }
 
 var allEventsV0 = []string{
@@ -161,20 +163,18 @@ type NotoBurnParams struct {
 	Data    pldtypes.HexBytes `json:"data"`
 }
 
-type LockStatesInput struct {
-	Inputs        []string `json:"inputs"`
-	Outputs       []string `json:"outputs"`
-	LockedOutputs []string `json:"lockedOutputs"`
+type CreateLockParams struct {
+	Params NotoCreateLockParams `json:"params"`
+	Data   pldtypes.HexBytes    `json:"data"`
 }
 
-type NotoLockParams struct {
-	TxId     string               `json:"txId"`
-	LockID   pldtypes.Bytes32     `json:"lockId"`
-	States   LockStatesInput      `json:"states"`
-	Delegate *pldtypes.EthAddress `json:"delegate"`
-	Options  pldtypes.HexBytes    `json:"options"`
-	Proof    pldtypes.HexBytes    `json:"proof"`
-	Data     pldtypes.HexBytes    `json:"data"`
+type NotoCreateLockParams struct {
+	TxId          string            `json:"txId"`
+	Inputs        []string          `json:"inputs"`
+	Outputs       []string          `json:"outputs"`
+	LockedOutputs []string          `json:"lockedOutputs"`
+	Proof         pldtypes.HexBytes `json:"proof"`
+	Options       pldtypes.HexBytes `json:"options"`
 }
 
 type NotoSetLockOptionsParams struct {
@@ -186,15 +186,70 @@ type NotoSetLockOptionsParams struct {
 	Data         pldtypes.HexBytes `json:"data"`
 }
 
+type UpdateLockParams struct {
+	LockID pldtypes.Bytes32     `json:"lockId"`
+	Params NotoUpdateLockParams `json:"params"`
+	Data   pldtypes.HexBytes    `json:"data"`
+}
+
+type NotoUpdateLockParams struct {
+	TxId         string            `json:"txId"`
+	LockedInputs []string          `json:"lockedInputs"`
+	Proof        pldtypes.HexBytes `json:"proof"`
+	Options      pldtypes.HexBytes `json:"options"`
+}
+
+var UpdateLockParamsABI = &abi.ParameterArray{
+	{Name: "txId", Type: "bytes32"},
+	{Name: "lockedInputs", Type: "bytes32[]"},
+	{Name: "proof", Type: "bytes"},
+	{Name: "options", Type: "bytes"},
+}
+
 type NotoDelegateLockParams struct {
-	TxId     string               `json:"txId"`
-	LockID   pldtypes.Bytes32     `json:"lockId"`
-	Delegate *pldtypes.EthAddress `json:"delegate"`
-	Proof    pldtypes.HexBytes    `json:"proof"`
-	Data     pldtypes.HexBytes    `json:"data"`
+	LockID     pldtypes.Bytes32     `json:"lockId"`
+	NewSpender *pldtypes.EthAddress `json:"newSpender"`
+	Data       pldtypes.HexBytes    `json:"data"`
+}
+
+type DelegateLockData struct {
+	TxId pldtypes.Bytes32  `json:"txId"`
+	Data pldtypes.HexBytes `json:"data"`
+}
+
+type DelegateLockDataStrings struct {
+	TxId string            `json:"txId"`
+	Data pldtypes.HexBytes `json:"data"`
+}
+
+var DelegateLockDataABI = &abi.ParameterArray{
+	{Name: "txId", Type: "bytes32"},
+	{Name: "data", Type: "bytes"},
+}
+
+type UnlockData struct {
+	TxId    pldtypes.Bytes32   `json:"txId"`
+	Inputs  []pldtypes.Bytes32 `json:"inputs"`
+	Outputs []pldtypes.Bytes32 `json:"outputs"`
+	Data    pldtypes.HexBytes  `json:"data"`
+}
+
+type UnlockDataStrings struct {
+	TxId    string            `json:"txId"`
+	Inputs  []string          `json:"inputs"`
+	Outputs []string          `json:"outputs"`
+	Data    pldtypes.HexBytes `json:"data"`
+}
+
+var UnlockDataABI = &abi.ParameterArray{
+	{Name: "txId", Type: "bytes32"},
+	{Name: "inputs", Type: "bytes32[]"},
+	{Name: "outputs", Type: "bytes32[]"},
+	{Name: "data", Type: "bytes"},
 }
 
 type NotoTransfer_Event struct {
+	TxId     pldtypes.Bytes32     `json:"txId"`
 	Operator *pldtypes.EthAddress `json:"operator"`
 	Inputs   []pldtypes.Bytes32   `json:"inputs"`
 	Outputs  []pldtypes.Bytes32   `json:"outputs"`
@@ -208,41 +263,44 @@ type LockStates struct {
 	LockedOutputs []pldtypes.Bytes32 `json:"lockedOutputs"`
 }
 
-type NotoLocked_Event struct {
-	Operator *pldtypes.EthAddress `json:"operator"`
-	LockID   pldtypes.Bytes32     `json:"lockId"`
-	States   LockStates           `json:"states"`
-	Delegate *pldtypes.EthAddress `json:"delegate"`
-	Options  pldtypes.HexBytes    `json:"options"`
-	Proof    pldtypes.HexBytes    `json:"proof"`
-	Data     pldtypes.HexBytes    `json:"data"`
-}
-
-type NotoTransferLocked_Event struct {
-	Operator      *pldtypes.EthAddress `json:"operator"`
+type NotoLockCreated_Event struct {
+	TxId          pldtypes.Bytes32     `json:"txId"`
 	LockID        pldtypes.Bytes32     `json:"lockId"`
-	LockedInputs  []pldtypes.Bytes32   `json:"lockedInputs"`
-	LockedOutputs []pldtypes.Bytes32   `json:"lockedOutputs"`
+	Owner         *pldtypes.EthAddress `json:"owner"`
+	Spender       *pldtypes.EthAddress `json:"spender"`
+	Inputs        []pldtypes.Bytes32   `json:"inputs"`
 	Outputs       []pldtypes.Bytes32   `json:"outputs"`
+	LockedOutputs []pldtypes.Bytes32   `json:"lockedOutputs"`
 	Proof         pldtypes.HexBytes    `json:"proof"`
 	Data          pldtypes.HexBytes    `json:"data"`
 }
 
+type NotoLockSpent_Event struct {
+	LockID  pldtypes.Bytes32     `json:"lockId"`
+	Spender *pldtypes.EthAddress `json:"spender"`
+	Data    pldtypes.HexBytes    `json:"data"`
+}
+
+type NotoLockCancelled_Event struct {
+	LockID  pldtypes.Bytes32     `json:"lockId"`
+	Spender *pldtypes.EthAddress `json:"spender"`
+	Data    pldtypes.HexBytes    `json:"data"`
+}
+
 type NotoLockUpdated_Event struct {
-	Operator     *pldtypes.EthAddress `json:"operator"`
+	TxId         pldtypes.Bytes32     `json:"txId"`
 	LockID       pldtypes.Bytes32     `json:"lockId"`
+	Operator     *pldtypes.EthAddress `json:"operator"`
 	LockedInputs []pldtypes.Bytes32   `json:"lockedInputs"`
-	Options      pldtypes.HexBytes    `json:"options"`
 	Proof        pldtypes.HexBytes    `json:"proof"`
 	Data         pldtypes.HexBytes    `json:"data"`
 }
 
 type NotoLockDelegated_Event struct {
-	Operator pldtypes.EthAddress  `json:"operator"`
-	LockID   pldtypes.Bytes32     `json:"lockId"`
-	Delegate *pldtypes.EthAddress `json:"delegate"`
-	Proof    pldtypes.HexBytes    `json:"proof"`
-	Data     pldtypes.HexBytes    `json:"data"`
+	LockID pldtypes.Bytes32     `json:"lockId"`
+	From   *pldtypes.EthAddress `json:"from"`
+	To     *pldtypes.EthAddress `json:"to"`
+	Data   pldtypes.HexBytes    `json:"data"`
 }
 
 type parsedCoins struct {
@@ -868,7 +926,7 @@ func (n *Noto) parseCoinList(ctx context.Context, label string, states []*protot
 	return result, nil
 }
 
-func (n *Noto) encodeTransactionData(ctx context.Context, transaction *prototk.TransactionSpecification, infoStates []*prototk.EndorsableState) (pldtypes.HexBytes, error) {
+func (n *Noto) encodeTransactionData_V0(ctx context.Context, transactionID string, infoStates []*prototk.EndorsableState) (pldtypes.HexBytes, error) {
 	var err error
 	stateIDs := make([]pldtypes.Bytes32, len(infoStates))
 	for i, state := range infoStates {
@@ -878,12 +936,8 @@ func (n *Noto) encodeTransactionData(ctx context.Context, transaction *prototk.T
 		}
 	}
 
-	transactionID, err := pldtypes.ParseBytes32Ctx(ctx, transaction.TransactionId)
-	if err != nil {
-		return nil, err
-	}
 	dataValues := &types.NotoTransactionData_V0{
-		TransactionID: transactionID,
+		TransactionID: pldtypes.MustParseBytes32(transactionID),
 		InfoStates:    stateIDs,
 	}
 	dataJSON, err := json.Marshal(dataValues)
@@ -901,17 +955,67 @@ func (n *Noto) encodeTransactionData(ctx context.Context, transaction *prototk.T
 	return data, nil
 }
 
+func (n *Noto) encodeTransactionData(ctx context.Context, infoStates []*prototk.EndorsableState) (pldtypes.HexBytes, error) {
+	var err error
+	stateIDs := make([]pldtypes.Bytes32, len(infoStates))
+	for i, state := range infoStates {
+		stateIDs[i], err = pldtypes.ParseBytes32Ctx(ctx, state.Id)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	dataValues := &types.NotoTransactionData_V1{
+		InfoStates: stateIDs,
+	}
+	dataJSON, err := json.Marshal(dataValues)
+	if err != nil {
+		return nil, err
+	}
+	dataABI, err := types.NotoTransactionDataABI_V1.EncodeABIDataJSONCtx(ctx, dataJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	var data []byte
+	data = append(data, types.NotoTransactionDataID_V1...)
+	data = append(data, dataABI...)
+	return data, nil
+}
+
 func (n *Noto) decodeTransactionData(ctx context.Context, data pldtypes.HexBytes) (*types.NotoTransactionData_V0, error) {
 	var dataValues types.NotoTransactionData_V0
 	if len(data) >= 4 {
 		dataPrefix := data[0:4]
-		if dataPrefix.String() == types.NotoTransactionDataID_V0.String() {
+
+		switch dataPrefix.String() {
+		case types.NotoTransactionDataID_V1.String():
+			dataDecoded, err := types.NotoTransactionDataABI_V1.DecodeABIDataCtx(ctx, data, 4)
+			if err == nil {
+				var dataJSON []byte
+				dataJSON, err = dataDecoded.JSON()
+				if err == nil {
+					// Note that V1 is a subset of V0, so we can use the same struct
+					err = json.Unmarshal(dataJSON, &dataValues)
+					if err == nil {
+						return &dataValues, nil
+					}
+				}
+			}
+			if err != nil {
+				return nil, err
+			}
+
+		case types.NotoTransactionDataID_V0.String():
 			dataDecoded, err := types.NotoTransactionDataABI_V0.DecodeABIDataCtx(ctx, data, 4)
 			if err == nil {
 				var dataJSON []byte
 				dataJSON, err = dataDecoded.JSON()
 				if err == nil {
 					err = json.Unmarshal(dataJSON, &dataValues)
+					if err == nil {
+						return &dataValues, nil
+					}
 				}
 			}
 			if err != nil {
@@ -919,10 +1023,7 @@ func (n *Noto) decodeTransactionData(ctx context.Context, data pldtypes.HexBytes
 			}
 		}
 	}
-	if dataValues.TransactionID.IsZero() {
-		// If no transaction ID could be decoded, assign a random one
-		dataValues.TransactionID = pldtypes.RandBytes32()
-	}
+
 	return &dataValues, nil
 }
 
@@ -1004,4 +1105,32 @@ func (n *Noto) getInterfaceABI(variant pldtypes.HexUint64) abi.ABI {
 		return interfaceV0Build.ABI
 	}
 	return interfaceBuild.ABI
+}
+
+// computeLockId computes the lockId the same way the contract does:
+// keccak256(abi.encode(address(this), msg.sender, txId))
+func (n *Noto) computeLockId(ctx context.Context, contractAddress *pldtypes.EthAddress, notaryAddress *pldtypes.EthAddress, txId string) (pldtypes.Bytes32, error) {
+	params := abi.ParameterArray{
+		{Name: "contract", Type: "address"},
+		{Name: "notary", Type: "address"},
+		{Name: "txId", Type: "bytes32"},
+	}
+
+	paramsJSON := map[string]any{
+		"contract": contractAddress.String(),
+		"notary":   notaryAddress.String(),
+		"txId":     txId,
+	}
+
+	jsonData, err := json.Marshal(paramsJSON)
+	if err != nil {
+		return pldtypes.Bytes32{}, err
+	}
+
+	encoded, err := params.EncodeABIDataJSONCtx(ctx, jsonData)
+	if err != nil {
+		return pldtypes.Bytes32{}, err
+	}
+
+	return pldtypes.Bytes32Keccak(encoded), nil
 }

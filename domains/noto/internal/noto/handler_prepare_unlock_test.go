@@ -53,6 +53,7 @@ func TestPrepareUnlock(t *testing.T) {
 	inputCoin := &types.NotoLockedCoinState{
 		ID: pldtypes.RandBytes32(),
 		Data: types.NotoLockedCoin{
+			Salt:   pldtypes.RandBytes32(),
 			LockID: lockID,
 			Owner:  (*pldtypes.EthAddress)(&senderKey.Address),
 			Amount: pldtypes.Int64ToInt256(100),
@@ -62,9 +63,10 @@ func TestPrepareUnlock(t *testing.T) {
 		return &prototk.FindAvailableStatesResponse{
 			States: []*prototk.StoredState{
 				{
-					Id:       inputCoin.ID.String(),
-					SchemaId: "lockedCoin",
-					DataJson: mustParseJSON(inputCoin.Data),
+					Id:        inputCoin.ID.String(),
+					SchemaId:  "lockedCoin",
+					DataJson:  mustParseJSON(inputCoin.Data),
+					CreatedAt: 1000,
 				},
 			},
 		}, nil
@@ -133,21 +135,32 @@ func TestPrepareUnlock(t *testing.T) {
 	require.Len(t, assembleRes.AssembledTransaction.InputStates, 0)
 	require.Len(t, assembleRes.AssembledTransaction.OutputStates, 0)
 	require.Len(t, assembleRes.AssembledTransaction.ReadStates, 1)
-	require.Len(t, assembleRes.AssembledTransaction.InfoStates, 3)
-	assert.Equal(t, inputCoin.ID.String(), assembleRes.AssembledTransaction.ReadStates[0].Id)
-	outputCoin, err := n.unmarshalCoin(assembleRes.AssembledTransaction.InfoStates[2].StateDataJson)
+	require.Len(t, assembleRes.AssembledTransaction.InfoStates, 4)
+
+	inputCoinState := assembleRes.AssembledTransaction.ReadStates[0]
+	dataState := assembleRes.AssembledTransaction.InfoStates[0]
+	lockInfoState := assembleRes.AssembledTransaction.InfoStates[1]
+	spendCoinState := assembleRes.AssembledTransaction.InfoStates[2]
+	cancelCoinState := assembleRes.AssembledTransaction.InfoStates[3]
+
+	assert.Equal(t, inputCoin.ID.String(), inputCoinState.Id)
+	spendCoin, err := n.unmarshalCoin(spendCoinState.StateDataJson)
 	require.NoError(t, err)
-	assert.Equal(t, receiverAddress, outputCoin.Owner.String())
-	assert.Equal(t, "100", outputCoin.Amount.Int().String())
-	outputInfo, err := n.unmarshalInfo(assembleRes.AssembledTransaction.InfoStates[0].StateDataJson)
+	assert.Equal(t, receiverAddress, spendCoin.Owner.String())
+	assert.Equal(t, "100", spendCoin.Amount.Int().String())
+	cancelCoin, err := n.unmarshalCoin(cancelCoinState.StateDataJson)
+	require.NoError(t, err)
+	assert.Equal(t, senderKey.Address.String(), cancelCoin.Owner.String())
+	assert.Equal(t, "100", cancelCoin.Amount.Int().String())
+	outputInfo, err := n.unmarshalInfo(dataState.StateDataJson)
 	require.NoError(t, err)
 	assert.Equal(t, "0x1234", outputInfo.Data.String())
-	lockInfo, err := n.unmarshalLock(assembleRes.AssembledTransaction.InfoStates[1].StateDataJson)
+	lockInfo, err := n.unmarshalLock(lockInfoState.StateDataJson)
 	require.NoError(t, err)
 	assert.Equal(t, senderKey.Address.String(), lockInfo.Owner.String())
 	assert.Equal(t, lockID, lockInfo.LockID)
 
-	encodedUnlock, err := n.encodeUnlock(ctx, ethtypes.MustNewAddress(contractAddress), []*types.NotoLockedCoin{&inputCoin.Data}, []*types.NotoLockedCoin{}, []*types.NotoCoin{outputCoin})
+	encodedUnlock, err := n.encodeUnlock(ctx, ethtypes.MustNewAddress(contractAddress), []*types.NotoLockedCoin{&inputCoin.Data}, []*types.NotoLockedCoin{}, []*types.NotoCoin{spendCoin})
 	require.NoError(t, err)
 	signature, err := senderKey.SignDirect(encodedUnlock)
 	require.NoError(t, err)
@@ -162,19 +175,24 @@ func TestPrepareUnlock(t *testing.T) {
 	}
 	infoStates := []*prototk.EndorsableState{
 		{
-			SchemaId:      "data",
+			SchemaId:      n.dataSchema.Id,
 			Id:            "0x4cc7840e186de23c4127b4853c878708d2642f1942959692885e098f1944547d",
-			StateDataJson: assembleRes.AssembledTransaction.InfoStates[0].StateDataJson,
+			StateDataJson: dataState.StateDataJson,
 		},
 		{
-			SchemaId:      "lockInfo",
+			SchemaId:      n.lockInfoSchema.Id,
 			Id:            "0x69101A0740EC8096B83653600FA7553D676FC92BCC6E203C3572D2CAC4F1DB2F",
-			StateDataJson: assembleRes.AssembledTransaction.InfoStates[1].StateDataJson,
+			StateDataJson: lockInfoState.StateDataJson,
 		},
 		{
-			SchemaId:      "coin",
+			SchemaId:      n.coinSchema.Id,
 			Id:            "0x26b394af655bdc794a6d7cd7f8004eec20bffb374e4ddd24cdaefe554878d945",
-			StateDataJson: assembleRes.AssembledTransaction.InfoStates[2].StateDataJson,
+			StateDataJson: spendCoinState.StateDataJson,
+		},
+		{
+			SchemaId:      n.coinSchema.Id,
+			Id:            "0xfdae13d798c19f84df28d52b9d66be6d29289045b0f41fd83e1f09df33f5f41f",
+			StateDataJson: cancelCoinState.StateDataJson,
 		},
 	}
 
@@ -197,7 +215,9 @@ func TestPrepareUnlock(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, prototk.EndorseTransactionResponse_ENDORSER_SUBMIT, endorseRes.EndorsementResult)
 
-	unlockHash, err := n.unlockHashFromStates(ctx, ethtypes.MustNewAddress(contractAddress), readStates, nil, n.filterSchema(infoStates, []string{"coin"}), pldtypes.MustParseHexBytes("0x1234"))
+	spendHash, err := n.unlockHashFromStates(ctx, ethtypes.MustNewAddress(contractAddress), readStates, infoStates[2:3], pldtypes.MustParseHexBytes("0x1234"))
+	require.NoError(t, err)
+	cancelHash, err := n.unlockHashFromStates(ctx, ethtypes.MustNewAddress(contractAddress), readStates, infoStates[3:4], pldtypes.MustParseHexBytes("0x1234"))
 	require.NoError(t, err)
 
 	// Prepare once to test base invoke
@@ -219,13 +239,13 @@ func TestPrepareUnlock(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	expectedFunction := mustParseJSON(interfaceBuild.ABI.Functions()["setLockOptions"])
+	expectedFunction := mustParseJSON(interfaceBuild.ABI.Functions()["updateLock"])
 	assert.JSONEq(t, expectedFunction, prepareRes.Transaction.FunctionAbiJson)
 	assert.Nil(t, prepareRes.Transaction.ContractAddress)
 
 	expectedOptions := types.NotoLockOptions{
-		UnlockHash: pldtypes.Bytes32(unlockHash),
-		Expiration: pldtypes.HexUint64(0),
+		SpendHash:  pldtypes.Bytes32(spendHash),
+		CancelHash: pldtypes.Bytes32(cancelHash),
 	}
 	expectedOptionsJSON, err := json.Marshal(expectedOptions)
 	require.NoError(t, err)
@@ -235,12 +255,14 @@ func TestPrepareUnlock(t *testing.T) {
 
 	assert.JSONEq(t, fmt.Sprintf(`{
 		"lockId": "%s",
-		"lockedInputs": ["%s"],
-		"options": "%s",
-		"proof": "%s",
-		"txId": "0x015e1881f2ba769c22d05c841f06949ec6e1bd573f5e1e0328885494212f077d",
-		"data": "0x00010000015e1881f2ba769c22d05c841f06949ec6e1bd573f5e1e0328885494212f077d000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000034cc7840e186de23c4127b4853c878708d2642f1942959692885e098f1944547d69101a0740ec8096b83653600fa7553d676fc92bcc6e203c3572d2cac4f1db2f26b394af655bdc794a6d7cd7f8004eec20bffb374e4ddd24cdaefe554878d945"
-	}`, lockID, inputCoin.ID, expectedOptionsHex, signatureBytes), prepareRes.Transaction.ParamsJson)
+		"params": {
+			"txId": "0x015e1881f2ba769c22d05c841f06949ec6e1bd573f5e1e0328885494212f077d",
+			"lockedInputs": ["%s"],
+			"proof": "%s",
+			"options": "%s"
+		},
+		"data": "0x00020000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000044cc7840e186de23c4127b4853c878708d2642f1942959692885e098f1944547d69101a0740ec8096b83653600fa7553d676fc92bcc6e203c3572d2cac4f1db2f26b394af655bdc794a6d7cd7f8004eec20bffb374e4ddd24cdaefe554878d945fdae13d798c19f84df28d52b9d66be6d29289045b0f41fd83e1f09df33f5f41f"
+	}`, lockID.HexString0xPrefix(), inputCoin.ID, signatureBytes, expectedOptionsHex), prepareRes.Transaction.ParamsJson)
 
 	var invokeFn abi.Entry
 	err = json.Unmarshal([]byte(prepareRes.Transaction.FunctionAbiJson), &invokeFn)

@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/LF-Decentralized-Trust-labs/paladin/common/go/pkg/i18n"
+	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/internal/msgs"
 	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/types"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
@@ -45,9 +47,6 @@ func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 			return nil, err
 		}
 		receipt.LockInfo = &types.ReceiptLockInfo{LockID: lock.LockID}
-		if !lock.Delegate.IsZero() {
-			receipt.LockInfo.Delegate = lock.Delegate
-		}
 	}
 
 	receipt.States.Inputs, err = n.receiptStates(ctx, n.filterSchema(req.InputStates, []string{n.coinSchema.Id}))
@@ -77,22 +76,42 @@ func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 	}
 
 	if receipt.LockInfo != nil && len(receipt.States.ReadLockedInputs) > 0 && len(receipt.States.PreparedOutputs) > 0 {
-		// For prepareUnlock transactions, include the encoded "transferLocked" call that can be used to unlock the coins
-		unlock := interfaceBuild.ABI.Functions()["transferLocked"]
-		receipt.LockInfo.UnlockParams = &types.TransferLockedPublicParams{
-			TxId:          pldtypes.Bytes32UUIDFirst16(uuid.New()).HexString(),
-			LockID:        receipt.LockInfo.LockID,
-			LockedInputs:  endorsableStateIDs(n.filterSchema(req.ReadStates, []string{n.lockedCoinSchema.Id})),
-			LockedOutputs: endorsableStateIDs(n.filterSchema(req.InfoStates, []string{n.lockedCoinSchema.Id})),
-			Outputs:       endorsableStateIDs(n.filterSchema(req.InfoStates, []string{n.coinSchema.Id})),
-			Proof:         pldtypes.HexBytes{},
-			Data:          pldtypes.HexBytes{},
+		// For prepareUnlock transactions, include the encoded "spendLock" call that can be used to unlock the coins
+		spendLock := interfaceBuild.ABI.Functions()["spendLock"]
+		if spendLock == nil {
+			return nil, i18n.NewError(ctx, msgs.MsgUnknownFunction, "spendLock")
 		}
+
+		spendOutputs, _, err := n.splitUnlockOutputs(ctx, n.filterSchema(req.InfoStates, []string{n.coinSchema.Id}))
+		if err != nil {
+			return nil, err
+		}
+
+		unlockData := &UnlockDataStrings{
+			TxId:    pldtypes.Bytes32UUIDFirst16(uuid.New()).HexString(),
+			Inputs:  endorsableStateIDs(n.filterSchema(req.ReadStates, []string{n.lockedCoinSchema.Id})),
+			Outputs: endorsableStateIDs(spendOutputs),
+			Data:    receipt.Data,
+		}
+		unlockDataJSON, err := json.Marshal(unlockData)
+		if err != nil {
+			return nil, err
+		}
+		unlockDataEncoded, err := UnlockDataABI.EncodeABIDataJSONCtx(ctx, unlockDataJSON)
+		if err != nil {
+			return nil, err
+		}
+
+		receipt.LockInfo.UnlockParams = &types.SpendLockPublicParams{
+			LockID: receipt.LockInfo.LockID,
+			Data:   unlockDataEncoded,
+		}
+
 		paramsJSON, err := json.Marshal(receipt.LockInfo.UnlockParams)
 		if err != nil {
 			return nil, err
 		}
-		encodedCall, err := unlock.EncodeCallDataJSONCtx(ctx, paramsJSON)
+		encodedCall, err := spendLock.EncodeCallDataJSONCtx(ctx, paramsJSON)
 		if err != nil {
 			return nil, err
 		}

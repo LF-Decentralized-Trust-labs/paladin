@@ -115,14 +115,9 @@ type UnlockRecipient struct {
 	Amount *pldtypes.HexUint256 `json:"amount"`
 }
 
-type TransferLockedPublicParams struct {
-	TxId          string            `json:"txId"`
-	LockID        pldtypes.Bytes32  `json:"lockId"`
-	LockedInputs  []string          `json:"lockedInputs"`
-	LockedOutputs []string          `json:"lockedOutputs"`
-	Outputs       []string          `json:"outputs"`
-	Proof         pldtypes.HexBytes `json:"proof"`
-	Data          pldtypes.HexBytes `json:"data"`
+type SpendLockPublicParams struct {
+	LockID pldtypes.Bytes32  `json:"lockId"`
+	Data   pldtypes.HexBytes `json:"data"`
 }
 
 type BalanceOfParam struct {

@@ -58,13 +58,23 @@ func (h *prepareUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTra
 		return res, err
 	}
 
+	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", params.From, req.ResolvedVerifiers)
+	if err != nil {
+		return nil, err
+	}
+
+	cancelOutputs, err := h.noto.prepareOutputs(fromAddress, (*pldtypes.HexUint256)(states.lockedInputs.total), []string{notary, params.From})
+	if err != nil {
+		return nil, err
+	}
+
 	assembledTransaction := &prototk.AssembledTransaction{}
 	assembledTransaction.ReadStates = states.lockedInputs.states
 	assembledTransaction.InfoStates = states.info
 	assembledTransaction.InfoStates = append(assembledTransaction.InfoStates, states.outputs.states...)
-	assembledTransaction.InfoStates = append(assembledTransaction.InfoStates, states.lockedOutputs.states...)
+	assembledTransaction.InfoStates = append(assembledTransaction.InfoStates, cancelOutputs.states...)
 
-	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, states.lockedInputs.coins, states.lockedOutputs.coins, states.outputs.coins)
+	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, states.lockedInputs.coins, nil, states.outputs.coins)
 	if err != nil {
 		return nil, err
 	}
@@ -98,26 +108,42 @@ func (h *prepareUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTra
 func (h *prepareUnlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.UnlockParams)
 	lockedInputs := req.Reads
-	allOutputs := h.noto.filterSchema(req.Info, []string{h.noto.coinSchema.Id, h.noto.lockedCoinSchema.Id})
-
-	inputs, err := h.noto.parseCoinList(ctx, "input", lockedInputs)
-	if err != nil {
-		return nil, err
-	}
-	outputs, err := h.noto.parseCoinList(ctx, "output", allOutputs)
+	allOutputs := h.noto.filterSchema(req.Info, []string{h.noto.coinSchema.Id})
+	spendOutputs, cancelOutputs, err := h.noto.splitUnlockOutputs(ctx, allOutputs)
 	if err != nil {
 		return nil, err
 	}
 
-	return h.endorse(ctx, tx, params, req, inputs, outputs)
+	parsedInputs, err := h.noto.parseCoinList(ctx, "input", lockedInputs)
+	if err != nil {
+		return nil, err
+	}
+	parsedSpendOutputs, err := h.noto.parseCoinList(ctx, "output", spendOutputs)
+	if err != nil {
+		return nil, err
+	}
+	parsedCancelOutputs, err := h.noto.parseCoinList(ctx, "output", cancelOutputs)
+	if err != nil {
+		return nil, err
+	}
+
+	return h.endorse(ctx, tx, params, req, parsedInputs, parsedSpendOutputs, parsedCancelOutputs)
 }
 
 func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.UnlockParams)
-
 	lockedInputs := req.ReadStates
-	outputs, lockedOutputs := h.noto.splitStates(req.InfoStates)
-	unlockHash, err := h.noto.unlockHashFromStates(ctx, tx.ContractAddress, lockedInputs, lockedOutputs, outputs, inParams.Data)
+	allOutputs := h.noto.filterSchema(req.InfoStates, []string{h.noto.coinSchema.Id})
+	spendOutputs, cancelOutputs, err := h.noto.splitUnlockOutputs(ctx, allOutputs)
+	if err != nil {
+		return nil, err
+	}
+
+	spendHash, err := h.noto.unlockHashFromStates(ctx, tx.ContractAddress, lockedInputs, spendOutputs, inParams.Data)
+	if err != nil {
+		return nil, err
+	}
+	cancelHash, err := h.noto.unlockHashFromStates(ctx, tx.ContractAddress, lockedInputs, cancelOutputs, inParams.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -130,8 +156,8 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 	}
 
 	lockOptions := types.NotoLockOptions{
-		UnlockHash: pldtypes.Bytes32(unlockHash),
-		Expiration: pldtypes.HexUint64(0), // Default to no expiration
+		SpendHash:  pldtypes.Bytes32(spendHash),
+		CancelHash: pldtypes.Bytes32(cancelHash),
 	}
 	lockOptionsJSON, err := json.Marshal(lockOptions)
 	if err != nil {
@@ -142,38 +168,44 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 		return nil, err
 	}
 
-	data, err := h.noto.encodeTransactionData(ctx, req.Transaction, req.InfoStates)
-	if err != nil {
-		return nil, err
-	}
-
 	var interfaceABI abi.ABI
 	var functionName string
 	var paramsJSON []byte
+	var txData pldtypes.HexBytes
 
 	switch tx.DomainConfig.Variant {
 	case types.NotoVariantDefault:
-		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
-		functionName = "setLockOptions"
-		params := &NotoSetLockOptionsParams{
-			TxId:         req.Transaction.TransactionId,
-			LockID:       inParams.LockID,
-			LockedInputs: endorsableStateIDs(lockedInputs),
-			Options:      lockOptionsEncoded,
-			Proof:        sender.Payload,
-			Data:         data,
+		txData, err = h.noto.encodeTransactionData(ctx, req.InfoStates)
+		if err == nil {
+			interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
+			functionName = "updateLock"
+			params := &UpdateLockParams{
+				LockID: inParams.LockID,
+				Params: NotoUpdateLockParams{
+					TxId:         req.Transaction.TransactionId,
+					LockedInputs: endorsableStateIDs(lockedInputs),
+					Proof:        sender.Payload,
+					Options:      lockOptionsEncoded,
+				},
+				Data: txData,
+			}
+			paramsJSON, err = json.Marshal(params)
 		}
-		paramsJSON, err = json.Marshal(params)
 	default:
-		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
-		functionName = "prepareUnlock"
-		params := &NotoPrepareUnlock_V0_Params{
-			LockedInputs: endorsableStateIDs(lockedInputs),
-			UnlockHash:   unlockHash.String(),
-			Signature:    sender.Payload,
-			Data:         data,
+		// We must use the legacy encoding for the transaction data, because there is no other place
+		// to pass in the transaction ID on this method
+		txData, err = h.noto.encodeTransactionData_V0(ctx, req.Transaction.TransactionId, req.InfoStates)
+		if err == nil {
+			interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
+			functionName = "prepareUnlock"
+			params := &NotoPrepareUnlock_V0_Params{
+				LockedInputs: endorsableStateIDs(lockedInputs),
+				UnlockHash:   spendHash.String(),
+				Signature:    sender.Payload,
+				Data:         txData,
+			}
+			paramsJSON, err = json.Marshal(params)
 		}
-		paramsJSON, err = json.Marshal(params)
 	}
 	if err != nil {
 		return nil, err

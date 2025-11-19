@@ -131,17 +131,12 @@ export interface UnlockRecipient {
 
 export interface NotoDelegateLockParams {
   lockId: string;
-  unlock: NotoTransferLockedPublicParams;
   delegate: string;
   data: string;
 }
 
-export interface NotoTransferLockedPublicParams {
+export interface SpendLockPublicParams {
   lockId: string;
-  lockedInputs: string[];
-  lockedOutputs: string[];
-  outputs: string[];
-  proof: string;
   data: string;
 }
 
@@ -329,16 +324,33 @@ export class NotoInstance {
     );
   }
 
-  unlockAsDelegate(
+  spendLock(
     from: PaladinVerifier,
-    data: NotoTransferLockedPublicParams
+    data: SpendLockPublicParams
   ) {
     return new TransactionFuture(
       this.paladin,
       this.paladin.sendTransaction({
         type: TransactionType.PUBLIC,
         abi: notoJSON.abi,
-        function: "unlock",
+        function: "spendLock",
+        to: this.address,
+        from: from.lookup,
+        data,
+      })
+    );
+  }
+
+  cancelLock(
+    from: PaladinVerifier,
+    data: SpendLockPublicParams
+  ) {
+    return new TransactionFuture(
+      this.paladin,
+      this.paladin.sendTransaction({
+        type: TransactionType.PUBLIC,
+        abi: notoJSON.abi,
+        function: "cancelLock",
         to: this.address,
         from: from.lookup,
         data,
@@ -381,17 +393,17 @@ export class NotoInstance {
     );
   }
 
-  encodeUnlock(data: NotoTransferLockedPublicParams) {
+  encodeSpendLock(data: SpendLockPublicParams) {
     return new ethers.Interface(notoJSON.abi).encodeFunctionData(
-      "transferLocked",
-      [
-        data.lockId,
-        data.lockedInputs,
-        data.lockedOutputs,
-        data.outputs,
-        data.proof,
-        data.data,
-      ]
+      "spendLock",
+      [data.lockId, data.data]
+    );
+  }
+
+  encodeCancelLock(data: SpendLockPublicParams) {
+    return new ethers.Interface(notoJSON.abi).encodeFunctionData(
+      "cancelLock",
+      [data.lockId, data.data]
     );
   }
 

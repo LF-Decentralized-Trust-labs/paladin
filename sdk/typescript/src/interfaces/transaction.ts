@@ -1,5 +1,5 @@
 import { BigNumberish, ethers } from "ethers";
-import { NotoTransferLockedPublicParams } from "../domains/noto";
+import { SpendLockPublicParams } from "../domains/noto";
 import { IStateBase } from "./states";
 
 export interface IBlock {
@@ -110,7 +110,7 @@ export interface INotoDomainReceipt {
   lockInfo?: {
     lockId: string;
     delegate?: string;
-    unlockParams?: NotoTransferLockedPublicParams;
+    unlockParams?: SpendLockPublicParams;
     unlockCall?: string;
   };
   data?: string;

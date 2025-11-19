@@ -396,7 +396,7 @@ func (s *notoTestSuite) TestNotoLock() {
 		Public().
 		From(recipient2Name).
 		To(noto.Address).
-		Function("transferLocked").
+		Function("spendLock").
 		Inputs(unlockReceipt.LockInfo.UnlockParams).
 		Send().
 		Wait(3 * time.Second)
