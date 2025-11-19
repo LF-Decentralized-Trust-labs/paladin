@@ -28,12 +28,13 @@ export async function newUnlockHash(
   };
   const types = {
     Unlock: [
+      { name: "txId", type: "bytes32" },
       { name: "lockedInputs", type: "bytes32[]" },
       { name: "outputs", type: "bytes32[]" },
       { name: "data", type: "bytes" },
     ],
   };
-  const value = { lockedInputs, outputs, data };
+  const value = { txId, lockedInputs, outputs, data };
   return TypedDataEncoder.hash(domain, types, value);
 }
 
@@ -45,14 +46,15 @@ export function fakeTXO() {
   return randomBytes32();
 }
 
-export function createLockOptions(spendHash?: string, cancelHash?: string) {
+export function createLockOptions(spendTxId: string, spendHash: string, cancelHash: string) {
   const options = {
-    spendHash: spendHash || ZeroHash,
-    cancelHash: cancelHash || ZeroHash,
+    spendTxId: spendTxId,
+    spendHash: spendHash,
+    cancelHash: cancelHash,
   };
   return ethers.AbiCoder.defaultAbiCoder().encode(
-    ["tuple(bytes32,bytes32)"],
-    [[options.spendHash, options.cancelHash]]
+    ["tuple(bytes32,bytes32,bytes32)"],
+    [[options.spendTxId, options.spendHash, options.cancelHash]]
   );
 }
 
@@ -214,11 +216,12 @@ export async function doPrepareUnlock(
   noto: Noto,
   lockId: string,
   lockedInputs: string[],
+  spendTxId: string,
   spendHash: string,
   cancelHash: string,
-  data: string
+  data: string,
 ) {
-  const options = createLockOptions(spendHash, cancelHash);
+  const options = createLockOptions(spendTxId , spendHash, cancelHash);
   const params = {
     txId: txId,
     lockedInputs: lockedInputs,

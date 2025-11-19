@@ -28,6 +28,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/signpayloads"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/verifiers"
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 )
 
@@ -52,8 +53,9 @@ func (h *prepareUnlockHandler) Init(ctx context.Context, tx *types.ParsedTransac
 func (h *prepareUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.UnlockParams)
 	notary := tx.DomainConfig.NotaryLookup
+	spendTxId := pldtypes.Bytes32UUIDFirst16(uuid.New())
 
-	res, states, err := h.assembleStates(ctx, tx, params, req)
+	res, states, err := h.assembleStates(ctx, tx, &spendTxId, params, req)
 	if err != nil || res.AssemblyResult != prototk.AssembleTransactionResponse_OK {
 		return res, err
 	}
@@ -139,11 +141,20 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 		return nil, err
 	}
 
-	spendHash, err := h.noto.unlockHashFromStates(ctx, tx.ContractAddress, lockedInputs, spendOutputs, inParams.Data)
+	var spendTxId pldtypes.Bytes32
+	lockInfoStates := h.noto.filterSchema(req.InfoStates, []string{h.noto.lockInfoSchema.Id})
+	if len(lockInfoStates) > 0 {
+		lock, err := h.noto.unmarshalLock(lockInfoStates[0].StateDataJson)
+		if err == nil {
+			spendTxId = lock.SpendTxId
+		}
+	}
+
+	spendHash, err := h.noto.unlockHashFromStates(ctx, tx.ContractAddress, spendTxId.String(), lockedInputs, spendOutputs, inParams.Data)
 	if err != nil {
 		return nil, err
 	}
-	cancelHash, err := h.noto.unlockHashFromStates(ctx, tx.ContractAddress, lockedInputs, cancelOutputs, inParams.Data)
+	cancelHash, err := h.noto.unlockHashFromStates(ctx, tx.ContractAddress, spendTxId.String(), lockedInputs, cancelOutputs, inParams.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +167,7 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 	}
 
 	lockOptions := types.NotoLockOptions{
+		SpendTxId:  spendTxId,
 		SpendHash:  pldtypes.Bytes32(spendHash),
 		CancelHash: pldtypes.Bytes32(cancelHash),
 	}

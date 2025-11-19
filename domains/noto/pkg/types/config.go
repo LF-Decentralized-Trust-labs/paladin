@@ -133,11 +133,13 @@ var NotoVariantLegacy pldtypes.HexUint64 = 0x0000
 var NotoVariantDefault pldtypes.HexUint64 = 0x0001
 
 type NotoLockOptions struct {
+	SpendTxId  pldtypes.Bytes32 `json:"spendTxId"`
 	SpendHash  pldtypes.Bytes32 `json:"spendHash"`
 	CancelHash pldtypes.Bytes32 `json:"cancelHash"`
 }
 
 var NotoLockOptionsABI = &abi.ParameterArray{
+	{Name: "spendTxId", Type: "bytes32"},
 	{Name: "spendHash", Type: "bytes32"},
 	{Name: "cancelHash", Type: "bytes32"},
 }

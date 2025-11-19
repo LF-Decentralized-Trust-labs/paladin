@@ -40,6 +40,7 @@ type ReceiptStates struct {
 
 type ReceiptLockInfo struct {
 	LockID       pldtypes.Bytes32       `json:"lockId"`
+	SpendTxId    *pldtypes.Bytes32      `json:"spendTxId,omitempty"`    // only set for prepareUnlock
 	UnlockParams *SpendLockPublicParams `json:"unlockParams,omitempty"` // only set for prepareUnlock
 	UnlockCall   pldtypes.HexBytes      `json:"unlockCall,omitempty"`   // only set for prepareUnlock
 }
@@ -107,9 +108,10 @@ var NotoLockedCoinABI = &abi.Parameter{
 }
 
 type NotoLockInfo struct {
-	Salt   pldtypes.Bytes32     `json:"salt"`
-	LockID pldtypes.Bytes32     `json:"lockId"`
-	Owner  *pldtypes.EthAddress `json:"owner"`
+	Salt      pldtypes.Bytes32     `json:"salt"`
+	LockID    pldtypes.Bytes32     `json:"lockId"`
+	Owner     *pldtypes.EthAddress `json:"owner"`
+	SpendTxId pldtypes.Bytes32     `json:"spendTxId"`
 }
 
 var NotoLockInfoABI = &abi.Parameter{
@@ -120,6 +122,7 @@ var NotoLockInfoABI = &abi.Parameter{
 		{Name: "salt", Type: "bytes32"},
 		{Name: "lockId", Type: "bytes32", Indexed: true},
 		{Name: "owner", Type: "address", Indexed: true},
+		{Name: "spendTxId", Type: "bytes32"},
 	},
 }
 

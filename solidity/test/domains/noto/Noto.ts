@@ -164,9 +164,10 @@ describe("Noto", function () {
       noto,
       lockId,
       [locked1],
+      unlockTxId,
       spendHash,
       cancelHash,
-      unlockData
+      unlockData,
     );
 
     // Delegate the lock
@@ -323,9 +324,10 @@ describe("Noto", function () {
         noto,
         lockId,
         [locked1],
+        unlockTxId,
         spendHash,
         cancelHash,
-        unlockData
+        unlockData,
       )
     ).to.be.rejectedWith("NotoDuplicateTransaction");
   });

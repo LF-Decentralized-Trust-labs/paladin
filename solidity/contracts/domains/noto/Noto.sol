@@ -47,7 +47,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
 
     bytes32 private constant UNLOCK_TYPEHASH =
         keccak256(
-            "Unlock(bytes32[] lockedInputs,bytes32[] outputs,bytes data)"
+            "Unlock(bytes32 txId,bytes32[] lockedInputs,bytes32[] outputs,bytes data)"
         );
 
     string private _name;
@@ -57,7 +57,8 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
     mapping(bytes32 => bool) private _unspent;
     mapping(bytes32 => bytes32) private _locked; // state ID => lock ID
     mapping(bytes32 => NotoLock) private _locks; // lock ID => lock details
-    mapping(bytes32 => bool) private _txids;
+    mapping(bytes32 => bool) private _txIds; // track used transaction IDs
+    mapping(bytes32 => bytes32) private _lockTxIds; // tx ID => lock ID (for prepared transactions)
 
     function requireNotary(address addr) internal view {
         if (addr != notary) {
@@ -73,10 +74,10 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
     }
 
     function useTxId(bytes32 txId) internal {
-        if (_txids[txId]) {
+        if (_txIds[txId]) {
             revert NotoDuplicateTransaction(txId);
         }
-        _txids[txId] = true;
+        _txIds[txId] = true;
     }
 
     modifier onlyNotary() {
@@ -304,6 +305,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
     }
 
     function _unlockHash(
+        bytes32 txId,
         bytes32[] memory lockedInputs,
         bytes32[] memory outputs,
         bytes memory data
@@ -311,6 +313,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         bytes32 structHash = keccak256(
             abi.encode(
                 UNLOCK_TYPEHASH,
+                txId,
                 keccak256(abi.encodePacked(lockedInputs)),
                 keccak256(abi.encodePacked(outputs)),
                 keccak256(data)
@@ -439,14 +442,14 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         bytes memory options
     ) internal virtual {
         LockOptions memory lockOptions = abi.decode(options, (LockOptions));
-        if (lockOptions.spendHash == 0 || lockOptions.cancelHash == 0) {
+        if (lockOptions.spendTxId == 0 || lockOptions.spendHash == 0 || lockOptions.cancelHash == 0) {
             revert NotoInvalidOptions(options);
         }
-
-        _locks[lockId].options = LockOptions({
-            spendHash: lockOptions.spendHash,
-            cancelHash: lockOptions.cancelHash
-        });
+        if (_txIds[lockOptions.spendTxId]) {
+            revert NotoDuplicateTransaction(lockOptions.spendTxId);
+        }
+        _locks[lockId].options = lockOptions;
+        _lockTxIds[lockOptions.spendTxId] = lockId;
     }
 
     /**
@@ -499,13 +502,17 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
             data,
             (bytes32, bytes32[], bytes32[], bytes)
         );
-        // Note: we cannot check the txId here, because the spendLock call may be
-        // disclosed before being executed, and an attacker could front-run to
-        // spend the txId and then prevent this from being executed.
+
+        NotoLock storage lock = _locks[lockId];
+        if (lock.options.spendTxId != 0 && lock.options.spendTxId != params.txId) {
+            revert NotoInvalidTransaction(params.txId);
+        }
+        _txIds[params.txId] = true;
 
         // If a specific unlock operation is expected, verify the hash matches
         if (expectedHash != 0) {
             bytes32 actualHash = _unlockHash(
+                params.txId,
                 params.inputs,
                 params.outputs,
                 params.data
@@ -516,7 +523,6 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto, INotoErrors {
         }
 
         // The operation must unlock all the locked inputs
-        NotoLock storage lock = _locks[lockId];
         if (lock.stateCount != params.inputs.length) {
             revert NotoInvalidUnlockInputs(
                 lock.stateCount,

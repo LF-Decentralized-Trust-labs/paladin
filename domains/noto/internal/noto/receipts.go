@@ -25,7 +25,6 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/paladin/domains/noto/pkg/types"
 	"github.com/LF-Decentralized-Trust-labs/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LF-Decentralized-Trust-labs/paladin/toolkit/pkg/prototk"
-	"github.com/google/uuid"
 )
 
 func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptRequest) (res *prototk.BuildReceiptResponse, err error) {
@@ -47,6 +46,9 @@ func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 			return nil, err
 		}
 		receipt.LockInfo = &types.ReceiptLockInfo{LockID: lock.LockID}
+		if !lock.SpendTxId.IsZero() {
+			receipt.LockInfo.SpendTxId = &lock.SpendTxId
+		}
 	}
 
 	receipt.States.Inputs, err = n.receiptStates(ctx, n.filterSchema(req.InputStates, []string{n.coinSchema.Id}))
@@ -87,8 +89,13 @@ func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 			return nil, err
 		}
 
+		var txId string
+		if receipt.LockInfo.SpendTxId != nil {
+			txId = receipt.LockInfo.SpendTxId.String()
+		}
+
 		unlockData := &UnlockDataStrings{
-			TxId:    pldtypes.Bytes32UUIDFirst16(uuid.New()).HexString(),
+			TxId:    txId,
 			Inputs:  endorsableStateIDs(n.filterSchema(req.ReadStates, []string{n.lockedCoinSchema.Id})),
 			Outputs: endorsableStateIDs(spendOutputs),
 			Data:    receipt.Data,

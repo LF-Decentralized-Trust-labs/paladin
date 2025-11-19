@@ -215,11 +215,6 @@ func TestPrepareUnlock(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, prototk.EndorseTransactionResponse_ENDORSER_SUBMIT, endorseRes.EndorsementResult)
 
-	spendHash, err := n.unlockHashFromStates(ctx, ethtypes.MustNewAddress(contractAddress), readStates, infoStates[2:3], pldtypes.MustParseHexBytes("0x1234"))
-	require.NoError(t, err)
-	cancelHash, err := n.unlockHashFromStates(ctx, ethtypes.MustNewAddress(contractAddress), readStates, infoStates[3:4], pldtypes.MustParseHexBytes("0x1234"))
-	require.NoError(t, err)
-
 	// Prepare once to test base invoke
 	prepareRes, err := n.PrepareTransaction(ctx, &prototk.PrepareTransactionRequest{
 		Transaction:       tx,
@@ -243,10 +238,33 @@ func TestPrepareUnlock(t *testing.T) {
 	assert.JSONEq(t, expectedFunction, prepareRes.Transaction.FunctionAbiJson)
 	assert.Nil(t, prepareRes.Transaction.ContractAddress)
 
+	// Extract the options from the response to get the generated SpendTxId
+	var actualParams UpdateLockParams
+	err = json.Unmarshal([]byte(prepareRes.Transaction.ParamsJson), &actualParams)
+	require.NoError(t, err)
+	cv, err := types.NotoLockOptionsABI.DecodeABIDataCtx(ctx, actualParams.Params.Options, 0)
+	require.NoError(t, err)
+	optionsJSON, err := cv.JSON()
+	require.NoError(t, err)
+	var actualOptions types.NotoLockOptions
+	err = json.Unmarshal(optionsJSON, &actualOptions)
+	require.NoError(t, err)
+
+	// Compute the expected hashes using the generated SpendTxId (not the prepareUnlock transaction ID)
+	spendHash, err := n.unlockHashFromStates(ctx, ethtypes.MustNewAddress(contractAddress), actualOptions.SpendTxId.HexString(), readStates, infoStates[2:3], pldtypes.MustParseHexBytes("0x1234"))
+	require.NoError(t, err)
+	cancelHash, err := n.unlockHashFromStates(ctx, ethtypes.MustNewAddress(contractAddress), actualOptions.SpendTxId.HexString(), readStates, infoStates[3:4], pldtypes.MustParseHexBytes("0x1234"))
+	require.NoError(t, err)
+
+	// Verify the options have the correct structure
 	expectedOptions := types.NotoLockOptions{
+		SpendTxId:  actualOptions.SpendTxId,
 		SpendHash:  pldtypes.Bytes32(spendHash),
 		CancelHash: pldtypes.Bytes32(cancelHash),
 	}
+	require.Equal(t, pldtypes.Bytes32(spendHash), actualOptions.SpendHash)
+	require.Equal(t, pldtypes.Bytes32(cancelHash), actualOptions.CancelHash)
+
 	expectedOptionsJSON, err := json.Marshal(expectedOptions)
 	require.NoError(t, err)
 	expectedOptionsEncoded, err := types.NotoLockOptionsABI.EncodeABIDataJSONCtx(ctx, expectedOptionsJSON)
