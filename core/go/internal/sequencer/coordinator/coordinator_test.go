@@ -28,6 +28,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/transport"
 	"github.com/LFDT-Paladin/paladin/core/mocks/componentsmocks"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,7 +50,7 @@ func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, originatorIden
 	}
 	mockDomainAPI := componentsmocks.NewDomainSmartContract(t)
 
-	coordinator, err := NewCoordinator(ctx, pldtypes.RandAddress(), mockDomainAPI, mocks.transportWriter, mocks.clock, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, 5, 5, 500, 10, "node1",
+	coordinator, err := NewCoordinator(ctx, pldtypes.RandAddress(), mockDomainAPI, mocks.transportWriter, mocks.clock, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, 5, 5, 500, 10, mocks.clock.Duration(10000), "node1",
 		metrics,
 		func(context.Context, *transaction.Transaction) {
 			// Not used
@@ -82,6 +83,9 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	ctx := context.Background()
 	originator := "sender@senderNode"
 	builder := NewCoordinatorBuilderForTesting(t, State_Idle)
+	builder.GetDomainAPI().On("ContractConfig").Return(&prototk.ContractConfig{
+		CoordinatorSelection: prototk.ContractConfig_COORDINATOR_SENDER,
+	})
 	c, mocks := builder.Build(ctx)
 
 	// Start by simulating the originator and delegate a transaction to the coordinator

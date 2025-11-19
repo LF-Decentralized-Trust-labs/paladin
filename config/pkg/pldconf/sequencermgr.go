@@ -26,6 +26,7 @@ type SequencerConfig struct {
 	BlockHeightTolerance          *uint64           `json:"blockHeightTolerance"`
 	BlockRange                    *uint64           `json:"blockRange"`
 	ClosingGracePeriod            *int              `json:"closingGracePeriod"`
+	HeartbeatInterval             *string           `json:"heartbeatInterval"`
 	MaxInflightTransactions       *int              `json:"maxInflightTransactions"`
 	MaxDispatchAhead              *int              `json:"maxDispatchAhead"`
 	TargetActiveCoordinators      *int              `json:"targetActiveCoordinators"`
@@ -40,6 +41,7 @@ type SequencerMinimumConfig struct {
 	BlockHeightTolerance          uint64
 	BlockRange                    uint64
 	ClosingGracePeriod            int
+	HeartbeatInterval             time.Duration
 	MaxInflightTransactions       int
 	MaxDispatchAhead              int
 	TargetActiveCoordinators      int
@@ -53,6 +55,7 @@ var SequencerDefaults = SequencerConfig{
 	BlockHeightTolerance:          confutil.P(uint64(10)),
 	BlockRange:                    confutil.P(uint64(100)),
 	ClosingGracePeriod:            confutil.P(4),
+	HeartbeatInterval:             confutil.P("10s"),
 	MaxInflightTransactions:       confutil.P(500),
 	MaxDispatchAhead:              confutil.P(10),
 	TargetActiveCoordinators:      confutil.P(50),
@@ -66,6 +69,7 @@ var SequencerMinimum = SequencerMinimumConfig{
 	BlockHeightTolerance:          1,
 	BlockRange:                    10,
 	ClosingGracePeriod:            1,
+	HeartbeatInterval:             1 * time.Second,
 	MaxInflightTransactions:       1,
 	MaxDispatchAhead:              1,
 	TargetActiveCoordinators:      10,

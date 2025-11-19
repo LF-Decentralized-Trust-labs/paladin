@@ -106,6 +106,7 @@ func init() {
 					}},
 				},
 				Event_TransactionCreated: {
+					Validator: validator_TransactionDoesNotExist,
 					Transitions: []Transition{{
 						To: State_Sending,
 						On: action_SendDelegationRequest,
@@ -124,6 +125,7 @@ func init() {
 					}},
 				},
 				Event_TransactionCreated: {
+					Validator: validator_TransactionDoesNotExist,
 					Actions: []ActionRule{{
 						Action: action_SendDelegationRequest,
 					}},

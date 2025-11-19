@@ -118,7 +118,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			sMgr.metrics.SetActiveSequencers(len(sMgr.sequencers))
 
 			if tx == nil {
-				log.L(ctx).Debugf("No TX provided to create sequencer")
+				log.L(ctx).Debugf("No TX provided to create sequencer for contract %s", contractAddr.String())
 			}
 
 			domainAPI, err := sMgr.components.DomainManager().GetSmartContractByAddress(ctx, sMgr.components.Persistence().NOTX(), contractAddr)
@@ -128,7 +128,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 			}
 
 			if domainAPI == nil {
-				err := i18n.NewError(ctx, msgs.MsgSequencerInternalError, "No domain provided to create sequencer")
+				err := i18n.NewError(ctx, msgs.MsgSequencerInternalError, "No domain provided to create sequencer for contract %s", contractAddr.String())
 				log.L(ctx).Error(err)
 				return nil, err
 			}
@@ -170,6 +170,7 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 				confutil.IntMin(sMgr.config.ClosingGracePeriod, pldconf.SequencerMinimum.ClosingGracePeriod, *pldconf.SequencerDefaults.ClosingGracePeriod),
 				confutil.IntMin(sMgr.config.MaxInflightTransactions, pldconf.SequencerMinimum.MaxInflightTransactions, *pldconf.SequencerDefaults.MaxInflightTransactions),
 				confutil.IntMin(sMgr.config.MaxDispatchAhead, pldconf.SequencerMinimum.MaxDispatchAhead, *pldconf.SequencerDefaults.MaxDispatchAhead),
+				confutil.DurationMin(sMgr.config.HeartbeatInterval, pldconf.SequencerMinimum.HeartbeatInterval, *pldconf.SequencerDefaults.HeartbeatInterval),
 				sMgr.nodeName,
 				sMgr.metrics,
 				func(ctx context.Context, t *coordTransaction.Transaction) {
@@ -177,11 +178,11 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 					sMgr.dispatch(ctx, t, dCtx, transportWriter)
 				},
 				func(contractAddress *pldtypes.EthAddress, coordinatorNode string) {
-					// A new coordinator became active, it might be us or it might be another node.
+					// A new coordinator became active or was confirmed as active. It might be us or it might be another node.
 					// Update metrics and check if we need to stop one to stay within the configured max active coordinators
 					sMgr.updateActiveCoordinators(sMgr.ctx)
 
-					// The originator needs to know where to delegate transactions to
+					// The originator needs to know to delegate transactions to the active coordinator
 					err := originator.SetActiveCoordinator(sMgr.ctx, coordinatorNode)
 					if err != nil {
 						log.L(ctx).Errorf("failed to set active coordinator for contract %s: %s", contractAddr.String(), err)
@@ -237,15 +238,15 @@ func (sMgr *sequencerManager) LoadSequencer(ctx context.Context, dbTX persistenc
 func (sMgr *sequencerManager) setInitialCoordinator(ctx context.Context, tx *components.PrivateTransaction, sequencer *sequencer) error {
 
 	if tx != nil && tx.PreAssembly != nil && tx.PreAssembly.RequiredVerifiers != nil {
+		log.L(ctx).Debugf("setting initial coordinator for %s, updating origininator node pool to include required verifiers of transaction %s", sequencer.contractAddress, tx.ID.String())
 		for _, verifiers := range tx.PreAssembly.RequiredVerifiers {
 			if strings.Contains(verifiers.Lookup, "@") {
-				parts := strings.Split(verifiers.Lookup, "@")
-				sequencer.GetCoordinator().UpdateOriginatorNodePool(ctx, parts[1])
+				sequencer.GetCoordinator().UpdateOriginatorNodePool(ctx, strings.Split(verifiers.Lookup, "@")[1])
 			}
 		}
 
 		// Get the best candidate for an initial coordinator, and use as the delegate for any originated transactions
-		err := sequencer.GetOriginator().SetActiveCoordinator(sMgr.ctx, sequencer.GetCoordinator().GetActiveCoordinatorNode(sMgr.ctx))
+		err := sequencer.GetOriginator().SetActiveCoordinator(sMgr.ctx, sequencer.GetCoordinator().GetActiveCoordinatorNode(sMgr.ctx, true))
 		if err != nil {
 			return err
 		}

@@ -43,16 +43,16 @@ func (_m *MockSeqCoordinator) EXPECT() *MockSeqCoordinator_Expecter {
 }
 
 // GetActiveCoordinatorNode provides a mock function for the type MockSeqCoordinator
-func (_mock *MockSeqCoordinator) GetActiveCoordinatorNode(ctx context.Context) string {
-	ret := _mock.Called(ctx)
+func (_mock *MockSeqCoordinator) GetActiveCoordinatorNode(ctx context.Context, initIfNoActiveCoordinator bool) string {
+	ret := _mock.Called(ctx, initIfNoActiveCoordinator)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetActiveCoordinatorNode")
 	}
 
 	var r0 string
-	if returnFunc, ok := ret.Get(0).(func(context.Context) string); ok {
-		r0 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, bool) string); ok {
+		r0 = returnFunc(ctx, initIfNoActiveCoordinator)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
@@ -66,18 +66,24 @@ type MockSeqCoordinator_GetActiveCoordinatorNode_Call struct {
 
 // GetActiveCoordinatorNode is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockSeqCoordinator_Expecter) GetActiveCoordinatorNode(ctx interface{}) *MockSeqCoordinator_GetActiveCoordinatorNode_Call {
-	return &MockSeqCoordinator_GetActiveCoordinatorNode_Call{Call: _e.mock.On("GetActiveCoordinatorNode", ctx)}
+//   - initIfNoActiveCoordinator bool
+func (_e *MockSeqCoordinator_Expecter) GetActiveCoordinatorNode(ctx interface{}, initIfNoActiveCoordinator interface{}) *MockSeqCoordinator_GetActiveCoordinatorNode_Call {
+	return &MockSeqCoordinator_GetActiveCoordinatorNode_Call{Call: _e.mock.On("GetActiveCoordinatorNode", ctx, initIfNoActiveCoordinator)}
 }
 
-func (_c *MockSeqCoordinator_GetActiveCoordinatorNode_Call) Run(run func(ctx context.Context)) *MockSeqCoordinator_GetActiveCoordinatorNode_Call {
+func (_c *MockSeqCoordinator_GetActiveCoordinatorNode_Call) Run(run func(ctx context.Context, initIfNoActiveCoordinator bool)) *MockSeqCoordinator_GetActiveCoordinatorNode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
+		var arg1 bool
+		if args[1] != nil {
+			arg1 = args[1].(bool)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -88,7 +94,7 @@ func (_c *MockSeqCoordinator_GetActiveCoordinatorNode_Call) Return(s string) *Mo
 	return _c
 }
 
-func (_c *MockSeqCoordinator_GetActiveCoordinatorNode_Call) RunAndReturn(run func(ctx context.Context) string) *MockSeqCoordinator_GetActiveCoordinatorNode_Call {
+func (_c *MockSeqCoordinator_GetActiveCoordinatorNode_Call) RunAndReturn(run func(ctx context.Context, initIfNoActiveCoordinator bool) string) *MockSeqCoordinator_GetActiveCoordinatorNode_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -686,12 +692,12 @@ func (_m *MockTransactionSelector) EXPECT() *MockTransactionSelector_Expecter {
 	return &MockTransactionSelector_Expecter{mock: &_m.Mock}
 }
 
-// SelectNextTransaction provides a mock function for the type MockTransactionSelector
-func (_mock *MockTransactionSelector) SelectNextTransaction(ctx context.Context, event *TransactionStateTransitionEvent) (*transaction.Transaction, error) {
+// SelectNextTransactionToAssemble provides a mock function for the type MockTransactionSelector
+func (_mock *MockTransactionSelector) SelectNextTransactionToAssemble(ctx context.Context, event *TransactionStateTransitionEvent) (*transaction.Transaction, error) {
 	ret := _mock.Called(ctx, event)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SelectNextTransaction")
+		panic("no return value specified for SelectNextTransactionToAssemble")
 	}
 
 	var r0 *transaction.Transaction
@@ -714,19 +720,19 @@ func (_mock *MockTransactionSelector) SelectNextTransaction(ctx context.Context,
 	return r0, r1
 }
 
-// MockTransactionSelector_SelectNextTransaction_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SelectNextTransaction'
-type MockTransactionSelector_SelectNextTransaction_Call struct {
+// MockTransactionSelector_SelectNextTransactionToAssemble_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SelectNextTransactionToAssemble'
+type MockTransactionSelector_SelectNextTransactionToAssemble_Call struct {
 	*mock.Call
 }
 
-// SelectNextTransaction is a helper method to define mock.On call
+// SelectNextTransactionToAssemble is a helper method to define mock.On call
 //   - ctx context.Context
 //   - event *TransactionStateTransitionEvent
-func (_e *MockTransactionSelector_Expecter) SelectNextTransaction(ctx interface{}, event interface{}) *MockTransactionSelector_SelectNextTransaction_Call {
-	return &MockTransactionSelector_SelectNextTransaction_Call{Call: _e.mock.On("SelectNextTransaction", ctx, event)}
+func (_e *MockTransactionSelector_Expecter) SelectNextTransactionToAssemble(ctx interface{}, event interface{}) *MockTransactionSelector_SelectNextTransactionToAssemble_Call {
+	return &MockTransactionSelector_SelectNextTransactionToAssemble_Call{Call: _e.mock.On("SelectNextTransactionToAssemble", ctx, event)}
 }
 
-func (_c *MockTransactionSelector_SelectNextTransaction_Call) Run(run func(ctx context.Context, event *TransactionStateTransitionEvent)) *MockTransactionSelector_SelectNextTransaction_Call {
+func (_c *MockTransactionSelector_SelectNextTransactionToAssemble_Call) Run(run func(ctx context.Context, event *TransactionStateTransitionEvent)) *MockTransactionSelector_SelectNextTransactionToAssemble_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -744,12 +750,12 @@ func (_c *MockTransactionSelector_SelectNextTransaction_Call) Run(run func(ctx c
 	return _c
 }
 
-func (_c *MockTransactionSelector_SelectNextTransaction_Call) Return(transaction1 *transaction.Transaction, err error) *MockTransactionSelector_SelectNextTransaction_Call {
+func (_c *MockTransactionSelector_SelectNextTransactionToAssemble_Call) Return(transaction1 *transaction.Transaction, err error) *MockTransactionSelector_SelectNextTransactionToAssemble_Call {
 	_c.Call.Return(transaction1, err)
 	return _c
 }
 
-func (_c *MockTransactionSelector_SelectNextTransaction_Call) RunAndReturn(run func(ctx context.Context, event *TransactionStateTransitionEvent) (*transaction.Transaction, error)) *MockTransactionSelector_SelectNextTransaction_Call {
+func (_c *MockTransactionSelector_SelectNextTransactionToAssemble_Call) RunAndReturn(run func(ctx context.Context, event *TransactionStateTransitionEvent) (*transaction.Transaction, error)) *MockTransactionSelector_SelectNextTransactionToAssemble_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -779,59 +785,6 @@ type MockTransactionPool_Expecter struct {
 
 func (_m *MockTransactionPool) EXPECT() *MockTransactionPool_Expecter {
 	return &MockTransactionPool_Expecter{mock: &_m.Mock}
-}
-
-// GetCurrentOriginatorPool provides a mock function for the type MockTransactionPool
-func (_mock *MockTransactionPool) GetCurrentOriginatorPool(ctx context.Context) []string {
-	ret := _mock.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetCurrentOriginatorPool")
-	}
-
-	var r0 []string
-	if returnFunc, ok := ret.Get(0).(func(context.Context) []string); ok {
-		r0 = returnFunc(ctx)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
-		}
-	}
-	return r0
-}
-
-// MockTransactionPool_GetCurrentOriginatorPool_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCurrentOriginatorPool'
-type MockTransactionPool_GetCurrentOriginatorPool_Call struct {
-	*mock.Call
-}
-
-// GetCurrentOriginatorPool is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockTransactionPool_Expecter) GetCurrentOriginatorPool(ctx interface{}) *MockTransactionPool_GetCurrentOriginatorPool_Call {
-	return &MockTransactionPool_GetCurrentOriginatorPool_Call{Call: _e.mock.On("GetCurrentOriginatorPool", ctx)}
-}
-
-func (_c *MockTransactionPool_GetCurrentOriginatorPool_Call) Run(run func(ctx context.Context)) *MockTransactionPool_GetCurrentOriginatorPool_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockTransactionPool_GetCurrentOriginatorPool_Call) Return(strings []string) *MockTransactionPool_GetCurrentOriginatorPool_Call {
-	_c.Call.Return(strings)
-	return _c
-}
-
-func (_c *MockTransactionPool_GetCurrentOriginatorPool_Call) RunAndReturn(run func(ctx context.Context) []string) *MockTransactionPool_GetCurrentOriginatorPool_Call {
-	_c.Call.Return(run)
-	return _c
 }
 
 // GetPooledTransactionsByOriginatorNodeAndIdentity provides a mock function for the type MockTransactionPool

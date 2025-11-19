@@ -22,6 +22,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/common/go/pkg/log"
 	"github.com/LFDT-Paladin/paladin/core/internal/msgs"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 )
 
 func (t *Transaction) SetPreviousTransaction(ctx context.Context, previousTransaction *Transaction) {
@@ -113,6 +114,12 @@ func (t *Transaction) initializeDependencies(ctx context.Context) error {
 
 	return nil
 
+}
+
+func action_recordRevert(_ context.Context, txn *Transaction) error {
+	now := pldtypes.TimestampNow()
+	txn.revertTime = &now
+	return nil
 }
 
 func action_initializeDependencies(ctx context.Context, txn *Transaction) error {

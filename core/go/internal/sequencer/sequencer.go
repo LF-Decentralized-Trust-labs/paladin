@@ -59,6 +59,7 @@ type sequencerManager struct {
 	metrics                       metrics.DistributedSequencerMetrics
 	sequencers                    map[string]*sequencer
 	blockHeight                   int64
+	blockHeightMutex              sync.RWMutex
 	engineIntegration             common.EngineIntegration
 	targetActiveCoordinatorsLimit int // Max number of contracts this node aims to concurrently act as coordinator for. It could still efficiently respond to dispatch requests from other coordinators because the originator will remain in memory.
 	targetActiveSequencersLimit   int // Max number of sequencers this node aims to retain in memory concurrently. Hitting this limit will cause an attempt to remove the lowest priority sequencer from memory, and hence require it to be recreated from persisted state if it is needed in the future
@@ -146,7 +147,9 @@ func (sMgr *sequencerManager) pollForIncompleteTransactions(ctx context.Context,
 
 		for {
 			resumedTransactions := 0
-			pendingTx, err := sMgr.components.TxManager().QueryTransactionsResolved(sMgr.ctx, query.NewQueryBuilder().Limit(1000).Query(), sMgr.components.Persistence().NOTX(), true)
+
+			// Originators are responsible for resuming and re-delegating their own transactions.
+			pendingTx, err := sMgr.components.TxManager().QueryTransactionsResolved(sMgr.ctx, query.NewQueryBuilder().Limit(1000).NotEqual("submitMode", string(pldapi.SubmitModeRemote)).Query(), sMgr.components.Persistence().NOTX(), true)
 			if err != nil {
 				log.L(sMgr.ctx).Errorf("Error querying pending transactions to resume incomplete ones: %s", err)
 			}
@@ -179,11 +182,6 @@ func (sMgr *sequencerManager) pollForIncompleteTransactions(ctx context.Context,
 			}
 		}
 	}()
-}
-
-func (sMgr *sequencerManager) OnNewBlockHeight(ctx context.Context, blockHeight int64) {
-	log.L(ctx).Tracef("new block height %d", blockHeight)
-	sMgr.blockHeight = blockHeight
 }
 
 // Synchronous function to submit a deployment request which is asynchronously processed
@@ -392,7 +390,7 @@ func (sMgr *sequencerManager) HandleTxResume(ctx context.Context, txi *component
 		if txi.Transaction.SubmitMode.V() != pldapi.SubmitModeAuto {
 			return i18n.NewError(ctx, msgs.MsgSequencerPrepareNotSupportedDeploy)
 		}
-		log.L(sMgr.ctx).Infof("resuming deploy transaction %s from signer %s", txi.Transaction.ID, txi.Transaction.From)
+		log.L(sMgr.ctx).Infof("resuming deploy transaction %s from %s", txi.Transaction.ID, txi.Transaction.From)
 		return sMgr.handleDeployTx(ctx, &components.PrivateContractDeploy{
 			ID:     *tx.ID,
 			Domain: tx.Domain,
@@ -407,7 +405,7 @@ func (sMgr *sequencerManager) HandleTxResume(ctx context.Context, txi *component
 	if txi.Function == nil || txi.Function.Definition == nil {
 		return i18n.NewError(ctx, msgs.MsgSequencerFunctionNotProvided)
 	}
-	log.L(sMgr.ctx).Infof("resuming transaction %s from signer %s", tx.ID, tx.From)
+	log.L(sMgr.ctx).Infof("resuming transaction %s from %s", tx.ID, tx.From)
 	return sMgr.handleTx(ctx, sMgr.components.Persistence().NOTX(), &components.PrivateTransaction{
 		ID:      *tx.ID,
 		Domain:  tx.Domain,
@@ -473,7 +471,16 @@ func (sMgr *sequencerManager) handleTx(ctx context.Context, dbTX persistence.DBT
 	return nil
 }
 
+func (sMgr *sequencerManager) OnNewBlockHeight(ctx context.Context, blockHeight int64) {
+	log.L(ctx).Tracef("new block height %d", blockHeight)
+	sMgr.blockHeightMutex.Lock()
+	defer sMgr.blockHeightMutex.Unlock()
+	sMgr.blockHeight = blockHeight
+}
+
 func (sMgr *sequencerManager) GetBlockHeight() int64 {
+	sMgr.blockHeightMutex.RLock()
+	defer sMgr.blockHeightMutex.RUnlock()
 	return sMgr.blockHeight
 }
 
@@ -654,6 +661,7 @@ func (sMgr *sequencerManager) HandlePublicTXsWritten(ctx context.Context, dbTX p
 
 func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, confirmedTxn *components.TxCompletion, from *pldtypes.EthAddress, nonce *pldtypes.HexUint64) error {
 	log.L(sMgr.ctx).Tracef("HandleTransactionConfirmed %s %s %+v", confirmedTxn.TransactionID.String(), from.String(), nonce)
+	sMgr.metrics.IncConfirmedTransactions()
 
 	// A transaction can be confirmed after the coordinating node has restarted. The coordinator doesn't persist the private TX, it relies
 	// on the originating node to delegate the private TX to it. HandleTransactionConfirmed first checks if a public TX for that request has been confirmed
@@ -679,10 +687,13 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 			// For a deploy we won't have tracked the transaction through the state machine, but we can load it ready for upcoming transactions and start
 			// off by selecting the next coordinator for the contract
 			sequencer.GetCoordinator().SelectActiveCoordinatorNode(ctx)
-		} else if sequencer.GetCoordinator().GetActiveCoordinatorNode(ctx) == sMgr.nodeName {
+		} else if sequencer.GetCoordinator().GetActiveCoordinatorNode(ctx, false) == sMgr.nodeName {
 			mtx := sequencer.GetCoordinator().GetTransactionByID(ctx, confirmedTxn.TransactionID)
 			if mtx == nil {
-				log.L(ctx).Infof("Coordinator not tracking transaction ID %s", confirmedTxn.TransactionID)
+				log.L(ctx).Warnf("Coordinator not tracking transaction ID %s", confirmedTxn.TransactionID)
+				// We have been told that a public TX has been confirmed on chain (either successful or failed)
+				// but we're not tracking it in the sequencer. Since we're only using this callback to
+				// update the sequencer's state we'll log a warning but ignore it
 				return nil
 			}
 
@@ -712,7 +723,6 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 			if err != nil {
 				return err
 			}
-			sMgr.metrics.IncConfirmedTransactions()
 		}
 	}
 
@@ -721,6 +731,7 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 
 func (sMgr *sequencerManager) HandleTransactionFailed(ctx context.Context, dbTX persistence.DBTX, failures []*components.PublicTxMatch) error {
 	log.L(sMgr.ctx).Tracef("HandleTransactionFailed %d", len(failures))
+	sMgr.metrics.IncRevertedTransactions()
 
 	privateFailureReceipts := make([]*components.ReceiptInputWithOriginator, len(failures))
 
@@ -751,7 +762,10 @@ func (sMgr *sequencerManager) HandleTransactionFailed(ctx context.Context, dbTX 
 		if sequencer != nil {
 			mtx := sequencer.GetCoordinator().GetTransactionByID(ctx, tx.TransactionID)
 			if mtx == nil {
-				return fmt.Errorf("coordinator not tracking transaction ID %s", tx.TransactionID)
+				// Log that we're not currently tracking this transaction in the sequencer, but we can continue for the other receipts
+				// since the only purpose of this function is to update the sequencer's in memory state
+				log.L(sMgr.ctx).Warnf("coordinator not tracking transaction ID %s, no sequencer to pass failure to", tx.TransactionID)
+				return nil
 			}
 
 			if tx.From == nil {
@@ -779,7 +793,6 @@ func (sMgr *sequencerManager) HandleTransactionFailed(ctx context.Context, dbTX 
 			}
 
 		}
-		sMgr.metrics.IncRevertedTransactions()
 	}
 
 	// Distribute the receipts to the correct location - either local if we were the submitter, or remote.

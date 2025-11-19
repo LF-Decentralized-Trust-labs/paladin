@@ -164,6 +164,8 @@ func (e *engineIntegration) AssembleAndSign(ctx context.Context, transactionID u
 	// if our block height is ahead of the coordinator, there is a small chance that we we assemble a transaction that the coordinator will not be able to
 	// endorse yet but it is better to wait around on the endorsement flow than to wait around on the assemble flow which is single threaded per domain
 
+	// TODO - we're not actually policing anything based on block height differences?
+
 	err := e.delegateDomainContext.ImportSnapshot(stateLocksJSON)
 	if err != nil {
 		log.L(ctx).Errorf("error importing state locks: %s", err)
@@ -328,7 +330,7 @@ func (e *engineIntegration) assembleAndSign(ctx context.Context, transactionID u
 		for _, state := range transaction.PostAssembly.OutputStates {
 			stateIDs += "," + state.ID.String()
 		}
-		log.L(ctx).Debugf("Assembled transaction %s, state IDs: %s", transactionID, stateIDs)
+		log.L(ctx).Debugf("Assembled transaction %s, state IDs: %s, result: %s", transactionID, stateIDs, transaction.PostAssembly.AssemblyResult.String())
 	}
 	return transaction.PostAssembly, nil
 }

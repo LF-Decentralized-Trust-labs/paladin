@@ -273,6 +273,7 @@ func init() {
 						{
 							// MRW TODO - we're re-pooling this transaction. Should we discard other
 							// assembled transactions i.e. re-pool everything this coordinator is tracking?
+							On: action_recordRevert,
 							If: guard_HasRevertReason,
 							To: State_Pooled,
 						},

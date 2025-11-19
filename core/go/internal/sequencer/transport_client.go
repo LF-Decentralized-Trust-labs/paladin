@@ -61,6 +61,8 @@ func (sMgr *sequencerManager) HandlePaladinMsg(ctx context.Context, message *com
 		go sMgr.handleDelegationRequestAcknowledgment(sMgr.ctx, message)
 	case transport.MessageType_Dispatched:
 		go sMgr.handleDispatchedEvent(sMgr.ctx, message)
+	case transport.MessageType_HandoverRequest:
+		go sMgr.handleHandoverRequest(sMgr.ctx, message)
 	case transport.MessageType_PreDispatchRequest:
 		go sMgr.handlePreDispatchRequest(sMgr.ctx, message)
 	case transport.MessageType_PreDispatchResponse:
@@ -128,19 +130,15 @@ func (sMgr *sequencerManager) handleAssembleRequest(ctx context.Context, message
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("failed to obtain sequencer to pass assemble request event to %v:", err)
-		return
-	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
 	assembleRequestEvent := &originatorTransaction.AssembleRequestReceivedEvent{}
 	assembleRequestEvent.TransactionID = uuid.MustParse(assembleRequest.TransactionId)
 	assembleRequestEvent.RequestID = uuid.MustParse(assembleRequest.AssembleRequestId)
-	assembleRequestEvent.Coordinator = seq.GetCoordinator().GetActiveCoordinatorNode(ctx)
+	assembleRequestEvent.Coordinator = seq.GetCoordinator().GetActiveCoordinatorNode(ctx, true)
 	assembleRequestEvent.CoordinatorsBlockHeight = assembleRequest.BlockHeight
 	assembleRequestEvent.StateLocksJSON = assembleRequest.StateLocks
 	assembleRequestEvent.PreAssembly = assembleRequest.PreAssembly
@@ -178,12 +176,8 @@ func (sMgr *sequencerManager) handleAssembleResponse(ctx context.Context, messag
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("failed to obtain sequencer to pass assemble response event %v:", err)
-		return
-	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -232,14 +226,11 @@ func (sMgr *sequencerManager) handleAssembleError(ctx context.Context, message *
 	log.L(ctx).Debugf("assemble error for TX %s: %s", assembleError.TransactionId, errorString)
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("failed to obtain sequencer to pass assemble error event %v:", err)
 		return
 	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
-		return
-	}
+
 	seq.GetCoordinator().QueueEvent(ctx, assembleErrorEvent)
 }
 
@@ -276,12 +267,8 @@ func (sMgr *sequencerManager) handleCoordinatorHeartbeatNotification(ctx context
 	heartbeatEvent.EventTime = time.Now()
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("failed to obtain sequencer to pass heartbeat event to %v:", err)
-		return
-	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -294,6 +281,33 @@ func (sMgr *sequencerManager) handleCoordinatorHeartbeatNotification(ctx context
 	}
 
 	seq.GetOriginator().QueueEvent(ctx, heartbeatEvent)
+}
+
+func (sMgr *sequencerManager) handleHandoverRequest(ctx context.Context, message *components.ReceivedMessage) {
+
+	handoverRequest := &engineProto.HandoverRequest{}
+	err := proto.Unmarshal(message.Payload, handoverRequest)
+	if err != nil {
+		sMgr.logPaladinMessageUnmarshalError(ctx, message, err)
+		return
+	}
+
+	contractAddress := sMgr.parseContractAddressString(ctx, handoverRequest.ContractAddress, message)
+	if contractAddress == nil {
+		return
+	}
+
+	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
+	if seq == nil || err != nil {
+		log.L(ctx).Errorf("failed to obtain sequencer to pass handover request event to %v:", err)
+		return
+	}
+
+	handoverRequestEvent := &coordinator.HandoverRequestEvent{}
+	handoverRequestEvent.Requester = message.FromNode
+	handoverRequestEvent.EventTime = time.Now()
+
+	seq.GetCoordinator().QueueEvent(ctx, handoverRequestEvent)
 }
 
 func (sMgr *sequencerManager) handlePreDispatchRequest(ctx context.Context, message *components.ReceivedMessage) {
@@ -311,12 +325,8 @@ func (sMgr *sequencerManager) handlePreDispatchRequest(ctx context.Context, mess
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("failed to obtain sequencer to pass pre dispatch event to %v:", err)
-		return
-	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -352,12 +362,8 @@ func (sMgr *sequencerManager) handlePreDispatchResponse(ctx context.Context, mes
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("failed to obtain sequencer to pass pre dispatch event to %v:", err)
-		return
-	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -386,12 +392,8 @@ func (sMgr *sequencerManager) handleDispatchedEvent(ctx context.Context, message
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("failed to obtain sequencer to pass dispatch confirmation event to %v:", err)
-		return
-	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -423,12 +425,8 @@ func (sMgr *sequencerManager) handleDelegationRequest(ctx context.Context, messa
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("failed to obtain sequencer to pass endorsement event %v:", err)
-		return
-	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -481,8 +479,6 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 	}
 
 	// If this TX ID doesn't exist in the "transactions" DB, insert here.
-	// Convert TX ID string to UUID
-
 	theUUID := pldtypes.MustParseBytes32(transactionSpecification.TransactionId).UUIDFirst16()
 	txID := theUUID
 	if err != nil {
@@ -551,9 +547,6 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 			return
 		}
 	}
-
-	// TODO - if we are endorsing but not the node the transaction was submitted to we could choose this point to populate our "transactions"
-	// DB with the inputs since the endorse gives us 99% of the original transaction inputs.
 
 	transactionVerifiers := make([]*prototk.ResolvedVerifier, len(endorsementRequest.Verifiers))
 	for i, v := range endorsementRequest.Verifiers {
@@ -714,14 +707,16 @@ func (sMgr *sequencerManager) handleEndorsementRequest(ctx context.Context, mess
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("handleEndorsementRequest failed to obtain sequencer to pass endorsement event %v:", err)
 		return
 	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
-		return
-	}
+
+	// Take this opportunity to update the state machine that there is a currently active coordinator. Heartbeats serve the same
+	// purpose but are on a set interval, so updating whenever we are given transactions to endorse is a useful optimisation
+	seq.GetCoordinator().QueueEvent(ctx, &coordinator.EndorsementRequestedEvent{
+		From: message.FromNode,
+	})
 
 	sMgr.metrics.IncEndorsedTransactions()
 	err = seq.GetTransportWriter().SendEndorsementResponse(ctx, endorsementRequest.TransactionId, endorsementRequest.IdempotencyKey, contractAddress.String(), attResult, endorsementResult, revertReason, transactionEndorsement.Name, endorsementRequest.Party, message.FromNode)
@@ -745,12 +740,8 @@ func (sMgr *sequencerManager) handleEndorsementResponse(ctx context.Context, mes
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("handleEndorsementRequest failed to obtain sequencer to pass endorsement event %v:", err)
-		return
-	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -796,12 +787,8 @@ func (sMgr *sequencerManager) handleNonceAssigned(ctx context.Context, message *
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("handleNonceAssignedEvent failed to obtain sequencer to pass nonce assigned event %v:", err)
-		return
-	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -827,12 +814,8 @@ func (sMgr *sequencerManager) handleTransactionSubmitted(ctx context.Context, me
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("handleTransactionSubmitted failed to obtain sequencer to pass transaction submitted event %v:", err)
-		return
-	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 
@@ -858,12 +841,8 @@ func (sMgr *sequencerManager) handleTransactionConfirmed(ctx context.Context, me
 	}
 
 	seq, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), *contractAddress, nil, nil)
-	if err != nil {
+	if seq == nil || err != nil {
 		log.L(ctx).Errorf("handleTransactionSubmitted failed to obtain sequencer to pass transaction submitted event %v:", err)
-		return
-	}
-	if seq == nil {
-		log.L(ctx).Errorf("no sequencer found for contract %s", contractAddress.String())
 		return
 	}
 

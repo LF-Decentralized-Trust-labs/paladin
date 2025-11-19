@@ -54,6 +54,8 @@ func (tm *txManager) blockIndexerPreCommit(
 	// order of confirmation delivery between public and private transactions)
 	finalizeInfo := make([]*components.ReceiptInput, 0, len(txMatches))
 	failedForPrivateTx := make([]*components.PublicTxMatch, 0)
+
+	// First finalize all public transactions, and record all failed public submissions for private transactions
 	for _, match := range txMatches {
 		log.L(ctx).Infof("blockIndexerPreCommit: processing next TX match %+v", match)
 		switch match.TransactionType.V() {
@@ -67,9 +69,31 @@ func (tm *txManager) blockIndexerPreCommit(
 				log.L(ctx).Infof("Base ledger transaction for private transaction %s FAILED hash=%s block=%d result=%s",
 					match.TransactionID, match.Hash, match.BlockNumber, match.Result)
 				failedForPrivateTx = append(failedForPrivateTx, match)
-			} else {
+			}
+		}
+	}
+
+	// It's technically possible that more than 1 public transaction result is received for the same
+	// private transaction, even within the same block. If any one public TX is successful the private
+	// TX is considered successful so we need to double check if any failures can be ignored because of
+	// a success that overrides it.
+	for _, match := range txMatches {
+		log.L(ctx).Infof("blockIndexerPreCommit: re-processing next TX match %+v", match)
+		switch match.TransactionType.V() {
+		case pldapi.TransactionTypePrivate:
+			if match.Result.V() == pldapi.TXResult_SUCCESS {
 				log.L(ctx).Infof("Base ledger transaction for private transaction %s SUCCESS hash=%s block=%d result=%s",
 					match.TransactionID, match.Hash, match.BlockNumber, match.Result)
+
+				// If this private TX also had a failed public submission in this block, ignore it
+				for i, failedTx := range failedForPrivateTx {
+					if failedTx.TransactionID == match.TransactionID {
+						log.L(ctx).Infof("Base ledger transaction for private transaction %s SUCCESS overrides failed public submission %s hash=%s block=%d result=%s",
+							match.TransactionID, failedTx.TransactionID, failedTx.Hash, failedTx.BlockNumber, failedTx.Result)
+						// Remove the failed transaction from the list
+						failedForPrivateTx = append(failedForPrivateTx[:i], failedForPrivateTx[i+1:]...)
+					}
+				}
 			}
 		}
 	}

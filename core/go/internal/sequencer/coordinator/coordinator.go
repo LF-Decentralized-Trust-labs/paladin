@@ -22,6 +22,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/LFDT-Paladin/paladin/core/internal/components"
@@ -73,7 +74,7 @@ type SeqCoordinator interface {
 	ProcessEvent(ctx context.Context, event common.Event) error
 
 	// Manage the state of the coordinator
-	GetActiveCoordinatorNode(ctx context.Context) string
+	GetActiveCoordinatorNode(ctx context.Context, initIfNoActiveCoordinator bool) string
 	SelectActiveCoordinatorNode(ctx context.Context) (string, error)
 	GetCurrentState() State
 	UpdateOriginatorNodePool(ctx context.Context, originatorNode string)
@@ -92,6 +93,7 @@ type coordinator struct {
 	activeCoordinatorNode                      string
 	activeCoordinatorBlockHeight               uint64
 	heartbeatIntervalsSinceStateChange         int
+	heartbeatInterval                          common.Duration
 	transactionsByID                           map[uuid.UUID]*transaction.Transaction
 	currentBlockHeight                         uint64
 	activeCoordinatorsFlushPointsBySignerNonce map[string]*common.FlushPoint
@@ -104,23 +106,24 @@ type coordinator struct {
 	requestTimeout                 common.Duration
 	assembleTimeout                common.Duration
 	originatorNodePool             []string // The (possibly changing) list of originator nodes
+	originatorNodePoolMutex        sync.RWMutex
 	nodeName                       string
 	coordinatorSelectionBlockRange uint64
 	maxInflightTransactions        int
 	maxDispatchAhead               int
 
 	/* Dependencies */
-	domainAPI          components.DomainSmartContract
-	transportWriter    transport.TransportWriter
-	clock              common.Clock
-	engineIntegration  common.EngineIntegration
-	syncPoints         syncpoints.SyncPoints
-	readyForDispatch   func(context.Context, *transaction.Transaction)
-	coordinatorStarted func(contractAddress *pldtypes.EthAddress, coordinatorNode string)
-	coordinatorIdle    func(contractAddress *pldtypes.EthAddress)
-	heartbeatCtx       context.Context
-	heartbeatCancel    context.CancelFunc
-	metrics            metrics.DistributedSequencerMetrics
+	domainAPI         components.DomainSmartContract
+	transportWriter   transport.TransportWriter
+	clock             common.Clock
+	engineIntegration common.EngineIntegration
+	syncPoints        syncpoints.SyncPoints
+	readyForDispatch  func(context.Context, *transaction.Transaction)
+	coordinatorActive func(contractAddress *pldtypes.EthAddress, coordinatorNode string)
+	coordinatorIdle   func(contractAddress *pldtypes.EthAddress)
+	heartbeatCtx      context.Context
+	heartbeatCancel   context.CancelFunc
+	metrics           metrics.DistributedSequencerMetrics
 
 	/*Algorithms*/
 	transactionSelector TransactionSelector
@@ -150,10 +153,11 @@ func NewCoordinator(
 	closingGracePeriod int,
 	maxInflightTransactions int,
 	maxDispatchAhead int,
+	heartbeatInterval common.Duration,
 	nodeName string,
 	metrics metrics.DistributedSequencerMetrics,
 	readyForDispatch func(context.Context, *transaction.Transaction),
-	coordinatorStarted func(contractAddress *pldtypes.EthAddress, coordinatorNode string),
+	coordinatorActive func(contractAddress *pldtypes.EthAddress, coordinatorNode string),
 	coordinatorIdle func(contractAddress *pldtypes.EthAddress),
 ) (*coordinator, error) {
 	c := &coordinator{
@@ -173,8 +177,9 @@ func NewCoordinator(
 		engineIntegration:                  engineIntegration,
 		syncPoints:                         syncPoints,
 		readyForDispatch:                   readyForDispatch,
-		coordinatorStarted:                 coordinatorStarted,
+		coordinatorActive:                  coordinatorActive,
 		coordinatorIdle:                    coordinatorIdle,
+		heartbeatInterval:                  heartbeatInterval,
 		nodeName:                           nodeName,
 		metrics:                            metrics,
 		coordinatorEvents:                  make(chan common.Event, 50), // TODO >1 only required for sqlite coarse-grained locks. Should this be DB-dependent?
@@ -279,8 +284,8 @@ func (c *coordinator) sendHandoverRequest(ctx context.Context) {
 	}
 }
 
-func (c *coordinator) GetActiveCoordinatorNode(ctx context.Context) string {
-	if c.activeCoordinatorNode == "" {
+func (c *coordinator) GetActiveCoordinatorNode(ctx context.Context, initIfNoActiveCoordinator bool) string {
+	if initIfNoActiveCoordinator && c.activeCoordinatorNode == "" {
 		// If we don't yet have an active coordinator, select one based on the appropriate algorithm for the contract type
 		activeCoordinator, err := c.SelectActiveCoordinatorNode(ctx)
 		if err != nil {
@@ -309,11 +314,13 @@ func (c *coordinator) SelectActiveCoordinatorNode(ctx context.Context) (string, 
 		}
 	} else if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_ENDORSER {
 		// E.g. Pente
-		// Make a fair choice about the next coordinator, but for now just choose the node this request arrived at
+		// Make a fair choice about the next coordinator
 		if len(c.originatorNodePool) == 0 {
 			log.L(ctx).Warnf("no pool to select a coordinator from yet")
 			return "", nil
 		} else {
+			c.originatorNodePoolMutex.RLock()
+			defer c.originatorNodePoolMutex.RUnlock()
 			// Round block number down to the nearest block range (e.g. block 1012, 1013, 1014 etc. all become 1000 for hashing)
 			effectiveBlockNumber := c.currentBlockHeight - (c.currentBlockHeight % c.coordinatorSelectionBlockRange)
 
@@ -321,7 +328,7 @@ func (c *coordinator) SelectActiveCoordinatorNode(ctx context.Context) (string, 
 			h := fnv.New32a()
 			h.Write([]byte(strconv.FormatUint(effectiveBlockNumber, 10)))
 			coordinator = c.originatorNodePool[int(h.Sum32())%len(c.originatorNodePool)]
-			log.L(ctx).Debugf("coordinator %s selected based on hash modulus of the originator pool", coordinator)
+			log.L(ctx).Debugf("coordinator %s selected based on hash modulus of the originator pool %+v", coordinator, c.originatorNodePool)
 		}
 	} else if c.domainAPI.ContractConfig().GetCoordinatorSelection() == prototk.ContractConfig_COORDINATOR_SENDER {
 		// E.g. Zeto
@@ -338,15 +345,20 @@ func (c *coordinator) SelectActiveCoordinatorNode(ctx context.Context) (string, 
 	return coordinator, nil
 }
 
+// The originator node pool is the list of all parties who should receive heartbeats, and who are
+// eligible to be chosen as the coordinator for ContractConfig_COORDINATOR_ENDORSER domains such as Pente
 func (c *coordinator) UpdateOriginatorNodePool(ctx context.Context, originatorNode string) {
-	if strings.Contains(originatorNode, "@") {
-		log.L(ctx).Errorf("originator ID provided, originator node expected: %s", originatorNode)
-	}
-	log.L(ctx).Debugf("updating originator node pool with node %s", originatorNode)
+	log.L(ctx).Debugf("updating originator node pool for contract %s with node %s", c.contractAddress.String(), originatorNode)
+	c.originatorNodePoolMutex.Lock()
+	defer c.originatorNodePoolMutex.Unlock()
 	if !slices.Contains(c.originatorNodePool, originatorNode) {
 		c.originatorNodePool = append(c.originatorNodePool, originatorNode)
-		slices.Sort(c.originatorNodePool)
 	}
+	if !slices.Contains(c.originatorNodePool, c.nodeName) {
+		// As coordinator we should always be in the pool as it's used to select the next coordinator when necessary
+		c.originatorNodePool = append(c.originatorNodePool, c.nodeName)
+	}
+	slices.Sort(c.originatorNodePool)
 }
 
 // TODO consider renaming to setDelegatedTransactionsForOriginator to make it clear that we expect originators to include all inflight transactions in every delegation request and therefore this is
@@ -381,7 +393,7 @@ func (c *coordinator) addToDelegatedTransactions(ctx context.Context, originator
 				//TODO the following logic should be moved to the state machine so that all the rules are in one place
 				if c.stateMachine.currentState == State_Active {
 					if from == transaction.State_Assembling || to == transaction.State_Pooled {
-						err := c.selectNextTransaction(ctx, &TransactionStateTransitionEvent{
+						err := c.selectNextTransactionToAssemble(ctx, &TransactionStateTransitionEvent{
 							TransactionID: t.ID,
 							From:          from,
 							To:            to,

@@ -32,6 +32,8 @@ func (c *coordinator) sendHeartbeat(ctx context.Context, contractAddress *pldtyp
 	snapshot := c.getSnapshot(ctx)
 	log.L(ctx).Debugf("sending heartbeats for sequencer %s", contractAddress.String())
 	var err error
+	c.originatorNodePoolMutex.RLock()
+	defer c.originatorNodePoolMutex.RUnlock()
 	for _, node := range c.originatorNodePool {
 		if node != c.nodeName {
 			log.L(ctx).Debugf("sending heartbeat to %s", node)

@@ -24,6 +24,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/coordinator/transaction"
 	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/testutil"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,6 +42,9 @@ func TestCoordinator_Idle_ToActive_OnTransactionsDelegated(t *testing.T) {
 
 	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Idle)
 	builder.OriginatorIdentityPool(originator)
+	builder.GetDomainAPI().On("ContractConfig").Return(&prototk.ContractConfig{
+		CoordinatorSelection: prototk.ContractConfig_COORDINATOR_SENDER,
+	})
 	c, _ := builder.Build(ctx)
 
 	assert.Equal(t, coordinator.State_Idle, c.GetCurrentState())
@@ -154,6 +158,11 @@ func TestCoordinator_Prepared_ToActive_OnTransactionConfirmed_IfFlushCompleted(t
 	ctx := context.Background()
 	builder := coordinator.NewCoordinatorBuilderForTesting(t, coordinator.State_Prepared)
 	c, _ := builder.Build(ctx)
+
+	domainAPI := builder.GetDomainAPI()
+	domainAPI.On("ContractConfig").Return(&prototk.ContractConfig{
+		CoordinatorSelection: prototk.ContractConfig_COORDINATOR_SENDER,
+	})
 
 	err := c.ProcessEvent(ctx, &coordinator.TransactionConfirmedEvent{
 		From:  builder.GetFlushPointSignerAddress(),

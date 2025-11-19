@@ -56,6 +56,7 @@ type Transaction struct {
 	nonce                *uint64
 	stateMachine         *StateMachine
 	revertReason         pldtypes.HexBytes
+	revertTime           *pldtypes.Timestamp
 
 	//TODO move the fields that are really just fine grained state info.  Move them into the stateMachine struct ( consider separate structs for each concrete state)
 	heartbeatIntervalsSinceStateChange               int
@@ -66,7 +67,7 @@ type Transaction struct {
 	onCleanup                                        func(context.Context)                           // function to be called when the transaction is removed from memory, e.g. when it is confirmed or reverted
 	pendingEndorsementRequests                       map[string]map[string]*common.IdempotentRequest //map of attestationRequest names to a map of parties to a struct containing information about the active pending request
 	// Pending endorsements mutex
-	pendingEndorsementsMutex  sync.Mutex // MRW TODO still to confirm if this is needed
+	pendingEndorsementsMutex  sync.Mutex
 	pendingPreDispatchRequest *common.IdempotentRequest
 	latestError               string
 	dependencies              *pldapi.TransactionDependencies

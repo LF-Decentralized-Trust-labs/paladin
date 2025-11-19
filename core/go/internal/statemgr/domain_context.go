@@ -321,6 +321,11 @@ func (dc *domainContext) FindAvailableStates(dbTX persistence.DBTX, schemaID pld
 	// Merge in un-flushed states to results
 	states, err = dc.mergeUnFlushedApplyLocks(schema, states, query, true /* exclude spent states */, false)
 	log.L(dc.Context).Debugf("domainContext:FindAvailableStates mergeUnFlushedApplyLocks %d", len(states))
+	if log.IsTraceEnabled() {
+		for _, s := range states {
+			log.L(dc.Context).Tracef("domainContext returning available state %s", s.ID)
+		}
+	}
 
 	return schema, states, err
 }
@@ -468,6 +473,7 @@ func (dc *domainContext) applyLocks(states []*pldapi.State) []*pldapi.State {
 		s.Locks = []*pldapi.StateLock{}
 		for _, l := range dc.txLocks {
 			if l.StateID.Equals(s.ID) {
+				log.L(dc).Tracef("state %s is locked by %s", s.ID, l.Transaction)
 				s.Locks = append(s.Locks, l)
 			}
 		}

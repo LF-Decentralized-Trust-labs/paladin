@@ -194,7 +194,7 @@ func TestSequencerManager_LoadSequencer_NewSequencer(t *testing.T) {
 
 	// Setup coordinator creation expectations
 	mocks.coordinator.EXPECT().UpdateOriginatorNodePool(ctx, mock.Anything).Maybe()
-	mocks.coordinator.EXPECT().GetActiveCoordinatorNode(ctx).Return("test-coordinator").Maybe()
+	mocks.coordinator.EXPECT().GetActiveCoordinatorNode(ctx, true).Return("test-coordinator").Maybe()
 
 	mocks.metrics.EXPECT().SetActiveSequencers(0).Once()
 

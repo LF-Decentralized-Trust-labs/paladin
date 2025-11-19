@@ -92,6 +92,19 @@ func (t *TransactionDispatchConfirmedEvent) GetTransactionID() uuid.UUID {
 	return t.TransactionID
 }
 
+type EndorsementRequestedEvent struct {
+	common.BaseEvent
+	From string
+}
+
+func (*EndorsementRequestedEvent) Type() EventType {
+	return Event_EndorsementRequested
+}
+
+func (*EndorsementRequestedEvent) TypeString() string {
+	return "Event_EndorsementRequested"
+}
+
 type HeartbeatReceivedEvent struct {
 	common.BaseEvent
 	transport.CoordinatorHeartbeatNotification

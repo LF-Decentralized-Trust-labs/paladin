@@ -19,7 +19,7 @@ const SEQUENCER_LOG_CATEGORY_FIELD = "category"
 
 const (
 	CATEGORY_STATE     string = "state"
-	CATEGORY_LIFECYCLE string = "life"
+	CATEGORY_LIFECYCLE string = "lifecycle"
 	CATEGORY_MSGTX     string = "msgtx"
 	CATEGORY_MSGRX     string = "msgrx"
 )

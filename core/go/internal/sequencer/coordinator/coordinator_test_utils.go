@@ -75,7 +75,7 @@ type CoordinatorBuilderForTesting struct {
 	state                                    State
 	maxInflightTransactions                  int
 	originatorIdentityPool                   []string
-	domainAPI                                components.DomainSmartContract
+	domainAPI                                *componentsmocks.DomainSmartContract
 	contractAddress                          *pldtypes.EthAddress
 	currentBlockHeight                       *uint64
 	activeCoordinatorBlockHeight             *uint64
@@ -155,6 +155,10 @@ func (b *CoordinatorBuilderForTesting) GetFlushPointHash() pldtypes.Bytes32 {
 	return *b.flushPointHash
 }
 
+func (b *CoordinatorBuilderForTesting) GetDomainAPI() *componentsmocks.DomainSmartContract {
+	return b.domainAPI
+}
+
 func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator, *CoordinatorDependencyMocks) {
 	if b.contractAddress == nil {
 		b.contractAddress = pldtypes.RandAddress()
@@ -178,13 +182,14 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 		mocks.Clock,
 		mocks.EngineIntegration,
 		mocks.SyncPoints,
-		mocks.Clock.Duration(1000), // Request timeout
-		mocks.Clock.Duration(5000), // Assemble timeout
-		100,                        // Block range size
-		5,                          // Block height tolerance
-		5,                          // Closing grace period (measured in number of heartbeat intervals)
-		b.maxInflightTransactions,  // Max inflight transactions
-		10,                         // Max dispatch ahead
+		mocks.Clock.Duration(1000),  // Request timeout
+		mocks.Clock.Duration(5000),  // Assemble timeout
+		100,                         // Block range size
+		5,                           // Block height tolerance
+		5,                           // Closing grace period (measured in number of heartbeat intervals)
+		b.maxInflightTransactions,   // Max inflight transactions
+		10,                          // Max dispatch ahead
+		mocks.Clock.Duration(10000), // Hearbeat interval
 		"node1",
 		b.metrics,
 		func(context.Context, *transaction.Transaction) {},                    // onReadyForDispatch function, not used in tests

@@ -26,9 +26,9 @@ import (
 	"github.com/google/uuid"
 )
 
-func (c *coordinator) selectNextTransaction(ctx context.Context, event *TransactionStateTransitionEvent) error {
-	log.L(ctx).Infof("selecting next transaction")
-	txn, err := c.transactionSelector.SelectNextTransaction(ctx, event)
+func (c *coordinator) selectNextTransactionToAssemble(ctx context.Context, event *TransactionStateTransitionEvent) error {
+	log.L(ctx).Info("selecting next transaction to assemble")
+	txn, err := c.transactionSelector.SelectNextTransactionToAssemble(ctx, event)
 	if err != nil {
 		log.L(ctx).Errorf("error selecting transaction: %v", err)
 		return err
@@ -61,11 +61,6 @@ func (c *coordinator) GetPooledTransactionsByOriginatorNodeAndIdentity(ctx conte
 	return transactionsByOriginatorNodeAndIdentity
 }
 
-func (c *coordinator) GetCurrentOriginatorPool(ctx context.Context) []string {
-	log.L(ctx).Debugf("%d originator pool identities for contract %s", len(c.originatorNodePool), c.contractAddress.HexString())
-	return c.originatorNodePool
-}
-
 func (c *coordinator) GetTransactionByID(_ context.Context, txnID uuid.UUID) *transaction.Transaction {
 	return c.transactionsByID[txnID]
 }
@@ -73,7 +68,7 @@ func (c *coordinator) GetTransactionByID(_ context.Context, txnID uuid.UUID) *tr
 // define the interface for the transaction selector algorithm
 // we inject into the algorithm a dependency that allows it to query the state of the transaction pool under the control of the coordinator
 type TransactionSelector interface {
-	SelectNextTransaction(ctx context.Context, event *TransactionStateTransitionEvent) (*transaction.Transaction, error)
+	SelectNextTransactionToAssemble(ctx context.Context, event *TransactionStateTransitionEvent) (*transaction.Transaction, error)
 }
 
 // define the interface that the transaction selector algorithm uses to query the state of the transaction pool
@@ -82,9 +77,6 @@ type TransactionPool interface {
 	GetPooledTransactionsByOriginatorNodeAndIdentity(ctx context.Context) map[string]map[string]*transaction.Transaction
 
 	GetTransactionByID(ctx context.Context, txnID uuid.UUID) *transaction.Transaction
-
-	// return a list of all members of the originators organized by their node identity
-	GetCurrentOriginatorPool(ctx context.Context) []string
 }
 
 type transactionSelector struct {
@@ -107,8 +99,8 @@ type originatorLocator struct {
 	identity string
 }
 
-// Determine if there is still an active originator, so we know if it's safe to select a new transaction to start processing
-func (ts *transactionSelector) currentTransactionStillInProgress(ctx context.Context, event *TransactionStateTransitionEvent) (bool, error) {
+// Determine if there is still an active assembler, so we know if it's safe to select a new transaction to start processing
+func (ts *transactionSelector) transactionStillBeingAssembled(ctx context.Context, event *TransactionStateTransitionEvent) (bool, error) {
 
 	log.L(ctx).Debugf("checking event before transaction selection: %+v", event)
 
@@ -124,16 +116,6 @@ func (ts *transactionSelector) currentTransactionStillInProgress(ctx context.Con
 		msg := fmt.Sprintf("transaction %s not found in the transaction pool", txnID)
 		log.L(ctx).Warn(msg)
 		return false, i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
-	}
-
-	if ts.currentAssemblingOriginator != nil {
-		// The state machine event is for a different originator to the one who's currently assmebling. This could be a delayed event and
-		// in the mean time we've started processing a TX from another originator. Disregard the event and wait for the current in-progress
-		// TX to move to a point where we can select the next TX.
-		if pooledTransaction.OriginatorNode() != ts.currentAssemblingOriginator.node || pooledTransaction.OriginatorIdentity() != ts.currentAssemblingOriginator.identity {
-			log.L(ctx).Warnf("current assembling originator is %s, no TX selection changes to take for TX %s from %s", ts.currentAssemblingOriginator, txnID.String(), pooledTransaction.OriginatorNode())
-			return true, nil
-		}
 	}
 
 	switch event.From {
@@ -167,16 +149,23 @@ func (ts *transactionSelector) currentTransactionStillInProgress(ctx context.Con
 	return ts.currentAssemblingOriginator != nil, nil
 }
 
-// We select a new transaction to process in the following cases:
-// 1. The current TX has moved to a state that we consider safe to select a new TX (e.g. the previous TX moved on to endorsing)
-// 2. The coordinator has just become the active coordinator
-// 3. The coordinator has just had a new TX delegated to it
-func (ts *transactionSelector) SelectNextTransaction(ctx context.Context, event *TransactionStateTransitionEvent) (*transaction.Transaction, error) {
-
+// This function provides the single decision point for whether the coordinator can safely start assembling a new transaction.
+// When the function is driven as a result of a transaction state change, it checks whether that change means it is safe to do so.
+// This means that SelectNextTransactionToAssemble() might return no new transaction to assemble, even if there are currently pooled ones.
+// Typically the function is driven in the following cases:
+// 1. The currently assembled TX has moved to a new state.
+//   - This typically means we have moved on to endorsing so we are safe to assemble the next one
+//   - However it could be because assembly timed out and we've re-pooled the timed out one. Again we are safe here to assemble a new one.
+//
+// 2. The coordinator has just become the active coordinator so there are no transactions currently being assembled
+// 3. The coordinator has just had a new TX delegated to it. We might still be assembling something else, so this is just a prompt
+// to consider if we can assemble the next one.
+// TODO policing safety of assembly here isn't ideal. The more we can move into the state machine to lower the likelihood of edge cases causing bugs in TX assembly.
+func (ts *transactionSelector) SelectNextTransactionToAssemble(ctx context.Context, event *TransactionStateTransitionEvent) (*transaction.Transaction, error) {
 	// Certain event types are confirmation that we are safe to select a new transaction. Others mean we
 	// need to wait for the current TX to progress
 	if event != nil {
-		currentTXStillInProgress, err := ts.currentTransactionStillInProgress(ctx, event)
+		currentTXStillInProgress, err := ts.transactionStillBeingAssembled(ctx, event)
 		if err != nil {
 			return nil, err
 		}

@@ -52,6 +52,7 @@ const (
 	Event_HandoverRequestReceived
 	Event_HandoverReceived
 	Event_TransactionStateTransition
+	Event_EndorsementRequested // Only used to update the state machine with updated information about the active coordinator, out of band of the heartbeats
 )
 
 type StateMachine struct {
@@ -97,6 +98,11 @@ func init() {
 					}},
 				},
 				Event_HeartbeatReceived: {
+					Transitions: []Transition{{
+						To: State_Observing,
+					}},
+				},
+				Event_EndorsementRequested: { // We can assert that someone else is actively coordinating if we're receiving these
 					Transitions: []Transition{{
 						To: State_Observing,
 					}},
@@ -177,7 +183,7 @@ func init() {
 						If: guard_Not(guard_HasTransactionsInflight),
 					}},
 				},
-				Event_HandoverRequestReceived: {
+				Event_HandoverRequestReceived: { // MRW TODO - what if N nodes all startup in active mode simultaneously? None of them can request handover because that only happens from State_Observing
 					Transitions: []Transition{{
 						To: State_Flush,
 					}},
@@ -233,9 +239,9 @@ func (c *coordinator) ProcessEvent(ctx context.Context, event common.Event) erro
 		return err
 	}
 
-	//If we get here, the state machine has defined a rule for handling this event
-	//Apply the event to the coordinator to update the internal state
-	// so that the guards and actions defined in the state machine can reference the new internal state of the coordinator
+	// If we get here, the state machine has defined a rule for handling this event. Apply the event to the coordinator to
+	// update the internal state so that the guards and actions defined in the state machine can reference the new internal
+	// state of the coordinator
 	err = c.applyEvent(ctx, event)
 	if err != nil {
 		return err
@@ -323,10 +329,15 @@ func (c *coordinator) applyEvent(ctx context.Context, event common.Event) error 
 		err = c.propagateEventToTransaction(ctx, event)
 	case *NewBlockEvent:
 		c.currentBlockHeight = event.BlockHeight
+	case *EndorsementRequestedEvent:
+		c.activeCoordinatorNode = event.From
+		c.coordinatorActive(c.contractAddress, event.From)
+		c.UpdateOriginatorNodePool(ctx, event.From) // In case we ever take over as coordinator we need to send heartbeats to potential originators
 	case *HeartbeatReceivedEvent:
 		c.activeCoordinatorNode = event.From
 		c.activeCoordinatorBlockHeight = event.BlockHeight
-		c.coordinatorStarted(c.contractAddress, event.From)
+		c.coordinatorActive(c.contractAddress, event.From)
+		c.UpdateOriginatorNodePool(ctx, event.From) // In case we ever take over as coordinator we need to send heartbeats to potential originators
 		for _, flushPoint := range event.FlushPoints {
 			c.activeCoordinatorsFlushPointsBySignerNonce[flushPoint.GetSignerNonce()] = flushPoint
 		}
@@ -407,7 +418,7 @@ func action_StopHeartbeating(ctx context.Context, c *coordinator) error {
 func action_SelectTransaction(ctx context.Context, c *coordinator) error {
 	// Take the opportunity to inform the sequencer lifecycle manager that we have become active so it can decide if that has
 	// casued us to reach the node's limit on active coordinators.
-	c.coordinatorStarted(c.contractAddress, c.nodeName)
+	c.coordinatorActive(c.contractAddress, c.nodeName)
 
 	// For domain types that can coordinate other nodes' transactions (e.g. Noto or Pente), start heartbeating
 	// Domains such as Zeto that are always coordinated on the originating node, heartbeats aren't required
@@ -417,7 +428,7 @@ func action_SelectTransaction(ctx context.Context, c *coordinator) error {
 	}
 
 	// Select our next transaction
-	return c.selectNextTransaction(ctx, nil)
+	return c.selectNextTransactionToAssemble(ctx, nil)
 }
 
 func action_Idle(ctx context.Context, c *coordinator) error {
@@ -429,8 +440,16 @@ func (c *coordinator) heartbeatLoop(ctx context.Context) {
 	if c.heartbeatCtx == nil {
 		c.heartbeatCtx, c.heartbeatCancel = context.WithCancel(ctx)
 
-		log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_STATE)).Debugf("coord    | %s  | Starting heartbeat loop", c.contractAddress.String()[0:8])
-		ticker := time.NewTicker(10 * time.Second)
+		log.L(log.WithLogField(ctx, common.SEQUENCER_LOG_CATEGORY_FIELD, common.CATEGORY_STATE)).Debugf("coord    | %s   | Starting heartbeat loop", c.contractAddress.String()[0:8])
+
+		// Send an initial heartbeat
+		err := c.sendHeartbeat(c.heartbeatCtx, c.contractAddress)
+		if err != nil {
+			log.L(ctx).Errorf("error sending heartbeat: %v", err)
+		}
+
+		// Then every N seconds
+		ticker := time.NewTicker(c.heartbeatInterval.(time.Duration))
 		defer ticker.Stop()
 		for {
 			select {
