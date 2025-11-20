@@ -709,6 +709,7 @@ var (
 	SequencerConfigBlockHeightTolerance          = pdm("SequencerConfig.blockHeightTolerance", "Tolerance for block height differences")
 	SequencerConfigBlockRange                    = pdm("SequencerConfig.blockRange", "Block range size for sequencer operations")
 	SequencerConfigClosingGracePeriod            = pdm("SequencerConfig.closingGracePeriod", "Grace period for closing operations")
+	SequencerConfigHeartbeatInterval             = pdm("SequencerConfig.heartbeatInterval", "Heartbeat interval for coordinators")
 	SequencerConfigMaxInflightTransactions       = pdm("SequencerConfig.maxInflightTransactions", "Maximum number of inflight transactions")
 	SequencerConfigMaxDispatchAhead              = pdm("SequencerConfig.maxDispatchAhead", "Maximum number of transactions to dispatch ahead")
 	SequencerConfigTargetActiveCoordinators      = pdm("SequencerConfig.targetActiveCoordinators", "Target number of active coordinators")

@@ -784,6 +784,7 @@
 | blockHeightTolerance | Tolerance for block height differences | `uint64` | `10` |
 | blockRange | Block range size for sequencer operations | `uint64` | `100` |
 | closingGracePeriod | Grace period for closing operations | `int` | `4` |
+| heartbeatInterval | Heartbeat interval for coordinators | `string` | `"10s"` |
 | maxDispatchAhead | Maximum number of transactions to dispatch ahead | `int` | `10` |
 | maxInflightTransactions | Maximum number of inflight transactions | `int` | `500` |
 | requestTimeout | Timeout for sequencer requests | `string` | `"10s"` |
