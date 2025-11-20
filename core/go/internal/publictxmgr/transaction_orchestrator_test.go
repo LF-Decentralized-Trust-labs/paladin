@@ -22,11 +22,13 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/uuid"
+
 	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
 	"github.com/LFDT-Paladin/paladin/config/pkg/pldconf"
-
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldapi"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -53,6 +55,7 @@ func newInflightTransaction(o *orchestrator, nonce uint64, txMods ...func(tx *DB
 		Nonce:   &nonce,
 		Gas:     2000,
 		Created: pldtypes.TimestampNow(),
+		To:      pldtypes.EthAddressBytes(pldtypes.RandBytes(20)),
 	}
 	for _, txMod := range txMods {
 		txMod(tx)
@@ -80,13 +83,18 @@ func TestNewOrchestratorLoadsSecondTxAndQueuesBalanceCheck(t *testing.T) {
 	o.inFlightTxs = []*inFlightTransactionStageController{mockIT}
 
 	// Return a single transaction - note there's a highest nonce query on startup before the first poll, so we query twice
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		m.db.ExpectQuery("SELECT.*public_txn").WillReturnRows(sqlmock.NewRows([]string{"from", "nonce"}).AddRow(
 			o.signingAddress, 2,
 		))
 	}
 	// Do not return any submissions for it
 	m.db.ExpectQuery("SELECT.*public_submissions").WillReturnRows(sqlmock.NewRows([]string{}))
+
+	// To pass the necessary events to the sequencer the orchestrator needs to retrieve the pub-id to tx-id binding
+	for range 2 {
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
+	}
 
 	addressBalanceChecked := make(chan bool)
 	m.ethClient.On("GetBalance", mock.Anything, o.signingAddress, "latest").Return(pldtypes.Uint64ToUint256(100), nil).Run(func(args mock.Arguments) {
@@ -108,11 +116,9 @@ func TestNewOrchestratorPollingLoopContextCancelled(t *testing.T) {
 
 	o.orchestratorLoopDone = make(chan struct{})
 	o.orchestratorLoop()
-
 }
 
 func TestNewOrchestratorPollingContextCancelledWhileRetrying(t *testing.T) {
-
 	ctx, o, m, done := newTestOrchestrator(t, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Orchestrator.MaxInFlight = confutil.P(10)
 	})
@@ -124,7 +130,6 @@ func TestNewOrchestratorPollingContextCancelledWhileRetrying(t *testing.T) {
 	o.ctxCancel()
 	polled, _ := o.pollAndProcess(ctx)
 	assert.Equal(t, -1, polled)
-
 }
 
 func TestNewOrchestratorPollingRemoveCompleted(t *testing.T) {
@@ -142,11 +147,10 @@ func TestNewOrchestratorPollingRemoveCompleted(t *testing.T) {
 	o.inFlightTxs = []*inFlightTransactionStageController{mockIT}
 	o.state = OrchestratorStateRunning
 
-	for i := 0; i < 2; i++ {
-		// return empty rows - once for max nonce calculation, and then again for the actual query
-		m.db.ExpectQuery("SELECT.*public_txn").WillReturnRows(sqlmock.NewRows([]string{}))
+	for range 2 {
+		m.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{}))
+		m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
 	}
-
 	ocDone, _ := o.Start(ctx)
 
 	// It should go idle
@@ -193,10 +197,8 @@ func TestOrchestratorWaitingForBalance(t *testing.T) {
 	o.state = OrchestratorStateRunning
 	o.lastQueueUpdate = time.Now()
 
-	for range 2 {
-		// return empty rows - once for max nonce calculation, and then again for the actual query
-		m.db.ExpectQuery("SELECT.*public_txn").WillReturnRows(sqlmock.NewRows([]string{}))
-	}
+	m.db.ExpectQuery("SELECT.*public_txn").WillReturnRows(sqlmock.NewRows([]string{}))
+	m.db.ExpectQuery("SELECT.*public_txn_bindings").WillReturnRows(sqlmock.NewRows([]string{"transaction"}).AddRow(uuid.New().String()))
 
 	// Mock the insufficient balance on the account that's submitting
 	m.ethClient.On("GetBalance", mock.Anything, o.signingAddress, "latest").Return(pldtypes.Uint64ToUint256(0), nil)

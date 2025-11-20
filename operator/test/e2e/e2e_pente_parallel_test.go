@@ -329,7 +329,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 				transfers := <-results
 				for _, transfer := range transfers {
 					testLog("SimpleERC20 wait for completion of transfer %s", transfer.ID())
-					Expect(transfer.Wait(10 * time.Second).Error()).To(BeNil())
+					Expect(transfer.Wait(20 * time.Second).Error()).To(BeNil())
 				}
 			}
 		})

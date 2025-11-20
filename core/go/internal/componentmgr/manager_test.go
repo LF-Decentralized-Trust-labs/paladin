@@ -134,7 +134,7 @@ func TestInitOK(t *testing.T) {
 	assert.NotNil(t, cm.TransportManager())
 	assert.NotNil(t, cm.RegistryManager())
 	assert.NotNil(t, cm.PluginManager())
-	assert.NotNil(t, cm.PrivateTxManager())
+	assert.NotNil(t, cm.SequencerManager())
 	assert.NotNil(t, cm.PublicTxManager())
 	assert.NotNil(t, cm.TxManager())
 	assert.NotNil(t, cm.GroupManager())
@@ -205,9 +205,9 @@ func TestStartOK(t *testing.T) {
 	mockPublicTxManager.On("Start").Return(nil)
 	mockPublicTxManager.On("Stop").Return()
 
-	mockPrivateTxManager := componentsmocks.NewPrivateTxManager(t)
-	mockPrivateTxManager.On("Start").Return(nil)
-	mockPrivateTxManager.On("Stop").Return()
+	mockSequencerManager := componentsmocks.NewSequencerManager(t)
+	mockSequencerManager.On("Start").Return(nil)
+	mockSequencerManager.On("Stop").Return()
 
 	mockTxManager := componentsmocks.NewTXManager(t)
 	mockTxManager.On("Start").Return(nil)
@@ -256,7 +256,7 @@ func TestStartOK(t *testing.T) {
 	cm.stateManager = mockStateManager
 	cm.rpcServer = mockRPCServer
 	cm.publicTxManager = mockPublicTxManager
-	cm.privateTxManager = mockPrivateTxManager
+	cm.sequencerManager = mockSequencerManager
 	cm.txManager = mockTxManager
 	cm.groupManager = mockGroupManager
 	cm.rpcAuthManager = mockRPCAuthManager
@@ -345,9 +345,9 @@ func TestCompleteStart_MultipleAuthorizers(t *testing.T) {
 	mockPublicTxManager.On("Start").Return(nil)
 	mockPublicTxManager.On("Stop").Return()
 
-	mockPrivateTxManager := componentsmocks.NewPrivateTxManager(t)
-	mockPrivateTxManager.On("Start").Return(nil)
-	mockPrivateTxManager.On("Stop").Return()
+	mockSequencerManager := componentsmocks.NewSequencerManager(t)
+	mockSequencerManager.On("Start").Return(nil)
+	mockSequencerManager.On("Stop").Return()
 
 	mockTxManager := componentsmocks.NewTXManager(t)
 	mockTxManager.On("Start").Return(nil)
@@ -411,7 +411,7 @@ func TestCompleteStart_MultipleAuthorizers(t *testing.T) {
 	cm.transportManager = mockTransportManager
 	cm.registryManager = mockRegistryManager
 	cm.publicTxManager = mockPublicTxManager
-	cm.privateTxManager = mockPrivateTxManager
+	cm.sequencerManager = mockSequencerManager
 	cm.txManager = mockTxManager
 	cm.groupManager = mockGroupManager
 	cm.stateManager = mockStateManager
@@ -463,9 +463,9 @@ func TestCompleteStart_SingleAuthorizer(t *testing.T) {
 	mockPublicTxManager.On("Start").Return(nil)
 	mockPublicTxManager.On("Stop").Return()
 
-	mockPrivateTxManager := componentsmocks.NewPrivateTxManager(t)
-	mockPrivateTxManager.On("Start").Return(nil)
-	mockPrivateTxManager.On("Stop").Return()
+	mockSequencerManager := componentsmocks.NewSequencerManager(t)
+	mockSequencerManager.On("Start").Return(nil)
+	mockSequencerManager.On("Stop").Return()
 
 	mockTxManager := componentsmocks.NewTXManager(t)
 	mockTxManager.On("Start").Return(nil)
@@ -536,7 +536,7 @@ func TestCompleteStart_SingleAuthorizer(t *testing.T) {
 	cm.transportManager = mockTransportManager
 	cm.registryManager = mockRegistryManager
 	cm.publicTxManager = mockPublicTxManager
-	cm.privateTxManager = mockPrivateTxManager
+	cm.sequencerManager = mockSequencerManager
 	cm.txManager = mockTxManager
 	cm.groupManager = mockGroupManager
 	cm.stateManager = mockStateManager
@@ -604,9 +604,9 @@ func TestCompleteStart_AuthorizerNotFound(t *testing.T) {
 	mockPublicTxManager.On("Start").Return(nil)
 	mockPublicTxManager.On("Stop").Return().Maybe()
 
-	mockPrivateTxManager := componentsmocks.NewPrivateTxManager(t)
-	mockPrivateTxManager.On("Start").Return(nil)
-	mockPrivateTxManager.On("Stop").Return().Maybe()
+	mockSequencerManager := componentsmocks.NewSequencerManager(t)
+	mockSequencerManager.On("Start").Return(nil)
+	mockSequencerManager.On("Stop").Return()
 
 	mockTxManager := componentsmocks.NewTXManager(t)
 	mockTxManager.On("Start").Return(nil)
@@ -649,7 +649,7 @@ func TestCompleteStart_AuthorizerNotFound(t *testing.T) {
 	cm.transportManager = mockTransportManager
 	cm.registryManager = mockRegistryManager
 	cm.publicTxManager = mockPublicTxManager
-	cm.privateTxManager = mockPrivateTxManager
+	cm.sequencerManager = mockSequencerManager
 	cm.txManager = mockTxManager
 	cm.groupManager = mockGroupManager
 	cm.stateManager = mockStateManager
@@ -722,9 +722,9 @@ func TestCompleteStart_AuthorizerMissingFromArray(t *testing.T) {
 	mockPublicTxManager.On("Start").Return(nil)
 	mockPublicTxManager.On("Stop").Return().Maybe()
 
-	mockPrivateTxManager := componentsmocks.NewPrivateTxManager(t)
-	mockPrivateTxManager.On("Start").Return(nil)
-	mockPrivateTxManager.On("Stop").Return().Maybe()
+	mockSequencerManager := componentsmocks.NewSequencerManager(t)
+	mockSequencerManager.On("Start").Return(nil)
+	mockSequencerManager.On("Stop").Return()
 
 	mockTxManager := componentsmocks.NewTXManager(t)
 	mockTxManager.On("Start").Return(nil)
@@ -780,7 +780,7 @@ func TestCompleteStart_AuthorizerMissingFromArray(t *testing.T) {
 	cm.transportManager = mockTransportManager
 	cm.registryManager = mockRegistryManager
 	cm.publicTxManager = mockPublicTxManager
-	cm.privateTxManager = mockPrivateTxManager
+	cm.sequencerManager = mockSequencerManager
 	cm.txManager = mockTxManager
 	cm.groupManager = mockGroupManager
 	cm.stateManager = mockStateManager
@@ -851,9 +851,9 @@ func TestCompleteStart_AuthorizersArrayEmptyButConfigured(t *testing.T) {
 	mockPublicTxManager.On("Start").Return(nil)
 	mockPublicTxManager.On("Stop").Return().Maybe()
 
-	mockPrivateTxManager := componentsmocks.NewPrivateTxManager(t)
-	mockPrivateTxManager.On("Start").Return(nil)
-	mockPrivateTxManager.On("Stop").Return().Maybe()
+	mockSequencerManager := componentsmocks.NewSequencerManager(t)
+	mockSequencerManager.On("Start").Return(nil)
+	mockSequencerManager.On("Stop").Return()
 
 	mockTxManager := componentsmocks.NewTXManager(t)
 	mockTxManager.On("Start").Return(nil)
@@ -902,7 +902,7 @@ func TestCompleteStart_AuthorizersArrayEmptyButConfigured(t *testing.T) {
 	cm.transportManager = mockTransportManager
 	cm.registryManager = mockRegistryManager
 	cm.publicTxManager = mockPublicTxManager
-	cm.privateTxManager = mockPrivateTxManager
+	cm.sequencerManager = mockSequencerManager
 	cm.txManager = mockTxManager
 	cm.groupManager = mockGroupManager
 	cm.stateManager = mockStateManager

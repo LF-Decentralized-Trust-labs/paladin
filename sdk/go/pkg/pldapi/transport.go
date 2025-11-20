@@ -24,11 +24,13 @@ import (
 type ReliableMessageType string
 
 const (
-	RMTState               ReliableMessageType = "state"
-	RMTReceipt             ReliableMessageType = "receipt"
-	RMTPreparedTransaction ReliableMessageType = "prepared_txn"
-	RMTPrivacyGroup        ReliableMessageType = "privacy_group"
-	RMTPrivacyGroupMessage ReliableMessageType = "privacy_group_message"
+	RMTState                       ReliableMessageType = "state"
+	RMTReceipt                     ReliableMessageType = "receipt"
+	RMTPublicTransaction           ReliableMessageType = "public_transaction"
+	RMTPublicTransactionSubmission ReliableMessageType = "public_transaction_submission"
+	RMTPreparedTransaction         ReliableMessageType = "prepared_txn"
+	RMTPrivacyGroup                ReliableMessageType = "privacy_group"
+	RMTPrivacyGroupMessage         ReliableMessageType = "privacy_group_message"
 )
 
 func (t ReliableMessageType) Enum() pldtypes.Enum[ReliableMessageType] {
@@ -39,6 +41,8 @@ func (t ReliableMessageType) Options() []string {
 	return []string{
 		string(RMTState),
 		string(RMTReceipt),
+		string(RMTPublicTransaction),
+		string(RMTPublicTransactionSubmission),
 		string(RMTPreparedTransaction),
 		string(RMTPrivacyGroup),
 		string(RMTPrivacyGroupMessage),

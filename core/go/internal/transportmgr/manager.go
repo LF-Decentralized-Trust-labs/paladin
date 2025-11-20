@@ -55,10 +55,11 @@ type transportManager struct {
 	domainManager    components.DomainManager
 	keyManager       components.KeyManager
 	txManager        components.TXManager
-	privateTxManager components.PrivateTxManager
+	sequencerManager components.SequencerManager
 	identityResolver components.IdentityResolver
 	groupManager     components.GroupManager
 	persistence      persistence.Persistence
+	publicTxManager  components.PublicTxManager
 
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
@@ -133,12 +134,13 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 	tm.domainManager = c.DomainManager()
 	tm.keyManager = c.KeyManager()
 	tm.txManager = c.TxManager()
-	tm.privateTxManager = c.PrivateTxManager()
+	tm.sequencerManager = c.SequencerManager()
 	tm.identityResolver = c.IdentityResolver()
 	tm.groupManager = c.GroupManager()
 	tm.persistence = c.Persistence()
 	tm.reliableMsgWriter = flushwriter.NewWriter(tm.bgCtx, tm.handleReliableMsgBatch, tm.persistence,
 		&tm.conf.ReliableMessageWriter, &pldconf.TransportManagerDefaults.ReliableMessageWriter)
+	tm.publicTxManager = c.PublicTxManager()
 	return nil
 }
 
@@ -256,6 +258,12 @@ func (tm *transportManager) LocalNodeName() string {
 // See docs in components package
 func (tm *transportManager) Send(ctx context.Context, send *components.FireAndForgetMessageSend) error {
 	ctx = log.WithComponent(ctx, "transportmanager")
+	return tm.SendWithNack(ctx, send, nil)
+}
+
+// See docs in components package
+func (tm *transportManager) SendWithNack(ctx context.Context, send *components.FireAndForgetMessageSend, errChan chan error) error {
+	ctx = log.WithComponent(ctx, "transportmanager")
 
 	// Check the message is valid
 	if len(send.Payload) == 0 {
@@ -278,10 +286,12 @@ func (tm *transportManager) Send(ctx context.Context, send *components.FireAndFo
 		msg.CorrelationId = &cidStr
 	}
 
-	return tm.queueFireAndForget(ctx, send.Node, msg)
+	return tm.queueFireAndForget(ctx, send.Node, msg, errChan)
 }
 
-func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName string, msg *prototk.PaladinMsg) error {
+func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName string, msg *prototk.PaladinMsg, errChan chan error) error {
+	log.L(ctx).Debugf("Queueing fire and forget message %s/%+v to node %s ", msg.MessageType, msg.MessageId, nodeName)
+
 	// Use or establish a p connection for the send
 	p, err := tm.getPeer(ctx, nodeName, true)
 	if err == nil {
@@ -296,13 +306,12 @@ func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName str
 	// However, the send is at-most-once, and the higher level message protocols that
 	// use this "send" must be fault tolerant to message loss.
 	select {
-	case p.sendQueue <- msg:
+	case p.sendQueue <- &msgWithErrChan{PaladinMsg: msg, errChan: errChan}:
 		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageId, pldtypes.StrOrEmpty(msg.CorrelationId), p.Name)
 		return nil
 	case <-ctx.Done():
 		return i18n.NewError(ctx, msgs.MsgContextCanceled)
 	}
-
 }
 
 // See docs in components package
@@ -310,6 +319,7 @@ func (tm *transportManager) SendReliable(ctx context.Context, dbTX persistence.D
 	ctx = log.WithComponent(ctx, "transportmanager")
 	peers := make(map[string]*peer)
 	for _, msg := range msgs {
+		log.L(ctx).Debugf("Sending reliable message %s/%+v to node %s", msg.MessageType, msg.ID, msg.Node)
 		var p *peer
 
 		msg.ID = uuid.New()

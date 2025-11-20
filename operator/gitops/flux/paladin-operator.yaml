@@ -88,6 +88,3 @@ spec:
     #     repository: postgres
     #     tag: latest
     #     pullPolicy: IfNotPresent
-       
-      
- 

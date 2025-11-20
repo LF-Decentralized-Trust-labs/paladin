@@ -28,7 +28,7 @@ Some guiding principles that underpin this architecture are as follows:
 
 ### Architecture
 
-![State Store Architecture](../images/state_store.jpg)
+![State Store Architecture](../images/state_store.jpg){.zoomable-image}
 
 Due to the fact that we cannot rely on the consensus algorithm and validators of the base ledger
 to retain backup copies of private data, Paladin is optimized for enterprise RDBMS systems that

@@ -383,7 +383,7 @@ func TestSendTransactionPrivateDeploy(t *testing.T) {
 		mockEmptyReceiptListeners,
 		mockInsertABIAndTransactionOK(true),
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-			mc.privateTxMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			mc.sequencerMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		})
 	defer done()
 
@@ -408,7 +408,7 @@ func TestSendTransactionPrivateInvoke(t *testing.T) {
 		mockEmptyReceiptListeners,
 		mockInsertABIAndTransactionOK(true), mockDomainContractResolve(t, "domain1"),
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-			mc.privateTxMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			mc.sequencerMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		})
 	defer done()
 
@@ -435,7 +435,7 @@ func TestSendTransactionPrivateInvokeFail(t *testing.T) {
 		mockEmptyReceiptListeners,
 		mockInsertABIAndTransactionOK(false), mockDomainContractResolve(t, "domain1"),
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-			mc.privateTxMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("pop"))
+			mc.sequencerMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("pop"))
 		})
 	defer done()
 
@@ -960,7 +960,7 @@ func TestCallTransactionPrivOk(t *testing.T) {
 			res, err := fnDef.Outputs.ParseJSON([]byte(`{"spins": 42}`))
 			require.NoError(t, err)
 
-			mc.privateTxMgr.On("CallPrivateSmartContract", mock.Anything, mock.Anything).
+			mc.sequencerMgr.On("CallPrivateSmartContract", mock.Anything, mock.Anything).
 				Return(res, nil)
 		})
 	defer done()
@@ -989,7 +989,7 @@ func TestCallTransactionPrivFail(t *testing.T) {
 		mockEmptyReceiptListeners,
 		mockInsertABIBeginCommit,
 		mockDomainContractResolve(t, "domain1"), func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-			mc.privateTxMgr.On("CallPrivateSmartContract", mock.Anything, mock.Anything).
+			mc.sequencerMgr.On("CallPrivateSmartContract", mock.Anything, mock.Anything).
 				Return(nil, fmt.Errorf("snap"))
 		})
 	defer done()
@@ -1066,7 +1066,7 @@ func TestChainedPrivateTXInsertWithIdempotencyKeys(t *testing.T) {
 		mockDomainContractResolve(t, "domain1"),
 		func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
 			// Only the parent Txn we create will get a callback
-			mc.privateTxMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			mc.sequencerMgr.On("HandleNewTx", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		},
 	)
 	defer done()

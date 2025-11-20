@@ -36,7 +36,7 @@ func writeTestConfig(t *testing.T) (configFile string) {
 	// log.SetLevel("debug")
 
 	var conf *pldconf.PaladinConfig
-	err := config.ReadAndParseYAMLFile(ctx, "../../test/config/sqlite.memory.config.yaml", &conf)
+	err := config.ReadAndParseYAMLFile(ctx, "./config/sqlite.memory.config.yaml", &conf)
 	require.NoError(t, err)
 
 	// For running in this unit test the dirs are different to the sample config
@@ -111,8 +111,8 @@ domains:
     config:
       address: any
 log:
-  level: info	
-`
+  level: info
+ `
 	var conf pldconf.PaladinConfig
 	err := yaml.Unmarshal([]byte(yamlConf), &conf)
 	require.NoError(t, err)

@@ -58,6 +58,7 @@ type mocksAndTestControl struct {
 	allComponents       *componentsmocks.AllComponents
 	db                  sqlmock.Sqlmock // unless realDB
 	keyManager          components.KeyManager
+	sequencerManager    *componentsmocks.SequencerManager
 	ethClientFactory    *ethclientmocks.EthClientFactory
 	ethClient           *ethclientmocks.EthClient
 	blockIndexer        *blockindexermocks.BlockIndexer
@@ -76,6 +77,7 @@ func baseMocks(t *testing.T) *mocksAndTestControl {
 		ethClient:        ethclientmocks.NewEthClient(t),
 		blockIndexer:     blockindexermocks.NewBlockIndexer(t),
 		txManager:        componentsmocks.NewTXManager(t),
+		sequencerManager: componentsmocks.NewSequencerManager(t),
 	}
 	mocks.allComponents.On("EthClientFactory").Return(mocks.ethClientFactory).Maybe()
 	mocks.ethClientFactory.On("SharedWS").Return(mocks.ethClient).Maybe()
@@ -84,6 +86,7 @@ func baseMocks(t *testing.T) *mocksAndTestControl {
 	mocks.allComponents.On("TxManager").Return(mocks.txManager).Maybe()
 	mocks.allComponents.On("TxManager").Return(mocks.txManager).Maybe()
 	mocks.allComponents.On("MetricsManager").Return(mm).Maybe()
+	mocks.allComponents.On("SequencerManager").Return(mocks.sequencerManager).Maybe()
 	return mocks
 }
 
@@ -210,6 +213,13 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 	})
 	defer done()
 
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.sequencerManager.On("HandlePublicTXsWritten", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	fakeTx := &pldapi.Transaction{}
+	fakeTx.From = "sender@node1"
+	m.txManager.On("GetTransactionByIDWithDBTX", mock.Anything, mock.Anything, mock.Anything).Return(fakeTx, nil)
+
+	// Mock a gas price
 	chainID, _ := rand.Int(rand.Reader, big.NewInt(100000000000000))
 	m.ethClient.On("ChainID").Return(chainID.Int64())
 
@@ -495,7 +505,7 @@ func TestAddActivityWrap(t *testing.T) {
 
 func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 	ctx := context.Background()
-	_, ptm, _, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+	_, ptm, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		mocks.db.MatchExpectationsInOrder(false)
 		mocks.db.ExpectBegin()
 		mocks.db.ExpectQuery("SELECT.*public_txns").WillReturnRows(sqlmock.NewRows([]string{}))
@@ -503,6 +513,8 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 		mocks.db.ExpectCommit()
 	})
 	defer done()
+
+	m.sequencerManager.On("HandlePublicTXsWritten", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// create transaction succeeded
 	tx, err := ptm.SingleTransactionSubmit(ctx, &components.PublicTxSubmission{
@@ -518,7 +530,6 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, tx.From)
 	assert.Equal(t, uint64(1223451), tx.Gas.Uint64())
-
 }
 
 func TestEngineSuspendResumeRealDB(t *testing.T) {
@@ -529,6 +540,12 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 		conf.Orchestrator.StageRetryTime = confutil.P("0ms") // without this we stick in the stage for 10s before we look to suspend
 	})
 	defer done()
+
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.sequencerManager.On("HandlePublicTXsWritten", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	fakeTx := &pldapi.Transaction{}
+	fakeTx.From = "sender@node1"
+	m.txManager.On("GetTransactionByIDWithDBTX", mock.Anything, mock.Anything, mock.Anything).Return(fakeTx, nil)
 
 	keyMapping, err := m.keyManager.ResolveKeyNewDatabaseTX(ctx, "signer1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
@@ -546,6 +563,11 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 		},
 	}
 
+	// Handing events to the sequencer requires the private transaction ID, so make sure we include that in the DB
+	pubTx.Bindings = []*components.PaladinTXReference{
+		{TransactionID: uuid.New(), TransactionType: pldapi.TransactionTypePrivate.Enum()},
+	}
+
 	// We can get the nonce
 	m.ethClient.On("GetTransactionCount", mock.Anything, mock.Anything).Return(confutil.P(pldtypes.HexUint64(1122334455)), nil)
 	// ... but attempting to get it onto the chain is going to block failing
@@ -556,6 +578,12 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
+
+	// TX manager will query TX bindings to pass events to the sequencer. Fake up just enough in `public_txn_bindings`
+	// err = m.allComponents.Persistence().NOTX().DB().Exec(`INSERT INTO "public_txn_bindings" ("pub_txn_id", "transaction", "tx_type", "sender", "contract_address") VALUES (?, ?, ?, ?, ?)`,
+	// 	1, uuid.New(), pldapi.TransactionTypePrivate.Enum(), "signer1", "").
+	// 	Error
+	// require.NoError(t, err)
 
 	// Wait for the orchestrator to kick off and pick this TX up
 	getIFT := func() *inFlightTransactionStageController {
@@ -604,6 +632,12 @@ func TestUpdateTransactionRealDB(t *testing.T) {
 		conf.Manager.OrchestratorIdleTimeout = confutil.P("1ms")
 	})
 	defer done()
+
+	m.sequencerManager.On("HandlePublicTXSubmission", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.sequencerManager.On("HandlePublicTXsWritten", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	fakeTx := &pldapi.Transaction{}
+	fakeTx.From = "sender@node1"
+	m.txManager.On("GetTransactionByIDWithDBTX", mock.Anything, mock.Anything, mock.Anything).Return(fakeTx, nil)
 
 	keyMapping, err := m.keyManager.ResolveKeyNewDatabaseTX(ctx, "signer1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)

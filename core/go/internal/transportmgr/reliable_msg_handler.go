@@ -33,13 +33,15 @@ import (
 )
 
 const (
-	RMHMessageTypeAck                 = "ack"
-	RMHMessageTypeNack                = "nack"
-	RMHMessageTypeStateDistribution   = string(pldapi.RMTState)
-	RMHMessageTypeReceipt             = string(pldapi.RMTReceipt)
-	RMHMessageTypePreparedTransaction = string(pldapi.RMTPreparedTransaction)
-	RMHMessageTypePrivacyGroup        = string(pldapi.RMTPrivacyGroup)
-	RMHMessageTypePrivacyGroupMessage = string(pldapi.RMTPrivacyGroupMessage)
+	RMHMessageTypeAck                         = "ack"
+	RMHMessageTypeNack                        = "nack"
+	RMHMessageTypeStateDistribution           = string(pldapi.RMTState)
+	RMHMessageTypeReceipt                     = string(pldapi.RMTReceipt)
+	RMHMessageTypePublicTransaction           = string(pldapi.RMTPublicTransaction)
+	RMHMessageTypePublicTransactionSubmission = string(pldapi.RMTPublicTransactionSubmission)
+	RMHMessageTypePreparedTransaction         = string(pldapi.RMTPreparedTransaction)
+	RMHMessageTypePrivacyGroup                = string(pldapi.RMTPrivacyGroup)
+	RMHMessageTypePrivacyGroupMessage         = string(pldapi.RMTPrivacyGroupMessage)
 )
 
 type reliableMsgOp struct {
@@ -88,6 +90,8 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX per
 	nullifierUpserts := make(map[string][]*components.NullifierUpsert)
 	var preparedTxnToAdd []*components.PreparedTransactionWithRefs
 	var txReceiptsToFinalize []*components.ReceiptInput
+	var txPublicTransactionsToPersist []*pldapi.PublicTxToDistribute  // public transactions
+	var txPublicTXSubmissionsToPersist []*pldapi.PublicTxToDistribute // public transaction submissions
 	var msgsToReceive []*receivedPrivacyGroupMessage
 	var privacyGroupsToAdd []*receivedPrivacyGroup
 
@@ -97,7 +101,7 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX per
 			if a.Error != "" {
 				log.L(ctx).Errorf("Sending nack to node '%s' for message %s: %s", a.node, a.id, a.Error)
 			}
-			_ = tm.queueFireAndForget(ctx, a.node, buildAck(a.id, a.Error))
+			_ = tm.queueFireAndForget(ctx, a.node, buildAck(a.id, a.Error), nil)
 		}
 	})
 
@@ -110,7 +114,7 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX per
 			if err == nil && sd.NullifierAlgorithm != nil && sd.NullifierVerifierType != nil && sd.NullifierPayloadType != nil {
 				// We need to build any nullifiers that are required, before we dispatch to persistence
 				var nullifier *components.NullifierUpsert
-				nullifier, err = tm.privateTxManager.BuildNullifier(ctx, tm.keyManager.KeyResolverForDBTX(dbTX), sd)
+				nullifier, err = tm.sequencerManager.BuildNullifier(ctx, tm.keyManager.KeyResolverForDBTX(dbTX), sd)
 				if err == nil {
 					nullifierUpserts[sd.Domain] = append(nullifierUpserts[sd.Domain], nullifier)
 				}
@@ -170,6 +174,33 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX per
 				// Build the ack now, as we'll fail the whole TX and not send any acks if the write fails
 				acksToSend = append(acksToSend, &ackInfo{node: v.p.Name, id: v.msg.MessageID})
 				txReceiptsToFinalize = append(txReceiptsToFinalize, &receipt)
+			}
+		case RMHMessageTypePublicTransaction:
+			log.L(ctx).Debugf("received public TX, parsePublicTransactionMsg: %+v", v.msg)
+			var publicTXToDistribute pldapi.PublicTxToDistribute
+			err := json.Unmarshal(v.msg.Payload, &publicTXToDistribute)
+			if err != nil {
+				acksToSend = append(acksToSend,
+					&ackInfo{node: v.p.Name, id: v.msg.MessageID, Error: err.Error()}, // reject the message permanently
+				)
+			} else {
+				// Build the ack now, as we'll fail the whole TX and not send any acks if the write fails
+				acksToSend = append(acksToSend, &ackInfo{node: v.p.Name, id: v.msg.MessageID})
+				txPublicTransactionsToPersist = append(txPublicTransactionsToPersist, &publicTXToDistribute)
+			}
+
+		case RMHMessageTypePublicTransactionSubmission:
+			log.L(ctx).Debugf("received public TX submission, parsePublicTransactionSubmissionMsg: %+v", v.msg)
+			var publicTXSubmissionToDistribute pldapi.PublicTxToDistribute
+			err := json.Unmarshal(v.msg.Payload, &publicTXSubmissionToDistribute)
+			if err != nil {
+				acksToSend = append(acksToSend,
+					&ackInfo{node: v.p.Name, id: v.msg.MessageID, Error: err.Error()}, // reject the message permanently
+				)
+			} else {
+				// Build the ack now, as we'll fail the whole TX and not send any acks if the write fails
+				acksToSend = append(acksToSend, &ackInfo{node: v.p.Name, id: v.msg.MessageID})
+				txPublicTXSubmissionsToPersist = append(txPublicTXSubmissionsToPersist, &publicTXSubmissionToDistribute)
 			}
 		case RMHMessageTypeAck, RMHMessageTypeNack:
 			ackNackToWrite := tm.parseReceivedAckNack(ctx, v.msg)
@@ -265,6 +296,20 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX per
 	// Insert the prepared transactions, capturing any post-commit
 	if len(preparedTxnToAdd) > 0 {
 		if err := tm.txManager.WritePreparedTransactions(ctx, dbTX, preparedTxnToAdd); err != nil {
+			return nil, err
+		}
+	}
+
+	// Insert any public transaction submissions
+	if len(txPublicTransactionsToPersist) > 0 {
+		if _, err := tm.publicTxManager.WriteReceivedTransactions(ctx, dbTX, txPublicTransactionsToPersist); err != nil {
+			return nil, err
+		}
+	}
+
+	// Insert any public transaction submissions
+	if len(txPublicTXSubmissionsToPersist) > 0 {
+		if _, err := tm.publicTxManager.WriteReceivedPublicTransactionSubmissions(ctx, dbTX, txPublicTXSubmissionsToPersist); err != nil {
 			return nil, err
 		}
 	}
@@ -385,6 +430,8 @@ func (tm *transportManager) buildStateDistributionMsg(ctx context.Context, dbTX 
 			nil
 	}
 	sd.StateData = states[0].Data
+
+	log.L(ctx).Tracef("sending state distribution msg for state %s, data=%s json=%s", states[0].ID, sd.StateData, pldtypes.JSONString(sd))
 
 	return &prototk.PaladinMsg{
 		MessageId:   rm.ID.String(),
@@ -549,6 +596,46 @@ func (tm *transportManager) buildReceiptDistributionMsg(ctx context.Context, dbT
 
 func parseMessageReceiptDistribution(ctx context.Context, msgID uuid.UUID, data []byte) (receipt *components.ReceiptInput, err error) {
 	err = json.Unmarshal(data, &receipt)
+	if err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidMessageData, msgID)
+	}
+	return
+}
+
+func (tm *transportManager) buildPublicTransactionMsg(ctx context.Context, dbTX persistence.DBTX, rm *pldapi.ReliableMessage) (*prototk.PaladinMsg, error, error) {
+
+	// Validate the message first (not retryable)
+	submission, parseErr := parseMessagePublicTransactionDistribution(ctx, rm.ID, rm.Metadata)
+	if parseErr != nil {
+		return nil, parseErr, nil
+	}
+
+	return &prototk.PaladinMsg{
+		MessageId:   rm.ID.String(),
+		Component:   prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
+		MessageType: RMHMessageTypePublicTransaction,
+		Payload:     pldtypes.JSONString(submission),
+	}, nil, nil
+}
+
+func (tm *transportManager) buildPublicTransactionSubmissionMsg(ctx context.Context, dbTX persistence.DBTX, rm *pldapi.ReliableMessage) (*prototk.PaladinMsg, error, error) {
+
+	// Validate the message first (not retryable)
+	submission, parseErr := parseMessagePublicTransactionDistribution(ctx, rm.ID, rm.Metadata)
+	if parseErr != nil {
+		return nil, parseErr, nil
+	}
+
+	return &prototk.PaladinMsg{
+		MessageId:   rm.ID.String(),
+		Component:   prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
+		MessageType: RMHMessageTypePublicTransactionSubmission,
+		Payload:     pldtypes.JSONString(submission),
+	}, nil, nil
+}
+
+func parseMessagePublicTransactionDistribution(ctx context.Context, msgID uuid.UUID, data []byte) (submission *pldapi.PublicTxToDistribute, err error) {
+	err = json.Unmarshal(data, &submission)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidMessageData, msgID)
 	}

@@ -1,0 +1,38 @@
+nodeName: alice
+db:
+  type: postgres
+  postgres:
+    dsn: "postgres://postgres:my-secret@localhost:5432/coordtestbedalice?sslmode=disable"
+    autoMigrate: true
+    migrationsDir: "../db/migrations/postgres"
+    debugQueries: false
+grpc:
+  shutdownTimeout: 0s
+rpcServer:
+  http:
+    port: 0
+    shutdownTimeout: 0s
+  ws:
+    disabled: true
+    shutdownTimeout: 0s
+blockIndexer:
+  fromBlock: latest
+blockchain:
+  http:
+    url: http://localhost:8545
+  ws:
+    url: ws://localhost:8546
+    initialConnectAttempts: 25
+wallets:
+  - name: wallet1
+    keySelector: .*
+    signer:
+      keyDerivation:
+        type: "bip32"
+      keyStore:
+        type: "static"
+        static:
+          keys:
+            seed:
+              encoding: none
+              inline: b7dd582ee8badc827c8dea7480d3d21ee058bfc8f88b1a4237c6dcb0dfcb76a2

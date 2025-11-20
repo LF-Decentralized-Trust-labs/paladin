@@ -34,6 +34,11 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+type msgWithErrChan struct {
+	*prototk.PaladinMsg
+	errChan chan error
+}
+
 type peer struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
@@ -45,7 +50,7 @@ type peer struct {
 	statsLock sync.Mutex
 
 	persistedMsgsAvailable chan struct{}
-	sendQueue              chan *prototk.PaladinMsg
+	sendQueue              chan *msgWithErrChan
 
 	// Send loop state (no lock as only used on the loop)
 	lastFullScan          time.Time
@@ -182,7 +187,7 @@ func (tm *transportManager) connectPeer(ctx context.Context, nodeName string, se
 				Activated: pldtypes.TimestampNow(),
 			},
 			persistedMsgsAvailable: make(chan struct{}, 1),
-			sendQueue:              make(chan *prototk.PaladinMsg, tm.senderBufferLen),
+			sendQueue:              make(chan *msgWithErrChan, tm.senderBufferLen),
 			senderDone:             make(chan struct{}),
 		}
 		p.ctx, p.cancelCtx = context.WithCancel(
@@ -388,6 +393,10 @@ func (p *peer) processReliableMsgPage(dbTX persistence.DBTX, page []*pldapi.Reli
 			msg, errorAck, err = p.tm.buildPrivacyGroupMessageMsg(p.ctx, dbTX, rm)
 		case pldapi.RMTReceipt:
 			msg, errorAck, err = p.tm.buildReceiptDistributionMsg(p.ctx, dbTX, rm)
+		case pldapi.RMTPublicTransaction:
+			msg, errorAck, err = p.tm.buildPublicTransactionMsg(p.ctx, dbTX, rm)
+		case pldapi.RMTPublicTransactionSubmission:
+			msg, errorAck, err = p.tm.buildPublicTransactionSubmissionMsg(p.ctx, dbTX, rm)
 		default:
 			errorAck = i18n.NewError(p.ctx, msgs.MsgTransportUnsupportedReliableMsg, rm.MessageType)
 		}
@@ -470,8 +479,14 @@ func (p *peer) sender() {
 			case msg := <-p.sendQueue:
 				resendTimer.Stop()
 				// send and spin straight round
-				if err := p.send(msg, nil); err != nil {
+				if err := p.send(msg.PaladinMsg, nil); err != nil {
 					log.L(p.ctx).Errorf("failed to send message '%s' after short retry (discarding): %s", msg.MessageId, err)
+					if msg.errChan != nil {
+						msg.errChan <- err
+					}
+				}
+				if msg.errChan != nil {
+					close(msg.errChan)
 				}
 			}
 		}

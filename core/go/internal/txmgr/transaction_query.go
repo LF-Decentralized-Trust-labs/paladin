@@ -303,6 +303,14 @@ func (tm *txManager) GetTransactionByID(ctx context.Context, id uuid.UUID) (*pld
 	return ptxs[0], nil
 }
 
+func (tm *txManager) GetTransactionByIDWithDBTX(ctx context.Context, dbTX persistence.DBTX, id uuid.UUID) (*pldapi.Transaction, error) {
+	ptxs, err := tm.QueryTransactions(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query(), dbTX, false)
+	if len(ptxs) == 0 || err != nil {
+		return nil, err
+	}
+	return ptxs[0], nil
+}
+
 func (tm *txManager) GetTransactionByIdempotencyKey(ctx context.Context, idempotencyKey string) (*pldapi.Transaction, error) {
 	ptxs, err := tm.QueryTransactions(ctx, query.NewQueryBuilder().Limit(1).Equal("idempotencyKey", idempotencyKey).Query(), tm.p.NOTX(), false)
 	if len(ptxs) == 0 || err != nil {

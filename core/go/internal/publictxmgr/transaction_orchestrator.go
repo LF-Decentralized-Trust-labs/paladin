@@ -30,6 +30,8 @@ import (
 	"github.com/LFDT-Paladin/paladin/core/pkg/ethclient"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/retry"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -426,6 +428,49 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 			return -1, len(oc.inFlightTxs)
 		}
 
+		for _, tx := range additional {
+			var txId string
+			err := oc.p.DB().
+				Table("public_txn_bindings").
+				Select(`"transaction"`).
+				Where(`"pub_txn_id" IN (?)`, []uint64{tx.PublicTxnID}).
+				Find(&txId).
+				Error
+			if err != nil {
+				log.L(ctx).Warnf("Orchestrator poll and process: error while retrieving binding for %d: %s", tx.PublicTxnID, err)
+				continue
+			}
+			if tx.Binding == nil {
+				tx.Binding = &DBPublicTxnBinding{}
+			}
+			if txId != "" {
+				// Convert txId to UUID
+				txIdUUID, err := uuid.Parse(txId)
+				if err != nil {
+					log.L(ctx).Warnf("Orchestrator poll and process: context cancelled while retrieving binding for %d: %s", tx.PublicTxnID, err)
+					continue
+				}
+				tx.Binding.Transaction = txIdUUID
+			}
+			if oc.sequencerManager == nil {
+				log.L(ctx).Warnf("Orchestrator poll and process: sequencer manager is nil for %d", tx.PublicTxnID)
+			} else {
+				if tx.To == nil {
+					log.L(ctx).Warnf("Orchestrator poll and process: to address is nil for %d", tx.PublicTxnID)
+				} else {
+					if tx.Binding == nil {
+						log.L(ctx).Warnf("Orchestrator poll and process: binding is nil for %d", tx.PublicTxnID)
+					} else {
+						err = oc.sequencerManager.HandleTransactionCollected(ctx, oc.signingAddress.String(), tx.To.String(), tx.Binding.Transaction)
+						if err != nil {
+							log.L(ctx).Warnf("Orchestrator poll and process: error while handing TX collected to sequencer for %d: %s", tx.PublicTxnID, err)
+						}
+					}
+				}
+			}
+
+		}
+
 		// Synchronously we ensure that we have a nonce for all of these.
 		// This is an indefinite retry, as we MUST not proceed until a nonce has been allocated+stored for every one
 		// of these transactions. Otherwise we might re-order transactions compared to their DB commit order
@@ -435,6 +480,42 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 		}); err != nil {
 			log.L(ctx).Warnf("Orchestrator context cancelled while allocating nonce: %s", err)
 			return
+		}
+
+		for _, tx := range additional {
+			var txId string
+			err := oc.p.DB().
+				Table("public_txn_bindings").
+				Select(`"transaction"`).
+				Where(`"pub_txn_id" IN (?)`, []uint64{tx.PublicTxnID}).
+				Find(&txId).
+				Error
+			if err != nil {
+				log.L(ctx).Warnf("Error retrieving binding for public TX ID %d: %s", tx.PublicTxnID, err)
+				return
+			}
+
+			if txId != "" {
+				// Convert txId to UUID
+				txIdUUID, err := uuid.Parse(txId)
+				if err != nil {
+					log.L(ctx).Warnf("Error parsing binding for public TX ID %d: %s", tx.PublicTxnID, err)
+					return
+				}
+
+				if oc.sequencerManager == nil {
+					log.L(ctx).Warnf("Orchestrator poll and process: sequencer manager is nil for %d", tx.PublicTxnID)
+				} else {
+					if tx.To == nil {
+						log.L(ctx).Warnf("Orchestrator poll and process: to address is nil for %d", tx.PublicTxnID)
+					} else {
+						err = oc.sequencerManager.HandleNonceAssigned(ctx, *tx.Nonce, tx.To.String(), txIdUUID)
+						if err != nil {
+							log.L(ctx).Warnf("Orchestrator poll and process: error while handing nonce assignment to sequencer for %d: %s", tx.PublicTxnID, err)
+						}
+					}
+				}
+			}
 		}
 
 		log.L(ctx).Debugf("Orchestrator poll and process: polled %d items, space: %d", len(additional), spaces)

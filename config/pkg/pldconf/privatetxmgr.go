@@ -44,6 +44,7 @@ var PrivateTxManagerDefaults = PrivateTxManagerConfig{
 		MaxPendingEvents:                    confutil.P(500),
 		RoundRobinCoordinatorBlockRangeSize: confutil.P(100),
 		AssembleRequestTimeout:              confutil.P("1s"),
+		BlockRangeSize:                      confutil.P(int64(10)),
 	},
 	RequestTimeout: confutil.P("1s"),
 }
@@ -57,4 +58,5 @@ type PrivateTxManagerSequencerConfig struct {
 	StaleTimeout                        *string `json:"staleTimeout,omitempty"`
 	RoundRobinCoordinatorBlockRangeSize *int    `json:"roundRobinCoordinatorBlockRangeSize,omitempty"`
 	AssembleRequestTimeout              *string `json:"assembleRequestTimeout,omitempty"`
+	BlockRangeSize                      *int64  `json:"blockRangeSize,omitempty"`
 }

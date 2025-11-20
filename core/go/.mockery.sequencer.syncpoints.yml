@@ -1,0 +1,12 @@
+template: testify
+pkgname: "{{.SrcPackageName}}mocks"
+structname: "{{.InterfaceName}}"
+filename: "{{.SrcPackageName}}mocks.go"
+dir: "mocks/{{.SrcPackageName}}mocks"
+packages:
+  github.com/LFDT-Paladin/paladin/core/internal/sequencer/syncpoints:
+    config:
+      all: true
+      dir: "{{.InterfaceDir}}"
+      pkgname: "{{.SrcPackageName}}"
+      structname: "Mock{{.InterfaceName}}"

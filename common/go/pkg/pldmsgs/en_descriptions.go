@@ -376,7 +376,7 @@ var (
 	PaladinConfigBlockIndexer     = pdm("PaladinConfig.blockIndexer", "Block indexer configuration")
 	PaladinConfigTempDir          = pdm("PaladinConfig.tempDir", "Temporary directory path")
 	PaladinConfigTxManager        = pdm("PaladinConfig.txManager", "Transaction manager configuration")
-	PaladinConfigPrivateTxManager = pdm("PaladinConfig.privateTxManager", "Private transaction manager configuration")
+	PaladinConfigSequencerManager = pdm("PaladinConfig.sequencerManager", "Sequencer manager configuration")
 	PaladinConfigPublicTxManager  = pdm("PaladinConfig.publicTxManager", "Public transaction manager configuration")
 	PaladinConfigIdentityResolver = pdm("PaladinConfig.identityResolver", "Identity resolver configuration")
 	PaladinConfigGroupManager     = pdm("PaladinConfig.groupManager", "Group manager configuration")
@@ -703,15 +703,19 @@ var (
 	DistributerConfigAcknowledgementWriter = pdm("DistributerConfig.acknowledgementWriter", "Acknowledgement writer configuration")
 	DistributerConfigReceivedObjectWriter  = pdm("DistributerConfig.receivedStateWriter", "Received state writer configuration")
 
-	// PrivateTxManagerSequencerConfig field descriptions
-	PrivateTxManagerSequencerConfigMaxConcurrentProcess                = pdm("PrivateTxManagerSequencerConfig.maxConcurrentProcess", "Maximum concurrent processes")
-	PrivateTxManagerSequencerConfigMaxInflightTransactions             = pdm("PrivateTxManagerSequencerConfig.maxInflightTransactions", "Maximum inflight transactions")
-	PrivateTxManagerSequencerConfigMaxPendingEvents                    = pdm("PrivateTxManagerSequencerConfig.maxPendingEvents", "Maximum pending events")
-	PrivateTxManagerSequencerConfigEvaluationInterval                  = pdm("PrivateTxManagerSequencerConfig.evalInterval", "Evaluation interval")
-	PrivateTxManagerSequencerConfigPersistenceRetryTimeout             = pdm("PrivateTxManagerSequencerConfig.persistenceRetryTimeout", "Persistence retry timeout")
-	PrivateTxManagerSequencerConfigStaleTimeout                        = pdm("PrivateTxManagerSequencerConfig.staleTimeout", "Stale timeout")
-	PrivateTxManagerSequencerConfigRoundRobinCoordinatorBlockRangeSize = pdm("PrivateTxManagerSequencerConfig.roundRobinCoordinatorBlockRangeSize", "Round robin coordinator block range size")
-	PrivateTxManagerSequencerConfigAssembleRequestTimeout              = pdm("PrivateTxManagerSequencerConfig.assembleRequestTimeout", "Assemble request timeout")
+	// SequencerConfig field descriptions
+	SequencerConfigAssembleTimeout               = pdm("SequencerConfig.assembleTimeout", "Timeout for transaction assembly")
+	SequencerConfigRequestTimeout                = pdm("SequencerConfig.requestTimeout", "Timeout for sequencer requests")
+	SequencerConfigBlockHeightTolerance          = pdm("SequencerConfig.blockHeightTolerance", "Tolerance for block height differences")
+	SequencerConfigBlockRange                    = pdm("SequencerConfig.blockRange", "Block range size for sequencer operations")
+	SequencerConfigClosingGracePeriod            = pdm("SequencerConfig.closingGracePeriod", "Grace period for closing operations")
+	SequencerConfigHeartbeatInterval             = pdm("SequencerConfig.heartbeatInterval", "Heartbeat interval for coordinators")
+	SequencerConfigMaxInflightTransactions       = pdm("SequencerConfig.maxInflightTransactions", "Maximum number of inflight transactions")
+	SequencerConfigMaxDispatchAhead              = pdm("SequencerConfig.maxDispatchAhead", "Maximum number of transactions to dispatch ahead")
+	SequencerConfigTargetActiveCoordinators      = pdm("SequencerConfig.targetActiveCoordinators", "Target number of active coordinators")
+	SequencerConfigTargetActiveSequencers        = pdm("SequencerConfig.targetActiveSequencers", "Target number of active sequencers")
+	SequencerConfigTransactionResumePollInterval = pdm("SequencerConfig.transactionResumePollInterval", "Poll interval for resuming transactions")
+	SequencerConfigWriter                        = pdm("SequencerConfig.writer", "Writer configuration")
 
 	// PublicTxManagerConfig field descriptions
 	PublicTxManagerConfigManager        = pdm("PublicTxManagerConfig.manager", "Manager configuration")

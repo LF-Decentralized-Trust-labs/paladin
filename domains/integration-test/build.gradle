@@ -62,6 +62,8 @@ dependencies {
 }
 
 task copySolidity(type: Copy) {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/domains/interfaces/INoto.sol/INoto.json'

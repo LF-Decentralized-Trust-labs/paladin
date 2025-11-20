@@ -28,6 +28,8 @@ spec:
     publicTxManager:
       gasLimit:
         gasEstimateFactor: 2.0
+    sequencerManager:
+      maxDispatchAhead: 1
   database:
     mode: sidecarPostgres
     migrationMode: auto

@@ -19,11 +19,34 @@ package io.kaleido.paladin.kata.engine;
 option go_package = "pkg/proto/engine";
 import "google/protobuf/any.proto";
 
+message NonceAssigned {
+    string id = 1;
+    string contract_address = 2;
+    string transaction_id = 3;
+    int64 nonce = 4;
+}
+
+message TransactionSubmitted {
+    string id = 1;
+    string contract_address = 2;
+    string transaction_id = 3;
+    bytes hash = 4;
+}
 
 message TransactionDispatched {
     string id = 1;
     string contract_address = 2;
     string transaction_id = 3;
+    bytes post_assemble_hash = 4;
+    string signer = 5;
+}
+
+message TransactionConfirmed {
+    string id = 1;
+    string contract_address = 2;
+    string transaction_id = 3;
+    int64 nonce = 4;
+    bytes revert_reason = 5;
 }
 
 message EndorsementRequest {
@@ -137,6 +160,7 @@ message AssembleResponse {
     string assemble_request_id = 2;
     string contract_address = 3;
     bytes post_assembly = 4;
+    bytes pre_assembly = 5;
 }
 
 message AssembleError {
@@ -144,4 +168,14 @@ message AssembleError {
     string assemble_request_id = 2;
     string contract_address = 3;
     string error_message = 4;
+}
+
+message CoordinatorHeartbeatNotification {
+    string from = 1;
+    string contract_address = 2; // Represent as hex address?
+    bytes coordinator_snapshot = 3;
+}
+
+message HandoverRequest {
+    string contract_address = 1; // Represent as hex address?
 }

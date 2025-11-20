@@ -77,6 +77,7 @@ func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persisten
 					Address:         parsedEvent.Instance,
 					ConfigBytes:     parsedEvent.Config,
 				})
+
 				// We don't know if the private transaction will match, but we need to pass it over
 				// to the private TX manager within our DB transaction to allow it to check
 				txCompletions = append(txCompletions, &components.TxCompletion{
@@ -124,17 +125,48 @@ func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persisten
 
 func (dm *domainManager) notifyTransactions(txCompletions txCompletionsOrdered) {
 	for _, completion := range txCompletions {
-		// Private transaction manager needs to know about these to update its in-memory state
-		dm.privateTxManager.PrivateTransactionConfirmed(dm.bgCtx, completion)
+		// The sequencer manager needs to know about these to update its in-memory state. For a regular private transaction with a public TX confirmation, we
+		// pass the "from" and "nonce" to the distributed sequencer state machine.
+		pubBindingTx, err := dm.publicTxManager.QueryPublicTxForTransactions(dm.bgCtx, dm.persistence.NOTX(), []uuid.UUID{completion.TransactionID}, nil)
+		if err != nil {
+			log.L(dm.bgCtx).Errorf("Error getting public transaction by ID: %s", err)
+		}
+
+		confirmedWithPublicTX := false
+
+		for _, pubTx := range pubBindingTx {
+			for _, publicTx := range pubTx {
+				log.L(dm.bgCtx).Debugf("Checking public transactions for TX ID %s to find a match for the receipt we are processing %s", completion.TransactionID, publicTx.TransactionHash)
+				if publicTx.TransactionHash.Equals(&completion.OnChain.TransactionHash) {
+					confirmedWithPublicTX = true
+					log.L(dm.bgCtx).Debugf("Found a match for the receipt we are processing %s", publicTx.TransactionHash)
+					err = dm.sequencerManager.HandleTransactionConfirmed(dm.bgCtx, completion, &publicTx.From, publicTx.Nonce)
+					if err != nil {
+						// Log but continue confirming other transactions
+						log.L(dm.bgCtx).Errorf("Error handling transaction confirmed event: %s", err)
+					}
+				}
+			}
+		}
+
+		// For private transaction's that are being confirmed by virtue of a successful chained private transaction, we don't give the distributed sequencer any information
+		// about the underlying chained public TX.
+		if !confirmedWithPublicTX {
+			log.L(dm.bgCtx).Debugf("No public TX found, confirming %s via chained transaction", completion.TransactionID)
+			err = dm.sequencerManager.HandleTransactionConfirmedByChainedTransaction(dm.bgCtx, completion)
+			if err != nil {
+				// Log but continue confirming other transactions
+				log.L(dm.bgCtx).Errorf("Error handling transaction confirmed event: %s", err)
+			}
+		}
 
 		// We also provide a direct waiter that's used by the testbed
 		inflight := dm.privateTxWaiter.GetInflight(completion.TransactionID)
-		log.L(dm.bgCtx).Infof("Notifying for private deployment TransactionID %s (waiter=%t)", completion.TransactionID, inflight != nil)
+		log.L(dm.bgCtx).Debugf("Notifying of completion for private deployment TransactionID %s (waiter=%t)", completion.TransactionID, inflight != nil)
 		if inflight != nil {
 			inflight.Complete(&completion.ReceiptInput)
 		}
 	}
-
 }
 
 func (d *domain) batchEventsByAddress(ctx context.Context, dbTX persistence.DBTX, batchID string, events []*pldapi.EventWithData) (map[pldtypes.EthAddress]*pscEventBatch, error) {
@@ -211,6 +243,7 @@ func (d *domain) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, ba
 				return err
 			}
 			log.L(ctx).Infof("Domain transaction completion: %s", txID)
+
 			completion := &components.TxCompletion{
 				PSC: batch.psc,
 				ReceiptInput: components.ReceiptInput{
@@ -272,7 +305,6 @@ func (d *domain) recoverTransactionID(ctx context.Context, txIDString string) (*
 }
 
 func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX persistence.DBTX, addr pldtypes.EthAddress, batch *pscEventBatch) (*prototk.HandleEventBatchResponse, error) {
-
 	// We have a domain context for queries, but we never flush it to DB - as the only updates
 	// we allow in this function are those performed within our dbTX.
 	c := d.newInFlightDomainRequest(dbTX, d.dm.stateStore.NewDomainContext(ctx, d, addr), false /* write enabled */)
@@ -361,6 +393,7 @@ func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX persisten
 
 	// Then any finalizations of those states
 	if len(stateSpends) > 0 || len(stateReads) > 0 || len(stateConfirms) > 0 || len(stateInfoRecords) > 0 {
+		log.L(ctx).Infof("Writing state finalizations for %d spends, %d reads, %d confirms, %d info records", len(stateSpends), len(stateReads), len(stateConfirms), len(stateInfoRecords))
 		if err := d.dm.stateStore.WriteStateFinalizations(ctx, dbTX, stateSpends, stateReads, stateConfirms, stateInfoRecords); err != nil {
 			return nil, err
 		}

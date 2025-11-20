@@ -166,6 +166,7 @@ func (dc *domainContext) mergeUnFlushed(schema components.Schema, dbStates []*pl
 	matches := make([]*components.StateWithLabels, 0, len(dc.creatingStates))
 	schemaId := schema.Persisted().ID
 	for _, state := range dc.creatingStates {
+		log.L(dc.Context).Tracef("State %s is a creating state", state.ID)
 		if !state.Schema.Equals(&schemaId) {
 			continue
 		}
@@ -173,6 +174,7 @@ func (dc *domainContext) mergeUnFlushed(schema components.Schema, dbStates []*pl
 			spent := false
 			for _, lock := range dc.txLocks {
 				if lock.StateID.Equals(state.ID) && lock.Type.V() == pldapi.StateLockTypeSpend {
+					log.L(dc.Context).Tracef("State %s is spent by transaction %s - not including in the response", state.ID, lock.Transaction)
 					spent = true
 					break
 				}
@@ -202,11 +204,18 @@ func (dc *domainContext) mergeUnFlushed(schema components.Schema, dbStates []*pl
 				}
 			}
 			if !dup {
-				log.L(dc).Debugf("Matched state %s from un-flushed writes", &state.ID)
+				log.L(dc).Tracef("Matched state %s from un-flushed writes", &state.ID)
 				// Take a shallow copy, as we'll apply the locks as they exist right now
 				shallowCopy := *state
 				matches = append(matches, &shallowCopy)
 			}
+		}
+	}
+
+	if log.IsTraceEnabled() {
+		log.L(dc.Context).Tracef("mergeUnFlushed: found %d matches", len(matches))
+		for _, m := range matches {
+			log.L(dc.Context).Tracef("Matched state: %s", m.ID)
 		}
 	}
 
@@ -292,6 +301,13 @@ func (dc *domainContext) FindAvailableStates(dbTX persistence.DBTX, schemaID pld
 		return nil, nil, err
 	}
 
+	if log.IsTraceEnabled() {
+		log.L(dc.Context).Tracef("Unflushed spends that are available states: %d", len(spending))
+		for _, s := range spending {
+			log.L(dc.Context).Tracef("Unflushed spend: %s", s.String())
+		}
+	}
+
 	// Run the query against the DB
 	schema, states, err := dc.ss.findStates(dc, dbTX, dc.domainName, &dc.contractAddress, schemaID, query, &components.StateQueryOptions{
 		StatusQualifier: pldapi.StateStatusAvailable,
@@ -305,6 +321,11 @@ func (dc *domainContext) FindAvailableStates(dbTX persistence.DBTX, schemaID pld
 	// Merge in un-flushed states to results
 	states, err = dc.mergeUnFlushedApplyLocks(schema, states, query, true /* exclude spent states */, false)
 	log.L(dc.Context).Debugf("domainContext:FindAvailableStates mergeUnFlushedApplyLocks %d", len(states))
+	if log.IsTraceEnabled() {
+		for _, s := range states {
+			log.L(dc.Context).Tracef("domainContext returning available state %s", s.ID)
+		}
+	}
 
 	return schema, states, err
 }
@@ -452,6 +473,7 @@ func (dc *domainContext) applyLocks(states []*pldapi.State) []*pldapi.State {
 		s.Locks = []*pldapi.StateLock{}
 		for _, l := range dc.txLocks {
 			if l.StateID.Equals(s.ID) {
+				log.L(dc).Tracef("state %s is locked by %s", s.ID, l.Transaction)
 				s.Locks = append(s.Locks, l)
 			}
 		}
@@ -641,11 +663,13 @@ type exportableStateLock struct {
 func (dc *domainContext) ExportSnapshot() ([]byte, error) {
 	dc.stateLock.Lock()
 	defer dc.stateLock.Unlock()
+	log.L(dc).Debugf("ExportSnapshot: Exporting domain context snapshot %s", dc.Info().ID)
 	if flushErr := dc.checkResetInitUnFlushed(); flushErr != nil {
 		return nil, flushErr
 	}
 	locks := make([]*exportableStateLock, 0, len(dc.txLocks))
 	for _, l := range dc.txLocks {
+		log.L(dc).Debugf("ExportSnapshot: State %s locked by transaction %s", l.StateID, l.Transaction)
 		locks = append(locks, &exportableStateLock{
 			State:       l.StateID,
 			Transaction: l.Transaction,
@@ -654,6 +678,7 @@ func (dc *domainContext) ExportSnapshot() ([]byte, error) {
 	}
 	states := make([]*components.StateUpsert, 0, len(dc.creatingStates))
 	for _, s := range dc.creatingStates {
+		log.L(dc).Debugf("ExportSnapshot: State %s created, data %s", s.ID, s.Data)
 		states = append(states, &components.StateUpsert{
 			ID:     s.ID,
 			Schema: s.Schema,

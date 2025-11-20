@@ -24,7 +24,7 @@ title: ReliableMessage
 | `id` | UUID for this message. A separate message, with a separate ID, is allocated for each participant that will receive the message | [`UUID`](simpletypes.md#uuid) |
 | `created` | The time this message was created | [`Timestamp`](simpletypes.md#timestamp) |
 | `node` | The target node for this message to be delivered to | `string` |
-| `messageType` | The type of the message. Each type has a different locally stored metadata schema, and an on-the-wire full payload format that can be built from the metadata on the source node | `"state", "receipt", "prepared_txn", "privacy_group", "privacy_group_message"` |
+| `messageType` | The type of the message. Each type has a different locally stored metadata schema, and an on-the-wire full payload format that can be built from the metadata on the source node | `"state", "receipt", "public_transaction", "public_transaction_submission", "prepared_txn", "privacy_group", "privacy_group_message"` |
 | `metadata` | The locally stored (on the source node) minimal data that allows the on-the-wire message to be built using other stored data | [`RawJSON`](simpletypes.md#rawjson) |
 | `ack` | An ack (or nack with error) that has finalized this message delivery so it will not be retried | [`ReliableMessageAckNoMsgID`](#reliablemessageacknomsgid) |
 

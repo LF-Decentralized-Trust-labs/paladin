@@ -305,7 +305,7 @@ type PersistenceOutput struct {
 type InFlightStageActionTriggers interface {
 	TriggerRetrieveGasPrice(ctx context.Context) error
 	TriggerSignTx(ctx context.Context) error
-	TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32) error
+	TriggerSubmitTx(ctx context.Context, signedMessage []byte, calculatedTxHash *pldtypes.Bytes32, contractAddress string) error
 	TriggerStatusUpdate(ctx context.Context) error
 }
 

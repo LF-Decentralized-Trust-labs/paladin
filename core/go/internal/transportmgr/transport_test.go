@@ -320,7 +320,7 @@ func TestReceiveMessageTransactionEngine(t *testing.T) {
 	receivedMessages := make(chan *components.ReceivedMessage, 1)
 
 	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
-		mc.privateTxManager.On("HandlePaladinMsg", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
+		mc.sequencerManager.On("HandlePaladinMsg", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
 			receivedMessages <- args[1].(*components.ReceivedMessage)
 		})
 	})
@@ -495,7 +495,7 @@ func TestSendContextClosed(t *testing.T) {
 
 	p := &peer{
 		transport: tp.t,
-		sendQueue: make(chan *prototk.PaladinMsg),
+		sendQueue: make(chan *msgWithErrChan),
 	}
 	tm.peers = map[string]*peer{
 		"node2": p,

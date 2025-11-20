@@ -82,7 +82,7 @@ func TestStateVersionTransactionFromRetrieveGasPriceToTracking(t *testing.T) {
 	var nilBytes []byte
 	var nilHash *pldtypes.Bytes32
 	// scenario A: no signer configured, do submission
-	mockActionTriggers.On("TriggerSubmitTx", mock.Anything, nilBytes, nilHash).Return(nil).Once()
+	mockActionTriggers.On("TriggerSubmitTx", mock.Anything, nilBytes, nilHash, mock.Anything, mock.Anything).Return(nil).Once()
 
 	version.StartNewStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived)
 	assert.Nil(t, version.GetStageTriggerError(ctx))
@@ -99,7 +99,7 @@ func TestStateVersionTransactionFromRetrieveGasPriceToTracking(t *testing.T) {
 		TransactionHash: testHash,
 	})
 	// do the submission
-	mockActionTriggers.On("TriggerSubmitTx", mock.Anything, testSignedData, testHash).Return(nil)
+	mockActionTriggers.On("TriggerSubmitTx", mock.Anything, testSignedData, testHash, mock.Anything, mock.Anything).Return(nil)
 	version.StartNewStageContext(ctx, InFlightTxStageSubmitting, BaseTxSubStatusReceived)
 	assert.Nil(t, version.GetStageTriggerError(ctx))
 

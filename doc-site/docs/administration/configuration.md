@@ -17,7 +17,6 @@
 | nodeName | Node name for transport identification | `string` | - |
 | peerInactivityTimeout | Timeout for peer inactivity detection | `string` | - |
 | peerReaperInterval | Interval for peer reaper cleanup | `string` | - |
-| privateTxManager | Private transaction manager configuration | [`PrivateTxManagerConfig`](#privatetxmanager) | - |
 | publicTxManager | Public transaction manager configuration | [`PublicTxManagerConfig`](#publictxmanager) | - |
 | registries | Map of registry configurations | [`map[string][RegistryConfig]`](#registries) | - |
 | registryManager | Registry manager configuration | [`RegistryManagerConfig`](#registrymanager) | - |
@@ -28,6 +27,7 @@
 | rpcServer | RPC server configuration | [`RPCServerConfig`](#rpcserver) | - |
 | sendQueueLen | Maximum length of send queue | `int` | - |
 | sendRetry | Send retry configuration | [`RetryConfigWithMax`](#sendretry) | - |
+| sequencerManager | Sequencer manager configuration | [`SequencerConfig`](#sequencermanager) | - |
 | signingModules | Map of signing module configurations | [`map[string][SigningModuleConfig]`](#signingmodules) | - |
 | startup | Startup configuration | [`StartupConfig`](#startup) | - |
 | statestore | State store configuration | [`StateStoreConfig`](#statestore) | - |
@@ -402,83 +402,6 @@
 | tls | TLS configuration | [`TLSConfig`](#metricsservertls) | - |
 | writeTimeout | Write timeout | `string` | - |
 
-## privateTxManager
-
-| Key | Description | Type | Default |
-|-----|-------------|------|---------|
-| preparedTransactionDistributer | Prepared transaction distributer configuration | [`DistributerConfig`](#privatetxmanagerpreparedtransactiondistributer) | - |
-| requestTimeout | Request timeout | `string` | `"1s"` |
-| sequencer | Sequencer configuration | [`PrivateTxManagerSequencerConfig`](#privatetxmanagersequencer) | - |
-| stateDistributer | State distributer configuration | [`DistributerConfig`](#privatetxmanagerstatedistributer) | - |
-| writer | Writer configuration | [`FlushWriterConfig`](#privatetxmanagerwriter) | - |
-
-## privateTxManager.preparedTransactionDistributer
-
-| Key | Description | Type | Default |
-|-----|-------------|------|---------|
-| acknowledgementWriter | Acknowledgement writer configuration | [`FlushWriterConfig`](#privatetxmanagerpreparedtransactiondistributeracknowledgementwriter) | - |
-| receivedStateWriter | Received state writer configuration | [`FlushWriterConfig`](#privatetxmanagerpreparedtransactiondistributerreceivedstatewriter) | - |
-
-## privateTxManager.preparedTransactionDistributer.acknowledgementWriter
-
-| Key | Description | Type | Default |
-|-----|-------------|------|---------|
-| batchMaxSize | Maximum batch size | `int` | - |
-| batchTimeout | Timeout for batch operations | `string` | - |
-| workerCount | Number of worker threads | `int` | - |
-
-## privateTxManager.preparedTransactionDistributer.receivedStateWriter
-
-| Key | Description | Type | Default |
-|-----|-------------|------|---------|
-| batchMaxSize | Maximum batch size | `int` | - |
-| batchTimeout | Timeout for batch operations | `string` | - |
-| workerCount | Number of worker threads | `int` | - |
-
-## privateTxManager.sequencer
-
-| Key | Description | Type | Default |
-|-----|-------------|------|---------|
-| assembleRequestTimeout | Assemble request timeout | `string` | `"1s"` |
-| evalInterval | Evaluation interval | `string` | `"5m"` |
-| maxConcurrentProcess | Maximum concurrent processes | `int` | `500` |
-| maxInflightTransactions | Maximum inflight transactions | `int` | `500` |
-| maxPendingEvents | Maximum pending events | `int` | `500` |
-| persistenceRetryTimeout | Persistence retry timeout | `string` | `"5s"` |
-| roundRobinCoordinatorBlockRangeSize | Round robin coordinator block range size | `int` | `100` |
-| staleTimeout | Stale timeout | `string` | `"10m"` |
-
-## privateTxManager.stateDistributer
-
-| Key | Description | Type | Default |
-|-----|-------------|------|---------|
-| acknowledgementWriter | Acknowledgement writer configuration | [`FlushWriterConfig`](#privatetxmanagerstatedistributeracknowledgementwriter) | - |
-| receivedStateWriter | Received state writer configuration | [`FlushWriterConfig`](#privatetxmanagerstatedistributerreceivedstatewriter) | - |
-
-## privateTxManager.stateDistributer.acknowledgementWriter
-
-| Key | Description | Type | Default |
-|-----|-------------|------|---------|
-| batchMaxSize | Maximum batch size | `int` | - |
-| batchTimeout | Timeout for batch operations | `string` | - |
-| workerCount | Number of worker threads | `int` | - |
-
-## privateTxManager.stateDistributer.receivedStateWriter
-
-| Key | Description | Type | Default |
-|-----|-------------|------|---------|
-| batchMaxSize | Maximum batch size | `int` | - |
-| batchTimeout | Timeout for batch operations | `string` | - |
-| workerCount | Number of worker threads | `int` | - |
-
-## privateTxManager.writer
-
-| Key | Description | Type | Default |
-|-----|-------------|------|---------|
-| batchMaxSize | Maximum batch size | `int` | `100` |
-| batchTimeout | Timeout for batch operations | `string` | `"25ms"` |
-| workerCount | Number of worker threads | `int` | `10` |
-
 ## publicTxManager
 
 | Key | Description | Type | Default |
@@ -852,6 +775,31 @@
 | initialDelay | Initial delay before retry | `string` | - |
 | maxAttempts | Maximum number of retry attempts | `int` | - |
 | maxDelay | Maximum delay between retries | `string` | - |
+
+## sequencerManager
+
+| Key | Description | Type | Default |
+|-----|-------------|------|---------|
+| assembleTimeout | Timeout for transaction assembly | `string` | `"60s"` |
+| blockHeightTolerance | Tolerance for block height differences | `uint64` | `10` |
+| blockRange | Block range size for sequencer operations | `uint64` | `100` |
+| closingGracePeriod | Grace period for closing operations | `int` | `4` |
+| heartbeatInterval | Heartbeat interval for coordinators | `string` | `"10s"` |
+| maxDispatchAhead | Maximum number of transactions to dispatch ahead | `int` | `10` |
+| maxInflightTransactions | Maximum number of inflight transactions | `int` | `500` |
+| requestTimeout | Timeout for sequencer requests | `string` | `"10s"` |
+| targetActiveCoordinators | Target number of active coordinators | `int` | `50` |
+| targetActiveSequencers | Target number of active sequencers | `int` | `50` |
+| transactionResumePollInterval | Poll interval for resuming transactions | `string` | `"5m"` |
+| writer | Writer configuration | [`FlushWriterConfig`](#sequencermanagerwriter) | - |
+
+## sequencerManager.writer
+
+| Key | Description | Type | Default |
+|-----|-------------|------|---------|
+| batchMaxSize | Maximum batch size | `int` | - |
+| batchTimeout | Timeout for batch operations | `string` | - |
+| workerCount | Number of worker threads | `int` | - |
 
 ## signingModules[]
 

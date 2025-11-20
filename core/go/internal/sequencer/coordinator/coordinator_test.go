@@ -1,0 +1,277 @@
+/*
+ * Copyright © 2025 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package coordinator
+
+import (
+	"context"
+	"testing"
+
+	"github.com/LFDT-Paladin/paladin/core/internal/components"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/common"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/coordinator/transaction"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/metrics"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/syncpoints"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/testutil"
+	"github.com/LFDT-Paladin/paladin/core/internal/sequencer/transport"
+	"github.com/LFDT-Paladin/paladin/core/mocks/componentsmocks"
+	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestTransactionStateTransition(t *testing.T) {
+
+}
+
+func NewCoordinatorForUnitTest(t *testing.T, ctx context.Context, originatorIdentityPool []string) (*coordinator, *coordinatorDependencyMocks) {
+
+	metrics := metrics.InitMetrics(context.Background(), prometheus.NewRegistry())
+	mocks := &coordinatorDependencyMocks{
+		transportWriter:   transport.NewMockTransportWriter(t),
+		clock:             &common.FakeClockForTesting{},
+		engineIntegration: common.NewMockEngineIntegration(t),
+		syncPoints:        &syncpoints.MockSyncPoints{},
+		emit:              func(event common.Event) {},
+	}
+	mockDomainAPI := componentsmocks.NewDomainSmartContract(t)
+
+	coordinator, err := NewCoordinator(ctx, pldtypes.RandAddress(), mockDomainAPI, mocks.transportWriter, mocks.clock, mocks.engineIntegration, mocks.syncPoints, mocks.clock.Duration(1000), mocks.clock.Duration(5000), 100, 5, 5, 500, 10, mocks.clock.Duration(10000), "node1",
+		metrics,
+		func(context.Context, *transaction.Transaction) {
+			// Not used
+		},
+		func(contractAddress *pldtypes.EthAddress, coordinatorNode string) {
+			// Not used
+		},
+		func(contractAddress *pldtypes.EthAddress) {
+			// Not used
+		})
+	require.NoError(t, err)
+
+	return coordinator, mocks
+}
+
+type coordinatorDependencyMocks struct {
+	transportWriter   *transport.MockTransportWriter
+	clock             *common.FakeClockForTesting
+	engineIntegration *common.MockEngineIntegration
+	emit              common.EmitEvent
+	syncPoints        syncpoints.SyncPoints
+}
+
+func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
+	// Test the progression of a single transaction through the coordinator's lifecycle
+	// Simulating originator node, endorser node and the public transaction manager (submitter)
+	// by inspecting the coordinator output messages and by sending events that would normally be triggered by those components sending messages to the coordinator.
+	// At each stage, we inspect the state of the coordinator by checking the snapshot it produces on heartbeat messages
+
+	ctx := context.Background()
+	originator := "sender@senderNode"
+	builder := NewCoordinatorBuilderForTesting(t, State_Idle)
+	builder.GetDomainAPI().On("ContractConfig").Return(&prototk.ContractConfig{
+		CoordinatorSelection: prototk.ContractConfig_COORDINATOR_SENDER,
+	})
+	c, mocks := builder.Build(ctx)
+
+	// Start by simulating the originator and delegate a transaction to the coordinator
+	transactionBuilder := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Originator(originator).NumberOfRequiredEndorsers(1)
+	txn := transactionBuilder.BuildSparse()
+	err := c.ProcessEvent(ctx, &TransactionsDelegatedEvent{
+		Originator:   originator,
+		Transactions: []*components.PrivateTransaction{txn},
+	})
+	assert.NoError(t, err)
+
+	// Assert that snapshot contains a transaction with matching ID
+	snapshot := c.getSnapshot(ctx)
+	require.NotNil(t, snapshot)
+	require.Equal(t, 1, len(snapshot.PooledTransactions))
+	assert.Equal(t, txn.ID.String(), snapshot.PooledTransactions[0].ID.String(), "Snapshot should contain the dispatched transaction with ID %s", txn.ID.String())
+
+	// Assert that a request has been sent to the originator and respond with an assembled transaction
+	require.True(t, mocks.SentMessageRecorder.HasSentAssembleRequest())
+	err = c.ProcessEvent(ctx, &transaction.AssembleSuccessEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
+			TransactionID: txn.ID,
+		},
+		RequestID:    mocks.SentMessageRecorder.SentAssembleRequestIdempotencyKey(),
+		PostAssembly: transactionBuilder.BuildPostAssembly(),
+		PreAssembly:  transactionBuilder.BuildPreAssembly(),
+	})
+	assert.NoError(t, err)
+
+	// Assert that snapshot still contains the same single transaction in the pooled transactions
+	snapshot = c.getSnapshot(ctx)
+	require.NotNil(t, snapshot)
+	require.Equal(t, 1, len(snapshot.PooledTransactions))
+	assert.Equal(t, txn.ID.String(), snapshot.PooledTransactions[0].ID.String(), "Snapshot should contain the dispatched transaction with ID %s", txn.ID.String())
+
+	// Assert that the coordinator has sent an endorsement request to the endorser and respond with an endorsement
+	require.Equal(t, 1, mocks.SentMessageRecorder.NumberOfSentEndorsementRequests())
+	err = c.ProcessEvent(ctx, &transaction.EndorsedEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
+			TransactionID: txn.ID,
+		},
+		RequestID:   mocks.SentMessageRecorder.SentEndorsementRequestsForPartyIdempotencyKey(transactionBuilder.GetEndorserIdentityLocator(0)),
+		Endorsement: transactionBuilder.BuildEndorsement(0),
+	})
+	assert.NoError(t, err)
+
+	// Assert that snapshot still contains the same single transaction in the pooled transactions
+	snapshot = c.getSnapshot(ctx)
+	require.NotNil(t, snapshot)
+	require.Equal(t, 1, len(snapshot.PooledTransactions))
+	assert.Equal(t, txn.ID.String(), snapshot.PooledTransactions[0].ID.String(), "Snapshot should contain the dispatched transaction with ID %s", txn.ID.String())
+
+	// Assert that the coordinator has sent a dispatch confirmation request to the transaction sender and respond with a dispatch confirmation
+	require.True(t, mocks.SentMessageRecorder.HasSentDispatchConfirmationRequest())
+	err = c.ProcessEvent(ctx, &transaction.DispatchRequestApprovedEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
+			TransactionID: txn.ID,
+		},
+		RequestID: mocks.SentMessageRecorder.SentDispatchConfirmationRequestIdempotencyKey(),
+	})
+	assert.NoError(t, err)
+
+	// Assert that snapshot no longer contains that transaction in the pooled transactions but does contain it in the dispatched transactions
+	//NOTE: This is a key design point.  When a transaction is ready to be dispatched, we communicate to other nodes, via the heartbeat snapshot, that the transaction is dispatched.
+	snapshot = c.getSnapshot(ctx)
+	require.NotNil(t, snapshot)
+	assert.Equal(t, 0, len(snapshot.PooledTransactions))
+	require.Equal(t, 1, len(snapshot.DispatchedTransactions), "Snapshot should contain exactly one dispatched transaction")
+	assert.Equal(t, txn.ID.String(), snapshot.DispatchedTransactions[0].ID.String(), "Snapshot should contain the dispatched transaction with ID %s", txn.ID.String())
+
+	// Assert that the transaction is ready to be collected by the dispatcher thread
+	readyTransactions, err := c.GetTransactionsReadyToDispatch(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, readyTransactions)
+	require.Equal(t, 1, len(readyTransactions), "There should be exactly one transaction ready to dispatch")
+	assert.Equal(t, txn.ID.String(), readyTransactions[0].ID.String(), "The transaction ready to dispatch should match the delegated transaction ID")
+
+	// Simulate the dispatcher thread collecting the transaction and dispatching it to a public transaction manager
+	err = c.ProcessEvent(ctx, &transaction.DispatchedEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
+			TransactionID: txn.ID,
+		},
+	})
+	assert.NoError(t, err)
+
+	// Simulate the public transaction manager collecting the dispatched transaction and associating a signing address with it
+	signerAddress := pldtypes.RandAddress()
+	err = c.ProcessEvent(ctx, &transaction.CollectedEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
+			TransactionID: txn.ID,
+		},
+		SignerAddress: *signerAddress,
+	})
+	assert.NoError(t, err)
+
+	// Assert that we now have a signer address in the snapshot
+	snapshot = c.getSnapshot(ctx)
+	require.NotNil(t, snapshot)
+	assert.Equal(t, 0, len(snapshot.PooledTransactions))
+	require.Equal(t, 1, len(snapshot.DispatchedTransactions), "Snapshot should contain exactly one dispatched transaction")
+	assert.Equal(t, txn.ID.String(), snapshot.DispatchedTransactions[0].ID.String(), "Snapshot should contain the dispatched transaction with ID %s", txn.ID.String())
+	assert.Equal(t, signerAddress.String(), snapshot.DispatchedTransactions[0].Signer.String(), "Snapshot should contain the dispatched transaction with signer address %s", signerAddress.String())
+
+	// Simulate the dispatcher thread allocating a nonce for the transaction
+	err = c.ProcessEvent(ctx, &transaction.NonceAllocatedEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
+			TransactionID: txn.ID,
+		},
+		Nonce: 42,
+	})
+	assert.NoError(t, err)
+
+	// Assert that the nonce is now included in the snapshot
+	snapshot = c.getSnapshot(ctx)
+	require.NotNil(t, snapshot)
+	assert.Equal(t, 0, len(snapshot.PooledTransactions))
+	require.Equal(t, 1, len(snapshot.DispatchedTransactions), "Snapshot should contain exactly one dispatched transaction")
+	assert.Equal(t, txn.ID.String(), snapshot.DispatchedTransactions[0].ID.String(), "Snapshot should contain the dispatched transaction with ID %s", txn.ID.String())
+	assert.Equal(t, signerAddress.String(), snapshot.DispatchedTransactions[0].Signer.String(), "Snapshot should contain the dispatched transaction with signer address %s", signerAddress.String())
+	require.NotNil(t, snapshot.DispatchedTransactions[0].Nonce, "Snapshot should contain the dispatched transaction with a nonce")
+	assert.Equal(t, uint64(42), *snapshot.DispatchedTransactions[0].Nonce, "Snapshot should contain the dispatched transaction with nonce 42")
+
+	// Simulate the public transaction manager submitting the transaction
+	submissionHash := pldtypes.Bytes32(pldtypes.RandBytes(32))
+	err = c.ProcessEvent(ctx, &transaction.SubmittedEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
+			TransactionID: txn.ID,
+		},
+		SubmissionHash: submissionHash,
+	})
+	assert.NoError(t, err)
+
+	// Assert that the hash is now included in the snapshot
+	snapshot = c.getSnapshot(ctx)
+	require.NotNil(t, snapshot)
+	assert.Equal(t, 0, len(snapshot.PooledTransactions))
+	require.Equal(t, 1, len(snapshot.DispatchedTransactions), "Snapshot should contain exactly one dispatched transaction")
+	assert.Equal(t, txn.ID.String(), snapshot.DispatchedTransactions[0].ID.String(), "Snapshot should contain the dispatched transaction with ID %s", txn.ID.String())
+	assert.Equal(t, signerAddress.String(), snapshot.DispatchedTransactions[0].Signer.String(), "Snapshot should contain the dispatched transaction with signer address %s", signerAddress.String())
+	require.NotNil(t, snapshot.DispatchedTransactions[0].Nonce, "Snapshot should contain the dispatched transaction with a nonce")
+	assert.Equal(t, uint64(42), *snapshot.DispatchedTransactions[0].Nonce, "Snapshot should contain the dispatched transaction with nonce 42")
+	require.NotNil(t, snapshot.DispatchedTransactions[0].LatestSubmissionHash, "Snapshot should contain the dispatched transaction with a submission hash")
+
+	// Simulate the block indexer confirming the transaction
+	err = c.ProcessEvent(ctx, &transaction.ConfirmedEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
+			TransactionID: txn.ID,
+		},
+		Nonce: 42,
+		Hash:  submissionHash,
+	})
+	assert.NoError(t, err)
+
+	// Assert that snapshot contains a transaction with matching ID
+	snapshot = c.getSnapshot(ctx)
+	require.NotNil(t, snapshot)
+
+	assert.Equal(t, 0, len(snapshot.DispatchedTransactions))
+	assert.Equal(t, 0, len(snapshot.PooledTransactions))
+	assert.Equal(t, 1, len(snapshot.ConfirmedTransactions))
+	assert.Equal(t, txn.ID.String(), snapshot.ConfirmedTransactions[0].ID.String())
+	assert.Equal(t, signerAddress.String(), snapshot.ConfirmedTransactions[0].Signer.String())
+	require.NotNil(t, snapshot.ConfirmedTransactions[0].Nonce)
+	assert.Equal(t, uint64(42), *snapshot.ConfirmedTransactions[0].Nonce)
+	assert.Equal(t, submissionHash, *snapshot.ConfirmedTransactions[0].LatestSubmissionHash)
+
+}
+
+func TestCoordinator_MaxInflightTransactions(t *testing.T) {
+	ctx := context.Background()
+	originator := "sender@senderNode"
+	builder := NewCoordinatorBuilderForTesting(t, State_Idle)
+	builder.SetMaxInflightTransactions(5)
+	c, _ := builder.Build(ctx)
+
+	// Start by simulating the originator and delegate a transaction to the coordinator
+	for i := range 100 {
+		transactionBuilder := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Originator(originator).NumberOfRequiredEndorsers(1)
+		txn := transactionBuilder.BuildSparse()
+		err := c.addToDelegatedTransactions(ctx, originator, []*components.PrivateTransaction{txn})
+
+		if i < 5 {
+			require.NoError(t, err)
+		} else {
+			require.Error(t, err)
+			require.ErrorContains(t, err, "PD012642")
+		}
+	}
+}
