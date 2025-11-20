@@ -1,0 +1,44 @@
+# Example configuration for private transaction node restart test
+# This test drives pente transactions at a configurable TPS across multiple nodes,
+# kills a random node after a specified duration, waits for restart, and verifies
+# all transactions complete successfully.
+
+nodes:
+  - name: node1
+    httpEndpoint: http://127.0.0.1:31548
+    wsEndpoint: ws://127.0.0.1:31549
+  - name: node2
+    httpEndpoint: http://127.0.0.1:31648
+    wsEndpoint: ws://127.0.0.1:31649
+  - name: node3
+    httpEndpoint: http://127.0.0.1:31748
+    wsEndpoint: ws://127.0.0.1:31749
+
+instances:
+  - name: private-transaction-node-restart-test
+    test:
+      name: private_transaction_node_restart
+      workers: 2
+      actionsPerLoop: 5
+    maxSubmissionsPerSecond: 10  # Target transactions per second
+    completionTimeout: 5m  # Wait up to 5 minutes for all transactions to complete
+    noWaitSubmission: true  # Don't wait for confirmations before submitting next action
+    delinquentAction: log
+    length: 1m
+    nodeKillConfig:
+      # Kill command template - use Go template syntax with .NodeName field
+      # For Kubernetes, construct pod name as paladin-{NodeName}-0 in the template
+      # Example for Kubernetes:
+      killCommandTemplate: "kubectl delete pod paladin-{{.NodeName}}-0 --grace-period=0 --force"
+      # Health check command - use Go template syntax with .NodeName field
+      # For Kubernetes, construct pod name as paladin-{NodeName}-0 in the template
+      # Example for Kubernetes: check that pod has 2/2 containers running
+      healthCheckCommand: "kubectl get pod paladin-{{.NodeName}}-0 -o jsonpath='{.status.containerStatuses[*].ready}'"
+      # Health check template - parses command output to determine if node is healthy
+      # Example: checks if output equals "true true" (both containers ready)
+      healthCheckTemplate: "{{if eq .Output \"true true\"}}true{{else}}false{{end}}"
+      killInterval: 30s
+
+logLevel: info
+logEvents: false
+

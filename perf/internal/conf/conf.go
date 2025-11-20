@@ -24,10 +24,8 @@ import (
 
 type RunnerConfig struct {
 	LogLevel                string
-	Tests                   []TestCaseConfig
+	Test                    TestCaseConfig
 	Length                  time.Duration
-	SigningKey              string
-	ContractOptions         ContractOptions
 	WSConfig                pldconf.WSClientConfig
 	HTTPConfig              pldconf.HTTPClientConfig
 	DelinquentAction        DelinquentAction
@@ -36,49 +34,55 @@ type RunnerConfig struct {
 	MaxTimePerAction        time.Duration
 	MaxActions              int64
 	RampLength              time.Duration
-	NoWaitSubmission        bool
 	MaxSubmissionsPerSecond int
+	CompletionTimeout       time.Duration
+	NoWaitSubmission        bool
+	NodeKillConfig          *NodeKillConfig
+	Nodes                   []NodeConfig
 }
 
 type PerformanceTestConfig struct {
-	LogLevel   string                   `json:"logLevel"`
-	Instances  []InstanceConfig         `json:"instances"`
-	WSConfig   pldconf.WSClientConfig   `json:"wsConfig,omitempty"`
-	HTTPConfig pldconf.HTTPClientConfig `json:"httpConfig,omitempty"`
-	Daemon     bool                     `json:"daemon,omitempty"`
-	Nodes      []NodeConfig             `json:"nodes"`
-	LogEvents  bool                     `json:"logEvents,omitempty"`
+	LogLevel   string                   `json:"logLevel" yaml:"logLevel"`
+	Instances  []InstanceConfig         `json:"instances" yaml:"instances"`
+	WSConfig   pldconf.WSClientConfig   `json:"wsConfig,omitempty" yaml:"wsConfig,omitempty"`
+	HTTPConfig pldconf.HTTPClientConfig `json:"httpConfig,omitempty" yaml:"httpConfig,omitempty"`
+	Daemon     bool                     `json:"daemon,omitempty" yaml:"daemon,omitempty"`
+	Nodes      []NodeConfig             `json:"nodes" yaml:"nodes"`
+	LogEvents  bool                     `json:"logEvents,omitempty" yaml:"logEvents,omitempty"`
 }
 
 type InstanceConfig struct {
-	Name                    string           `json:"name"`
-	Tests                   []TestCaseConfig `json:"tests"`
-	Length                  time.Duration    `json:"length"`
-	NodeIndex               int              `json:"nodeIndex"`
-	SigningKey              string           `json:"signingKey,omitempty"`
-	ContractOptions         ContractOptions  `json:"contractOptions,omitempty"`
-	MaxTimePerAction        time.Duration    `json:"maxTimePerAction,omitempty"`
-	MaxActions              int64            `json:"maxActions,omitempty"`
-	RampLength              time.Duration    `json:"rampLength,omitempty"`
-	NoWaitSubmission        bool             `json:"noWaitSubmission"`
-	MaxSubmissionsPerSecond int              `json:"maxSubmissionsPerSecond"`
-	DelinquentAction        DelinquentAction `json:"delinquentAction,omitempty"`
+	Name                    string           `json:"name" yaml:"name"`
+	Test                    TestCaseConfig   `json:"test" yaml:"test"`
+	Length                  time.Duration    `json:"length" yaml:"length"`
+	MaxTimePerAction        time.Duration    `json:"maxTimePerAction,omitempty" yaml:"maxTimePerAction,omitempty"`
+	MaxActions              int64            `json:"maxActions,omitempty" yaml:"maxActions,omitempty"`
+	RampLength              time.Duration    `json:"rampLength,omitempty" yaml:"rampLength,omitempty"`
+	MaxSubmissionsPerSecond int              `json:"maxSubmissionsPerSecond" yaml:"maxSubmissionsPerSecond"`
+	DelinquentAction        DelinquentAction `json:"delinquentAction,omitempty" yaml:"delinquentAction,omitempty"`
+	CompletionTimeout       time.Duration    `json:"completionTimeout,omitempty" yaml:"completionTimeout,omitempty"`
+	NoWaitSubmission        bool             `json:"noWaitSubmission,omitempty" yaml:"noWaitSubmission,omitempty"`
+	NodeKillConfig          *NodeKillConfig  `json:"nodeKillConfig,omitempty" yaml:"nodeKillConfig,omitempty"`
 }
 
 type TestCaseConfig struct {
-	Name           TestName `json:"name"`
-	Workers        int      `json:"workers"`
-	ActionsPerLoop int      `json:"actionsPerLoop"`
+	Name           TestName `json:"name" yaml:"name"`
+	Workers        int      `json:"workers" yaml:"workers"`
+	ActionsPerLoop int      `json:"actionsPerLoop" yaml:"actionsPerLoop"`
 }
 
 type NodeConfig struct {
-	Name         string `json:"name"`
-	HTTPEndpoint string `json:"httpEndpoint"`
-	WSEndpoint   string `json:"wsEndpoint"`
+	Name         string `json:"name" yaml:"name"`
+	HTTPEndpoint string `json:"httpEndpoint" yaml:"httpEndpoint"`
+	WSEndpoint   string `json:"wsEndpoint" yaml:"wsEndpoint"`
 }
 
-type ContractOptions struct {
-	Address string `json:"address"`
+type NodeKillConfig struct {
+	KillCommandTemplate string        `json:"killCommandTemplate,omitempty" yaml:"killCommandTemplate,omitempty"`
+	HealthCheckCommand  string        `json:"healthCheckCommand,omitempty" yaml:"healthCheckCommand,omitempty"`
+	HealthCheckTemplate string        `json:"healthCheckTemplate,omitempty" yaml:"healthCheckTemplate,omitempty"`
+	RestartTimeout      time.Duration `json:"restartTimeout,omitempty" yaml:"restartTimeout,omitempty"`
+	KillInterval        time.Duration `json:"killInterval,omitempty" yaml:"killInterval,omitempty"`
 }
 
 type TestName string
@@ -86,6 +90,8 @@ type TestName string
 const (
 	// PerfTestPublicContract invokes a public smart contract and checks for transaction receipts
 	PerfTestPublicContract TestName = "public_contract"
+	// PerfTestPrivateTransactionNodeRestart drives pente transactions across nodes, kills a node, and verifies recovery
+	PerfTestPrivateTransactionNodeRestart TestName = "private_transaction_node_restart"
 )
 
 type DelinquentAction string

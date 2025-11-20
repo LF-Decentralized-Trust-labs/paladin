@@ -13,10 +13,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-task make(type: Exec) {
+configurations {
+    // Resolvable configurations
+    compiledContracts {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+}
+
+dependencies {
+    compiledContracts project(path: ":solidity", configuration: "compiledContracts")
+}
+
+task copySolidity(type: Copy, dependsOn: [":solidity:compile"]) {
+    inputs.files(configurations.compiledContracts)
+    from fileTree(configurations.compiledContracts.asPath) {
+        include 'contracts/testcontracts/SimpleStorage.sol/SimpleStorage.json'
+    }
+    into 'internal/perf/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
+}
+
+task make(type: Exec, dependsOn: copySolidity) {
     executable 'make'
 }
 
 task build {
     dependsOn make
+}
+
+task clean(type: Delete) {
+    delete 'internal/perf/abis'
 }
