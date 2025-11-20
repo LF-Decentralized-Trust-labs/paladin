@@ -92,7 +92,7 @@ fi
 # set paladin SDK version to latest if not set
 if [ "$PALADIN_SDK_VERSION" = "" ] && [ "$BUILD_PALADIN_SDK" = "false" ]; then
     PALADIN_SDK_VERSION=latest
-    # PALADIN_SDK_VERSION=$(npm view @lfdecentralizedtrust-labs/paladin-sdk version)
+    # PALADIN_SDK_VERSION=$(npm view @lfdecentralizedtrust/paladin-sdk version)
     print_status "PALADIN_SDK_VERSION not set, using latest version: $PALADIN_SDK_VERSION"
 fi
 
@@ -108,7 +108,7 @@ switch_paladin_sdk_version() {
     local name="$1"
     if [ "$BUILD_PALADIN_SDK" = "true" ]; then
         print_status "Running $name with local paladin SDK..."
-        npm uninstall @lfdecentralizedtrust-labs/paladin-sdk 2>/dev/null || true
+        npm uninstall @lfdecentralizedtrust/paladin-sdk 2>/dev/null || true
         if ! npm install file:../../sdk/typescript; then
             print_error "Failed to install local SDK for $name"
             exit 1
@@ -117,8 +117,8 @@ switch_paladin_sdk_version() {
 
     if [ "$PALADIN_SDK_VERSION" != "" ]; then
         print_status "Running $name with paladin SDK version $PALADIN_SDK_VERSION..."
-        npm uninstall @lfdecentralizedtrust-labs/paladin-sdk 2>/dev/null || true
-        if ! npm install @lfdecentralizedtrust-labs/paladin-sdk@$PALADIN_SDK_VERSION; then
+        npm uninstall @lfdecentralizedtrust/paladin-sdk 2>/dev/null || true
+        if ! npm install @lfdecentralizedtrust/paladin-sdk@$PALADIN_SDK_VERSION; then
             print_error "Failed to install SDK version $PALADIN_SDK_VERSION for $name"
             exit 1
         fi

@@ -1,0 +1,18 @@
+name: 'Free Up Disk Space'
+description: 'Removes large, pre-installed toolsets like .NET, Android, and Swift to free up disk space.'
+runs:
+  using: "composite"
+  steps:
+    - name: Free up disk space
+      shell: bash
+      run: |
+        echo "--- Disk Usage Before Cleanup ---"
+        df -h
+        echo "Removing large pre-installed toolsets..."
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /usr/share/swift
+        sudo rm -rf /opt/ghc
+        echo "--- Disk Usage After Cleanup ---"
+        df -h
+

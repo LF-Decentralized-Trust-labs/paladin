@@ -2,7 +2,7 @@ import PaladinClient, {
   PaladinVerifier,
   PentePrivacyGroup,
   PentePrivateContract,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import { DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import bondTracker from "../abis/BondTracker.json";
 import { InvestorList } from "./investorlist";

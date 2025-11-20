@@ -63,12 +63,12 @@ spec:
     operator:
       namespace: paladin # This value must match metadata.namespace
       image:
-        repository: ghcr.io/lf-decentralized-trust-labs/paladin-operator
+        repository: ghcr.io/lfdt-paladin/paladin-operator
         tag: main
         pullPolicy: Always
     paladin:
       image:
-        repository: ghcr.io/lf-decentralized-trust-labs/paladin
+        repository: ghcr.io/lfdt-paladin/paladin
         tag: main
         pullPolicy: Always
       # tollerations:

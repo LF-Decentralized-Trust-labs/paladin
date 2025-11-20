@@ -16,7 +16,7 @@ operator:
   name: paladin-operator
   namespace: "" # DEPRECATED: Use the namespace field in the HelmRelease instead. e.g. helm install ... --namespace <namespace>
   image:
-    repository: ghcr.io/lf-decentralized-trust-labs/paladin-operator
+    repository: ghcr.io/lfdt-paladin/paladin-operator
     tag: main
     pullPolicy: Always
 
@@ -201,7 +201,7 @@ installCRDs: false
 paladin:
   nodeNamePrefix: node
   image:
-    repository: ghcr.io/lf-decentralized-trust-labs/paladin
+    repository: ghcr.io/lfdt-paladin/paladin
     tag: main
     pullPolicy: Always
   labels:

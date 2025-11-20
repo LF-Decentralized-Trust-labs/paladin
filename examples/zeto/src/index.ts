@@ -16,7 +16,7 @@ import PaladinClient, {
   PaladinVerifier,
   TransactionType,
   ZetoFactory,
-} from "@lfdecentralizedtrust-labs/paladin-sdk";
+} from "@lfdecentralizedtrust/paladin-sdk";
 import { checkDeploy, checkReceipt } from "paladin-example-common";
 import erc20Abi from "./zeto-abis/SampleERC20.json";
 import * as fs from 'fs';

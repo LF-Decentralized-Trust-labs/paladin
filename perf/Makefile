@@ -28,7 +28,7 @@ install: ## Installs the package
 		cd pldperf && go install -ldflags="-X 'github.com/LFDT-Paladin/paladin/perf/internal/version.Version=$(VERSION)' -X 'github.com/LFDT-Paladin/paladin/perf/internal/version.Date=$(DATE)' -X 'github.com/LFDT-Paladin/paladin/perf/internal/version.Commit=$(GITREF)'"
 # TODO: what should the tag be
 docker:
-	docker build --platform linux/amd64 --build-arg BUILD_VERSION=$(VERSION) . -t ghcr.io/lf-decentralized-trust-labs/paladin-perf-cli
+	docker build --platform linux/amd64 --build-arg BUILD_VERSION=$(VERSION) . -t ghcr.io/lfdt-paladin/paladin-perf-cli
 
 lint: ${LINT} ## Checks and reports lint errors
 		GOGC=20 $(LINT) run -v --timeout 5m

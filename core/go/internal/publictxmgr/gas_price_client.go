@@ -411,7 +411,9 @@ func (hGpc *HybridGasPriceClient) Init(ctx context.Context) error {
 	}
 
 	// Gas oracle API config comes next in precedence
-	if hGpc.conf.GasOracleAPI != nil {
+	// We need to check for a non-empty URL for backwards compatibility with an older configuration version which
+	// didn't use a pointer to the gas oracle API config.
+	if hGpc.conf.GasOracleAPI != nil && hGpc.conf.GasOracleAPI.URL != "" {
 		gasOracleClient, err := pldresty.New(ctx, &hGpc.conf.GasOracleAPI.HTTPClientConfig)
 		if err != nil {
 			log.L(ctx).Errorf("Failed to initialize gas oracle HTTP client: %+v", err)

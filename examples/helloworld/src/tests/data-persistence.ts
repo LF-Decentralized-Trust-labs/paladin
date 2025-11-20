@@ -12,7 +12,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-import PaladinClient from "@lfdecentralizedtrust-labs/paladin-sdk";
+import PaladinClient from "@lfdecentralizedtrust/paladin-sdk";
 import helloWorldJson from "../abis/HelloWorld.json";
 import * as fs from 'fs';
 import { DEFAULT_POLL_TIMEOUT, nodeConnections, findLatestContractDataFile, getCachePath } from "paladin-example-common";

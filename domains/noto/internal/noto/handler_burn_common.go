@@ -200,6 +200,10 @@ func (h *burnCommon) baseLedgerInvokeBurn(ctx context.Context, req *prototk.Prep
 }
 
 func (h *burnCommon) hookInvokeBurn(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper, from string, amount *pldtypes.HexUint256, data pldtypes.HexBytes) (*TransactionWrapper, error) {
+	senderAddress, err := h.noto.findEthAddressVerifier(ctx, "sender", tx.Transaction.From, req.ResolvedVerifiers)
+	if err != nil {
+		return nil, err
+	}
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", from, req.ResolvedVerifiers)
 	if err != nil {
 		return nil, err
@@ -210,7 +214,7 @@ func (h *burnCommon) hookInvokeBurn(ctx context.Context, tx *types.ParsedTransac
 		return nil, err
 	}
 	params := &BurnHookParams{
-		Sender: fromAddress,
+		Sender: senderAddress,
 		From:   fromAddress,
 		Amount: amount,
 		Data:   data,

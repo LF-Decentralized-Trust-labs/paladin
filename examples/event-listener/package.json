@@ -14,14 +14,14 @@
   "author": "",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@types/node": "^22.8.7",
-    "copy-file": "^11.0.0",
+    "@types/node": "^22.19.0",
+    "copy-file": "^11.1.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@lfdecentralizedtrust-labs/paladin-sdk": "file:../../sdk/typescript",
-    "nanoid": "^3.3.9",
+    "@lfdecentralizedtrust/paladin-sdk": "file:../../sdk/typescript",
+    "nanoid": "^3.3.11",
     "paladin-example-common": "file:../common"
   }
 }

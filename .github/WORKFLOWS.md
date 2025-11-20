@@ -45,7 +45,7 @@ Once changes are merged into the `main` branch, workflows prepare the project fo
 
 - **[Publish Docker Images](workflows/cross-build-images.yaml):**  
   Produces production-grade, cross-platform Docker images and publishes them to the container registry:
-  - **Registry:** `ghcr.io/lf-decentralized-trust-labs`
+  - **Registry:** `ghcr.io/lfdt-paladin`
   - **Images:** `paladin`, `paladin-operator`
   - **Tagging:** Images are tagged with `main`.
   - **Platforms:** `linux/amd64`, `linux/arm64`
@@ -64,7 +64,7 @@ Release candidates are created first for testing and validation:
   - **[Release Docker Images](workflows/release-images.yaml):**  
     Builds and **publishes Docker images** tagged with the RC version (e.g., `v1.2.3-rc.1`).
     - **Registries:** 
-      - `ghcr.io/lf-decentralized-trust-labs`
+      - `ghcr.io/lfdt-paladin`
       - `docker.io/lfdecentralizedtrust`
     - **Images:** `paladin`, `paladin-operator`
     > RC images are **never** tagged as `latest`
@@ -83,7 +83,7 @@ Once the RC has been tested and validated, the final release can be created:
   - **[Release Docker Images](workflows/release-images.yaml):**  
     Builds and **publishes Docker images** tagged with the release version (e.g., `v1.2.3`) and `latest`.
     - **Registries:** 
-      - `ghcr.io/lf-decentralized-trust-labs`
+      - `ghcr.io/lfdt-paladin`
       - `docker.io/lfdecentralizedtrust`
     - **Images:** `paladin`, `paladin-operator`
     > `latest` is configurable 
@@ -165,7 +165,7 @@ Paladin includes a manual workflow for pushing Docker images to both DockerHub a
 * Pushes them to both:
 
   * **DockerHub:** `docker.io/lfdecentralizedtrust/...`
-  * **GHCR:** `ghcr.io/lf-decentralized-trust-labs/...`
+  * **GHCR:** `ghcr.io/lfdt-paladin/...`
 * Tags include the version you specified, and optionally `latest`.
 
 ### Example
@@ -178,7 +178,7 @@ If you run with:
 Images will be published as:
 
 * `docker.io/lfdecentralizedtrust/paladin:v0.1.0-hotfix.0`
-* `ghcr.io/lf-decentralized-trust-labs/paladin:v0.1.0-hotfix.0`
+* `ghcr.io/lfdt-paladin/paladin:v0.1.0-hotfix.0`
 
 If you set **Latest = true**, the same images will also be tagged as `latest`.
 

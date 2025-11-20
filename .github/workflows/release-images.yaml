@@ -40,7 +40,6 @@ jobs:
   image-tags:
     runs-on: ubuntu-latest
     outputs:
-      dockerhub_repository: ${{ steps.dockerhub_repo.outputs.repository }}
       ghcr_repository: ${{ steps.ghcr_repo.outputs.repository }}
       tags: ${{ steps.determine-tags.outputs.tags }}
     steps:
@@ -62,13 +61,6 @@ jobs:
           
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 
-      - name: Set DockerHub Repository
-        id: dockerhub_repo
-        uses: ./.github/actions/repository
-        with:
-          repository: ${{ github.repository_owner }}
-          registry: "docker.io"
-
       - name: Set GHCR Repository
         id: ghcr_repo
         uses: ./.github/actions/repository
@@ -76,17 +68,7 @@ jobs:
           repository: ${{ github.repository_owner }}
           registry: "ghcr.io"
  
-  push-to-dockerhub:
-    needs: image-tags
-    uses: ./.github/workflows/cross-build-images.yaml
-    with:
-      registry: docker.io
-      repository: ${{ needs.image-tags.outputs.dockerhub_repository }}
-      image_tags: ${{ needs.image-tags.outputs.tags }}
-    secrets:
-      username: ${{ secrets.DOCKERHUB_USERNAME }}
-      password: ${{ secrets.DOCKERHUB_TOKEN }}
-
+  # Build images once to GHCR
   push-to-ghcr:
     needs: image-tags
     uses: ./.github/workflows/cross-build-images.yaml
@@ -97,3 +79,15 @@ jobs:
     secrets:
       username: ${{ github.actor }}
       password: ${{ secrets.GITHUB_TOKEN }}
+
+  # Copy the built images from GHCR to DockerHub (no rebuild)
+  copy-to-dockerhub:
+    needs: [image-tags, push-to-ghcr]
+    uses: ./.github/workflows/copy-images.yaml
+    with:
+      source_tag: ${{ inputs.tag }}
+      target_tag: ${{ inputs.tag }}
+      latest: ${{ inputs.latest }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

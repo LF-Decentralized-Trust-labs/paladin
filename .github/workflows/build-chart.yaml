@@ -58,6 +58,9 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Free up disk space on runner
+        uses: ./.github/actions/free-up-disk-space
+
       - name: Install pre-requisites
         uses: ./.github/actions/setup
 

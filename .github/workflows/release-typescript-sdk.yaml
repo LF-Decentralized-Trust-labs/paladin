@@ -105,7 +105,7 @@ jobs:
         shell: bash
         run: |
           # The version for `dist-tag add` must not have the 'v' prefix
-          PACKAGE_SPEC="@lfdecentralizedtrust-labs/paladin-sdk@${{ steps.prep_version.outputs.clean_version }}"
+          PACKAGE_SPEC="@lfdecentralizedtrust/paladin-sdk@${{ steps.prep_version.outputs.clean_version }}"
           
           echo "Adding tags for $PACKAGE_SPEC..."
           

@@ -21,9 +21,9 @@ runs:
             # override only if the package.json has 'paladin-sdk' as a dependency
             if grep -q "paladin-sdk" package.json; then
               # First, remove the existing file: dependency
-              npm uninstall @lfdecentralizedtrust-labs/paladin-sdk
+              npm uninstall @lfdecentralizedtrust/paladin-sdk
               # Then, install the new version
-              npm install @lfdecentralizedtrust-labs/paladin-sdk@$sdk_version
+              npm install @lfdecentralizedtrust/paladin-sdk@$sdk_version
             fi
             cd ../..
           fi
