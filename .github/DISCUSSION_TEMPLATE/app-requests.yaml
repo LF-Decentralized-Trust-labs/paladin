@@ -1,0 +1,61 @@
+# Template metadata
+title: "GitHub App Integration Request"
+labels: ["app-request"]
+
+# Template body
+body:
+  - type: input
+    id: app_name
+    attributes:
+      label: "GitHub App Name"
+      description: "Enter the exact name of the GitHub App you’d like integrated."
+      placeholder: "Example: Dependabot, Snyk, or Custom Internal App"
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected_repos
+    attributes:
+      label: "Affected Repositories"
+      description: |
+        Specify where this integration should be applied.
+        You can choose:
+        - `All` (for all repositories)
+        - A list of specific repository names (one per line)
+      placeholder: |
+        All
+        OR
+        repo-one
+        repo-two
+    validations:
+      required: true
+
+  - type: textarea
+    id: justification
+    attributes:
+      label: "Justification"
+      description: "Explain why this integration is needed and what value it provides."
+      placeholder: "Describe the motivation, compliance, or business reason for this integration."
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        **Default Included Teams:**  
+        @LFDT-Paladin/paladin-admins
+        @LFDT-Paladin/lf-staff
+  - type: textarea
+    id: additional_teams
+    attributes:
+      label: "Additional Teams to Include (optional)"
+      description: "Add any other organization teams to notify about this request. Separate multiple teams with spaces."
+      placeholder: |
+        Please include the following teams:
+        - @LFDT-Paladin/paladin-admins
+        - @LFDT-Paladin/lf-staff
+      value: | 
+        @LFDT-Paladin/paladin-admins
+        @LFDT-Paladin/lf-staff
+    validations:
+      required: false
