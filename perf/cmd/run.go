@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"path"
 	"time"
@@ -108,12 +107,12 @@ func loadConfig(filename string) (*conf.PerformanceTestConfig, error) {
 	if d, err := ioutil.ReadFile(filename); err != nil {
 		return nil, err
 	} else {
-		var config *conf.PerformanceTestConfig
+		config := &conf.PerformanceTestConfig{}
 		var err error
 		if path.Ext(filename) == ".yaml" || path.Ext(filename) == ".yml" {
-			err = yaml.Unmarshal(d, &config)
+			err = yaml.Unmarshal(d, config)
 		} else {
-			err = json.Unmarshal(d, &config)
+			err = json.Unmarshal(d, config)
 		}
 
 		if err != nil {
@@ -143,21 +142,13 @@ func selectInstance(config *conf.PerformanceTestConfig) (*conf.InstanceConfig, e
 
 func generateRunnerConfigFromInstance(instance *conf.InstanceConfig, perfConfig *conf.PerformanceTestConfig) (*conf.RunnerConfig, error) {
 	runnerConfig := &conf.RunnerConfig{
-		Tests: instance.Tests,
+		Test: instance.Test,
 	}
 
 	runnerConfig.HTTPConfig = perfConfig.HTTPConfig
 	runnerConfig.WSConfig = perfConfig.WSConfig
 
-	log.Infof("Running test against endpoint \"%s\"\n", perfConfig.Nodes[instance.NodeIndex].HTTPEndpoint)
-
-	runnerConfig.HTTPConfig.URL = perfConfig.Nodes[instance.NodeIndex].HTTPEndpoint
-	runnerConfig.WSConfig.URL = perfConfig.Nodes[instance.NodeIndex].WSEndpoint
-
-	runnerConfig.SigningKey = instance.SigningKey
-	runnerConfig.ContractOptions = instance.ContractOptions
 	runnerConfig.LogLevel = perfConfig.LogLevel
-	runnerConfig.NoWaitSubmission = instance.NoWaitSubmission
 	runnerConfig.MaxSubmissionsPerSecond = instance.MaxSubmissionsPerSecond
 	runnerConfig.Length = instance.Length
 	runnerConfig.Daemon = perfConfig.Daemon
@@ -166,6 +157,10 @@ func generateRunnerConfigFromInstance(instance *conf.InstanceConfig, perfConfig 
 	runnerConfig.MaxTimePerAction = instance.MaxTimePerAction
 	runnerConfig.MaxActions = instance.MaxActions
 	runnerConfig.RampLength = instance.RampLength
+	runnerConfig.CompletionTimeout = instance.CompletionTimeout
+	runnerConfig.NoWaitSubmission = instance.NoWaitSubmission
+	runnerConfig.NodeKillConfig = instance.NodeKillConfig
+	runnerConfig.Nodes = perfConfig.Nodes
 
 	// If delinquent action has been set on the test run instance this overrides the command line
 	if instance.DelinquentAction != "" {
@@ -173,11 +168,6 @@ func generateRunnerConfigFromInstance(instance *conf.InstanceConfig, perfConfig 
 	}
 
 	setDefaults(runnerConfig)
-
-	err := validateConfig(runnerConfig, instance, perfConfig)
-	if err != nil {
-		return nil, err
-	}
 
 	return runnerConfig, nil
 }
@@ -187,16 +177,15 @@ func setDefaults(runnerConfig *conf.RunnerConfig) {
 		runnerConfig.MaxTimePerAction = 60 * time.Second
 	}
 
-	for i := range runnerConfig.Tests {
-		if runnerConfig.Tests[i].ActionsPerLoop <= 0 {
-			runnerConfig.Tests[i].ActionsPerLoop = 1
-		}
+	if runnerConfig.Test.ActionsPerLoop <= 0 {
+		runnerConfig.Test.ActionsPerLoop = 1
 	}
-}
 
-func validateConfig(cfg *conf.RunnerConfig, instance *conf.InstanceConfig, globalConfig *conf.PerformanceTestConfig) error {
-	if len(globalConfig.Nodes) > 0 && ((instance.NodeIndex + 1) > len(globalConfig.Nodes)) {
-		return fmt.Errorf("NodeIndex %d not valid - only %d nodes have been configured", instance.NodeIndex, len(globalConfig.Nodes))
+	if runnerConfig.CompletionTimeout == 0 {
+		runnerConfig.CompletionTimeout = 5 * time.Minute
 	}
-	return nil
+
+	if runnerConfig.NodeKillConfig != nil && runnerConfig.NodeKillConfig.RestartTimeout == 0 {
+		runnerConfig.NodeKillConfig.RestartTimeout = 2 * time.Minute
+	}
 }

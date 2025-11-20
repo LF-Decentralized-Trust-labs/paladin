@@ -5,6 +5,7 @@ Paladin Performance CLI is a HTTP load testing tool that generates a constant re
 ## Items Subject to Testing
 
 - Public transaction submission
+- Private transaction (pente) submission with node restart resilience testing
 
 ## Build
 
@@ -194,7 +195,60 @@ The `pldperf` tool is designed to let you run various styles of test. There are 
   - The test will allow at most `startRate` actions to happen per second. Over the period of `rateRampUpTime` seconds the allowed rate will increase linearly until `endRate` actions per seconds are reached. At this point the test will continue at `endRate` actions per second until the test finishes.
   - If `startRate` is the only value that is set, the test will run at that rate for the entire test.
 - Waiting for events to be confirmed before doing the next submission
-  - See `noWaitSubmission` (defaults to `false`).
-  - When set to `true` each worker routine will perform its action (e.g. minting a token) and wait for confirmation of that event before doing its next action.
+  - See `noWaitSubmission` attribute (defaults to `false`).
+  - When set to `false` (default), each worker routine will perform its action (e.g. minting a token) and wait for confirmation of that event before doing its next action.
+  - When set to `true`, workers will submit actions without waiting for confirmations, allowing for higher throughput. This is useful for stress testing maximum submission rates.
   - `maxSubmissionsPerSecond` can be used to control the maximum number of submissions per second to avoid overloading the system under test.
-- Having a worker loop submit more than 1 action per loop by setting `actionsPerLoop` for the test. This can be helpful when you want to scale the number of actions done in parallel without having to scale the number of workers. The default value is `1` for this attribute. If setting to a value > `1` it is recommended to have `noWaitSubmission` to set `false`.
+- Having a worker loop submit more than 1 action per loop by setting `actionsPerLoop` for the test. This can be helpful when you want to scale the number of actions done in parallel without having to scale the number of workers. The default value is `1` for this attribute.
+
+## Private Transaction Node Restart Test
+
+This test drives pente (private) transactions at a configurable TPS across multiple nodes, kills a random node at regular intervals, waits for restart, and verifies all transactions complete successfully.
+
+### Setup
+
+1. Create a configuration file for your test. See [`example-private-transaction-node-restart.yaml`](./config/example-private-transaction-node-restart.yaml) for an example.
+2. Configure multiple nodes in the `nodes` section of the config file. The privacy group members will be automatically generated as "member@" + each node name.
+3. The contract bytecode and ABI are automatically loaded from `smart-contracts/simplestorage/simple_storage.json`.
+4. Configure `nodeKillConfig` with:
+   - `killCommandTemplate`: Command template to kill a node (uses Go template syntax with `.NodeName` field)
+   - `healthCheckCommand`: Command template to check node health (uses Go template syntax with `.NodeName` field)
+   - `healthCheckTemplate`: Go template to parse health check command output. The template receives `.Output` containing the command output and should output "true" if healthy, "false" otherwise.
+   - `restartTimeout`: Maximum time to wait for node restart (default: 5m)
+   - `killInterval`: Interval at which to kill a random node (e.g., 30s). When this interval elapses, a node is killed and the test waits for it to restart before resuming transaction submissions.
+5. Set test parameters:
+   - `maxSubmissionsPerSecond`: Maximum transactions per second (e.g., 10)
+   - `completionTimeout`: Maximum time to wait for all transactions to complete after test ends (default: 5m)
+
+### Running the Test
+
+```bash
+pldperf run -c <config file> -i 0
+```
+
+### Test Flow
+
+1. **Setup Phase**: Creates a privacy group (with members automatically generated from node names) and deploys the SimpleStorage contract (loaded from `simple_storage.json`) to it
+2. **Load Phase**: Workers submit pente transactions at the configured rate (`maxSubmissionsPerSecond`), randomly distributed across nodes
+3. **Node Kill Phase**: At each `killInterval`, a random node is killed and new transaction submissions stop
+4. **Recovery Phase**: The test waits for the killed node to restart (up to `restartTimeout`)
+5. **Resume Phase**: Once the node restarts, transaction submissions resume
+6. **Verification Phase**: When the test ends, it waits up to `completionTimeout` for all pending transactions to receive receipts
+
+### Node Kill Configuration
+
+The `killCommandTemplate` supports different deployment scenarios using Go template syntax:
+
+- **Kubernetes**: `kubectl delete pod paladin-{{.NodeName}}-0 -n paladin --grace-period=0 --force`
+- **Docker**: `docker kill {{.NodeName}}`
+- **Custom**: Any command template using the `.NodeName` field
+
+The `healthCheckCommand` and `healthCheckTemplate` work together to determine when a node has restarted:
+
+- **Kubernetes example**: 
+  - Command: `kubectl get pod paladin-{{.NodeName}}-0 -n paladin -o jsonpath='{.status.containerStatuses[*].ready}'`
+  - Template: Checks that the output equals "true true" (both containers ready)
+- **Custom**: The template receives `.Output` containing the command output and should output "true" if healthy, "false" otherwise
+
+Available template fields:
+- `.NodeName`: The name of the node from the configuration

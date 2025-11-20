@@ -43,15 +43,18 @@ func (tc *publicContract) Name() conf.TestName {
 }
 
 func (tc *publicContract) RunOnce(iterationCount int) (string, error) {
+	if tc.pr.contractAddress == nil {
+		return "", fmt.Errorf("contract address not set - contract deployment may have failed")
+	}
+
 	// This will always be the ABI reference for simple storage - can disregard error when hardcoded to a valid value
 	abiRef := pldtypes.MustParseBytes32("0x23dbc09b901a3bf265a44b60ca7337eeba63f506ddd8ed77ac1505a52a2c5d15")
-	to := pldtypes.MustEthAddress(tc.pr.cfg.ContractOptions.Address)
-	result, err := tc.pr.httpClient.PTX().SendTransaction(tc.pr.ctx, &pldapi.TransactionInput{
+	result, err := tc.pr.httpClients[0].PTX().SendTransaction(tc.pr.ctx, &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			Type:         pldapi.TransactionTypePublic.Enum(),
 			ABIReference: &abiRef,
 			Function:     "set",
-			To:           to,
+			To:           tc.pr.contractAddress,
 			// This test is more valuable if it uses different signing keys, otherwise it only exercises
 			// a single transaction orchestrator. This approach works when using the default paladin
 			// wallet, but may require additional configuration if testing with an external wallet
