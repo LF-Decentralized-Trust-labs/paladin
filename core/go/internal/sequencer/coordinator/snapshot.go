@@ -84,6 +84,8 @@ func (c *coordinator) getSnapshot(ctx context.Context) *common.CoordinatorSnapsh
 			fallthrough
 		case transaction.State_Submitted:
 			fallthrough
+		case transaction.State_SubmissionPrepared:
+			fallthrough
 		case transaction.State_Dispatched:
 			dispatchedTransaction := &common.DispatchedTransaction{}
 			dispatchedTransaction.ID = txn.ID

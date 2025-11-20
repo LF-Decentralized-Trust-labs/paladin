@@ -163,7 +163,15 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	require.Equal(t, 1, len(readyTransactions), "There should be exactly one transaction ready to dispatch")
 	assert.Equal(t, txn.ID.String(), readyTransactions[0].ID.String(), "The transaction ready to dispatch should match the delegated transaction ID")
 
-	// Simulate the dispatcher thread collecting the transaction and dispatching it to a public transaction manager with a signing address
+	// Simulate the dispatcher thread collecting the transaction and dispatching it to a public transaction manager
+	err = c.ProcessEvent(ctx, &transaction.DispatchedEvent{
+		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
+			TransactionID: txn.ID,
+		},
+	})
+	assert.NoError(t, err)
+
+	// Simulate the public transaction manager collecting the dispatched transaction and associating a signing address with it
 	signerAddress := pldtypes.RandAddress()
 	err = c.ProcessEvent(ctx, &transaction.CollectedEvent{
 		BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{

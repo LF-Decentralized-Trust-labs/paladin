@@ -169,7 +169,7 @@ func (*DispatchRequestRejectedEvent) TypeString() string {
 }
 
 // CollectedEvent
-// Collected by the dispatcher thread and dispatched to a public transaction manager for a given signer address
+// Collected by the public transaction manager after being dispatched
 type CollectedEvent struct {
 	BaseCoordinatorEvent
 	SignerAddress pldtypes.EthAddress
@@ -181,6 +181,20 @@ func (*CollectedEvent) Type() EventType {
 
 func (*CollectedEvent) TypeString() string {
 	return "Event_Collected"
+}
+
+// DispatchedEvent
+// Collected by the dispatcher thread and dispatched to the public transaction manager
+type DispatchedEvent struct {
+	BaseCoordinatorEvent
+}
+
+func (*DispatchedEvent) Type() EventType {
+	return Event_Dispatched
+}
+
+func (*DispatchedEvent) TypeString() string {
+	return "Event_Dispatched"
 }
 
 // NonceAllocatedEvent

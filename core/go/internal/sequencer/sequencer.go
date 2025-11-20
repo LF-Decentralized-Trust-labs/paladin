@@ -729,6 +729,64 @@ func (sMgr *sequencerManager) HandleTransactionConfirmed(ctx context.Context, co
 	return nil
 }
 
+func (sMgr *sequencerManager) HandleTransactionConfirmedByChainedTransaction(ctx context.Context, confirmedTxn *components.TxCompletion) error {
+	log.L(sMgr.ctx).Tracef("HandleTransactionConfirmedByChainedTransaction %s", confirmedTxn.TransactionID.String())
+	sMgr.metrics.IncConfirmedTransactions()
+
+	// A transaction can be confirmed after the coordinating node has restarted. The coordinator doesn't persist the private TX, it relies
+	// on the originating node to delegate the private TX to it. HandleTransactionConfirmed first checks if a public TX for that request has been confirmed
+	// on chain, so in in this context we will assume we have the private TX in memory from which we can determine the originating node for confirmation events.
+
+	var contractAddress pldtypes.EthAddress
+	deploy := confirmedTxn.ContractAddress != nil
+	if deploy {
+		// Creation of a new contract
+		contractAddress = *confirmedTxn.ContractAddress
+	} else {
+		// Invoke of an existing contract
+		contractAddress = confirmedTxn.PSC.Address()
+	}
+
+	sequencer, err := sMgr.LoadSequencer(ctx, sMgr.components.Persistence().NOTX(), contractAddress, nil, nil)
+	if err != nil {
+		return err
+	}
+
+	if sequencer != nil {
+		if deploy {
+			// For a deploy we won't have tracked the transaction through the state machine, but we can load it ready for upcoming transactions and start
+			// off by selecting the next coordinator for the contract
+			sequencer.GetCoordinator().SelectActiveCoordinatorNode(ctx)
+		} else if sequencer.GetCoordinator().GetActiveCoordinatorNode(ctx, false) == sMgr.nodeName {
+			mtx := sequencer.GetCoordinator().GetTransactionByID(ctx, confirmedTxn.TransactionID)
+			if mtx == nil {
+				log.L(ctx).Warnf("Coordinator not tracking transaction ID %s", confirmedTxn.TransactionID)
+				// We have been told that a private TX has been confirmed through its chained transaction being confirmed, but we're not tracking
+				// the transaction in the sequencer. Since we're only using this callback to update the sequencer's state we'll log a warning but ignore it
+				return nil
+			}
+
+			confirmedEvent := &coordinator.TransactionConfirmedEvent{
+				TxID:         confirmedTxn.TransactionID,
+				Hash:         confirmedTxn.OnChain.TransactionHash,
+				RevertReason: confirmedTxn.RevertData,
+			}
+			confirmedEvent.EventTime = time.Now()
+
+			sequencer.GetCoordinator().QueueEvent(ctx, confirmedEvent)
+
+			// Forward the event to the originating node. This is only to update the originator's state machine, not for DB confirmation
+			transportWriter := sequencer.GetTransportWriter()
+			err = transportWriter.SendTransactionConfirmed(ctx, confirmedTxn.TransactionID, mtx.OriginatorNode(), &contractAddress, nil, confirmedTxn.RevertData)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func (sMgr *sequencerManager) HandleTransactionFailed(ctx context.Context, dbTX persistence.DBTX, failures []*components.PublicTxMatch) error {
 	log.L(sMgr.ctx).Tracef("HandleTransactionFailed %d", len(failures))
 	sMgr.metrics.IncRevertedTransactions()

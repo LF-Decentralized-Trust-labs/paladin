@@ -36,7 +36,8 @@ const (
 	State_Blocked                              // is fully endorsed but cannot proceed due to dependencies not being ready for dispatch
 	State_Confirming_Dispatchable              // endorsed and waiting for confirmation that were are OK to dispatch. The originator can still request not to proceed at this point.
 	State_Ready_For_Dispatch                   // dispatch confirmation received and waiting to be collected by the dispatcher thread.Going into this state is the point of no return
-	State_Dispatched                           // collected by the dispatcher thread but not yet submitted
+	State_Dispatched                           // collected by the dispatcher thread but not yet processed by the public TX manager
+	State_SubmissionPrepared                   // collected by the public TX manager but not yet submitted
 	State_Submitted                            // at least one submission has been made to the blockchain
 	State_Confirmed                            // "recently" confirmed on the base ledger.  NOTE: confirmed transactions are not held in memory for ever so getting a list of confirmed transactions will only return those confirmed recently
 	State_Final                                // final state for the transaction. Transactions are removed from memory as soon as they enter this state
@@ -57,7 +58,8 @@ const (
 	Event_DependencyReverted                                                             // another transaction, for which this transaction has a dependency on, has been reverted
 	Event_DispatchRequestApproved                                                        // dispatch confirmation received from the originator
 	Event_DispatchRequestRejected                                                        // dispatch confirmation response received from the originator with a rejection
-	Event_Collected                                                                      // collected by the dispatcher thread
+	Event_Dispatched                                                                     // dispatched to the public TX manager
+	Event_Collected                                                                      // collected by the public TX manager
 	Event_NonceAllocated                                                                 // nonce allocated by the dispatcher thread
 	Event_Submitted                                                                      // submission made to the blockchain.  Each time this event is received, the submission hash is updated
 	Event_Confirmed                                                                      // confirmation received from the blockchain of either a successful or reverted transaction
@@ -243,7 +245,7 @@ func init() {
 		State_Ready_For_Dispatch: {
 			OnTransitionTo: action_NotifyDependentsOfReadiness, //TODO also at this point we should notify the dispatch thread to come and collect this transaction
 			Events: map[EventType]EventHandler{
-				Event_Collected: {
+				Event_Dispatched: {
 					Transitions: []Transition{
 						{
 							To: State_Dispatched,
@@ -252,6 +254,16 @@ func init() {
 			},
 		},
 		State_Dispatched: {
+			Events: map[EventType]EventHandler{
+				Event_Collected: {
+					Transitions: []Transition{
+						{
+							To: State_SubmissionPrepared,
+						}},
+				},
+			},
+		},
+		State_SubmissionPrepared: {
 			Events: map[EventType]EventHandler{
 				Event_Submitted: {
 					Transitions: []Transition{
@@ -521,6 +533,8 @@ func (s State) String() string {
 		return "State_Ready_For_Dispatch"
 	case State_Dispatched:
 		return "State_Dispatched"
+	case State_SubmissionPrepared:
+		return "State_SubmissionPrepared"
 	case State_Submitted:
 		return "State_Submitted"
 	case State_Confirmed:

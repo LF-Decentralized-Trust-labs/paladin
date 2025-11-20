@@ -48,11 +48,13 @@ import (
 type QueryRequest struct {
 	Type     Query
 	Response chan any
+	TX       uuid.UUID
 }
 type Query string
 
 const (
 	QueryTypeDispatchedTransactions Query = "dispatched_transactions"
+	QueryTypeConfirmStateDispatched Query = "confirm_state_dispatched"
 )
 
 func (tt Query) Enum() pldtypes.Enum[Query] {
@@ -62,6 +64,7 @@ func (tt Query) Enum() pldtypes.Enum[Query] {
 func (tt Query) Options() []string {
 	return []string{
 		string(QueryTypeDispatchedTransactions),
+		string(QueryTypeConfirmStateDispatched),
 	}
 }
 
@@ -210,9 +213,30 @@ func (c *coordinator) eventLoop(ctx context.Context) {
 		case query := <-c.externalQueries:
 			log.L(ctx).Debugf("coordinator handling external query %s", query.Type)
 			if query.Type == QueryTypeDispatchedTransactions {
-				dispatchingTransactionCount := len(c.getTransactionsInStates(ctx, []transaction.State{transaction.State_Dispatched, transaction.State_Submitted}))
-				log.L(ctx).Tracef("coordinator responding to %s: %d dispatched transactions", query.Type, dispatchingTransactionCount)
+				dispatchingTransactions := c.getTransactionsInStates(ctx, []transaction.State{transaction.State_Dispatched, transaction.State_Submitted, transaction.State_SubmissionPrepared})
+				dispatchingTransactionCount := 0
+				for _, txn := range dispatchingTransactions {
+					if txn.PreparedPrivateTransaction == nil {
+						// We don't count transactions with 0 public base ledger transactions in the dispatch count
+						dispatchingTransactionCount++
+					}
+				}
+				log.L(ctx).Debugf("coordinator has %d dispatching transactions", dispatchingTransactionCount)
 				query.Response <- dispatchingTransactionCount
+			} else if query.Type == QueryTypeConfirmStateDispatched { // Check if the TX is any of the "dispatched" states (which includes submitted & submission prepared)
+				tx := c.transactionsByID[query.TX]
+				if tx == nil {
+					// Log internal error
+					msg := fmt.Sprintf("transaction %s not found", query.TX.String())
+					err := i18n.NewError(ctx, msgs.MsgSequencerInternalError, msg)
+					log.L(ctx).Error(err)
+					query.Response <- true // We should probably still unblock the dispatch loop by signalling that this TX has been processed
+				}
+				if tx.GetState() == transaction.State_Dispatched || tx.GetState() == transaction.State_SubmissionPrepared || tx.GetState() == transaction.State_Submitted {
+					query.Response <- true
+				} else {
+					query.Response <- false
+				}
 			} else {
 				log.L(ctx).Errorf("%s", i18n.NewError(ctx, msgs.MsgSequencerInternalError, "external query type unknown").Error())
 			}
@@ -242,18 +266,15 @@ func (c *coordinator) dispatchLoop(ctx context.Context) {
 			}
 
 			log.L(ctx).Debugf("coordinator asking for number of transactions currently in dispatch")
-		waitForDispatch:
+		waitUntilAllowedToDispatch:
 			for {
-				queryStart := time.Now() // While this mechanism is proving out, capture query times
 				c.externalQueries <- coordinatorQuery
 				select {
 				case response := <-coordinatorQuery.Response:
-					queryDuration := time.Since(queryStart)
-					log.L(ctx).Debugf("coordinator query response %d us", queryDuration.Microseconds())
 					inFlight := response.(int)
 					if inFlight < c.maxDispatchAhead {
 						log.L(ctx).Debugf("inFlight TX count %d < maxDispatchAhead %d - OK to dispatch", inFlight, c.maxDispatchAhead)
-						break waitForDispatch
+						break waitUntilAllowedToDispatch
 					}
 				case <-ctx.Done():
 					log.L(ctx).Infof("coordinator dispatch loop cancelled during query")
@@ -265,6 +286,39 @@ func (c *coordinator) dispatchLoop(ctx context.Context) {
 				// throughput
 				time.Sleep(100 * time.Millisecond)
 			}
+
+			// Queue the coordinator event loop to move this TX to dispatched. We can't proceed until we have
+			// confirmation that it has moved to the correct state, or else we can't enforce maxDispatchAhead safely.
+			// Note we can't use ProcessEvent in place of QueueEvent because we aren't the coordinator event loop.
+			c.QueueEvent(ctx, &transaction.DispatchedEvent{
+				BaseCoordinatorEvent: transaction.BaseCoordinatorEvent{
+					TransactionID: tx.ID,
+				},
+			})
+			log.L(ctx).Debugf("coordinator confirming transaction %s marked as dispatched", tx.ID.String())
+
+		waitUntilTXStateDispatched:
+			for {
+				confirmDispatchedQuery := QueryRequest{
+					Type:     QueryTypeConfirmStateDispatched,
+					TX:       tx.ID,
+					Response: make(chan any),
+				}
+				c.externalQueries <- confirmDispatchedQuery
+				select {
+				case response := <-confirmDispatchedQuery.Response:
+					confirmedTXState := response.(bool)
+					if confirmedTXState {
+						break waitUntilTXStateDispatched
+					} else {
+						time.Sleep(100 * time.Millisecond)
+					}
+				case <-ctx.Done():
+					log.L(ctx).Infof("coordinator dispatch loop cancelled during confirmation query")
+					return
+				}
+			}
+
 			log.L(ctx).Debugf("coordinator submitting transaction %s for dispatch", tx.ID.String())
 			c.readyForDispatch(ctx, tx)
 		case <-c.stopDispatchLoop:
@@ -522,27 +576,30 @@ func (c *coordinator) findTransactionBySignerNonce(ctx context.Context, signer *
 func (c *coordinator) confirmDispatchedTransaction(ctx context.Context, txId uuid.UUID, from *pldtypes.EthAddress, nonce uint64, hash pldtypes.Bytes32, revertReason pldtypes.HexBytes) (bool, error) {
 	log.L(ctx).Debugf("we currently have %d transactions to handle, confirming that dispatched TX %s is in our list", len(c.transactionsByID), txId.String())
 
-	// First check whether it is one that we have been coordinating
-	if dispatchedTransaction := c.findTransactionBySignerNonce(ctx, from, nonce); dispatchedTransaction != nil {
-		if dispatchedTransaction.GetLatestSubmissionHash() == nil || *(dispatchedTransaction.GetLatestSubmissionHash()) != hash {
-			// Is this not the transaction that we are looking for?
-			// We have missed a submission?  Or is it possible that an earlier submission has managed to get confirmed?
-			// It is interesting so we log it but either way,  this must be the transaction that we are looking for because we can't re-use a nonce
-			log.L(ctx).Debugf("transaction %s confirmed with a different hash than expected", dispatchedTransaction.ID.String())
+	// Confirming a transaction via its chained transaction, we won't hav a from address
+	if from != nil {
+		// First check whether it is one that we have been coordinating
+		if dispatchedTransaction := c.findTransactionBySignerNonce(ctx, from, nonce); dispatchedTransaction != nil {
+			if dispatchedTransaction.GetLatestSubmissionHash() == nil || *(dispatchedTransaction.GetLatestSubmissionHash()) != hash {
+				// Is this not the transaction that we are looking for?
+				// We have missed a submission?  Or is it possible that an earlier submission has managed to get confirmed?
+				// It is interesting so we log it but either way,  this must be the transaction that we are looking for because we can't re-use a nonce
+				log.L(ctx).Debugf("transaction %s confirmed with a different hash than expected", dispatchedTransaction.ID.String())
+			}
+			event := &transaction.ConfirmedEvent{
+				Hash:         hash,
+				RevertReason: revertReason,
+				Nonce:        nonce,
+			}
+			event.TransactionID = dispatchedTransaction.ID
+			event.EventTime = time.Now()
+			err := dispatchedTransaction.HandleEvent(ctx, event)
+			if err != nil {
+				log.L(ctx).Errorf("error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
+				return false, err
+			}
+			return true, nil
 		}
-		event := &transaction.ConfirmedEvent{
-			Hash:         hash,
-			RevertReason: revertReason,
-			Nonce:        nonce,
-		}
-		event.TransactionID = dispatchedTransaction.ID
-		event.EventTime = time.Now()
-		err := dispatchedTransaction.HandleEvent(ctx, event)
-		if err != nil {
-			log.L(ctx).Errorf("error handling ConfirmedEvent for transaction %s: %v", dispatchedTransaction.ID.String(), err)
-			return false, err
-		}
-		return true, nil
 	}
 
 	for _, dispatchedTransaction := range c.transactionsByID {
