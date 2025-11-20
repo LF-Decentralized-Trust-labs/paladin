@@ -16,7 +16,7 @@ interface INotoPrivate {
         bytes32[] lockedInputs;
         bytes32[] lockedOutputs;
         bytes32[] outputs;
-        bytes signature;
+        bytes proof;
         bytes data;
     }
 
@@ -65,7 +65,6 @@ interface INotoPrivate {
 
     function delegateLock(
         bytes32 lockId,
-        UnlockPublicParams calldata unlock,
         address delegate,
         bytes calldata data
     ) external;

@@ -97,8 +97,8 @@ var NotoUnlockTypeSet = eip712.TypeSet{
 
 var NotoUnlockMaskedTypeSet = eip712.TypeSet{
 	"Unlock": {
+		{Name: "txId", Type: "bytes32"},
 		{Name: "lockedInputs", Type: "bytes32[]"},
-		{Name: "lockedOutputs", Type: "bytes32[]"},
 		{Name: "outputs", Type: "bytes32[]"},
 		{Name: "data", Type: "bytes"},
 	},
@@ -256,15 +256,19 @@ func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owne
 	}
 }
 
-func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string, lockID pldtypes.Bytes32, owner *pldtypes.EthAddress, amount *big.Int) (inputs *preparedLockedInputs, revert bool, err error) {
+// Select from available locked states for a given lock ID and owner,
+// ensuring the total amount is at least the specified amount.
+// If selectAll is true, ALL available states will be found selected.
+func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string, lockID pldtypes.Bytes32, owner *pldtypes.EthAddress, amount *big.Int, selectAll bool) (inputs *preparedLockedInputs, revert bool, err error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*prototk.StateRef{}
 	coins := []*types.NotoLockedCoin{}
+	limit := 10
 
 	for {
 		queryBuilder := query.NewQueryBuilder().
-			Limit(10).
+			Limit(limit).
 			Sort(".created").
 			Equal("lockId", lockID).
 			Equal("owner", owner.String())
@@ -275,13 +279,10 @@ func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string
 
 		log.L(ctx).Debugf("State query: %s", queryBuilder.Query())
 		states, err := n.findAvailableStates(ctx, stateQueryContext, n.lockedCoinSchema.Id, queryBuilder.Query().String())
-
 		if err != nil {
 			return nil, false, err
 		}
-		if len(states) == 0 {
-			return nil, true, i18n.NewError(ctx, msgs.MsgInsufficientFunds, total.Text(10))
-		}
+
 		for _, state := range states {
 			lastStateTimestamp = state.CreatedAt
 			coin, err := n.unmarshalLockedCoin(state.DataJson)
@@ -295,15 +296,26 @@ func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string
 			})
 			coins = append(coins, coin)
 			log.L(ctx).Debugf("Selecting coin %s value=%s total=%s required=%s)", state.Id, coin.Amount.Int().Text(10), total.Text(10), amount.Text(10))
-			if total.Cmp(amount) >= 0 {
-				return &preparedLockedInputs{
-					coins:  coins,
-					states: stateRefs,
-					total:  total,
-				}, false, nil
+			if total.Cmp(amount) >= 0 && !selectAll {
+				// total achieved - stop here unless we need to select all states
+				break
 			}
 		}
+
+		if len(states) < limit {
+			// no more states to select
+			break
+		}
 	}
+
+	if total.Cmp(amount) >= 0 {
+		return &preparedLockedInputs{
+			coins:  coins,
+			states: stateRefs,
+			total:  total,
+		}, false, nil
+	}
+	return nil, true, i18n.NewError(ctx, msgs.MsgInsufficientFunds, total.Text(10))
 }
 
 func (n *Noto) prepareOutputs(ownerAddress *pldtypes.EthAddress, amount *pldtypes.HexUint256, distributionList []string) (*preparedOutputs, error) {
@@ -346,18 +358,16 @@ func (n *Noto) prepareInfo(data pldtypes.HexBytes, distributionList []string) ([
 	return []*prototk.NewState{newState}, err
 }
 
-func (n *Noto) prepareLockInfo(lockID pldtypes.Bytes32, owner, delegate *pldtypes.EthAddress, distributionList []string) (*prototk.NewState, error) {
-	if delegate == nil {
-		delegate = &pldtypes.EthAddress{}
-	}
+func (n *Noto) prepareLockInfo(lockID pldtypes.Bytes32, owner *pldtypes.EthAddress, spendTxId *pldtypes.Bytes32, distributionList []string) (*prototk.NewState, error) {
 	newData := &types.NotoLockInfo{
-		Salt:     pldtypes.RandBytes32(),
-		LockID:   lockID,
-		Owner:    owner,
-		Delegate: delegate,
+		Salt:   pldtypes.RandBytes32(),
+		LockID: lockID,
+		Owner:  owner,
+	}
+	if spendTxId != nil {
+		newData.SpendTxId = *spendTxId
 	}
 	return n.makeNewLockState(newData, distributionList)
-
 }
 
 func (n *Noto) filterSchema(states []*prototk.EndorsableState, schemas []string) (filtered []*prototk.EndorsableState) {
@@ -508,20 +518,20 @@ func (n *Noto) encodeUnlock(ctx context.Context, contract *ethtypes.Address0xHex
 	})
 }
 
-func (n *Noto) unlockHashFromStates(ctx context.Context, contract *ethtypes.Address0xHex, lockedInputs, lockedOutputs, outputs []*prototk.EndorsableState, data pldtypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
-	return n.unlockHashFromIDs(ctx, contract, endorsableStateIDs(lockedInputs), endorsableStateIDs(lockedOutputs), endorsableStateIDs(outputs), data)
+func (n *Noto) unlockHashFromStates(ctx context.Context, contract *ethtypes.Address0xHex, txId string, lockedInputs, outputs []*prototk.EndorsableState, data pldtypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
+	return n.unlockHashFromIDs(ctx, contract, txId, endorsableStateIDs(lockedInputs), endorsableStateIDs(outputs), data)
 }
 
-func (n *Noto) unlockHashFromIDs(ctx context.Context, contract *ethtypes.Address0xHex, lockedInputs, lockedOutputs, outputs []string, data pldtypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
+func (n *Noto) unlockHashFromIDs(ctx context.Context, contract *ethtypes.Address0xHex, txId string, lockedInputs, outputs []string, data pldtypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
 		Types:       NotoUnlockMaskedTypeSet,
 		PrimaryType: "Unlock",
 		Domain:      n.eip712Domain(contract),
 		Message: map[string]any{
-			"lockedInputs":  stringToAny(lockedInputs),
-			"lockedOutputs": stringToAny(lockedOutputs),
-			"outputs":       stringToAny(outputs),
-			"data":          data,
+			"txId":         txId,
+			"lockedInputs": stringToAny(lockedInputs),
+			"outputs":      stringToAny(outputs),
+			"data":         data,
 		},
 	})
 }

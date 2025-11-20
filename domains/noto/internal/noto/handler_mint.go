@@ -28,6 +28,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signpayloads"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 )
 
 type mintHandler struct {
@@ -158,7 +159,7 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *mintHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *mintHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	// Include the signature from the sender/notary
 	// This is not verified on the base ledger, but can be verified by anyone with the unmasked state data
 	sender := domain.FindAttestation("sender", req.AttestationResult)
@@ -166,23 +167,45 @@ func (h *mintHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepare
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
 	}
 
-	data, err := h.noto.encodeTransactionData(ctx, req.Transaction, req.InfoStates)
+	data, err := h.noto.encodeTransactionData(ctx, req.InfoStates)
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoMintParams{
-		TxId:      req.Transaction.TransactionId,
-		Outputs:   endorsableStateIDs(req.OutputStates),
-		Signature: sender.Payload,
-		Data:      data,
+
+	var interfaceABI abi.ABI
+	var functionName string
+	var paramsJSON []byte
+
+	switch tx.DomainConfig.Variant {
+	case types.NotoVariantDefault:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
+		functionName = "mint"
+		params := &NotoMintParams{
+			TxId:    req.Transaction.TransactionId,
+			Outputs: endorsableStateIDs(req.OutputStates),
+			Proof:   sender.Payload,
+			Data:    data,
+		}
+		paramsJSON, err = json.Marshal(params)
+	default:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
+		functionName = "mint"
+		params := &NotoMint_V0_Params{
+			TxId:      req.Transaction.TransactionId,
+			Outputs:   endorsableStateIDs(req.OutputStates),
+			Signature: sender.Payload,
+			Data:      data,
+		}
+		paramsJSON, err = json.Marshal(params)
 	}
-	paramsJSON, err := json.Marshal(params)
+
 	if err != nil {
 		return nil, err
 	}
+
 	return &TransactionWrapper{
 		transactionType: prototk.PreparedTransaction_PUBLIC,
-		functionABI:     interfaceBuild.ABI.Functions()["mint"],
+		functionABI:     interfaceABI.Functions()[functionName],
 		paramsJSON:      paramsJSON,
 	}, nil
 }
@@ -237,7 +260,7 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "notary")
 	}
 
-	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, req)
 	if err != nil {
 		return nil, err
 	}

@@ -256,12 +256,10 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	log.L(ctx).Infof("Approve both Noto transactions")
 	notoGold.DelegateLock(ctx, &nototypes.DelegateLockParams{
 		LockID:   goldUnlockReceipt.LockInfo.LockID,
-		Unlock:   goldUnlockReceipt.LockInfo.UnlockParams,
 		Delegate: transferAtom.Address,
 	}).SignAndSend(alice).Wait()
 	notoSilver.DelegateLock(ctx, &nototypes.DelegateLockParams{
 		LockID:   silverUnlockReceipt.LockInfo.LockID,
-		Unlock:   silverUnlockReceipt.LockInfo.UnlockParams,
 		Delegate: transferAtom.Address,
 	}).SignAndSend(bob).Wait()
 
@@ -457,7 +455,6 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 	log.L(ctx).Infof("Approve both transfers")
 	noto.DelegateLock(ctx, &nototypes.DelegateLockParams{
 		LockID:   notoUnlockReceipt.LockInfo.LockID,
-		Unlock:   notoUnlockReceipt.LockInfo.UnlockParams,
 		Delegate: transferAtom.Address,
 	}).SignAndSend(alice).Wait()
 	zeto.DelegateLock(ctx, tb, lockedZeto, transferAtom.Address, bobKey.Identifier)

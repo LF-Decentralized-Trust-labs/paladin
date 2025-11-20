@@ -29,6 +29,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signpayloads"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 )
 
 type unlockCommon struct {
@@ -40,10 +41,9 @@ type unlockHandler struct {
 }
 
 type unlockStates struct {
-	lockedInputs  *preparedLockedInputs
-	lockedOutputs *preparedLockedOutputs
-	outputs       *preparedOutputs
-	info          []*prototk.NewState
+	lockedInputs *preparedLockedInputs
+	outputs      *preparedOutputs
+	info         []*prototk.NewState
 }
 
 func (h *unlockCommon) validateParams(ctx context.Context, unlockParams *types.UnlockParams) error {
@@ -91,7 +91,7 @@ func (h *unlockCommon) init(ctx context.Context, tx *types.ParsedTransaction, pa
 	}, nil
 }
 
-func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTransaction, params *types.UnlockParams, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, *unlockStates, error) {
+func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTransaction, spendTxId *pldtypes.Bytes32, params *types.UnlockParams, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, *unlockStates, error) {
 	notary := tx.DomainConfig.NotaryLookup
 
 	_, err := h.noto.findEthAddressVerifier(ctx, "notary", notary, req.ResolvedVerifiers)
@@ -108,7 +108,7 @@ func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTrans
 		requiredTotal = requiredTotal.Add(requiredTotal, entry.Amount.Int())
 	}
 
-	lockedInputStates, revert, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.LockID, fromAddress, requiredTotal)
+	lockedInputStates, revert, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.LockID, fromAddress, requiredTotal, true)
 	if err != nil {
 		if revert {
 			message := err.Error()
@@ -121,7 +121,7 @@ func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTrans
 	}
 
 	remainder := big.NewInt(0).Sub(lockedInputStates.total, requiredTotal)
-	unlockedOutputs, lockedOutputs, err := h.assembleUnlockOutputs(ctx, tx, params, req, fromAddress, remainder)
+	unlockedOutputs, err := h.assembleUnlockOutputs(ctx, tx, params, req, fromAddress, remainder)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -130,7 +130,7 @@ func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTrans
 	if err != nil {
 		return nil, nil, err
 	}
-	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, nil, []string{notary, params.From})
+	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, spendTxId, []string{notary, params.From})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -139,40 +139,40 @@ func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTrans
 	return &prototk.AssembleTransactionResponse{
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 		}, &unlockStates{
-			lockedInputs:  lockedInputStates,
-			lockedOutputs: lockedOutputs,
-			outputs:       unlockedOutputs,
-			info:          infoStates,
+			lockedInputs: lockedInputStates,
+			outputs:      unlockedOutputs,
+			info:         infoStates,
 		}, nil
 }
 
-func (h *unlockCommon) assembleUnlockOutputs(ctx context.Context, tx *types.ParsedTransaction, params *types.UnlockParams, req *prototk.AssembleTransactionRequest, from *pldtypes.EthAddress, remainder *big.Int) (*preparedOutputs, *preparedLockedOutputs, error) {
+func (h *unlockCommon) assembleUnlockOutputs(ctx context.Context, tx *types.ParsedTransaction, params *types.UnlockParams, req *prototk.AssembleTransactionRequest, from *pldtypes.EthAddress, remainder *big.Int) (*preparedOutputs, error) {
 	notary := tx.DomainConfig.NotaryLookup
 
 	unlockedOutputs := &preparedOutputs{}
 	for _, entry := range params.Recipients {
 		toAddress, err := h.noto.findEthAddressVerifier(ctx, "to", entry.To, req.ResolvedVerifiers)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		outputs, err := h.noto.prepareOutputs(toAddress, entry.Amount, []string{notary, params.From, entry.To})
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		unlockedOutputs.coins = append(unlockedOutputs.coins, outputs.coins...)
 		unlockedOutputs.states = append(unlockedOutputs.states, outputs.states...)
 	}
 
-	lockedOutputs := &preparedLockedOutputs{}
+	// Remainder is returned to the lock owner as unlocked outputs
 	if remainder.Cmp(big.NewInt(0)) == 1 {
-		var err error
-		lockedOutputs, err = h.noto.prepareLockedOutputs(params.LockID, from, (*pldtypes.HexUint256)(remainder), []string{notary, params.From})
+		remainderOutputs, err := h.noto.prepareOutputs(from, (*pldtypes.HexUint256)(remainder), []string{notary, params.From})
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
+		unlockedOutputs.coins = append(unlockedOutputs.coins, remainderOutputs.coins...)
+		unlockedOutputs.states = append(unlockedOutputs.states, remainderOutputs.states...)
 	}
 
-	return unlockedOutputs, lockedOutputs, nil
+	return unlockedOutputs, nil
 }
 
 func (h *unlockCommon) endorse(
@@ -180,25 +180,38 @@ func (h *unlockCommon) endorse(
 	tx *types.ParsedTransaction,
 	params *types.UnlockParams,
 	req *prototk.EndorseTransactionRequest,
-	inputs, outputs *parsedCoins,
+	inputs, spendOutputs, cancelOutputs *parsedCoins,
 ) (*prototk.EndorseTransactionResponse, error) {
 	if err := h.checkAllowed(ctx, tx, params.From); err != nil {
 		return nil, err
 	}
 
 	// Validate the amounts, and lock creator's ownership of all locked inputs/outputs
-	if err := h.noto.validateUnlockAmounts(ctx, inputs, outputs); err != nil {
+	if err := h.noto.validateUnlockAmounts(ctx, inputs, spendOutputs); err != nil {
 		return nil, err
 	}
 	if err := h.noto.validateLockOwners(ctx, params.From, req.ResolvedVerifiers, inputs.lockedCoins, inputs.lockedStates); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateLockOwners(ctx, params.From, req.ResolvedVerifiers, outputs.lockedCoins, outputs.lockedStates); err != nil {
+	if err := h.noto.validateLockOwners(ctx, params.From, req.ResolvedVerifiers, spendOutputs.lockedCoins, spendOutputs.lockedStates); err != nil {
 		return nil, err
 	}
 
+	// If cancel outputs are present (for prepare unlock), validate the amounts and owners
+	if cancelOutputs != nil {
+		if err := h.noto.validateUnlockAmounts(ctx, inputs, cancelOutputs); err != nil {
+			return nil, err
+		}
+		if err := h.noto.validateLockOwners(ctx, params.From, req.ResolvedVerifiers, cancelOutputs.lockedCoins, cancelOutputs.lockedStates); err != nil {
+			return nil, err
+		}
+		if err := h.noto.validateOwners(ctx, params.From, req.ResolvedVerifiers, cancelOutputs.coins, cancelOutputs.states); err != nil {
+			return nil, err
+		}
+	}
+
 	// Notary checks the signatures from the sender, then submits the transaction
-	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, inputs.lockedCoins, outputs.lockedCoins, outputs.coins)
+	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, inputs.lockedCoins, spendOutputs.lockedCoins, spendOutputs.coins)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +241,7 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 	params := tx.Params.(*types.UnlockParams)
 	notary := tx.DomainConfig.NotaryLookup
 
-	res, states, err := h.assembleStates(ctx, tx, params, req)
+	res, states, err := h.assembleStates(ctx, tx, nil, params, req)
 	if err != nil || res.AssemblyResult != prototk.AssembleTransactionResponse_OK {
 		return res, err
 	}
@@ -236,10 +249,9 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 	assembledTransaction := &prototk.AssembledTransaction{}
 	assembledTransaction.InputStates = states.lockedInputs.states
 	assembledTransaction.OutputStates = states.outputs.states
-	assembledTransaction.OutputStates = append(assembledTransaction.OutputStates, states.lockedOutputs.states...)
 	assembledTransaction.InfoStates = states.info
 
-	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, states.lockedInputs.coins, states.lockedOutputs.coins, states.outputs.coins)
+	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, states.lockedInputs.coins, nil, states.outputs.coins)
 	if err != nil {
 		return nil, err
 	}
@@ -280,10 +292,12 @@ func (h *unlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction
 	if err != nil {
 		return nil, err
 	}
-	return h.endorse(ctx, tx, params, req, inputs, outputs)
+	return h.endorse(ctx, tx, params, req, inputs, outputs, nil)
 }
 
-func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+	inParams := tx.Params.(*types.UnlockParams)
+
 	lockedInputs := req.InputStates
 	outputs, lockedOutputs := h.noto.splitStates(req.OutputStates)
 
@@ -294,24 +308,56 @@ func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepa
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
 	}
 
-	data, err := h.noto.encodeTransactionData(ctx, req.Transaction, req.InfoStates)
+	txData, err := h.noto.encodeTransactionData(ctx, req.InfoStates)
 	if err != nil {
 		return nil, err
 	}
-	params := &types.UnlockPublicParams{
-		TxId:          req.Transaction.TransactionId,
-		LockedInputs:  endorsableStateIDs(lockedInputs),
-		LockedOutputs: endorsableStateIDs(lockedOutputs),
-		Outputs:       endorsableStateIDs(outputs),
-		Signature:     unlockSignature.Payload,
-		Data:          data,
+
+	var interfaceABI abi.ABI
+	var functionName string
+	var paramsJSON []byte
+
+	switch tx.DomainConfig.Variant {
+	case types.NotoVariantDefault:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
+		functionName = "spendLock"
+		unlockParams := &UnlockDataStrings{
+			TxId:    req.Transaction.TransactionId,
+			Inputs:  endorsableStateIDs(lockedInputs),
+			Outputs: endorsableStateIDs(outputs),
+			Data:    txData,
+		}
+		unlockParamsJSON, err := json.Marshal(unlockParams)
+		if err != nil {
+			return nil, err
+		}
+		unlockParamsEncoded, err := UnlockDataABI.EncodeABIDataJSONCtx(ctx, unlockParamsJSON)
+		if err != nil {
+			return nil, err
+		}
+		params := &types.SpendLockPublicParams{
+			LockID: inParams.LockID,
+			Data:   unlockParamsEncoded,
+		}
+		paramsJSON, err = json.Marshal(params)
+	default:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
+		functionName = "unlock"
+		params := &NotoUnlock_V0_Params{
+			TxId:          req.Transaction.TransactionId,
+			LockedInputs:  endorsableStateIDs(lockedInputs),
+			LockedOutputs: endorsableStateIDs(lockedOutputs),
+			Outputs:       endorsableStateIDs(outputs),
+			Signature:     unlockSignature.Payload,
+			Data:          txData,
+		}
+		paramsJSON, err = json.Marshal(params)
 	}
-	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()["unlock"],
+		functionABI: interfaceABI.Functions()[functionName],
 		paramsJSON:  paramsJSON,
 	}, nil
 }
@@ -370,7 +416,7 @@ func (h *unlockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "notary")
 	}
 
-	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, req)
 	if err != nil {
 		return nil, err
 	}

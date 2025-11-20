@@ -29,6 +29,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signpayloads"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 )
 
 type transferCommon struct {
@@ -160,7 +161,7 @@ func (h *transferCommon) endorseTransfer(ctx context.Context, tx *types.ParsedTr
 	if err := h.noto.validateTransferAmounts(ctx, inputs, outputs); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, from, req, inputs.coins, inputs.states); err != nil {
+	if err := h.noto.validateOwners(ctx, from, req.ResolvedVerifiers, inputs.coins, inputs.states); err != nil {
 		return nil, err
 	}
 
@@ -177,7 +178,7 @@ func (h *transferCommon) endorseTransfer(ctx context.Context, tx *types.ParsedTr
 	}, nil
 }
 
-func (h *transferCommon) baseLedgerInvokeTransfer(ctx context.Context, req *prototk.PrepareTransactionRequest, withApproval bool) (*TransactionWrapper, error) {
+func (h *transferCommon) baseLedgerInvokeTransfer(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	// Include the signature from the sender
 	// This is not verified on the base ledger, but can be verified by anyone with the unmasked state data
 	signature := domain.FindAttestation("sender", req.AttestationResult)
@@ -185,27 +186,44 @@ func (h *transferCommon) baseLedgerInvokeTransfer(ctx context.Context, req *prot
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
 	}
 
-	data, err := h.noto.encodeTransactionData(ctx, req.Transaction, req.InfoStates)
+	data, err := h.noto.encodeTransactionData(ctx, req.InfoStates)
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoTransferParams{
-		TxId:      req.Transaction.TransactionId,
-		Inputs:    endorsableStateIDs(req.InputStates),
-		Outputs:   endorsableStateIDs(req.OutputStates),
-		Signature: signature.Payload,
-		Data:      data,
+
+	var interfaceABI abi.ABI
+	var functionName string
+	var paramsJSON []byte
+
+	switch tx.DomainConfig.Variant {
+	case types.NotoVariantDefault:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
+		functionName = "transfer"
+		params := &NotoTransferParams{
+			TxId:    req.Transaction.TransactionId,
+			Inputs:  endorsableStateIDs(req.InputStates),
+			Outputs: endorsableStateIDs(req.OutputStates),
+			Proof:   signature.Payload,
+			Data:    data,
+		}
+		paramsJSON, err = json.Marshal(params)
+	default:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
+		functionName = "transfer"
+		params := &NotoTransfer_V0_Params{
+			TxId:      req.Transaction.TransactionId,
+			Inputs:    endorsableStateIDs(req.InputStates),
+			Outputs:   endorsableStateIDs(req.OutputStates),
+			Signature: signature.Payload,
+			Data:      data,
+		}
+		paramsJSON, err = json.Marshal(params)
 	}
-	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
-	}
-	fn := "transfer"
-	if withApproval {
-		fn = "transferWithApproval"
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()[fn],
+		functionABI: interfaceABI.Functions()[functionName],
 		paramsJSON:  paramsJSON,
 	}, nil
 }
@@ -263,7 +281,7 @@ func (h *transferCommon) prepareTransfer(ctx context.Context, tx *types.ParsedTr
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "notary")
 	}
 
-	baseTransaction, err := h.baseLedgerInvokeTransfer(ctx, req, false)
+	baseTransaction, err := h.baseLedgerInvokeTransfer(ctx, tx, req)
 	if err != nil {
 		return nil, err
 	}

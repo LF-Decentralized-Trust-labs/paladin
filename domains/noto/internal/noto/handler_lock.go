@@ -29,6 +29,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signpayloads"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 )
 
 type lockHandler struct {
@@ -71,7 +72,7 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	params := tx.Params.(*types.LockParams)
 	notary := tx.DomainConfig.NotaryLookup
 
-	_, err := h.noto.findEthAddressVerifier(ctx, "notary", notary, req.ResolvedVerifiers)
+	notaryAddress, err := h.noto.findEthAddressVerifier(ctx, "notary", notary, req.ResolvedVerifiers)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,21 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		return nil, err
 	}
 
-	lockID := pldtypes.RandBytes32()
+	// Pre-compute the lockId as it will be generated on the smart contract
+	contractAddress := (*pldtypes.EthAddress)(tx.ContractAddress)
+	var senderAddress *pldtypes.EthAddress
+	if tx.DomainConfig.NotaryMode == types.NotaryModeHooks.Enum() &&
+		tx.DomainConfig.Options.Hooks != nil &&
+		tx.DomainConfig.Options.Hooks.PublicAddress != nil {
+		senderAddress = tx.DomainConfig.Options.Hooks.PublicAddress
+	} else {
+		senderAddress = notaryAddress
+	}
+	lockID, err := h.noto.computeLockId(ctx, contractAddress, senderAddress, tx.Transaction.TransactionId)
+	if err != nil {
+		return nil, err
+	}
+
 	lockedOutputStates, err := h.noto.prepareLockedOutputs(lockID, fromAddress, params.Amount, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
@@ -178,7 +193,7 @@ func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	if err := h.noto.validateLockAmounts(ctx, inputs, outputs); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, inputs.coins, inputs.states); err != nil {
+	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req.ResolvedVerifiers, inputs.coins, inputs.states); err != nil {
 		return nil, err
 	}
 	if err := h.noto.validateLockOwners(ctx, tx.Transaction.From, req.ResolvedVerifiers, outputs.lockedCoins, outputs.lockedStates); err != nil {
@@ -198,7 +213,7 @@ func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *lockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *lockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, lockID pldtypes.Bytes32, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inputs := req.InputStates
 	outputs, lockedOutputs := h.noto.splitStates(req.OutputStates)
 
@@ -209,24 +224,49 @@ func (h *lockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepare
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
 	}
 
-	data, err := h.noto.encodeTransactionData(ctx, req.Transaction, req.InfoStates)
+	data, err := h.noto.encodeTransactionData(ctx, req.InfoStates)
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoLockParams{
-		TxId:          req.Transaction.TransactionId,
-		Inputs:        endorsableStateIDs(inputs),
-		Outputs:       endorsableStateIDs(outputs),
-		LockedOutputs: endorsableStateIDs(lockedOutputs),
-		Signature:     lockSignature.Payload,
-		Data:          data,
+
+	var interfaceABI abi.ABI
+	var functionName string
+	var paramsJSON []byte
+
+	switch tx.DomainConfig.Variant {
+	case types.NotoVariantDefault:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
+		functionName = "createLock"
+		params := &CreateLockParams{
+			Params: NotoCreateLockParams{
+				TxId:          req.Transaction.TransactionId,
+				Inputs:        endorsableStateIDs(inputs),
+				Outputs:       endorsableStateIDs(outputs),
+				LockedOutputs: endorsableStateIDs(lockedOutputs),
+				Proof:         lockSignature.Payload,
+				Options:       nil,
+			},
+			Data: data,
+		}
+		paramsJSON, err = json.Marshal(params)
+	default:
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
+		functionName = "lock"
+		params := &NotoLock_V0_Params{
+			TxId:          req.Transaction.TransactionId,
+			Inputs:        endorsableStateIDs(inputs),
+			Outputs:       endorsableStateIDs(outputs),
+			LockedOutputs: endorsableStateIDs(lockedOutputs),
+			Signature:     lockSignature.Payload,
+			Data:          data,
+		}
+		paramsJSON, err = json.Marshal(params)
 	}
-	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()["lock"],
+		functionABI: interfaceABI.Functions()[functionName],
 		paramsJSON:  paramsJSON,
 	}, nil
 }
@@ -295,7 +335,7 @@ func (h *lockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "notary")
 	}
 
-	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, lockID, req)
 	if err != nil {
 		return nil, err
 	}

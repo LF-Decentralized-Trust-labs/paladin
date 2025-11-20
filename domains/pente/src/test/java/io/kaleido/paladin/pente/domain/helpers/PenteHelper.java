@@ -189,44 +189,4 @@ public class PenteHelper {
                 ), "");
         return new ObjectMapper().convertValue(queryResult, PenteCallOutputJSON.class);
     }
-
-    public Testbed.TransactionResult prepare(String sender, JsonABI.Entry fn, Map<String, Object> inputs) throws IOException {
-        return TestbedHelper.getTransactionResult(
-                testbed.getRpcClient().request("testbed_prepare", new Testbed.TransactionInput(
-                        "private",
-                        "",
-                        sender,
-                        JsonHex.addressFrom(address),
-                        inputs,
-                        new JsonABI(List.of(fn)),
-                        "")));
-    }
-
-    public String approveTransition(String sender, JsonHex.Bytes32 txID, JsonHex.Address delegate, JsonHex.Bytes32 transitionHash, List<JsonHex.Bytes> signatures) throws IOException {
-        JsonABI.Entry fn = JsonABI.newFunction(
-                "approveTransition",
-                JsonABI.newParameters(
-                        JsonABI.newParameter("txId", "bytes32"),
-                        JsonABI.newParameter("delegate", "address"),
-                        JsonABI.newParameter("transitionHash", "bytes32"),
-                        JsonABI.newParameter("signatures", "bytes[]")
-                ),
-                JsonABI.newParameters()
-        );
-
-        return TestbedHelper.sendTransaction(testbed,
-                new Testbed.TransactionInput(
-                        "public",
-                        "",
-                        sender,
-                        JsonHex.addressFrom(address),
-                        new HashMap<>() {{
-                            put("txId", txID);
-                            put("delegate", delegate);
-                            put("transitionHash", transitionHash);
-                            put("signatures", signatures);
-                        }},
-                        new JsonABI(List.of(fn)),
-                        ""));
-    }
 }

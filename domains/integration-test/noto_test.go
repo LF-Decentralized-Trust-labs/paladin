@@ -383,7 +383,6 @@ func (s *notoTestSuite) TestNotoLock() {
 			Function: "delegateLock",
 			Data: toJSON(t, &types.DelegateLockParams{
 				LockID:   unlockReceipt.LockInfo.LockID,
-				Unlock:   unlockReceipt.LockInfo.UnlockParams,
 				Delegate: pldtypes.MustEthAddress(recipient2Key.Verifier.Verifier),
 			}),
 		},
@@ -397,7 +396,7 @@ func (s *notoTestSuite) TestNotoLock() {
 		Public().
 		From(recipient2Name).
 		To(noto.Address).
-		Function("unlock").
+		Function("spendLock").
 		Inputs(unlockReceipt.LockInfo.UnlockParams).
 		Send().
 		Wait(3 * time.Second)
