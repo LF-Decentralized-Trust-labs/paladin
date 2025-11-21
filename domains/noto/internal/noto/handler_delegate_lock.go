@@ -86,7 +86,7 @@ func (h *delegateLockHandler) Assemble(ctx context.Context, tx *types.ParsedTran
 	if err != nil {
 		return nil, err
 	}
-	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, params.Delegate, []string{notary, tx.Transaction.From})
+	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, params.Delegate, nil, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}

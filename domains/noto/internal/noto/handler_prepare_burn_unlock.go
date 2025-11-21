@@ -100,6 +100,7 @@ func (h *prepareBurnUnlockHandler) Init(ctx context.Context, tx *types.ParsedTra
 func (h *prepareBurnUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.PrepareBurnUnlockParams)
 	notary := tx.DomainConfig.NotaryLookup
+	unlockTxId := pldtypes.Bytes32UUIDFirst16(uuid.New())
 
 	_, err := h.noto.findEthAddressVerifier(ctx, "notary", notary, req.ResolvedVerifiers)
 	if err != nil {
@@ -133,7 +134,7 @@ func (h *prepareBurnUnlockHandler) Assemble(ctx context.Context, tx *types.Parse
 	if err != nil {
 		return nil, err
 	}
-	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, nil, []string{notary, params.From})
+	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, nil, &unlockTxId, []string{notary, params.From})
 	if err != nil {
 		return nil, err
 	}
@@ -234,8 +235,12 @@ func (h *prepareBurnUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *typ
 		return nil, err
 	}
 
-	// Generate a new unlockTxId that will be used for the unlock
-	unlockTxId := pldtypes.Bytes32UUIDFirst16(uuid.New()).String()
+	// Read unlockTxId from LockInfo state
+	lockInfo, err := h.noto.extractLockInfo(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	unlockTxId := lockInfo.UnlockTxId.String()
 	baseParams := &NotoPrepareUnlockParams{
 		TxId:         &req.Transaction.TransactionId,
 		LockId:       &params.LockID,

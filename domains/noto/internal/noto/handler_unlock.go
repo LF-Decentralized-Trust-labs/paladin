@@ -97,7 +97,7 @@ func (h *unlockCommon) init(ctx context.Context, tx *types.ParsedTransaction, pa
 	}, nil
 }
 
-func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTransaction, params *types.UnlockParams, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, *unlockStates, error) {
+func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTransaction, params *types.UnlockParams, unlockTxId *pldtypes.Bytes32, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, *unlockStates, error) {
 	notary := tx.DomainConfig.NotaryLookup
 
 	_, err := h.noto.findEthAddressVerifier(ctx, "notary", notary, req.ResolvedVerifiers)
@@ -136,7 +136,7 @@ func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTrans
 	if err != nil {
 		return nil, nil, err
 	}
-	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, nil, []string{notary, params.From})
+	lockState, err := h.noto.prepareLockInfo(params.LockID, fromAddress, nil, unlockTxId, []string{notary, params.From})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -234,7 +234,7 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 	params := tx.Params.(*types.UnlockParams)
 	notary := tx.DomainConfig.NotaryLookup
 
-	res, states, err := h.assembleStates(ctx, tx, params, req)
+	res, states, err := h.assembleStates(ctx, tx, params, nil, req)
 	if err != nil || res.AssemblyResult != prototk.AssembleTransactionResponse_OK {
 		return res, err
 	}

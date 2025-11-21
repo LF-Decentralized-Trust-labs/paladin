@@ -53,8 +53,9 @@ func (h *prepareUnlockHandler) Init(ctx context.Context, tx *types.ParsedTransac
 func (h *prepareUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.UnlockParams)
 	notary := tx.DomainConfig.NotaryLookup
+	unlockTxId := pldtypes.Bytes32UUIDFirst16(uuid.New())
 
-	res, states, err := h.assembleStates(ctx, tx, params, req)
+	res, states, err := h.assembleStates(ctx, tx, params, &unlockTxId, req)
 	if err != nil || res.AssemblyResult != prototk.AssembleTransactionResponse_OK {
 		return res, err
 	}
@@ -140,8 +141,13 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 
 	if tx.DomainConfig.IsV1() {
 		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
-		// For V1, generate a new unlockTxId that will be used for the unlock
-		unlockTxId := pldtypes.Bytes32UUIDFirst16(uuid.New()).String()
+		// Read unlockTxId from LockInfo state
+		lockInfo, err := h.noto.extractLockInfo(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		unlockTxId := lockInfo.UnlockTxId.String()
+
 		params := &NotoPrepareUnlockParams{
 			TxId:         &req.Transaction.TransactionId,
 			LockId:       &inParams.LockID,

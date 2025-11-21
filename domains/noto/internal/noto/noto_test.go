@@ -77,7 +77,7 @@ func TestNotoDomainInit(t *testing.T) {
 		ConfigJson: "{}",
 	})
 	require.NoError(t, err)
-	assert.Len(t, configureRes.DomainConfig.AbiStateSchemasJson, 5)
+	assert.Len(t, configureRes.DomainConfig.AbiStateSchemasJson, 6)
 
 	initRes, err := n.InitDomain(ctx, &prototk.InitDomainRequest{
 		AbiStateSchemas: []*prototk.StateSchema{
@@ -86,6 +86,7 @@ func TestNotoDomainInit(t *testing.T) {
 			{Id: "schema3"},
 			{Id: "schema4"},
 			{Id: "schema5"},
+			{Id: "schema6"},
 		},
 	})
 	require.NoError(t, err)
@@ -93,10 +94,9 @@ func TestNotoDomainInit(t *testing.T) {
 
 	assert.Equal(t, "noto", n.Name())
 	assert.Equal(t, "schema1", n.CoinSchemaID())
-	assert.Equal(t, "schema2", n.LockInfoSchemaID())
-	assert.Equal(t, "schema3", n.LockedCoinSchemaID())
-	// DataSchemaID returns V1 schema, which is now the 5th schema
-	assert.Equal(t, "schema5", n.DataSchemaID())
+	assert.Equal(t, "schema3", n.LockInfoSchemaID()) // V1 lock info schema is 3rd
+	assert.Equal(t, "schema4", n.LockedCoinSchemaID())
+	assert.Equal(t, "schema6", n.DataSchemaID()) // V1 data schema is 6th
 }
 
 func TestNotoDomainDeployDefaults(t *testing.T) {

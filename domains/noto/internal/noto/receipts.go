@@ -41,7 +41,7 @@ func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 		variant = info.Variant
 	}
 
-	lockInfoStates := n.filterSchema(req.InfoStates, []string{n.lockInfoSchema.Id})
+	lockInfoStates := n.filterSchema(req.InfoStates, []string{n.lockInfoSchemaV0.Id, n.lockInfoSchemaV1.Id})
 	if len(lockInfoStates) == 1 {
 		lock, err := n.unmarshalLock(lockInfoStates[0].StateDataJson)
 		if err != nil {
@@ -50,6 +50,9 @@ func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 		receipt.LockInfo = &types.ReceiptLockInfo{LockID: lock.LockID}
 		if !lock.Delegate.IsZero() {
 			receipt.LockInfo.Delegate = lock.Delegate
+		}
+		if !lock.UnlockTxId.IsZero() {
+			receipt.LockInfo.UnlockTxId = &lock.UnlockTxId
 		}
 	}
 
@@ -80,23 +83,22 @@ func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 	}
 
 	if receipt.LockInfo != nil && (len(receipt.States.PreparedOutputs) > 0 || len(receipt.States.ReadLockedInputs) > 0) {
-		// For prepareUnlock, createMintLock, and prepareBurnUnlock transactions, include the encoded "unlock" call that can
-		// be used to unlock the coins (or burn them in the case of prepareBurnUnlock).
+		// For prepareUnlock, createMintLock, and prepareBurnUnlock transactions, include the encoded "unlock"
+		// call that can be used to unlock the coins.
 		var interfaceABI abi.ABI
 		var paramsJSON []byte
 		if variant == types.NotoVariantDefault {
 			interfaceABI = n.getInterfaceABI(types.NotoVariantDefault)
-			unlockParamsStruct := &NotoUnlockStruct{
-				LockedInputs:  endorsableStateIDs(n.filterSchema(req.ReadStates, []string{n.lockedCoinSchema.Id})),
-				LockedOutputs: endorsableStateIDs(n.filterSchema(req.InfoStates, []string{n.lockedCoinSchema.Id})),
-				Outputs:       endorsableStateIDs(n.filterSchema(req.InfoStates, []string{n.coinSchema.Id})),
-				Signature:     pldtypes.HexBytes{},
-				Data:          receipt.Data,
-			}
 			receipt.LockInfo.UnlockParams = map[string]any{
-				"txId":   pldtypes.Bytes32UUIDFirst16(uuid.New()).String(),
+				"txId":   receipt.LockInfo.UnlockTxId,
 				"lockId": receipt.LockInfo.LockID,
-				"params": unlockParamsStruct,
+				"params": &NotoUnlockStruct{
+					LockedInputs:  endorsableStateIDs(n.filterSchema(req.ReadStates, []string{n.lockedCoinSchema.Id})),
+					LockedOutputs: endorsableStateIDs(n.filterSchema(req.InfoStates, []string{n.lockedCoinSchema.Id})),
+					Outputs:       endorsableStateIDs(n.filterSchema(req.InfoStates, []string{n.coinSchema.Id})),
+					Signature:     pldtypes.HexBytes{},
+					Data:          receipt.Data,
+				},
 			}
 			paramsJSON, err = json.Marshal(receipt.LockInfo.UnlockParams)
 		} else {

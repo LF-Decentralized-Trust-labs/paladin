@@ -88,6 +88,7 @@ func (h *createMintLockHandler) Init(ctx context.Context, tx *types.ParsedTransa
 func (h *createMintLockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.CreateMintLockParams)
 	notary := tx.DomainConfig.NotaryLookup
+	unlockTxId := pldtypes.Bytes32UUIDFirst16(uuid.New())
 
 	notaryAddress, err := h.noto.findEthAddressVerifier(ctx, "notary", notary, req.ResolvedVerifiers)
 	if err != nil {
@@ -131,7 +132,7 @@ func (h *createMintLockHandler) Assemble(ctx context.Context, tx *types.ParsedTr
 	if err != nil {
 		return nil, err
 	}
-	lockState, err := h.noto.prepareLockInfo(lockID, fromAddress, nil, []string{notary, tx.Transaction.From})
+	lockState, err := h.noto.prepareLockInfo(lockID, fromAddress, nil, &unlockTxId, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
@@ -200,15 +201,12 @@ func (h *createMintLockHandler) baseLedgerInvoke(ctx context.Context, tx *types.
 	params := tx.Params.(*types.CreateMintLockParams)
 
 	// Extract lockID from info states
-	lockStates := h.noto.filterSchema(req.InfoStates, []string{h.noto.lockInfoSchema.Id})
-	if len(lockStates) != 1 {
-		return nil, i18n.NewError(ctx, msgs.MsgLockIDNotFound)
-	}
-	lock, err := h.noto.unmarshalLock(lockStates[0].StateDataJson)
+	lockInfo, err := h.noto.extractLockInfo(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	lockID := lock.LockID
+	lockID := lockInfo.LockID
+	unlockTxId := lockInfo.UnlockTxId.String()
 
 	outputs := h.noto.filterSchema(req.InfoStates, []string{h.noto.coinSchema.Id})
 	unlockHash, err := h.noto.unlockHashFromStates(ctx, tx.ContractAddress, nil, nil, outputs, params.Data)
@@ -228,8 +226,6 @@ func (h *createMintLockHandler) baseLedgerInvoke(ctx context.Context, tx *types.
 		return nil, err
 	}
 
-	// Generate a new unlockTxId that will be used for the unlock
-	unlockTxId := pldtypes.Bytes32UUIDFirst16(uuid.New()).String()
 	baseParams := &NotoPrepareUnlockParams{
 		TxId:         &req.Transaction.TransactionId,
 		LockId:       &lockID,
@@ -254,15 +250,11 @@ func (h *createMintLockHandler) hookInvoke(ctx context.Context, tx *types.Parsed
 	inParams := tx.Params.(*types.CreateMintLockParams)
 
 	// Extract lockID from info states
-	lockStates := h.noto.filterSchema(req.InfoStates, []string{h.noto.lockInfoSchema.Id})
-	if len(lockStates) != 1 {
-		return nil, i18n.NewError(ctx, msgs.MsgLockIDNotFound)
-	}
-	lock, err := h.noto.unmarshalLock(lockStates[0].StateDataJson)
+	lockInfo, err := h.noto.extractLockInfo(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	lockID := lock.LockID
+	lockID := lockInfo.LockID
 
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
 	if err != nil {

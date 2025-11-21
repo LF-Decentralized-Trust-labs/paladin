@@ -108,7 +108,8 @@ var eventSignaturesV0 = mustLoadEventSignatures(interfaceV0Build.ABI, allEventsV
 
 var allSchemas = []*abi.Parameter{
 	types.NotoCoinABI,
-	types.NotoLockInfoABI,
+	types.NotoLockInfoABI_V0,
+	types.NotoLockInfoABI_V1,
 	types.NotoLockedCoinABI,
 	types.TransactionDataABI_V0,
 	types.TransactionDataABI_V1,
@@ -127,7 +128,8 @@ type Noto struct {
 	lockedCoinSchema     *prototk.StateSchema
 	dataSchemaV0         *prototk.StateSchema
 	dataSchemaV1         *prototk.StateSchema
-	lockInfoSchema       *prototk.StateSchema
+	lockInfoSchemaV0     *prototk.StateSchema
+	lockInfoSchemaV1     *prototk.StateSchema
 }
 
 type NotoDeployParams struct {
@@ -366,7 +368,7 @@ func (n *Noto) LockedCoinSchemaID() string {
 }
 
 func (n *Noto) LockInfoSchemaID() string {
-	return n.lockInfoSchema.Id
+	return n.lockInfoSchemaV1.Id
 }
 
 func (n *Noto) DataSchemaID() string {
@@ -406,8 +408,10 @@ func (n *Noto) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (
 			n.dataSchemaV0 = req.AbiStateSchemas[i]
 		case types.TransactionDataABI_V1.Name:
 			n.dataSchemaV1 = req.AbiStateSchemas[i]
-		case types.NotoLockInfoABI.Name:
-			n.lockInfoSchema = req.AbiStateSchemas[i]
+		case types.NotoLockInfoABI_V0.Name:
+			n.lockInfoSchemaV0 = req.AbiStateSchemas[i]
+		case types.NotoLockInfoABI_V1.Name:
+			n.lockInfoSchemaV1 = req.AbiStateSchemas[i]
 		}
 	}
 	return &prototk.InitDomainResponse{}, nil
@@ -1011,4 +1015,16 @@ func (n *Noto) computeLockId(ctx context.Context, contractAddress *pldtypes.EthA
 	}
 
 	return pldtypes.Bytes32Keccak(encoded), nil
+}
+
+func (n *Noto) extractLockInfo(ctx context.Context, req *prototk.PrepareTransactionRequest) (*types.NotoLockInfo_V1, error) {
+	lockStates := n.filterSchema(req.InfoStates, []string{n.lockInfoSchemaV0.Id, n.lockInfoSchemaV1.Id})
+	if len(lockStates) == 1 {
+		lock, err := n.unmarshalLock(lockStates[0].StateDataJson)
+		if err != nil {
+			return nil, err
+		}
+		return lock, nil
+	}
+	return nil, i18n.NewError(ctx, msgs.MsgLockIDNotFound)
 }

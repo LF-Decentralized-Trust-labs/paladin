@@ -37,7 +37,8 @@ func TestPrepareUnlock(t *testing.T) {
 		Callbacks:        mockCallbacks,
 		coinSchema:       &prototk.StateSchema{Id: "coin"},
 		lockedCoinSchema: &prototk.StateSchema{Id: "lockedCoin"},
-		lockInfoSchema:   &prototk.StateSchema{Id: "lockInfo"},
+		lockInfoSchemaV0: &prototk.StateSchema{Id: "lockInfo"},
+		lockInfoSchemaV1: &prototk.StateSchema{Id: "lockInfo_v1"},
 		dataSchemaV0:     &prototk.StateSchema{Id: "data"},
 		dataSchemaV1:     &prototk.StateSchema{Id: "data_v1"},
 	}
