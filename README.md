@@ -1,5 +1,11 @@
 # Paladin
 
+[![Release](https://github.com/LFDT-Paladin/paladin/actions/workflows/release.yaml/badge.svg)](https://github.com/LFDT-Paladin/paladin/actions/workflows/release.yaml)
+[![Release Candidate](https://github.com/LFDT-Paladin/paladin/actions/workflows/release-candidate.yaml/badge.svg)](https://github.com/LFDT-Paladin/paladin/actions/workflows/release-candidate.yaml)
+[![Release TypeScript](https://github.com/LFDT-Paladin/paladin/actions/workflows/release-typescript-sdk.yaml/badge.svg)](https://github.com/LFDT-Paladin/paladin/actions/workflows/release-typescript-sdk.yaml)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/11486/badge)](https://bestpractices.coreinfrastructure.org/projects/11486)
+[![License](https://img.shields.io/badge/license-apache2-blue.svg)](LICENSE.md)
+
 Paladin brings true programmable privacy to the world's most popular smart contract platform.
 
 ![Paladin](doc-site/docs/images/paladin_overview.svg)
