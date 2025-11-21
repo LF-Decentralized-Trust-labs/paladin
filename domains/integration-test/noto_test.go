@@ -532,3 +532,134 @@ func (s *notoTestSuite) TestNotoCreateMintLock() {
 	balanceOfResult = noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient2Name}).SignAndCall(notaryName).Wait()
 	assert.Equal(t, "50", balanceOfResult["totalBalance"].(string), "Balance of recipient2 should be 50 after unlock")
 }
+
+func (s *notoTestSuite) TestNotoPrepareBurnUnlock() {
+	ctx := context.Background()
+	t := s.T()
+	log.L(ctx).Infof("TestNotoPrepareBurnUnlock")
+
+	waitForNoto, notoTestbed := newNotoDomain(t, pldtypes.MustEthAddress(s.factoryAddress))
+	done, _, tb, rpc := newTestbed(t, s.hdWalletSeed, map[string]*testbed.TestbedDomain{
+		s.domainName: notoTestbed,
+	})
+	defer done()
+	pld := helpers.NewPaladinClient(t, ctx, tb)
+
+	notoDomain := <-waitForNoto
+
+	recipient1Key, err := tb.ResolveKey(ctx, recipient1Name, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	require.NoError(t, err)
+
+	log.L(ctx).Infof("Deploying an instance of Noto")
+	noto := helpers.DeployNoto(ctx, t, rpc, s.domainName, notary, nil)
+	log.L(ctx).Infof("Noto deployed to %s", noto.Address)
+
+	log.L(ctx).Infof("Mint 100 from notary to recipient1")
+	var invokeResult testbed.TransactionResult
+	rpcerr := rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     notaryName,
+			To:       noto.Address,
+			Function: "mint",
+			Data: toJSON(t, &types.MintParams{
+				To:     recipient1Name,
+				Amount: pldtypes.Int64ToInt256(100),
+			}),
+		},
+		ABI: types.NotoABI,
+	}, true)
+	require.NoError(t, rpcerr)
+
+	coins := findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
+	require.Len(t, coins, 1)
+	assert.Equal(t, int64(100), coins[0].Data.Amount.Int().Int64())
+
+	log.L(ctx).Infof("Lock 50 from recipient1")
+	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     recipient1Name,
+			To:       noto.Address,
+			Function: "lock",
+			Data: toJSON(t, &types.LockParams{
+				Amount: pldtypes.Int64ToInt256(50),
+			}),
+		},
+		ABI: types.NotoABI,
+	}, true)
+	require.NoError(t, rpcerr)
+
+	var lockReceipt types.NotoDomainReceipt
+	err = json.Unmarshal(invokeResult.DomainReceipt, &lockReceipt)
+	require.NoError(t, err)
+	require.NotNil(t, lockReceipt.LockInfo)
+	require.NotEmpty(t, lockReceipt.LockInfo.LockID)
+
+	lockedCoins := findAvailableCoins[types.NotoLockedCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
+	require.Len(t, lockedCoins, 1)
+	assert.Equal(t, int64(50), lockedCoins[0].Data.Amount.Int().Int64())
+	assert.Equal(t, recipient1Key.Verifier.Verifier, lockedCoins[0].Data.Owner.String())
+
+	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
+	require.Len(t, coins, 1)
+	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
+
+	balanceOfResult := noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient1Name}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "50", balanceOfResult["totalBalance"].(string), "Balance of recipient1 should be 50")
+
+	log.L(ctx).Infof("Prepare burn unlock for the locked 50")
+	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     recipient1Name,
+			To:       noto.Address,
+			Function: "prepareBurnUnlock",
+			Data: toJSON(t, &types.PrepareBurnUnlockParams{
+				LockID: lockReceipt.LockInfo.LockID,
+				From:   recipient1Name,
+				Amount: pldtypes.Int64ToInt256(50),
+				Data:   pldtypes.HexBytes{},
+			}),
+		},
+		ABI: types.NotoABI,
+	}, true)
+	require.NoError(t, rpcerr)
+
+	var burnUnlockReceipt types.NotoDomainReceipt
+	err = json.Unmarshal(invokeResult.DomainReceipt, &burnUnlockReceipt)
+	require.NoError(t, err)
+	require.NotNil(t, burnUnlockReceipt.LockInfo)
+	require.NotNil(t, burnUnlockReceipt.LockInfo.UnlockParams)
+
+	// Verify unlock params structure
+	unlockParamsMap := burnUnlockReceipt.LockInfo.UnlockParams
+	paramsMap, ok := unlockParamsMap["params"].(map[string]any)
+	require.True(t, ok, "params should be a map")
+	outputs, ok := paramsMap["outputs"].([]any)
+	require.True(t, ok, "outputs should be an array")
+	assert.Equal(t, 0, len(outputs), "prepareBurnUnlock should have no outputs")
+
+	// Perform the unlock using the prepared unlock params (this should burn the locked value)
+	log.L(ctx).Infof("Unlock the burn lock (should burn the locked value)")
+	notoBuild := solutils.MustLoadBuild(helpers.NotoInterfaceJSON)
+	tx := pld.ForABI(ctx, notoBuild.ABI).
+		Public().
+		From(notaryName).
+		To(noto.Address).
+		Function("unlock").
+		Inputs(burnUnlockReceipt.LockInfo.UnlockParams).
+		Send().
+		Wait(3 * time.Second)
+	require.NoError(t, tx.Error())
+
+	// Verify locked coins are gone (burned)
+	lockedCoins = findAvailableCoins[types.NotoLockedCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
+	require.Len(t, lockedCoins, 0, "Should have no locked coins after burn unlock")
+
+	// Verify no new coins were created (the locked value was burned)
+	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
+	require.Len(t, coins, 1, "Should still have only 1 coin (the original 50)")
+	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64(), "The remaining coin should still be 50")
+
+	// Verify final balance (should still be 50, as the locked 50 was burned)
+	balanceOfResult = noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient1Name}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "50", balanceOfResult["totalBalance"].(string), "Balance of recipient1 should still be 50 after burn")
+}

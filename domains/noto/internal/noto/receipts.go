@@ -79,9 +79,9 @@ func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptReques
 		return nil, err
 	}
 
-	if receipt.LockInfo != nil && len(receipt.States.PreparedOutputs) > 0 {
-		// For prepareUnlock and createMintLock transactions, include the encoded "unlock" call that can
-		// be used to unlock the coins.
+	if receipt.LockInfo != nil && (len(receipt.States.PreparedOutputs) > 0 || len(receipt.States.ReadLockedInputs) > 0) {
+		// For prepareUnlock, createMintLock, and prepareBurnUnlock transactions, include the encoded "unlock" call that can
+		// be used to unlock the coins (or burn them in the case of prepareBurnUnlock).
 		var interfaceABI abi.ABI
 		var paramsJSON []byte
 		if variant == types.NotoVariantDefault {

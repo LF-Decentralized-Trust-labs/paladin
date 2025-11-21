@@ -109,6 +109,13 @@ type CreateMintLockParams struct {
 	Data       pldtypes.HexBytes  `json:"data"`
 }
 
+type PrepareBurnUnlockParams struct {
+	LockID pldtypes.Bytes32     `json:"lockId"`
+	From   string               `json:"from"`
+	Amount *pldtypes.HexUint256 `json:"amount"`
+	Data   pldtypes.HexBytes    `json:"data"`
+}
+
 type DelegateLockParams struct {
 	LockID   pldtypes.Bytes32     `json:"lockId"`
 	Unlock   *UnlockPublicParams  `json:"unlock,omitempty"` // Required for V0, omitted for V1

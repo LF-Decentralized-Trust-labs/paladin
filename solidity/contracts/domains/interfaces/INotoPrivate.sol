@@ -63,6 +63,13 @@ interface INotoPrivate {
         bytes calldata data
     ) external;
 
+    function prepareBurnUnlock(
+        bytes32 lockId,
+        string calldata from,
+        uint256 amount,
+        bytes calldata data
+    ) external;
+
     function delegateLock(
         bytes32 lockId,
         address delegate,
