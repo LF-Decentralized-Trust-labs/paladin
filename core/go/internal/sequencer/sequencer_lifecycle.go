@@ -380,6 +380,8 @@ func (sMgr *sequencerManager) dispatch(ctx context.Context, t *coordTransaction.
 				},
 			}
 
+			// MRW TODO - We currently issue state machine CollectEvents from the publix TX manager, but we could arguably do it here.
+
 			data, err := pt.PreparedPublicTransaction.ABI[0].EncodeCallDataJSONCtx(ctx, pt.PreparedPublicTransaction.Data)
 			if err != nil {
 				log.L(ctx).Errorf("failed to encode call data for public transaction %s: %s", pt.ID, err)

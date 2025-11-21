@@ -83,7 +83,7 @@ func (t *Transaction) notifyDependentsOfReadinessAndQueueForDispatch(ctx context
 		t.traceDispatch(ctx)
 	}
 
-	// Ask the distributed sequencer manager to add this TX to the queue for collection
+	// Nudge the sequencer to process this TX
 	t.onReadyForDispatch(ctx, t)
 
 	//this function is called when the transaction enters the ready for dispatch state

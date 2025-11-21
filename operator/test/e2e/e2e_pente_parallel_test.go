@@ -329,7 +329,11 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 				transfers := <-results
 				for _, transfer := range transfers {
 					testLog("SimpleERC20 wait for completion of transfer %s", transfer.ID())
-					Expect(transfer.Wait(20 * time.Second).Error()).To(BeNil())
+					// TODO this is temporarily set to a very large time allowance while the new sequencer is pinned (at least for devnet) to 1 transaction per block.
+					// See maxDispatchAhead config parameter. The old sequencer used a fixed signing address for Pente transactions. The new sequencer users a new
+					// address per transaction (by default) so this timeout can be reduced when a) we change the test to configure the new sequenecer with fixed
+					// Pente signing addresses or b) we add efficient re-assembly logic for reverted transactions when base ledger transactions are mined out of assembly sequence.
+					Expect(transfer.Wait(90 * time.Second).Error()).To(BeNil())
 				}
 			}
 		})

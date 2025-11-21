@@ -86,6 +86,7 @@ func TestCoordinator_SingleTransactionLifecycle(t *testing.T) {
 	builder.GetDomainAPI().On("ContractConfig").Return(&prototk.ContractConfig{
 		CoordinatorSelection: prototk.ContractConfig_COORDINATOR_SENDER,
 	})
+	builder.MaxDispatchAhead(0) // Stop the dispatcher loop from progressing states - we're manually updating state throughout the test
 	c, mocks := builder.Build(ctx)
 
 	// Start by simulating the originator and delegate a transaction to the coordinator

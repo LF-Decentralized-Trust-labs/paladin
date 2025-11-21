@@ -88,6 +88,7 @@ type CoordinatorBuilderForTesting struct {
 	transactions                             []*transaction.Transaction
 	heartbeatsUntilClosingGracePeriodExpires *int
 	metrics                                  metrics.DistributedSequencerMetrics
+	maxDispatchAhead                         *int
 }
 
 type CoordinatorDependencyMocks struct {
@@ -159,6 +160,11 @@ func (b *CoordinatorBuilderForTesting) GetDomainAPI() *componentsmocks.DomainSma
 	return b.domainAPI
 }
 
+func (b *CoordinatorBuilderForTesting) MaxDispatchAhead(maxDispatchAhead int) *CoordinatorBuilderForTesting {
+	b.maxDispatchAhead = &maxDispatchAhead
+	return b
+}
+
 func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator, *CoordinatorDependencyMocks) {
 	if b.contractAddress == nil {
 		b.contractAddress = pldtypes.RandAddress()
@@ -202,6 +208,10 @@ func (b *CoordinatorBuilderForTesting) Build(ctx context.Context) (*coordinator,
 
 	for _, tx := range b.transactions {
 		coordinator.transactionsByID[tx.ID] = tx
+	}
+
+	if b.maxDispatchAhead != nil {
+		coordinator.maxDispatchAhead = *b.maxDispatchAhead
 	}
 
 	coordinator.stateMachine.currentState = b.state
