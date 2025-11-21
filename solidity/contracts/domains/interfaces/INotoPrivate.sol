@@ -39,7 +39,15 @@ interface INotoPrivate {
         bytes calldata data
     ) external;
 
+    // @deprecated - use createLock instead
     function lock(uint256 amount, bytes calldata data) external;
+
+    function createLock(uint256 amount, bytes calldata data) external;
+
+    function createMintLock(
+        UnlockRecipient[] calldata recipients,
+        bytes calldata data
+    ) external;
 
     function unlock(
         bytes32 lockId,

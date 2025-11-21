@@ -104,6 +104,11 @@ type UnlockParams struct {
 	Data       pldtypes.HexBytes  `json:"data"`
 }
 
+type CreateMintLockParams struct {
+	Recipients []*UnlockRecipient `json:"recipients"`
+	Data       pldtypes.HexBytes  `json:"data"`
+}
+
 type DelegateLockParams struct {
 	LockID   pldtypes.Bytes32     `json:"lockId"`
 	Unlock   *UnlockPublicParams  `json:"unlock,omitempty"` // Required for V0, omitted for V1

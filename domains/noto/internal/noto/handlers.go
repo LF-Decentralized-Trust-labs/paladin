@@ -44,8 +44,10 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 		return &burnHandler{burnCommon: burnCommon{noto: n}}
 	case "burnFrom":
 		return &burnFromHandler{burnCommon: burnCommon{noto: n}}
-	case "lock":
+	case "lock", "createLock":
 		return &lockHandler{noto: n}
+	case "createMintLock":
+		return &createMintLockHandler{noto: n}
 	case "unlock":
 		return &unlockHandler{unlockCommon: unlockCommon{noto: n}}
 	case "prepareUnlock":

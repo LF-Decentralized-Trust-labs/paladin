@@ -149,6 +149,16 @@ contract NotoTrackerERC20 is INotoHooks, ERC20 {
         _onLock(sender, lockId, from, amount, data, prepared);
     }
 
+    function onCreateMintLock(
+        address sender,
+        bytes32 lockId,
+        UnlockRecipient[] calldata recipients,
+        bytes calldata data,
+        PreparedTransaction calldata prepared
+    ) external virtual override onlyNotary(sender) {
+        _onPrepareUnlock(sender, lockId, recipients, data, prepared);
+    }
+
     function onUnlock(
         address sender,
         bytes32 lockId,
