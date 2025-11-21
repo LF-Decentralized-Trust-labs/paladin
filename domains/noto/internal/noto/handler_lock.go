@@ -71,7 +71,7 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	params := tx.Params.(*types.LockParams)
 	notary := tx.DomainConfig.NotaryLookup
 
-	_, err := h.noto.findEthAddressVerifier(ctx, "notary", notary, req.ResolvedVerifiers)
+	notaryAddress, err := h.noto.findEthAddressVerifier(ctx, "notary", notary, req.ResolvedVerifiers)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,21 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		return nil, err
 	}
 
-	lockID := pldtypes.RandBytes32()
+	// Pre-compute the lockId as it will be generated on the smart contract
+	var senderAddress *pldtypes.EthAddress
+	contractAddress := (*pldtypes.EthAddress)(tx.ContractAddress)
+	if tx.DomainConfig.NotaryMode == types.NotaryModeHooks.Enum() &&
+		tx.DomainConfig.Options.Hooks != nil &&
+		tx.DomainConfig.Options.Hooks.PublicAddress != nil {
+		senderAddress = tx.DomainConfig.Options.Hooks.PublicAddress
+	} else {
+		senderAddress = notaryAddress
+	}
+	lockID, err := h.noto.computeLockId(ctx, contractAddress, senderAddress, tx.Transaction.TransactionId)
+	if err != nil {
+		return nil, err
+	}
+
 	lockedOutputStates, err := h.noto.prepareLockedOutputs(lockID, fromAddress, params.Amount, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
@@ -109,11 +123,11 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		unlockedOutputStates.states = append(unlockedOutputStates.states, returnedStates.states...)
 	}
 
-	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, tx.Transaction.From})
+	infoStates, err := h.noto.prepareInfo(params.Data, tx.DomainConfig.Variant, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
-	lockState, err := h.noto.prepareLockInfo(lockID, fromAddress, nil, []string{notary, tx.Transaction.From})
+	lockState, err := h.noto.prepareLockInfo(lockID, fromAddress, nil, nil, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +212,7 @@ func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *lockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *lockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inputs := req.InputStates
 	outputs, lockedOutputs := h.noto.splitStates(req.OutputStates)
 
@@ -213,6 +227,8 @@ func (h *lockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepare
 	if err != nil {
 		return nil, err
 	}
+
+	interfaceABI := h.noto.getInterfaceABI(tx.DomainConfig.Variant)
 	params := &NotoLockParams{
 		TxId:          req.Transaction.TransactionId,
 		Inputs:        endorsableStateIDs(inputs),
@@ -226,7 +242,7 @@ func (h *lockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepare
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()["lock"],
+		functionABI: interfaceABI.Functions()["lock"],
 		paramsJSON:  paramsJSON,
 	}, nil
 }
@@ -272,30 +288,19 @@ func (h *lockHandler) hookInvoke(ctx context.Context, lockID pldtypes.Bytes32, t
 	}, nil
 }
 
-func (h *lockHandler) extractLockID(ctx context.Context, req *prototk.PrepareTransactionRequest) (pldtypes.Bytes32, error) {
-	lockStates := h.noto.filterSchema(req.InfoStates, []string{h.noto.lockInfoSchema.Id})
-	if len(lockStates) == 1 {
-		lock, err := h.noto.unmarshalLock(lockStates[0].StateDataJson)
-		if err != nil {
-			return pldtypes.Bytes32{}, err
-		}
-		return lock.LockID, nil
-	}
-	return pldtypes.Bytes32{}, i18n.NewError(ctx, msgs.MsgLockIDNotFound)
-}
-
 func (h *lockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	lockID, err := h.extractLockID(ctx, req)
+	lockInfo, err := h.noto.extractLockInfo(ctx, req)
 	if err != nil {
 		return nil, err
 	}
+	lockID := lockInfo.LockID
 
 	endorsement := domain.FindAttestation("notary", req.AttestationResult)
 	if endorsement == nil || endorsement.Verifier.Lookup != tx.DomainConfig.NotaryLookup {
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "notary")
 	}
 
-	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, req)
 	if err != nil {
 		return nil, err
 	}

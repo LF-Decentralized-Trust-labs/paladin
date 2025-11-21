@@ -117,7 +117,7 @@ describe("Noto", function () {
     );
 
     // Lock both of them
-    await doLock(
+    const lockId = await doLock(
       randomBytes32(),
       notary,
       noto,
@@ -145,7 +145,8 @@ describe("Noto", function () {
       [locked1],
       [locked2],
       [txo4],
-      randomBytes32()
+      randomBytes32(),
+      lockId
     );
 
     // Check that the same state cannot be unlocked again
@@ -157,7 +158,8 @@ describe("Noto", function () {
         [locked1],
         [],
         [],
-        randomBytes32()
+        randomBytes32(),
+        lockId
       )
     ).to.be.rejectedWith("NotoInvalidInput");
 
@@ -170,7 +172,7 @@ describe("Noto", function () {
       [txo5],
       unlockData
     );
-    await doPrepareUnlock(notary, noto, [locked2], unlockHash, unlockData);
+    await doPrepareUnlock(notary, noto, [locked2], unlockHash, unlockData, lockId);
 
     // Delegate the unlock
     await doDelegateLock(
@@ -179,7 +181,8 @@ describe("Noto", function () {
       noto,
       unlockHash,
       delegate.address,
-      randomBytes32()
+      randomBytes32(),
+      lockId
     );
 
     // Attempt to perform an incorrect unlock
@@ -188,25 +191,15 @@ describe("Noto", function () {
         randomBytes32(),
         delegate,
         noto,
-        [locked1, locked2],
-        [],
-        [txo5],
-        unlockData
-      ) // mismatched input states
-    ).to.be.rejectedWith("NotoInvalidInput");
-    await expect(
-      doUnlock(
-        randomBytes32(),
-        delegate,
-        noto,
         [locked2],
         [],
         [txo5],
-        randomBytes32()
+        randomBytes32(),
+        lockId
       ) // wrong data
     ).to.be.rejectedWith("NotoInvalidUnlockHash");
     await expect(
-      doUnlock(randomBytes32(), other, noto, [locked2], [], [txo5], unlockData) // wrong delegate
+      doUnlock(randomBytes32(), other, noto, [locked2], [], [txo5], unlockData, lockId) // wrong delegate
     ).to.be.rejectedWith("NotoInvalidDelegate");
 
     // Perform the prepared unlock
@@ -217,7 +210,8 @@ describe("Noto", function () {
       [locked2],
       [],
       [txo5],
-      unlockData
+      unlockData,
+      lockId
     );
   });
 
@@ -272,7 +266,7 @@ describe("Noto", function () {
     ).to.be.rejectedWith("NotoDuplicateTransaction");
 
     // Lock both of them using a new TX ID - should succeed
-    await doLock(
+    const lockId = await doLock(
       randomBytes32(),
       notary,
       noto,
@@ -291,7 +285,8 @@ describe("Noto", function () {
         [locked1],
         [locked2],
         [txo4],
-        randomBytes32()
+        randomBytes32(),
+        lockId
       )
     ).to.be.rejectedWith("NotoDuplicateTransaction");
 
@@ -313,7 +308,8 @@ describe("Noto", function () {
         noto,
         unlockHash,
         delegate.address,
-        randomBytes32()
+        randomBytes32(),
+        lockId
       )
     ).to.be.rejectedWith("NotoDuplicateTransaction");
   });

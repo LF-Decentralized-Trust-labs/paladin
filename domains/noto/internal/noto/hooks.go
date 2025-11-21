@@ -79,6 +79,15 @@ type ApproveUnlockHookParams struct {
 	Prepared PreparedTransaction  `json:"prepared"`
 }
 
+type PrepareBurnUnlockHookParams struct {
+	Sender   *pldtypes.EthAddress `json:"sender"`
+	LockId   pldtypes.Bytes32     `json:"lockId"`
+	From     *pldtypes.EthAddress `json:"from"`
+	Amount   *pldtypes.HexUint256 `json:"amount"`
+	Data     pldtypes.HexBytes    `json:"data"`
+	Prepared PreparedTransaction  `json:"prepared"`
+}
+
 type DelegateUnlockHookParams struct {
 	Sender     *pldtypes.EthAddress       `json:"sender"`
 	LockID     pldtypes.Bytes32           `json:"lockId"`

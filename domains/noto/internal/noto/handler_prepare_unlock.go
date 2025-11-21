@@ -28,6 +28,8 @@ import (
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signpayloads"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
+	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 )
 
 type prepareUnlockHandler struct {
@@ -51,8 +53,9 @@ func (h *prepareUnlockHandler) Init(ctx context.Context, tx *types.ParsedTransac
 func (h *prepareUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.UnlockParams)
 	notary := tx.DomainConfig.NotaryLookup
+	unlockTxId := pldtypes.Bytes32UUIDFirst16(uuid.New())
 
-	res, states, err := h.assembleStates(ctx, tx, params, req)
+	res, states, err := h.assembleStates(ctx, tx, params, &unlockTxId, req)
 	if err != nil || res.AssemblyResult != prototk.AssembleTransactionResponse_OK {
 		return res, err
 	}
@@ -113,8 +116,7 @@ func (h *prepareUnlockHandler) Endorse(ctx context.Context, tx *types.ParsedTran
 
 func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.UnlockParams)
-
-	lockedInputs := req.ReadStates
+	lockedInputs := h.noto.filterSchema(req.ReadStates, []string{h.noto.lockedCoinSchema.Id})
 	outputs, lockedOutputs := h.noto.splitStates(req.InfoStates)
 	unlockHash, err := h.noto.unlockHashFromStates(ctx, tx.ContractAddress, lockedInputs, lockedOutputs, outputs, inParams.Data)
 	if err != nil {
@@ -132,18 +134,44 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoPrepareUnlockParams{
-		LockedInputs: endorsableStateIDs(lockedInputs),
-		UnlockHash:   pldtypes.Bytes32(unlockHash),
-		Signature:    sender.Payload,
-		Data:         data,
+
+	var interfaceABI abi.ABI
+	var paramsJSON []byte
+
+	if tx.DomainConfig.IsV1() {
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
+		// Read unlockTxId from LockInfo state
+		lockInfo, err := h.noto.extractLockInfo(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		unlockTxId := lockInfo.UnlockTxId.String()
+
+		params := &NotoPrepareUnlockParams{
+			TxId:         &req.Transaction.TransactionId,
+			LockId:       &inParams.LockID,
+			UnlockTxId:   &unlockTxId,
+			LockedInputs: endorsableStateIDs(lockedInputs),
+			UnlockHash:   pldtypes.Bytes32(unlockHash),
+			Signature:    sender.Payload,
+			Data:         data,
+		}
+		paramsJSON, err = json.Marshal(params)
+	} else {
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
+		params := &NotoPrepareUnlockParams{
+			LockedInputs: endorsableStateIDs(lockedInputs),
+			UnlockHash:   pldtypes.Bytes32(unlockHash),
+			Signature:    sender.Payload,
+			Data:         data,
+		}
+		paramsJSON, err = json.Marshal(params)
 	}
-	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()["prepareUnlock"],
+		functionABI: interfaceABI.Functions()["prepareUnlock"],
 		paramsJSON:  paramsJSON,
 	}, nil
 }

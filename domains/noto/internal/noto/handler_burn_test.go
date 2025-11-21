@@ -35,9 +35,9 @@ import (
 
 func TestBurn(t *testing.T) {
 	n := &Noto{
-		Callbacks:  mockCallbacks,
-		coinSchema: &prototk.StateSchema{Id: "coin"},
-		dataSchema: &prototk.StateSchema{Id: "data"},
+		Callbacks:    mockCallbacks,
+		coinSchema:   &prototk.StateSchema{Id: "coin"},
+		dataSchemaV1: &prototk.StateSchema{Id: "data"},
 	}
 	ctx := context.Background()
 	fn := types.NotoABI.Functions()["burn"]

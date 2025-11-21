@@ -82,7 +82,7 @@ func (h *burnCommon) assembleBurn(ctx context.Context, tx *types.ParsedTransacti
 		}
 		return nil, err
 	}
-	infoStates, err := h.noto.prepareInfo(data, []string{notary, tx.Transaction.From, from})
+	infoStates, err := h.noto.prepareInfo(data, tx.DomainConfig.Variant, []string{notary, tx.Transaction.From, from})
 	if err != nil {
 		return nil, err
 	}

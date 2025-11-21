@@ -297,7 +297,6 @@ async function main(): Promise<boolean> {
     .using(paladin2)
     .delegateLock(investor1, {
       lockId,
-      unlock: assetUnlockParams,
       delegate: atom.address,
       data: "0x",
     })

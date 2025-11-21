@@ -120,4 +120,13 @@ const (
 	NotaryModeIntHooks pldtypes.HexUint64 = 0x0001
 )
 
-var NotoVariantDefault pldtypes.HexUint64 = 0x0000
+var NotoVariantDefault pldtypes.HexUint64 = 0x0001 // V1 variant
+var NotoVariantLegacy pldtypes.HexUint64 = 0x0000  // V0 variant
+
+func (c *NotoParsedConfig) IsV1() bool {
+	return c.Variant == NotoVariantDefault
+}
+
+func (c *NotoParsedConfig) IsV0() bool {
+	return c.Variant == NotoVariantLegacy
+}

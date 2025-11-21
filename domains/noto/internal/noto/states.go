@@ -132,8 +132,8 @@ func (n *Noto) unmarshalInfo(stateData string) (*types.TransactionData, error) {
 	return &info, err
 }
 
-func (n *Noto) unmarshalLock(stateData string) (*types.NotoLockInfo, error) {
-	var lock types.NotoLockInfo
+func (n *Noto) unmarshalLock(stateData string) (*types.NotoLockInfo_V1, error) {
+	var lock types.NotoLockInfo_V1
 	err := json.Unmarshal([]byte(stateData), &lock)
 	return &lock, err
 }
@@ -168,19 +168,19 @@ func (n *Noto) makeNewInfoState(info *types.TransactionData, distributionList []
 		return nil, err
 	}
 	return &prototk.NewState{
-		SchemaId:         n.dataSchema.Id,
+		SchemaId:         n.dataSchemaV1.Id,
 		StateDataJson:    string(infoJSON),
 		DistributionList: distributionList,
 	}, nil
 }
 
-func (n *Noto) makeNewLockState(lock *types.NotoLockInfo, distributionList []string) (*prototk.NewState, error) {
+func (n *Noto) makeNewLockState(lock *types.NotoLockInfo_V1, distributionList []string) (*prototk.NewState, error) {
 	lockJSON, err := json.Marshal(lock)
 	if err != nil {
 		return nil, err
 	}
 	return &prototk.NewState{
-		SchemaId:         n.lockInfoSchema.Id,
+		SchemaId:         n.lockInfoSchemaV1.Id,
 		StateDataJson:    string(lockJSON),
 		DistributionList: distributionList,
 	}, nil
@@ -337,27 +337,30 @@ func (n *Noto) prepareLockedOutputs(id pldtypes.Bytes32, ownerAddress *pldtypes.
 	}, err
 }
 
-func (n *Noto) prepareInfo(data pldtypes.HexBytes, distributionList []string) ([]*prototk.NewState, error) {
+func (n *Noto) prepareInfo(data pldtypes.HexBytes, variant pldtypes.HexUint64, distributionList []string) ([]*prototk.NewState, error) {
 	newData := &types.TransactionData{
-		Salt: pldtypes.RandHex(32),
-		Data: data,
+		Salt:    pldtypes.RandHex(32),
+		Data:    data,
+		Variant: variant,
 	}
 	newState, err := n.makeNewInfoState(newData, distributionList)
 	return []*prototk.NewState{newState}, err
 }
 
-func (n *Noto) prepareLockInfo(lockID pldtypes.Bytes32, owner, delegate *pldtypes.EthAddress, distributionList []string) (*prototk.NewState, error) {
+func (n *Noto) prepareLockInfo(lockID pldtypes.Bytes32, owner, delegate *pldtypes.EthAddress, unlockTxId *pldtypes.Bytes32, distributionList []string) (*prototk.NewState, error) {
 	if delegate == nil {
 		delegate = &pldtypes.EthAddress{}
 	}
-	newData := &types.NotoLockInfo{
+	newData := &types.NotoLockInfo_V1{
 		Salt:     pldtypes.RandBytes32(),
 		LockID:   lockID,
 		Owner:    owner,
 		Delegate: delegate,
 	}
+	if unlockTxId != nil {
+		newData.UnlockTxId = *unlockTxId
+	}
 	return n.makeNewLockState(newData, distributionList)
-
 }
 
 func (n *Noto) filterSchema(states []*prototk.EndorsableState, schemas []string) (filtered []*prototk.EndorsableState) {

@@ -38,8 +38,10 @@ func TestLock(t *testing.T) {
 		Callbacks:        mockCallbacks,
 		coinSchema:       &prototk.StateSchema{Id: "coin"},
 		lockedCoinSchema: &prototk.StateSchema{Id: "lockedCoin"},
-		lockInfoSchema:   &prototk.StateSchema{Id: "lockInfo"},
-		dataSchema:       &prototk.StateSchema{Id: "data"},
+		lockInfoSchemaV0: &prototk.StateSchema{Id: "lockInfo"},
+		lockInfoSchemaV1: &prototk.StateSchema{Id: "lockInfo_v1"},
+		dataSchemaV0:     &prototk.StateSchema{Id: "data"},
+		dataSchemaV1:     &prototk.StateSchema{Id: "data_v1"},
 	}
 	ctx := context.Background()
 	fn := types.NotoABI.Functions()["lock"]
