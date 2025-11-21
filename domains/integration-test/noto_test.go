@@ -383,7 +383,6 @@ func (s *notoTestSuite) TestNotoLock() {
 			Function: "delegateLock",
 			Data: toJSON(t, &types.DelegateLockParams{
 				LockID:   unlockReceipt.LockInfo.LockID,
-				Unlock:   unlockReceipt.LockInfo.UnlockParams,
 				Delegate: pldtypes.MustEthAddress(recipient2Key.Verifier.Verifier),
 			}),
 		},

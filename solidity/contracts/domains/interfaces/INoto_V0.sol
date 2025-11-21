@@ -2,18 +2,11 @@
 pragma solidity ^0.8.20;
 
 /**
- * @title INoto
- * @dev All implementations of Noto must conform to this interface.
+ * @title INoto_V0
+ * @dev Legacy interface for Noto implementations (variant 0).
+ *      This interface contains the old event structure and function signatures.
  */
-interface INoto {
-    struct UnlockParams {
-        bytes32[] lockedInputs;
-        bytes32[] lockedOutputs;
-        bytes32[] outputs;
-        bytes signature;
-        bytes data;
-    }
-
+interface INoto_V0 {
     event NotoTransfer(
         bytes32 txId,
         bytes32[] inputs,
@@ -24,7 +17,6 @@ interface INoto {
 
     event NotoLock(
         bytes32 txId,
-        bytes32 lockId,
         bytes32[] inputs,
         bytes32[] outputs,
         bytes32[] lockedOutputs,
@@ -34,7 +26,6 @@ interface INoto {
 
     event NotoUnlock(
         bytes32 txId,
-        bytes32 lockId,
         address sender,
         bytes32[] lockedInputs,
         bytes32[] lockedOutputs,
@@ -44,9 +35,6 @@ interface INoto {
     );
 
     event NotoUnlockPrepared(
-        bytes32 txId,
-        bytes32 lockId,
-        bytes32 unlockTxId,
         bytes32[] lockedInputs,
         bytes32 unlockHash,
         bytes signature,
@@ -55,7 +43,6 @@ interface INoto {
 
     event NotoLockDelegated(
         bytes32 txId,
-        bytes32 lockId,
         bytes32 unlockHash,
         address delegate,
         bytes signature,
@@ -98,14 +85,14 @@ interface INoto {
 
     function unlock(
         bytes32 txId,
-        bytes32 lockId,
-        UnlockParams calldata params
+        bytes32[] calldata lockedInputs,
+        bytes32[] calldata lockedOutputs,
+        bytes32[] calldata outputs,
+        bytes calldata signature,
+        bytes calldata data
     ) external;
 
     function prepareUnlock(
-        bytes32 txId,
-        bytes32 lockId,
-        bytes32 unlockTxId,
         bytes32[] calldata lockedInputs,
         bytes32 unlockHash,
         bytes calldata signature,
@@ -114,7 +101,7 @@ interface INoto {
 
     function delegateLock(
         bytes32 txId,
-        bytes32 lockId,
+        bytes32 unlockHash,
         address delegate,
         bytes calldata signature,
         bytes calldata data

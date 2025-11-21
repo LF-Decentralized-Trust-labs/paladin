@@ -86,7 +86,7 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	if err != nil {
 		return nil, err
 	}
-	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, params.To})
+	infoStates, err := h.noto.prepareInfo(params.Data, tx.DomainConfig.Variant, []string{notary, params.To})
 	if err != nil {
 		return nil, err
 	}

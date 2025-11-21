@@ -48,9 +48,10 @@ var notoBasicConfig = &types.NotoParsedConfig{
 
 func TestTransfer(t *testing.T) {
 	n := &Noto{
-		Callbacks:  mockCallbacks,
-		coinSchema: &prototk.StateSchema{Id: "coin"},
-		dataSchema: &prototk.StateSchema{Id: "data"},
+		Callbacks:    mockCallbacks,
+		coinSchema:   &prototk.StateSchema{Id: "coin"},
+		dataSchemaV0: &prototk.StateSchema{Id: "data"},
+		dataSchemaV1: &prototk.StateSchema{Id: "data_v1"},
 	}
 	ctx := context.Background()
 	fn := types.NotoABI.Functions()["transfer"]
@@ -297,9 +298,10 @@ func TestTransfer(t *testing.T) {
 
 func TestTransferAssembleMissingFrom(t *testing.T) {
 	n := &Noto{
-		Callbacks:  mockCallbacks,
-		coinSchema: &prototk.StateSchema{Id: "coin"},
-		dataSchema: &prototk.StateSchema{Id: "data"},
+		Callbacks:    mockCallbacks,
+		coinSchema:   &prototk.StateSchema{Id: "coin"},
+		dataSchemaV0: &prototk.StateSchema{Id: "data"},
+		dataSchemaV1: &prototk.StateSchema{Id: "data_v1"},
 	}
 	handler := &transferHandler{
 		transferCommon: transferCommon{noto: n},
@@ -331,9 +333,10 @@ func TestTransferAssembleMissingFrom(t *testing.T) {
 
 func TestTransferAssembleMissingTo(t *testing.T) {
 	n := &Noto{
-		Callbacks:  mockCallbacks,
-		coinSchema: &prototk.StateSchema{Id: "coin"},
-		dataSchema: &prototk.StateSchema{Id: "data"},
+		Callbacks:    mockCallbacks,
+		coinSchema:   &prototk.StateSchema{Id: "coin"},
+		dataSchemaV0: &prototk.StateSchema{Id: "data"},
+		dataSchemaV1: &prototk.StateSchema{Id: "data_v1"},
 	}
 	handler := &transferHandler{
 		transferCommon: transferCommon{noto: n},

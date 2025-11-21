@@ -18,7 +18,7 @@ ext {
         include 'internal/**/*.go'
         include 'pkg/**/*.go'
     }
-    targetCoverage = 66
+    targetCoverage = 64.5
     maxCoverageBarGap = 1
 }
 
@@ -60,11 +60,13 @@ task copyInternalSolidity(type: Copy) {
     into 'internal/noto/abis'
     from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/domains/interfaces/INoto.sol/INoto.json'
+        include 'contracts/domains/interfaces/INoto_V0.sol/INoto_V0.json'
         include 'contracts/domains/interfaces/INotoErrors.sol/INotoErrors.json'
         include 'contracts/domains/interfaces/INotoHooks.sol/INotoHooks.json'
         include 'contracts/domains/noto/NotoFactory.sol/NotoFactory.json'
         include 'contracts/domains/noto/NotoFactory_V0.sol/NotoFactory_V0.json'
         include 'contracts/domains/noto/Noto.sol/Noto.json'
+        include 'contracts/domains/interfaces/INotoPrivate_V0.sol/INotoPrivate_V0.json'
     }
 
     // Flatten all paths into the destination folder

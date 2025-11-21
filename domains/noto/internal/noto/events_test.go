@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/LFDT-Paladin/paladin/domains/noto/pkg/types"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
@@ -124,10 +125,14 @@ func TestHandleEventBatch_NotoLock(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	txId := pldtypes.RandBytes32()
+	lockId := pldtypes.RandBytes32()
 	input := pldtypes.RandBytes32()
 	output := pldtypes.RandBytes32()
 	lockedOutput := pldtypes.RandBytes32()
 	event := &NotoLock_Event{
+		TxId:          txId,
+		LockId:        lockId,
 		Inputs:        []pldtypes.Bytes32{input},
 		Outputs:       []pldtypes.Bytes32{output},
 		LockedOutputs: []pldtypes.Bytes32{lockedOutput},
@@ -143,6 +148,11 @@ func TestHandleEventBatch_NotoLock(t *testing.T) {
 				SoliditySignature: eventSignatures[NotoLock],
 				DataJson:          string(notoEventJson),
 			},
+		},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: mustParseJSON(&types.NotoParsedConfig{
+				Variant: types.NotoVariantDefault,
+			}),
 		},
 	}
 
@@ -189,8 +199,16 @@ func TestHandleEventBatch_NotoLockBadTransactionData(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	event := &NotoTransfer_Event{
-		Data: pldtypes.MustParseHexBytes("0x00010000"),
+	txId := pldtypes.RandBytes32()
+	lockId := pldtypes.RandBytes32()
+	event := &NotoLock_Event{
+		TxId:          txId,
+		LockId:        lockId,
+		Inputs:        []pldtypes.Bytes32{},
+		Outputs:       []pldtypes.Bytes32{},
+		LockedOutputs: []pldtypes.Bytes32{},
+		Signature:     pldtypes.MustParseHexBytes("0x1234"),
+		Data:          pldtypes.MustParseHexBytes("0x00010000"), // Bad transaction data
 	}
 	notoEventJson, err := json.Marshal(event)
 	require.NoError(t, err)
@@ -201,6 +219,11 @@ func TestHandleEventBatch_NotoLockBadTransactionData(t *testing.T) {
 				SoliditySignature: eventSignatures[NotoLock],
 				DataJson:          string(notoEventJson),
 			}},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: mustParseJSON(&types.NotoParsedConfig{
+				Variant: types.NotoVariantDefault,
+			}),
+		},
 	}
 
 	_, err = n.HandleEventBatch(ctx, req)
@@ -216,10 +239,14 @@ func TestHandleEventBatch_NotoUnlock(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	txId := pldtypes.RandBytes32()
+	lockId := pldtypes.RandBytes32()
 	lockedInput := pldtypes.RandBytes32()
 	output := pldtypes.RandBytes32()
 	lockedOutput := pldtypes.RandBytes32()
 	event := &NotoUnlock_Event{
+		TxId:          txId,
+		LockId:        lockId,
 		LockedInputs:  []pldtypes.Bytes32{lockedInput},
 		LockedOutputs: []pldtypes.Bytes32{lockedOutput},
 		Outputs:       []pldtypes.Bytes32{output},
@@ -237,7 +264,9 @@ func TestHandleEventBatch_NotoUnlock(t *testing.T) {
 			},
 		},
 		ContractInfo: &prototk.ContractInfo{
-			ContractConfigJson: `{}`,
+			ContractConfigJson: mustParseJSON(&types.NotoParsedConfig{
+				Variant: types.NotoVariantDefault,
+			}),
 		},
 	}
 
@@ -284,8 +313,16 @@ func TestHandleEventBatch_NotoUnlockBadTransactionData(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	event := &NotoTransfer_Event{
-		Data: pldtypes.MustParseHexBytes("0x00010000"),
+	txId := pldtypes.RandBytes32()
+	lockId := pldtypes.RandBytes32()
+	event := &NotoUnlock_Event{
+		TxId:          txId,
+		LockId:        lockId,
+		LockedInputs:  []pldtypes.Bytes32{},
+		LockedOutputs: []pldtypes.Bytes32{},
+		Outputs:       []pldtypes.Bytes32{},
+		Signature:     pldtypes.MustParseHexBytes("0x1234"),
+		Data:          pldtypes.MustParseHexBytes("0x00010000"), // Bad transaction data
 	}
 	notoEventJson, err := json.Marshal(event)
 	require.NoError(t, err)
@@ -296,6 +333,11 @@ func TestHandleEventBatch_NotoUnlockBadTransactionData(t *testing.T) {
 				SoliditySignature: eventSignatures[NotoUnlock],
 				DataJson:          string(notoEventJson),
 			}},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: mustParseJSON(&types.NotoParsedConfig{
+				Variant: types.NotoVariantDefault,
+			}),
+		},
 	}
 
 	_, err = n.HandleEventBatch(ctx, req)

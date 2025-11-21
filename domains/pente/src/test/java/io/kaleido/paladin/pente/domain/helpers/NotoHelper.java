@@ -214,7 +214,6 @@ public class NotoHelper {
                 JsonHex.addressFrom(address),
                 new HashMap<>() {{
                     put("lockId", lockId);
-                    put("unlock", unlockParams);
                     put("delegate", delegate);
                     put("data", "0x");
                 }},

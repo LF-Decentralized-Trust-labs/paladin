@@ -19,4 +19,6 @@ interface INotoErrors {
     error NotoAlreadyPrepared(bytes32 unlockHash);
 
     error NotoDuplicateTransaction(bytes32 txId);
+
+    error NotoDuplicateLock(bytes32 txId);
 }

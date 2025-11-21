@@ -41,7 +41,7 @@ type ReceiptStates struct {
 type ReceiptLockInfo struct {
 	LockID       pldtypes.Bytes32     `json:"lockId"`
 	Delegate     *pldtypes.EthAddress `json:"delegate,omitempty"`     // only set for delegateLock
-	UnlockParams *UnlockPublicParams  `json:"unlockParams,omitempty"` // only set for prepareUnlock
+	UnlockParams map[string]any       `json:"unlockParams,omitempty"` // only set for prepareUnlock
 	UnlockCall   pldtypes.HexBytes    `json:"unlockCall,omitempty"`   // only set for prepareUnlock
 }
 
@@ -127,16 +127,30 @@ var NotoLockInfoABI = &abi.Parameter{
 }
 
 type TransactionData struct {
-	Salt string            `json:"salt"`
-	Data pldtypes.HexBytes `json:"data"`
+	Salt    string             `json:"salt"`
+	Data    pldtypes.HexBytes  `json:"data"`
+	Variant pldtypes.HexUint64 `json:"variant"` // Noto contract variant
 }
 
-var TransactionDataABI = &abi.Parameter{
+// TransactionDataABI_V0 is the original schema
+var TransactionDataABI_V0 = &abi.Parameter{
 	Name:         "TransactionData",
 	Type:         "tuple",
 	InternalType: "struct TransactionData",
 	Components: abi.ParameterArray{
 		{Name: "salt", Type: "bytes32"},
 		{Name: "data", Type: "bytes"},
+	},
+}
+
+// TransactionDataABI_V1 is the new schema with Noto variant field
+var TransactionDataABI_V1 = &abi.Parameter{
+	Name:         "TransactionData_V1",
+	Type:         "tuple",
+	InternalType: "struct TransactionData_V1",
+	Components: abi.ParameterArray{
+		{Name: "salt", Type: "bytes32"},
+		{Name: "data", Type: "bytes"},
+		{Name: "variant", Type: "uint64"},
 	},
 }

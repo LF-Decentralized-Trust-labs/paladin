@@ -28,6 +28,8 @@ import (
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signpayloads"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
+	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 )
 
 type prepareUnlockHandler struct {
@@ -132,18 +134,39 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoPrepareUnlockParams{
-		LockedInputs: endorsableStateIDs(lockedInputs),
-		UnlockHash:   pldtypes.Bytes32(unlockHash),
-		Signature:    sender.Payload,
-		Data:         data,
+
+	var interfaceABI abi.ABI
+	var paramsJSON []byte
+
+	if tx.DomainConfig.IsV1() {
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantDefault)
+		// For V1, generate a new unlockTxId that will be used for the unlock
+		unlockTxId := pldtypes.Bytes32UUIDFirst16(uuid.New()).String()
+		params := &NotoPrepareUnlockParams{
+			TxId:         &req.Transaction.TransactionId,
+			LockId:       &inParams.LockID,
+			UnlockTxId:   &unlockTxId,
+			LockedInputs: endorsableStateIDs(lockedInputs),
+			UnlockHash:   pldtypes.Bytes32(unlockHash),
+			Signature:    sender.Payload,
+			Data:         data,
+		}
+		paramsJSON, err = json.Marshal(params)
+	} else {
+		interfaceABI = h.noto.getInterfaceABI(types.NotoVariantLegacy)
+		params := &NotoPrepareUnlockParams{
+			LockedInputs: endorsableStateIDs(lockedInputs),
+			UnlockHash:   pldtypes.Bytes32(unlockHash),
+			Signature:    sender.Payload,
+			Data:         data,
+		}
+		paramsJSON, err = json.Marshal(params)
 	}
-	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: interfaceBuild.ABI.Functions()["prepareUnlock"],
+		functionABI: interfaceABI.Functions()["prepareUnlock"],
 		paramsJSON:  paramsJSON,
 	}, nil
 }

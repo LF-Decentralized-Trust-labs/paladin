@@ -43,13 +43,19 @@ describe("Atom", function () {
       [f1txo3, f1txo4],
       f1TxData
     );
+
+    const lockId = await noto.getLockId(f1txo1);
+    const unlockParams = {
+      lockedInputs: [f1txo1, f1txo2],
+      lockedOutputs: [],
+      outputs: [f1txo3, f1txo4],
+      signature: randomBytes32(),
+      data: f1TxData,
+    };
     const encoded1 = noto.interface.encodeFunctionData("unlock", [
       randomBytes32(),
-      [f1txo1, f1txo2],
-      [],
-      [f1txo3, f1txo4],
-      randomBytes32(),
-      f1TxData,
+      lockId,
+      unlockParams,
     ]);
     const encoded2 = erc20.interface.encodeFunctionData("transferFrom", [
       notary2.address,
@@ -76,12 +82,14 @@ describe("Atom", function () {
     const mcAddr = createMFEvent?.args.addr;
 
     // Do the delegation/approval transactions
+    const prepareTxId = randomBytes32();
+    const unlockTxId = randomBytes32();
     await noto
       .connect(notary1)
-      .prepareUnlock([f1txo1, f1txo2], multiTXF1Part, "0x", "0x");
+      .prepareUnlock(prepareTxId, lockId, unlockTxId, [f1txo1, f1txo2], multiTXF1Part, "0x", "0x");
     await noto.connect(notary1).delegateLock(
       randomBytes32(),
-      multiTXF1Part,
+      lockId,
       mcAddr,
       "0x",
       "0x"
@@ -127,14 +135,18 @@ describe("Atom", function () {
       [f1txo3, f1txo4],
       f1TxData
     );
-
+    const lockId = await noto.getLockId(f1txo1);
+    const unlockParams = {
+      lockedInputs: [f1txo1, f1txo2],
+      lockedOutputs: [],
+      outputs: [f1txo3, f1txo4],
+      signature: randomBytes32(),
+      data: f1TxData,
+    };
     const encoded1 = noto.interface.encodeFunctionData("unlock", [
       randomBytes32(),
-      [f1txo1, f1txo2],
-      [],
-      [f1txo3, f1txo4],
-      randomBytes32(),
-      f1TxData,
+      lockId,
+      unlockParams,
     ]);
 
     // Deploy the delegation contract

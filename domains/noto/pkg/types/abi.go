@@ -106,7 +106,7 @@ type UnlockParams struct {
 
 type DelegateLockParams struct {
 	LockID   pldtypes.Bytes32     `json:"lockId"`
-	Unlock   *UnlockPublicParams  `json:"unlock"`
+	Unlock   *UnlockPublicParams  `json:"unlock,omitempty"` // Required for V0, omitted for V1
 	Delegate *pldtypes.EthAddress `json:"delegate"`
 	Data     pldtypes.HexBytes    `json:"data"`
 }

@@ -26,7 +26,6 @@ import (
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/algorithms"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
-	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/stretchr/testify/assert"
@@ -39,7 +38,8 @@ func TestPrepareUnlock(t *testing.T) {
 		coinSchema:       &prototk.StateSchema{Id: "coin"},
 		lockedCoinSchema: &prototk.StateSchema{Id: "lockedCoin"},
 		lockInfoSchema:   &prototk.StateSchema{Id: "lockInfo"},
-		dataSchema:       &prototk.StateSchema{Id: "data"},
+		dataSchemaV0:     &prototk.StateSchema{Id: "data"},
+		dataSchemaV1:     &prototk.StateSchema{Id: "data_v1"},
 	}
 	ctx := context.Background()
 	fn := types.NotoABI.Functions()["prepareUnlock"]
@@ -78,6 +78,7 @@ func TestPrepareUnlock(t *testing.T) {
 			ContractAddress: contractAddress,
 			ContractConfigJson: mustParseJSON(&types.NotoParsedConfig{
 				NotaryLookup: "notary@node1",
+				Variant:      types.NotoVariantDefault,
 			}),
 		},
 		FunctionAbiJson:   mustParseJSON(fn),
@@ -221,24 +222,25 @@ func TestPrepareUnlock(t *testing.T) {
 	expectedFunction := mustParseJSON(interfaceBuild.ABI.Functions()["prepareUnlock"])
 	assert.JSONEq(t, expectedFunction, prepareRes.Transaction.FunctionAbiJson)
 	assert.Nil(t, prepareRes.Transaction.ContractAddress)
-	assert.JSONEq(t, fmt.Sprintf(`{
-		"lockedInputs": ["%s"],
-		"unlockHash": "%s",
-		"signature": "%s",
-		"data": "0x00010000015e1881f2ba769c22d05c841f06949ec6e1bd573f5e1e0328885494212f077d000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000034cc7840e186de23c4127b4853c878708d2642f1942959692885e098f1944547d69101a0740ec8096b83653600fa7553d676fc92bcc6e203c3572d2cac4f1db2f26b394af655bdc794a6d7cd7f8004eec20bffb374e4ddd24cdaefe554878d945"
-	}`, inputCoin.ID, unlockHash, signatureBytes), prepareRes.Transaction.ParamsJson)
 
-	var invokeFn abi.Entry
-	err = json.Unmarshal([]byte(prepareRes.Transaction.FunctionAbiJson), &invokeFn)
+	// Verify base invoke params
+	var baseParams NotoPrepareUnlockParams
+	err = json.Unmarshal([]byte(prepareRes.Transaction.ParamsJson), &baseParams)
 	require.NoError(t, err)
-	encodedCall, err := invokeFn.EncodeCallDataJSONCtx(ctx, []byte(prepareRes.Transaction.ParamsJson))
-	require.NoError(t, err)
+	assert.Equal(t, "0x015e1881f2ba769c22d05c841f06949ec6e1bd573f5e1e0328885494212f077d", *baseParams.TxId)
+	assert.Equal(t, lockID, *baseParams.LockId)
+	assert.NotEmpty(t, baseParams.UnlockTxId)
+	assert.Equal(t, []string{inputCoin.ID.String()}, baseParams.LockedInputs)
+	assert.Equal(t, unlockHash.String(), baseParams.UnlockHash.String())
+	assert.Equal(t, signatureBytes, baseParams.Signature)
+	assert.NotEmpty(t, baseParams.Data)
 
 	// Prepare again to test hook invoke
 	hookAddress := "0x515fba7fe1d8b9181be074bd4c7119544426837c"
 	tx.ContractInfo.ContractConfigJson = mustParseJSON(&types.NotoParsedConfig{
 		NotaryLookup: "notary@node1",
 		NotaryMode:   types.NotaryModeHooks.Enum(),
+		Variant:      types.NotoVariantDefault,
 		Options: types.NotoOptions{
 			Hooks: &types.NotoHooksOptions{
 				PublicAddress:     pldtypes.MustEthAddress(hookAddress),
@@ -267,17 +269,24 @@ func TestPrepareUnlock(t *testing.T) {
 	expectedFunction = mustParseJSON(hooksBuild.ABI.Functions()["onPrepareUnlock"])
 	assert.JSONEq(t, expectedFunction, prepareRes.Transaction.FunctionAbiJson)
 	assert.Equal(t, &hookAddress, prepareRes.Transaction.ContractAddress)
-	assert.JSONEq(t, fmt.Sprintf(`{
-		"sender": "%s",
-		"lockId": "%s",
-		"recipients": [{
-			"to": "0x2000000000000000000000000000000000000000",
-			"amount": "0x64"
-		}],
-		"data": "0x1234",
-		"prepared": {
-			"contractAddress": "%s",
-			"encodedCall": "%s"
-		}
-	}`, senderKey.Address, lockID, contractAddress, pldtypes.HexBytes(encodedCall)), prepareRes.Transaction.ParamsJson)
+
+	// Verify hook invoke params
+	var hookParams UnlockHookParams
+	err = json.Unmarshal([]byte(prepareRes.Transaction.ParamsJson), &hookParams)
+	require.NoError(t, err)
+	require.NotNil(t, hookParams.Sender)
+	assert.Equal(t, senderKey.Address.String(), hookParams.Sender.String())
+	assert.Equal(t, lockID, hookParams.LockID)
+	assert.Equal(t, pldtypes.MustParseHexBytes("0x1234"), hookParams.Data)
+
+	// Verify recipients
+	require.Len(t, hookParams.Recipients, 1)
+	require.NotNil(t, hookParams.Recipients[0].To)
+	assert.Equal(t, pldtypes.MustEthAddress("0x2000000000000000000000000000000000000000").String(), hookParams.Recipients[0].To.String())
+	require.NotNil(t, hookParams.Recipients[0].Amount)
+	assert.Equal(t, pldtypes.Int64ToInt256(100).String(), hookParams.Recipients[0].Amount.String())
+
+	// Verify prepared transaction
+	assert.Equal(t, pldtypes.MustEthAddress(contractAddress), hookParams.Prepared.ContractAddress)
+	assert.NotEmpty(t, hookParams.Prepared.EncodedCall)
 }

@@ -28,9 +28,10 @@ import (
 
 func TestTransferFromBasicModeRestriction(t *testing.T) {
 	n := &Noto{
-		Callbacks:  mockCallbacks,
-		coinSchema: &prototk.StateSchema{Id: "coin"},
-		dataSchema: &prototk.StateSchema{Id: "data"},
+		Callbacks:    mockCallbacks,
+		coinSchema:   &prototk.StateSchema{Id: "coin"},
+		dataSchemaV0: &prototk.StateSchema{Id: "data"},
+		dataSchemaV1: &prototk.StateSchema{Id: "data_v1"},
 	}
 	ctx := context.Background()
 
@@ -71,9 +72,10 @@ func TestTransferFromBasicModeRestriction(t *testing.T) {
 
 func TestTransferFromHooksModeAllowed(t *testing.T) {
 	n := &Noto{
-		Callbacks:  mockCallbacks,
-		coinSchema: &prototk.StateSchema{Id: "coin"},
-		dataSchema: &prototk.StateSchema{Id: "data"},
+		Callbacks:    mockCallbacks,
+		coinSchema:   &prototk.StateSchema{Id: "coin"},
+		dataSchemaV0: &prototk.StateSchema{Id: "data"},
+		dataSchemaV1: &prototk.StateSchema{Id: "data_v1"},
 	}
 	ctx := context.Background()
 

@@ -91,7 +91,7 @@ func (h *transferCommon) assembleTransfer(ctx context.Context, tx *types.ParsedT
 	if from != tx.Transaction.From {
 		infoDistributionList = append(infoDistributionList, from)
 	}
-	infoStates, err := h.noto.prepareInfo(data, infoDistributionList)
+	infoStates, err := h.noto.prepareInfo(data, tx.DomainConfig.Variant, infoDistributionList)
 	if err != nil {
 		return nil, err
 	}

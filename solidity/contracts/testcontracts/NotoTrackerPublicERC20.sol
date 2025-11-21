@@ -17,8 +17,16 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
     using Address for address;
 
     NotoLocks internal _locks = new NotoLocks();
+    address internal _notary;
 
-    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
+    modifier onlyNotary(address sender) {
+        require(sender == _notary, "Sender is not the notary");
+        _;
+    }
+
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {
+        _notary = msg.sender;
+    }
 
     function onMint(
         address sender,
@@ -26,7 +34,7 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external override {
+    ) external override onlyNotary(sender) {
         _mint(to, amount);
         _executeOperation(prepared);
     }

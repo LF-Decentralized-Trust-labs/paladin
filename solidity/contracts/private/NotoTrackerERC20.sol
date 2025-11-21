@@ -10,7 +10,7 @@ import {NotoLocks} from "./NotoLocks.sol";
  * @dev Example Noto hooks which track all Noto token movements on a private ERC20.
  */
 contract NotoTrackerERC20 is INotoHooks, ERC20 {
-    NotoLocks internal _locks  = new NotoLocks();
+    NotoLocks internal _locks = new NotoLocks();
     address internal _notary;
 
     modifier onlyNotary(address sender) {

@@ -12,14 +12,6 @@ interface INotoPrivate {
         uint256 amount;
     }
 
-    struct UnlockPublicParams {
-        bytes32[] lockedInputs;
-        bytes32[] lockedOutputs;
-        bytes32[] outputs;
-        bytes signature;
-        bytes data;
-    }
-
     function mint(
         string calldata to,
         uint256 amount,
@@ -65,7 +57,6 @@ interface INotoPrivate {
 
     function delegateLock(
         bytes32 lockId,
-        UnlockPublicParams calldata unlock,
         address delegate,
         bytes calldata data
     ) external;

@@ -39,7 +39,8 @@ func TestLock(t *testing.T) {
 		coinSchema:       &prototk.StateSchema{Id: "coin"},
 		lockedCoinSchema: &prototk.StateSchema{Id: "lockedCoin"},
 		lockInfoSchema:   &prototk.StateSchema{Id: "lockInfo"},
-		dataSchema:       &prototk.StateSchema{Id: "data"},
+		dataSchemaV0:     &prototk.StateSchema{Id: "data"},
+		dataSchemaV1:     &prototk.StateSchema{Id: "data_v1"},
 	}
 	ctx := context.Background()
 	fn := types.NotoABI.Functions()["lock"]
