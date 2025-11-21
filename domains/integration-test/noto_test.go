@@ -402,15 +402,16 @@ func (s *notoTestSuite) TestNotoLock() {
 		Wait(3 * time.Second)
 	require.NoError(t, tx.Error())
 
-	balanceOfResult = noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient2Name}).SignAndCall(notaryName).Wait()
-	assert.Equal(t, "100", balanceOfResult["totalBalance"].(string), "Balance of recipient should be 100")
-
+	// Wait for locked coins to be consumed and new coins to be created
 	findAvailableCoins(t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), "pstate_queryContractStates", noto.Address, nil, func(coins []*types.NotoLockedCoinState) bool {
 		return len(coins) == 0
 	})
 	coins = findAvailableCoins(t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil, func(coins []*types.NotoCoinState) bool {
 		return len(coins) == 2
 	})
+
+	balanceOfResult = noto.BalanceOf(ctx, &types.BalanceOfParam{Account: recipient2Name}).SignAndCall(notaryName).Wait()
+	assert.Equal(t, "100", balanceOfResult["totalBalance"].(string), "Balance of recipient should be 100")
 	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[0].Data.Owner.String())
 	assert.Equal(t, int64(50), coins[1].Data.Amount.Int().Int64())
@@ -503,8 +504,10 @@ func (s *notoTestSuite) TestNotoCreateMintLock() {
 		Wait(3 * time.Second)
 	require.NoError(t, tx.Error())
 
-	// Verify coins are now created
-	coins = findAvailableCoins[types.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
+	// Wait for coins to be created
+	coins = findAvailableCoins(t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), "pstate_queryContractStates", noto.Address, nil, func(coins []*types.NotoCoinState) bool {
+		return len(coins) == 2
+	})
 	require.Len(t, coins, 2, "Should have 2 coins after unlock")
 
 	// Verify coin amounts and owners
@@ -650,8 +653,10 @@ func (s *notoTestSuite) TestNotoPrepareBurnUnlock() {
 		Wait(3 * time.Second)
 	require.NoError(t, tx.Error())
 
-	// Verify locked coins are gone (burned)
-	lockedCoins = findAvailableCoins[types.NotoLockedCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), "pstate_queryContractStates", noto.Address, nil)
+	// Wait for locked coins to be consumed (burned)
+	lockedCoins = findAvailableCoins(t, ctx, rpc, notoDomain.Name(), notoDomain.LockedCoinSchemaID(), "pstate_queryContractStates", noto.Address, nil, func(coins []*types.NotoLockedCoinState) bool {
+		return len(coins) == 0
+	})
 	require.Len(t, lockedCoins, 0, "Should have no locked coins after burn unlock")
 
 	// Verify no new coins were created (the locked value was burned)
