@@ -116,8 +116,7 @@ func (h *prepareUnlockHandler) Endorse(ctx context.Context, tx *types.ParsedTran
 
 func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.UnlockParams)
-
-	lockedInputs := req.ReadStates
+	lockedInputs := h.noto.filterSchema(req.ReadStates, []string{h.noto.lockedCoinSchema.Id})
 	outputs, lockedOutputs := h.noto.splitStates(req.InfoStates)
 	unlockHash, err := h.noto.unlockHashFromStates(ctx, tx.ContractAddress, lockedInputs, lockedOutputs, outputs, inParams.Data)
 	if err != nil {

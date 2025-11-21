@@ -225,7 +225,7 @@ func (n *Noto) handleV1Event(ctx context.Context, ev *prototk.OnChainEvent, res 
 				return err
 			}
 			n.recordTransactionInfo(ev, txData, res)
-			res.ReadStates = append(res.ReadStates, n.parseStatesFromEvent(unlockPrepared.UnlockTxId, unlockPrepared.LockedInputs)...)
+			res.ReadStates = append(res.ReadStates, n.parseStatesFromEvent(unlockPrepared.TxId, unlockPrepared.LockedInputs)...)
 		} else {
 			log.L(ctx).Warnf("Ignoring malformed NotoUnlockPrepared event in batch %s: %s", req.BatchId, err)
 		}
