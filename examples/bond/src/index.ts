@@ -378,7 +378,6 @@ async function main(): Promise<boolean> {
     .using(paladin3)
     .delegateLock(investor, {
       lockId: cashLockId,
-      unlock: cashUnlockParams,
       delegate: atomAddress,
       data: "0x",
     })
@@ -391,7 +390,6 @@ async function main(): Promise<boolean> {
     .using(paladin2)
     .delegateLock(bondCustodian, {
       lockId: bondLockId,
-      unlock: assetUnlockParams,
       delegate: atomAddress,
       data: "0x",
     })
