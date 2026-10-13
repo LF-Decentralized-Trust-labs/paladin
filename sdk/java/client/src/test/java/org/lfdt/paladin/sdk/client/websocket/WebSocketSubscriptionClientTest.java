@@ -31,12 +31,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.lfdt.paladin.sdk.client.exception.PaladinConnectionException;
+import org.lfdt.paladin.sdk.client.exception.PaladinRpcException;
 import org.lfdt.paladin.sdk.core.json.PaladinObjectMapper;
 import org.lfdt.paladin.sdk.core.privacygroup.PrivacyGroupMessageBatch;
 import org.lfdt.paladin.sdk.core.transaction.TransactionEventBatch;
@@ -313,6 +317,213 @@ class WebSocketSubscriptionClientTest {
     }
   }
 
+  @Test
+  void dependentStagesCanWaitOnClientCallsFromOtherThreads() throws Exception {
+    final AtomicReference<WebSocket.Listener> listener = new AtomicReference<>();
+    try (WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(
+            config(),
+            error -> {},
+            value -> {
+              listener.set(value);
+              return new CompletableFuture<>();
+            })) {
+      final FakeSocket socket = new FakeSocket(listener.get());
+      // The stage blocks on another thread that needs the client: this deadlocks if the
+      // connection future is completed while the client holds its lock.
+      final CompletableFuture<Boolean> crossThreadCall =
+          client
+              .connected()
+              .thenApply(
+                  ignored -> {
+                    try {
+                      CompletableFuture.runAsync(
+                              () -> client.subscribeReceipts("from-callback", event -> {}))
+                          .get(2, TimeUnit.SECONDS);
+                      return true;
+                    } catch (final Exception e) {
+                      return false;
+                    }
+                  });
+      listener.get().onOpen(socket);
+      assertTrue(crossThreadCall.get(5, TimeUnit.SECONDS));
+      assertEquals("from-callback", socket.nextRequest().path("params").get(1).asText());
+    }
+  }
+
+  @Test
+  void abortsAConnectionThatOpensAfterClose() throws Exception {
+    final AtomicReference<WebSocket.Listener> listener = new AtomicReference<>();
+    final WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(
+            config(),
+            error -> {},
+            value -> {
+              listener.set(value);
+              return new CompletableFuture<>();
+            });
+    final CompletableFuture<WebSocketSubscriptionClient.Subscription> pending =
+        client.subscribeReceipts("pending", ignored -> {});
+    client.close();
+    final FakeSocket late = new FakeSocket(listener.get());
+    listener.get().onOpen(late);
+    assertTrue(late.aborted);
+    assertNull(late.nextRequestOrNull(50));
+    assertThrows(ExecutionException.class, () -> pending.get(2, TimeUnit.SECONDS));
+    assertThrows(ExecutionException.class, () -> client.connected().get(2, TimeUnit.SECONDS));
+  }
+
+  @Test
+  void retriesWhenTheConnectorThrows() throws Exception {
+    final FakeConnector connector = new FakeConnector();
+    final AtomicBoolean thrown = new AtomicBoolean();
+    final List<Throwable> errors = new ArrayList<>();
+    try (WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(
+            config(),
+            errors::add,
+            value -> {
+              if (!thrown.getAndSet(true)) {
+                throw new IllegalStateException("connector failed");
+              }
+              return connector.connect(value);
+            })) {
+      connector.next();
+      client.connected().get(2, TimeUnit.SECONDS);
+      assertEquals(1, errors.size());
+    }
+  }
+
+  @Test
+  void answeredHeartbeatsKeepTheConnectionOpen() throws Exception {
+    final FakeConnector connector = new FakeConnector();
+    final WebSocketClientConfig settings =
+        WebSocketClientConfig.builder("ws://localhost:8548")
+            .heartbeatInterval(Duration.ofMillis(20))
+            .reconnectDelay(Duration.ofMillis(10))
+            .build();
+    try (WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(settings, error -> {}, connector::connect)) {
+      final FakeSocket socket = connector.next();
+      assertTrue(socket.pings.await(2, TimeUnit.SECONDS));
+      assertNull(connector.sockets.poll(100, TimeUnit.MILLISECONDS));
+      client.connected().get(2, TimeUnit.SECONDS);
+    }
+  }
+
+  @Test
+  void connectsThroughTheHttpClientAndStopsWhenRefused() throws Exception {
+    final List<Throwable> errors = new CopyOnWriteArrayList<>();
+    final WebSocketClientConfig settings =
+        WebSocketClientConfig.builder("ws://127.0.0.1:1")
+            .header("Authorization", "Bearer token")
+            .connectTimeout(Duration.ofSeconds(2))
+            .reconnectDelay(Duration.ZERO)
+            .build();
+    try (WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(settings, errors::add)) {
+      assertThrows(ExecutionException.class, () -> client.connected().get(10, TimeUnit.SECONDS));
+      assertEquals(1, errors.size());
+      assertThrows(
+          ExecutionException.class,
+          () -> client.subscribeReceipts("after-failure", ignored -> {}).get());
+    }
+    try (WebSocketSubscriptionClient client = new WebSocketSubscriptionClient(settings)) {
+      assertThrows(ExecutionException.class, () -> client.connected().get(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  void releasesASubscriptionRemovedWhileResubscribing() throws Exception {
+    final FakeConnector connector = new FakeConnector();
+    try (WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(config(), error -> {}, connector::connect)) {
+      final FakeSocket first = connector.next();
+      final CompletableFuture<WebSocketSubscriptionClient.Subscription> pending =
+          client.subscribeMessages("removed", ignored -> {});
+      first.respond(first.nextRequest(), "first-id");
+      final WebSocketSubscriptionClient.Subscription handle = pending.get(2, TimeUnit.SECONDS);
+      first.disconnect();
+      final FakeSocket second = connector.next();
+      final JsonNode resubscribe = second.nextRequest();
+      assertFalse(handle.unsubscribe().get(2, TimeUnit.SECONDS));
+      second.respond(resubscribe, "second-id");
+      final JsonNode release = second.nextRequest();
+      assertEquals("pgroup_unsubscribe", release.path("method").asText());
+      assertEquals("second-id", release.path("params").get(0).asText());
+    }
+  }
+
+  @Test
+  void rejectsInvalidSubscriptionIdsAndReportsFailedResubscriptions() throws Exception {
+    final FakeConnector connector = new FakeConnector();
+    final List<Throwable> errors = new CopyOnWriteArrayList<>();
+    try (WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(config(), errors::add, connector::connect)) {
+      final FakeSocket first = connector.next();
+      final CompletableFuture<WebSocketSubscriptionClient.Subscription> invalid =
+          client.subscribeReceipts("blank-id", ignored -> {});
+      first.respond(first.nextRequest(), "");
+      assertThrows(ExecutionException.class, () -> invalid.get(2, TimeUnit.SECONDS));
+
+      final CompletableFuture<WebSocketSubscriptionClient.Subscription> established =
+          client.subscribeReceipts("established", ignored -> {});
+      first.respond(first.nextRequest(), "first-id");
+      established.get(2, TimeUnit.SECONDS);
+      first.disconnect();
+      final FakeSocket second = connector.next();
+      second.respond(second.nextRequest(), "");
+      final FakeSocket third = reconnect(connector, second);
+      third.error(third.nextRequest(), -32602, "listener removed");
+      // Each disconnect is reported too: disconnect, invalid ID, disconnect, RPC error.
+      assertEquals(4, errors.size());
+      assertEquals(PaladinConnectionException.class, errors.get(1).getClass());
+      assertEquals("invalid subscription ID", errors.get(1).getMessage());
+      assertEquals(PaladinRpcException.class, errors.get(3).getClass());
+    }
+  }
+
+  @Test
+  void reconnectsAfterSocketErrorsAndFailedSends() throws Exception {
+    final FakeConnector connector = new FakeConnector();
+    final List<Throwable> errors = new CopyOnWriteArrayList<>();
+    try (WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(config(), errors::add, connector::connect)) {
+      final FakeSocket first = connector.next();
+      first.failSends = true;
+      final CompletableFuture<WebSocketSubscriptionClient.Subscription> retried =
+          client.subscribeReceipts("send-fails", ignored -> {});
+      // A failed send drops the connection; the subscription is retried on the next one.
+      final FakeSocket second = connector.next();
+      final JsonNode request = second.nextRequest();
+      assertEquals("send-fails", request.path("params").get(1).asText());
+      second.respond(request, "retried-id");
+      assertEquals("retried-id", retried.get(2, TimeUnit.SECONDS).serverId());
+      second.listener.onError(second, new IllegalStateException("socket error"));
+      connector.next();
+      assertEquals(2, errors.size());
+    }
+  }
+
+  @Test
+  void closesEvenWhenTheCloseFrameFails() throws Exception {
+    final FakeConnector connector = new FakeConnector();
+    final WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(config(), error -> {}, connector::connect);
+    final FakeSocket socket = connector.next();
+    socket.failClose = true;
+    client.close();
+    assertThrows(
+        ExecutionException.class,
+        () -> client.subscribeReceipts("after-close", ignored -> {}).get(2, TimeUnit.SECONDS));
+  }
+
+  private static FakeSocket reconnect(final FakeConnector connector, final FakeSocket current)
+      throws InterruptedException {
+    current.disconnect();
+    return connector.next();
+  }
+
   private static WebSocketClientConfig config() {
     return WebSocketClientConfig.builder("ws://localhost:8548")
         .reconnectDelay(Duration.ofMillis(10))
@@ -346,6 +557,10 @@ class WebSocketSubscriptionClientTest {
     private final Listener listener;
     private final BlockingQueue<String> requests = new LinkedBlockingQueue<>();
     private boolean replyToPing = true;
+    private volatile boolean failSends;
+    private volatile boolean failClose;
+    private final CountDownLatch pings = new CountDownLatch(3);
+    private volatile boolean aborted;
 
     private FakeSocket(final Listener listener) {
       this.listener = listener;
@@ -408,6 +623,9 @@ class WebSocketSubscriptionClientTest {
 
     @Override
     public CompletableFuture<WebSocket> sendText(final CharSequence data, final boolean last) {
+      if (failSends) {
+        return CompletableFuture.failedFuture(new IllegalStateException("send failed"));
+      }
       requests.add(data.toString());
       return CompletableFuture.completedFuture(this);
     }
@@ -421,6 +639,7 @@ class WebSocketSubscriptionClientTest {
     public CompletableFuture<WebSocket> sendPing(final ByteBuffer message) {
       if (replyToPing) {
         listener.onPong(this, message);
+        pings.countDown();
       }
       return CompletableFuture.completedFuture(this);
     }
@@ -432,6 +651,9 @@ class WebSocketSubscriptionClientTest {
 
     @Override
     public CompletableFuture<WebSocket> sendClose(final int statusCode, final String reason) {
+      if (failClose) {
+        return CompletableFuture.failedFuture(new IllegalStateException("close failed"));
+      }
       return CompletableFuture.completedFuture(this);
     }
 
@@ -454,6 +676,8 @@ class WebSocketSubscriptionClientTest {
     }
 
     @Override
-    public void abort() {}
+    public void abort() {
+      aborted = true;
+    }
   }
 }

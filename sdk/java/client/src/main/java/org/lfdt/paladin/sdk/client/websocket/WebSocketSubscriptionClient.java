@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,10 +29,12 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -50,12 +53,14 @@ import org.lfdt.paladin.sdk.core.json.PaladinObjectMapper;
  * acknowledged by the consumer. The server pauses that subscription until it receives one.
  *
  * <p>Callbacks run on the WebSocket listener thread. Keep them short and hand longer work to an
- * application executor. This client is thread-safe; close it when finished.
+ * application executor. This client is thread-safe; close it when finished. Returned futures are
+ * completed outside the client's internal lock, so dependent stages may call back into the client.
  */
 public final class WebSocketSubscriptionClient implements AutoCloseable {
 
   private static final String PTX = "ptx";
   private static final String PGROUP = "pgroup";
+  private static final Duration CLOSE_FRAME_TIMEOUT = Duration.ofSeconds(1);
 
   private final WebSocketClientConfig config;
   private final ObjectMapper mapper = PaladinObjectMapper.shared();
@@ -180,125 +185,162 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
     final Subscription subscription =
         new Subscription(
             namespace, type, listenerName, Objects.requireNonNull(consumer, "consumer"));
+    final long attempt;
     synchronized (this) {
       if (closed || terminated) {
         return CompletableFuture.failedFuture(new IllegalStateException("client is closed"));
       }
       subscriptions.put(subscription.localId, subscription);
-      if (socket != null) {
-        sendSubscribe(subscription);
-      }
+      // While disconnected, the next opened() call sends this subscription.
+      attempt = socket == null ? -1 : generation;
+    }
+    if (attempt >= 0) {
+      sendSubscribe(attempt, subscription);
     }
     return subscription.ready;
   }
 
-  private synchronized void connect() {
-    if (closed || terminated || connecting || socket != null) {
+  // Locking rule: the monitor guards connection state only. Futures are completed, the error
+  // handler is called, and sockets are opened, sent to, or closed after the monitor is released,
+  // so callers' dependent stages can safely call back into this client from any thread.
+
+  private void connect() {
+    final long attempt;
+    synchronized (this) {
+      if (closed || terminated || connecting || socket != null) {
+        return;
+      }
+      connecting = true;
+      attempt = ++generation;
+    }
+    final CompletableFuture<WebSocket> opening;
+    try {
+      opening = connector.apply(new SocketListener(attempt));
+    } catch (final RuntimeException e) {
+      disconnected(attempt, e);
       return;
     }
-    connecting = true;
-    final long attempt = ++generation;
-    connector
-        .apply(new SocketListener(attempt))
-        .whenComplete(
-            (opened, failure) -> {
-              if (failure != null) {
-                disconnected(attempt, failure);
-              }
-            });
+    opening.whenComplete(
+        (opened, failure) -> {
+          if (failure != null) {
+            disconnected(attempt, failure);
+          }
+        });
   }
 
-  private synchronized void opened(final long attempt, final WebSocket openedSocket) {
-    if (closed || terminated || attempt != generation) {
+  private void opened(final long attempt, final WebSocket openedSocket) {
+    final List<Subscription> resubscribe;
+    synchronized (this) {
+      if (closed || terminated || attempt != generation) {
+        resubscribe = null;
+      } else {
+        socket = openedSocket;
+        connecting = false;
+        reconnectAttempts = 0;
+        sendTail = CompletableFuture.completedFuture(openedSocket);
+        lastPongNanos = System.nanoTime();
+        if (reconnectTask != null) {
+          reconnectTask.cancel(false);
+          reconnectTask = null;
+        }
+        heartbeatTask =
+            scheduler.scheduleAtFixedRate(
+                () -> heartbeat(attempt),
+                config.heartbeatInterval().toMillis(),
+                config.heartbeatInterval().toMillis(),
+                TimeUnit.MILLISECONDS);
+        resubscribe = List.copyOf(subscriptions.values());
+      }
+    }
+    if (resubscribe == null) {
+      // A connection from an earlier generation, or one that finished after close().
       openedSocket.abort();
       return;
     }
-    socket = openedSocket;
-    connecting = false;
-    reconnectAttempts = 0;
-    sendTail = CompletableFuture.completedFuture(openedSocket);
-    lastPongNanos = System.nanoTime();
-    if (reconnectTask != null) {
-      reconnectTask.cancel(false);
-      reconnectTask = null;
-    }
-    heartbeatTask =
-        scheduler.scheduleAtFixedRate(
-            () -> heartbeat(attempt),
-            config.heartbeatInterval().toMillis(),
-            config.heartbeatInterval().toMillis(),
-            TimeUnit.MILLISECONDS);
-    for (final Subscription subscription : List.copyOf(subscriptions.values())) {
-      sendSubscribe(subscription);
+    for (final Subscription subscription : resubscribe) {
+      sendSubscribe(attempt, subscription);
     }
     firstConnection.complete(null);
   }
 
-  private synchronized void disconnected(final long attempt, final Throwable cause) {
-    if (closed
-        || terminated
-        || attempt != generation
-        || reconnectTask != null
-        || (socket == null && !connecting)) {
-      return;
+  private void disconnected(final long attempt, final Throwable cause) {
+    final WebSocket oldSocket;
+    final List<CompletableFuture<JsonNode>> failedRequests;
+    final List<Subscription> failedSubscriptions;
+    final boolean terminate;
+    synchronized (this) {
+      if (closed
+          || terminated
+          || attempt != generation
+          || reconnectTask != null
+          || (socket == null && !connecting)) {
+        return;
+      }
+      oldSocket = socket;
+      socket = null;
+      connecting = false;
+      if (heartbeatTask != null) {
+        heartbeatTask.cancel(false);
+        heartbeatTask = null;
+      }
+      active.clear();
+      for (final Subscription subscription : subscriptions.values()) {
+        subscription.serverId = null;
+      }
+      failedRequests = List.copyOf(pending.values());
+      pending.clear();
+      terminate = config.reconnectDelay() == null;
+      if (terminate) {
+        terminated = true;
+        failedSubscriptions = List.copyOf(subscriptions.values());
+        scheduler.shutdownNow();
+      } else {
+        failedSubscriptions = List.of();
+        final long base = config.reconnectDelay().toMillis();
+        final long max = config.maxReconnectDelay().toMillis();
+        final long delay = Math.min(max, base * (1L << Math.min(reconnectAttempts++, 30)));
+        reconnectTask =
+            scheduler.schedule(
+                () -> {
+                  synchronized (WebSocketSubscriptionClient.this) {
+                    reconnectTask = null;
+                  }
+                  connect();
+                },
+                delay,
+                TimeUnit.MILLISECONDS);
+      }
     }
-    final WebSocket oldSocket = socket;
-    socket = null;
-    connecting = false;
     if (oldSocket != null) {
       oldSocket.abort();
     }
-    if (heartbeatTask != null) {
-      heartbeatTask.cancel(false);
-      heartbeatTask = null;
-    }
-    active.clear();
-    for (final Subscription subscription : subscriptions.values()) {
-      subscription.serverId = null;
-    }
     final PaladinConnectionException error =
         new PaladinConnectionException("WebSocket disconnected", cause);
-    for (final CompletableFuture<JsonNode> future : pending.values()) {
+    for (final CompletableFuture<JsonNode> future : failedRequests) {
       future.completeExceptionally(error);
     }
-    pending.clear();
-    if (config.reconnectDelay() == null) {
-      terminated = true;
+    if (terminate) {
       firstConnection.completeExceptionally(error);
-      for (final Subscription subscription : subscriptions.values()) {
+      for (final Subscription subscription : failedSubscriptions) {
         subscription.ready.completeExceptionally(error);
       }
-      scheduler.shutdownNow();
-      report(error);
-      return;
     }
-    final long base = config.reconnectDelay().toMillis();
-    final long max = config.maxReconnectDelay().toMillis();
-    final long delay = Math.min(max, base * (1L << Math.min(reconnectAttempts++, 30)));
-    reconnectTask =
-        scheduler.schedule(
-            () -> {
-              synchronized (WebSocketSubscriptionClient.this) {
-                reconnectTask = null;
-              }
-              connect();
-            },
-            delay,
-            TimeUnit.MILLISECONDS);
     report(error);
   }
 
   private void heartbeat(final long attempt) {
     final WebSocket current;
+    final boolean timedOut;
     synchronized (this) {
       if (closed || attempt != generation || socket == null) {
         return;
       }
       current = socket;
-      if (System.nanoTime() - lastPongNanos > config.heartbeatInterval().toNanos() * 3 / 2) {
-        disconnected(attempt, new PaladinTimeoutException("WebSocket heartbeat timed out", null));
-        return;
-      }
+      timedOut = System.nanoTime() - lastPongNanos > config.heartbeatInterval().toNanos() * 3 / 2;
+    }
+    if (timedOut) {
+      disconnected(attempt, new PaladinTimeoutException("WebSocket heartbeat timed out", null));
+      return;
     }
     current
         .sendPing(ByteBuffer.wrap(new byte[] {1}))
@@ -309,97 +351,138 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
             });
   }
 
-  private void sendSubscribe(final Subscription subscription) {
-    final long attempt = generation;
-    request(subscription.namespace + "_subscribe", subscription.type, subscription.listenerName)
-        .whenComplete(
-            (result, failure) -> {
-              synchronized (WebSocketSubscriptionClient.this) {
-                if (closed || attempt != generation) {
-                  return;
-                }
-                if (!subscriptions.containsKey(subscription.localId)) {
-                  if (failure == null && result != null && result.isTextual()) {
-                    request(subscription.namespace + "_unsubscribe", result.asText());
-                  }
-                  return;
-                }
-                if (failure != null) {
-                  if (socket == null) {
-                    return;
-                  }
-                  if (!subscription.ready.isDone()) {
-                    subscriptions.remove(subscription.localId);
-                    subscription.ready.completeExceptionally(failure);
-                  } else {
-                    report(failure);
-                  }
-                  return;
-                }
-                if (result == null || !result.isTextual() || result.asText().isBlank()) {
-                  final PaladinConnectionException error =
-                      new PaladinConnectionException("invalid subscription ID", null);
-                  if (!subscription.ready.isDone()) {
-                    subscriptions.remove(subscription.localId);
-                    subscription.ready.completeExceptionally(error);
-                  } else {
-                    report(error);
-                  }
-                  return;
-                }
-                subscription.serverId = result.asText();
-                active.put(subscription.serverId, subscription);
-                subscription.ready.complete(subscription);
-              }
-            });
+  private void sendSubscribe(final long attempt, final Subscription subscription) {
+    request(
+            attempt,
+            subscription.namespace + "_subscribe",
+            subscription.type,
+            subscription.listenerName)
+        .whenComplete((result, failure) -> subscribed(attempt, subscription, result, failure));
   }
 
-  private synchronized CompletableFuture<JsonNode> request(
-      final String method, final Object... params) {
-    if (socket == null) {
-      return CompletableFuture.failedFuture(
-          new PaladinConnectionException("WebSocket is disconnected", null));
+  private void subscribed(
+      final long attempt,
+      final Subscription subscription,
+      final JsonNode result,
+      final Throwable failure) {
+    final String serverId =
+        failure == null && result != null && result.isTextual() && !result.asText().isBlank()
+            ? result.asText()
+            : null;
+    final Throwable error =
+        failure != null
+            ? failure
+            : serverId == null
+                ? new PaladinConnectionException("invalid subscription ID", null)
+                : null;
+    final boolean removed;
+    boolean firstAttempt = false;
+    synchronized (this) {
+      if (closed || attempt != generation) {
+        return;
+      }
+      removed = !subscriptions.containsKey(subscription.localId);
+      if (!removed && error != null) {
+        if (failure != null && socket == null) {
+          // The connection dropped; the next opened() call resubscribes.
+          return;
+        }
+        firstAttempt = !subscription.ready.isDone();
+        if (firstAttempt) {
+          subscriptions.remove(subscription.localId);
+        }
+      } else if (!removed) {
+        subscription.serverId = serverId;
+        active.put(serverId, subscription);
+      }
     }
-    final String id = String.format(Locale.ROOT, "%09d", requestCounter.incrementAndGet());
-    final CompletableFuture<JsonNode> result = new CompletableFuture<>();
-    pending.put(id, result);
-    scheduler.schedule(
-        () -> {
-          synchronized (WebSocketSubscriptionClient.this) {
-            if (pending.remove(id) != null) {
-              result.completeExceptionally(
-                  new PaladinTimeoutException("WebSocket RPC " + method + " timed out", null));
-            }
-          }
-        },
-        config.requestTimeout().toMillis(),
-        TimeUnit.MILLISECONDS);
+    if (removed) {
+      // Unsubscribed while the request was in flight: release the server-side subscription.
+      if (serverId != null) {
+        request(attempt, subscription.namespace + "_unsubscribe", serverId);
+      }
+    } else if (error == null) {
+      subscription.ready.complete(subscription);
+    } else if (firstAttempt) {
+      subscription.ready.completeExceptionally(error);
+    } else {
+      report(error);
+    }
+  }
+
+  private CompletableFuture<JsonNode> request(
+      final long attempt, final String method, final Object... params) {
+    final String id = nextRequestId();
+    final String text;
     try {
-      send(mapper.writeValueAsString(new JsonRpcRequest(id, method, List.of(params))));
+      text = mapper.writeValueAsString(new JsonRpcRequest(id, method, List.of(params)));
     } catch (final Exception e) {
-      pending.remove(id);
-      result.completeExceptionally(e);
+      return CompletableFuture.failedFuture(e);
     }
+    final CompletableFuture<JsonNode> result = new CompletableFuture<>();
+    synchronized (this) {
+      if (closed || socket == null || attempt != generation) {
+        return CompletableFuture.failedFuture(
+            new PaladinConnectionException("WebSocket is disconnected", null));
+      }
+      pending.put(id, result);
+      scheduler.schedule(
+          () ->
+              failRequest(
+                  id, new PaladinTimeoutException("WebSocket RPC " + method + " timed out", null)),
+          config.requestTimeout().toMillis(),
+          TimeUnit.MILLISECONDS);
+    }
+    send(attempt, text)
+        .whenComplete(
+            (ignored, failure) -> {
+              if (failure != null) {
+                failRequest(id, failure);
+              }
+            });
     return result;
   }
 
-  private synchronized CompletableFuture<Void> send(final String text) {
-    final WebSocket current = socket;
-    if (current == null) {
-      return CompletableFuture.failedFuture(
-          new PaladinConnectionException("WebSocket is disconnected", null));
+  private void failRequest(final String id, final Throwable error) {
+    final CompletableFuture<JsonNode> response;
+    synchronized (this) {
+      response = pending.remove(id);
     }
-    final long attempt = generation;
-    final CompletableFuture<WebSocket> next =
-        sendTail
-            .handle((ignored, failure) -> null)
-            .thenCompose(ignored -> current.sendText(text, true));
-    sendTail = next;
-    next.exceptionally(
-        failure -> {
-          disconnected(attempt, failure);
-          return null;
-        });
+    if (response != null) {
+      response.completeExceptionally(error);
+    }
+  }
+
+  private String nextRequestId() {
+    return String.format(Locale.ROOT, "%09d", requestCounter.incrementAndGet());
+  }
+
+  private CompletableFuture<Void> send(final long attempt, final String text) {
+    final WebSocket current;
+    final CompletableFuture<WebSocket> previous;
+    final CompletableFuture<WebSocket> next = new CompletableFuture<>();
+    synchronized (this) {
+      current = socket;
+      if (closed || current == null || attempt != generation) {
+        return CompletableFuture.failedFuture(
+            new PaladinConnectionException("WebSocket is disconnected", null));
+      }
+      // Reserve this frame's place in the send order; the actual send happens unlocked.
+      previous = sendTail;
+      sendTail = next;
+    }
+    previous
+        .handle((ignored, failure) -> null)
+        .thenCompose(ignored -> current.sendText(text, true))
+        .whenComplete(
+            (sent, failure) -> {
+              if (failure == null) {
+                next.complete(sent);
+              } else {
+                next.completeExceptionally(failure);
+                disconnected(attempt, failure);
+              }
+            });
     return next.thenApply(ignored -> null);
   }
 
@@ -474,37 +557,64 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
     }
   }
 
+  /**
+   * Closes the connection and fails every pending subscription and request. A connection attempt
+   * that completes after this call is aborted.
+   */
   @Override
-  public synchronized void close() {
-    if (closed) {
-      return;
-    }
-    closed = true;
-    generation++;
-    if (reconnectTask != null) {
-      reconnectTask.cancel(false);
-    }
-    if (heartbeatTask != null) {
-      heartbeatTask.cancel(false);
-    }
-    final IllegalStateException error = new IllegalStateException("client is closed");
-    firstConnection.completeExceptionally(error);
-    for (final CompletableFuture<JsonNode> future : pending.values()) {
-      future.completeExceptionally(error);
-    }
-    pending.clear();
-    for (final Subscription subscription : subscriptions.values()) {
-      subscription.ready.completeExceptionally(error);
-      subscription.serverId = null;
-    }
-    subscriptions.clear();
-    active.clear();
-    if (socket != null) {
-      socket.sendClose(WebSocket.NORMAL_CLOSURE, "closing");
+  public void close() {
+    final WebSocket current;
+    final List<CompletableFuture<JsonNode>> failedRequests;
+    final List<Subscription> removed;
+    synchronized (this) {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      generation++;
+      if (reconnectTask != null) {
+        reconnectTask.cancel(false);
+        reconnectTask = null;
+      }
+      if (heartbeatTask != null) {
+        heartbeatTask.cancel(false);
+        heartbeatTask = null;
+      }
+      current = socket;
       socket = null;
+      connecting = false;
+      failedRequests = List.copyOf(pending.values());
+      pending.clear();
+      removed = List.copyOf(subscriptions.values());
+      for (final Subscription subscription : removed) {
+        subscription.serverId = null;
+      }
+      subscriptions.clear();
+      active.clear();
     }
     scheduler.shutdownNow();
-    httpClient.close();
+    final IllegalStateException error = new IllegalStateException("client is closed");
+    firstConnection.completeExceptionally(error);
+    for (final CompletableFuture<JsonNode> future : failedRequests) {
+      future.completeExceptionally(error);
+    }
+    for (final Subscription subscription : removed) {
+      subscription.ready.completeExceptionally(error);
+    }
+    if (current != null) {
+      try {
+        current
+            .sendClose(WebSocket.NORMAL_CLOSURE, "closing")
+            .get(CLOSE_FRAME_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+      } catch (final InterruptedException e) {
+        Thread.currentThread().interrupt();
+      } catch (final ExecutionException | TimeoutException e) {
+        // Best effort: the server also releases the subscriptions when the connection drops.
+      }
+    }
+    // shutdownNow() aborts in-flight exchanges, including a connection attempt that is still
+    // opening, instead of waiting for them as close() would.
+    httpClient.shutdownNow();
   }
 
   /** A stable local subscription handle retained across reconnections. */
@@ -543,7 +653,7 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
      *
      * @return the server identifier, or {@code null} while disconnected
      */
-    public synchronized String serverId() {
+    public String serverId() {
       return serverId;
     }
 
@@ -554,6 +664,7 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
      */
     public CompletableFuture<Boolean> unsubscribe() {
       final String id;
+      final long attempt;
       synchronized (WebSocketSubscriptionClient.this) {
         if (subscriptions.remove(localId) == null) {
           return CompletableFuture.completedFuture(false);
@@ -563,12 +674,13 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
         if (id != null) {
           active.remove(id);
         }
-        ready.completeExceptionally(new IllegalStateException("subscription removed"));
+        attempt = generation;
       }
+      ready.completeExceptionally(new IllegalStateException("subscription removed"));
       if (id == null) {
         return CompletableFuture.completedFuture(false);
       }
-      return request(namespace + "_unsubscribe", id).thenApply(JsonNode::asBoolean);
+      return request(attempt, namespace + "_unsubscribe", id).thenApply(JsonNode::asBoolean);
     }
   }
 
@@ -646,15 +758,17 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
           return CompletableFuture.failedFuture(
               new PaladinConnectionException("subscription connection has changed", null));
         }
-        final String id = String.format(Locale.ROOT, "%09d", requestCounter.incrementAndGet());
-        try {
-          return send(
-              mapper.writeValueAsString(
-                  new JsonRpcRequest(id, subscription.namespace + suffix, List.of(serverId))));
-        } catch (final Exception e) {
-          return CompletableFuture.failedFuture(e);
-        }
       }
+      final String text;
+      try {
+        text =
+            mapper.writeValueAsString(
+                new JsonRpcRequest(
+                    nextRequestId(), subscription.namespace + suffix, List.of(serverId)));
+      } catch (final Exception e) {
+        return CompletableFuture.failedFuture(e);
+      }
+      return send(attempt, text);
     }
   }
 
