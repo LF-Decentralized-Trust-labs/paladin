@@ -53,7 +53,7 @@ done
 **Step 2 — set the go directive explicitly** (`go get` only sets the minimum a dep requires, not the intended target version):
 
 ```bash
-python3 .cursor/skills/upgrade-go/scripts/update_go_directives.py 1.26.0 go1.26.4
+python3 .claude/skills/upgrade-go/scripts/update_go_directives.py 1.26.0 go1.26.4
 ```
 
 **Step 3 — tidy** using a fresh `GOMODCACHE` (required — see [reference.md](reference.md#gomodcache-trick)):
