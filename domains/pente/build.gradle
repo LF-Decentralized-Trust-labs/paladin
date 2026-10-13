@@ -8,14 +8,6 @@ group = 'io.kaleido'
 
 configurations {
     // Resolvable configurations
-    toolkitProtoDefinitions {
-        canBeConsumed = false
-        canBeResolved = true
-    }
-    libcore {
-        canBeConsumed = false
-        canBeResolved = true
-    }
     compiledContracts {
         canBeConsumed = false
         canBeResolved = true

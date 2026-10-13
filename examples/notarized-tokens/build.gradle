@@ -15,10 +15,6 @@
 
 configurations {
     // Resolvable configurations
-    contractCompile {
-        canBeConsumed = false
-        canBeResolved = true
-    }
     buildSDK {
         canBeConsumed = false
         canBeResolved = true

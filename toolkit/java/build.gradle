@@ -24,7 +24,7 @@ configurations {
     }
 }
 
-tasks.register('collectProtocFiles', Copy) {
+tasks.register('collectProtocFiles', Sync) {
     from configurations.toolkitProtoDefinitions.asFileTree
     into "src/main/proto"
 }
