@@ -365,6 +365,15 @@ func TestNewBlockIndexerRestoreCheckpointFail(t *testing.T) {
 	require.NoError(t, p.Mock.ExpectationsWereMet())
 }
 
+func TestBlockIndexerStopClosesBlockListenerConnection(t *testing.T) {
+	_, bi, mRPC, done := newTestBlockIndexer(t)
+	defer done()
+
+	bi.Stop()
+
+	mRPC.AssertCalled(t, "Close")
+}
+
 func checkIndexedBlockEqual(t *testing.T, expected *BlockInfoJSONRPC, indexed *pldapi.IndexedBlock) {
 	assert.Equal(t, expected.Hash.String(), indexed.Hash.String())
 	assert.Equal(t, expected.Number.Uint64(), uint64(indexed.Number))

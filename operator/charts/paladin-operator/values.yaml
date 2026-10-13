@@ -235,7 +235,7 @@ besu:
   nodeNamePrefix: node
   image:
     repository: hyperledger/besu
-    tag: 25.8.0
+    tag: 26.9.0
     pullPolicy: IfNotPresent
   labels:
     app: besu

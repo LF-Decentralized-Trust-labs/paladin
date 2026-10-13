@@ -321,7 +321,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 	require.Equal(t, int64(14), *baseBlock, "Checkpoint block should be 14")
 
 	// Stop and restart
-	bi.Stop()
+	bi.stopProcessing()
 
 	bi, err = newBlockIndexer(ctx, &pldconf.BlockIndexerConfig{
 		CommitBatchSize: confutil.P(1),

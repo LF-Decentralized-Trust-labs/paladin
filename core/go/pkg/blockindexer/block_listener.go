@@ -38,10 +38,10 @@ import (
 // 1) To establish and keep track of what the head block height of the blockchain is, so event streams know how far from the head they are
 // 2) To feed new block information to any registered consumers
 type blockListener struct {
-	ctx    context.Context
-	wsConn rpcclient.WSClient // if configured the getting the blockheight will not complete until WS connects, overrides backend once connected
-	//nolint:unused // May be used in future
-	wsConnClosed               bool
+	ctx                        context.Context
+	cancelCtx                  context.CancelFunc
+	wsConn                     rpcclient.WSClient // if configured the getting the blockheight will not complete until WS connects, overrides backend once connected
+	stopOnce                   sync.Once
 	listenLoopDone             chan struct{}
 	initialBlockHeightObtained chan struct{}
 	newHeadsTap                chan struct{}
@@ -58,8 +58,10 @@ type blockListener struct {
 
 func newBlockListener(ctx context.Context, conf *pldconf.BlockIndexerConfig, wsConfig *pldconf.WSClientConfig) (bl *blockListener, err error) {
 	chainHeadCacheLen := confutil.IntMin(conf.ChainHeadCacheLen, 1, *pldconf.BlockIndexerDefaults.ChainHeadCacheLen)
+	ctx, cancelCtx := context.WithCancel(log.WithLogField(ctx, "role", "blocklistener"))
 	bl = &blockListener{
-		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
+		ctx:                        ctx,
+		cancelCtx:                  cancelCtx,
 		initialBlockHeightObtained: make(chan struct{}),
 		newHeadsTap:                make(chan struct{}, 1),
 		highestBlock:               0,
@@ -71,6 +73,7 @@ func newBlockListener(ctx context.Context, conf *pldconf.BlockIndexerConfig, wsC
 	}
 	bl.wsConn, err = rpcclient.NewWSClient(ctx, wsConfig)
 	if err != nil {
+		cancelCtx()
 		return nil, err
 	}
 	return bl, nil
@@ -488,21 +491,14 @@ func (bl *blockListener) getHighestBlock(ctx context.Context) (uint64, error) {
 	return highestBlock, nil
 }
 
-//nolint:unused // May be used in future
-func (bl *blockListener) waitClosed() {
-	bl.wsMux.Lock()
-	listenLoopDone := bl.listenLoopDone
-	var wsConnToClose rpcclient.WSClient
-	if bl.wsConn != nil && !bl.wsConnClosed {
-		wsConnToClose = bl.wsConn
-		bl.wsConnClosed = true
-	}
-	bl.wsMux.Unlock()
-	if wsConnToClose != nil {
-		_ = wsConnToClose.UnsubscribeAll(bl.ctx)
-		wsConnToClose.Close()
-	}
-	if listenLoopDone != nil {
-		<-listenLoopDone
-	}
+func (bl *blockListener) stop() {
+	bl.stopOnce.Do(func() {
+		// Cancelling the context closes the connection, so unsubscribe first
+		_ = bl.wsConn.UnsubscribeAll(bl.ctx)
+		bl.cancelCtx()
+		if bl.listenLoopDone != nil {
+			<-bl.listenLoopDone
+		}
+		bl.wsConn.Close()
+	})
 }

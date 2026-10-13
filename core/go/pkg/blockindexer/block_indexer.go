@@ -179,7 +179,7 @@ func (bi *blockIndexer) Start(internalStreams ...*InternalEventStream) error {
 }
 
 func (bi *blockIndexer) startOrReset() {
-	bi.Stop()
+	bi.stopProcessing()
 
 	// Restore any checkpoint
 	runCtx, cancelFunc := context.WithCancel(log.WithLogField(bi.parentCtxForReset, "role", "block_indexer"))
@@ -227,6 +227,11 @@ func (bi *blockIndexer) startup(runCtx context.Context) {
 }
 
 func (bi *blockIndexer) Stop() {
+	bi.stopProcessing()
+	bi.blockListener.stop()
+}
+
+func (bi *blockIndexer) stopProcessing() {
 	bi.stateLock.Lock()
 	wasStarted := bi.started
 	processorDone := bi.processorDone

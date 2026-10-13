@@ -42,11 +42,11 @@ const testBlockFilterID1 = "block_filter_1"
 const testBlockFilterID2 = "block_filter_2"
 
 func newTestBlockListener(t *testing.T) (context.Context, *blockListener, *rpcclientmocks.WSClient, func()) {
-	ctx, cancelCtx := context.WithCancel(context.Background())
+	ctx, cancelCtx := context.WithCancel(t.Context())
 	bl, mRPC := newTestBlockListenerConf(t, ctx, &pldconf.BlockIndexerConfig{})
 	return ctx, bl, mRPC, func() {
 		cancelCtx()
-		bl.waitClosed()
+		bl.stop()
 	}
 }
 
@@ -214,7 +214,7 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 		}
 	})
 
-	ctx, cancelCtx := context.WithCancel(context.Background())
+	ctx, cancelCtx := context.WithCancel(t.Context())
 	bl, err := newBlockListener(ctx, &pldconf.BlockIndexerConfig{
 		BlockPollingInterval: confutil.P("100s"), // so the test would just hang if no WS notifications
 	}, &pldconf.WSClientConfig{
@@ -296,7 +296,7 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 	assert.True(t, failedConnectOnce)
 	assert.True(t, failedSubOnce)
 
-	bl.waitClosed()
+	bl.stop()
 
 	wsDone()
 	<-svrDone
@@ -1309,7 +1309,8 @@ func TestBlockListenerBlockNotFound(t *testing.T) {
 
 	bl.start()
 
-	bl.waitClosed()
+	<-bl.listenLoopDone
+	bl.stop()
 
 }
 
@@ -1343,7 +1344,8 @@ func TestBlockListenerBlockHashFailed(t *testing.T) {
 
 	bl.start()
 
-	bl.waitClosed()
+	<-bl.listenLoopDone
+	bl.stop()
 
 }
 
@@ -1370,7 +1372,8 @@ func TestBlockListenerReestablishBlockFilter(t *testing.T) {
 	})
 
 	bl.start()
-	bl.waitClosed()
+	<-bl.listenLoopDone
+	bl.stop()
 
 }
 
@@ -1388,8 +1391,35 @@ func TestBlockListenerReestablishBlockFilterFail(t *testing.T) {
 	})
 
 	bl.start()
-	bl.waitClosed()
+	<-bl.listenLoopDone
+	bl.stop()
 
+}
+
+func TestBlockListenerStopReleasesConnectionWithoutParentCancel(t *testing.T) {
+	bl, mRPC := newTestBlockListenerConf(t, t.Context(), &pldconf.BlockIndexerConfig{})
+	bl.blockPollingInterval = 1 * time.Microsecond
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexUint64)
+		*hbh = ethtypes.HexUint64(1000)
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*string)
+		*hbh = testBlockFilterID1
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil)
+
+	bl.start()
+	bl.stop()
+
+	mRPC.AssertCalled(t, "UnsubscribeAll", mock.Anything)
+	mRPC.AssertCalled(t, "Close")
+	select {
+	case <-bl.listenLoopDone:
+	default:
+		t.Fatal("listen loop still running after stop")
+	}
 }
 
 func TestBlockListenerDispatchStopped(t *testing.T) {
