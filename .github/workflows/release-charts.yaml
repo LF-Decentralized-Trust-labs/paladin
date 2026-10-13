@@ -176,7 +176,7 @@ jobs:
             echo "CR_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
           fi
       - name: Release crd chart
-        uses: helm/chart-releaser-action@v1.6.0
+        uses: helm/chart-releaser-action@v1.7.0
         with:
           mark_as_latest: false # the release job is marked as latest
           charts_dir: "operator/charts"
