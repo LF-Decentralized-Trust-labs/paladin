@@ -55,7 +55,7 @@ export interface PenteApproveTransitionParams {
 
 // Represents an in-flight Pente privacy group deployment
 export class PentePrivacyGroupFuture {
-  public tx: Promise<TransactionFuture | undefined>;
+  public tx: Promise<TransactionFuture | undefined | void>;
 
   constructor(
     private paladin: PaladinClient,
@@ -65,7 +65,9 @@ export class PentePrivacyGroupFuture {
       group.genesisTransaction
         ? new TransactionFuture(paladin, group.genesisTransaction)
         : undefined
-    );
+    ).catch((err: any) => {
+      console.error(`Failed to create privacy group: ${err.message}`);
+    });
   }
 
   async waitForReceipt(waitMs?: number, full = false) {
