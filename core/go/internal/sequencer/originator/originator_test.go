@@ -68,7 +68,7 @@ func TestOriginator_SingleTransactionLifecycle(t *testing.T) {
 	// Start by creating a transaction with the originator
 	transactionBuilder := testutil.NewPrivateTransactionBuilderForTesting().Address(builder.GetContractAddress()).Originator(originatorLocator).NumberOfRequiredEndorsers(1)
 	txn := transactionBuilder.BuildSparse()
-	postAssembly, postAssemblyHash := transactionBuilder.BuildPostAssemblyAndHash()
+	postAssembly := transactionBuilder.BuildPostAssembly()
 	mocks.EngineIntegration.On(
 		"Assemble",
 		mock.Anything,
@@ -96,7 +96,7 @@ func TestOriginator_SingleTransactionLifecycle(t *testing.T) {
 	// Simulate the coordinator sending a dispatch confirmation
 	o.QueueEvent(ctx, &transaction.PreDispatchRequestReceivedEvent{
 		BaseEvent: transaction.BaseEvent{TransactionID: txn.ID},
-		RequestID: assembleRequestIdempotencyKey, Coordinator: coordinatorNode, PostAssemblyHash: postAssemblyHash,
+		RequestID: assembleRequestIdempotencyKey, Coordinator: coordinatorNode,
 	})
 	sync = statemachine.NewSyncEvent()
 	o.QueueEvent(ctx, sync)
@@ -256,12 +256,10 @@ func Test_propagateEventToTransaction_UnknownTransaction_PreDispatchRequestSends
 	builder := NewOriginatorBuilderForTesting(t, State_Observing)
 	o, mocks := builder.Build()
 	unknownTxID := uuid.New()
-	postAssemblyHash := pldtypes.RandBytes32()
 	event := &transaction.PreDispatchRequestReceivedEvent{
-		BaseEvent:        transaction.BaseEvent{TransactionID: unknownTxID},
-		Coordinator:      coordinatorLocator,
-		PostAssemblyHash: &postAssemblyHash,
-		RequestID:        uuid.New(),
+		BaseEvent:   transaction.BaseEvent{TransactionID: unknownTxID},
+		Coordinator: coordinatorLocator,
+		RequestID:   uuid.New(),
 	}
 	require.NoError(t, o.stateMachineEventLoop.ProcessEvent(ctx, event))
 	assert.True(t, mocks.SentMessageRecorder.HasSentPreDispatchRejection(), "SendPreDispatchRejection should be called for unknown transaction")

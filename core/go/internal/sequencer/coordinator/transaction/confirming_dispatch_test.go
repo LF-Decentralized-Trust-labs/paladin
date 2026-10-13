@@ -149,18 +149,6 @@ func Test_ConfirmingDispatch_Timeout_TransitionsToPooled_AndClearsPendingRequest
 	assert.Nil(t, txn.pendingPreDispatchRequest)
 }
 
-func Test_hash_NilPrivateTransaction_ReturnsError(t *testing.T) {
-	ctx := t.Context()
-	txn, _ := NewTransactionBuilderForTesting(t, State_Confirming_Dispatchable).Build()
-	txn.pt = nil
-
-	hash, err := txn.hash(ctx)
-
-	require.Error(t, err)
-	assert.Nil(t, hash)
-	assert.Contains(t, err.Error(), "Cannot hash transaction without PrivateTransaction")
-}
-
 func Test_sendPreDispatchRequest_RequestTimeoutSchedulesTimer_QueueEventCalled(t *testing.T) {
 	ctx := t.Context()
 	timeoutEventReceived := false
@@ -192,27 +180,4 @@ func Test_sendPreDispatchRequest_RequestTimeoutSchedulesTimer_QueueEventCalled(t
 	require.NoError(t, err)
 
 	assert.True(t, timeoutEventReceived, "queueEventForCoordinator should have been called with RequestTimeoutIntervalEvent")
-}
-
-func Test_hash_NilPostAssembly_ReturnsError(t *testing.T) {
-	ctx := t.Context()
-	txn, _ := NewTransactionBuilderForTesting(t, State_Confirming_Dispatchable).Build()
-	txn.pt.PostAssembly = nil
-
-	hash, err := txn.hash(ctx)
-
-	require.Error(t, err)
-	assert.Nil(t, hash)
-	assert.Contains(t, err.Error(), "Cannot hash transaction without PostAssembly")
-}
-
-func Test_sendPreDispatchRequest_HashError_WhenPostAssemblyNil(t *testing.T) {
-	ctx := t.Context()
-	txn, _ := NewTransactionBuilderForTesting(t, State_Confirming_Dispatchable).Build()
-	txn.pt.PostAssembly = nil
-
-	err := txn.sendPreDispatchRequest(ctx)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Cannot hash transaction without PostAssembly")
 }

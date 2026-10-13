@@ -249,7 +249,6 @@ message PreDispatchRequest {
     string id = 1;
     string transaction_id = 2;
     string contract_address = 3;
-    bytes post_assemble_hash = 4;
 }
 
 message PreDispatchResponse {

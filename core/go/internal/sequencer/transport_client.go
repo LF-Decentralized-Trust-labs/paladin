@@ -624,12 +624,9 @@ func (sMgr *sequencerManager) handlePreDispatchRequest(ctx context.Context, mess
 		return
 	}
 
-	postAssemblyHash := pldtypes.NewBytes32FromSlice(preDispatchRequest.PostAssembleHash)
-
 	preDispatchRequestReceivedEvent := &originatorTransaction.PreDispatchRequestReceivedEvent{
-		RequestID:        requestID,
-		Coordinator:      message.FromNode,
-		PostAssemblyHash: &postAssemblyHash,
+		RequestID:   requestID,
+		Coordinator: message.FromNode,
 	}
 	preDispatchRequestReceivedEvent.TransactionID = transactionID
 	preDispatchRequestReceivedEvent.EventTime = time.Now()

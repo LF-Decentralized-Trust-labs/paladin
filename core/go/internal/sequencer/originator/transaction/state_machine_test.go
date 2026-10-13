@@ -1135,15 +1135,11 @@ func TestOriginatorTransaction_Endorsement_Gathering_ToPrepared_OnDispatchConfir
 	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering)
 	txn, mocks := builder.BuildWithMocks()
 
-	hash, err := txn.GetHash(ctx)
-	require.NoError(t, err)
-
-	err = txn.HandleEvent(ctx, &PreDispatchRequestReceivedEvent{
+	err := txn.HandleEvent(ctx, &PreDispatchRequestReceivedEvent{
 		BaseEvent: BaseEvent{
 			TransactionID: txn.GetID(),
 		},
-		Coordinator:      builder.GetCoordinator(),
-		PostAssemblyHash: hash,
+		Coordinator: builder.GetCoordinator(),
 	})
 	assert.NoError(t, err)
 
@@ -1157,35 +1153,11 @@ func TestOriginatorTransaction_Endorsement_Gathering_NoTransition_OnDispatchConf
 	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering)
 	txn, mocks := builder.BuildWithMocks()
 
-	hash, err := txn.GetHash(ctx)
-	require.NoError(t, err)
-
-	err = txn.HandleEvent(ctx, &PreDispatchRequestReceivedEvent{
-		BaseEvent: BaseEvent{
-			TransactionID: txn.GetID(),
-		},
-		Coordinator:      uuid.New().String(),
-		PostAssemblyHash: hash,
-	})
-	assert.NoError(t, err)
-
-	assert.False(t, mocks.SentMessageRecorder.HasSentPreDispatchResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
-	assert.Equal(t, State_Endorsement_Gathering, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
-}
-
-func TestOriginatorTransaction_Endorsement_Gathering_NoTransition_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
-	ctx := context.Background()
-	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering)
-	txn, mocks := builder.BuildWithMocks()
-
-	hash := pldtypes.Bytes32(pldtypes.RandBytes(32))
-
 	err := txn.HandleEvent(ctx, &PreDispatchRequestReceivedEvent{
 		BaseEvent: BaseEvent{
 			TransactionID: txn.GetID(),
 		},
-		Coordinator:      builder.GetCoordinator(),
-		PostAssemblyHash: &hash,
+		Coordinator: uuid.New().String(),
 	})
 	assert.NoError(t, err)
 
@@ -1327,15 +1299,11 @@ func TestOriginatorTransaction_Prepared_NoTransition_Do_Resend_OnDispatchConfirm
 	builder := NewTransactionBuilderForTesting(t, State_Prepared)
 	txn, mocks := builder.BuildWithMocks()
 
-	hash, err := txn.GetHash(ctx)
-	require.NoError(t, err)
-
-	err = txn.HandleEvent(ctx, &PreDispatchRequestReceivedEvent{
+	err := txn.HandleEvent(ctx, &PreDispatchRequestReceivedEvent{
 		BaseEvent: BaseEvent{
 			TransactionID: txn.GetID(),
 		},
-		Coordinator:      builder.GetCoordinator(),
-		PostAssemblyHash: hash,
+		Coordinator: builder.GetCoordinator(),
 	})
 	assert.NoError(t, err)
 
@@ -1348,35 +1316,11 @@ func TestOriginatorTransaction_Prepared_Ignore_OnDispatchConfirmationRequestRece
 	builder := NewTransactionBuilderForTesting(t, State_Prepared)
 	txn, mocks := builder.BuildWithMocks()
 
-	hash, err := txn.GetHash(ctx)
-	require.NoError(t, err)
-
-	err = txn.HandleEvent(ctx, &PreDispatchRequestReceivedEvent{
-		BaseEvent: BaseEvent{
-			TransactionID: txn.GetID(),
-		},
-		Coordinator:      uuid.New().String(),
-		PostAssemblyHash: hash,
-	})
-	assert.NoError(t, err)
-
-	assert.False(t, mocks.SentMessageRecorder.HasSentPreDispatchResponse(), "dispatch confirmation response was unexpectedly sent back to coordinator")
-	assert.Equal(t, State_Prepared, txn.GetCurrentState(), "current state is %s", txn.GetCurrentState().String())
-}
-
-func TestOriginatorTransaction_Prepared_Ignore_OnDispatchConfirmationRequestReceivedIfNotMatches_WrongHash(t *testing.T) {
-	ctx := context.Background()
-	builder := NewTransactionBuilderForTesting(t, State_Prepared)
-	txn, mocks := builder.BuildWithMocks()
-
-	hash := pldtypes.Bytes32(pldtypes.RandBytes(32))
-
 	err := txn.HandleEvent(ctx, &PreDispatchRequestReceivedEvent{
 		BaseEvent: BaseEvent{
 			TransactionID: txn.GetID(),
 		},
-		Coordinator:      builder.GetCoordinator(),
-		PostAssemblyHash: &hash,
+		Coordinator: uuid.New().String(),
 	})
 	assert.NoError(t, err)
 

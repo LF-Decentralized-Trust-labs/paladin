@@ -857,13 +857,11 @@ func TestHandlePreDispatchRequest_Success(t *testing.T) {
 
 	txID := uuid.New()
 	requestID := uuid.New()
-	hash := pldtypes.RandBytes32()
 
 	preDispatchRequest := &engineProto.PreDispatchRequest{
-		Id:               requestID.String(),
-		TransactionId:    txID.String(),
-		ContractAddress:  contractAddr.String(),
-		PostAssembleHash: hash[:],
+		Id:              requestID.String(),
+		TransactionId:   txID.String(),
+		ContractAddress: contractAddr.String(),
 	}
 	payload, _ := proto.Marshal(preDispatchRequest)
 

@@ -110,9 +110,9 @@ func (txn *originatorTransaction) handleSign(ctx context.Context, txID uuid.UUID
 	})
 }
 
-// action_SignSuccess records the collected signatures on the local PostAssembly so they contribute to the
-// transaction hash and are available to action_SendSignResponse, mirroring how action_AssembleSuccess
-// records the PostAssembly before action_SendAssembleSuccessResponse reads it.
+// action_SignSuccess records the collected signatures on the local PostAssembly so they are available to
+// action_SendSignResponse, mirroring how action_AssembleSuccess records the PostAssembly before
+// action_SendAssembleSuccessResponse reads it.
 func action_SignSuccess(_ context.Context, t *originatorTransaction, event common.Event) error {
 	e := event.(*SignSuccessEvent)
 	t.pt.PostAssembly.AssembleResponse.Signatures = append(t.pt.PostAssembly.AssembleResponse.Signatures, e.Results...)

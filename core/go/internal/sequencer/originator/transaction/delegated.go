@@ -100,16 +100,6 @@ func validator_PreDispatchRequestFromCurrentDelegate(ctx context.Context, txn *o
 		log.L(ctx).Debugf("DispatchConfirmationRequest invalid for transaction %s. Expected coordinator %s, got %s", txn.pt.ID.String(), txn.currentDelegate, preDispatchRequestEvent.Coordinator)
 		return false, nil
 	}
-	txnHash, err := txn.hashInternal(ctx)
-	if err != nil {
-		log.L(ctx).Errorf("error hashing transaction: %s", err)
-		return false, err
-	}
-	if !txnHash.Equals(preDispatchRequestEvent.PostAssemblyHash) {
-		// TODO: Should be be rejecting the dispatch here rather than leaving it to time out on the coordinator?
-		log.L(ctx).Debugf("DispatchConfirmationRequest invalid for transaction %s. Transaction hash does not match.", txn.pt.ID.String())
-		return false, nil
-	}
 	return true, nil
 }
 

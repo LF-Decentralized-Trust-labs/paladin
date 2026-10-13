@@ -245,25 +245,19 @@ func TestValidator_PreDispatchRequestMatchesAssembledDelegation_Success(t *testi
 		},
 	}
 
-	// Get the transaction hash
-	txnHash, err := txn.GetHash(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, txnHash)
-
 	requestID := uuid.New()
 	event := &PreDispatchRequestReceivedEvent{
 		BaseEvent: BaseEvent{
 			TransactionID: txn.GetID(),
 		},
-		Coordinator:      coordinator,
-		PostAssemblyHash: txnHash,
-		RequestID:        requestID,
+		Coordinator: coordinator,
+		RequestID:   requestID,
 	}
 
 	matches, err := validator_PreDispatchRequestFromCurrentDelegate(ctx, txn, event)
 
 	assert.NoError(t, err)
-	assert.True(t, matches, "Should return true when coordinator and hash match")
+	assert.True(t, matches, "Should return true when the request is from the current delegate")
 	// Note: request ID is stored by action_PreDispatchRequestReceived (first action) when the event is processed via HandleEvent
 }
 
@@ -288,71 +282,18 @@ func TestValidator_PreDispatchRequestFromCurrentDelegate_WrongCoordinator(t *tes
 		},
 	}
 
-	// Get the transaction hash
-	txnHash, err := txn.GetHash(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, txnHash)
-
 	event := &PreDispatchRequestReceivedEvent{
 		BaseEvent: BaseEvent{
 			TransactionID: txn.GetID(),
 		},
-		Coordinator:      differentCoordinator,
-		PostAssemblyHash: txnHash,
-		RequestID:        uuid.New(),
+		Coordinator: differentCoordinator,
+		RequestID:   uuid.New(),
 	}
 
 	matches, err := validator_PreDispatchRequestFromCurrentDelegate(ctx, txn, event)
 
 	assert.NoError(t, err)
 	assert.False(t, matches, "Should return false when coordinator does not match")
-	assert.Equal(t, uuid.Nil, txn.latestPreDispatchRequestID, "Should not store request ID when validation fails")
-}
-
-func TestValidator_PreDispatchRequestMatchesAssembledDelegation_WrongHash(t *testing.T) {
-	// Test that validator_PreDispatchRequestFromCurrentDelegate returns false when hash does not match
-	ctx := context.Background()
-	builder := NewTransactionBuilderForTesting(t, State_Endorsement_Gathering)
-	txn, _ := builder.BuildWithMocks()
-
-	coordinator := "coordinator@node1"
-	txn.currentDelegate = coordinator
-	txn.pt.PostAssembly = &components.TransactionPostAssembly{
-		AssembleResponse: &prototk.TransactionPostAssembly{
-			AssemblyResult: prototk.AssembleTransactionResponse_OK,
-			Signatures: []*prototk.AttestationResult{
-				{
-					Payload: []byte("test signature"),
-				},
-			},
-		},
-	}
-
-	// Get the transaction hash
-	txnHash, err := txn.GetHash(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, txnHash)
-
-	// Create a different hash
-	differentHash := ptrTo(pldtypes.RandBytes32())
-	// Ensure it's different
-	for differentHash.Equals(txnHash) {
-		differentHash = ptrTo(pldtypes.RandBytes32())
-	}
-
-	event := &PreDispatchRequestReceivedEvent{
-		BaseEvent: BaseEvent{
-			TransactionID: txn.GetID(),
-		},
-		Coordinator:      coordinator,
-		PostAssemblyHash: differentHash,
-		RequestID:        uuid.New(),
-	}
-
-	matches, err := validator_PreDispatchRequestFromCurrentDelegate(ctx, txn, event)
-
-	assert.NoError(t, err)
-	assert.False(t, matches, "Should return false when hash does not match")
 	assert.Equal(t, uuid.Nil, txn.latestPreDispatchRequestID, "Should not store request ID when validation fails")
 }
 
@@ -377,34 +318,6 @@ func TestValidator_PreDispatchRequestMatchesAssembledDelegation_WrongEventType(t
 
 	assert.NoError(t, err)
 	assert.False(t, matches, "Should return false when event type is wrong")
-}
-
-func TestValidator_PreDispatchRequestMatchesAssembledDelegation_HashError(t *testing.T) {
-	// Test that validator_PreDispatchRequestFromCurrentDelegate returns error when Hash() fails
-	ctx := context.Background()
-	builder := NewTransactionBuilderForTesting(t, State_Delegated)
-	txn, _ := builder.BuildWithMocks()
-
-	coordinator := "coordinator@node1"
-	txn.currentDelegate = coordinator
-
-	// Set PostAssembly to nil to cause Hash() to fail
-	txn.pt.PostAssembly = nil
-
-	event := &PreDispatchRequestReceivedEvent{
-		BaseEvent: BaseEvent{
-			TransactionID: txn.GetID(),
-		},
-		Coordinator:      coordinator,
-		PostAssemblyHash: ptrTo(pldtypes.RandBytes32()),
-		RequestID:        uuid.New(),
-	}
-
-	matches, err := validator_PreDispatchRequestFromCurrentDelegate(ctx, txn, event)
-
-	assert.Error(t, err, "Should return error when Hash() fails")
-	assert.False(t, matches, "Should return false when there's an error")
-	assert.Contains(t, err.Error(), "cannot hash transaction without PostAssembly", "Error should indicate missing PostAssembly")
 }
 
 func Test_action_ResetDelegationState_ClearsAssemblyAndDispatchState(t *testing.T) {
@@ -526,10 +439,9 @@ func TestAction_SendPreDispatchRejectionNotCurrentDelegate_Success(t *testing.T)
 	txn.currentDelegate = "coordinator@node1"
 	reqID := uuid.New()
 	event := &PreDispatchRequestReceivedEvent{
-		BaseEvent:        BaseEvent{TransactionID: txn.GetID()},
-		Coordinator:      "other@node2",
-		PostAssemblyHash: ptrTo(pldtypes.RandBytes32()),
-		RequestID:        reqID,
+		BaseEvent:   BaseEvent{TransactionID: txn.GetID()},
+		Coordinator: "other@node2",
+		RequestID:   reqID,
 	}
 
 	mocks.TransportWriter.EXPECT().
@@ -552,10 +464,9 @@ func TestAction_SendPreDispatchRejectionNotCurrentDelegate_TransportError_LogsWa
 	txn.currentDelegate = "coordinator@node1"
 	reqID := uuid.New()
 	event := &PreDispatchRequestReceivedEvent{
-		BaseEvent:        BaseEvent{TransactionID: txn.GetID()},
-		Coordinator:      "other@node2",
-		PostAssemblyHash: ptrTo(pldtypes.RandBytes32()),
-		RequestID:        reqID,
+		BaseEvent:   BaseEvent{TransactionID: txn.GetID()},
+		Coordinator: "other@node2",
+		RequestID:   reqID,
 	}
 
 	mocks.TransportWriter.EXPECT().

@@ -44,10 +44,6 @@ func (t *coordinatorTransaction) applyEndorsement(ctx context.Context, endorseme
 	delete(t.pendingEndorsementRequests[endorsement.Name], endorsement.Verifier.Lookup)
 	t.pt.PostAssembly.CollectedEndorsements = append(t.pt.PostAssembly.CollectedEndorsements, endorsement)
 
-	// MRW TODO - Hashing the TX for dispatch confirmation requires that there is > 0 signatures. Need to follow up where an endorsed TX populates the signatures. Temporarily put this workaround in.
-	// log.L(ctx).Infof("Applying endorsement. Appending %+v to list of endorsements received for transaction %s from %s", endorsement, t.pt.ID, endorsement.Verifier.Lookup)
-	// t.pt.PostAssembly.Signatures = append(t.pt.PostAssembly.Signatures, endorsement)
-
 	// Log complete list of current endorsements
 	for _, endorsement := range t.pt.PostAssembly.CollectedEndorsements {
 		log.L(ctx).Debugf("completed endorsement: %+v", endorsement)

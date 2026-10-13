@@ -120,10 +120,9 @@ func Test_action_PreDispatchRequestReceived_SetsRequestID(t *testing.T) {
 	txn, _ := builder.BuildWithMocks()
 	requestID := uuid.New()
 	event := &PreDispatchRequestReceivedEvent{
-		BaseEvent:        BaseEvent{TransactionID: txn.pt.ID},
-		RequestID:        requestID,
-		Coordinator:      "coord@node1",
-		PostAssemblyHash: nil,
+		BaseEvent:   BaseEvent{TransactionID: txn.pt.ID},
+		RequestID:   requestID,
+		Coordinator: "coord@node1",
 	}
 	err := action_PreDispatchRequestReceived(ctx, txn, event)
 	require.NoError(t, err)

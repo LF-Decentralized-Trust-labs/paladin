@@ -197,40 +197,6 @@ func TestTransaction_GetFirstDelegatedTime_ReturnsSetTime(t *testing.T) {
 	assert.Equal(t, txn.firstDelegatedTime, firstDelegatedTime, "GetFirstDelegatedTime should return the recorded first-delegation time")
 }
 
-func TestTransaction_Hash_ErrorWhenPrivateTransactionIsNil(t *testing.T) {
-	// Test that Hash returns an error when PrivateTransaction is nil
-	ctx := context.Background()
-
-	// Create a transaction with nil PrivateTransaction by manually constructing it
-	txn := &originatorTransaction{
-		pt: nil,
-	}
-
-	hash, err := txn.GetHash(ctx)
-
-	assert.Error(t, err, "Hash should return an error when PrivateTransaction is nil")
-	assert.Nil(t, hash, "Hash should return nil hash when PrivateTransaction is nil")
-	assert.Contains(t, err.Error(), "cannot hash transaction without PrivateTransaction", "Error message should indicate the validation failure")
-}
-
-func TestTransaction_Hash_ErrorWhenPostAssemblyIsNil(t *testing.T) {
-	// Test that Hash returns an error when PostAssembly is nil
-	ctx := context.Background()
-
-	// Create a transaction with a PrivateTransaction that has nil PostAssembly
-	builder := NewTransactionBuilderForTesting(t, State_Initial)
-	txn, _ := builder.BuildWithMocks()
-
-	// Set PostAssembly to nil to test the error case
-	txn.pt.PostAssembly = nil
-
-	hash, err := txn.GetHash(ctx)
-
-	assert.Error(t, err, "Hash should return an error when PostAssembly is nil")
-	assert.Nil(t, hash, "Hash should return nil hash when PostAssembly is nil")
-	assert.Contains(t, err.Error(), "cannot hash transaction without PostAssembly", "Error message should indicate the validation failure")
-}
-
 func TestTransaction_GetCurrentState_ReturnsInitialState(t *testing.T) {
 	// Test that GetCurrentState returns the initial state for a newly created transaction
 	builder := NewTransactionBuilderForTesting(t, State_Initial)

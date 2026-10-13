@@ -237,9 +237,8 @@ func (*AssembleErrorEvent) TypeString() string {
 
 type PreDispatchRequestReceivedEvent struct {
 	BaseEvent
-	RequestID        uuid.UUID
-	Coordinator      string
-	PostAssemblyHash *pldtypes.Bytes32
+	RequestID   uuid.UUID
+	Coordinator string
 }
 
 func (*PreDispatchRequestReceivedEvent) Type() EventType {

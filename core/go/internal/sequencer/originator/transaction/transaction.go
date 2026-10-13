@@ -30,7 +30,6 @@ import (
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/sha3"
 )
 
 type assembleRequestFromCoordinator struct {
@@ -177,38 +176,6 @@ func (t *originatorTransaction) GetStatus(ctx context.Context) components.Privat
 		Endorsements: t.getEndorsementStatus(ctx),
 		Transaction:  t.pt,
 	}
-}
-
-func (t *originatorTransaction) GetHash(ctx context.Context) (*pldtypes.Bytes32, error) {
-	t.RLock()
-	defer t.RUnlock()
-	return t.hashInternal(ctx)
-}
-
-// hashInternal contains the hashing logic; used internally and by the public Hash.
-func (t *originatorTransaction) hashInternal(ctx context.Context) (*pldtypes.Bytes32, error) {
-	if t.pt == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "cannot hash transaction without PrivateTransaction")
-	}
-	if t.pt.PostAssembly == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, "cannot hash transaction without PostAssembly")
-	}
-
-	log.L(ctx).Debugf("hashing transaction %s with %d signatures and %d endorsements", t.pt.ID.String(), len(t.pt.PostAssembly.AssembleResponse.GetSignatures()), len(t.pt.PostAssembly.AssembleResponse.GetEndorsements()))
-
-	// MRW TODO MUST DO - it's not clear is a originator transaction hash if valid without any signatures or endorsements.
-	// After assemble a Pente TX can have just the assembler's endorsement (not everyone else's), so comparing hashes with > 1 endorsements will fail
-	// if len(t.pt.PostAssembly.AssemblyResponse.GetSignatures()) == 0 {
-	// 	return nil, i18n.NewError(ctx, msgs.MsgSequencerInternalError, " cannot hash transaction without at least one Signature")
-	// }
-
-	hash := sha3.NewLegacyKeccak256()
-	for _, signature := range t.pt.PostAssembly.AssembleResponse.GetSignatures() {
-		hash.Write(signature.Payload)
-	}
-	var h32 pldtypes.Bytes32
-	_ = hash.Sum(h32[0:0])
-	return &h32, nil
 }
 
 func (t *originatorTransaction) getEndorsementStatus(ctx context.Context) []components.PrivateTxEndorsementStatus {

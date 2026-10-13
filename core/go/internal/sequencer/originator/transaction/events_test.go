@@ -270,20 +270,17 @@ func TestPreDispatchRequestReceivedEvent_Fields(t *testing.T) {
 	txID := uuid.New()
 	requestID := uuid.New()
 	coordinator := "coordinator@testNode"
-	postAssemblyHash := pldtypes.RandBytes32()
 
 	event := &PreDispatchRequestReceivedEvent{
 		BaseEvent: BaseEvent{
 			TransactionID: txID,
 		},
-		RequestID:        requestID,
-		Coordinator:      coordinator,
-		PostAssemblyHash: &postAssemblyHash,
+		RequestID:   requestID,
+		Coordinator: coordinator,
 	}
 	assert.Equal(t, txID, event.GetTransactionID())
 	assert.Equal(t, requestID, event.RequestID)
 	assert.Equal(t, coordinator, event.Coordinator)
-	assert.Equal(t, &postAssemblyHash, event.PostAssemblyHash)
 }
 
 func TestDispatchedEvent_Type(t *testing.T) {
