@@ -1,0 +1,33 @@
+# Gradle performance optimization settings - Optimized for GitHub Actions runners
+# These settings provide optimal performance for GitHub Actions runners (2-4 cores, 7-14GB RAM)
+# 
+# GitHub Actions runners typically have:
+# - 2-4 CPU cores
+# - 7-14GB RAM
+# - Limited disk I/O
+# - Ephemeral environment (no daemon needed)
+
+org.gradle.parallel=true
+org.gradle.caching=true
+org.gradle.configureondemand=true
+org.gradle.daemon=false
+
+# JVM settings optimized for GitHub Actions runners
+# -Xmx2g: 2GB heap (conservative for CI environment)
+# -XX:MaxMetaspaceSize=512m: 512MB metaspace
+# -XX:+UseG1GC: G1 garbage collector for better performance
+# -XX:MaxGCPauseMillis=200: Target 200ms pause time
+org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8 -XX:+UseG1GC -XX:+OptimizeStringConcat -XX:+UseStringDeduplication -XX:MaxGCPauseMillis=200
+
+# Parallel execution settings for GitHub Actions runners
+# Use 2 workers
+# This matches the --max-workers=2 that should be used in CI
+org.gradle.workers.max=2
+org.gradle.parallel.threads=2
+
+org.gradle.caching.debug=false
+# org.gradle.configuration-cache=true
+org.gradle.test.parallel=true
+org.gradle.test.parallel.maxThreads=2
+org.gradle.scan.acceptLicense=true
+org.gradle.incremental=true

@@ -154,9 +154,9 @@ jobs:
           rm Chart.lock
           
       # e2e tests 
-      - name: E2E Test
+      - name: CI (e2e) Test
         run: |
-          ./gradlew e2e \
+          ./gradlew ci \
             -PloadImages=false \
             -PbuildOperator=false \
             -PbuildPaladin=false \
@@ -164,7 +164,15 @@ jobs:
             -PoperatorImageTag=${{ inputs.images_tag }} \
             -PpaladinImageName=${{ steps.finalize-image-names.outputs.IMG_PALADIN }} \
             -PpaladinImageTag=${{ inputs.images_tag }} \
-            -PdeleteCluster=false
+            -PdumpChartInfoOnFailure=true
+            
+      - name: Upload Diagnostic Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paladin-failure
+          path: dump-*/
+          retention-days: 7
 
       # set CR_TOKEN env with the GitHub token secret when it is workflow_dispatch action
       - name: Set CR_TOKEN

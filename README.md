@@ -55,6 +55,16 @@ Then run the following command to build Paladin via [Gradle](https://gradle.org/
 ./gradlew build
 ```
 
+
+> The build is optimized for computers with **16GB RAM** by default. For slower computers:
+>
+> **Quick Setup:**
+>  ```bash
+>  # Run with optimized settings
+> ./gradlew build --max-workers=2 --parallel
+> ./gradlew build --max-workers=1       # For very slow laptops
+>  ```
+
 ### Running a full development environment
 
 Check out the operator readme:

@@ -19,7 +19,7 @@ import PaladinClient, {
   TransactionType,
 } from "@lfdecentralizedtrust/paladin-sdk";
 import { nanoid } from "nanoid";
-import { checkDeploy, getCachePath, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
+import { checkDeploy, getCachePath, waitForDomainReceipt, DEFAULT_POLL_TIMEOUT } from "paladin-example-common";
 import helloWorldJson from "./abis/HelloWorld.json";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -37,7 +37,7 @@ async function main(): Promise<boolean> {
   
   logger.log("Initializing Paladin client from the environment configuration...");
   const paladin = new PaladinClient(nodeConnections[0].clientOptions);
-  const [verifierNode1] = paladin.getVerifiers(`member@${nodeConnections[0].id}`);
+  const [verifierNode1] = paladin.getVerifiers(`group_member@${nodeConnections[0].id}`);
 
   // Create a privacy group for Node1 alone
   logger.log("Creating a privacy group for Node1...");
@@ -108,11 +108,19 @@ async function main(): Promise<boolean> {
     logger.log(
       `Processing receipt ${receipt.id} (sequence: ${receipt.sequence})`
     );
-    const domainReceipt = await paladin.ptx.getDomainReceipt(
-      receipt.domain,
-      receipt.id
-    );
-    if (domainReceipt !== undefined && "receipt" in domainReceipt) {
+    
+    // Use the common helper to wait for domain receipt
+    const domainReceipt = await waitForDomainReceipt(paladin, receipt.domain, receipt.id, {
+      logger: logger,
+      maxAttempts: 20,
+      baseDelay: 500
+    });
+    
+    if (!domainReceipt) {
+      return; // Helper already logged the failure
+    }
+    
+    if ("receipt" in domainReceipt) {
       // Skip if this receipt is not for our contract
       if (domainReceipt.receipt.to !== contractAddress) {
         logger.log(
