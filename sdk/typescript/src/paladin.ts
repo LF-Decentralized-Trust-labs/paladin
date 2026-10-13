@@ -6,6 +6,8 @@ import {
   DomainInvokeRPC,
   IABIDecodedData,
   IBlockchainEventListener,
+  IChainedDispatch,
+  IDispatch,
   IDomain,
   IDomainSmartContract,
   IEthAddress,
@@ -559,6 +561,44 @@ export default class PaladinClient {
         [query]
       );
       return res.data.result;
+    },
+
+    queryDispatches: async (query: IQuery) => {
+      const res = await this.post<JsonRpcResult<IDispatch[]>>(
+        "ptx_queryDispatches",
+        [query]
+      );
+      return res.data.result;
+    },
+
+    getDispatch: async (id: string) => {
+      const res = await this.post<JsonRpcResult<IDispatch>>(
+        "ptx_getDispatch",
+        [id],
+        {
+          validateStatus: (status) => status < 300 || status === 404,
+        }
+      );
+      return res.status === 404 ? undefined : res.data.result;
+    },
+
+    queryChainedDispatches: async (query: IQuery) => {
+      const res = await this.post<JsonRpcResult<IChainedDispatch[]>>(
+        "ptx_queryChainedDispatches",
+        [query]
+      );
+      return res.data.result;
+    },
+
+    getChainedDispatch: async (id: string) => {
+      const res = await this.post<JsonRpcResult<IChainedDispatch>>(
+        "ptx_getChainedDispatch",
+        [id],
+        {
+          validateStatus: (status) => status < 300 || status === 404,
+        }
+      );
+      return res.status === 404 ? undefined : res.data.result;
     },
 
     queryPendingTransactions: async (query: IQuery, full?: boolean) => {

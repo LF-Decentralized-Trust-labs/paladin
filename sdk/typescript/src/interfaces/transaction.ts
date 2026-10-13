@@ -60,6 +60,18 @@ export interface IPreparedTransaction {
   metadata: any;
 }
 
+export interface IDispatch {
+  id: string;
+  transactionID: string;
+  publicTransactionID: number;
+}
+
+export interface IChainedDispatch {
+  id: string;
+  transactionID: string;
+  chainedTransactionID: string;
+}
+
 export interface ITransactionInput extends ITransactionBase {
   abiReference?: string;
   abi?: ethers.InterfaceAbi;
