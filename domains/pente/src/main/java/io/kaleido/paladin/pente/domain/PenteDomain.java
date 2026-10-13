@@ -439,12 +439,37 @@ import com.fasterxml.jackson.core.JsonProcessingException;
                      setPayload(ByteString.copyFrom(endorsementPayload)).
                      build());
          } catch (PenteEVMTransaction.EVMExecutionException e) {
+             // Either the EVM reverted, or the account state supplied with the request did not match
+             // what the transaction expects (e.g. a stale nonce): Both are REVERT results.
              LOGGER.error("EVM execution failed during endorsement", e);
              return CompletableFuture.completedFuture(EndorseTransactionResponse.newBuilder().
-                     setEndorsementResult(EndorseTransactionResponse.Result.SIGN).
+                     setEndorsementResult(EndorseTransactionResponse.Result.REVERT).
                      setRevertReason(e.getMessage()).
                      build());
+         } catch (JsonProcessingException | IllegalArgumentException | IllegalStateException e) {
+             // The request was malformed, the info state carrying the transaction would not parse, or
+             // re-executing it did not reproduce the proposed inputs and outputs. Deterministic in every
+             // case: asking us again with the same assembly gets the same answer, so the result is revert.
+             LOGGER.error("Transaction not endorsed", e);
+             return CompletableFuture.completedFuture(EndorseTransactionResponse.newBuilder().
+                     setEndorsementResult(EndorseTransactionResponse.Result.REVERT).
+                     setRevertReason(e.getMessage()).
+                     build());
+         } catch (ExecutionException e) {
+             if (e.getCause() instanceof ErrorResponseException && isPermanentFailure((ErrorResponseException) e.getCause())) {
+                 // As during assembly, an INVALID_INPUT response from a plugin is a deterministic failure of
+                 // the transaction (e.g. an undecodable raw transaction, an invalid ABI), so the result must
+                 // be revert.
+                 LOGGER.error("Error response from plugin during endorsement", e);
+                 return CompletableFuture.completedFuture(EndorseTransactionResponse.newBuilder().
+                         setEndorsementResult(EndorseTransactionResponse.Result.REVERT).
+                         setRevertReason(e.getMessage()).
+                         build());
+             }
+             return CompletableFuture.failedFuture(e);
          } catch (Exception e) {
+             // Anything else (IO, interrupt, class loading) may be transient, so it is reported as an
+             // error and the coordinator is free to retry rather than finalizing the transaction.
              return CompletableFuture.failedFuture(e);
          } finally {
              ThreadContext.clearAll();
