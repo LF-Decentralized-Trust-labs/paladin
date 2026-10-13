@@ -241,7 +241,7 @@ func TestPrivacyGroupRPCLifecycleRealDB(t *testing.T) {
 			To:       nil, // simulate is a deploy inside the privacy group
 			Function: &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{{Type: "string", Name: "input1"}}},
 			Gas:      confutil.P(pldtypes.HexUint64(12345)),
-			Value:    pldtypes.Int64ToInt256(123456789),
+			Value:    pldtypes.Uint64ToUint256(123456789),
 			Input:    pldtypes.RawJSON(`{"input1": "value1"}`),
 			Bytecode: pldtypes.MustParseHexBytes(`0xfeedbeef`),
 		},

@@ -745,7 +745,7 @@ func TestSign(t *testing.T) {
 	fakeCoin := types.ZetoCoin{
 		Salt:   (*pldtypes.HexUint256)(salt),
 		Owner:  pldtypes.MustParseHexBytes(alicePubKey),
-		Amount: pldtypes.Int64ToInt256(12345),
+		Amount: pldtypes.Uint64ToUint256(12345),
 	}
 	req = &pb.SignRequest{
 		Algorithm:   z.getAlgoZetoSnarkBJJ(),

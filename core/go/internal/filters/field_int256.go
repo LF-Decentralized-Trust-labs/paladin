@@ -42,5 +42,5 @@ func (sf Int256Field) SQLValue(ctx context.Context, jsonValue pldtypes.RawJSON) 
 	if err != nil {
 		return "", err
 	}
-	return pldtypes.Int256To65CharDBSafeSortableString(bi), nil
+	return pldtypes.Int256To65CharDBSafeSortableString(ctx, bi)
 }

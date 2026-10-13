@@ -52,7 +52,7 @@ func TestMintValidateParams(t *testing.T) {
 	assert.EqualError(t, err, "PD210027: Parameter 'amount' must be in the range (0, 2^100) (index=0)")
 
 	_, err = h.ValidateParams(ctx, nil, "{\"mints\":[{\"to\":\"0x1234567890123456789012345678901234567890\",\"amount\":-10}]}")
-	assert.EqualError(t, err, "PD210027: Parameter 'amount' must be in the range (0, 2^100) (index=0)")
+	assert.EqualError(t, err, "PD020027: Negative value invalid for a uint256: -10")
 
 	max := big.NewInt(0).Exp(big.NewInt(2), big.NewInt(100), nil).Text(10)
 	_, err = h.ValidateParams(ctx, nil, "{\"mints\":[{\"to\":\"0x1234567890123456789012345678901234567890\",\"amount\":"+max+"}]}")

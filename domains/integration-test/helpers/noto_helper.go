@@ -98,43 +98,43 @@ func DeployNotoImplementation(ctx context.Context, t *testing.T, rpc rpcclient.C
 	}
 }
 
-func (n *NotoHelper) Mint(ctx context.Context, to string, amount int64) *DomainTransactionHelper {
+func (n *NotoHelper) Mint(ctx context.Context, to string, amount uint64) *DomainTransactionHelper {
 	fn := types.NotoABI.Functions()["mint"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.MintParams{
 		To:     to,
-		Amount: pldtypes.Int64ToInt256(amount),
+		Amount: pldtypes.Uint64ToUint256(amount),
 	}))
 }
 
-func (n *NotoHelper) Transfer(ctx context.Context, to string, amount int64) *DomainTransactionHelper {
+func (n *NotoHelper) Transfer(ctx context.Context, to string, amount uint64) *DomainTransactionHelper {
 	fn := types.NotoABI.Functions()["transfer"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.TransferParams{
 		To:     to,
-		Amount: pldtypes.Int64ToInt256(amount),
+		Amount: pldtypes.Uint64ToUint256(amount),
 	}))
 }
 
-func (n *NotoHelper) TransferFrom(ctx context.Context, from, to string, amount int64) *DomainTransactionHelper {
+func (n *NotoHelper) TransferFrom(ctx context.Context, from, to string, amount uint64) *DomainTransactionHelper {
 	fn := types.NotoABI.Functions()["transferFrom"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.TransferFromParams{
 		From:   from,
 		To:     to,
-		Amount: pldtypes.Int64ToInt256(amount),
+		Amount: pldtypes.Uint64ToUint256(amount),
 	}))
 }
 
-func (n *NotoHelper) Burn(ctx context.Context, amount int64) *DomainTransactionHelper {
+func (n *NotoHelper) Burn(ctx context.Context, amount uint64) *DomainTransactionHelper {
 	fn := types.NotoABI.Functions()["burn"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.BurnParams{
-		Amount: pldtypes.Int64ToInt256(amount),
+		Amount: pldtypes.Uint64ToUint256(amount),
 	}))
 }
 
-func (n *NotoHelper) BurnFrom(ctx context.Context, from string, amount int64) *DomainTransactionHelper {
+func (n *NotoHelper) BurnFrom(ctx context.Context, from string, amount uint64) *DomainTransactionHelper {
 	fn := types.NotoABI.Functions()["burnFrom"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.BurnFromParams{
 		From:   from,
-		Amount: pldtypes.Int64ToInt256(amount),
+		Amount: pldtypes.Uint64ToUint256(amount),
 	}))
 }
 

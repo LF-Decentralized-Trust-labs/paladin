@@ -45,7 +45,7 @@ func TestCreateTransferLock(t *testing.T) {
 		ID: pldtypes.RandBytes32(),
 		Data: types.NotoCoin{
 			Owner:  (*pldtypes.EthAddress)(&senderKey.Address),
-			Amount: pldtypes.Int64ToInt256(150), // we'll have a remainder
+			Amount: pldtypes.Uint64ToUint256(150), // we'll have a remainder
 		},
 	}
 	mockCallbacks.MockFindAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
@@ -405,7 +405,7 @@ func TestCreateTransferLock(t *testing.T) {
 	require.NotNil(t, hookParams.Recipients[0].To)
 	assert.Equal(t, pldtypes.MustEthAddress("0x2000000000000000000000000000000000000000").String(), hookParams.Recipients[0].To.String())
 	require.NotNil(t, hookParams.Recipients[0].Amount)
-	assert.Equal(t, pldtypes.Int64ToInt256(100).String(), hookParams.Recipients[0].Amount.String())
+	assert.Equal(t, pldtypes.Uint64ToUint256(100).String(), hookParams.Recipients[0].Amount.String())
 
 	// Verify prepared transaction
 	assert.Equal(t, pldtypes.MustEthAddress(contractAddress), hookParams.Prepared.ContractAddress)

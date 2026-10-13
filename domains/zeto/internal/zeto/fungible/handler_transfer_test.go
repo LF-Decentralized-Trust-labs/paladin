@@ -91,7 +91,7 @@ func TestTransferValidateParams(t *testing.T) {
 		{
 			name:        "Invalid 'amount' parameter (-10)",
 			input:       "{\"transfers\":[{\"to\":\"0x1234567890123456789012345678901234567890\",\"amount\":-10}]}",
-			expectedErr: "PD210027: Parameter 'amount' must be in the range (0, 2^100) (index=0)",
+			expectedErr: "PD020027: Negative value invalid for a uint256: -10",
 		},
 		{
 			name:        "Total amount exceeds range",

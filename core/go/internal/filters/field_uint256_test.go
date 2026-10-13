@@ -50,6 +50,14 @@ func TestUint256Field(t *testing.T) {
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000003039", vSmallPos)
 	assert.Len(t, vSmallPos, 64)
 
+	// Values outside the range of a uint256 are rejected. Encoding a negative would silently
+	// use its absolute value, and one of more than 256 bits would lose its leading digits
+	_, err = Uint256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`-1`))
+	assert.Regexp(t, "PD020027", err)
+
+	_, err = Uint256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`"0x10000000000000000000000000000000000000000000000000000000000000000"`))
+	assert.Regexp(t, "PD020028", err)
+
 	nv, err := Uint256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`null`))
 	require.NoError(t, err)
 	assert.Nil(t, nv)

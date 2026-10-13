@@ -44,7 +44,7 @@ func TestCreateBurnLock(t *testing.T) {
 		ID: pldtypes.RandBytes32(),
 		Data: types.NotoCoin{
 			Owner:  (*pldtypes.EthAddress)(&senderKey.Address),
-			Amount: pldtypes.Int64ToInt256(150), // we'll have a remainder
+			Amount: pldtypes.Uint64ToUint256(150), // we'll have a remainder
 		},
 	}
 	mockCallbacks.MockFindAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {

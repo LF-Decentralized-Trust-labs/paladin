@@ -148,7 +148,7 @@ func (s *notoTransferSuite) Setup() error {
 		log.Infof("Minting initial supply of %d to %s (Noto instance %d)...", s.initialMintAmount, senderIdentity, i)
 		mintParams := &nototypes.MintParams{
 			To:     senderIdentity,
-			Amount: pldtypes.Int64ToInt256(s.initialMintAmount),
+			Amount: pldtypes.Uint64ToUint256(uint64(s.initialMintAmount)),
 		}
 		mintJSON, err := json.Marshal(mintParams)
 		if err != nil {
@@ -335,7 +335,7 @@ func (tc *notoTransferWorker) RunOnce(iterationCount int) (string, error) {
 
 	transferParams := &nototypes.TransferParams{
 		To:     target,
-		Amount: pldtypes.Int64ToInt256(1),
+		Amount: pldtypes.Uint64ToUint256(1),
 	}
 	transferJSON, err := json.Marshal(transferParams)
 	if err != nil {

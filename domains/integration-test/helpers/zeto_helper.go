@@ -223,17 +223,17 @@ func (z *ZetoHelper) ApproveERC20(ctx context.Context, tb testbed.Testbed, erc20
 	assert.NoError(z.t, err)
 }
 
-func (z *ZetoHelper) Deposit(ctx context.Context, amount int64) *DomainTransactionHelper {
+func (z *ZetoHelper) Deposit(ctx context.Context, amount uint64) *DomainTransactionHelper {
 	params := &types.DepositParams{
-		Amount: pldtypes.Int64ToInt256(amount),
+		Amount: pldtypes.Uint64ToUint256(amount),
 	}
 	fn := types.ZetoFungibleABI.Functions()["deposit"]
 	return NewDomainTransactionHelper(ctx, z.t, z.rpc, z.Address, fn, toJSON(z.t, &params))
 }
 
-func (z *ZetoHelper) Withdraw(ctx context.Context, amount int64) *DomainTransactionHelper {
+func (z *ZetoHelper) Withdraw(ctx context.Context, amount uint64) *DomainTransactionHelper {
 	params := &types.WithdrawParams{
-		Amount: pldtypes.Int64ToInt256(amount),
+		Amount: pldtypes.Uint64ToUint256(amount),
 	}
 	fn := types.ZetoFungibleABI.Functions()["withdraw"]
 	return NewDomainTransactionHelper(ctx, z.t, z.rpc, z.Address, fn, toJSON(z.t, &params))

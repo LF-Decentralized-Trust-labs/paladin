@@ -206,7 +206,7 @@ func TestBalanceOfExecCall(t *testing.T) {
 		coin := &types.NotoCoin{
 			Salt:   pldtypes.RandBytes32(),
 			Owner:  (*pldtypes.EthAddress)(&aliceKey.Address),
-			Amount: pldtypes.Int64ToInt256(100),
+			Amount: pldtypes.Uint64ToUint256(100),
 		}
 
 		mockCallbacks.MockFindAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
@@ -242,12 +242,12 @@ func TestBalanceOfExecCall(t *testing.T) {
 		coin1 := &types.NotoCoin{
 			Salt:   pldtypes.RandBytes32(),
 			Owner:  (*pldtypes.EthAddress)(&aliceKey.Address),
-			Amount: pldtypes.Int64ToInt256(75),
+			Amount: pldtypes.Uint64ToUint256(75),
 		}
 		coin2 := &types.NotoCoin{
 			Salt:   pldtypes.RandBytes32(),
 			Owner:  (*pldtypes.EthAddress)(&aliceKey.Address),
-			Amount: pldtypes.Int64ToInt256(25),
+			Amount: pldtypes.Uint64ToUint256(25),
 		}
 
 		mockCallbacks.MockFindAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
@@ -318,7 +318,7 @@ func TestBalanceOfExecCall(t *testing.T) {
 		coin := &types.NotoCoin{
 			Salt:   pldtypes.RandBytes32(),
 			Owner:  (*pldtypes.EthAddress)(&aliceKey.Address),
-			Amount: pldtypes.Int64ToInt256(0),
+			Amount: pldtypes.Uint64ToUint256(0),
 		}
 
 		mockCallbacks.MockFindAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {

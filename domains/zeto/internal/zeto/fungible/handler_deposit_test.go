@@ -27,8 +27,11 @@ func TestDepositValidateParams(t *testing.T) {
 	_, err = h.ValidateParams(ctx, config, "bad json")
 	require.ErrorContains(t, err, "PD210105: Failed to decode the deposit call.")
 
-	_, err = h.ValidateParams(ctx, config, "{\"amount\":-100}")
+	_, err = h.ValidateParams(ctx, config, "{\"amount\":0}")
 	require.ErrorContains(t, err, "PD210027: Parameter 'amount' must be in the range (0, 2^100) (index=0)")
+
+	_, err = h.ValidateParams(ctx, config, "{\"amount\":-100}")
+	require.ErrorContains(t, err, "PD020027: Negative value invalid for a uint256: -100")
 }
 
 func TestDepositInit(t *testing.T) {

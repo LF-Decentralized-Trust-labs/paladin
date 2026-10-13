@@ -71,7 +71,7 @@ func TestTransferLockedValidateParams(t *testing.T) {
 	assert.EqualError(t, err, "PD210027: Parameter 'amount' must be in the range (0, 2^100) (index=0)")
 
 	_, err = h.ValidateParams(ctx, nil, "{\"lockedInputs\":[\"0x0c3d1d2996e66d8512c7c3faa4b5f55180fee870190d589a911b6517dc578dba\"],\"delegate\":\"delegate1\",\"transfers\":[{\"to\":\"0x1234567890123456789012345678901234567890\",\"amount\":-10}]}")
-	assert.EqualError(t, err, "PD210027: Parameter 'amount' must be in the range (0, 2^100) (index=0)")
+	assert.EqualError(t, err, "PD020027: Negative value invalid for a uint256: -10")
 
 	amt1 := big.NewInt(0).Exp(big.NewInt(2), big.NewInt(100), nil)
 	amt1.Sub(amt1, big.NewInt(1000))

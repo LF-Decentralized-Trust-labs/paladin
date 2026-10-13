@@ -174,16 +174,16 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	swap := helpers.DeploySwap(ctx, t, tb, pld, alice, &helpers.TradeRequestInput{
 		Holder1:       aliceKey.Verifier.Verifier,
 		TokenAddress1: notoGold.Address,
-		TokenValue1:   pldtypes.Int64ToInt256(1),
+		TokenValue1:   pldtypes.Uint64ToUint256(1),
 
 		Holder2:       bobKey.Verifier.Verifier,
 		TokenAddress2: notoSilver.Address,
-		TokenValue2:   pldtypes.Int64ToInt256(10),
+		TokenValue2:   pldtypes.Uint64ToUint256(10),
 	})
 
 	log.L(ctx).Infof("Prepare the transfers")
 	notoGoldLock := notoGold.Lock(ctx, &nototypes.LockParams{
-		Amount: pldtypes.Int64ToInt256(1),
+		Amount: pldtypes.Uint64ToUint256(1),
 	}).SignAndSend(alice).Wait()
 	notoGoldLockResult := decodeTransactionResult(t, notoGoldLock)
 	var goldLockReceipt nototypes.NotoDomainReceipt
@@ -193,7 +193,7 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 	require.NotEmpty(t, goldLockReceipt.LockInfo.LockID)
 
 	notoSilverLock := notoSilver.Lock(ctx, &nototypes.LockParams{
-		Amount: pldtypes.Int64ToInt256(10),
+		Amount: pldtypes.Uint64ToUint256(10),
 	}).SignAndSend(bob).Wait()
 	notoSilverLockResult := decodeTransactionResult(t, notoSilverLock)
 	var silverLockReceipt nototypes.NotoDomainReceipt
@@ -210,7 +210,7 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 			From:   alice,
 			Recipients: []*nototypes.UnlockRecipient{{
 				To:     bob,
-				Amount: pldtypes.Int64ToInt256(1),
+				Amount: pldtypes.Uint64ToUint256(1),
 			}},
 		},
 		UnlockData: pldtypes.MustParseHexBytes("0x9999"),
@@ -228,7 +228,7 @@ func (s *pvpTestSuite) pvpNotoNoto(withHooks bool) {
 			From:   bob,
 			Recipients: []*nototypes.UnlockRecipient{{
 				To:     alice,
-				Amount: pldtypes.Int64ToInt256(10),
+				Amount: pldtypes.Uint64ToUint256(10),
 			}},
 		},
 		UnlockData: pldtypes.MustParseHexBytes("0xfeedbeef"),
@@ -368,16 +368,16 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 	swap := helpers.DeploySwap(ctx, t, tb, pld, alice, &helpers.TradeRequestInput{
 		Holder1:       aliceKey.Verifier.Verifier,
 		TokenAddress1: noto.Address,
-		TokenValue1:   pldtypes.Int64ToInt256(1),
+		TokenValue1:   pldtypes.Uint64ToUint256(1),
 
 		Holder2:       bobKey.Verifier.Verifier,
 		TokenAddress2: zeto.Address,
-		TokenValue2:   pldtypes.Int64ToInt256(1),
+		TokenValue2:   pldtypes.Uint64ToUint256(1),
 	})
 
 	log.L(ctx).Infof("Prepare the Noto transfer")
 	notoLock := noto.Lock(ctx, &nototypes.LockParams{
-		Amount: pldtypes.Int64ToInt256(1),
+		Amount: pldtypes.Uint64ToUint256(1),
 	}).SignAndSend(alice).Wait()
 	notoLockResult := decodeTransactionResult(t, notoLock)
 
@@ -394,7 +394,7 @@ func (s *pvpTestSuite) TestNotoForZeto() {
 			From:   alice,
 			Recipients: []*nototypes.UnlockRecipient{{
 				To:     bob,
-				Amount: pldtypes.Int64ToInt256(1),
+				Amount: pldtypes.Uint64ToUint256(1),
 			}},
 		},
 	}).SignAndSend(alice).Wait()

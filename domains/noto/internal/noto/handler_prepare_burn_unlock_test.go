@@ -59,7 +59,7 @@ func TestPrepareBurnUnlock(t *testing.T) {
 		Data: types.NotoLockedCoin{
 			LockID: lockID,
 			Owner:  (*pldtypes.EthAddress)(&senderKey.Address),
-			Amount: pldtypes.Int64ToInt256(100),
+			Amount: pldtypes.Uint64ToUint256(100),
 		},
 	}
 	inputLockInfoSalt := pldtypes.RandBytes32()

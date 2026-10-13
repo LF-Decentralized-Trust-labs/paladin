@@ -29,11 +29,26 @@ import (
 	"github.com/hyperledger-firefly/signer/pkg/abi"
 )
 
-// HexInt256 is any integer (signed or unsigned) up to 256 bits in size, serialized to the DB using a 65 sortable string (a 0/1 sign character, followed by 32 hex bytes)
+// HexInt256 is a signed integer in the range -2^255 to 2^255-1, serialized to the DB using a
+// 65 character sortable string (a 0/1 sign character, followed by 32 hex bytes of two's complement)
 type HexInt256 big.Int
 
-func Int64ToInt256(v int64) *HexUint256 {
-	return (*HexUint256)(new(big.Int).SetInt64(v))
+var (
+	int256Min = new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), 255))
+	int256Max = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 255), big.NewInt(1))
+)
+
+// checkInt256Range enforces the range of the type. The DB serialization is exactly 32 bytes of
+// two's complement, so the same check covers both parsing a value and persisting one.
+func checkInt256Range(ctx context.Context, bi *big.Int) error {
+	if bi.Cmp(int256Min) < 0 || bi.Cmp(int256Max) > 0 {
+		return i18n.NewError(ctx, pldmsgs.MsgTypesInt256OutOfRange, bi.Text(10))
+	}
+	return nil
+}
+
+func Int64ToInt256(v int64) *HexInt256 {
+	return (*HexInt256)(new(big.Int).SetInt64(v))
 }
 
 // Parse a string
@@ -41,6 +56,9 @@ func ParseHexInt256(ctx context.Context, s string) (*HexInt256, error) {
 	bi, ok := new(big.Int).SetString(s, 0)
 	if !ok {
 		return nil, i18n.NewError(ctx, pldmsgs.MsgTypesInvalidHexInteger, s)
+	}
+	if err := checkInt256Range(ctx, bi); err != nil {
+		return nil, err
 	}
 	return (*HexInt256)(bi), nil
 }
@@ -108,7 +126,11 @@ func (hi *HexInt256) Value() (driver.Value, error) {
 	if hi == nil {
 		return nil, nil
 	}
-	return Int256To65CharDBSafeSortableString((*big.Int)(hi)), nil
+	s, err := Int256To65CharDBSafeSortableString(context.Background(), (*big.Int)(hi))
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (hi *HexInt256) Scan(src interface{}) error {
@@ -133,30 +155,48 @@ func (hi *HexInt256) Scan(src interface{}) error {
 	}
 }
 
-func Int256To65CharDBSafeSortableString(bi *big.Int) string {
+func Int256To65CharDBSafeSortableString(ctx context.Context, bi *big.Int) (string, error) {
 	sign := bi.Sign()
-	signPlusZeroPaddedInt256 := PadHexBigIntTwosComplement(bi, make([]byte, 65))
+	signPlusZeroPaddedInt256, err := PadHexBigIntTwosComplement(ctx, bi, make([]byte, 65))
+	if err != nil {
+		return "", err
+	}
 	if sign < 0 {
 		signPlusZeroPaddedInt256[0] = '0'
 	} else {
 		// Zero or positive get a "1" in the first string position, which makes them
 		signPlusZeroPaddedInt256[0] = '1'
 	}
-	return (string)(signPlusZeroPaddedInt256)
+	return (string)(signPlusZeroPaddedInt256), nil
 }
 
-// PadHexBigIntTwosComplement returns the supplied buffer, with all the bytes to the left of
-// the two's complement formatted string set to 0
-func PadHexBigIntTwosComplement(bi *big.Int, buff []byte) []byte {
+// PadHexBigIntTwosComplement returns the supplied buffer, containing the two's complement
+// formatted string sign-extended to the left - with 'f' for a negative integer, and '0' for
+// zero or a positive one. The supplied integer is not modified.
+//
+// The integer must be in the range of an int256, and its encoding must fit within the supplied
+// buffer. Both are errors, rather than the silently wrapped or truncated - and so incorrect -
+// encoding that an out of range value would otherwise produce
+func PadHexBigIntTwosComplement(ctx context.Context, bi *big.Int, buff []byte) ([]byte, error) {
+	if err := checkInt256Range(ctx, bi); err != nil {
+		return nil, err
+	}
 	twosComplement := abi.SerializeInt256TwosComplementBytes(bi)
 	unPadded := hex.EncodeToString(twosComplement)
 	boundary := len(buff) - len(unPadded)
+	if boundary < 0 {
+		return nil, i18n.NewError(ctx, pldmsgs.MsgTypesHexIntBufferTooSmall, len(buff), len(unPadded))
+	}
+	signExtend := byte('0')
+	if bi.Sign() < 0 {
+		signExtend = 'f'
+	}
 	for i := 0; i < len(buff); i++ {
 		if i >= boundary {
 			buff[i] = unPadded[i-boundary]
 		} else {
-			buff[i] = 'f'
+			buff[i] = signExtend
 		}
 	}
-	return buff
+	return buff, nil
 }

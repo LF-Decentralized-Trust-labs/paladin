@@ -36,15 +36,25 @@ func TestInt256Field(t *testing.T) {
 	_, err = Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`[]`))
 	assert.Regexp(t, "FF22091", err)
 
-	vBigNeg, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`"-0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
-	require.NoError(t, err)
-	assert.Equal(t, "00000000000000000000000000000000000000000000000000000000000000001", vBigNeg)
-	assert.Len(t, vBigNeg, 65)
+	// Values outside the range of an int256 are rejected. Encoding them would wrap the two's
+	// complement body modulo 2^256 while taking the sign character from the original value, so
+	// -(2^256-1) would encode as a negative-signed +1, and 2^256-1 as a positive-signed -1
+	_, err = Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`"-0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
+	assert.Regexp(t, "PD020029", err)
 
-	vBigPos, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
+	_, err = Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
+	assert.Regexp(t, "PD020029", err)
+
+	// The extremes of the range still encode
+	vMin, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`"-0x8000000000000000000000000000000000000000000000000000000000000000"`))
 	require.NoError(t, err)
-	assert.Equal(t, "1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", vBigPos)
-	assert.Len(t, vBigPos, 65)
+	assert.Equal(t, "08000000000000000000000000000000000000000000000000000000000000000", vMin)
+	assert.Len(t, vMin, 65)
+
+	vMax, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`"0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
+	require.NoError(t, err)
+	assert.Equal(t, "17fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", vMax)
+	assert.Len(t, vMax, 65)
 
 	vZero, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`0`))
 	require.NoError(t, err)
@@ -61,13 +71,13 @@ func TestInt256Field(t *testing.T) {
 	assert.Equal(t, "10000000000000000000000000000000000000000000000000000000000003039", vSmallPos)
 	assert.Len(t, vSmallPos, 65)
 
-	assert.Equal(t, -1, strings.Compare(vBigNeg.(string), vBigPos.(string)))
-	assert.Equal(t, 1, strings.Compare(vBigPos.(string), vBigNeg.(string)))
-	assert.Equal(t, -1, strings.Compare(vBigNeg.(string), vZero.(string)))
-	assert.Equal(t, -1, strings.Compare(vBigNeg.(string), vSmallNeg.(string)))
+	assert.Equal(t, -1, strings.Compare(vMin.(string), vMax.(string)))
+	assert.Equal(t, 1, strings.Compare(vMax.(string), vMin.(string)))
+	assert.Equal(t, -1, strings.Compare(vMin.(string), vZero.(string)))
+	assert.Equal(t, -1, strings.Compare(vMin.(string), vSmallNeg.(string)))
 	assert.Equal(t, 1, strings.Compare(vSmallPos.(string), vZero.(string)))
-	assert.Equal(t, 1, strings.Compare(vBigPos.(string), vZero.(string)))
-	assert.Equal(t, 1, strings.Compare(vBigPos.(string), vSmallPos.(string)))
+	assert.Equal(t, 1, strings.Compare(vMax.(string), vZero.(string)))
+	assert.Equal(t, 1, strings.Compare(vMax.(string), vSmallPos.(string)))
 
 	nv, err := Int256Field("test").SQLValue(ctx, (pldtypes.RawJSON)(`null`))
 	require.NoError(t, err)

@@ -215,7 +215,10 @@ func (as *abiSchema) mapValueToLabel(ctx context.Context, fieldName string, labe
 			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
 		}
 		// Otherwise we fall back to encoding as a fixed-width hex string - with a leading sign character
-		filterString := pldtypes.Int256To65CharDBSafeSortableString(bigIntVal)
+		filterString, err := pldtypes.Int256To65CharDBSafeSortableString(ctx, bigIntVal)
+		if err != nil {
+			return nil, nil, err
+		}
 		return &pldapi.StateLabel{Label: fieldName, Value: filterString}, nil, nil
 	case labelTypeUint256:
 		bigIntVal, ok := f.Value.(*big.Int)
@@ -223,7 +226,10 @@ func (as *abiSchema) mapValueToLabel(ctx context.Context, fieldName string, labe
 			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
 		}
 		bigIntVal = bigIntVal.Abs(bigIntVal)
-		filterString := filters.Uint256ToFilterString(ctx, bigIntVal)
+		filterString, err := filters.Uint256ToFilterString(ctx, bigIntVal)
+		if err != nil {
+			return nil, nil, err
+		}
 		return &pldapi.StateLabel{Label: fieldName, Value: filterString}, nil, nil
 	case labelTypeBytes:
 		byteValue, ok := f.Value.([]byte)

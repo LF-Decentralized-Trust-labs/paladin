@@ -70,8 +70,11 @@ func TestLockValidateParams(t *testing.T) {
 	_, err = h.ValidateParams(ctx, config, "{\"delegate\":\"0x1234567890123456789012345678901234567890\"}")
 	assert.ErrorContains(t, err, "PD210026: Parameter 'amount' is required (index=0)")
 
-	_, err = h.ValidateParams(ctx, config, "{\"amount\":-10,\"delegate\":\"0x1234567890123456789012345678901234567890\"}")
+	_, err = h.ValidateParams(ctx, config, "{\"amount\":0,\"delegate\":\"0x1234567890123456789012345678901234567890\"}")
 	assert.ErrorContains(t, err, "PD210107: Total amount must be in the range (0, 2^100)")
+
+	_, err = h.ValidateParams(ctx, config, "{\"amount\":-10,\"delegate\":\"0x1234567890123456789012345678901234567890\"}")
+	assert.ErrorContains(t, err, "PD020027: Negative value invalid for a uint256: -10")
 
 	amt1 := big.NewInt(0).Exp(big.NewInt(2), big.NewInt(100), nil) // max allowed
 	amt1.Sub(amt1, big.NewInt(1))

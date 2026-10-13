@@ -800,4 +800,15 @@ func TestABISchemaMapValueToLabelTypeErrors(t *testing.T) {
 	_, _, err = as.mapValueToLabel(ctx, "", labelTypeBytes, cv)
 	assert.Regexp(t, "PD010109", err)
 
+	// The ABI parse of a value only range checks it when encoding to ABI bytes, so a value
+	// outside the range of the label's type reaches the label encoders and is rejected there
+	cv, err = tc.ParseExternal("0x10000000000000000000000000000000000000000000000000000000000000000") // 2^256
+	require.NoError(t, err)
+
+	_, _, err = as.mapValueToLabel(ctx, "", labelTypeInt256, cv)
+	assert.Regexp(t, "PD020029", err)
+
+	_, _, err = as.mapValueToLabel(ctx, "", labelTypeUint256, cv)
+	assert.Regexp(t, "PD020028", err)
+
 }

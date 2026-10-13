@@ -217,7 +217,7 @@ func (s *notoPenteTrackerSuite) Setup() error {
 		log.Infof("Minting %d tokens to %s...", s.initialMintAmount, memberIdentity)
 		mintParams := &nototypes.MintParams{
 			To:     memberIdentity,
-			Amount: pldtypes.Int64ToInt256(s.initialMintAmount),
+			Amount: pldtypes.Uint64ToUint256(uint64(s.initialMintAmount)),
 		}
 		mintJSON, err := json.Marshal(mintParams)
 		if err != nil {
@@ -400,7 +400,7 @@ func (tc *notoPenteTrackerWorker) RunOnce(iterationCount int) (string, error) {
 
 	transferParams := &nototypes.TransferParams{
 		To:     recipient,
-		Amount: pldtypes.Int64ToInt256(1),
+		Amount: pldtypes.Uint64ToUint256(1),
 	}
 	transferJSON, err := json.Marshal(transferParams)
 	if err != nil {

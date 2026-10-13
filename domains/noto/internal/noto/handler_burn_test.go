@@ -54,7 +54,7 @@ func TestBurn(t *testing.T) {
 		ID: pldtypes.RandBytes32(),
 		Data: types.NotoCoin{
 			Owner:  (*pldtypes.EthAddress)(&senderKey.Address),
-			Amount: pldtypes.Int64ToInt256(100),
+			Amount: pldtypes.Uint64ToUint256(100),
 		},
 	}
 	mockCallbacks.MockFindAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
@@ -285,7 +285,7 @@ func TestBurn_V0(t *testing.T) {
 		ID: pldtypes.RandBytes32(),
 		Data: types.NotoCoin{
 			Owner:  (*pldtypes.EthAddress)(&senderKey.Address),
-			Amount: pldtypes.Int64ToInt256(100),
+			Amount: pldtypes.Uint64ToUint256(100),
 		},
 	}
 	mockCallbacks.MockFindAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
@@ -528,7 +528,7 @@ func TestBurn_Nullifiers(t *testing.T) {
 		ID: pldtypes.RandBytes32(),
 		Data: types.NotoCoin{
 			Owner:  (*pldtypes.EthAddress)(&senderKey.Address),
-			Amount: pldtypes.Int64ToInt256(100),
+			Amount: pldtypes.Uint64ToUint256(100),
 		},
 	}
 	mockCallbacks.MockFindAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {

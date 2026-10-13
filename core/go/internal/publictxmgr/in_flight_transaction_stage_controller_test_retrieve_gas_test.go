@@ -67,8 +67,8 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 
 	currentGeneration := it.stateManager.GetCurrentGeneration(ctx).(*inFlightTransactionStateGeneration)
 	retrievedGasPrice := &pldapi.PublicTxGasPricing{
-		MaxFeePerGas:         pldtypes.Int64ToInt256(10),
-		MaxPriorityFeePerGas: pldtypes.Int64ToInt256(1),
+		MaxFeePerGas:         pldtypes.Uint64ToUint256(10),
+		MaxPriorityFeePerGas: pldtypes.Uint64ToUint256(1),
 	}
 	// succeed retrieving gas price
 	currentGeneration.bufferedStageOutputs = make([]*StageOutput, 0)

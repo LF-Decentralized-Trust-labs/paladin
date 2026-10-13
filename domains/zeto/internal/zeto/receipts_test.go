@@ -139,8 +139,8 @@ func TestBuildReceiptMint(t *testing.T) {
 	assert.Equal(t, pldtypes.MustParseBytes32(coinSchemaID), receipt.States.Outputs[0].Schema)
 	assert.Equal(t, pldtypes.MustParseHexBytes(stateID2), receipt.States.Outputs[1].ID)
 	assert.Equal(t, []*types.ReceiptTransfer{
-		{To: owner1, Amount: pldtypes.Int64ToInt256(10), Data: pldtypes.MustParseHexBytes("0xdeadbeef")},
-		{To: owner1, Amount: pldtypes.Int64ToInt256(20), Data: pldtypes.MustParseHexBytes("0xfeedface")},
+		{To: owner1, Amount: pldtypes.Uint64ToUint256(10), Data: pldtypes.MustParseHexBytes("0xdeadbeef")},
+		{To: owner1, Amount: pldtypes.Uint64ToUint256(20), Data: pldtypes.MustParseHexBytes("0xfeedface")},
 	}, receipt.Transfers)
 }
 
@@ -174,8 +174,8 @@ func TestBuildReceiptTransferDataPerEntry(t *testing.T) {
 		},
 	})
 	assert.Equal(t, []*types.ReceiptTransfer{
-		{From: owner1, To: owner2, Amount: pldtypes.Int64ToInt256(40), Data: pldtypes.MustParseHexBytes("0xdeadbeef")},
-		{From: owner1, To: owner3, Amount: pldtypes.Int64ToInt256(60), Data: pldtypes.MustParseHexBytes("0xfeedface")},
+		{From: owner1, To: owner2, Amount: pldtypes.Uint64ToUint256(40), Data: pldtypes.MustParseHexBytes("0xdeadbeef")},
+		{From: owner1, To: owner3, Amount: pldtypes.Uint64ToUint256(60), Data: pldtypes.MustParseHexBytes("0xfeedface")},
 	}, receipt.Transfers)
 }
 
@@ -193,7 +193,7 @@ func TestBuildReceiptChangeCarriesNoData(t *testing.T) {
 		},
 	})
 	assert.Equal(t, []*types.ReceiptTransfer{
-		{From: owner1, To: owner2, Amount: pldtypes.Int64ToInt256(40), Data: pldtypes.MustParseHexBytes("0xdeadbeef")},
+		{From: owner1, To: owner2, Amount: pldtypes.Uint64ToUint256(40), Data: pldtypes.MustParseHexBytes("0xdeadbeef")},
 	}, receipt.Transfers)
 }
 
@@ -227,7 +227,7 @@ func TestBuildReceiptBurn(t *testing.T) {
 	assert.Equal(t, pldtypes.MustParseHexBytes(stateID1), receipt.States.Inputs[0].ID)
 	assert.Equal(t, []*types.ReceiptTransfer{{
 		From:   owner1,
-		Amount: pldtypes.Int64ToInt256(1),
+		Amount: pldtypes.Uint64ToUint256(1),
 	}}, receipt.Transfers)
 }
 
@@ -244,7 +244,7 @@ func TestBuildReceiptBurnWithRemainder(t *testing.T) {
 	require.Len(t, receipt.States.Outputs, 1)
 	assert.Equal(t, []*types.ReceiptTransfer{{
 		From:   owner1,
-		Amount: pldtypes.Int64ToInt256(2),
+		Amount: pldtypes.Uint64ToUint256(2),
 	}}, receipt.Transfers)
 }
 
@@ -264,7 +264,7 @@ func TestBuildReceiptTransferWithChange(t *testing.T) {
 	assert.Equal(t, []*types.ReceiptTransfer{{
 		From:   owner1,
 		To:     owner2,
-		Amount: pldtypes.Int64ToInt256(25),
+		Amount: pldtypes.Uint64ToUint256(25),
 	}}, receipt.Transfers)
 }
 
@@ -287,9 +287,9 @@ func TestBuildReceiptTransferReportsEachCoinSeparately(t *testing.T) {
 		},
 	})
 	assert.Equal(t, []*types.ReceiptTransfer{
-		{From: owner1, To: owner2, Amount: pldtypes.Int64ToInt256(30), Data: pldtypes.MustParseHexBytes("0x01")},
-		{From: owner1, To: owner2, Amount: pldtypes.Int64ToInt256(20), Data: pldtypes.MustParseHexBytes("0x02")},
-		{From: owner1, To: owner3, Amount: pldtypes.Int64ToInt256(50), Data: pldtypes.MustParseHexBytes("0x03")},
+		{From: owner1, To: owner2, Amount: pldtypes.Uint64ToUint256(30), Data: pldtypes.MustParseHexBytes("0x01")},
+		{From: owner1, To: owner2, Amount: pldtypes.Uint64ToUint256(20), Data: pldtypes.MustParseHexBytes("0x02")},
+		{From: owner1, To: owner3, Amount: pldtypes.Uint64ToUint256(50), Data: pldtypes.MustParseHexBytes("0x03")},
 	}, receipt.Transfers)
 }
 
@@ -333,7 +333,7 @@ func TestBuildReceiptTransferLocked(t *testing.T) {
 	assert.Equal(t, []*types.ReceiptTransfer{{
 		From:   owner1,
 		To:     owner2,
-		Amount: pldtypes.Int64ToInt256(5),
+		Amount: pldtypes.Uint64ToUint256(5),
 	}}, receipt.Transfers)
 }
 
@@ -536,7 +536,7 @@ func TestUnmarshalInfo(t *testing.T) {
 func TestUnmarshalCoin(t *testing.T) {
 	coin, err := unmarshalCoin(fmt.Sprintf(`{"amount":"100","owner":"%s","locked":true}`, owner1))
 	require.NoError(t, err)
-	assert.Equal(t, pldtypes.Int64ToInt256(100), coin.Amount)
+	assert.Equal(t, pldtypes.Uint64ToUint256(100), coin.Amount)
 	assert.Equal(t, owner1, coin.Owner)
 	assert.True(t, coin.Locked)
 
@@ -587,8 +587,8 @@ func TestBuildFungibleTransfersMultipleSenders(t *testing.T) {
 	// what moved rather than reporting something misleading
 	inputs := &parsedCoins{
 		coins: []*types.ZetoCoin{
-			{Owner: owner1, Amount: pldtypes.Int64ToInt256(100)},
-			{Owner: owner2, Amount: pldtypes.Int64ToInt256(50)},
+			{Owner: owner1, Amount: pldtypes.Uint64ToUint256(100)},
+			{Owner: owner2, Amount: pldtypes.Uint64ToUint256(50)},
 		},
 	}
 	assert.Nil(t, buildFungibleTransfers(context.Background(), inputs, &parsedCoins{}, nil))
@@ -599,39 +599,39 @@ func TestBuildFungibleTransfersZeroAmount(t *testing.T) {
 	inputs := &parsedCoins{}
 	outputs := &parsedCoins{
 		coins: []*types.ZetoCoin{
-			{Owner: owner1, Amount: pldtypes.Int64ToInt256(100)},
-			{Owner: owner2, Amount: pldtypes.Int64ToInt256(0)},
+			{Owner: owner1, Amount: pldtypes.Uint64ToUint256(100)},
+			{Owner: owner2, Amount: pldtypes.Uint64ToUint256(0)},
 		},
 	}
 	transfers := buildFungibleTransfers(context.Background(), inputs, outputs, nil)
 	assert.Equal(t, []*types.ReceiptTransfer{
-		{To: owner1, Amount: pldtypes.Int64ToInt256(100)},
+		{To: owner1, Amount: pldtypes.Uint64ToUint256(100)},
 	}, transfers)
 }
 
 func TestBuildFungibleTransfersDoesNotMutateCoins(t *testing.T) {
 	outputs := &parsedCoins{
 		coins: []*types.ZetoCoin{
-			{Owner: owner1, Amount: pldtypes.Int64ToInt256(30)},
-			{Owner: owner1, Amount: pldtypes.Int64ToInt256(20)},
+			{Owner: owner1, Amount: pldtypes.Uint64ToUint256(30)},
+			{Owner: owner1, Amount: pldtypes.Uint64ToUint256(20)},
 		},
 	}
 	transfers := buildFungibleTransfers(context.Background(), &parsedCoins{}, outputs, nil)
 	require.Len(t, transfers, 2)
-	assert.Equal(t, pldtypes.Int64ToInt256(30), transfers[0].Amount)
-	assert.Equal(t, pldtypes.Int64ToInt256(20), transfers[1].Amount)
-	assert.Equal(t, pldtypes.Int64ToInt256(30), outputs.coins[0].Amount)
-	assert.Equal(t, pldtypes.Int64ToInt256(20), outputs.coins[1].Amount)
+	assert.Equal(t, pldtypes.Uint64ToUint256(30), transfers[0].Amount)
+	assert.Equal(t, pldtypes.Uint64ToUint256(20), transfers[1].Amount)
+	assert.Equal(t, pldtypes.Uint64ToUint256(30), outputs.coins[0].Amount)
+	assert.Equal(t, pldtypes.Uint64ToUint256(20), outputs.coins[1].Amount)
 }
 
 func TestBuildFungibleTransfersLockedCoinsKeepEntryPositions(t *testing.T) {
 	// Locked and unlocked coins share one ordered list, so a locked output does not shift the entry
 	// positions the data is matched on
-	inputs := &parsedCoins{coins: []*types.ZetoCoin{{Owner: owner1, Amount: pldtypes.Int64ToInt256(100)}}}
+	inputs := &parsedCoins{coins: []*types.ZetoCoin{{Owner: owner1, Amount: pldtypes.Uint64ToUint256(100)}}}
 	outputs := &parsedCoins{
 		coins: []*types.ZetoCoin{
-			{Owner: owner2, Amount: pldtypes.Int64ToInt256(40), Locked: true},
-			{Owner: owner3, Amount: pldtypes.Int64ToInt256(60)},
+			{Owner: owner2, Amount: pldtypes.Uint64ToUint256(40), Locked: true},
+			{Owner: owner3, Amount: pldtypes.Uint64ToUint256(60)},
 		},
 	}
 	entryData := []pldtypes.HexBytes{
@@ -639,8 +639,8 @@ func TestBuildFungibleTransfersLockedCoinsKeepEntryPositions(t *testing.T) {
 		pldtypes.MustParseHexBytes("0x02"),
 	}
 	assert.Equal(t, []*types.ReceiptTransfer{
-		{From: owner1, To: owner2, Amount: pldtypes.Int64ToInt256(40), Data: pldtypes.MustParseHexBytes("0x01")},
-		{From: owner1, To: owner3, Amount: pldtypes.Int64ToInt256(60), Data: pldtypes.MustParseHexBytes("0x02")},
+		{From: owner1, To: owner2, Amount: pldtypes.Uint64ToUint256(40), Data: pldtypes.MustParseHexBytes("0x01")},
+		{From: owner1, To: owner3, Amount: pldtypes.Uint64ToUint256(60), Data: pldtypes.MustParseHexBytes("0x02")},
 	}, buildFungibleTransfers(context.Background(), inputs, outputs, entryData))
 }
 
@@ -693,9 +693,9 @@ func TestParseCoinList(t *testing.T) {
 	// Locked and unlocked coins share one ordered list, so that a coin's position still identifies
 	// the transfer entry that produced it
 	require.Len(t, result.coins, 2)
-	assert.Equal(t, pldtypes.Int64ToInt256(100), result.coins[0].Amount)
+	assert.Equal(t, pldtypes.Uint64ToUint256(100), result.coins[0].Amount)
 	assert.False(t, result.coins[0].Locked)
-	assert.Equal(t, pldtypes.Int64ToInt256(50), result.coins[1].Amount)
+	assert.Equal(t, pldtypes.Uint64ToUint256(50), result.coins[1].Amount)
 	assert.True(t, result.coins[1].Locked)
 	require.Len(t, result.nfts, 1)
 	assert.Equal(t, pldtypes.MustParseHexUint256("0xdeadbeef"), result.nfts[0].TokenID)

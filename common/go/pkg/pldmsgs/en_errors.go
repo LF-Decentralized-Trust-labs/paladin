@@ -54,6 +54,10 @@ var (
 	MsgBigIntParseFailed                     = pde("PD020024", "Failed to parse JSON value '%s' into BigInt")
 	MsgBigIntTooLarge                        = pde("PD020025", "Byte length of serialized integer is too large %d (max=%d)")
 	MsgTypeRestoreFailed                     = pde("PD020026", "Failed to restore type '%T' into '%T'")
+	MsgTypesUint256Negative                  = pde("PD020027", "Negative value invalid for a uint256: %s")
+	MsgTypesUint256TooLarge                  = pde("PD020028", "Integer too large for a uint256: %s")
+	MsgTypesInt256OutOfRange                 = pde("PD020029", "Integer outside the range of an int256 (-2^255 to 2^255-1): %s")
+	MsgTypesHexIntBufferTooSmall             = pde("PD020030", "Buffer of %d characters is too small for the %d character encoding of the integer")
 
 	// Inflight PD0201XX
 	MsgInflightRequestCancelled = pde("PD020100", "Request cancelled after %s")

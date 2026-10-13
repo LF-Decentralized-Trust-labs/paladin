@@ -91,7 +91,7 @@ func TestTransfer(t *testing.T) {
 		ID: pldtypes.RandBytes32(),
 		Data: types.NotoCoin{
 			Owner:  (*pldtypes.EthAddress)(&senderKey.Address),
-			Amount: pldtypes.Int64ToInt256(100),
+			Amount: pldtypes.Uint64ToUint256(100),
 		},
 	}
 	mockCallbacks.MockFindAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
@@ -377,7 +377,7 @@ func TestTransfer_V0(t *testing.T) {
 		ID: pldtypes.RandBytes32(),
 		Data: types.NotoCoin{
 			Owner:  (*pldtypes.EthAddress)(&senderKey.Address),
-			Amount: pldtypes.Int64ToInt256(100),
+			Amount: pldtypes.Uint64ToUint256(100),
 		},
 	}
 	mockCallbacks.MockFindAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
@@ -655,7 +655,7 @@ func TestTransfer_Nullifiers(t *testing.T) {
 		ID: pldtypes.RandBytes32(),
 		Data: types.NotoCoin{
 			Owner:  (*pldtypes.EthAddress)(&senderKey.Address),
-			Amount: pldtypes.Int64ToInt256(100),
+			Amount: pldtypes.Uint64ToUint256(100),
 		},
 	}
 	mockCallbacks.MockFindAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
@@ -904,7 +904,7 @@ func TestTransferAssembleMissingFrom(t *testing.T) {
 		DomainConfig:    notoBasicConfigV1,
 		Params: &types.TransferParams{
 			To:     "receiver@node2",
-			Amount: pldtypes.Int64ToInt256(75),
+			Amount: pldtypes.Uint64ToUint256(75),
 			Data:   pldtypes.MustParseHexBytes("0x1234"),
 		},
 	}
@@ -941,7 +941,7 @@ func TestTransferAssembleMissingTo(t *testing.T) {
 		DomainConfig:    notoBasicConfigV1,
 		Params: &types.TransferParams{
 			To:     "receiver@node2",
-			Amount: pldtypes.Int64ToInt256(75),
+			Amount: pldtypes.Uint64ToUint256(75),
 			Data:   pldtypes.MustParseHexBytes("0x1234"),
 		},
 	}

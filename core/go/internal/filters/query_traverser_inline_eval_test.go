@@ -316,7 +316,7 @@ func TestEvalQueryMatchNullDoesNotMatch(t *testing.T) {
 	assert.False(t, match)
 
 	// uint256 test
-	err = json.Unmarshal([]byte(`{"eq": [{"field": "uint256Field", "value": "-11223344"}]}`), &qf)
+	err = json.Unmarshal([]byte(`{"eq": [{"field": "uint256Field", "value": "11223344"}]}`), &qf)
 	require.NoError(t, err)
 	match, err = EvalQuery(context.Background(), qf, allTypesFieldMap, ResolvingValueSet{})
 	require.NoError(t, err)
