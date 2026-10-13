@@ -78,7 +78,7 @@ jobs:
       matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
       - name: Checkout Paladin branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.paladin_branch }}
           submodules: recursive
@@ -91,7 +91,7 @@ jobs:
         uses: ./paladin/.github/actions/setup
 
       - name: Setup kustomize
-        uses: imranismail/setup-kustomize@v2
+        uses: imranismail/setup-kustomize@v3
 
       - name: Override test length
         if: inputs.length != ''

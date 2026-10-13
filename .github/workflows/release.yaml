@@ -81,13 +81,13 @@ jobs:
       
       - id: new-tag
         name: Validate new tag follows semver versioning
-        uses: matt-usurp/validate-semver@v2
+        uses: matt-usurp/validate-semver@v3
         with:
           version: ${{ steps.set-vars.outputs.tag }}
           
       - id: rc-tag
         name: Validate RC tag follows semver versioning
-        uses: matt-usurp/validate-semver@v2
+        uses: matt-usurp/validate-semver@v3
         with:
           version: ${{ steps.set-vars.outputs.rc_tag }}
           
@@ -212,7 +212,7 @@ jobs:
 
     steps:
     - name: Checkout repository code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         submodules: recursive
         ref: ${{ needs.setup.outputs.rc_tag }}
@@ -240,7 +240,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
           ref: ${{ needs.setup.outputs.rc_tag }}
@@ -249,13 +249,13 @@ jobs:
         uses: ./.github/actions/print-disk-usage
 
       - name: Download Helm artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: helm-artifacts
           path: helm-artifacts/
 
       - name: Download Solidity artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: contracts
           path: contracts/
@@ -264,7 +264,7 @@ jobs:
         run: |
           ls -R
       - name: Create final release with all artifacts
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.setup.outputs.tag }}
           target_commitish: ${{ needs.prepare-release.outputs.new_sha }}
