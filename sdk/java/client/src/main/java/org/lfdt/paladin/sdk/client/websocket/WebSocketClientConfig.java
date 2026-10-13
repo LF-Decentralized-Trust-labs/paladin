@@ -169,7 +169,8 @@ public final class WebSocketClientConfig {
     }
 
     /**
-     * Sets the initial reconnect delay. Zero disables reconnection.
+     * Sets the initial reconnect delay. Zero disables reconnection. It must not exceed the maximum
+     * reconnect delay, which is checked by {@link #build()}.
      *
      * @param value a nonnegative duration
      * @return this builder
@@ -210,8 +211,13 @@ public final class WebSocketClientConfig {
      * Builds the immutable configuration.
      *
      * @return the configuration
+     * @throws IllegalArgumentException if the reconnect delay exceeds the maximum reconnect delay
      */
     public WebSocketClientConfig build() {
+      if (reconnectDelay != null && reconnectDelay.compareTo(maxReconnectDelay) > 0) {
+        throw new IllegalArgumentException(
+            "reconnectDelay must not exceed maxReconnectDelay (" + maxReconnectDelay + ")");
+      }
       return new WebSocketClientConfig(this);
     }
 

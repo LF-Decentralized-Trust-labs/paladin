@@ -51,7 +51,8 @@ try (WebSocketSubscriptionClient ws = new WebSocketSubscriptionClient(config)) {
 
 `subscribeBlockchainEvents` and `subscribeMessages` use `TransactionEventBatch` and
 `PrivacyGroupMessageBatch`. Configure authentication with `WebSocketClientConfig.Builder.header`.
-Set `reconnectDelay(Duration.ZERO)` to disable reconnection. An optional error handler constructor
+Set `reconnectDelay(Duration.ZERO)` to disable reconnection; otherwise `reconnectDelay` must not exceed
+`maxReconnectDelay` (default 30 s), or `build()` throws. An optional error handler constructor
 reports connection failures and callback errors.
 
 ### Testing against local nodes

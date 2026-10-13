@@ -188,6 +188,33 @@ class WebSocketSubscriptionClientTest {
         IllegalArgumentException.class,
         () ->
             WebSocketClientConfig.builder("ws://localhost").reconnectDelay(Duration.ofSeconds(-1)));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            WebSocketClientConfig.builder("ws://localhost")
+                .reconnectDelay(Duration.ofSeconds(30))
+                .maxReconnectDelay(Duration.ofSeconds(1))
+                .build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            WebSocketClientConfig.builder("ws://localhost")
+                .maxReconnectDelay(Duration.ofSeconds(1))
+                .reconnectDelay(Duration.ofSeconds(30))
+                .build());
+    assertEquals(
+        Duration.ofSeconds(5),
+        WebSocketClientConfig.builder("ws://localhost")
+            .reconnectDelay(Duration.ofSeconds(5))
+            .maxReconnectDelay(Duration.ofSeconds(5))
+            .build()
+            .reconnectDelay());
+    assertNull(
+        WebSocketClientConfig.builder("ws://localhost")
+            .reconnectDelay(Duration.ZERO)
+            .maxReconnectDelay(Duration.ofMillis(1))
+            .build()
+            .reconnectDelay());
     final WebSocketClientConfig settings =
         WebSocketClientConfig.builder("wss://example.com")
             .connectTimeout(Duration.ofSeconds(1))
