@@ -16,10 +16,13 @@
 package transportmgr
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/LFDT-Paladin/paladin/config/pkg/confutil"
@@ -31,6 +34,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/pldtypes"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -61,6 +65,81 @@ func setupAckOrNackCheck(t *testing.T, tp *testPlugin, msgID uuid.UUID, expected
 		}
 
 	}
+}
+
+func captureTransportLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	buf := new(bytes.Buffer)
+	logger := logrus.StandardLogger()
+	prevOut := logger.Out
+	logger.SetOutput(buf)
+	t.Cleanup(func() {
+		logger.SetOutput(prevOut)
+	})
+	return buf
+}
+
+func TestHandleReliableMsgBatchLogsAckNackSendFailures(t *testing.T) {
+	t.Run("queue failure", func(t *testing.T) {
+		ctx, tm, _, done := newTestTransport(t, false,
+			mockEmptyReliableMsgs,
+			func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
+				mc.db.Mock.ExpectBegin()
+				mc.db.Mock.ExpectCommit()
+			})
+		defer done()
+
+		logBuf := captureTransportLogs(t)
+		msg := testReceivedReliableMsg("unsupported_message_type", nil)
+		p := &peer{PeerInfo: pldapi.PeerInfo{Name: tm.localNodeName}}
+
+		err := tm.persistence.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+			_, err := tm.handleReliableMsgBatch(ctx, dbTX, []*reliableMsgOp{{p: p, msg: msg}})
+			return err
+		})
+		require.NoError(t, err)
+		require.Contains(t, logBuf.String(), fmt.Sprintf("Failed to send nack to node '%s' for message %s", p.Name, msg.MessageID))
+	})
+
+	t.Run("send failure", func(t *testing.T) {
+		ctx, tm, tp, done := newTestTransport(t, false,
+			mockGoodTransport,
+			mockEmptyReliableMsgs,
+			func(mc *mockComponents, conf *pldconf.TransportManagerInlineConfig) {
+				mc.db.Mock.ExpectBegin()
+				mc.db.Mock.ExpectCommit()
+			})
+		defer done()
+
+		logBuf := captureTransportLogs(t)
+		sendAttempted := make(chan struct{}, 1)
+		mockActivateDeactivateOk(tp)
+		tp.Functions.SendMessage = func(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
+			select {
+			case sendAttempted <- struct{}{}:
+			default:
+			}
+			return nil, fmt.Errorf("pop")
+		}
+
+		msg := testReceivedReliableMsg("unsupported_message_type", nil)
+		p := &peer{PeerInfo: pldapi.PeerInfo{Name: "node2"}}
+
+		err := tm.persistence.Transaction(ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+			_, err := tm.handleReliableMsgBatch(ctx, dbTX, []*reliableMsgOp{{p: p, msg: msg}})
+			return err
+		})
+		require.NoError(t, err)
+
+		select {
+		case <-sendAttempted:
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for ack/nack send attempt")
+		}
+		require.Eventually(t, func() bool {
+			return strings.Contains(logBuf.String(), fmt.Sprintf("Failed to send nack to node '%s' for message %s: pop", p.Name, msg.MessageID))
+		}, 5*time.Second, 50*time.Millisecond)
+	})
 }
 
 func TestReceiveMessageStateWithNullifierSendAckRealDB(t *testing.T) {

@@ -99,10 +99,18 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX per
 	dbTX.AddPostCommit(func(ctx context.Context) {
 		// We've committed the database work ok - send the acks/nacks to the other side
 		for _, a := range acksToSend {
+			ackType := RMHMessageTypeAck
 			if a.Error != "" {
+				ackType = RMHMessageTypeNack
 				log.L(ctx).Errorf("Sending nack to node '%s' for message %s: %s", a.node, a.id, a.Error)
 			}
-			_ = tm.queueFireAndForget(ctx, a.node, buildAck(a.id, a.Error), nil)
+			node, msgID := a.node, a.id
+			logSendErr := func(ctx context.Context, err error) {
+				log.L(ctx).Errorf("Failed to send %s to node '%s' for message %s: %s", ackType, node, msgID, err)
+			}
+			if err := tm.queueFireAndForget(ctx, a.node, buildAck(a.id, a.Error), logSendErr); err != nil {
+				logSendErr(ctx, err)
+			}
 		}
 	})
 
