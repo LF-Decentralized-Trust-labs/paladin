@@ -39,6 +39,9 @@ import java.util.*;
 
 public class PersistedAccount implements Account {
 
+    // ObjectMapper is thread-safe once configured, and is shared so its serializer cache is reused across calls.
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final Address address;
 
     private long nonce;
@@ -222,7 +225,7 @@ public class PersistedAccount implements Account {
                 }
                 return TrieIterator.State.CONTINUE;
             });
-            return new ObjectMapper().writeValueAsBytes(jsonAccount);
+            return OBJECT_MAPPER.writeValueAsBytes(jsonAccount);
         } catch(Exception e) {
             throw new IllegalArgumentException(e);
         }
@@ -230,7 +233,7 @@ public class PersistedAccount implements Account {
 
     public static PersistedAccount deserialize(byte[] data)  {
         try {
-            var jsonAccount = new ObjectMapper().readValue(data, PersistedAccountJson.class);
+            var jsonAccount = OBJECT_MAPPER.readValue(data, PersistedAccountJson.class);
             if (!jsonAccount.version().equals("v24.9.0")) {
                 throw new IllegalArgumentException("unsupported version: %s".formatted(jsonAccount.version()));
             }

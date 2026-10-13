@@ -40,6 +40,9 @@
  public class PenteEVMTransaction {
  
      private static final Logger LOGGER = PaladinLogging.getLogger(PenteEVMTransaction.class);
+
+     // ObjectMapper is thread-safe once configured, and is shared so its serializer cache is reused across calls.
+     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
  
      @JsonProperty
      Address from;
@@ -153,8 +156,7 @@
       */
      static PenteEVMTransaction buildFromInput(PenteDomain domain, byte[] txInputBytes) throws IOException, ExecutionException, InterruptedException {
  
-         var objectMapper = new ObjectMapper();
-         var txInputState = objectMapper.readValue(txInputBytes, PenteTransaction.TransactionInputInfoState.class);
+         var txInputState = OBJECT_MAPPER.readValue(txInputBytes, PenteTransaction.TransactionInputInfoState.class);
  
          // Decode the rawTransaction data
          var request = DecodeDataRequest.newBuilder().
@@ -164,7 +166,7 @@
          var response = domain.decodeData(request).get();
  
          // JSON parse the result back into our base object
-         var evmTxn = objectMapper.readValue(response.getBody(), PenteEVMTransaction.class);
+         var evmTxn = OBJECT_MAPPER.readValue(response.getBody(), PenteEVMTransaction.class);
  
          // Now complete initialization with the other information in the info
          evmTxn.postJSONParseInit(domain, txInputState.evmVersion(), txInputState.baseBlock().longValue(), txInputState.baseBlockTimestamp().longValue(), txInputState.bytecodeLength().intValue());

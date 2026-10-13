@@ -27,6 +27,8 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class JsonQuery {
+    // ObjectMapper is thread-safe once configured, and is shared so its serializer cache is reused across calls.
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     public record Query(
         @JsonProperty
@@ -152,7 +154,7 @@ public class JsonQuery {
 
         @Override
         public final String json() throws IOException {
-            return new ObjectMapper().writeValueAsString(this.query);
+            return OBJECT_MAPPER.writeValueAsString(this.query);
         }
 
     }

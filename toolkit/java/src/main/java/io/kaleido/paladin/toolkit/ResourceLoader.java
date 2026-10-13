@@ -24,13 +24,15 @@ import java.io.StringWriter;
 
 public class ResourceLoader {
 
+    // ObjectMapper is thread-safe once configured, and is shared so its serializer cache is reused across calls.
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     public static String jsonResourceEntryText(ClassLoader classLoader, String resourcePath, String entry) throws IOException {
         try (InputStream is = classLoader.getResourceAsStream(resourcePath)) {
             if (is == null) {
                 throw new IllegalArgumentException("resource %s not found".formatted(resourcePath));
             }
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode node = objectMapper.readTree(is);
+            JsonNode node = OBJECT_MAPPER.readTree(is);
             JsonNode entryNode = node.get(entry);
             if (entryNode == null) {
                 throw new IllegalArgumentException("entry %s not found in JSON resource %s".formatted(entry, resourcePath));
@@ -38,7 +40,7 @@ public class ResourceLoader {
             if (entryNode.isValueNode()) {
                 return entryNode.asText();
             }
-            return objectMapper.writeValueAsString(entryNode);
+            return OBJECT_MAPPER.writeValueAsString(entryNode);
         }
     }
 

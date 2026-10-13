@@ -33,6 +33,8 @@ import java.util.Collection;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class JsonABI extends ArrayList<JsonABI.Entry> {
+    // ObjectMapper is thread-safe once configured, and is shared so its serializer cache is reused across calls.
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Entry(
@@ -165,17 +167,15 @@ public class JsonABI extends ArrayList<JsonABI.Entry> {
     }
 
     public static JsonABI fromReader(Reader abiJSON) throws IOException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        return objectMapper.readValue(abiJSON, JsonABI.class);
+        return OBJECT_MAPPER.readValue(abiJSON, JsonABI.class);
     }
 
     private static String toJSONString(Object any, boolean pretty) {
         try {
-            ObjectMapper objectMapper = new ObjectMapper();
             if (pretty) {
-                return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(any);
+                return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(any);
             }
-            return objectMapper.writeValueAsString(any);
+            return OBJECT_MAPPER.writeValueAsString(any);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

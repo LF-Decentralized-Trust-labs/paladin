@@ -63,6 +63,9 @@
   */
  class PenteTransaction {
      private static final Logger LOGGER = PaladinLogging.getLogger(PenteTransaction.class);
+
+     // ObjectMapper is thread-safe once configured, and is shared so its serializer cache is reused across calls.
+     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
  
      @JsonIgnoreProperties(ignoreUnknown = true)
      public record Values(
@@ -117,12 +120,12 @@
      PenteTransaction(PenteDomain domain, TransactionSpecification tx, BlockContext blockCtx) throws IOException, IllegalArgumentException {
          this.domain = domain;
          contractAddress = new Address(tx.getContractInfo().getContractAddress());
-         contractConfig = new ObjectMapper().readValue(tx.getContractInfo().getContractConfigJson(), PenteConfiguration.ContractConfig.class);
+         contractConfig = OBJECT_MAPPER.readValue(tx.getContractInfo().getContractConfigJson(), PenteConfiguration.ContractConfig.class);
          from = tx.getFrom();
          baseBlock = blockCtx != null ? blockCtx.getBlockNumber() : 0;
          baseBlockTimestamp = blockCtx != null ? blockCtx.getBlockTimestamp() : 0;
          // Check the ABI params we expect at the top level (we don't mind the order)
-         functionDef = new ObjectMapper().readValue(tx.getFunctionAbiJson(), JsonABI.Entry.class);
+         functionDef = OBJECT_MAPPER.readValue(tx.getFunctionAbiJson(), JsonABI.Entry.class);
          for (JsonABI.Parameter param : functionDef.inputs()) {
              switch (param.name()) {
                  case "group" -> defs.group = checkGroup(param);
@@ -156,7 +159,7 @@
  
      Values getValues() throws IOException, IllegalArgumentException {
          if (values == null) {
-             values = checkValues(new ObjectMapper().readValue(jsonParams, Values.class));
+             values = checkValues(OBJECT_MAPPER.readValue(jsonParams, Values.class));
          }
          return values;
      }
@@ -209,7 +212,7 @@
      }
  
      byte[] getEncodedCallData() throws IOException, IllegalStateException, ExecutionException, InterruptedException {
-         String paramsJSON = new ObjectMapper().writeValueAsString(getValues().inputs);
+         String paramsJSON = OBJECT_MAPPER.writeValueAsString(getValues().inputs);
          EncodeDataRequest request;
          switch (abiEntryType) {
              case ABIEntryType.DEPLOY -> {
@@ -248,7 +251,7 @@
          var request = EncodeDataRequest.newBuilder().
                  setEncodingType(EncodingType.ETH_TRANSACTION_SIGNED).
                  setDefinition(defs.inputs.toJSON(false)).
-                 setBody(new ObjectMapper().writeValueAsString(ethTXJson)).
+                 setBody(OBJECT_MAPPER.writeValueAsString(ethTXJson)).
                  setDefinition("eip-1559").
                  setKeyIdentifier(from).
                  build();
@@ -364,7 +367,7 @@
          );
          var txInputState = NewState.newBuilder().
                  setSchemaId(latestTransactionInputSchemaId).
-                 setStateDataJsonBytes(ByteString.copyFrom(new ObjectMapper().writeValueAsBytes(txInput))).
+                 setStateDataJsonBytes(ByteString.copyFrom(OBJECT_MAPPER.writeValueAsBytes(txInput))).
                  addAllDistributionList(lookups).
                  build();
          result.addAllInputStates(inputStates);
@@ -486,7 +489,7 @@
          }};
          var encoded = domain.encodeData(EncodeDataRequest.newBuilder().
                  setEncodingType(EncodingType.TYPED_DATA_V4).
-                 setBody(new ObjectMapper().writeValueAsString(typedDataRequest)).
+                 setBody(OBJECT_MAPPER.writeValueAsString(typedDataRequest)).
                  build()).get();
          return encoded.getData().toByteArray();
      }

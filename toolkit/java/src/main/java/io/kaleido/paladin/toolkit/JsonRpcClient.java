@@ -37,6 +37,9 @@
  public class JsonRpcClient implements Closeable {
  
      private static final Logger LOGGER = PaladinLogging.getLogger(JsonRpcClient.class);
+
+     // ObjectMapper is thread-safe once configured, and is shared so its serializer cache is reused across calls.
+     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
  
      private final String uriString;
  
@@ -95,8 +98,7 @@
          long requestId = nextRequest.getAndIncrement();
          try {
              // Build JSON request body
-             ObjectMapper objectMapper = new ObjectMapper();
-             String requestBody = objectMapper.writeValueAsString(
+             String requestBody = OBJECT_MAPPER.writeValueAsString(
                      new JSONRPCRequest(
                              "2.0",
                              requestId,
@@ -116,7 +118,7 @@
              HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
  
              // Parse the response body
-             JSONRPCResponse<ResultType> rpcRes = objectMapper.readValue(res.body(), new TypeReference<>() {});
+             JSONRPCResponse<ResultType> rpcRes = OBJECT_MAPPER.readValue(res.body(), new TypeReference<>() {});
              if (res.statusCode() < 200 || res.statusCode() >= 300 ||
                      (rpcRes.error() != null && rpcRes.error().code < 0)) {
                  String message = "";

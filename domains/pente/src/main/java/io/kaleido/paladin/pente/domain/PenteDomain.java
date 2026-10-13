@@ -51,6 +51,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
  public class PenteDomain extends DomainInstance {
      private static final Logger LOGGER = PaladinLogging.getLogger(PenteDomain.class);
 
+     // ObjectMapper is thread-safe once configured, and is shared so its serializer cache is reused across calls.
+     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
      // Error selectors for retryable base ledger reverts (all take a single bytes32 parameter)
      // PenteInputNotAvailable(bytes32 input)
      private static final byte[] SELECTOR_INPUT_NOT_AVAILABLE = new byte[]{(byte)0xa8, (byte)0x0f, (byte)0x89, (byte)0xf4};
@@ -93,7 +96,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
      @Override
      protected CompletableFuture<InitDeployResponse> initDeploy(InitDeployRequest request) {
          try {
-             var params = new ObjectMapper().readValue(request.getTransaction().getConstructorParamsJson(),
+             var params = OBJECT_MAPPER.readValue(request.getTransaction().getConstructorParamsJson(),
                      PenteConfiguration.PrivacyGroupConstructorParamsJSON.class);
 
              // Only support one string right now for endorsement type.
@@ -155,7 +158,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
      @Override
      protected CompletableFuture<PrepareDeployResponse> prepareDeploy(PrepareDeployRequest request) {
          try {
-             var params = new ObjectMapper().readValue(request.getTransaction().getConstructorParamsJson(),
+             var params = OBJECT_MAPPER.readValue(request.getTransaction().getConstructorParamsJson(),
                      PenteConfiguration.PrivacyGroupConstructorParamsJSON.class);
 
              var resolvedVerifiers = getResolvedEndorsers(params.group().salt(), params.group().members(), request.getResolvedVerifiersList());
@@ -176,7 +179,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
              var newPrivacyGroupABIJson = config.getFactoryContractABI().getABIEntry("function", "newPrivacyGroup").toJSON(false);
              response.getTransactionBuilder().
                      setFunctionAbiJson(newPrivacyGroupABIJson).
-                     setParamsJson(new ObjectMapper().writeValueAsString(new PenteConfiguration.NewPrivacyGroupFactoryParams(
+                     setParamsJson(OBJECT_MAPPER.writeValueAsString(new PenteConfiguration.NewPrivacyGroupFactoryParams(
                              new Bytes32(request.getTransaction().getTransactionId()),
                              new JsonHex.Bytes(onchainConfBuilder.toByteArray())
                      )));
@@ -194,7 +197,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
              var contractConfigObj = new PenteConfiguration.ContractConfig(onChainConfig.evmVersion());
             var contractConfig = ContractConfig.newBuilder().
-                     setContractConfigJson(new ObjectMapper().writeValueAsString(contractConfigObj)).
+                     setContractConfigJson(OBJECT_MAPPER.writeValueAsString(contractConfigObj)).
                      setCoordinatorSelection(ContractConfig.CoordinatorSelection.COORDINATOR_ENDORSER).
                     setSubmitterSelection(ContractConfig.SubmitterSelection.SUBMITTER_COORDINATOR);
             if (request.hasPrivacyGroup()) {
@@ -246,7 +249,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
                          addAllTopics(log.topics().stream().map(t -> ByteString.copyFrom(t.getBytes())).toList()).
                          setData(ByteString.copyFrom(log.data().getBytes())).
                          build()).get();
-                 var externalCall = new ObjectMapper().readValue(
+                 var externalCall = OBJECT_MAPPER.readValue(
                          decodedEvent.getBody(),
                          PenteConfiguration.TransactionExternalCall.class);
                  externalCalls.add(externalCall);
@@ -256,7 +259,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
      }
 
      private String buildDomainData(PenteEVMTransaction.EVMExecutionResult execResult) throws JsonProcessingException, InterruptedException, ExecutionException {
-         return new ObjectMapper().writeValueAsString(
+         return OBJECT_MAPPER.writeValueAsString(
                  new PenteConfiguration.DomainData(
                          new Address(execResult.contractAddress().toArray()),
                          parseExternalCalls(execResult.logs())));
@@ -469,7 +472,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
              if (request.getDomainData().isEmpty()) {
                  externalCalls = Collections.emptyList();
              } else {
-                 var domainData = new ObjectMapper().readValue(request.getDomainData(), PenteConfiguration.DomainData.class);
+                 var domainData = OBJECT_MAPPER.readValue(request.getDomainData(), PenteConfiguration.DomainData.class);
                  externalCalls = domainData.externalCalls();
              }
 
@@ -488,7 +491,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
              var transitionABI = config.getPrivacyGroupABI().getABIEntry("function", "transition").toJSON(false);
              var transitionTX = PreparedTransaction.newBuilder().
                      setFunctionAbiJson(transitionABI).
-                     setParamsJson(new ObjectMapper().writeValueAsString(params));
+                     setParamsJson(OBJECT_MAPPER.writeValueAsString(params));
              var result = PrepareTransactionResponse.newBuilder();
 
              if (request.getTransaction().getIntent() == TransactionSpecification.Intent.PREPARE_TRANSACTION) {
@@ -509,7 +512,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
                      put("states", params.get("states"));
                      put("externalCalls", externalCalls);
                  }};
-                 var transitionWithApprovalParamsJSON = new ObjectMapper().writeValueAsString(transitionWithApprovalParams);
+                 var transitionWithApprovalParamsJSON = OBJECT_MAPPER.writeValueAsString(transitionWithApprovalParams);
 
                  var encodeRequest = EncodeDataRequest.newBuilder().
                          setEncodingType(EncodingType.FUNCTION_CALL_DATA).
@@ -527,7 +530,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
                                  transitionWithApprovalParamsJSON,
                                  JsonHex.wrap(encodeResponse.getData().toByteArray())));
 
-                 result.setMetadata(new ObjectMapper().writeValueAsString(metadata));
+                 result.setMetadata(OBJECT_MAPPER.writeValueAsString(metadata));
              }
 
              result.setTransaction(transitionTX);
@@ -542,11 +545,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
      @Override
      protected CompletableFuture<HandleEventBatchResponse> handleEventBatch(HandleEventBatchRequest request) {
          try {
-             var mapper = new ObjectMapper();
              var result = HandleEventBatchResponse.newBuilder();
              for (var event : request.getEventsList()) {
                  if (PenteConfiguration.transferSignature.equals(event.getSoliditySignature())) {
-                     var transfer = mapper.readValue(event.getDataJson(), PenteTransitionJSON.class);
+                     var transfer = OBJECT_MAPPER.readValue(event.getDataJson(), PenteTransitionJSON.class);
                      var inputs = Arrays.stream(transfer.inputs).map(id -> StateUpdate.newBuilder()
                              .setId(id.to0xHex())
                              .setTransactionId(transfer.txId.to0xHex())
@@ -572,7 +574,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
                              .addAllConfirmedStates(outputs)
                              .addAllInfoStates(info);
                  } else if (PenteConfiguration.approvalSignature.equals(event.getSoliditySignature())) {
-                     var approval = mapper.readValue(event.getDataJson(), PenteApprovedJSON.class);
+                     var approval = OBJECT_MAPPER.readValue(event.getDataJson(), PenteApprovedJSON.class);
                      result.addTransactionsComplete(CompletedTransaction.newBuilder()
                                      .setTransactionId(approval.txId.to0xHex())
                                      .setLocation(event.getLocation())
@@ -677,7 +679,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
              var jsonReceipt = evmTxn.buildJSONReceipt(execResult);
 
              return CompletableFuture.completedFuture(BuildReceiptResponse.newBuilder().
-                     setReceiptJson(new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(jsonReceipt)).
+                     setReceiptJson(OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(jsonReceipt)).
                      build());
          } catch (Exception e) {
              return CompletableFuture.failedFuture(e);
@@ -714,8 +716,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
      protected CompletableFuture<InitPrivacyGroupResponse> initPrivacyGroup(InitPrivacyGroupRequest request) {
 
          try {
-             final var mapper = new ObjectMapper();
-
              // Read the supplied properties into a generic map structure,
              var pgConfig = request.getPrivacyGroup().getConfigurationMap();
 
@@ -743,8 +743,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
              return CompletableFuture.completedFuture(InitPrivacyGroupResponse.newBuilder()
                      .setTransaction(PreparedTransaction.newBuilder()
                              .setType(PreparedTransaction.TransactionType.PRIVATE)
-                             .setFunctionAbiJson(mapper.writeValueAsString(constructorABI))
-                             .setParamsJson(mapper.writeValueAsString(constructorParams))
+                             .setFunctionAbiJson(OBJECT_MAPPER.writeValueAsString(constructorABI))
+                             .setParamsJson(OBJECT_MAPPER.writeValueAsString(constructorParams))
                              .build())
                      .build());
          } catch (Exception e) {
@@ -789,7 +789,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
              // - The member list
              // That is because these are passed into each transaction in Pente (as has been the case from the
              // beginning, before the privacy group management APIs in Paladin existed).
-             var mapper = new ObjectMapper();
              var groupABI = JsonABI.newTuple("group", "Group", JsonABI.newParameters(
                      JsonABI.newParameter("salt", "bytes32"),
                      JsonABI.newParameter("members", "string[]")
@@ -815,11 +814,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
              JsonNode jsonValue = null;
              var inTxn = request.getTransaction();
              if (inTxn.hasInputJson()) {
-                 jsonValue = mapper.readValue(inTxn.getInputJson(), JsonNode.class);
+                 jsonValue = OBJECT_MAPPER.readValue(inTxn.getInputJson(), JsonNode.class);
              }
              JsonABI.Entry funcDef = null;
              if (inTxn.hasFunctionAbiJson()) {
-                 funcDef = mapper.readValue(inTxn.getFunctionAbiJson(), JsonABI.Entry.class);
+                 funcDef = OBJECT_MAPPER.readValue(inTxn.getFunctionAbiJson(), JsonABI.Entry.class);
              }
              if (!inTxn.hasTo()) {
                  // Unlike pure ethereum transactions, we require the bytecode to be split out from the
@@ -890,8 +889,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
              return CompletableFuture.completedFuture(WrapPrivacyGroupEVMTXResponse.newBuilder()
                      .setTransaction(PreparedTransaction.newBuilder()
                              .setType(PreparedTransaction.TransactionType.PRIVATE)
-                             .setParamsJson(mapper.writeValueAsString(data))
-                             .setFunctionAbiJson(mapper.writeValueAsString(privateABI))
+                             .setParamsJson(OBJECT_MAPPER.writeValueAsString(data))
+                             .setFunctionAbiJson(OBJECT_MAPPER.writeValueAsString(privateABI))
                              .build())
                      .build());
          } catch (Exception e) {
@@ -930,7 +929,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
      @Override
      protected CompletableFuture<InvokeRPCResponse> invokeRPC(InvokeRPCRequest request) {
          try {
-             var params = new ObjectMapper().readTree(request.getParamsJson());
+             var params = OBJECT_MAPPER.readTree(request.getParamsJson());
              return switch (request.getMethod()) {
                  case "pente_getCodeHash" -> invokeGetCodeHash(request.getStateQueryContext(), params);
                  case "pente_getCode" -> invokeGetCode(request.getStateQueryContext(), params);
@@ -949,7 +948,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
              var codeHash = accountLoader.load(address)
                      .map(PersistedAccount::getCodeHashOrZero)
                      .orElse(org.hyperledger.besu.datatypes.Hash.ZERO);
-             var resultJson = new ObjectMapper().writeValueAsString(codeHash.toHexString());
+             var resultJson = OBJECT_MAPPER.writeValueAsString(codeHash.toHexString());
              return CompletableFuture.completedFuture(
                      InvokeRPCResponse.newBuilder().setResultJson(resultJson).build());
          } catch (Exception e) {
@@ -965,7 +964,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
                      .map(PersistedAccount::getCode)
                      .orElse(null);
              var codeHex = (codeBytes != null) ? codeBytes.toHexString() : "";
-             var resultJson = new ObjectMapper().writeValueAsString(codeHex);
+             var resultJson = OBJECT_MAPPER.writeValueAsString(codeHex);
              return CompletableFuture.completedFuture(
                      InvokeRPCResponse.newBuilder().setResultJson(resultJson).build());
          } catch (Exception e) {
