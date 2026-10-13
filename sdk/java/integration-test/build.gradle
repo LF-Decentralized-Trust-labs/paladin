@@ -1,5 +1,28 @@
 // End-to-end integration tests against a real Paladin node
 dependencies {
     testImplementation project(':sdk:java:client')
+    testImplementation project(':sdk:java:core')
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.18.6'
     testImplementation project(':sdk:java:domains')
+}
+
+// Live operator tests run only through the explicit task, never as part of a unit-test build.
+test {
+    useJUnitPlatform { excludeTags 'operator-e2e' }
+}
+
+tasks.register('operatorE2E', Test) {
+    description = 'Exercises the Java SDK against the operator three-node installation.'
+    group = 'verification'
+    dependsOn testClasses, ':operator:copySolidity'
+    mustRunAfter ':operator:deploy'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'operator-e2e' }
+    systemProperty 'paladin.node1', 'http://127.0.0.1:31548'
+    systemProperty 'paladin.node2', 'http://127.0.0.1:31648'
+    systemProperty 'paladin.node3', 'http://127.0.0.1:31748'
+    systemProperty 'paladin.erc20Artifact', rootProject.file('operator/test/e2e/abis/ERC20Simple.json').absolutePath
+    // The live cluster state is external to Gradle's inputs.
+    outputs.upToDateWhen { false }
 }

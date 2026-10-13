@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import org.lfdt.paladin.sdk.client.privacygroup.PrivacyGroupClient;
 import org.lfdt.paladin.sdk.client.rpc.RpcClient;
 import org.lfdt.paladin.sdk.client.tx.TxBuilder;
 import org.lfdt.paladin.sdk.core.abi.ABIDecodedData;
@@ -87,7 +88,7 @@ public final class PtxClient {
    * @return a new builder bound to this client
    */
   public TxBuilder newTx() {
-    return TxBuilder.on(this);
+    return TxBuilder.on(this, new PrivacyGroupClient(rpc));
   }
 
   /**

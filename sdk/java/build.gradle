@@ -59,10 +59,10 @@ subprojects {
             rule {
                 limit {
                     // Ratcheted floor: set just under the lowest module's current instruction
-                    // coverage (core, 94.7%) so that new under-tested code fails the build.
+                    // coverage (core, 96.3%) so that new under-tested code fails the build.
                     // Raise this whenever the modules clear the next whole percent.
                     counter = 'INSTRUCTION'
-                    minimum = 0.94
+                    minimum = 0.96
                 }
             }
         }

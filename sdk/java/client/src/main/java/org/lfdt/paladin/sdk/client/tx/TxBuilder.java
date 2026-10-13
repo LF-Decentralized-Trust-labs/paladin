@@ -24,12 +24,21 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import org.lfdt.paladin.sdk.client.exception.PaladinInvalidTransactionException;
 import org.lfdt.paladin.sdk.client.exception.PaladinTimeoutException;
+import org.lfdt.paladin.sdk.client.privacygroup.PrivacyGroupClient;
 import org.lfdt.paladin.sdk.client.ptx.PtxClient;
 import org.lfdt.paladin.sdk.client.rpc.RpcClient;
 import org.lfdt.paladin.sdk.core.abi.AbiEntry;
+import org.lfdt.paladin.sdk.core.abi.AbiParameter;
+import org.lfdt.paladin.sdk.core.abi.EntryType;
 import org.lfdt.paladin.sdk.core.json.PaladinObjectMapper;
+import org.lfdt.paladin.sdk.core.privacygroup.PrivacyGroup;
+import org.lfdt.paladin.sdk.core.privacygroup.PrivacyGroupEVMCall;
+import org.lfdt.paladin.sdk.core.privacygroup.PrivacyGroupEVMTXInput;
+import org.lfdt.paladin.sdk.core.transaction.PublicTxOptions;
+import org.lfdt.paladin.sdk.core.transaction.TransactionCall;
 import org.lfdt.paladin.sdk.core.transaction.TransactionInput;
 import org.lfdt.paladin.sdk.core.transaction.TransactionType;
 import org.lfdt.paladin.sdk.core.types.Bytes32;
@@ -39,8 +48,10 @@ import org.lfdt.paladin.sdk.core.types.HexUint256;
 import org.lfdt.paladin.sdk.core.types.HexUint64;
 
 /**
- * Fluent, high-level builder for constructing and submitting Paladin transactions, mirroring Go's
- * {@code pldclient.TxBuilder}.
+ * Fluent, high-level builder for constructing and submitting Paladin transactions. Privacy groups
+ * selected with {@link #privacyGroup(PrivacyGroup)} or {@link #privacyGroupId(HexBytes)} route
+ * submissions and calls through the privacy-group namespace. Use {@link #buildPrivacyGroup()} to
+ * inspect their submission body; {@link #build()} is for ordinary public and private transactions.
  *
  * <p>It sits one level above {@link PtxClient}: instead of assembling a {@link TransactionInput}
  * and hand-rolling a receipt poll loop, describe the transaction by chaining, finish with {@link
@@ -92,6 +103,10 @@ public final class TxBuilder {
   public static final Duration DEFAULT_RECEIPT_TIMEOUT = Duration.ofSeconds(30);
 
   private final PtxClient ptx;
+  private final PrivacyGroupClient privacyGroups;
+  private HexBytes group;
+  private String block;
+  private String dataFormat;
 
   private String idempotencyKey;
   private TransactionType type;
@@ -114,8 +129,9 @@ public final class TxBuilder {
 
   private PaladinInvalidTransactionException deferredError;
 
-  private TxBuilder(final PtxClient ptx) {
+  private TxBuilder(final PtxClient ptx, final PrivacyGroupClient privacyGroups) {
     this.ptx = Objects.requireNonNull(ptx, "ptx");
+    this.privacyGroups = Objects.requireNonNull(privacyGroups, "privacyGroups");
   }
 
   /**
@@ -125,7 +141,7 @@ public final class TxBuilder {
    * @return a new builder
    */
   public static TxBuilder on(final PtxClient ptx) {
-    return new TxBuilder(ptx);
+    return Objects.requireNonNull(ptx, "ptx").newTx();
   }
 
   /**
@@ -135,7 +151,85 @@ public final class TxBuilder {
    * @return a new builder
    */
   public static TxBuilder on(final RpcClient rpc) {
-    return new TxBuilder(new PtxClient(Objects.requireNonNull(rpc, "rpc")));
+    return on(new PtxClient(rpc), new PrivacyGroupClient(rpc));
+  }
+
+  /**
+   * Starts a builder using namespace clients for submission and receipt retrieval.
+   *
+   * @param ptx the transaction client; must not be {@code null}
+   * @param privacyGroups the privacy-group client for the same node; must not be {@code null}
+   * @return a new builder
+   */
+  public static TxBuilder on(final PtxClient ptx, final PrivacyGroupClient privacyGroups) {
+    return new TxBuilder(ptx, privacyGroups);
+  }
+
+  /**
+   * Targets a privacy group, taking both its domain and identifier.
+   *
+   * @param group the group to execute in; must not be {@code null}
+   * @return this builder; invalid input is deferred until a terminal operation
+   */
+  public TxBuilder privacyGroup(final PrivacyGroup group) {
+    if (group == null) {
+      defer("privacy group is required", null);
+      return this;
+    }
+    return domain(group.domain()).privacyGroupId(group.id());
+  }
+
+  /**
+   * Targets a privacy group by identifier. Set its domain separately with {@link #domain(String)}.
+   * The transaction is implicitly private; an explicit public type is rejected.
+   *
+   * @param group the nonempty group identifier
+   * @return this builder
+   */
+  public TxBuilder privacyGroupId(final HexBytes group) {
+    if (group == null || group.isEmpty()) {
+      defer("privacy group identifier must not be empty", null);
+    } else {
+      this.group = group;
+    }
+    return this;
+  }
+
+  /**
+   * Targets a privacy group using a hex identifier. Parsing errors are deferred.
+   *
+   * @param group the hex group identifier
+   * @return this builder
+   */
+  public TxBuilder privacyGroupId(final String group) {
+    try {
+      privacyGroupId(HexBytes.fromString(group));
+    } catch (final RuntimeException e) {
+      defer("invalid privacy group identifier", e);
+    }
+    return this;
+  }
+
+  /**
+   * Sets the block context used by {@link #call()}.
+   *
+   * @param block a block number or special value such as {@code "latest"}
+   * @return this builder
+   */
+  public TxBuilder block(final String block) {
+    this.block = block;
+    return this;
+  }
+
+  /**
+   * Sets the output format used by {@link #call()}.
+   *
+   * @param dataFormat the node's ABI output serialization options
+   * @return this builder
+   */
+  public TxBuilder dataFormat(final String dataFormat) {
+    this.dataFormat = dataFormat;
+    return this;
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -267,7 +361,8 @@ public final class TxBuilder {
   }
 
   /**
-   * Sets the deploy bytecode, required for a public deploy and rejected for a private one.
+   * Sets deploy bytecode, required for public and privacy-group deploys. Other private deploys
+   * obtain bytecode from their domain and reject this option.
    *
    * @param bytecode the deploy bytecode
    * @return this builder
@@ -489,13 +584,21 @@ public final class TxBuilder {
    * @throws PaladinInvalidTransactionException if a chaining call failed earlier, or the definition
    *     is structurally invalid (no type, no signing identity, a private transaction without a
    *     domain, a function invoke without a target, or a deploy whose bytecode does not match its
-   *     type)
+   *     type), or a privacy group is selected (use {@link #buildPrivacyGroup()} instead)
    */
   public TransactionInput build() {
     if (deferredError != null) {
       throw deferredError;
     }
-    validate();
+    if (group != null) {
+      throw new PaladinInvalidTransactionException(
+          "use buildPrivacyGroup() for a privacy-group transaction");
+    }
+    validate(true);
+    return transactionInput();
+  }
+
+  private TransactionInput transactionInput() {
     return TransactionInput.builder()
         .idempotencyKey(idempotencyKey)
         .type(type)
@@ -532,11 +635,151 @@ public final class TxBuilder {
   public SentTransaction send() {
     CompletableFuture<UUID> id;
     try {
-      id = ptx.sendTransaction(build());
+      id =
+          group == null
+              ? ptx.sendTransaction(build())
+              : privacyGroups.sendTransaction(buildPrivacyGroup());
     } catch (final PaladinInvalidTransactionException e) {
       id = CompletableFuture.failedFuture(e);
     }
     return new SentTransaction(ptx, id, pollingInterval, receiptTimeout);
+  }
+
+  /**
+   * Builds the privacy-group submission body, resolving the function against the inline ABI.
+   * Existing gas, value, and fee setters configure the nested base-ledger submission options. ABI
+   * references and transaction dependencies are unsupported by the privacy-group RPC.
+   *
+   * @return the privacy-group transaction body
+   * @throws PaladinInvalidTransactionException if the definition or a previous setter is invalid
+   */
+  public PrivacyGroupEVMTXInput buildPrivacyGroup() {
+    return privacyGroupInput(true);
+  }
+
+  private PrivacyGroupEVMTXInput privacyGroupInput(final boolean requireFrom) {
+    validateGroup(requireFrom);
+    return PrivacyGroupEVMTXInput.builder(domain, group)
+        .idempotencyKey(idempotencyKey)
+        .from(from)
+        .to(to)
+        .input(data)
+        .function(resolveGroupFunction())
+        .bytecode(bytecode)
+        .publicTxOptions(
+            PublicTxOptions.builder()
+                .gas(gas)
+                .value(value)
+                .maxFeePerGas(maxFeePerGas)
+                .maxPriorityFeePerGas(maxPriorityFeePerGas)
+                .build())
+        .build();
+  }
+
+  /**
+   * Executes a read-only call through the transaction or privacy-group namespace. The signing
+   * identity is optional for calls. Uses {@link #block(String)} and {@link #dataFormat(String)}
+   * when supplied.
+   *
+   * @return the decoded JSON result; validation and RPC errors complete the future exceptionally
+   */
+  public CompletableFuture<JsonNode> call() {
+    try {
+      if (group != null) {
+        return privacyGroups.call(
+            PrivacyGroupEVMCall.builder(privacyGroupInput(false))
+                .block(block)
+                .dataFormat(dataFormat)
+                .build());
+      }
+      if (deferredError != null) {
+        throw deferredError;
+      }
+      validate(false);
+      return ptx.call(
+          TransactionCall.builder(transactionInput()).block(block).dataFormat(dataFormat).build());
+    } catch (final PaladinInvalidTransactionException e) {
+      return CompletableFuture.failedFuture(e);
+    }
+  }
+
+  private void validateGroup(final boolean requireFrom) {
+    if (deferredError != null) {
+      throw deferredError;
+    }
+    if (group == null) {
+      throw new PaladinInvalidTransactionException("a privacy group is required");
+    }
+    if (type == TransactionType.PUBLIC) {
+      throw new PaladinInvalidTransactionException("privacy-group transactions must be private");
+    }
+    if (isBlank(domain)) {
+      throw new PaladinInvalidTransactionException(
+          "a domain is required for privacy-group transactions");
+    }
+    if (requireFrom && isBlank(from)) {
+      throw new PaladinInvalidTransactionException(
+          "a signing identity is required: call from(...)");
+    }
+    if (abiReference != null || !dependsOn.isEmpty()) {
+      throw new PaladinInvalidTransactionException(
+          "privacy-group transactions do not support ABI references or dependencies");
+    }
+    if (isBlank(function)) {
+      if (to != null) {
+        throw new PaladinInvalidTransactionException(
+            "a function is required when a target address is set");
+      }
+      if (bytecode == null || bytecode.isEmpty()) {
+        throw new PaladinInvalidTransactionException(
+            "bytecode is required for a privacy-group deploy");
+      }
+    } else if (to == null) {
+      throw new PaladinInvalidTransactionException(
+          "a target address is required to invoke a function");
+    }
+  }
+
+  private AbiEntry resolveGroupFunction() {
+    if (isBlank(function)) {
+      return abi.stream()
+          .filter(entry -> entry.type() == EntryType.CONSTRUCTOR)
+          .findFirst()
+          .orElse(abi.isEmpty() ? null : AbiEntry.constructor().build());
+    }
+    final List<AbiEntry> matches =
+        abi.stream()
+            .filter(entry -> entry.type() == EntryType.FUNCTION)
+            .filter(entry -> function.equals(entry.name()) || function.equals(signature(entry)))
+            .toList();
+    if (matches.size() != 1) {
+      throw new PaladinInvalidTransactionException(
+          "function '"
+              + function
+              + "' must match exactly one inline ABI entry (use a full signature for overloads)");
+    }
+    return matches.getFirst();
+  }
+
+  private static String signature(final AbiEntry entry) {
+    return entry.name()
+        + "("
+        + entry.inputs().stream().map(TxBuilder::parameterType).collect(Collectors.joining(","))
+        + ")";
+  }
+
+  private static String parameterType(final AbiParameter parameter) {
+    final String type = parameter.type();
+    if (type.startsWith("tuple")) {
+      return "("
+          + parameter.components().stream()
+              .map(TxBuilder::parameterType)
+              .collect(Collectors.joining(","))
+          + ")"
+          + type.substring(5);
+    }
+    // Canonical ABI signatures expand Solidity's integer aliases, including array types.
+    return type.replaceFirst("^uint(?=\\[|$)", "uint256").replaceFirst("^int(?=\\[|$)", "int256");
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -556,12 +799,12 @@ public final class TxBuilder {
   /**
    * Mirrors Go's {@code txBuilder.validateForSend}, plus the signing identity Go checks on send.
    */
-  private void validate() {
+  private void validate(final boolean requireFrom) {
     if (type == null) {
       throw new PaladinInvalidTransactionException(
           "transaction type is required: call publicTx(), privateTx() or type(...)");
     }
-    if (isBlank(from)) {
+    if (requireFrom && isBlank(from)) {
       throw new PaladinInvalidTransactionException(
           "a signing identity is required: call from(...)");
     }

@@ -106,4 +106,56 @@ Output: `core/build/docs/javadoc/index.html`.
 ```
 
 Report: `core/build/reports/jacoco/test/html/index.html`.
-The build fails if instruction coverage drops below the configured minimum (currently 94%).
+The build fails if instruction coverage drops below the configured minimum (currently 96%).
+
+## Privacy-group transactions
+
+Select a group returned by `client.privacyGroups()` and use the transaction builder
+for deployments, invocations, and read-only calls:
+
+```java
+var sent = client.newTx()
+    .privacyGroup(group)
+    .from("alice@node1")
+    .to(contractAddress)
+    .abi(erc20Abi)
+    .function("transfer(address,uint256)")
+    .inputs(Map.of("to", recipientAddress, "value", 25))
+    .send();
+var receipt = sent.waitForReceipt().join(); // inspect receipt.success()
+
+var balance = client.newTx()
+    .privacyGroupId(group.id())
+    .domain(group.domain())
+    .from("alice@node1")
+    .to(contractAddress)
+    .abi(erc20Abi)
+    .function("balanceOf")
+    .inputs(Map.of("account", recipientAddress))
+    .dataFormat("mode=array&number=string")
+    .call().join();
+```
+
+For deployments, use `.constructor().bytecode(bytecode)` and supply the constructor
+arguments with `.inputs(...)`. Group transactions are implicitly private. Function
+invocations require an inline ABI; overloaded names must use a full signature.
+`buildPrivacyGroup()` returns the privacy-group RPC body; `build()` remains the
+ordinary transaction body builder. Gas, value, and fee setters configure the
+base-ledger submission options. ABI references and dependencies are not supported
+by the privacy-group RPC and are rejected by the builder.
+
+### Live integration test
+
+The Java SDK integration test exercises this API against a running default
+three-node installation. It creates a group on nodes 1 and 2, deploys ERC20Simple,
+mints and transfers tokens, checks balances on both members, and verifies that
+node 3 does not receive the group. With JDK 21 and the nodes running, invoke it
+explicitly from the repository root:
+
+```sh
+./gradlew :sdk:java:integration-test:operatorE2E
+```
+
+The task prepares the ERC20Simple artifact and connects to localhost ports
+31548, 31648, and 31748. Ordinary Java SDK `test` and `check` tasks exclude
+this live test.

@@ -44,6 +44,9 @@ import org.lfdt.paladin.sdk.client.rpc.HttpRpcClient;
 import org.lfdt.paladin.sdk.client.rpc.MockJsonRpcServer;
 import org.lfdt.paladin.sdk.core.abi.AbiEntry;
 import org.lfdt.paladin.sdk.core.abi.AbiParameter;
+import org.lfdt.paladin.sdk.core.abi.EntryType;
+import org.lfdt.paladin.sdk.core.json.PaladinObjectMapper;
+import org.lfdt.paladin.sdk.core.privacygroup.PrivacyGroup;
 import org.lfdt.paladin.sdk.core.transaction.Transaction;
 import org.lfdt.paladin.sdk.core.transaction.TransactionInput;
 import org.lfdt.paladin.sdk.core.transaction.TransactionReceipt;
@@ -868,6 +871,262 @@ class TxBuilderTest {
           assertEquals("alice", tx.from());
           assertEquals("ptx_getTransaction", server.requests().get(1).get("method").asText());
           assertEquals(TX_ID, server.requests().get(1).get("params").get(0).asText());
+        });
+  }
+
+  private static TxBuilder groupDeploy(final HttpRpcClient rpc) {
+    return TxBuilder.on(rpc)
+        .privacyGroupId("0x1234")
+        .domain("pente")
+        .from("alice")
+        .bytecode("0x6000");
+  }
+
+  @Test
+  void privacyGroupDeploySendsAndPollsThroughCorrectNamespaces() throws IOException {
+    withNode(
+        (n, req) ->
+            MockJsonRpcServer.Response.of(
+                200, success(n == 1 ? "\"" + TX_ID + "\"" : receiptJson(true))),
+        (server, rpc) -> {
+          final var constructor =
+              AbiEntry.constructor().input(AbiParameter.of("supply", "uint256")).build();
+          final var group =
+              PaladinObjectMapper.shared()
+                  .readValue("{\"domain\":\"pente\",\"id\":\"0x1234\"}", PrivacyGroup.class);
+          final TxBuilder builder =
+              TxBuilder.on(new PtxClient(rpc))
+                  .privacyGroup(group)
+                  .from("alice")
+                  .constructor()
+                  .bytecode("0x6000")
+                  .abiEntry(constructor)
+                  .inputs(Map.of("supply", 10))
+                  .idempotencyKey("deploy-1")
+                  .gas(100000)
+                  .value(2)
+                  .maxFeePerGas(BigInteger.valueOf(30))
+                  .maxPriorityFeePerGas(BigInteger.ONE)
+                  .pollingInterval(Duration.ofMillis(1));
+          final SentTransaction sent = builder.send();
+          assertEquals(UUID.fromString(TX_ID), sent.id().join());
+          assertEquals(1, server.requestCount());
+          assertTrue(sent.waitForReceipt().join().success());
+          assertEquals("pgroup_sendTransaction", server.requests().get(0).get("method").asText());
+          assertEquals(
+              "ptx_getTransactionReceipt", server.requests().get(1).get("method").asText());
+          final JsonNode body = server.requests().get(0).get("params").get(0);
+          assertEquals("pente", body.get("domain").asText());
+          assertEquals("0x1234", body.get("group").asText());
+          assertEquals("alice", body.get("from").asText());
+          assertEquals("0x6000", body.get("bytecode").asText());
+          assertEquals("constructor", body.get("function").get("type").asText());
+          assertEquals(10, body.get("input").get("supply").asInt());
+          assertEquals("deploy-1", body.get("idempotencyKey").asText());
+          assertEquals("0x186a0", body.get("publicTxOptions").get("gas").asText());
+          assertEquals("0x02", body.get("publicTxOptions").get("value").asText());
+          assertEquals("0x1e", body.get("publicTxOptions").get("maxFeePerGas").asText());
+          assertEquals("0x01", body.get("publicTxOptions").get("maxPriorityFeePerGas").asText());
+          assertFalse(body.has("type"));
+          assertFalse(body.has("abi"));
+          assertFalse(body.has("data"));
+          assertFalse(body.has("gas"));
+          assertThrows(PaladinInvalidTransactionException.class, builder::build);
+        });
+  }
+
+  @Test
+  void privacyGroupConstructorResolutionAndRawInput() throws IOException {
+    withNode(
+        node(0, null),
+        (server, rpc) -> {
+          assertNull(groupDeploy(rpc).buildPrivacyGroup().function());
+          final var defaultConstructor =
+              groupDeploy(rpc)
+                  .abiEntry(AbiEntry.function("balance").build())
+                  .buildPrivacyGroup()
+                  .function();
+          assertEquals(EntryType.CONSTRUCTOR, defaultConstructor.type());
+          assertTrue(defaultConstructor.inputs().isEmpty());
+          final var raw = groupDeploy(rpc).privateTx().inputs("0x1234").buildPrivacyGroup();
+          assertEquals("0x1234", raw.input().asText());
+          assertNull(raw.function());
+          assertEquals(0, server.requestCount());
+        });
+  }
+
+  @Test
+  void privacyGroupInvokesResolveNamesAndOverloadedSignatures() throws IOException {
+    withNode(
+        (n, req) -> MockJsonRpcServer.Response.of(200, success("\"" + TX_ID + "\"")),
+        (server, rpc) -> {
+          final var uintFn =
+              AbiEntry.function("set").input(AbiParameter.of("value", "uint")).build();
+          final var addressFn =
+              AbiEntry.function("set").input(AbiParameter.of("value", "address")).build();
+          final TxBuilder builder =
+              groupDeploy(rpc)
+                  .bytecode((HexBytes) null)
+                  .to(CONTRACT)
+                  .function("set")
+                  .abiEntry(uintFn)
+                  .abiEntry(AbiEntry.event("set").build())
+                  .inputs(List.of(42));
+          assertEquals(uintFn, builder.buildPrivacyGroup().function());
+          builder.abiEntry(addressFn);
+          assertThrows(PaladinInvalidTransactionException.class, builder::buildPrivacyGroup);
+          builder.function("set(uint256)");
+          assertEquals(uintFn, builder.buildPrivacyGroup().function());
+          builder.send().id().join();
+          final JsonNode body = server.requests().get(0).get("params").get(0);
+          assertEquals(CONTRACT, body.get("to").asText());
+          assertEquals("set", body.get("function").get("name").asText());
+          assertEquals(42, body.get("input").get(0).asInt());
+          assertFalse(body.has("bytecode"));
+          assertEquals(addressFn, builder.function("set(address)").buildPrivacyGroup().function());
+          final var tuple =
+              AbiEntry.function("tupleFn")
+                  .input(
+                      AbiParameter.builder("v", "tuple[]")
+                          .component(AbiParameter.of("n", "int[]"))
+                          .component(
+                              AbiParameter.builder("nested", "tuple")
+                                  .component(AbiParameter.of("a", "address"))
+                                  .build())
+                          .build())
+                  .build();
+          assertEquals(
+              tuple,
+              builder
+                  .abiEntry(tuple)
+                  .function("tupleFn((int256[],(address))[])")
+                  .buildPrivacyGroup()
+                  .function());
+          assertThrows(
+              PaladinInvalidTransactionException.class,
+              () -> builder.function("absent").buildPrivacyGroup());
+        });
+  }
+
+  @Test
+  void privacyGroupCallsAllowNoSignerAndOmitSubmissionOptions() throws IOException {
+    withNode(
+        (n, req) -> MockJsonRpcServer.Response.of(200, success("{\"balance\":42}")),
+        (server, rpc) -> {
+          final TxBuilder builder =
+              new PtxClient(rpc)
+                  .newTx()
+                  .privacyGroupId(HexBytes.fromString("0x1234"))
+                  .domain("pente")
+                  .to(CONTRACT)
+                  .function("balance")
+                  .abiEntry(AbiEntry.function("balance").build())
+                  .inputs(Map.of())
+                  .gas(100)
+                  .idempotencyKey("ignored")
+                  .block("latest")
+                  .dataFormat("mode=array");
+          assertEquals(42, builder.call().join().get("balance").asInt());
+          assertEquals("pgroup_call", server.requests().get(0).get("method").asText());
+          final JsonNode body = server.requests().get(0).get("params").get(0);
+          assertEquals("0x1234", body.get("group").asText());
+          assertEquals("latest", body.get("block").asText());
+          assertEquals("mode=array", body.get("dataFormat").asText());
+          assertFalse(body.has("publicTxOptions"));
+          assertFalse(body.has("idempotencyKey"));
+          assertFalse(body.has("from"));
+        });
+  }
+
+  @Test
+  void ordinaryCallsUsePtxAndPropagateResults() throws IOException {
+    withNode(
+        (n, req) -> MockJsonRpcServer.Response.of(200, success("[42]")),
+        (server, rpc) -> {
+          final var result =
+              TxBuilder.on(rpc)
+                  .publicTx()
+                  .to(CONTRACT)
+                  .function("balance")
+                  .block("latest")
+                  .dataFormat("mode=array")
+                  .call()
+                  .join();
+          assertEquals(42, result.get(0).asInt());
+          assertEquals("ptx_call", server.requests().get(0).get("method").asText());
+          assertEquals(
+              "latest", server.requests().get(0).get("params").get(0).get("block").asText());
+          assertThrows(CompletionException.class, () -> TxBuilder.on(rpc).call().join());
+        });
+  }
+
+  @Test
+  void privacyGroupValidationDefersFailuresWithoutRpc() throws IOException {
+    withNode(
+        node(0, null),
+        (server, rpc) -> {
+          final List<TxBuilder> invalid =
+              List.of(
+                  groupDeploy(rpc).publicTx(),
+                  groupDeploy(rpc).domain(" "),
+                  groupDeploy(rpc).from(null),
+                  groupDeploy(rpc).abiReference(Bytes32.fromString("0x" + "01".repeat(32))),
+                  groupDeploy(rpc).dependsOn(UUID.randomUUID()),
+                  groupDeploy(rpc).to(CONTRACT),
+                  groupDeploy(rpc).bytecode((HexBytes) null),
+                  groupDeploy(rpc).bytecode("0x"),
+                  groupDeploy(rpc).function("set"),
+                  groupDeploy(rpc).to(CONTRACT).function("set"),
+                  groupDeploy(rpc).privacyGroup(null),
+                  groupDeploy(rpc).privacyGroupId((HexBytes) null),
+                  groupDeploy(rpc).privacyGroupId("0x"),
+                  groupDeploy(rpc).privacyGroupId("not-hex"),
+                  groupDeploy(rpc).inputsJson("{"));
+          for (final TxBuilder builder : invalid) {
+            final var error =
+                assertThrows(PaladinInvalidTransactionException.class, builder::buildPrivacyGroup);
+            assertInstanceOf(
+                PaladinInvalidTransactionException.class,
+                assertThrows(CompletionException.class, () -> builder.send().id().join())
+                    .getCause());
+            assertNotNull(error.getMessage());
+          }
+          assertThrows(
+              PaladinInvalidTransactionException.class,
+              () -> TxBuilder.on(rpc).buildPrivacyGroup());
+          assertThrows(CompletionException.class, () -> groupDeploy(rpc).publicTx().call().join());
+          assertThrows(
+              CompletionException.class, () -> TxBuilder.on(rpc).inputsJson("{").call().join());
+          final TxBuilder firstError = groupDeploy(rpc).privacyGroupId("badhex");
+          final var error =
+              assertThrows(PaladinInvalidTransactionException.class, firstError::buildPrivacyGroup);
+          firstError.inputsJson("{");
+          assertSame(
+              error,
+              assertThrows(
+                  PaladinInvalidTransactionException.class, firstError::buildPrivacyGroup));
+          assertEquals(0, server.requestCount());
+        });
+  }
+
+  @Test
+  void privacyGroupRpcErrorsReachSendAndCallFutures() throws IOException {
+    withNode(
+        (n, req) ->
+            MockJsonRpcServer.Response.of(
+                200,
+                "{\"jsonrpc\":\"2.0\",\"id\":\"x\",\"error\":{\"code\":-32603,\"message\":\"group not ready\"}}"),
+        (server, rpc) -> {
+          final SentTransaction sent = groupDeploy(rpc).send();
+          assertInstanceOf(
+              PaladinRpcException.class,
+              assertThrows(CompletionException.class, () -> sent.waitForReceipt().join())
+                  .getCause());
+          assertInstanceOf(
+              PaladinRpcException.class,
+              assertThrows(CompletionException.class, () -> groupDeploy(rpc).call().join())
+                  .getCause());
+          assertEquals(2, server.requestCount());
         });
   }
 }
