@@ -50,7 +50,7 @@ Before you begin, ensure you have the following installed:
 For convenience, you can run the entire setup with a single Gradle command:
 
 ```sh
-../gradlew deploy
+./gradlew deploy
 ```
 
 This command performs all the necessary steps to deploy the Paladin Operator and create a functional Paladin node:
@@ -68,7 +68,7 @@ This command performs all the necessary steps to deploy the Paladin Operator and
 **Cleanup**
 
 ```
-../gradlew clean
+./gradlew :operator:clean
 ```
 
 > This will not delete the cluster. Delete the cluster by running `make kind-delete`
@@ -81,10 +81,10 @@ Alternatively, you can follow these steps to build and deploy the Paladin Operat
 
 #### Step 1: Build the Paladin and Operator Images
 
-Navigate to the **parent directory** of the project (where the `build.gradle` file is located) and run:
+From the **root of the repository**, run:
 
 ```sh
-../gradlew docker
+./gradlew docker
 ```
 
 This command will:
@@ -198,7 +198,7 @@ This confirms that the Paladin and Besu nodes are successfully deployed and runn
 To remove the operator and clean up all resources from your cluster, run:
 
 ```sh
-../gradlew clean
+./gradlew :operator:clean
 ```
 
 This command will:
