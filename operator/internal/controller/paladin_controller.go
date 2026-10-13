@@ -1,5 +1,5 @@
 /*
-Copyright 2025.
+Copyright 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -861,6 +861,10 @@ func (r *PaladinReconciler) generatePaladinConfig(ctx context.Context, node *cor
 	pldConf.RPCServer.HTTP.Address = ptrTo("0.0.0.0") // use k8s for network control outside the pod
 	pldConf.RPCServer.WS.Port = ptrTo(8549)
 	pldConf.RPCServer.WS.Address = ptrTo("0.0.0.0") // use k8s for network control outside the pod
+	if len(pldConf.RPCServer.WS.CORS.AllowedOrigins) == 0 && !pldConf.RPCServer.WS.CORS.Enabled {
+		pldConf.RPCServer.WS.CORS.Enabled = true
+		pldConf.RPCServer.WS.CORS.AllowedOrigins = []string{"*"}
+	}
 	if pldConf.MetricsServer.Enabled != nil && *pldConf.MetricsServer.Enabled {
 		pldConf.MetricsServer.Address = ptrTo("0.0.0.0") // reachable via NodePort (e.g. kind hostPort 31550)
 	}

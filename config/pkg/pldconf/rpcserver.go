@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright contributors to Paladin, an LFDT project
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -40,6 +40,15 @@ type RPCServerConfig struct {
 	LegacyReturnCodes bool                `json:"legacyReturnCodes,omitempty"` // Return HTTP 500 for all JSON/RPC errors (legacy pre-v1 behaviour to give us the option of reverting the new default if it breaks user applications)
 }
 
+var rpcServerWSHTTPDefaults = func() HTTPServerConfig {
+	d := HTTPDefaults
+	d.CORS = CORSConfig{
+		Enabled:        true,
+		AllowedOrigins: []string{"*"},
+	}
+	return d
+}()
+
 var RPCServerConfigDefaults = RPCServerConfig{
 	HTTP: RPCServerConfigHTTP{
 		HTTPServerConfig: HTTPDefaults,
@@ -47,6 +56,6 @@ var RPCServerConfigDefaults = RPCServerConfig{
 	WS: RPCServerConfigWS{
 		ReadBufferSize:   confutil.P("64KB"),
 		WriteBufferSize:  confutil.P("64KB"),
-		HTTPServerConfig: HTTPDefaults,
+		HTTPServerConfig: rpcServerWSHTTPDefaults,
 	},
 }

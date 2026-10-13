@@ -1,5 +1,5 @@
 /*
-Copyright 2025.
+Copyright 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -756,6 +756,11 @@ func TestGeneratePaladinConfig(t *testing.T) {
 
 	// Verify that the generated config contains expected values
 	assert.Contains(t, configYAML, `nodeName: test-node`)
+	assert.Contains(t, configYAML, "rpcServer:")
+	assert.Contains(t, configYAML, "cors:")
+	assert.Contains(t, configYAML, "enabled: true")
+	assert.Contains(t, configYAML, "allowedOrigins:")
+	assert.Contains(t, configYAML, "- '*'\n")
 }
 
 func TestGeneratePaladinConfigWithLogPersistence(t *testing.T) {
