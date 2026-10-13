@@ -303,6 +303,26 @@ class WebSocketSubscriptionClientTest {
   }
 
   @Test
+  void failsRequestsWhoseResponseHasNoResult() throws Exception {
+    final FakeConnector connector = new FakeConnector();
+    try (WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(config(), error -> {}, connector::connect)) {
+      final FakeSocket socket = connector.next();
+      final CompletableFuture<WebSocketSubscriptionClient.Subscription> subscription =
+          client.subscribeReceipts("listener", ignored -> {});
+      final JsonNode request = socket.nextRequest();
+      socket.respond(request, "sub-id");
+      final CompletableFuture<Boolean> removed =
+          subscription.get(2, TimeUnit.SECONDS).unsubscribe();
+      final JsonNode unsubscribe = socket.nextRequest();
+      socket.raw("{\"jsonrpc\":\"2.0\",\"id\":\"" + unsubscribe.path("id").asText() + "\"}");
+      final ExecutionException failure =
+          assertThrows(ExecutionException.class, () -> removed.get(2, TimeUnit.SECONDS));
+      assertTrue(failure.getCause() instanceof PaladinConnectionException);
+    }
+  }
+
+  @Test
   void timesOutUnansweredRequestsAndDisconnectsOnMissedPong() throws Exception {
     final FakeConnector connector = new FakeConnector();
     final WebSocketClientConfig settings =

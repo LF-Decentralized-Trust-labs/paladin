@@ -516,6 +516,10 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
       response.completeExceptionally(
           new PaladinRpcException(
               error.path("code").asInt(), error.path("message").asText(), error.get("data"), 0));
+    } else if (!root.has("result")) {
+      // A JSON-RPC success response must carry a result; never hand callers a null node.
+      response.completeExceptionally(
+          new PaladinConnectionException("WebSocket RPC response has no result", null));
     } else {
       response.complete(root.get("result"));
     }
