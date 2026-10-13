@@ -35,6 +35,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -50,7 +51,8 @@ import org.lfdt.paladin.sdk.core.json.PaladinObjectMapper;
  * <p>Subscriptions keep a stable local handle while the server assigns a new subscription ID after
  * each reconnect. The client resubscribes automatically, with exponential backoff, and sends ping
  * frames to detect a lost connection. Each delivered batch must be acknowledged or negatively
- * acknowledged by the consumer. The server pauses that subscription until it receives one.
+ * acknowledged by the consumer, exactly once. The server pauses that subscription until it receives
+ * one. If the consumer throws before answering, the client negatively acknowledges the batch.
  *
  * <p>Callbacks run on the WebSocket listener thread. Keep them short and hand longer work to an
  * application executor. This client is thread-safe; close it when finished. Returned futures are
@@ -539,8 +541,9 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
       subscription.consumer.accept(event);
     } catch (final RuntimeException e) {
       report(e);
+      // Only nack a batch the consumer has not already answered before throwing.
       event
-          .nack()
+          .nackUnlessAnswered()
           .exceptionally(
               failure -> {
                 report(failure);
@@ -691,6 +694,7 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
     private final String serverId;
     private final long attempt;
     private final JsonNode result;
+    private final AtomicBoolean answered = new AtomicBoolean();
 
     private SubscriptionEvent(
         final Subscription subscription,
@@ -735,7 +739,8 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
     }
 
     /**
-     * Acknowledges this batch on its original connection.
+     * Acknowledges this batch on its original connection. A batch can be answered only once; a
+     * later {@code ack()} or {@code nack()} fails with {@link IllegalStateException}.
      *
      * @return completion of the WebSocket send
      */
@@ -744,7 +749,8 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
     }
 
     /**
-     * Negatively acknowledges this batch on its original connection.
+     * Negatively acknowledges this batch on its original connection. A batch can be answered only
+     * once; a later {@code ack()} or {@code nack()} fails with {@link IllegalStateException}.
      *
      * @return completion of the WebSocket send
      */
@@ -752,7 +758,22 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
       return respond("_nack");
     }
 
+    private CompletableFuture<Void> nackUnlessAnswered() {
+      if (!answered.compareAndSet(false, true)) {
+        return CompletableFuture.completedFuture(null);
+      }
+      return send("_nack");
+    }
+
     private CompletableFuture<Void> respond(final String suffix) {
+      if (!answered.compareAndSet(false, true)) {
+        return CompletableFuture.failedFuture(
+            new IllegalStateException("batch has already been answered"));
+      }
+      return send(suffix);
+    }
+
+    private CompletableFuture<Void> send(final String suffix) {
       synchronized (WebSocketSubscriptionClient.this) {
         if (active.get(serverId) != subscription || attempt != generation) {
           return CompletableFuture.failedFuture(
@@ -768,7 +789,7 @@ public final class WebSocketSubscriptionClient implements AutoCloseable {
       } catch (final Exception e) {
         return CompletableFuture.failedFuture(e);
       }
-      return send(attempt, text);
+      return WebSocketSubscriptionClient.this.send(attempt, text);
     }
   }
 

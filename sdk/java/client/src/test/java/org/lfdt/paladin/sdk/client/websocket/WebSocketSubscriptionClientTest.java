@@ -253,6 +253,56 @@ class WebSocketSubscriptionClientTest {
   }
 
   @Test
+  void doesNotNackABatchTheConsumerAcknowledgedBeforeThrowing() throws Exception {
+    final FakeConnector connector = new FakeConnector();
+    final List<Throwable> errors = new CopyOnWriteArrayList<>();
+    try (WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(config(), errors::add, connector::connect)) {
+      final FakeSocket socket = connector.next();
+      final CompletableFuture<WebSocketSubscriptionClient.Subscription> subscription =
+          client.subscribeReceipts(
+              "listener",
+              event -> {
+                event.ack();
+                throw new IllegalStateException("consumer failed after ack");
+              });
+      final JsonNode request = socket.nextRequest();
+      socket.respond(request, "sub-id");
+      subscription.get(2, TimeUnit.SECONDS);
+      socket.notify("ptx_subscription", "sub-id", "{\"batchId\":1}");
+      assertEquals("ptx_ack", socket.nextRequest().path("method").asText());
+      assertNull(socket.nextRequestOrNull(100));
+      assertEquals(1, errors.size());
+    }
+  }
+
+  @Test
+  void answersEachBatchOnlyOnce() throws Exception {
+    final FakeConnector connector = new FakeConnector();
+    try (WebSocketSubscriptionClient client =
+        new WebSocketSubscriptionClient(config(), error -> {}, connector::connect)) {
+      final FakeSocket socket = connector.next();
+      final BlockingQueue<WebSocketSubscriptionClient.SubscriptionEvent> events =
+          new LinkedBlockingQueue<>();
+      final CompletableFuture<WebSocketSubscriptionClient.Subscription> subscription =
+          client.subscribeReceipts("listener", events::add);
+      final JsonNode request = socket.nextRequest();
+      socket.respond(request, "sub-id");
+      subscription.get(2, TimeUnit.SECONDS);
+      socket.notify("ptx_subscription", "sub-id", "{\"batchId\":1}");
+      final WebSocketSubscriptionClient.SubscriptionEvent event = events.poll(2, TimeUnit.SECONDS);
+      assertNotNull(event);
+      event.nack().get(2, TimeUnit.SECONDS);
+      final ExecutionException ack =
+          assertThrows(ExecutionException.class, () -> event.ack().get(2, TimeUnit.SECONDS));
+      assertTrue(ack.getCause() instanceof IllegalStateException);
+      assertThrows(ExecutionException.class, () -> event.nack().get(2, TimeUnit.SECONDS));
+      assertEquals("ptx_nack", socket.nextRequest().path("method").asText());
+      assertNull(socket.nextRequestOrNull(100));
+    }
+  }
+
+  @Test
   void timesOutUnansweredRequestsAndDisconnectsOnMissedPong() throws Exception {
     final FakeConnector connector = new FakeConnector();
     final WebSocketClientConfig settings =
