@@ -13,26 +13,19 @@ When a developer opens a PR, several automated checks are triggered to validate 
   - **[Template the Helm Chart](workflows/build-chart.yaml):** Rebuilds and validates Helm charts for correctness.  
     > **Note:** Charts are **not published** but tested locally.
 
-- **[Test Examples](workflows/on-pr-push-examples.yaml):**
-  - **Status:** [![Test Examples](https://github.com/LFDT-Paladin/paladin/actions/workflows/on-pr-push-examples.yaml/badge.svg?branch=main)](https://github.com/LFDT-Paladin/paladin/actions/workflows/on-pr-push-examples.yaml)
+- **[Test Examples](workflows/test-examples.yaml):**
+  - **Status:** [![Test Examples](https://github.com/LFDT-Paladin/paladin/actions/workflows/test-examples.yaml/badge.svg?branch=main)](https://github.com/LFDT-Paladin/paladin/actions/workflows/test-examples.yaml)
   - **Trigger:** Runs on pushes and pull requests to `main` that modify files under `examples/**`.
   - **Purpose:** Validates that example changes don't break existing functionality by running them against both the latest published and local versions of the SDK and contracts.
   - **Key Steps:**
     - **Backwards Compatibility:** Runs `test-examples.yaml` with `build_local_sdk` and `build_local_abi` set to `false` to ensure the examples work with the latest published versions.
     - **Forward Compatibility:** Runs `test-examples.yaml` with `build_local_sdk` and `build_local_abi` set to `true` to ensure the examples work with the current code in the PR.
-- **[Check Metadata Changes](workflows/check-metadata-changes.yml):**
 
-- **[Test TypeScript SDK](workflows/on-pr-push-ts-sdk.yaml):**  
-  Validates SDK changes against existing examples:
-  - **Triggers on:** Changes to `sdk/typescript/**` files
-  - **Tests:** Examples with locally built SDK and published ABI
-  - **Purpose:** Ensures SDK modifications don't break example compatibility
+- **Test TypeScript SDK:**  
+  Validation of the TypeScript SDK is performed as part of the current PR workflows to ensure changes remain compatible with examples.
 
-- **[Test Solidity Changes](workflows/on-pr-push-solidity.yaml):**  
-  Validates Solidity contract changes against examples:
-  - **Triggers on:** Changes to `solidity/**` files
-  - **Tests:** Examples with locally built ABI and published SDK
-  - **Purpose:** Ensures contract changes don't break example functionality
+- **Test Solidity Changes:**  
+  Solidity contract validation is included in the PR workflows to ensure changes do not break example functionality.
 
 All checks must pass before PRs can be merged to the main branch.
 
