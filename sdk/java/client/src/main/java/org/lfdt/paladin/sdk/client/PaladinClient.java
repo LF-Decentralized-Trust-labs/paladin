@@ -62,8 +62,8 @@ import org.lfdt.paladin.sdk.core.abi.AbiEntry;
  * it in try-with-resources. A client built with {@link #wrap(RpcClient)} borrows a transport the
  * caller created, so {@link #close()} leaves it open; close that transport yourself when done.
  *
- * <p>WebSocket connection and the subscription methods that need it are not part of this release;
- * only the HTTP transport is available today.
+ * <p>This facade uses the HTTP transport. Use {@link
+ * org.lfdt.paladin.sdk.client.websocket.WebSocketSubscriptionClient} for subscription streams.
  *
  * <p>Instances created with {@code http(...)} are thread-safe and intended to be shared for the
  * lifetime of the application. A wrapped client is thread-safe if its supplied {@link RpcClient} is

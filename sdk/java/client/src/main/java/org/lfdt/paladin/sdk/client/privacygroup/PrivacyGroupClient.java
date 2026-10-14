@@ -43,8 +43,8 @@ import org.lfdt.paladin.sdk.core.types.HexBytes;
  *
  * <p>The namespace covers three things: the groups themselves, the EVM transactions and calls
  * executed inside them, and the off-chain messages members exchange. Message delivery is driven by
- * named listeners; subscribing to a listener's stream needs a WebSocket transport and is not part
- * of this client.
+ * named listeners; use {@link org.lfdt.paladin.sdk.client.websocket.WebSocketSubscriptionClient} to
+ * consume their streams.
  */
 public final class PrivacyGroupClient {
 

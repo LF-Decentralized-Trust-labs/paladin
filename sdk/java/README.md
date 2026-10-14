@@ -3,17 +3,19 @@
 Native Java SDK for [Paladin](https://github.com/LFDT-Paladin/paladin) — enables enterprise
 JVM applications to interact with a Paladin node using a Java native library.
 
-Work in progress...
+The core models, asynchronous HTTP RPC client, seven RPC namespaces, transaction builder, and
+WebSocket subscriptions are implemented. Domain helpers, test utilities, node integration tests,
+and Maven publishing are still in progress.
 
 ## Modules
 
 | Module             | Description                                      |
 |--------------------|--------------------------------------------------|
-| `core`             | Data models and primitives                       |
-| `client`           | HTTP + WebSocket transport, RPC client           |
-| `domains`          | Helpers for Noto, Pente, and Zeto protocols      |
-| `testing`          | Mock client, WireMock stubs, Testcontainers      |
-| `integration-test` | End-to-end tests against a real Paladin node     |
+| `core`             | Data models, primitives, and subscription batches |
+| `client`           | HTTP RPC, namespace clients, transaction builder, and WebSocket subscriptions |
+| `domains`          | Planned helpers for Noto, Pente, and Zeto        |
+| `testing`          | Planned test utilities                           |
+| `integration-test` | Planned end-to-end tests against a Paladin node  |
 
 ## Building
 
@@ -27,9 +29,51 @@ Work in progress...
 
 Requires JDK 21+.
 
+## WebSocket subscriptions
+
+Use a WebSocket endpoint and subscribe with an existing Paladin listener name. Each batch must be
+acknowledged after processing or negatively acknowledged to request redelivery. The client pings
+the node, reconnects with backoff after a disconnect, and resubscribes using the same local handle;
+the server subscription ID changes on each connection.
+
+```java
+WebSocketClientConfig config = WebSocketClientConfig.builder("ws://localhost:8549").build();
+try (WebSocketSubscriptionClient ws = new WebSocketSubscriptionClient(config)) {
+  WebSocketSubscriptionClient.Subscription subscription =
+      ws.subscribeReceipts("my-receipts", event -> {
+        TransactionReceiptBatch batch = event.resultAs(TransactionReceiptBatch.class);
+        // Process batch.receipts() before acknowledging it.
+        event.ack();
+      }).join();
+  // Keep the client open while consuming events; call subscription.unsubscribe() when done.
+}
+```
+
+`subscribeBlockchainEvents` and `subscribeMessages` use `TransactionEventBatch` and
+`PrivacyGroupMessageBatch`. Configure authentication with `WebSocketClientConfig.Builder.header`.
+Set `reconnectDelay(Duration.ZERO)` to disable reconnection; otherwise `reconnectDelay` must not exceed
+`maxReconnectDelay` (default 30 s), or `build()` throws. An optional error handler constructor
+reports connection failures and callback errors.
+
+### Testing against local nodes
+
+With the operator development cluster running, run the opt-in live test:
+
+```bash
+PALADIN_LIVE_TEST=true ./gradlew :sdk:java:client:test --tests '*WebSocketLiveTest' --rerun-tasks
+```
+
+The test uses HTTP/WebSocket port pairs `31548/31549`, `31648/31649`, and `31748/31749`.
+It requires existing transaction receipts and contract-registration events. It creates temporary
+listeners, checks typed batches and NACK redelivery, and cuts its own TCP proxy connection to
+verify automatic resubscription and rejection of stale acknowledgments. It deletes its listeners
+afterward. Where a local privacy group exists, it sends a uniquely tagged test message that remains
+in that group's history; otherwise it checks only message subscription and unsubscription.
+The test is skipped unless `PALADIN_LIVE_TEST=true`.
+
 ## Code quality
 
-The build enforces formatting, Javadoc completeness, and test coverage. All run as part of
+The build enforces formatting, Checkstyle, Javadoc completeness, and test coverage. All run as part of
 `build`/`check`, so CI fails if any is violated.
 
 ### Formatting (Spotless + Google Java Format)
