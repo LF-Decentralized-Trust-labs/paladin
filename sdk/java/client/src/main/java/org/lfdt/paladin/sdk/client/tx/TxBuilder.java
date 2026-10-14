@@ -86,7 +86,7 @@ import org.lfdt.paladin.sdk.core.types.HexUint64;
  * <p>{@link #send()} submits and returns immediately, exactly as Go's {@code Send()} and
  * TypeScript's {@code sendTransaction()} do. Waiting is a second, explicit step on the returned
  * {@link SentTransaction}: {@link SentTransaction#waitForReceipt()} polls {@code
- * ptx_getTransactionReceipt} every {@link #pollingInterval(Duration)} (default one second) until a
+ * ptx_getTransactionReceipt} with increasing delays (100ms up to one second by default) until a
  * receipt lands or {@link #receiptTimeout(Duration)} (default 30 seconds) elapses, at which point
  * the future fails with a {@link PaladinTimeoutException}. Take the transaction id alone, without
  * waiting, from {@link SentTransaction#id()}.
@@ -96,7 +96,7 @@ import org.lfdt.paladin.sdk.core.types.HexUint64;
  */
 public final class TxBuilder {
 
-  /** Default delay between receipt polls, used unless {@link #pollingInterval(Duration)} is set. */
+  /** Maximum default delay between receipt polls. */
   public static final Duration DEFAULT_POLLING_INTERVAL = Duration.ofSeconds(1);
 
   /** Default receipt wait, used unless {@link #receiptTimeout(Duration)} is set. */
@@ -125,6 +125,7 @@ public final class TxBuilder {
   private HexBytes bytecode;
 
   private Duration pollingInterval = DEFAULT_POLLING_INTERVAL;
+  private Duration initialPollingInterval = Duration.ofMillis(100);
   private Duration receiptTimeout = DEFAULT_RECEIPT_TIMEOUT;
 
   private PaladinInvalidTransactionException deferredError;
@@ -537,8 +538,9 @@ public final class TxBuilder {
   }
 
   /**
-   * Sets the delay between receipt polls used by {@link SentTransaction#waitForReceipt()}. A
-   * non-positive or {@code null} interval is deferred, not thrown.
+   * Sets a fixed delay between receipt polls, replacing the default exponential backoff from 100ms
+   * to one second, used by {@link SentTransaction#waitForReceipt()}. A non-positive or {@code null}
+   * interval is deferred, not thrown.
    *
    * @param pollingInterval the delay between polls
    * @return this builder
@@ -549,6 +551,7 @@ public final class TxBuilder {
       return this;
     }
     this.pollingInterval = pollingInterval;
+    this.initialPollingInterval = pollingInterval;
     return this;
   }
 
@@ -642,7 +645,7 @@ public final class TxBuilder {
     } catch (final PaladinInvalidTransactionException e) {
       id = CompletableFuture.failedFuture(e);
     }
-    return new SentTransaction(ptx, id, pollingInterval, receiptTimeout);
+    return new SentTransaction(ptx, id, initialPollingInterval, pollingInterval, receiptTimeout);
   }
 
   /**

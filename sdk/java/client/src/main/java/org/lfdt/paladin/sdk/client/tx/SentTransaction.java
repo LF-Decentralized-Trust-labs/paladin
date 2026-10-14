@@ -20,6 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.lfdt.paladin.sdk.client.exception.PaladinInvalidTransactionException;
 import org.lfdt.paladin.sdk.client.exception.PaladinTimeoutException;
 import org.lfdt.paladin.sdk.client.ptx.PtxClient;
@@ -58,6 +59,7 @@ public final class SentTransaction {
 
   private final PtxClient ptx;
   private final CompletableFuture<UUID> id;
+  private final Duration initialPollingInterval;
   private final Duration pollingInterval;
   private final Duration receiptTimeout;
 
@@ -68,10 +70,13 @@ public final class SentTransaction {
   SentTransaction(
       final PtxClient ptx,
       final CompletableFuture<UUID> id,
+      final Duration initialPollingInterval,
       final Duration pollingInterval,
       final Duration receiptTimeout) {
     this.ptx = Objects.requireNonNull(ptx, "ptx");
     this.id = Objects.requireNonNull(id, "id");
+    this.initialPollingInterval =
+        Objects.requireNonNull(initialPollingInterval, "initialPollingInterval");
     this.pollingInterval = Objects.requireNonNull(pollingInterval, "pollingInterval");
     this.receiptTimeout = Objects.requireNonNull(receiptTimeout, "receiptTimeout");
   }
@@ -96,9 +101,9 @@ public final class SentTransaction {
    * TransactionReceipt#failureMessage()} explains why. Inspect the receipt rather than relying on
    * the future failing — matching the TypeScript SDK.
    *
-   * <p>Polling is fully asynchronous: it occupies no thread while waiting, and each sleep is
-   * clamped to the time remaining, so a polling interval coarser than the timeout still fails on
-   * schedule rather than overshooting.
+   * <p>Polling is fully asynchronous: it occupies no thread while waiting, the timeout starts once
+   * submission returns an id, and it also applies while a receipt RPC is pending. Cancellation or
+   * timeout stops further polls; an already issued RPC may still finish.
    *
    * @return a future completing with the transaction's receipt; failing with a {@link
    *     PaladinTimeoutException} if no receipt arrives in time, or with the submission failure or
@@ -111,15 +116,16 @@ public final class SentTransaction {
   /**
    * Waits for the transaction's receipt with an explicit timeout, overriding the builder's {@link
    * TxBuilder#receiptTimeout(Duration)} for this call. Equivalent to Go's {@code
-   * SentTransaction.Wait(timeout)}. The polling interval still comes from the builder.
+   * SentTransaction.Wait(timeout)}. The polling strategy still comes from the builder.
    *
    * <p>Reverts and asynchrony behave exactly as described on {@link #waitForReceipt()}.
    *
    * @param timeout the total time to wait for a receipt; must be positive
    * @return a future completing with the transaction's receipt; failing with a {@link
    *     PaladinTimeoutException} if no receipt arrives in time, with a {@link
-   *     PaladinInvalidTransactionException} if the timeout is {@code null} or non-positive, or with
-   *     the submission failure or an underlying transport failure
+   *     PaladinInvalidTransactionException} if the timeout is {@code null} or non-positive, or the
+   *     timeout or polling interval cannot be represented in nanoseconds; or with the submission
+   *     failure or an underlying transport failure
    */
   public CompletableFuture<TransactionReceipt> waitForReceipt(final Duration timeout) {
     if (timeout == null || timeout.isNegative() || timeout.isZero()) {
@@ -127,8 +133,49 @@ public final class SentTransaction {
           new PaladinInvalidTransactionException(
               "receipt timeout must be positive, got: " + timeout));
     }
-    return id.thenCompose(
-        txId -> pollForReceipt(txId, System.nanoTime() + timeout.toNanos(), timeout, 1));
+    final long timeoutNanos;
+    final long initialDelayNanos;
+    try {
+      timeoutNanos = timeout.toNanos();
+      initialDelayNanos = initialPollingInterval.toNanos();
+    } catch (final ArithmeticException e) {
+      return CompletableFuture.failedFuture(
+          new PaladinInvalidTransactionException(
+              "receipt timeout or polling interval is too large", e));
+    }
+    final CompletableFuture<TransactionReceipt> result = new CompletableFuture<>();
+    id.whenComplete(
+        (txId, submissionError) -> {
+          if (result.isDone()) {
+            return;
+          }
+          if (submissionError != null) {
+            result.completeExceptionally(submissionError);
+            return;
+          }
+          final CompletableFuture<TransactionReceipt> polling = new CompletableFuture<>();
+          polling
+              .orTimeout(timeoutNanos, TimeUnit.NANOSECONDS)
+              .whenComplete(
+                  (receipt, error) -> {
+                    if (error instanceof TimeoutException) {
+                      result.completeExceptionally(
+                          new PaladinTimeoutException(
+                              "no receipt for transaction "
+                                  + txId
+                                  + " after "
+                                  + timeout.toMillis()
+                                  + "ms"));
+                    } else if (error != null) {
+                      result.completeExceptionally(error);
+                    } else {
+                      result.complete(receipt);
+                    }
+                  });
+          result.whenComplete((receipt, error) -> polling.cancel(false));
+          pollForReceipt(txId, polling, initialDelayNanos);
+        });
+    return result;
   }
 
   /**
@@ -157,34 +204,35 @@ public final class SentTransaction {
    * Polls for a receipt until one lands or the deadline passes, without holding a thread between
    * attempts.
    */
-  private CompletableFuture<TransactionReceipt> pollForReceipt(
-      final UUID txId, final long deadlineNanos, final Duration timeout, final int attempt) {
-    return ptx.getTransactionReceipt(txId)
-        .thenCompose(
-            receipt -> {
-              if (receipt != null) {
-                return CompletableFuture.completedFuture(receipt);
-              }
-              final long remaining = deadlineNanos - System.nanoTime();
-              if (remaining <= 0) {
-                return CompletableFuture.failedFuture(
-                    new PaladinTimeoutException(
-                        "no receipt for transaction "
-                            + txId
-                            + " after "
-                            + attempt
-                            + " attempt(s) over "
-                            + timeout.toMillis()
-                            + "ms"));
-              }
-              // Never sleep past the deadline, so the timeout fires on schedule even when the
-              // polling interval is coarser than the time left.
-              final long delayNanos = Math.min(pollingInterval.toNanos(), remaining);
-              final Executor delayed =
-                  CompletableFuture.delayedExecutor(delayNanos, TimeUnit.NANOSECONDS);
-              return CompletableFuture.supplyAsync(() -> null, delayed)
-                  .thenCompose(
-                      ignored -> pollForReceipt(txId, deadlineNanos, timeout, attempt + 1));
-            });
+  private void pollForReceipt(
+      final UUID txId, final CompletableFuture<TransactionReceipt> result, final long delayNanos) {
+    if (result.isDone()) {
+      return;
+    }
+    final CompletableFuture<TransactionReceipt> request;
+    try {
+      request = ptx.getTransactionReceipt(txId);
+    } catch (final RuntimeException e) {
+      result.completeExceptionally(e);
+      return;
+    }
+    request.whenComplete(
+        (receipt, error) -> {
+          if (result.isDone()) {
+            return;
+          }
+          if (error != null) {
+            result.completeExceptionally(error);
+          } else if (receipt != null) {
+            result.complete(receipt);
+          } else {
+            final Executor delayed =
+                CompletableFuture.delayedExecutor(delayNanos, TimeUnit.NANOSECONDS);
+            // Add rather than multiply so a caller's large fixed interval cannot overflow.
+            final long nextDelay =
+                delayNanos + Math.min(delayNanos, pollingInterval.toNanos() - delayNanos);
+            delayed.execute(() -> pollForReceipt(txId, result, nextDelay));
+          }
+        });
   }
 }
