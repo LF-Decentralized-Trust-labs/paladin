@@ -64,11 +64,11 @@ const (
 	pscValid
 )
 
-func (d *domain) initSmartContract(ctx context.Context, dbTX persistence.DBTX, def *PrivateSmartContract) (pscLoadResult, *domainContract, error) {
+func (d *domain) initSmartContract(ctx context.Context, dbTX persistence.DBTX, def *PrivateSmartContract, loadGeneration uint64) (pscLoadResult, *domainContract, error) {
 	loadResult, dc, err := d.newDomainContract(ctx, dbTX, def, def.ConfigBytes)
 	// Only cache valid ones
 	if dc != nil {
-		d.dm.contractCache.Set(dc.info.Address, dc)
+		d.dm.cacheContract(dc, loadGeneration)
 	}
 	return loadResult, dc, err
 }

@@ -1789,3 +1789,21 @@ func TestUpgradeInRolledBackBatchNotCached(t *testing.T) {
 	assert.Empty(t, <-utd.confirmed)
 	assert.Equal(t, []string{`{"config":"0xfeedbeef"}`}, *batchConfigs)
 }
+
+func TestLiveContractLoadedDuringLiveConfigChangeNotCached(t *testing.T) {
+	utd, contractAddr, done := newUpgradeTestDomain(t, false)
+	defer done()
+
+	initContract := utd.tp.Functions.InitContract
+	utd.tp.Functions.InitContract = func(ctx context.Context, icr *prototk.InitContractRequest) (*prototk.InitContractResponse, error) {
+		// The load has read the row, and the indexer commits an upgrade before the contract is initialized
+		utd.tp.Functions.InitContract = initContract
+		utd.handleBatch(t, upgradeEvent(contractAddr, "0xcafe", 0))
+		return initContract(ctx, icr)
+	}
+
+	assert.Equal(t, `{"config":"0xfeedbeef"}`, utd.liveContractConfig(t, contractAddr))
+	assert.Empty(t, <-utd.confirmed)
+	assert.Equal(t, contractAddr, <-utd.configChanged)
+	assert.Equal(t, `{"config":"0xcafe"}`, utd.liveContractConfig(t, contractAddr))
+}
