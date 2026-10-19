@@ -20,6 +20,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"testing"
 
@@ -48,6 +49,25 @@ func TestSolidityEventSignatures(t *testing.T) {
 	assert.Equal(t, "event PaladinUpgradeSmartContractConfig_V0(bytes config)", eventSolSig_PaladinUpgradeSmartContractConfig_V0)
 }
 
+func registrationEvent(registry pldtypes.EthAddress, deployTX uuid.UUID, contractAddr pldtypes.EthAddress, config string, logIndex int64) *pldapi.EventWithData {
+	return &pldapi.EventWithData{
+		SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
+		Address:           registry,
+		IndexedEvent: &pldapi.IndexedEvent{
+			BlockNumber:      12345,
+			TransactionIndex: 0,
+			LogIndex:         logIndex,
+			TransactionHash:  pldtypes.RandBytes32(),
+			Signature:        eventSig_PaladinRegisterSmartContract_V0,
+		},
+		Data: pldtypes.RawJSON(`{
+			"txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
+			"instance": "` + contractAddr.String() + `",
+			"config": "` + config + `"
+		}`),
+	}
+}
+
 func registerTestSmartContract(t *testing.T, td *testDomainContext) (deployTX uuid.UUID, contractAddr pldtypes.EthAddress) {
 	// Index an event indicating deployment of a new smart contract instance
 	deployTX = uuid.New()
@@ -55,27 +75,12 @@ func registerTestSmartContract(t *testing.T, td *testDomainContext) (deployTX uu
 	var batchTxs txCompletionsOrdered
 	var unprocessedEvents []*pldapi.EventWithData
 	err := td.dm.persistence.Transaction(td.ctx, func(ctx context.Context, dbTX persistence.DBTX) (err error) {
-		unprocessedEvents, batchTxs, err = td.dm.registrationIndexer(ctx, dbTX, &blockindexer.EventDeliveryBatch{
+		unprocessedEvents, _, batchTxs, err = td.dm.registrationIndexer(ctx, dbTX, &blockindexer.EventDeliveryBatch{
 			StreamID:   uuid.New(),
 			StreamName: "name_given_by_component_mgr",
 			BatchID:    uuid.New(),
 			Events: []*pldapi.EventWithData{
-				{
-					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
-					Address:           (pldtypes.EthAddress)(*td.tp.d.RegistryAddress()),
-					IndexedEvent: &pldapi.IndexedEvent{
-						BlockNumber:      12345,
-						TransactionIndex: 0,
-						LogIndex:         0,
-						TransactionHash:  pldtypes.NewBytes32FromSlice(pldtypes.RandBytes(32)),
-						Signature:        eventSig_PaladinRegisterSmartContract_V0,
-					},
-					Data: pldtypes.RawJSON(`{
-					  "txId": "` + pldtypes.Bytes32UUIDFirst16(deployTX).String() + `",
-					  "instance": "` + contractAddr.String() + `",
-					  "config": "0xfeedbeef"
-				  }`),
-				},
+				registrationEvent(*td.d.registryAddress, deployTX, contractAddr, "0xfeedbeef", 0),
 			},
 		})
 		return err
@@ -142,7 +147,7 @@ func TestEventIndexingBadEvent(t *testing.T) {
 	defer done()
 
 	err := td.dm.persistence.Transaction(td.ctx, func(ctx context.Context, tx persistence.DBTX) error {
-		_, _, err := td.dm.registrationIndexer(td.ctx, tx, &blockindexer.EventDeliveryBatch{
+		_, _, _, err := td.dm.registrationIndexer(td.ctx, tx, &blockindexer.EventDeliveryBatch{
 			StreamID:   uuid.New(),
 			StreamName: "name_given_by_component_mgr",
 			BatchID:    uuid.New(),
@@ -177,7 +182,7 @@ func TestEventIndexingInsertError(t *testing.T) {
 	contractAddr := pldtypes.EthAddress(pldtypes.RandBytes(20))
 	deployTX := uuid.New()
 	err := td.dm.persistence.Transaction(td.ctx, func(ctx context.Context, tx persistence.DBTX) error {
-		_, _, err := td.dm.registrationIndexer(td.ctx, tx, &blockindexer.EventDeliveryBatch{
+		_, _, _, err := td.dm.registrationIndexer(td.ctx, tx, &blockindexer.EventDeliveryBatch{
 			StreamID:   uuid.New(),
 			StreamName: "name_given_by_component_mgr",
 			BatchID:    uuid.New(),
@@ -1345,6 +1350,7 @@ func domainEvent(source pldtypes.EthAddress, logIndex int64) *pldapi.EventWithDa
 // upgradeTestDomain is a real-DB domain whose sequencer manager mock relays what the completion loop hands it
 type upgradeTestDomain struct {
 	*testDomainContext
+	deployTX      uuid.UUID
 	confirmed     chan []*components.TxCompletion
 	configChanged chan pldtypes.EthAddress
 	initConfigs   []string
@@ -1367,7 +1373,8 @@ func newUpgradeTestDomain(t *testing.T, upgradeFails bool) (*upgradeTestDomain, 
 		mc.txManager.On("FinalizeTransactions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	})
 	utd.testDomainContext = td
-	_, contractAddr := registerTestSmartContract(t, td)
+	deployTX, contractAddr := registerTestSmartContract(t, td)
+	utd.deployTX = deployTX
 
 	td.tp.Functions.HandleEventBatch = func(ctx context.Context, req *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error) {
 		return &prototk.HandleEventBatchResponse{}, nil
@@ -1397,12 +1404,39 @@ func (utd *upgradeTestDomain) handleBatch(t *testing.T, events ...*pldapi.EventW
 	require.NoError(t, err)
 }
 
-func (utd *upgradeTestDomain) storedConfig(t *testing.T, addr pldtypes.EthAddress) string {
+func (utd *upgradeTestDomain) storedContract(t *testing.T, addr pldtypes.EthAddress) *PrivateSmartContract {
 	var contracts []*PrivateSmartContract
 	err := utd.dm.persistence.NOTX().DB(utd.ctx).Table("private_smart_contracts").Where("address = ?", addr).Find(&contracts).Error
 	require.NoError(t, err)
 	require.Len(t, contracts, 1)
-	return contracts[0].ConfigBytes.String()
+	return contracts[0]
+}
+
+func (utd *upgradeTestDomain) storedConfig(t *testing.T, addr pldtypes.EthAddress) string {
+	return utd.storedContract(t, addr).ConfigBytes.String()
+}
+
+func (utd *upgradeTestDomain) storedIndexedConfig(t *testing.T, addr pldtypes.EthAddress) string {
+	return utd.storedContract(t, addr).IndexedConfigBytes.String()
+}
+
+func (utd *upgradeTestDomain) liveContract(t *testing.T, addr pldtypes.EthAddress) components.DomainSmartContract {
+	psc, err := utd.dm.GetSmartContractByAddress(utd.ctx, utd.dm.persistence.NOTX(), addr)
+	require.NoError(t, err)
+	return psc
+}
+
+func (utd *upgradeTestDomain) liveContractConfig(t *testing.T, addr pldtypes.EthAddress) string {
+	return utd.liveContract(t, addr).ContractConfig().ContractConfigJson
+}
+
+func (utd *upgradeTestDomain) recordBatchConfigs() *[]string {
+	var batchConfigs []string
+	utd.tp.Functions.HandleEventBatch = func(ctx context.Context, req *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error) {
+		batchConfigs = append(batchConfigs, req.ContractInfo.ContractConfigJson)
+		return &prototk.HandleEventBatchResponse{}, nil
+	}
+	return &batchConfigs
 }
 
 func TestUpgradeEventFromInstanceReplacesConfig(t *testing.T) {
@@ -1451,10 +1485,11 @@ func TestUpgradeEventForInstanceOfAnotherRegistryIgnored(t *testing.T) {
 
 	otherInstance := *pldtypes.RandAddress()
 	err := utd.dm.persistence.NOTX().DB(utd.ctx).Table("private_smart_contracts").Create(&PrivateSmartContract{
-		DeployTX:        uuid.New(),
-		RegistryAddress: *pldtypes.RandAddress(),
-		Address:         otherInstance,
-		ConfigBytes:     pldtypes.HexBytes{0xfe, 0xed},
+		DeployTX:           uuid.New(),
+		RegistryAddress:    *pldtypes.RandAddress(),
+		Address:            otherInstance,
+		ConfigBytes:        pldtypes.HexBytes{0xfe, 0xed},
+		IndexedConfigBytes: pldtypes.HexBytes{0xfe, 0xed},
 	}).Error
 	require.NoError(t, err)
 
@@ -1563,4 +1598,194 @@ func TestUpgradeEventUpdateError(t *testing.T) {
 		})
 	})
 	assert.Regexp(t, "pop", err)
+}
+
+func TestUpgradeEventLiveConfigUpdateError(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), func(mc *mockComponents) {
+		mc.db.ExpectBegin()
+		mc.db.ExpectExec("UPDATE.*private_smart_contracts.*indexed_config_bytes").WillReturnResult(sqlmock.NewResult(0, 1))
+		mc.db.ExpectExec("UPDATE.*private_smart_contracts.*config_bytes").WillReturnError(fmt.Errorf("pop"))
+		mc.db.ExpectRollback()
+	})
+	defer done()
+
+	contractAddr := *pldtypes.RandAddress()
+	err := td.dm.persistence.Transaction(td.ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		return td.d.handleEventBatch(ctx, dbTX, &blockindexer.EventDeliveryBatch{
+			BatchID: uuid.New(),
+			Events:  []*pldapi.EventWithData{upgradeEvent(contractAddr, "0xcafe", 0)},
+		})
+	})
+	assert.Regexp(t, "pop", err)
+}
+
+func TestEventForInstanceOfUnconfiguredRegistryDiscarded(t *testing.T) {
+	utd, _, done := newUpgradeTestDomain(t, false)
+	defer done()
+
+	otherInstance := *pldtypes.RandAddress()
+	err := utd.dm.persistence.NOTX().DB(utd.ctx).Table("private_smart_contracts").Create(&PrivateSmartContract{
+		DeployTX:           uuid.New(),
+		RegistryAddress:    *pldtypes.RandAddress(),
+		Address:            otherInstance,
+		ConfigBytes:        pldtypes.HexBytes{0xfe, 0xed},
+		IndexedConfigBytes: pldtypes.HexBytes{0xfe, 0xed},
+	}).Error
+	require.NoError(t, err)
+
+	utd.tp.Functions.HandleEventBatch = func(ctx context.Context, req *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error) {
+		return nil, fmt.Errorf("events of a contract whose registry is not configured must not be dispatched")
+	}
+
+	utd.handleBatch(t, domainEvent(otherInstance, 0))
+	assert.Empty(t, <-utd.confirmed)
+	assert.Empty(t, utd.initConfigs)
+}
+
+func TestReplayedStreamDispatchesHistoricalConfigAndKeepsLiveConfig(t *testing.T) {
+	utd, contractAddr, done := newUpgradeTestDomain(t, false)
+	defer done()
+
+	var batchConfigs []string
+	var batchEventCounts []int
+	utd.tp.Functions.HandleEventBatch = func(ctx context.Context, req *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error) {
+		batchConfigs = append(batchConfigs, req.ContractInfo.ContractConfigJson)
+		batchEventCounts = append(batchEventCounts, len(req.Events))
+		return &prototk.HandleEventBatchResponse{}, nil
+	}
+
+	registration := registrationEvent(*utd.d.registryAddress, utd.deployTX, contractAddr, "0xfeedbeef", 0)
+	beforeUpgrades := []*pldapi.EventWithData{domainEvent(contractAddr, 1), domainEvent(contractAddr, 2)}
+	afterFirstUpgrade := []*pldapi.EventWithData{upgradeEvent(contractAddr, "0xcafe", 3), domainEvent(contractAddr, 4), domainEvent(contractAddr, 5)}
+	afterSecondUpgrade := []*pldapi.EventWithData{upgradeEvent(contractAddr, "0xf00d", 6), domainEvent(contractAddr, 7), domainEvent(contractAddr, 8)}
+
+	utd.handleBatch(t, slices.Concat(beforeUpgrades, afterFirstUpgrade, afterSecondUpgrade)...)
+	assert.Empty(t, <-utd.confirmed)
+	assert.Equal(t, contractAddr, <-utd.configChanged)
+	assert.Equal(t, "0xf00d", utd.storedConfig(t, contractAddr))
+
+	batchConfigs, batchEventCounts = nil, nil
+	for i, replayed := range [][]*pldapi.EventWithData{
+		append([]*pldapi.EventWithData{registration}, beforeUpgrades...),
+		afterFirstUpgrade,
+		afterSecondUpgrade,
+	} {
+		utd.handleBatch(t, replayed...)
+		if i == 0 {
+			assert.Len(t, <-utd.confirmed, 1)
+		} else {
+			assert.Empty(t, <-utd.confirmed)
+		}
+		assert.Equal(t, "0xf00d", utd.storedConfig(t, contractAddr))
+		assert.Equal(t, `{"config":"0xf00d"}`, utd.liveContractConfig(t, contractAddr))
+	}
+
+	assert.Empty(t, utd.configChanged)
+	assert.Equal(t, []string{`{"config":"0xfeedbeef"}`, `{"config":"0xcafe"}`, `{"config":"0xf00d"}`}, batchConfigs)
+	assert.Equal(t, []int{2, 2, 2}, batchEventCounts)
+	assert.Equal(t, "0xf00d", utd.storedIndexedConfig(t, contractAddr))
+}
+
+func TestReplayedRegistrationMovesIndexedConfigBack(t *testing.T) {
+	utd, contractAddr, done := newUpgradeTestDomain(t, false)
+	defer done()
+
+	upgrade := upgradeEvent(contractAddr, "0xcafe", 0)
+	utd.handleBatch(t, upgrade)
+	assert.Empty(t, <-utd.confirmed)
+	assert.Equal(t, contractAddr, <-utd.configChanged)
+	live := utd.liveContract(t, contractAddr)
+	assert.Equal(t, `{"config":"0xcafe"}`, live.ContractConfig().ContractConfigJson)
+
+	utd.handleBatch(t, registrationEvent(*utd.d.registryAddress, utd.deployTX, contractAddr, "0xfeedbeef", 0))
+	assert.Len(t, <-utd.confirmed, 1)
+	assert.Empty(t, utd.configChanged)
+	assert.Equal(t, "0xcafe", utd.storedConfig(t, contractAddr))
+	assert.Equal(t, configLocation(upgrade), utd.storedContract(t, contractAddr).ConfigLocation)
+	assert.Equal(t, "0xfeedbeef", utd.storedIndexedConfig(t, contractAddr))
+	assert.Same(t, live, utd.liveContract(t, contractAddr))
+}
+
+func TestIndexedContractLoadedAfterReplayedRegistrationIsCached(t *testing.T) {
+	utd, contractAddr, done := newUpgradeTestDomain(t, false)
+	defer done()
+
+	utd.handleBatch(t, upgradeEvent(contractAddr, "0xcafe", 0))
+	assert.Empty(t, <-utd.confirmed)
+	assert.Equal(t, contractAddr, <-utd.configChanged)
+	live := utd.liveContract(t, contractAddr)
+
+	utd.handleBatch(t, registrationEvent(*utd.d.registryAddress, utd.deployTX, contractAddr, "0xfeedbeef", 0))
+	assert.Len(t, <-utd.confirmed, 1)
+
+	batchConfigs := utd.recordBatchConfigs()
+	utd.initConfigs = nil
+	utd.handleBatch(t, domainEvent(contractAddr, 1))
+	assert.Empty(t, <-utd.confirmed)
+	utd.handleBatch(t, domainEvent(contractAddr, 2))
+	assert.Empty(t, <-utd.confirmed)
+
+	assert.Equal(t, []string{`{"config":"0xfeedbeef"}`, `{"config":"0xfeedbeef"}`}, *batchConfigs)
+	assert.Equal(t, []string{"0xfeedbeef"}, utd.initConfigs)
+	assert.Same(t, live, utd.liveContract(t, contractAddr))
+}
+
+func TestRegistrationOfDifferentDeploymentDoesNotResetConfig(t *testing.T) {
+	utd, contractAddr, done := newUpgradeTestDomain(t, false)
+	defer done()
+
+	utd.handleBatch(t, registrationEvent(*utd.d.registryAddress, uuid.New(), contractAddr, "0xcafe", 0))
+
+	assert.Len(t, <-utd.confirmed, 1)
+	assert.Empty(t, utd.configChanged)
+	assert.Equal(t, "0xfeedbeef", utd.storedConfig(t, contractAddr))
+	assert.Equal(t, "0xfeedbeef", utd.storedIndexedConfig(t, contractAddr))
+}
+
+func TestRegistrationForInstanceOfAnotherRegistryDoesNotResetConfig(t *testing.T) {
+	utd, _, done := newUpgradeTestDomain(t, false)
+	defer done()
+
+	deployTX := uuid.New()
+	otherInstance := *pldtypes.RandAddress()
+	err := utd.dm.persistence.NOTX().DB(utd.ctx).Table("private_smart_contracts").Create(&PrivateSmartContract{
+		DeployTX:           deployTX,
+		RegistryAddress:    *pldtypes.RandAddress(),
+		Address:            otherInstance,
+		ConfigBytes:        pldtypes.HexBytes{0xfe, 0xed},
+		IndexedConfigBytes: pldtypes.HexBytes{0xfe, 0xed},
+	}).Error
+	require.NoError(t, err)
+
+	utd.handleBatch(t, registrationEvent(*utd.d.registryAddress, deployTX, otherInstance, "0xcafe", 0))
+
+	assert.Len(t, <-utd.confirmed, 1)
+	assert.Empty(t, utd.configChanged)
+	assert.Equal(t, "0xfeed", utd.storedConfig(t, otherInstance))
+	assert.Equal(t, "0xfeed", utd.storedIndexedConfig(t, otherInstance))
+}
+
+func TestUpgradeInRolledBackBatchNotCached(t *testing.T) {
+	utd, contractAddr, done := newUpgradeTestDomain(t, false)
+	defer done()
+
+	utd.tp.Functions.HandleEventBatch = func(ctx context.Context, req *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	err := utd.dm.persistence.Transaction(utd.ctx, func(ctx context.Context, dbTX persistence.DBTX) error {
+		return utd.d.handleEventBatch(ctx, dbTX, &blockindexer.EventDeliveryBatch{
+			BatchID: uuid.New(),
+			Events:  []*pldapi.EventWithData{upgradeEvent(contractAddr, "0xcafe", 0), domainEvent(contractAddr, 1)},
+		})
+	})
+	assert.Regexp(t, "pop", err)
+
+	assert.Empty(t, utd.configChanged)
+	assert.Equal(t, `{"config":"0xfeedbeef"}`, utd.liveContractConfig(t, contractAddr))
+
+	batchConfigs := utd.recordBatchConfigs()
+	utd.handleBatch(t, domainEvent(contractAddr, 2))
+	assert.Empty(t, <-utd.confirmed)
+	assert.Equal(t, []string{`{"config":"0xfeedbeef"}`}, *batchConfigs)
 }

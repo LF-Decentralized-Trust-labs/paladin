@@ -18,8 +18,7 @@ package domainmgr
 import (
 	"context"
 	"encoding/json"
-	"maps"
-	"slices"
+	"fmt"
 	"sort"
 
 	"github.com/LFDT-Paladin/paladin/common/go/pkg/i18n"
@@ -49,7 +48,7 @@ type pscEventBatch struct {
 	psc *domainContract
 }
 
-func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persistence.DBTX, batch *blockindexer.EventDeliveryBatch) ([]*pldapi.EventWithData, txCompletionsOrdered, error) {
+func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persistence.DBTX, batch *blockindexer.EventDeliveryBatch) ([]*pldapi.EventWithData, []pldtypes.EthAddress, txCompletionsOrdered, error) {
 
 	var contracts []*PrivateSmartContract
 	var txCompletions txCompletionsOrdered
@@ -68,14 +67,16 @@ func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persisten
 
 			var parsedEvent event_PaladinRegisterSmartContract_V0
 			if err := json.Unmarshal(ev.Data, &parsedEvent); err != nil {
-				return nil, nil, i18n.WrapError(ctx, err, msgs.MsgDomainInvalidRegistryEventData, ev.SoliditySignature)
+				return nil, nil, nil, i18n.WrapError(ctx, err, msgs.MsgDomainInvalidRegistryEventData, ev.SoliditySignature)
 			}
 			txID := parsedEvent.TXId.UUIDFirst16()
 			contracts = append(contracts, &PrivateSmartContract{
-				DeployTX:        txID,
-				RegistryAddress: ev.Address,
-				Address:         parsedEvent.Instance,
-				ConfigBytes:     parsedEvent.Config,
+				DeployTX:           txID,
+				RegistryAddress:    ev.Address,
+				Address:            parsedEvent.Instance,
+				ConfigBytes:        parsedEvent.Config,
+				ConfigLocation:     configLocation(ev),
+				IndexedConfigBytes: parsedEvent.Config,
 			})
 
 			// We don't know if the private transaction will match, but we need to pass it over
@@ -102,40 +103,74 @@ func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX persisten
 		}
 	}
 
-	// Insert the batch of new contracts in this DB transaction (we do this before we call the domain to process the events)
+	// Insert the batch of new contracts in this DB transaction (we do this before we call the domain to process the events).
+	// A replayed registration moves the indexed config back to that at registration, so the events that follow it are
+	// dispatched with the config in force when they were emitted.
+	var registered []pldtypes.EthAddress
 	if len(contracts) > 0 {
 		err := dbTX.DB(ctx).
 			Table("private_smart_contracts").
 			Clauses(clause.OnConflict{
 				Columns:   []clause.Column{{Name: "address"}},
-				DoNothing: true, // immutable
+				DoUpdates: clause.AssignmentColumns([]string{"indexed_config_bytes"}),
+				Where: clause.Where{Exprs: []clause.Expression{clause.Expr{
+					SQL: "private_smart_contracts.domain_address = excluded.domain_address AND private_smart_contracts.deploy_tx = excluded.deploy_tx",
+				}}},
 			}).
 			Create(contracts).
 			Error
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
+		}
+		for _, c := range contracts {
+			registered = append(registered, c.Address)
 		}
 	}
 
-	return nonRegisterEvents, txCompletions, nil
+	return nonRegisterEvents, registered, txCompletions, nil
 }
 
-// applyUpgrade replaces the stored configuration of a contract registered under this domain's registry with
-// that announced by the contract. Returns false when the contract is not registered here.
-func (d *domain) applyUpgrade(ctx context.Context, dbTX persistence.DBTX, addr pldtypes.EthAddress, upgrade *event_PaladinUpgradeSmartContractConfig_V0) (bool, error) {
+// Fixed width, so that locations compare in chain order as strings
+func configLocation(ev *pldapi.EventWithData) *string {
+	location := fmt.Sprintf("%016x%08x%08x", ev.BlockNumber, ev.TransactionIndex, ev.LogIndex)
+	return &location
+}
+
+// applyUpgrade sets the indexed config of a contract registered under this domain's registry to that announced by the
+// contract, and its live config too unless a later event wrote it.
+func (d *domain) applyUpgrade(ctx context.Context, dbTX persistence.DBTX, ev *pldapi.EventWithData, upgrade *event_PaladinUpgradeSmartContractConfig_V0) (registered bool, liveConfigChanged bool, err error) {
+	// indexed_config_bytes stores whatever config the event stream has indexed up to. It may go backwards in the
+	// case of event replay so is always written when a config upgrade event is received.It ensures that all
+	// domain events are handled with the config that was in use when they were emitted.
 	res := dbTX.DB(ctx).
 		Table("private_smart_contracts").
-		Where("address = ? AND domain_address = ?", addr, d.registryAddress).
-		Update("config_bytes", upgrade.Config)
+		Where("address = ? AND domain_address = ?", ev.Address, d.registryAddress).
+		Update("indexed_config_bytes", upgrade.Config)
 	if res.Error != nil {
-		return false, res.Error
+		return false, false, res.Error
 	}
 	if res.RowsAffected == 0 {
-		log.L(ctx).Debugf("Discarding upgrade of %s that is not registered under domain %s", addr, d.name)
-		return false, nil
+		log.L(ctx).Debugf("Discarding upgrade of %s that is not registered under domain %s", ev.Address, d.name)
+		return false, false, nil
 	}
-	log.L(ctx).Infof("Configuration of smart contract %s upgraded", addr)
-	return true, nil
+	// config_bytes stores the latest config for any component that needs the "live" config. The column
+	// is only updated if this event is newer than the event which wrote the last config. Location will only
+	// be null if the row was written before config upgrade was supported, meaning a null location must be for
+	// a registration event and is always older than an upgrade.
+	location := configLocation(ev)
+	res = dbTX.DB(ctx).
+		Table("private_smart_contracts").
+		Where("address = ? AND (config_location IS NULL OR config_location < ?)", ev.Address, *location).
+		Updates(map[string]any{"config_bytes": upgrade.Config, "config_location": location})
+	if res.Error != nil {
+		return false, false, res.Error
+	}
+	if res.RowsAffected == 0 {
+		log.L(ctx).Infof("Replayed upgrade of smart contract %s applied to the indexed configuration only", ev.Address)
+		return true, false, nil
+	}
+	log.L(ctx).Infof("Configuration of smart contract %s upgraded", ev.Address)
+	return true, true, nil
 }
 
 // Direct waiters are only used by the testbed
@@ -149,34 +184,38 @@ func (dm *domainManager) notifyWaiters(txCompletions txCompletionsOrdered) {
 	}
 }
 
-// Splits each contract's events into batches at its upgrades, keeping event order. Upgraded config is persisted
-// here in between batches, so that the next batch of events can be dispatched with the contract config that was
-// in place at the time the events were emitted.
-func (d *domain) batchEventsByContractConfig(ctx context.Context, dbTX persistence.DBTX, batchID string, events []*pldapi.EventWithData) ([]*pscEventBatch, []pldtypes.EthAddress, error) {
+// Splits each contract's events into batches at its upgrades, keeping event order. Upgraded indexed config is
+// persisted here in between batches, so that the next batch of events can be dispatched with the contract config
+// that was in place at the time the events were emitted.
+func (d *domain) batchEventsByContractConfig(ctx context.Context, dbTX persistence.DBTX, batchID string, registered []pldtypes.EthAddress, events []*pldapi.EventWithData) ([]*pscEventBatch, error) {
 
 	var batches []*pscEventBatch
-	configChanged := make(map[pldtypes.EthAddress]bool)
+	indexedConfigWritten := make(map[pldtypes.EthAddress]bool)
+	for _, addr := range registered {
+		indexedConfigWritten[addr] = true
+	}
+	liveConfigChanged := make(map[pldtypes.EthAddress]bool)
 	current := make(map[pldtypes.EthAddress]*pscEventBatch)
 
 	for _, ev := range events {
 		if ev.SoliditySignature == eventSolSig_PaladinUpgradeSmartContractConfig_V0 {
 			var upgrade event_PaladinUpgradeSmartContractConfig_V0
 			if err := json.Unmarshal(ev.Data, &upgrade); err != nil {
-				return nil, nil, i18n.WrapError(ctx, err, msgs.MsgDomainInvalidRegistryEventData, ev.SoliditySignature)
+				return nil, i18n.WrapError(ctx, err, msgs.MsgDomainInvalidRegistryEventData, ev.SoliditySignature)
 			}
-			upgraded, err := d.applyUpgrade(ctx, dbTX, ev.Address, &upgrade)
+			upgraded, liveChanged, err := d.applyUpgrade(ctx, dbTX, ev, &upgrade)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			if upgraded {
-				d.dm.contractCache.Delete(ev.Address)
 				// any batches created before the upgrade still exist in the batches slice but deleting
 				// the reference to it from current will force the next event for this contract to
 				// start a new batch which will be initialised with the new confix
 				delete(current, ev.Address)
-				// record which contracts have changed config so their sequencers can be restarted
-				// once the DB TX is committed
-				configChanged[ev.Address] = true
+				indexedConfigWritten[ev.Address] = true
+				if liveChanged {
+					liveConfigChanged[ev.Address] = true
+				}
 			}
 			continue
 		}
@@ -185,9 +224,9 @@ func (d *domain) batchEventsByContractConfig(ctx context.Context, dbTX persisten
 			// Note: hits will be cached, but events from unrecognized contracts will always
 			// result in a cache miss and a database lookup
 			// TODO: revisit if we should optimize this
-			_, psc, err := d.dm.getSmartContractCached(ctx, dbTX, ev.Address)
+			psc, err := d.indexedSmartContract(ctx, dbTX, ev.Address, indexedConfigWritten[ev.Address])
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			if psc == nil {
 				log.L(ctx).Debugf("Discarding %s event for unregistered address %s", ev.SoliditySignature, ev.Address)
@@ -219,19 +258,63 @@ func (d *domain) batchEventsByContractConfig(ctx context.Context, dbTX persisten
 		})
 	}
 
-	return batches, slices.Collect(maps.Keys(configChanged)), nil
+	dbTX.AddPostCommit(func(txCtx context.Context) {
+		// Once the config changes have been written, the cached domain used for handling events
+		// must be invalidated, so the next batch of events has a domain loaded with the newly committed
+		// config
+		for addr := range indexedConfigWritten {
+			d.indexedContracts.Delete(addr)
+		}
+		// Consumers holding a live configuration this batch replaced are refreshed here, before the indexer moves on,
+		// so no work started after this batch is indexed can run against it.
+		for addr := range liveConfigChanged {
+			d.dm.contractConfigChanged(txCtx, addr)
+		}
+	})
+
+	return batches, nil
+}
+
+// Returns the contract initialized with its indexed config, or nil when it is not a valid contract of a domain configured
+// on this node. skipCache must be set for a contract whose row this DB TX wrote, as the write is not yet committed.
+func (d *domain) indexedSmartContract(ctx context.Context, dbTX persistence.DBTX, addr pldtypes.EthAddress, skipCache bool) (*domainContract, error) {
+	if !skipCache {
+		if dc, isCached := d.indexedContracts.Get(addr); isCached {
+			return dc, nil
+		}
+	}
+	var contracts []*PrivateSmartContract
+	err := dbTX.DB(ctx).
+		Table("private_smart_contracts").
+		Where("address = ?", addr).
+		Limit(1).
+		Find(&contracts).
+		Error
+	if err != nil || len(contracts) == 0 {
+		return nil, err
+	}
+	def := contracts[0]
+	contractDomain := d.dm.getDomainByAddressOrNil(&def.RegistryAddress)
+	if contractDomain == nil {
+		return nil, nil
+	}
+	_, dc, err := contractDomain.newDomainContract(ctx, dbTX, def, def.IndexedConfigBytes)
+	if dc != nil && !skipCache {
+		d.indexedContracts.Set(addr, dc)
+	}
+	return dc, err
 }
 
 func (d *domain) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, batch *blockindexer.EventDeliveryBatch) error {
 
 	// First index any domain contract deployments
-	nonDeployEvents, txCompletions, err := d.dm.registrationIndexer(ctx, dbTX, batch)
+	nonDeployEvents, registered, txCompletions, err := d.dm.registrationIndexer(ctx, dbTX, batch)
 	if err != nil {
 		return err
 	}
 
 	// Then divide remaining events by contract and configuration, and dispatch to the appropriate domain context
-	batches, configChanged, err := d.batchEventsByContractConfig(ctx, dbTX, batch.BatchID.String(), nonDeployEvents)
+	batches, err := d.batchEventsByContractConfig(ctx, dbTX, batch.BatchID.String(), registered, nonDeployEvents)
 	if err != nil {
 		return err
 	}
@@ -298,12 +381,6 @@ func (d *domain) handleEventBatch(ctx context.Context, dbTX persistence.DBTX, ba
 	}
 
 	dbTX.AddPostCommit(func(txCtx context.Context) {
-		// Consumers holding the old configuration are refreshed here, before the indexer moves on, so no work
-		// started after this batch is indexed can run against it. The cache is evicted again because a contract
-		// with no events after its upgrade in this batch was never reloaded.
-		for _, addr := range configChanged {
-			d.dm.contractConfigChanged(txCtx, addr)
-		}
 		// Enqueue the full sorted batch to the sequencer for ordered background processing.
 		// Handling of the completions on the queue must happen outside of this goroutine, which is critical path for the
 		// event indexer of the Paladin node.
