@@ -619,3 +619,23 @@ func TestHandleLifecycleNoBlockNack(t *testing.T) {
 	require.Empty(t, es.receiptSubs)
 
 }
+
+func TestDeliverMessageBatchSubscriptionClosed(t *testing.T) {
+	_, _, gm, _, done := newTestGroupManagerWithWebSocketRPC(t)
+	defer done()
+
+	ctrl := &mockRPCAsyncControl{}
+	es := gm.rpcEventStreams
+	sub := &receiptListenerSubscription{
+		es:        es,
+		ctrl:      ctrl,
+		acksNacks: make(chan *rpcAckNack, 1),
+		closed:    make(chan struct{}),
+	}
+	es.receiptSubs["sub1"] = sub
+
+	sub.ConnectionClosed()
+
+	err := sub.DeliverMessageBatch(t.Context(), 1, []*pldapi.PrivacyGroupMessage{{ID: uuid.New()}})
+	require.Regexp(t, "PD012520.*sub1", err)
+}
