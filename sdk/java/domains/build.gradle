@@ -1,4 +1,6 @@
 // Domain helpers for Noto, Pente, and Zeto protocols
 dependencies {
+    implementation project(':sdk:java:core')
     implementation project(':sdk:java:client')
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.6'
 }
