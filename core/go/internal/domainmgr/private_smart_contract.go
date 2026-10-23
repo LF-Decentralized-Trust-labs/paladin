@@ -36,11 +36,13 @@ import (
 )
 
 type PrivateSmartContract struct {
-	DeployTX        uuid.UUID           `json:"deployTransaction"   gorm:"column:deploy_tx"`
-	RegistryAddress pldtypes.EthAddress `json:"domainAddress"       gorm:"column:domain_address"`
-	Address         pldtypes.EthAddress `json:"address"             gorm:"column:address"`
-	ConfigBytes     pldtypes.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
-	Created         pldtypes.Timestamp  `json:"created"             gorm:"column:created;autoCreateTime:nano"`
+	DeployTX           uuid.UUID           `json:"deployTransaction"   gorm:"column:deploy_tx"`
+	RegistryAddress    pldtypes.EthAddress `json:"domainAddress"       gorm:"column:domain_address"`
+	Address            pldtypes.EthAddress `json:"address"             gorm:"column:address"`
+	ConfigBytes        pldtypes.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
+	ConfigLocation     *string             `json:"configLocation"      gorm:"column:config_location"`      // of the event that wrote ConfigBytes
+	IndexedConfigBytes pldtypes.HexBytes   `json:"indexedConfigBytes"  gorm:"column:indexed_config_bytes"` // in force at the event stream's position
+	Created            pldtypes.Timestamp  `json:"created"             gorm:"column:created;autoCreateTime:nano"`
 }
 
 type domainContract struct {
@@ -62,7 +64,16 @@ const (
 	pscValid
 )
 
-func (d *domain) initSmartContract(ctx context.Context, dbTX persistence.DBTX, def *PrivateSmartContract) (pscLoadResult, *domainContract, error) {
+func (d *domain) initSmartContract(ctx context.Context, dbTX persistence.DBTX, def *PrivateSmartContract, loadGeneration uint64) (pscLoadResult, *domainContract, error) {
+	loadResult, dc, err := d.newDomainContract(ctx, dbTX, def, def.ConfigBytes)
+	// Only cache valid ones
+	if dc != nil {
+		d.dm.cacheContract(dc, loadGeneration)
+	}
+	return loadResult, dc, err
+}
+
+func (d *domain) newDomainContract(ctx context.Context, dbTX persistence.DBTX, def *PrivateSmartContract, configBytes pldtypes.HexBytes) (pscLoadResult, *domainContract, error) {
 	dc := &domainContract{
 		dm:   d.dm,
 		d:    d,
@@ -80,11 +91,11 @@ func (d *domain) initSmartContract(ctx context.Context, dbTX persistence.DBTX, d
 
 	res, err := d.api.InitContract(ctx, &prototk.InitContractRequest{
 		ContractAddress: def.Address.String(),
-		ContractConfig:  def.ConfigBytes,
+		ContractConfig:  configBytes,
 		PrivacyGroup:    privacyGroup,
 	})
 	if err != nil {
-		log.L(ctx).Errorf("Error initializing smart contract address: %s with config %s :  %s", def.Address, def.ConfigBytes.HexString(), err.Error())
+		log.L(ctx).Errorf("Error initializing smart contract address: %s with config %s :  %s", def.Address, configBytes.HexString(), err.Error())
 		return pscInitError, nil, err
 	}
 	if !res.Valid {
@@ -92,9 +103,6 @@ func (d *domain) initSmartContract(ctx context.Context, dbTX persistence.DBTX, d
 		return pscInvalid, nil, nil
 	}
 	dc.config = res.ContractConfig
-
-	// Only cache valid ones
-	d.dm.contractCache.Set(dc.info.Address, dc)
 	return pscValid, dc, nil
 }
 

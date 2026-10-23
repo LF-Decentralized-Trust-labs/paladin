@@ -43,6 +43,7 @@ import (
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/query"
 	"github.com/LFDT-Paladin/paladin/sdk/go/pkg/retry"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/algorithms"
+	"github.com/LFDT-Paladin/paladin/toolkit/pkg/cache"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/prototk"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/signpayloads"
 	"github.com/LFDT-Paladin/paladin/toolkit/pkg/verifiers"
@@ -66,6 +67,8 @@ type domain struct {
 	config      *prototk.DomainConfig
 	schemasByID map[string]components.Schema
 	eventStream blockindexer.EventStream
+
+	indexedContracts cache.Cache[pldtypes.EthAddress, *domainContract] // only used by the event stream's batch handler, one batch at a time
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
@@ -101,6 +104,7 @@ func (dm *domainManager) newDomain(name string, conf *pldconf.DomainConfig, toDo
 		schemasByID:          make(map[string]components.Schema),
 		inFlight:             make(map[string]*inFlightDomainRequest),
 		completionQueue:      make(chan []*components.TxCompletion, 100),
+		indexedContracts:     cache.NewCache[pldtypes.EthAddress, *domainContract](&dm.conf.DomainManager.ContractCache, &pldconf.PaladinConfigDefaults.DomainManager.ContractCache),
 	}
 	if conf.DefaultGasLimit != nil {
 		d.defaultGasLimit = pldtypes.HexUint64(*conf.DefaultGasLimit)

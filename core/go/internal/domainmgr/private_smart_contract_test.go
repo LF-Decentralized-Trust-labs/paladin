@@ -93,7 +93,7 @@ func goodPSC(t *testing.T, td *testDomainContext) *domainContract {
 		RegistryAddress: *d.RegistryAddress(),
 		Address:         pldtypes.EthAddress(pldtypes.RandBytes(20)),
 		ConfigBytes:     []byte{0xfe, 0xed, 0xbe, 0xef},
-	})
+	}, d.dm.getContractCacheGeneration())
 	require.NoError(t, err)
 	require.Equal(t, pscValid, loadResult)
 	require.NotNil(t, psc.ContractConfig())
@@ -1891,7 +1891,7 @@ func TestInitSmartContractQueryGroupsError(t *testing.T) {
 		RegistryAddress: *td.d.RegistryAddress(),
 		Address:         *pldtypes.RandAddress(),
 		ConfigBytes:     []byte{},
-	})
+	}, td.d.dm.getContractCacheGeneration())
 	require.Error(t, err)
 	assert.Regexp(t, "groups query error", err)
 	assert.Equal(t, pscInitError, loadResult)
@@ -1928,7 +1928,7 @@ func TestInitSmartContractWithPrivacyGroup(t *testing.T) {
 		RegistryAddress: *td.d.RegistryAddress(),
 		Address:         *pldtypes.RandAddress(),
 		ConfigBytes:     []byte{},
-	})
+	}, td.d.dm.getContractCacheGeneration())
 	require.NoError(t, err)
 	assert.Equal(t, pscValid, loadResult)
 	assert.NotNil(t, psc)
