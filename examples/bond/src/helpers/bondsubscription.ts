@@ -35,14 +35,16 @@ export const newBondSubscription = async (
   if (bondSubscriptionConstructor === undefined) {
     throw new Error("Bond subscription constructor not found");
   }
-  const address = await pente
-    .deploy({
-      abi: bondSubscription.abi,
-      bytecode: bondSubscription.bytecode,
-      from: from.lookup,
-      inputs: params,
-    })
-    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
+  const deployFuture = pente.deploy({
+    abi: bondSubscription.abi,
+    bytecode: bondSubscription.bytecode,
+    from: from.lookup,
+    inputs: params,
+  });
+  const address = await deployFuture.waitForDeploy(DEFAULT_POLL_TIMEOUT);
+  if (address) {
+    console.log(`  txID: ${await deployFuture.id}`);
+  }
   return address ? new BondSubscription(pente, address) : undefined;
 };
 

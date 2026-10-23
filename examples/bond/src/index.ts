@@ -60,15 +60,15 @@ async function main(): Promise<boolean> {
   // Create a Noto token to represent cash
   logger.log("Deploying Noto cash token...");
   const notoFactory = new NotoFactory(paladin1, "noto");
-  const notoCash = await notoFactory
-    .newNoto(cashIssuer, {
-      name: "BOND",
-      symbol: "BOND",
-      notary: cashIssuer,
-      notaryMode: "basic",
-    })
-    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
+  const notoCashFuture = notoFactory.newNoto(cashIssuer, {
+    name: "BOND",
+    symbol: "BOND",
+    notary: cashIssuer,
+    notaryMode: "basic",
+  });
+  const notoCash = await notoCashFuture.waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(notoCash)) return false;
+  logger.log(`  txID: ${await notoCashFuture.id}`);
 
   // Issue some cash
   logger.log("Issuing cash...");
@@ -80,6 +80,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
 
   let balanceInvestor = await notoCash.balanceOf(cashIssuer, {
     account: investor.lookup,
@@ -99,6 +100,7 @@ async function main(): Promise<boolean> {
     })
     .waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(issuerCustodianGroup)) return false;
+  logger.log(`  txID: ${issuerCustodianGroup.group.genesisTransaction}`);
 
   // Deploy the public bond tracker on the base ledger (controlled by the privacy group)
   logger.log("Creating public bond tracker...");
@@ -124,6 +126,7 @@ async function main(): Promise<boolean> {
     return false;
   }
   logger.log(`Success! address: ${receipt.contractAddress}`);
+  logger.log(`  txID: ${txID}`);
   const bondTrackerPublicAddress = receipt.contractAddress;
 
   // Deploy private bond tracker to the issuer/custodian privacy group
@@ -138,22 +141,22 @@ async function main(): Promise<boolean> {
 
   // Deploy Noto token to represent bond
   logger.log("Deploying Noto bond token...");
-  const notoBond = await notoFactory
-    .newNoto(bondIssuer, {
-      name: "BOND",
-      symbol: "BOND",
-      notary: bondCustodian,
-      notaryMode: "hooks",
-      options: {
-        hooks: {
-          privateGroup: issuerCustodianGroup,
-          publicAddress: issuerCustodianGroup.address,
-          privateAddress: bondTracker.address,
-        },
+  const notoBondFuture = notoFactory.newNoto(bondIssuer, {
+    name: "BOND",
+    symbol: "BOND",
+    notary: bondCustodian,
+    notaryMode: "hooks",
+    options: {
+      hooks: {
+        privateGroup: issuerCustodianGroup,
+        publicAddress: issuerCustodianGroup.address,
+        privateAddress: bondTracker.address,
       },
-    })
-    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
+    },
+  });
+  const notoBond = await notoBondFuture.waitForDeploy(DEFAULT_POLL_TIMEOUT);
   if (!checkDeploy(notoBond)) return false;
+  logger.log(`  txID: ${await notoBondFuture.id}`);
 
   // Deploy the atom factory on the base ledger
   logger.log("Creating atom factory...");
@@ -171,6 +174,7 @@ async function main(): Promise<boolean> {
     return false;
   }
   logger.log(`Success! address: ${receipt.contractAddress}`);
+  logger.log(`  txID: ${txID}`);
   const atomFactoryAddress = receipt.contractAddress;
 
   // Issue the bond to the custodian
@@ -183,6 +187,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
   let balanceCustodian = await notoBond.balanceOf(bondIssuer, {
     account: bondCustodian.lookup,
   });
@@ -200,14 +205,17 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
 
   // Add allowed investors
+  logger.log("Adding investor to allow list...");
   const investorList = await bondTracker.investorList(bondIssuer);
   receipt = await investorList
     .using(paladin2)
     .addInvestor(bondCustodian, { addr: await investor.address() })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
 
   // Create a Pente privacy group between the bond investor and bond custodian
   logger.log("Creating investor+custodian privacy group...");
@@ -224,6 +232,7 @@ async function main(): Promise<boolean> {
     return false;
   }
   logger.log(`Success! address: ${investorCustodianGroup.address}`);
+  logger.log(`  txID: ${investorCustodianGroup.group.genesisTransaction}`);
 
   // Deploy bond subscription to the investor/custodian privacy group
   logger.log("Creating private bond subscription...");
@@ -249,6 +258,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
   receipt = await paladin3.ptx.getTransactionReceiptFull(receipt.id);
   let domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const cashLockId = domainReceipt?.lockInfo?.lockId;
@@ -276,6 +286,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT, true);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
   domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const cashUnlockCall = domainReceipt?.lockInfo?.unlockCall;
   if (cashUnlockCall === undefined) {
@@ -293,6 +304,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT, true);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
   domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const bondLockId = domainReceipt?.lockInfo?.lockId;
   if (bondLockId === undefined) {
@@ -319,6 +331,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT, true);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
   domainReceipt = receipt?.domainReceipt as INotoDomainReceipt | undefined;
   const assetUnlockCall = domainReceipt?.lockInfo?.unlockCall;
   if (assetUnlockCall === undefined) {
@@ -336,6 +349,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
 
   // Pass the prepared bond transfer to the subscription contract
   logger.log("Adding bond information to subscription request...");
@@ -347,6 +361,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
 
   // Prepare bond distribution (initializes atomic swap of payment and bond units)
   logger.log("Generating atom for bond distribution...");
@@ -355,6 +370,7 @@ async function main(): Promise<boolean> {
     .distribute(bondCustodian)
     .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
 
   // Extract the address of the created Atom
   const events = await paladin2.bidx.decodeTransactionEvents(
@@ -370,7 +386,7 @@ async function main(): Promise<boolean> {
     return false;
   }
   const atomAddress = atomDeployedEvent.data.addr;
-  logger.log("Success!");
+  logger.log(`Success! atom address: ${atomAddress}`);
 
   // Approve the payment transfer
   logger.log("Approving payment transfer...");
@@ -383,6 +399,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
 
   // Approve the bond transfer
   logger.log("Approving bond transfer...");
@@ -395,6 +412,7 @@ async function main(): Promise<boolean> {
     })
     .waitForReceipt(DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
 
   // Execute the atomic transfer
   logger.log("Distributing bond...");
@@ -408,6 +426,7 @@ async function main(): Promise<boolean> {
   });
   receipt = await paladin2.pollForReceipt(txID, DEFAULT_POLL_TIMEOUT);
   if (!checkReceipt(receipt)) return false;
+  logger.log(`  txID: ${receipt.id}`);
 
 
   // it can take some time for the balances to update, so loop until all balances are >0

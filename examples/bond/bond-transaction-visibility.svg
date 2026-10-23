@@ -1,0 +1,458 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1610" height="1766" viewBox="0 0 1610 1766" font-family="Helvetica, Arial, sans-serif" font-size="12">
+<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#b91c1c"/><line x1="0" y1="0" x2="0" y2="6" stroke="#991b1b" stroke-width="2"/></pattern></defs>
+<rect width="1610" height="1766" fill="#ffffff"/>
+<text x="20" y="34" font-size="22" font-weight="700" fill="#111827">Paladin bond example — who sees what, transaction by transaction</text>
+<text x="20" y="56" font-size="13" fill="#4b5563">Each row is one Paladin transaction from examples/bond/src/index.ts. Each node column shows what that node holds for it: the transaction itself, the indexed receipt, and the private states (spent / read / confirmed / info).</text>
+<text x="20" y="74" font-size="13" fill="#4b5563">Noto shares a state only with the notary, the sender, and the owners of the coins involved. Pente shares with the members of the privacy group. A public transaction is tracked only by the node that submitted it.</text>
+<rect x="700" y="96" width="290" height="44" rx="6" fill="#f3f4f6" stroke="#d1d5db"/>
+<text x="710" y="114" font-size="15" font-weight="700" fill="#111827">Node1 <tspan font-weight="400" fill="#374151">— cashIssuer · bondIssuer</tspan></text>
+<text x="710" y="131" font-size="11" fill="#6b7280">notary of the cash token</text>
+<rect x="1000" y="96" width="290" height="44" rx="6" fill="#f3f4f6" stroke="#d1d5db"/>
+<text x="1010" y="114" font-size="15" font-weight="700" fill="#111827">Node2 <tspan font-weight="400" fill="#374151">— bondCustodian</tspan></text>
+<text x="1010" y="131" font-size="11" fill="#6b7280">notary of the bond token · member of both groups</text>
+<rect x="1300" y="96" width="290" height="44" rx="6" fill="#f3f4f6" stroke="#d1d5db"/>
+<text x="1310" y="114" font-size="15" font-weight="700" fill="#111827">Node3 <tspan font-weight="400" fill="#374151">— investor</tspan></text>
+<text x="1310" y="131" font-size="11" fill="#6b7280">member of investor+custodian group</text>
+<text x="20" y="126" font-size="12" font-weight="700" fill="#374151">TX</text>
+<text x="78" y="126" font-size="12" font-weight="700" fill="#374151">Step</text>
+<text x="392" y="126" font-size="12" font-weight="700" fill="#374151">Domain</text>
+<text x="572" y="126" font-size="12" font-weight="700" fill="#374151">Submitted by</text>
+<rect x="20" y="150" width="1570" height="24" fill="#e5e7eb" rx="4"/>
+<text x="30" y="166" font-size="12" font-weight="700" fill="#1f2937" letter-spacing="0.5">SETUP: CASH TOKEN</text>
+<line x1="20" y1="233" x2="1590" y2="233" stroke="#e5e7eb"/>
+<text x="20" y="202" font-size="14" font-weight="700" fill="#111827">TX1</text>
+<text x="78" y="200" font-size="13" font-weight="600" fill="#111827">Deploy Noto cash token</text>
+<text x="78" y="217" font-size="11" fill="#6b7280">notary = cashIssuer@node1, basic mode</text>
+<rect x="392" y="192" width="164" height="22" rx="11" fill="#0f766e"/>
+<text x="474" y="207" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · cash</text>
+<text x="572" y="200" font-size="13" font-weight="700" fill="#111827">Node1</text>
+<text x="572" y="216" font-size="11" fill="#6b7280">cashIssuer</text>
+<rect x="700" y="186" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="710" y="202" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="710" y="216" font-size="11" fill="#ffffff">deployer</text>
+<rect x="1000" y="186" width="290" height="40" rx="5" fill="#6b7280" stroke="#6b7280"/>
+<text x="1010" y="202" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">RECEIPT, NO STATES</text>
+<text x="1010" y="216" font-size="11" fill="#ffffff">deploy event only</text>
+<rect x="1300" y="186" width="290" height="40" rx="5" fill="#6b7280" stroke="#6b7280"/>
+<text x="1310" y="202" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">RECEIPT, NO STATES</text>
+<text x="1310" y="216" font-size="11" fill="#ffffff">deploy event only</text>
+<line x1="20" y1="287" x2="1590" y2="287" stroke="#e5e7eb"/>
+<text x="20" y="256" font-size="14" font-weight="700" fill="#111827">TX2</text>
+<text x="78" y="254" font-size="13" font-weight="600" fill="#111827">Issue cash</text>
+<text x="78" y="271" font-size="11" fill="#6b7280">mint 100000 cash → investor</text>
+<rect x="392" y="246" width="164" height="22" rx="11" fill="#0f766e"/>
+<text x="474" y="261" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · cash</text>
+<text x="572" y="254" font-size="13" font-weight="700" fill="#111827">Node1</text>
+<text x="572" y="270" font-size="11" fill="#6b7280">cashIssuer</text>
+<rect x="700" y="240" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="710" y="256" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="710" y="270" font-size="11" fill="#ffffff">sender + notary</text>
+<rect x="1000" y="240" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="1010" y="256" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="1010" y="270" font-size="11" fill="#ffffff">not a party</text>
+<rect x="1300" y="240" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="1310" y="256" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="1310" y="270" font-size="11" fill="#ffffff">coin owner</text>
+<rect x="20" y="288" width="1570" height="24" fill="#e5e7eb" rx="4"/>
+<text x="30" y="304" font-size="12" font-weight="700" fill="#1f2937" letter-spacing="0.5">SETUP: ISSUER + CUSTODIAN GROUP AND BOND TOKEN</text>
+<line x1="20" y1="371" x2="1590" y2="371" stroke="#e5e7eb"/>
+<text x="20" y="340" font-size="14" font-weight="700" fill="#111827">TX3</text>
+<text x="78" y="338" font-size="13" font-weight="600" fill="#111827">Create issuer+custodian privacy group</text>
+<text x="78" y="355" font-size="11" fill="#6b7280">members: bondIssuer@node1, bondCustodian@node2</text>
+<rect x="392" y="330" width="164" height="22" rx="11" fill="#1d4ed8"/>
+<text x="474" y="345" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Pente · issuer+custodian</text>
+<text x="572" y="338" font-size="13" font-weight="700" fill="#111827">Node1</text>
+<text x="572" y="354" font-size="11" fill="#6b7280">bondIssuer</text>
+<rect x="700" y="324" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="710" y="340" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="710" y="354" font-size="11" fill="#ffffff">member</text>
+<rect x="1000" y="324" width="290" height="40" rx="5" fill="#6b7280" stroke="#6b7280"/>
+<text x="1010" y="340" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">RECEIPT, NO STATES</text>
+<text x="1010" y="354" font-size="11" fill="#ffffff">member (genesis shared)</text>
+<rect x="1300" y="324" width="290" height="40" rx="5" fill="#6b7280" stroke="#6b7280"/>
+<text x="1310" y="340" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">RECEIPT, NO STATES</text>
+<text x="1310" y="354" font-size="11" fill="#ffffff">deploy event only</text>
+<line x1="20" y1="425" x2="1590" y2="425" stroke="#e5e7eb"/>
+<text x="20" y="394" font-size="14" font-weight="700" fill="#111827">TX4</text>
+<text x="78" y="392" font-size="13" font-weight="600" fill="#111827">Deploy public bond tracker</text>
+<text x="78" y="409" font-size="11" fill="#6b7280">base-ledger contract owned by the group</text>
+<rect x="392" y="384" width="164" height="22" rx="11" fill="#4b5563"/>
+<text x="474" y="399" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Public · base ledger</text>
+<text x="572" y="392" font-size="13" font-weight="700" fill="#111827">Node1</text>
+<text x="572" y="408" font-size="11" fill="#6b7280">bondIssuer</text>
+<rect x="700" y="378" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="710" y="394" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="710" y="408" font-size="11" fill="#ffffff">public tx</text>
+<rect x="1000" y="378" width="290" height="40" rx="5" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="4 3"/>
+<text x="1010" y="394" font-size="11" font-weight="700" fill="#6b7280" letter-spacing="0.4">NOT IN PALADIN</text>
+<text x="1010" y="408" font-size="11" fill="#6b7280">base ledger only</text>
+<rect x="1300" y="378" width="290" height="40" rx="5" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="4 3"/>
+<text x="1310" y="394" font-size="11" font-weight="700" fill="#6b7280" letter-spacing="0.4">NOT IN PALADIN</text>
+<text x="1310" y="408" font-size="11" fill="#6b7280">base ledger only</text>
+<line x1="20" y1="479" x2="1590" y2="479" stroke="#e5e7eb"/>
+<text x="20" y="448" font-size="14" font-weight="700" fill="#111827">TX5</text>
+<text x="78" y="446" font-size="13" font-weight="600" fill="#111827">Deploy private bond tracker</text>
+<text x="78" y="463" font-size="11" fill="#6b7280">BondTracker + InvestorList in issuer+custodian group</text>
+<rect x="392" y="438" width="164" height="22" rx="11" fill="#1d4ed8"/>
+<text x="474" y="453" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Pente · issuer+custodian</text>
+<text x="572" y="446" font-size="13" font-weight="700" fill="#111827">Node1</text>
+<text x="572" y="462" font-size="11" fill="#6b7280">bondIssuer</text>
+<rect x="700" y="432" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="710" y="448" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="710" y="462" font-size="11" fill="#ffffff">member: 4 accounts + info</text>
+<rect x="1000" y="432" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="1010" y="448" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="1010" y="462" font-size="11" fill="#ffffff">member: 4 accounts + info</text>
+<rect x="1300" y="432" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="1310" y="448" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="1310" y="462" font-size="11" fill="#ffffff">not a member</text>
+<line x1="20" y1="533" x2="1590" y2="533" stroke="#e5e7eb"/>
+<text x="20" y="502" font-size="14" font-weight="700" fill="#111827">TX6</text>
+<text x="78" y="500" font-size="13" font-weight="600" fill="#111827">Deploy Noto bond token</text>
+<text x="78" y="517" font-size="11" fill="#6b7280">notary = bondCustodian@node2, hooks → private tracker</text>
+<rect x="392" y="492" width="164" height="22" rx="11" fill="#7c3aed"/>
+<text x="474" y="507" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · bond</text>
+<text x="572" y="500" font-size="13" font-weight="700" fill="#111827">Node1</text>
+<text x="572" y="516" font-size="11" fill="#6b7280">bondIssuer</text>
+<rect x="700" y="486" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="710" y="502" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="710" y="516" font-size="11" fill="#ffffff">deployer</text>
+<rect x="1000" y="486" width="290" height="40" rx="5" fill="#6b7280" stroke="#6b7280"/>
+<text x="1010" y="502" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">RECEIPT, NO STATES</text>
+<text x="1010" y="516" font-size="11" fill="#ffffff">deploy event only</text>
+<rect x="1300" y="486" width="290" height="40" rx="5" fill="#6b7280" stroke="#6b7280"/>
+<text x="1310" y="502" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">RECEIPT, NO STATES</text>
+<text x="1310" y="516" font-size="11" fill="#ffffff">deploy event only</text>
+<line x1="20" y1="587" x2="1590" y2="587" stroke="#e5e7eb"/>
+<text x="20" y="556" font-size="14" font-weight="700" fill="#111827">TX7</text>
+<text x="78" y="554" font-size="13" font-weight="600" fill="#111827">Deploy atom factory</text>
+<text x="78" y="571" font-size="11" fill="#6b7280">base-ledger contract</text>
+<rect x="392" y="546" width="164" height="22" rx="11" fill="#4b5563"/>
+<text x="474" y="561" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Public · base ledger</text>
+<text x="572" y="554" font-size="13" font-weight="700" fill="#111827">Node1</text>
+<text x="572" y="570" font-size="11" fill="#6b7280">bondIssuer</text>
+<rect x="700" y="540" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="710" y="556" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="710" y="570" font-size="11" fill="#ffffff">public tx</text>
+<rect x="1000" y="540" width="290" height="40" rx="5" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="4 3"/>
+<text x="1010" y="556" font-size="11" font-weight="700" fill="#6b7280" letter-spacing="0.4">NOT IN PALADIN</text>
+<text x="1010" y="570" font-size="11" fill="#6b7280">base ledger only</text>
+<rect x="1300" y="540" width="290" height="40" rx="5" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="4 3"/>
+<text x="1310" y="556" font-size="11" font-weight="700" fill="#6b7280" letter-spacing="0.4">NOT IN PALADIN</text>
+<text x="1310" y="570" font-size="11" fill="#6b7280">base ledger only</text>
+<line x1="20" y1="641" x2="1590" y2="641" stroke="#e5e7eb"/>
+<text x="20" y="610" font-size="14" font-weight="700" fill="#111827">TX8</text>
+<text x="78" y="608" font-size="13" font-weight="600" fill="#111827">Issue bond</text>
+<text x="78" y="625" font-size="11" fill="#6b7280">mint 1000 bond → bondCustodian</text>
+<rect x="392" y="600" width="164" height="22" rx="11" fill="#7c3aed"/>
+<text x="474" y="615" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · bond</text>
+<text x="572" y="608" font-size="13" font-weight="700" fill="#111827">Node1</text>
+<text x="572" y="624" font-size="11" fill="#6b7280">bondIssuer</text>
+<rect x="700" y="594" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="710" y="610" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="710" y="624" font-size="11" fill="#ffffff">sender (minter)</text>
+<rect x="1000" y="594" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="1010" y="610" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="1010" y="624" font-size="11" fill="#ffffff">notary + coin owner</text>
+<rect x="1300" y="594" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="1310" y="610" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="1310" y="624" font-size="11" fill="#ffffff">not a party</text>
+<rect x="20" y="642" width="1570" height="24" fill="#e5e7eb" rx="4"/>
+<text x="30" y="658" font-size="12" font-weight="700" fill="#1f2937" letter-spacing="0.5">DISTRIBUTION SET-UP</text>
+<line x1="20" y1="725" x2="1590" y2="725" stroke="#e5e7eb"/>
+<text x="20" y="694" font-size="14" font-weight="700" fill="#111827">TX9</text>
+<text x="78" y="692" font-size="13" font-weight="600" fill="#111827">Begin distribution</text>
+<text x="78" y="709" font-size="11" fill="#6b7280">bondTracker.beginDistribution</text>
+<rect x="392" y="684" width="164" height="22" rx="11" fill="#1d4ed8"/>
+<text x="474" y="699" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Pente · issuer+custodian</text>
+<text x="572" y="692" font-size="13" font-weight="700" fill="#111827">Node2</text>
+<text x="572" y="708" font-size="11" fill="#6b7280">bondCustodian</text>
+<rect x="700" y="678" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="710" y="694" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="710" y="708" font-size="11" fill="#ffffff">member</text>
+<rect x="1000" y="678" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1010" y="694" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1010" y="708" font-size="11" fill="#ffffff">member</text>
+<rect x="1300" y="678" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="1310" y="694" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="1310" y="708" font-size="11" fill="#ffffff">not a member</text>
+<line x1="20" y1="779" x2="1590" y2="779" stroke="#e5e7eb"/>
+<text x="20" y="748" font-size="14" font-weight="700" fill="#111827">TX10</text>
+<text x="78" y="746" font-size="13" font-weight="600" fill="#111827">Add investor to allow list</text>
+<text x="78" y="763" font-size="11" fill="#6b7280">investorList.addInvestor(investor)</text>
+<rect x="392" y="738" width="164" height="22" rx="11" fill="#1d4ed8"/>
+<text x="474" y="753" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Pente · issuer+custodian</text>
+<text x="572" y="746" font-size="13" font-weight="700" fill="#111827">Node2</text>
+<text x="572" y="762" font-size="11" fill="#6b7280">bondCustodian</text>
+<rect x="700" y="732" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="710" y="748" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="710" y="762" font-size="11" fill="#ffffff">member</text>
+<rect x="1000" y="732" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1010" y="748" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1010" y="762" font-size="11" fill="#ffffff">member</text>
+<rect x="1300" y="732" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="1310" y="748" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="1310" y="762" font-size="11" fill="#ffffff">not a member</text>
+<line x1="20" y1="833" x2="1590" y2="833" stroke="#e5e7eb"/>
+<text x="20" y="802" font-size="14" font-weight="700" fill="#111827">TX11</text>
+<text x="78" y="800" font-size="13" font-weight="600" fill="#111827">Create investor+custodian privacy group</text>
+<text x="78" y="817" font-size="11" fill="#6b7280">members: investor@node3, bondCustodian@node2</text>
+<rect x="392" y="792" width="164" height="22" rx="11" fill="#be185d"/>
+<text x="474" y="807" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Pente · investor+custodian</text>
+<text x="572" y="800" font-size="13" font-weight="700" fill="#111827">Node3</text>
+<text x="572" y="816" font-size="11" fill="#6b7280">investor</text>
+<rect x="700" y="786" width="290" height="40" rx="5" fill="#6b7280" stroke="#6b7280"/>
+<text x="710" y="802" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">RECEIPT, NO STATES</text>
+<text x="710" y="816" font-size="11" fill="#ffffff">deploy event only</text>
+<rect x="1000" y="786" width="290" height="40" rx="5" fill="#6b7280" stroke="#6b7280"/>
+<text x="1010" y="802" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">RECEIPT, NO STATES</text>
+<text x="1010" y="816" font-size="11" fill="#ffffff">member (genesis shared)</text>
+<rect x="1300" y="786" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1310" y="802" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1310" y="816" font-size="11" fill="#ffffff">member</text>
+<line x1="20" y1="887" x2="1590" y2="887" stroke="#e5e7eb"/>
+<text x="20" y="856" font-size="14" font-weight="700" fill="#111827">TX12</text>
+<text x="78" y="854" font-size="13" font-weight="600" fill="#111827">Deploy private bond subscription</text>
+<text x="78" y="871" font-size="11" fill="#6b7280">BondSubscription in investor+custodian group</text>
+<rect x="392" y="846" width="164" height="22" rx="11" fill="#be185d"/>
+<text x="474" y="861" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Pente · investor+custodian</text>
+<text x="572" y="854" font-size="13" font-weight="700" fill="#111827">Node3</text>
+<text x="572" y="870" font-size="11" fill="#6b7280">investor</text>
+<rect x="700" y="840" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="710" y="856" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="710" y="870" font-size="11" fill="#ffffff">not a member</text>
+<rect x="1000" y="840" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="1010" y="856" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="1010" y="870" font-size="11" fill="#ffffff">member: 2 accounts + info</text>
+<rect x="1300" y="840" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1310" y="856" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1310" y="870" font-size="11" fill="#ffffff">member: 2 accounts + info</text>
+<rect x="20" y="888" width="1570" height="24" fill="#e5e7eb" rx="4"/>
+<text x="30" y="904" font-size="12" font-weight="700" fill="#1f2937" letter-spacing="0.5">PREPARE THE SWAP LEGS</text>
+<line x1="20" y1="971" x2="1590" y2="971" stroke="#e5e7eb"/>
+<text x="20" y="940" font-size="14" font-weight="700" fill="#111827">TX13</text>
+<text x="78" y="938" font-size="13" font-weight="600" fill="#111827">Lock cash</text>
+<text x="78" y="955" font-size="11" fill="#6b7280">lock 100 of the investor&#x27;s 100000 cash (+ lock info)</text>
+<rect x="392" y="930" width="164" height="22" rx="11" fill="#0f766e"/>
+<text x="474" y="945" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · cash</text>
+<text x="572" y="938" font-size="13" font-weight="700" fill="#111827">Node3</text>
+<text x="572" y="954" font-size="11" fill="#6b7280">investor</text>
+<rect x="700" y="924" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="710" y="940" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="710" y="954" font-size="11" fill="#ffffff">notary</text>
+<rect x="1000" y="924" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="1010" y="940" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="1010" y="954" font-size="11" fill="#ffffff">not a party</text>
+<rect x="1300" y="924" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1310" y="940" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1310" y="954" font-size="11" fill="#ffffff">sender + owner</text>
+<line x1="20" y1="1025" x2="1590" y2="1025" stroke="#e5e7eb"/>
+<text x="20" y="994" font-size="14" font-weight="700" fill="#111827">TX14</text>
+<text x="78" y="992" font-size="13" font-weight="600" fill="#111827">Prepare cash unlock</text>
+<text x="78" y="1009" font-size="11" fill="#6b7280">prepare unlock: 100 locked cash → bondCustodian</text>
+<rect x="392" y="984" width="164" height="22" rx="11" fill="#0f766e"/>
+<text x="474" y="999" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · cash</text>
+<text x="572" y="992" font-size="13" font-weight="700" fill="#111827">Node3</text>
+<text x="572" y="1008" font-size="11" fill="#6b7280">investor</text>
+<rect x="700" y="978" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="710" y="994" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="710" y="1008" font-size="11" fill="#ffffff">notary</text>
+<rect x="1000" y="978" width="290" height="40" rx="5" fill="#d97706" stroke="#d97706"/>
+<text x="1010" y="994" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">PARTIAL</text>
+<text x="1010" y="1008" font-size="11" fill="#ffffff">6 info states (prepared outputs); lock states hidden</text>
+<rect x="1300" y="978" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1310" y="994" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1310" y="1008" font-size="11" fill="#ffffff">sender + owner</text>
+<line x1="20" y1="1079" x2="1590" y2="1079" stroke="#e5e7eb"/>
+<text x="20" y="1048" font-size="14" font-weight="700" fill="#111827">TX15</text>
+<text x="78" y="1046" font-size="13" font-weight="600" fill="#111827">Lock bond</text>
+<text x="78" y="1063" font-size="11" fill="#6b7280">lock 100 of the custodian&#x27;s 1000 bond (+ lock info)</text>
+<rect x="392" y="1038" width="164" height="22" rx="11" fill="#7c3aed"/>
+<text x="474" y="1053" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · bond</text>
+<text x="572" y="1046" font-size="13" font-weight="700" fill="#111827">Node2</text>
+<text x="572" y="1062" font-size="11" fill="#6b7280">bondCustodian</text>
+<rect x="700" y="1032" width="290" height="40" rx="5" fill="#d97706" stroke="#d97706"/>
+<text x="710" y="1048" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">PARTIAL</text>
+<text x="710" y="1062" font-size="11" fill="#ffffff">only the spent 1000 coin (from TX8); rest hidden</text>
+<rect x="1000" y="1032" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1010" y="1048" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1010" y="1062" font-size="11" fill="#ffffff">sender + owner + notary</text>
+<rect x="1300" y="1032" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="1310" y="1048" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="1310" y="1062" font-size="11" fill="#ffffff">not a party</text>
+<line x1="20" y1="1133" x2="1590" y2="1133" stroke="#e5e7eb"/>
+<text x="20" y="1102" font-size="14" font-weight="700" fill="#111827">TX16</text>
+<text x="78" y="1100" font-size="13" font-weight="600" fill="#111827">Prepare bond unlock</text>
+<text x="78" y="1117" font-size="11" fill="#6b7280">prepare unlock: 100 locked bond → investor</text>
+<rect x="392" y="1092" width="164" height="22" rx="11" fill="#7c3aed"/>
+<text x="474" y="1107" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · bond</text>
+<text x="572" y="1100" font-size="13" font-weight="700" fill="#111827">Node2</text>
+<text x="572" y="1116" font-size="11" fill="#6b7280">bondCustodian</text>
+<rect x="700" y="1086" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="710" y="1102" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="710" y="1116" font-size="11" fill="#ffffff">not a party</text>
+<rect x="1000" y="1086" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1010" y="1102" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1010" y="1116" font-size="11" fill="#ffffff">sender + owner + notary</text>
+<rect x="1300" y="1086" width="290" height="40" rx="5" fill="#d97706" stroke="#d97706"/>
+<text x="1310" y="1102" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">PARTIAL</text>
+<text x="1310" y="1116" font-size="11" fill="#ffffff">6 info states (prepared outputs); lock states hidden</text>
+<line x1="20" y1="1187" x2="1590" y2="1187" stroke="#e5e7eb"/>
+<text x="20" y="1156" font-size="14" font-weight="700" fill="#111827">TX17</text>
+<text x="78" y="1154" font-size="13" font-weight="600" fill="#111827">Add payment info to subscription</text>
+<text x="78" y="1171" font-size="11" fill="#6b7280">bondSubscription.preparePayment(cash unlock call)</text>
+<rect x="392" y="1146" width="164" height="22" rx="11" fill="#be185d"/>
+<text x="474" y="1161" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Pente · investor+custodian</text>
+<text x="572" y="1154" font-size="13" font-weight="700" fill="#111827">Node3</text>
+<text x="572" y="1170" font-size="11" fill="#6b7280">investor</text>
+<rect x="700" y="1140" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="710" y="1156" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="710" y="1170" font-size="11" fill="#ffffff">not a member</text>
+<rect x="1000" y="1140" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="1010" y="1156" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="1010" y="1170" font-size="11" fill="#ffffff">member</text>
+<rect x="1300" y="1140" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1310" y="1156" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1310" y="1170" font-size="11" fill="#ffffff">member</text>
+<line x1="20" y1="1241" x2="1590" y2="1241" stroke="#e5e7eb"/>
+<text x="20" y="1210" font-size="14" font-weight="700" fill="#111827">TX18</text>
+<text x="78" y="1208" font-size="13" font-weight="600" fill="#111827">Add bond info to subscription</text>
+<text x="78" y="1225" font-size="11" fill="#6b7280">bondSubscription.prepareBond(bond unlock call)</text>
+<rect x="392" y="1200" width="164" height="22" rx="11" fill="#be185d"/>
+<text x="474" y="1215" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Pente · investor+custodian</text>
+<text x="572" y="1208" font-size="13" font-weight="700" fill="#111827">Node2</text>
+<text x="572" y="1224" font-size="11" fill="#6b7280">bondCustodian</text>
+<rect x="700" y="1194" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="710" y="1210" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="710" y="1224" font-size="11" fill="#ffffff">not a member</text>
+<rect x="1000" y="1194" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1010" y="1210" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1010" y="1224" font-size="11" fill="#ffffff">member</text>
+<rect x="1300" y="1194" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="1310" y="1210" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="1310" y="1224" font-size="11" fill="#ffffff">member</text>
+<rect x="20" y="1242" width="1570" height="24" fill="#e5e7eb" rx="4"/>
+<text x="30" y="1258" font-size="12" font-weight="700" fill="#1f2937" letter-spacing="0.5">SETTLE ATOMICALLY</text>
+<line x1="20" y1="1325" x2="1590" y2="1325" stroke="#e5e7eb"/>
+<text x="20" y="1294" font-size="14" font-weight="700" fill="#111827">TX19</text>
+<text x="78" y="1292" font-size="13" font-weight="600" fill="#111827">Generate atom</text>
+<text x="78" y="1309" font-size="11" fill="#6b7280">bondSubscription.distribute → ext. call deploys Atom</text>
+<rect x="392" y="1284" width="164" height="22" rx="11" fill="#be185d"/>
+<text x="474" y="1299" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Pente · investor+custodian</text>
+<text x="572" y="1292" font-size="13" font-weight="700" fill="#111827">Node2</text>
+<text x="572" y="1308" font-size="11" fill="#6b7280">bondCustodian</text>
+<rect x="700" y="1278" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="710" y="1294" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="710" y="1308" font-size="11" fill="#ffffff">not a member</text>
+<rect x="1000" y="1278" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1010" y="1294" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1010" y="1308" font-size="11" fill="#ffffff">member</text>
+<rect x="1300" y="1278" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="1310" y="1294" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="1310" y="1308" font-size="11" fill="#ffffff">member</text>
+<line x1="20" y1="1379" x2="1590" y2="1379" stroke="#e5e7eb"/>
+<text x="20" y="1348" font-size="14" font-weight="700" fill="#111827">TX20</text>
+<text x="78" y="1346" font-size="13" font-weight="600" fill="#111827">Approve payment transfer</text>
+<text x="78" y="1363" font-size="11" fill="#6b7280">delegate cash lock → Atom</text>
+<rect x="392" y="1338" width="164" height="22" rx="11" fill="#0f766e"/>
+<text x="474" y="1353" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · cash</text>
+<text x="572" y="1346" font-size="13" font-weight="700" fill="#111827">Node3</text>
+<text x="572" y="1362" font-size="11" fill="#6b7280">investor</text>
+<rect x="700" y="1332" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="710" y="1348" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="710" y="1362" font-size="11" fill="#ffffff">notary</text>
+<rect x="1000" y="1332" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="1010" y="1348" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="1010" y="1362" font-size="11" fill="#ffffff">not a party</text>
+<rect x="1300" y="1332" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1310" y="1348" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1310" y="1362" font-size="11" fill="#ffffff">sender + owner</text>
+<line x1="20" y1="1433" x2="1590" y2="1433" stroke="#e5e7eb"/>
+<text x="20" y="1402" font-size="14" font-weight="700" fill="#111827">TX21</text>
+<text x="78" y="1400" font-size="13" font-weight="600" fill="#111827">Approve bond transfer</text>
+<text x="78" y="1417" font-size="11" fill="#6b7280">delegate bond lock → Atom</text>
+<rect x="392" y="1392" width="164" height="22" rx="11" fill="#7c3aed"/>
+<text x="474" y="1407" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · bond</text>
+<text x="572" y="1400" font-size="13" font-weight="700" fill="#111827">Node2</text>
+<text x="572" y="1416" font-size="11" fill="#6b7280">bondCustodian</text>
+<rect x="700" y="1386" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="710" y="1402" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="710" y="1416" font-size="11" fill="#ffffff">not a party</text>
+<rect x="1000" y="1386" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1010" y="1402" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1010" y="1416" font-size="11" fill="#ffffff">sender + owner + notary</text>
+<rect x="1300" y="1386" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="1310" y="1402" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="1310" y="1416" font-size="11" fill="#ffffff">not a party</text>
+<line x1="20" y1="1487" x2="1590" y2="1487" stroke="#e5e7eb"/>
+<text x="20" y="1456" font-size="14" font-weight="700" fill="#111827">TX22</text>
+<text x="78" y="1454" font-size="13" font-weight="600" fill="#111827">Distribute bond</text>
+<text x="78" y="1471" font-size="11" fill="#6b7280">Atom.execute() on base ledger; emits TX23 + TX24</text>
+<rect x="392" y="1446" width="164" height="22" rx="11" fill="#4b5563"/>
+<text x="474" y="1461" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Public · base ledger</text>
+<text x="572" y="1454" font-size="13" font-weight="700" fill="#111827">Node2</text>
+<text x="572" y="1470" font-size="11" fill="#6b7280">bondCustodian</text>
+<rect x="700" y="1440" width="290" height="40" rx="5" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="4 3"/>
+<text x="710" y="1456" font-size="11" font-weight="700" fill="#6b7280" letter-spacing="0.4">NOT IN PALADIN</text>
+<text x="710" y="1470" font-size="11" fill="#6b7280">base ledger only</text>
+<rect x="1000" y="1440" width="290" height="40" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="1010" y="1456" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="1010" y="1470" font-size="11" fill="#ffffff">public tx</text>
+<rect x="1300" y="1440" width="290" height="40" rx="5" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="4 3"/>
+<text x="1310" y="1456" font-size="11" font-weight="700" fill="#6b7280" letter-spacing="0.4">NOT IN PALADIN</text>
+<text x="1310" y="1470" font-size="11" fill="#6b7280">base ledger only</text>
+<line x1="20" y1="1541" x2="1590" y2="1541" stroke="#e5e7eb"/>
+<text x="20" y="1510" font-size="14" font-weight="700" fill="#111827">TX23</text>
+<text x="78" y="1508" font-size="13" font-weight="600" fill="#111827">Cash unlock (event of TX22)</text>
+<text x="78" y="1525" font-size="11" fill="#6b7280">locked 100 cash → 100 cash owned by bondCustodian</text>
+<rect x="392" y="1500" width="164" height="22" rx="11" fill="#0f766e"/>
+<text x="474" y="1515" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · cash</text>
+<text x="572" y="1508" font-size="12" fill="#374151">on-chain event</text>
+<text x="572" y="1524" font-size="11" fill="#6b7280">Atom contract</text>
+<rect x="700" y="1494" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="710" y="1510" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="710" y="1524" font-size="11" fill="#ffffff">notary</text>
+<rect x="1000" y="1494" width="290" height="40" rx="5" fill="#d97706" stroke="#d97706"/>
+<text x="1010" y="1510" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">PARTIAL</text>
+<text x="1010" y="1524" font-size="11" fill="#ffffff">new coin + info; spent lock states hidden</text>
+<rect x="1300" y="1494" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="1310" y="1510" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="1310" y="1524" font-size="11" fill="#ffffff">owner of spent states + prepared outputs</text>
+<line x1="20" y1="1595" x2="1590" y2="1595" stroke="#e5e7eb"/>
+<text x="20" y="1564" font-size="14" font-weight="700" fill="#111827">TX24</text>
+<text x="78" y="1562" font-size="13" font-weight="600" fill="#111827">Bond unlock (event of TX22)</text>
+<text x="78" y="1579" font-size="11" fill="#6b7280">locked 100 bond → 100 bond owned by investor</text>
+<rect x="392" y="1554" width="164" height="22" rx="11" fill="#7c3aed"/>
+<text x="474" y="1569" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Noto · bond</text>
+<text x="572" y="1562" font-size="12" fill="#374151">on-chain event</text>
+<text x="572" y="1578" font-size="11" fill="#6b7280">Atom contract</text>
+<rect x="700" y="1548" width="290" height="40" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="710" y="1564" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="710" y="1578" font-size="11" fill="#ffffff">not a party</text>
+<rect x="1000" y="1548" width="290" height="40" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="1010" y="1564" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="1010" y="1578" font-size="11" fill="#ffffff">notary + owner of spent states</text>
+<rect x="1300" y="1548" width="290" height="40" rx="5" fill="#d97706" stroke="#d97706"/>
+<text x="1310" y="1564" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.4">PARTIAL</text>
+<text x="1310" y="1578" font-size="11" fill="#ffffff">new coin + info; spent lock states hidden</text>
+<text x="20" y="1622" font-size="13" font-weight="700" fill="#111827">Legend</text>
+<rect x="20" y="1632" width="150" height="34" rx="5" fill="#1e3a5f" stroke="#1e3a5f"/>
+<text x="28" y="1653" font-size="10.5" font-weight="700" fill="#ffffff" letter-spacing="0.4">SUBMITTED HERE</text>
+<text x="180" y="1653" font-size="11.5" fill="#374151">has the transaction, receipt and all private states</text>
+<rect x="540" y="1632" width="150" height="34" rx="5" fill="#15803d" stroke="#15803d"/>
+<text x="548" y="1653" font-size="10.5" font-weight="700" fill="#ffffff" letter-spacing="0.4">ALL STATES</text>
+<text x="700" y="1653" font-size="11.5" fill="#374151">receipt and all private states (received via state distribution)</text>
+<rect x="1060" y="1632" width="150" height="34" rx="5" fill="#d97706" stroke="#d97706"/>
+<text x="1068" y="1653" font-size="10.5" font-weight="700" fill="#ffffff" letter-spacing="0.4">PARTIAL</text>
+<text x="1220" y="1653" font-size="11.5" fill="#374151">receipt and some states; the rest are &#x27;unavailable&#x27;</text>
+<rect x="20" y="1678" width="150" height="34" rx="5" fill="url(#hatch)" stroke="#b91c1c"/>
+<text x="28" y="1699" font-size="10.5" font-weight="700" fill="#ffffff" letter-spacing="0.4">STATES UNAVAILABLE</text>
+<text x="180" y="1699" font-size="11.5" fill="#374151">receipt indexed from chain only; no private state data</text>
+<rect x="540" y="1678" width="150" height="34" rx="5" fill="#6b7280" stroke="#6b7280"/>
+<text x="548" y="1699" font-size="10.5" font-weight="700" fill="#ffffff" letter-spacing="0.4">RECEIPT, NO STATES</text>
+<text x="700" y="1699" font-size="11.5" fill="#374151">deploy event seen on chain; the tx produces no private states</text>
+<rect x="1060" y="1678" width="150" height="34" rx="5" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="4 3"/>
+<text x="1068" y="1699" font-size="10.5" font-weight="700" fill="#6b7280" letter-spacing="0.4">NOT IN PALADIN</text>
+<text x="1220" y="1699" font-size="11.5" fill="#374151">ordinary public tx; only the submitter&#x27;s Paladin tracks it</text>
+<text x="20" y="1748" font-size="11" fill="#6b7280">Captured from a live three-node run on 2026-10-22 by querying ptx_getTransactionFull, ptx_getTransactionReceiptFull and ptx_getStateReceipt on each node. TX23 and TX24 are the Noto receipts Paladin indexes from the events emitted by the Atom.execute() call in TX22; they have no submitting node.</text>
+</svg>

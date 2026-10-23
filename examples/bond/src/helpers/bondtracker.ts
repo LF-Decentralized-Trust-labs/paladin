@@ -24,14 +24,16 @@ export const newBondTracker = async (
   from: PaladinVerifier,
   params: BondTrackerConstructorParams
 ) => {
-  const address = await pente
-    .deploy({
-      abi: bondTracker.abi,
-      bytecode: bondTracker.bytecode,
-      from: from.lookup,
-      inputs: params,
-    })
-    .waitForDeploy(DEFAULT_POLL_TIMEOUT);
+  const deployFuture = pente.deploy({
+    abi: bondTracker.abi,
+    bytecode: bondTracker.bytecode,
+    from: from.lookup,
+    inputs: params,
+  });
+  const address = await deployFuture.waitForDeploy(DEFAULT_POLL_TIMEOUT);
+  if (address) {
+    console.log(`  txID: ${await deployFuture.id}`);
+  }
   return address ? new BondTracker(pente, address) : undefined;
 };
 
